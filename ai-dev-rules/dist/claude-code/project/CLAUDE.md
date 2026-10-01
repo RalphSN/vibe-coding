@@ -1,0 +1,3 @@
+<!-- 由 scripts/build.ps1 產生，請改 ai-dev-rules 的來源（core/、skills/、workflows/、agents/、enforcement/），不要改這裡 -->
+
+@AGENTS.md

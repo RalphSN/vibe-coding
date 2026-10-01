@@ -1,0 +1,19 @@
+# 由 scripts/build.ps1 產生，請改 ai-dev-rules 的來源（core/、skills/、workflows/、agents/、enforcement/），不要改這裡
+# 由 ai-dev-rules 提供。Codex permissions profile：在工作區擋下 .env 讀寫。
+# 注意：permissions profile 與 sandbox_mode / [sandbox_workspace_write] 互斥，只能擇一。
+# install.ps1 只有加上 -IncludeCodexPermissions 才會寫進 ~/.codex/config.toml。
+# default_permissions 是頂層鍵，必須放在所有 [table] 之前；install.ps1 會處理位置。
+
+[permissions.ai-dev-rules]
+description = "ai-dev-rules: workspace write, deny secret files"
+extends = ":workspace"
+
+[permissions.ai-dev-rules.filesystem]
+glob_scan_max_depth = 4
+
+[permissions.ai-dev-rules.filesystem.":workspace_roots"]
+"**/.env" = "deny"
+"**/.env.local" = "deny"
+"**/.env.*.local" = "deny"
+"**/.env.production" = "deny"
+"**/.env.development" = "deny"

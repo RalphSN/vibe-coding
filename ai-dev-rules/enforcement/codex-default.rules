@@ -1,0 +1,58 @@
+# 由 ai-dev-rules 提供。Codex execpolicy 規則（Starlark）。
+# 多條符合時取最嚴格的決策。測試：codex execpolicy check --pretty --rules <此檔> -- git push --force
+
+prefix_rule(
+    pattern = ["git", "push", "--force"],
+    decision = "forbidden",
+    justification = "禁止 force push（ai-dev-rules 03-git）",
+    match = ["git push --force origin main"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", "-f"],
+    decision = "forbidden",
+    justification = "禁止 force push（ai-dev-rules 03-git）",
+    match = ["git push -f"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", "--force-with-lease"],
+    decision = "forbidden",
+    justification = "禁止 force push（ai-dev-rules 03-git）",
+    match = ["git push --force-with-lease"],
+)
+
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "forbidden",
+    justification = "禁止 rm -rf（ai-dev-rules 05-security）",
+    match = ["rm -rf build"],
+)
+
+prefix_rule(
+    pattern = ["rm", "-fr"],
+    decision = "forbidden",
+    justification = "禁止 rm -rf（ai-dev-rules 05-security）",
+    match = ["rm -fr build"],
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "push 需要使用者確認（ai-dev-rules 03-git）",
+    match = ["git push origin feat/login"],
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "prompt",
+    justification = "會丟掉未提交的改動",
+    match = ["git reset --hard HEAD~1"],
+)
+
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "prompt",
+    justification = "會刪除未追蹤的檔案",
+    match = ["git clean -fd"],
+)

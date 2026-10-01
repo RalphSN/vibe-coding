@@ -1,0 +1,30 @@
+{
+  "description": "ai-dev-rules hooks",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \".codex/hooks/block-dangerous.ps1\" -Tool codex",
+            "timeout": 30,
+            "statusMessage": "ai-dev-rules: checking command"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \".codex/hooks/format-on-edit.ps1\" -Tool codex",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
