@@ -40,17 +40,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe",
-            "timeout": 30,
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-dangerous.ps1",
-              "-Tool",
-              "claude"
-            ]
+            "shell": "bash",
+            "command": "for p in powershell.exe pwsh /usr/local/bin/pwsh /opt/homebrew/bin/pwsh; do command -v \"$p\" >/dev/null 2>&1 && break; done; \"$p\" -NoProfile -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-dangerous.ps1\" -Tool claude",
+            "timeout": 30
           }
         ]
       }
@@ -61,17 +53,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe",
-            "timeout": 60,
-            "args": [
-              "-NoProfile",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/format-on-edit.ps1",
-              "-Tool",
-              "claude"
-            ]
+            "shell": "bash",
+            "command": "for p in powershell.exe pwsh /usr/local/bin/pwsh /opt/homebrew/bin/pwsh; do command -v \"$p\" >/dev/null 2>&1 && break; done; \"$p\" -NoProfile -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/format-on-edit.ps1\" -Tool claude",
+            "timeout": 60
           }
         ]
       }

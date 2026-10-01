@@ -1,10 +1,12 @@
 # ai-dev-rules
 
-一套開發規範寫一次，由腳本轉成 Claude Code、Codex、Antigravity 三種格式。
+一套開發規範寫一次，由腳本轉成 Claude Code、Codex、Antigravity 三種格式。Windows 與 macOS 都能用。
 
 ## 3 步安裝
 
-在這個資料夾開 PowerShell（5.1 或 7 都可以）：
+**Windows**：在這個資料夾開 PowerShell（5.1 或 7 都可以），照下面的指令執行。
+
+**macOS**：先裝 PowerShell 7（`brew install powershell`，或從 [PowerShell 官方 GitHub](https://github.com/PowerShell/PowerShell/releases) 下載 `.pkg`），hook 也要靠它執行。之後把下面指令開頭的 `powershell -ExecutionPolicy Bypass -File` 換成 `pwsh`，例如 `pwsh scripts/build.ps1`。
 
 1. 產生並檢查：
    ```powershell
@@ -23,6 +25,19 @@
 只裝一個工具：加 `-Tool claude`、`-Tool codex` 或 `-Tool antigravity`。
 被覆寫或合併的舊檔會備份到 `backups/<時間戳>/`。
 
+### Windows 與 macOS 的差異
+
+| 項目 | Windows | macOS |
+|---|---|---|
+| 執行腳本 | `powershell -ExecutionPolicy Bypass -File scripts/xxx.ps1` | `pwsh scripts/xxx.ps1` |
+| hook 用的 PowerShell | 內建的 `powershell.exe`（5.1） | `pwsh`（PowerShell 7） |
+| Claude Code 專案層 hook | 需要 Git Bash（裝 Git for Windows 就有） | 系統內建 bash |
+
+- `dist/` 的內容和在哪個系統 build 無關，兩邊 build 出來一模一樣。
+- 全域設定（`~/.claude`、`~/.codex`、`~/.gemini`）每台電腦各裝一次，install.ps1 會自動填入這台電腦的 PowerShell 路徑。
+- 專案層設定可以 commit 進 git 兩邊共用：Claude Code 和 Codex 的 hook 會在執行時自動挑 `powershell.exe` 或 `pwsh`。
+- 例外是 Antigravity 的 `.agents/hooks.json`：官方沒有依系統切換的寫法，裡面是安裝那台電腦的 PowerShell 路徑。兩個系統共用的專案，在另一台電腦重跑一次 `install.ps1 -Scope project -Tool antigravity -Target <專案> -Apply`；或兩台都裝 PowerShell 7，安裝時加 `-PowerShellExe pwsh`，這個檔案就兩邊通用（macOS 要確認 Antigravity 啟動時的 PATH 找得到 `pwsh`）。
+
 ### 安裝後要手動做的
 
 Antigravity 2.0 App 不讀 CLI 的設定檔，權限要在 UI 手動加（依 2.18 版畫面）：
@@ -37,6 +52,12 @@ Codex 想多一層擋 `.env`：加 `-IncludeCodexPermissions` 再裝一次。這
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/new-project.ps1 -List
 powershell -ExecutionPolicy Bypass -File scripts/new-project.ps1 -Starter vue3-vite-ts -Target D:\code\my-app
+```
+
+macOS：
+
+```bash
+pwsh scripts/new-project.ps1 -Starter vue3-vite-ts -Target ~/code/my-app
 ```
 
 會放進專案：`AGENTS.md`（三工具共用）、`CLAUDE.md`（只有 `@AGENTS.md`）、三工具的 hooks 與權限設定、範本指定的領域規則。已存在的檔案預設略過。
@@ -64,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File scripts/new-project.ps1 -Starter vue3-v
 
 ```
 ai-dev-rules/
-├── README.md、CHANGELOG.md
+├── README.md、CHANGELOG.md、.gitattributes
 ├── docs/
 │   ├── research-notes.md     研究結果與來源
 │   └── tool-comparison.md    三工具功能對照與落差
@@ -98,4 +119,7 @@ ai-dev-rules/
 - 領域規範在全域一律做成 `domain-*` skill。官方文件沒寫清楚 `~/.claude/rules/` 裡的 `paths:` 會怎麼處理，做成 skill 比較保險。
 - Antigravity 的 workflows 全部做成 skill，因為 2026-11-01 起 workflows 棄用。
 - 專案 `CLAUDE.md` 只放 `@AGENTS.md`。新版 Claude Code 雖然會直接讀 `AGENTS.md`，但專案一有 `CLAUDE.local.md` 就不讀了；用 import 兩種情況都有效，而且不會重複載入。
-- 腳本相容 Windows PowerShell 5.1：這台電腦沒有安裝 PowerShell 7。
+- 腳本相容 Windows PowerShell 5.1：Windows 那台電腦沒有安裝 PowerShell 7。macOS 用 PowerShell 7 跑同一套腳本，不另外維護 bash 版本。
+- 路徑一律用 `/` 組合：Windows 也接受 `/`，macOS 不接受 `\`。
+- `verify.ps1` 重新 build 到暫存資料夾比對內容，不比修改時間：git clone 或在兩台電腦間同步後，修改時間不可靠。
+- `.gitattributes` 固定行尾（`.ps1` 用 CRLF，其他 LF），兩個系統 build 完都不會出現只有行尾不同的差異。

@@ -5,9 +5,13 @@
   1. 複製範本的 AGENTS.md（把 {{PROJECT_NAME}} 換成資料夾名稱）與 files/ 底下的檔案。
      專案裡已經有同名檔案時略過；加 -Force 會先備份再覆寫。
   2. 呼叫 install.ps1 -Scope project，裝上 CLAUDE.md、hooks、權限設定、範本指定的領域規則。
-  相容 Windows PowerShell 5.1 與 PowerShell 7。
+  相容 Windows PowerShell 5.1 與 PowerShell 7（Windows、macOS）。
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts/new-project.ps1 -Starter vue3-vite-ts -Target D:\code\my-app
+  （Windows）
+.EXAMPLE
+  pwsh scripts/new-project.ps1 -Starter vue3-vite-ts -Target ~/code/my-app
+  （macOS）
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts/new-project.ps1 -List
 #>
@@ -26,16 +30,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'lib\common.ps1')
+. (Join-Path $PSScriptRoot 'lib/common.ps1')
 
 $Root = Get-RepoRoot
-$StarterRoot = Join-Path $Root 'templates\project-starters'
+$StarterRoot = Join-Path $Root 'templates/project-starters'
 $available = @(Get-ChildItem $StarterRoot -Directory | ForEach-Object Name)
 
 if ($List -or -not $Starter) {
     Write-Host '可用範本：'
     foreach ($name in $available) {
-        $cfg = (Read-TextFile (Join-Path $StarterRoot "$name\starter.json")) | ConvertFrom-Json
+        $cfg = (Read-TextFile (Join-Path $StarterRoot "$name/starter.json")) | ConvertFrom-Json
         Write-Host ("  {0,-16} {1}（領域：{2}）" -f $name, $cfg.description, (@($cfg.domains) -join ', '))
     }
     if (-not $List) { Write-Host ''; Write-Host '用法：new-project.ps1 -Starter <範本> -Target <專案路徑>' }
@@ -54,7 +58,7 @@ $ProjectName = Split-Path -Leaf $TargetFull
 $starterDir = Join-Path $StarterRoot $Starter
 $cfg = (Read-TextFile (Join-Path $starterDir 'starter.json')) | ConvertFrom-Json
 $domains = @($cfg.domains)
-$BackupRoot = Join-Path $Root ("backups\" + (Get-Date -Format 'yyyyMMdd-HHmmss') + "\new-project")
+$BackupRoot = Join-Path $Root ("backups/" + (Get-Date -Format 'yyyyMMdd-HHmmss') + "/new-project")
 
 # ---------- 1. 範本檔案 ----------
 $files = New-Object System.Collections.Generic.List[object]
@@ -62,7 +66,7 @@ $files.Add([pscustomobject]@{ Source = (Join-Path $starterDir 'AGENTS.md'); Rel 
 $extra = Join-Path $starterDir 'files'
 if (Test-Path -LiteralPath $extra) {
     foreach ($f in Get-ChildItem -LiteralPath $extra -Recurse -File -Force) {
-        $files.Add([pscustomobject]@{ Source = $f.FullName; Rel = $f.FullName.Substring($extra.Length).TrimStart('\') })
+        $files.Add([pscustomobject]@{ Source = $f.FullName; Rel = Get-RelativePath $extra $f.FullName })
     }
 }
 
@@ -100,4 +104,4 @@ if (-not $DryRun) { $installArgs['Apply'] = $true }
 & (Join-Path $PSScriptRoot 'install.ps1') @installArgs
 
 Write-Host ''
-Write-Host "下一步：打開 $TargetFull\AGENTS.md，把（填入…）的地方換成這個專案的實際資訊。"
+Write-Host "下一步：打開 $(Join-Path $TargetFull 'AGENTS.md')，把（填入…）的地方換成這個專案的實際資訊。"

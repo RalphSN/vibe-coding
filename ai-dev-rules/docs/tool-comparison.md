@@ -15,6 +15,7 @@
 | Hooks | `settings.json` 的 `hooks` | `hooks.json` | `hooks.json`（最外層是自訂名稱） |
 | 權限 | `permissions.allow / ask / deny` | permissions profile、`rules/*.rules` | CLI `settings.json` 的 `permissions`；2.0 App 用 UI |
 | 大小上限 | 每檔建議 < 200 行 | 合計 32 KiB | 規則每檔 24,000 bytes；always_on 合計 20,000 tokens |
+| Hook 依系統切換 | 無專用欄位；shell 形式在 macOS 用 sh、Windows 用 Git Bash | `command`（macOS）+ `commandWindows`（Windows） | 文件沒寫 |
 
 ## 這個規範庫怎麼對應
 
@@ -29,6 +30,7 @@
 | 擋危險指令 | permissions deny / ask + PreToolUse hook | `.rules`（forbidden / prompt）+ PreToolUse hook | CLI permissions + PreToolUse hook |
 | 擋 `.env` | `Read(.env)` deny + hook | hook；加 `-IncludeCodexPermissions` 再多一層 permissions profile | `read_file(.env)` deny + hook |
 | 自動格式化 | 專案層 PostToolUse 跑 Prettier | 專案層 PostToolUse | 專案層 PostToolUse |
+| hook 指令（Windows / macOS） | 全域：install 填入這台的 PowerShell；專案：交給 bash，執行時挑 `powershell.exe` 或 `pwsh` | `commandWindows` 用 `powershell.exe`，`command` 用 sh 挑 `pwsh` | install 填入這台的 PowerShell（專案層兩系統共用要另外處理，見 README） |
 
 Claude 的 02–06 放在 `rules/` 而不是 `CLAUDE.md`，是為了讓每個檔案都低於 200 行；兩者都是每次載入，效果相同。
 
@@ -44,10 +46,13 @@ Claude 的 02–06 放在 `rules/` 而不是 `CLAUDE.md`，是為了讓每個檔
 | Codex `.rules` 比對 argv 前綴 | Windows 上指令包在 `powershell -Command` 裡時可能比對不到 | hook 會讀完整指令字串再判斷 |
 | Codex permissions profile 與 `sandbox_mode` 互斥 | 不能直接寫進既有設定 | 預設不寫；`-IncludeCodexPermissions` 會先檢查衝突 |
 | 文字規則沒有約束力 | 模型可能不照做 | 破壞性操作、秘密檔案都同時有設定層的擋法 |
+| macOS 沒有 Windows PowerShell 5.1 | hook 與腳本要另一個執行環境 | macOS 用 PowerShell 7 跑同一套腳本；腳本同時相容 5.1 與 7 |
+| Antigravity hook 沒有依系統切換的寫法 | 專案層 `.agents/hooks.json` 只對安裝的那個系統有效 | 在另一台重跑 install，或兩台都裝 PowerShell 7 並用 `-PowerShellExe pwsh` |
+| Claude Code 在 Windows 用 Git Bash 跑 shell 形式的 hook | 沒裝 Git Bash 時專案層 hook 不會生效 | install.ps1 在 Windows 找不到 Git Bash 會提醒；全域 hook 用 exec 形式，不受影響 |
 
 ## 未查證、要實際操作確認的項目
 
-1. Antigravity hook 在 Windows 的執行方式，以及 hook 沒有輸出決策時要輸出什麼（目前輸出 `{}`）。
+1. Antigravity hook 在 Windows、macOS 的執行方式，以及 hook 沒有輸出決策時要輸出什麼（目前輸出 `{}`）。
 2. Antigravity `run_command` / `view_file` 的參數欄位名稱：hook 目前掃描所有字串參數，不依賴欄位名稱。
 3. Codex 專案層 hook 的工作目錄是不是專案根目錄（`.codex/hooks.json` 用相對路徑）。
 4. Antigravity CLI 的 `permissions` 在 Windows 是否生效（文件說 Windows 還沒有統一的權限系統）。

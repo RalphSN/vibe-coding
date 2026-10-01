@@ -4,7 +4,8 @@
 #   claude       stdin: tool_name / tool_input   stdout: hookSpecificOutput.permissionDecision
 #   codex        stdin: tool_name / tool_input   stdout: 同 claude（只輸出 deny，ask 交給 .rules 的 prompt）
 #   antigravity  stdin: toolCall.name / args     stdout: { decision, reason }
-# 相容 Windows PowerShell 5.1 與 PowerShell 7。檔案需存成 UTF-8 with BOM。
+# 相容 Windows PowerShell 5.1 與 PowerShell 7（Windows、macOS）。檔案需存成 UTF-8 with BOM。
+# 指令同時檢查 Windows（PowerShell、cmd）與 macOS（bash、zsh）的寫法；路徑接受 \ 與 /。
 param(
     [ValidateSet('claude', 'codex', 'antigravity')]
     [string]$Tool = 'claude'
@@ -63,7 +64,7 @@ function Test-Command([string]$cmd) {
     if ($c -match '\b(rd|rmdir)\s+/s\b' -or ($c -match '\bdel\s' -and $c -match '\s/s\b' -and $c -match '\s/q\b')) {
         return @('deny', '禁止 rd /s、del /s /q（ai-dev-rules 05-security）。')
     }
-    if ($c -match '\b(mkfs|diskpart)\b' -or $c -match '\bformat\s+[a-z]:' -or $c -match '\bdd\s+if=') {
+    if ($c -match '\b(mkfs|diskpart)\b' -or $c -match '\bformat\s+[a-z]:' -or $c -match '\bdd\s+if=' -or $c -match '\bdiskutil\s+(erase\w*|zerodisk|randomdisk|secureerase|partitiondisk|reformat)\b') {
         return @('deny', '禁止磁碟格式化類指令。')
     }
     if ($c -match $SecretTokenPattern -and $c -match $ReadVerbPattern) {

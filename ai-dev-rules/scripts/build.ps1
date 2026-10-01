@@ -3,18 +3,27 @@
   把 core/、skills/、workflows/、agents/、enforcement/ 轉成三個工具的 dist/。
 .DESCRIPTION
   每次執行都會清空並重建 dist/。dist/ 不要手改，改來源再重跑。
-  相容 Windows PowerShell 5.1 與 PowerShell 7。
+  產生的內容與執行的作業系統無關：Windows 和 macOS build 出來的 dist/ 一模一樣。
+  相容 Windows PowerShell 5.1 與 PowerShell 7（Windows、macOS）。
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts/build.ps1
+  （Windows）
+.EXAMPLE
+  pwsh scripts/build.ps1
+  （macOS）
 #>
 [CmdletBinding()]
-param()
+param(
+    # 輸出資料夾，預設 dist/；verify.ps1 會 build 到暫存資料夾來比對
+    [string]$OutDir
+)
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'lib\common.ps1')
+. (Join-Path $PSScriptRoot 'lib/common.ps1')
 
 $Root = Get-RepoRoot
 $Dist = Join-Path $Root 'dist'
+if ($OutDir) { $Dist = $OutDir }
 $HeaderText = '由 scripts/build.ps1 產生，請改 ai-dev-rules 的來源（core/、skills/、workflows/、agents/、enforcement/），不要改這裡'
 $MdHeader = "<!-- $HeaderText -->"
 $HashHeader = "# $HeaderText"
@@ -26,7 +35,7 @@ function Get-Sources {
         $fm = ConvertFrom-Frontmatter (Read-TextFile $f.FullName)
         [pscustomobject]@{ Id = $fm.Meta.id; Title = $fm.Meta.title; Body = $fm.Body }
     }
-    $domains = foreach ($f in Get-ChildItem (Join-Path $Root 'core\domains') -Filter '*.md' -File | Sort-Object Name) {
+    $domains = foreach ($f in Get-ChildItem (Join-Path $Root 'core/domains') -Filter '*.md' -File | Sort-Object Name) {
         $fm = ConvertFrom-Frontmatter (Read-TextFile $f.FullName)
         $globs = @()
         if ($fm.Meta.Contains('globs')) { $globs = @($fm.Meta.globs) }
@@ -79,7 +88,7 @@ function New-GlobalEntry($Items, [string]$ToolName) {
 function Copy-SkillExtras([string]$SourceDir, [string]$TargetDir) {
     foreach ($item in Get-ChildItem $SourceDir -Recurse -File) {
         if ($item.Name -eq 'SKILL.md' -and $item.DirectoryName -eq $SourceDir) { continue }
-        $rel = $item.FullName.Substring($SourceDir.Length).TrimStart('\')
+        $rel = Get-RelativePath $SourceDir $item.FullName
         $dest = Join-Path $TargetDir $rel
         $text = Read-TextFile $item.FullName
         if ($item.Extension -eq '.md') { $text = $MdHeader + "`n`n" + $text }
@@ -117,7 +126,7 @@ function Write-Skill {
     if ($SourceDir) { Copy-SkillExtras $SourceDir $dir }
     if ($Tool -eq 'codex' -and $Manual) {
         $yaml = @($HashHeader, 'policy:', '  allow_implicit_invocation: false') -join "`n"
-        Write-TextFile (Join-Path $dir 'agents\openai.yaml') ($yaml + "`n")
+        Write-TextFile (Join-Path $dir 'agents/openai.yaml') ($yaml + "`n")
     }
 }
 
@@ -140,13 +149,51 @@ function Write-Json([string]$Path, $Object) {
 
 function Copy-Enforcement([string]$Name, [string]$Dest) {
     # .ps1 / .rules / .toml 開頭加上產生註解；JSON 不能有註解，改由 dist/README.md 說明
-    $text = Read-TextFile (Join-Path $Root "enforcement\$Name")
+    $text = Read-TextFile (Join-Path $Root "enforcement/$Name")
     if ($Name -match '\.(ps1|rules|toml)$') { $text = $HashHeader + "`n" + $text }
     Write-TextFile $Dest $text
 }
 
-function New-PwshHookCommand([string]$ScriptPath, [string]$Tool) {
-    return "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Tool $Tool"
+# ---------- hook 指令（Windows、macOS 共用）----------
+# hook 腳本在 Windows 用內建的 powershell.exe（5.1），在 macOS 用 pwsh（PowerShell 7）。
+# -ExecutionPolicy 在非 Windows 會被忽略，所以參數兩邊一樣，只有執行檔不同。
+# - Claude Code 專案層、Codex 的 command：交給 sh/bash，執行時才挑執行檔，同一份設定兩個系統都能用
+# - Codex 的 commandWindows：Windows 專用欄位，直接寫 powershell.exe
+# - Claude Code 全域、Antigravity：沒有依系統切換的方式，寫 {{PS}}，由 install.ps1 換成這台電腦的 PowerShell
+
+function New-PwshHookCommand([string]$Exe, [string]$ScriptPath, [string]$Tool) {
+    return "$Exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Tool $Tool"
+}
+
+function New-PwshHookArgs([string]$ScriptPath, [string]$Tool) {
+    return @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath, '-Tool', $Tool)
+}
+
+function New-ShLauncher([string]$ScriptPath, [string]$Tool) {
+    # POSIX sh 片段：先找 powershell.exe（Windows 的 Git Bash），再找 pwsh（macOS）。
+    # 桌面 App 的 PATH 常常沒有 Homebrew 路徑，所以也直接檢查 pwsh 的常見安裝位置。
+    $find = 'for p in powershell.exe pwsh /usr/local/bin/pwsh /opt/homebrew/bin/pwsh; do command -v "$p" >/dev/null 2>&1 && break; done; '
+    return $find + (New-PwshHookCommand '"$p"' $ScriptPath $Tool)
+}
+
+function New-ClaudeProjectHook([string]$Script, [int]$Timeout) {
+    return [ordered]@{
+        type    = 'command'
+        shell   = 'bash'
+        command = (New-ShLauncher ('$CLAUDE_PROJECT_DIR/.claude/hooks/' + $Script) 'claude')
+        timeout = $Timeout
+    }
+}
+
+function New-CodexHook([string]$ScriptPath, [int]$Timeout, [string]$StatusMessage = '') {
+    $h = [ordered]@{
+        type           = 'command'
+        command        = (New-ShLauncher $ScriptPath 'codex')
+        commandWindows = (New-PwshHookCommand 'powershell.exe' $ScriptPath 'codex')
+        timeout        = $Timeout
+    }
+    if ($StatusMessage) { $h['statusMessage'] = $StatusMessage }
+    return $h
 }
 
 # ---------- 開始 ----------
@@ -157,23 +204,23 @@ if (Test-Path -LiteralPath $Dist) { Remove-Item -LiteralPath $Dist -Recurse -For
 $alwaysIds = @('00-communication', '01-workflow')
 $claudeEntry = @($src.Core | Where-Object { $alwaysIds -contains $_.Id })
 $claudeRules = @($src.Core | Where-Object { $alwaysIds -notcontains $_.Id })
-$perm = Read-TextFile (Join-Path $Root 'enforcement\claude-permissions.json') | ConvertFrom-Json
-$agPerm = Read-TextFile (Join-Path $Root 'enforcement\antigravity-permissions.json') | ConvertFrom-Json
+$perm = Read-TextFile (Join-Path $Root 'enforcement/claude-permissions.json') | ConvertFrom-Json
+$agPerm = Read-TextFile (Join-Path $Root 'enforcement/antigravity-permissions.json') | ConvertFrom-Json
 $PreMatcherClaude = 'Bash|PowerShell|Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob'
 $PreMatcherAg = 'run_command|view_file|write_to_file|replace_file_content|multi_replace_file_content'
 
 # ===== Claude Code：global（對應 ~/.claude/）=====
-$cg = Join-Path $Dist 'claude-code\global'
+$cg = Join-Path $Dist 'claude-code/global'
 Write-TextFile (Join-Path $cg 'CLAUDE.md') (New-GlobalEntry $claudeEntry 'claude')
 foreach ($c in $claudeRules) {
-    Write-TextFile (Join-Path $cg "rules\$($c.Id).md") ($MdHeader + "`n`n" + $c.Body.TrimEnd() + "`n")
+    Write-TextFile (Join-Path $cg "rules/$($c.Id).md") ($MdHeader + "`n`n" + $c.Body.TrimEnd() + "`n")
 }
 Write-AllSkills (Join-Path $cg 'skills') 'claude' $src
 foreach ($a in $src.Agents) {
     $text = @('---', "name: $($a.Name)", ('description: ' + (ConvertTo-YamlScalar $a.Description)), 'tools: Read, Grep, Glob, Bash', '---', '', $MdHeader, '', $a.Body.TrimEnd()) -join "`n"
-    Write-TextFile (Join-Path $cg "agents\$($a.Name).md") ($text + "`n")
+    Write-TextFile (Join-Path $cg "agents/$($a.Name).md") ($text + "`n")
 }
-Copy-Enforcement 'block-dangerous.ps1' (Join-Path $cg 'hooks\block-dangerous.ps1')
+Copy-Enforcement 'block-dangerous.ps1' (Join-Path $cg 'hooks/block-dangerous.ps1')
 Write-Json (Join-Path $cg 'settings.json') ([ordered]@{
         '$schema'   = 'https://json.schemastore.org/claude-code-settings.json'
         permissions = [ordered]@{ deny = @($perm.deny); ask = @($perm.ask) }
@@ -182,8 +229,8 @@ Write-Json (Join-Path $cg 'settings.json') ([ordered]@{
                     matcher = $PreMatcherClaude
                     hooks   = @([ordered]@{
                             type    = 'command'
-                            command = 'powershell.exe'
-                            args    = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '{{HOME}}/.claude/hooks/block-dangerous.ps1', '-Tool', 'claude')
+                            command = '{{PS}}'
+                            args    = (New-PwshHookArgs '{{HOME}}/.claude/hooks/block-dangerous.ps1' 'claude')
                             timeout = 30
                         })
                 })
@@ -191,44 +238,38 @@ Write-Json (Join-Path $cg 'settings.json') ([ordered]@{
     })
 
 # ===== Claude Code：project（對應專案根目錄）=====
-$cp = Join-Path $Dist 'claude-code\project'
+$cp = Join-Path $Dist 'claude-code/project'
 Write-TextFile (Join-Path $cp 'CLAUDE.md') ("$MdHeader`n`n@AGENTS.md`n")
 foreach ($d in $src.Domains) {
     $fm = ''
     if ($d.Globs.Count -gt 0) {
         $fm = "---`npaths:`n" + (($d.Globs | ForEach-Object { "  - `"$_`"" }) -join "`n") + "`n---`n`n"
     }
-    Write-TextFile (Join-Path $cp ".claude\rules\$($d.Id).md") ($fm + $MdHeader + "`n`n" + $d.Body.TrimEnd() + "`n")
+    Write-TextFile (Join-Path $cp ".claude/rules/$($d.Id).md") ($fm + $MdHeader + "`n`n" + $d.Body.TrimEnd() + "`n")
 }
-Copy-Enforcement 'block-dangerous.ps1' (Join-Path $cp '.claude\hooks\block-dangerous.ps1')
-Copy-Enforcement 'format-on-edit.ps1' (Join-Path $cp '.claude\hooks\format-on-edit.ps1')
-Write-Json (Join-Path $cp '.claude\settings.json') ([ordered]@{
+Copy-Enforcement 'block-dangerous.ps1' (Join-Path $cp '.claude/hooks/block-dangerous.ps1')
+Copy-Enforcement 'format-on-edit.ps1' (Join-Path $cp '.claude/hooks/format-on-edit.ps1')
+Write-Json (Join-Path $cp '.claude/settings.json') ([ordered]@{
         '$schema'   = 'https://json.schemastore.org/claude-code-settings.json'
         permissions = [ordered]@{ deny = @($perm.deny); ask = @($perm.ask) }
         hooks       = [ordered]@{
             PreToolUse  = @([ordered]@{
                     matcher = $PreMatcherClaude
-                    hooks   = @([ordered]@{
-                            type = 'command'; command = 'powershell.exe'; timeout = 30
-                            args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '${CLAUDE_PROJECT_DIR}/.claude/hooks/block-dangerous.ps1', '-Tool', 'claude')
-                        })
+                    hooks   = @(New-ClaudeProjectHook 'block-dangerous.ps1' 30)
                 })
             PostToolUse = @([ordered]@{
                     matcher = 'Edit|Write|MultiEdit'
-                    hooks   = @([ordered]@{
-                            type = 'command'; command = 'powershell.exe'; timeout = 60
-                            args = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '${CLAUDE_PROJECT_DIR}/.claude/hooks/format-on-edit.ps1', '-Tool', 'claude')
-                        })
+                    hooks   = @(New-ClaudeProjectHook 'format-on-edit.ps1' 60)
                 })
         }
     })
 
 # ===== Codex：global（對應 ~/.codex/）=====
-$xg = Join-Path $Dist 'codex\global'
+$xg = Join-Path $Dist 'codex/global'
 Write-TextFile (Join-Path $xg 'AGENTS.md') (New-GlobalEntry $src.Core 'codex')
 Write-AllSkills (Join-Path $xg 'skills') 'codex' $src
-Copy-Enforcement 'codex-default.rules' (Join-Path $xg 'rules\ai-dev-rules.rules')
-Copy-Enforcement 'block-dangerous.ps1' (Join-Path $xg 'hooks\block-dangerous.ps1')
+Copy-Enforcement 'codex-default.rules' (Join-Path $xg 'rules/ai-dev-rules.rules')
+Copy-Enforcement 'block-dangerous.ps1' (Join-Path $xg 'hooks/block-dangerous.ps1')
 Copy-Enforcement 'codex-permissions.toml' (Join-Path $xg 'config.snippet.toml')
 foreach ($a in $src.Agents) {
     $toml = @(
@@ -240,80 +281,75 @@ foreach ($a in $src.Agents) {
         $a.Body.TrimEnd()
         '"""'
     ) -join "`n"
-    Write-TextFile (Join-Path $xg "agents\$($a.Name).toml") ($toml + "`n")
+    Write-TextFile (Join-Path $xg "agents/$($a.Name).toml") ($toml + "`n")
 }
 Write-Json (Join-Path $xg 'hooks.json') ([ordered]@{
         description = 'ai-dev-rules hooks'
         hooks       = [ordered]@{
             PreToolUse = @([ordered]@{
                     matcher = 'Bash|apply_patch'
-                    hooks   = @([ordered]@{
-                            type          = 'command'
-                            command       = (New-PwshHookCommand '{{HOME}}/.codex/hooks/block-dangerous.ps1' 'codex')
-                            timeout       = 30
-                            statusMessage = 'ai-dev-rules: checking command'
-                        })
+                    hooks   = @(New-CodexHook '{{HOME}}/.codex/hooks/block-dangerous.ps1' 30 'ai-dev-rules: checking command')
                 })
         }
     })
 
 # ===== Codex：project =====
-$xp = Join-Path $Dist 'codex\project'
-Copy-Enforcement 'codex-default.rules' (Join-Path $xp '.codex\rules\ai-dev-rules.rules')
-Copy-Enforcement 'block-dangerous.ps1' (Join-Path $xp '.codex\hooks\block-dangerous.ps1')
-Copy-Enforcement 'format-on-edit.ps1' (Join-Path $xp '.codex\hooks\format-on-edit.ps1')
-Write-Json (Join-Path $xp '.codex\hooks.json') ([ordered]@{
+$xp = Join-Path $Dist 'codex/project'
+Copy-Enforcement 'codex-default.rules' (Join-Path $xp '.codex/rules/ai-dev-rules.rules')
+Copy-Enforcement 'block-dangerous.ps1' (Join-Path $xp '.codex/hooks/block-dangerous.ps1')
+Copy-Enforcement 'format-on-edit.ps1' (Join-Path $xp '.codex/hooks/format-on-edit.ps1')
+Write-Json (Join-Path $xp '.codex/hooks.json') ([ordered]@{
         description = 'ai-dev-rules hooks'
         hooks       = [ordered]@{
             PreToolUse  = @([ordered]@{
                     matcher = 'Bash|apply_patch'
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '.codex/hooks/block-dangerous.ps1' 'codex'); timeout = 30; statusMessage = 'ai-dev-rules: checking command' })
+                    hooks   = @(New-CodexHook '.codex/hooks/block-dangerous.ps1' 30 'ai-dev-rules: checking command')
                 })
             PostToolUse = @([ordered]@{
                     matcher = 'apply_patch'
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '.codex/hooks/format-on-edit.ps1' 'codex'); timeout = 60 })
+                    hooks   = @(New-CodexHook '.codex/hooks/format-on-edit.ps1' 60)
                 })
         }
     })
 
 # ===== Antigravity：global（對應 ~/.gemini/）=====
-$ag = Join-Path $Dist 'antigravity\global'
+$ag = Join-Path $Dist 'antigravity/global'
 Write-TextFile (Join-Path $ag 'GEMINI.md') (New-GlobalEntry $src.Core 'antigravity')
-Write-AllSkills (Join-Path $ag 'config\skills') 'antigravity' $src
-Copy-Enforcement 'block-dangerous.ps1' (Join-Path $ag 'config\hooks\block-dangerous.ps1')
-Write-Json (Join-Path $ag 'config\hooks.json') ([ordered]@{
+Write-AllSkills (Join-Path $ag 'config/skills') 'antigravity' $src
+Copy-Enforcement 'block-dangerous.ps1' (Join-Path $ag 'config/hooks/block-dangerous.ps1')
+Write-Json (Join-Path $ag 'config/hooks.json') ([ordered]@{
         'ai-dev-rules' = [ordered]@{
             PreToolUse = @([ordered]@{
                     matcher = $PreMatcherAg
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '{{HOME}}/.gemini/config/hooks/block-dangerous.ps1' 'antigravity'); timeout = 30 })
+                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '{{PS}}' '{{HOME}}/.gemini/config/hooks/block-dangerous.ps1' 'antigravity'); timeout = 30 })
                 })
         }
     })
-Write-Json (Join-Path $ag 'antigravity-cli\settings.json') ([ordered]@{
+Write-Json (Join-Path $ag 'antigravity-cli/settings.json') ([ordered]@{
         permissions = [ordered]@{ deny = @($agPerm.deny); ask = @($agPerm.ask) }
     })
 
 # ===== Antigravity：project =====
-$ap = Join-Path $Dist 'antigravity\project'
+$ap = Join-Path $Dist 'antigravity/project'
 foreach ($d in $src.Domains) {
     if ($d.Globs.Count -gt 0) {
         $fm = "---`ntrigger: glob`ndescription: " + (ConvertTo-YamlScalar $d.Description) + "`nglobs: `"" + ($d.Globs -join ', ') + "`"`n---`n`n"
     } else {
         $fm = "---`ntrigger: model_decision`ndescription: " + (ConvertTo-YamlScalar $d.Description) + "`n---`n`n"
     }
-    Write-TextFile (Join-Path $ap ".agents\rules\$($d.Id).md") ($fm + $MdHeader + "`n`n" + $d.Body.TrimEnd() + "`n")
+    Write-TextFile (Join-Path $ap ".agents/rules/$($d.Id).md") ($fm + $MdHeader + "`n`n" + $d.Body.TrimEnd() + "`n")
 }
-Copy-Enforcement 'block-dangerous.ps1' (Join-Path $ap '.agents\hooks\block-dangerous.ps1')
-Copy-Enforcement 'format-on-edit.ps1' (Join-Path $ap '.agents\hooks\format-on-edit.ps1')
-Write-Json (Join-Path $ap '.agents\hooks.json') ([ordered]@{
+Copy-Enforcement 'block-dangerous.ps1' (Join-Path $ap '.agents/hooks/block-dangerous.ps1')
+Copy-Enforcement 'format-on-edit.ps1' (Join-Path $ap '.agents/hooks/format-on-edit.ps1')
+Write-Json (Join-Path $ap '.agents/hooks.json') ([ordered]@{
         'ai-dev-rules' = [ordered]@{
             PreToolUse  = @([ordered]@{
                     matcher = $PreMatcherAg
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '.agents/hooks/block-dangerous.ps1' 'antigravity'); timeout = 30 })
+                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '{{PS}}' '.agents/hooks/block-dangerous.ps1' 'antigravity'); timeout = 30 })
                 })
             PostToolUse = @([ordered]@{
                     matcher = 'write_to_file|replace_file_content|multi_replace_file_content'
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '.agents/hooks/format-on-edit.ps1' 'antigravity'); timeout = 60 })
+                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '{{PS}}' '.agents/hooks/format-on-edit.ps1' 'antigravity'); timeout = 60 })
                 })
         }
     })
@@ -335,7 +371,9 @@ $MdHeader
 | ``antigravity/global/`` | ``~/.gemini/`` | ``install.ps1 -Tool antigravity`` |
 | ``antigravity/project/`` | 專案根目錄 | 同上 |
 
-JSON 設定檔裡的 ``{{HOME}}`` 由 install.ps1 換成實際的家目錄路徑；``settings.json``、``hooks.json`` 是用合併的方式寫入，不會整個覆蓋。
+JSON 設定檔裡的 ``{{HOME}}`` 由 install.ps1 換成實際的家目錄路徑，``{{PS}}`` 換成這台電腦執行 hook 的 PowerShell（Windows：``powershell.exe``；macOS：``pwsh`` 的完整路徑）。``settings.json``、``hooks.json`` 是用合併的方式寫入，不會整個覆蓋。
+
+Claude Code 專案層與 Codex 的 hook 指令不需要替換：Claude 交給 bash 在執行時挑 ``powershell.exe`` 或 ``pwsh``，Codex 用 ``commandWindows`` 區分，同一份設定 Windows 與 macOS 都能用。
 "@
 Write-TextFile (Join-Path $Dist 'README.md') $readme
 

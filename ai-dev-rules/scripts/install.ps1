@@ -5,10 +5,14 @@
   - 覆寫或合併前，舊檔會備份到 backups/<時間戳>/。
   - settings.json、hooks.json 用合併的方式寫入：保留你原本的設定，只加入或更新 ai-dev-rules 的項目。
   - Codex 的 config.toml 預設不動；加 -IncludeCodexPermissions 才會加入擋 .env 的 permissions profile。
-  相容 Windows PowerShell 5.1 與 PowerShell 7。
+  - hook 在 Windows 用 powershell.exe，在 macOS 用 pwsh（PowerShell 7）；設定檔裡的 {{PS}} 依這台電腦替換。
+  相容 Windows PowerShell 5.1 與 PowerShell 7（Windows、macOS）。
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts/install.ps1
-  （列出安裝到三個工具全域會做的事）
+  （Windows：列出安裝到三個工具全域會做的事）
+.EXAMPLE
+  pwsh scripts/install.ps1
+  （macOS：同上）
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts/install.ps1 -Tool claude -Apply
 .EXAMPLE
@@ -38,11 +42,15 @@ param(
     [switch]$IncludeCodexPermissions,
 
     # 家目錄；測試時可指到暫存資料夾
-    [string]$HomeDir = $HOME
+    [string]$HomeDir = $HOME,
+
+    # 執行 hook 的 PowerShell，用來替換設定檔裡的 {{PS}}。
+    # 預設：Windows 用 powershell.exe；macOS 用 pwsh 的完整路徑（桌面 App 的 PATH 常常找不到 pwsh）
+    [string]$PowerShellExe
 )
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'lib\common.ps1')
+. (Join-Path $PSScriptRoot 'lib/common.ps1')
 
 if ($DryRun -and $Apply) { throw '-DryRun 和 -Apply 不能同時使用。' }
 $Root = Get-RepoRoot
@@ -56,8 +64,16 @@ if ($Scope -eq 'project') {
 if (-not $Domains -or $Domains.Count -eq 0) { $Domains = @('web-frontend', 'game-dev') }
 $HomeDir = (Resolve-Path -LiteralPath $HomeDir).Path
 $HomeSlash = $HomeDir.Replace('\', '/')
+if (-not $PowerShellExe) {
+    if (Test-IsWindows) { $PowerShellExe = 'powershell.exe' }
+    else {
+        $found = Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $PowerShellExe = $found.Source }
+        else { $PowerShellExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName }
+    }
+}
 $Stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$BackupRoot = Join-Path $Root "backups\$Stamp"
+$BackupRoot = Join-Path $Root "backups/$Stamp"
 $Tools = @('claude', 'codex', 'antigravity')
 if ($Tool -ne 'all') { $Tools = @($Tool) }
 $OurHookScripts = 'block-dangerous.ps1', 'format-on-edit.ps1'
@@ -71,7 +87,7 @@ function Add-Action([string]$Kind, [string]$Source, [string]$Dest, [string]$Labe
 function Add-CopyTree([string]$SourceDir, [string]$DestDir, [string]$Label) {
     if (-not (Test-Path -LiteralPath $SourceDir)) { return }
     foreach ($f in Get-ChildItem -LiteralPath $SourceDir -Recurse -File) {
-        $rel = $f.FullName.Substring($SourceDir.Length).TrimStart('\')
+        $rel = Get-RelativePath $SourceDir $f.FullName
         Add-Action 'copy' $f.FullName (Join-Path $DestDir $rel) $Label
     }
 }
@@ -137,7 +153,7 @@ function Merge-Permissions($Existing, $Incoming) {
 }
 
 function Get-MergedJsonText([string]$Kind, [string]$Source, [string]$Dest) {
-    $incomingText = (Read-TextFile $Source).Replace('{{HOME}}', $HomeSlash)
+    $incomingText = (Read-TextFile $Source).Replace('{{HOME}}', $HomeSlash).Replace('{{PS}}', $PowerShellExe)
     $new = ConvertTo-Tree ($incomingText | ConvertFrom-Json)
     $old = Read-JsonTree $Dest
     switch ($Kind) {
@@ -192,24 +208,24 @@ if ($Scope -eq 'global') {
     foreach ($t in $Tools) {
         switch ($t) {
             'claude' {
-                $src = Join-Path $Dist 'claude-code\global'; $dst = Join-Path $HomeDir '.claude'
+                $src = Join-Path $Dist 'claude-code/global'; $dst = Join-Path $HomeDir '.claude'
                 Add-Action 'copy' (Join-Path $src 'CLAUDE.md') (Join-Path $dst 'CLAUDE.md') 'claude'
                 foreach ($sub in 'rules', 'skills', 'agents', 'hooks') { Add-CopyTree (Join-Path $src $sub) (Join-Path $dst $sub) 'claude' }
                 Add-Action 'merge-claude' (Join-Path $src 'settings.json') (Join-Path $dst 'settings.json') 'claude'
             }
             'codex' {
-                $src = Join-Path $Dist 'codex\global'; $dst = Join-Path $HomeDir '.codex'
+                $src = Join-Path $Dist 'codex/global'; $dst = Join-Path $HomeDir '.codex'
                 Add-Action 'copy' (Join-Path $src 'AGENTS.md') (Join-Path $dst 'AGENTS.md') 'codex'
                 foreach ($sub in 'skills', 'rules', 'agents', 'hooks') { Add-CopyTree (Join-Path $src $sub) (Join-Path $dst $sub) 'codex' }
                 Add-Action 'merge-hooks' (Join-Path $src 'hooks.json') (Join-Path $dst 'hooks.json') 'codex'
                 if ($IncludeCodexPermissions) { Add-Action 'codex-toml' (Join-Path $src 'config.snippet.toml') (Join-Path $dst 'config.toml') 'codex' }
             }
             'antigravity' {
-                $src = Join-Path $Dist 'antigravity\global'; $dst = Join-Path $HomeDir '.gemini'
+                $src = Join-Path $Dist 'antigravity/global'; $dst = Join-Path $HomeDir '.gemini'
                 Add-Action 'copy' (Join-Path $src 'GEMINI.md') (Join-Path $dst 'GEMINI.md') 'antigravity'
-                foreach ($sub in 'config\skills', 'config\hooks') { Add-CopyTree (Join-Path $src $sub) (Join-Path $dst $sub) 'antigravity' }
-                Add-Action 'merge-ag-hooks' (Join-Path $src 'config\hooks.json') (Join-Path $dst 'config\hooks.json') 'antigravity'
-                Add-Action 'merge-permissions' (Join-Path $src 'antigravity-cli\settings.json') (Join-Path $dst 'antigravity-cli\settings.json') 'antigravity'
+                foreach ($sub in 'config/skills', 'config/hooks') { Add-CopyTree (Join-Path $src $sub) (Join-Path $dst $sub) 'antigravity' }
+                Add-Action 'merge-ag-hooks' (Join-Path $src 'config/hooks.json') (Join-Path $dst 'config/hooks.json') 'antigravity'
+                Add-Action 'merge-permissions' (Join-Path $src 'antigravity-cli/settings.json') (Join-Path $dst 'antigravity-cli/settings.json') 'antigravity'
             }
         }
     }
@@ -217,27 +233,27 @@ if ($Scope -eq 'global') {
     foreach ($t in $Tools) {
         switch ($t) {
             'claude' {
-                $src = Join-Path $Dist 'claude-code\project'
+                $src = Join-Path $Dist 'claude-code/project'
                 if (Test-Path -LiteralPath (Join-Path $Target 'AGENTS.md')) {
                     Add-Action 'copy' (Join-Path $src 'CLAUDE.md') (Join-Path $Target 'CLAUDE.md') 'claude'
                 } else {
                     Write-Host '專案沒有 AGENTS.md，略過 CLAUDE.md（它只負責 @AGENTS.md）。' -ForegroundColor Yellow
                 }
-                Add-CopyTree (Join-Path $src '.claude\hooks') (Join-Path $Target '.claude\hooks') 'claude'
-                foreach ($d in $Domains) { Add-Action 'copy' (Join-Path $src ".claude\rules\$d.md") (Join-Path $Target ".claude\rules\$d.md") 'claude' }
-                Add-Action 'merge-claude' (Join-Path $src '.claude\settings.json') (Join-Path $Target '.claude\settings.json') 'claude'
+                Add-CopyTree (Join-Path $src '.claude/hooks') (Join-Path $Target '.claude/hooks') 'claude'
+                foreach ($d in $Domains) { Add-Action 'copy' (Join-Path $src ".claude/rules/$d.md") (Join-Path $Target ".claude/rules/$d.md") 'claude' }
+                Add-Action 'merge-claude' (Join-Path $src '.claude/settings.json') (Join-Path $Target '.claude/settings.json') 'claude'
             }
             'codex' {
-                $src = Join-Path $Dist 'codex\project'
-                Add-CopyTree (Join-Path $src '.codex\rules') (Join-Path $Target '.codex\rules') 'codex'
-                Add-CopyTree (Join-Path $src '.codex\hooks') (Join-Path $Target '.codex\hooks') 'codex'
-                Add-Action 'merge-hooks' (Join-Path $src '.codex\hooks.json') (Join-Path $Target '.codex\hooks.json') 'codex'
+                $src = Join-Path $Dist 'codex/project'
+                Add-CopyTree (Join-Path $src '.codex/rules') (Join-Path $Target '.codex/rules') 'codex'
+                Add-CopyTree (Join-Path $src '.codex/hooks') (Join-Path $Target '.codex/hooks') 'codex'
+                Add-Action 'merge-hooks' (Join-Path $src '.codex/hooks.json') (Join-Path $Target '.codex/hooks.json') 'codex'
             }
             'antigravity' {
-                $src = Join-Path $Dist 'antigravity\project'
-                Add-CopyTree (Join-Path $src '.agents\hooks') (Join-Path $Target '.agents\hooks') 'antigravity'
-                foreach ($d in $Domains) { Add-Action 'copy' (Join-Path $src ".agents\rules\$d.md") (Join-Path $Target ".agents\rules\$d.md") 'antigravity' }
-                Add-Action 'merge-ag-hooks' (Join-Path $src '.agents\hooks.json') (Join-Path $Target '.agents\hooks.json') 'antigravity'
+                $src = Join-Path $Dist 'antigravity/project'
+                Add-CopyTree (Join-Path $src '.agents/hooks') (Join-Path $Target '.agents/hooks') 'antigravity'
+                foreach ($d in $Domains) { Add-Action 'copy' (Join-Path $src ".agents/rules/$d.md") (Join-Path $Target ".agents/rules/$d.md") 'antigravity' }
+                Add-Action 'merge-ag-hooks' (Join-Path $src '.agents/hooks.json') (Join-Path $Target '.agents/hooks.json') 'antigravity'
             }
         }
     }
@@ -270,7 +286,26 @@ $mode = '預覽（沒有寫入任何檔案）'
 if ($Apply) { $mode = '寫入' }
 Write-Host "install：$Scope / $($Tools -join ', ') / $mode"
 Write-Host "目標：$baseDir"
+Write-Host "hook 使用的 PowerShell：$PowerShellExe"
 Write-Host ''
+
+# hook 的執行環境：缺了不會報錯，只是 hook 不會生效，所以先提醒
+if (Test-IsWindows) {
+    if ($Scope -eq 'project' -and $Tools -contains 'claude') {
+        $gitBash = $env:CLAUDE_CODE_GIT_BASH_PATH
+        if (-not $gitBash) {
+            $git = Get-Command git -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($git) { $gitBash = Join-Path (Split-Path -Parent (Split-Path -Parent $git.Source)) 'bin/bash.exe' }
+        }
+        if (-not $gitBash -or -not (Test-Path -LiteralPath $gitBash)) {
+            Write-Host '注意：找不到 Git Bash。Claude Code 專案層 hook 交給 bash 執行（才能和 macOS 共用設定），請先安裝 Git for Windows。' -ForegroundColor Yellow
+        }
+    }
+} elseif (-not (Get-Command $PowerShellExe -ErrorAction SilentlyContinue)) {
+    Write-Host "注意：找不到 $PowerShellExe。hook 需要 PowerShell 7，請先安裝（例如 brew install powershell）。" -ForegroundColor Yellow
+} elseif ($PowerShellExe -like "$([System.IO.Path]::GetTempPath().TrimEnd('/'))*") {
+    Write-Host "注意：$PowerShellExe 在暫存資料夾，之後可能被刪掉。建議安裝 PowerShell 7 後再裝一次，或用 -PowerShellExe 指定。" -ForegroundColor Yellow
+}
 
 $changed = @($Actions | Where-Object { $_.Status -ne '不變' })
 foreach ($group in ($Actions | Group-Object Status)) {
@@ -292,7 +327,7 @@ if (-not $Apply) {
 
 foreach ($a in $changed) {
     if (Test-Path -LiteralPath $a.Dest) {
-        $rel = $a.Dest.Substring($baseDir.Length).TrimStart('\')
+        $rel = Get-RelativePath $baseDir $a.Dest
         $backup = Join-Path (Join-Path $BackupRoot "$Scope-$($a.Label)") $rel
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
         Copy-Item -LiteralPath $a.Dest -Destination $backup -Force

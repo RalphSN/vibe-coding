@@ -13,4 +13,6 @@
 | `antigravity/global/` | `~/.gemini/` | `install.ps1 -Tool antigravity` |
 | `antigravity/project/` | 專案根目錄 | 同上 |
 
-JSON 設定檔裡的 `{{HOME}}` 由 install.ps1 換成實際的家目錄路徑；`settings.json`、`hooks.json` 是用合併的方式寫入，不會整個覆蓋。
+JSON 設定檔裡的 `{{HOME}}` 由 install.ps1 換成實際的家目錄路徑，`{{PS}}` 換成這台電腦執行 hook 的 PowerShell（Windows：`powershell.exe`；macOS：`pwsh` 的完整路徑）。`settings.json`、`hooks.json` 是用合併的方式寫入，不會整個覆蓋。
+
+Claude Code 專案層與 Codex 的 hook 指令不需要替換：Claude 交給 bash 在執行時挑 `powershell.exe` 或 `pwsh`，Codex 用 `commandWindows` 區分，同一份設定 Windows 與 macOS 都能用。

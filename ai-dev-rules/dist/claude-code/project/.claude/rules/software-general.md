@@ -12,13 +12,20 @@
 
 ## 跨平台路徑
 
-- 用 `path.join`（Node）、`Join-Path`（PowerShell）、`pathlib`（Python）組路徑，不手寫 `/` 或 `\`。
+- 用 `path.join`（Node）、`Join-Path`（PowerShell）、`pathlib`（Python）組路徑，不手寫 `\`；寫死的相對路徑用 `/`（Windows 也接受）。
 - 不寫死使用者目錄；用 `os.homedir()`、`$HOME`、`Path.home()`。
 - 路徑可能有空格，傳給外部指令時一律加引號。
+- 檔名大小寫要和引用一致：macOS 預設不分大小寫、Linux 伺服器會分。
 
-## Windows / PowerShell
+## Windows 與 macOS
 
-- 使用者的主要環境是 Windows 11 + PowerShell；給指令時預設給 PowerShell 版本。
+- 使用者同時用 Windows 11（PowerShell）和 macOS（zsh）；給指令前先看目前的作業系統，給那個系統的版本。不確定時兩種都給。
+- 自動化腳本要兩個系統都能跑：PowerShell 腳本相容 Windows PowerShell 5.1 與 macOS 的 PowerShell 7（`pwsh`），或改用 Node.js / Python。
+- 判斷系統：PowerShell 用 `$IsWindows`（5.1 沒有這個變數，視為 Windows）；Node 用 `process.platform`；Python 用 `sys.platform`。
+- 不呼叫只有單一系統才有的指令（`powershell.exe`、`cmd`、`open`、`pbcopy`）而沒有另一個系統的替代做法。
+
+## PowerShell
+
 - 腳本要同時相容 Windows PowerShell 5.1 和 PowerShell 7：
   - 5.1 沒有 `&&`、`||`、`?:`、`??`。
   - 5.1 的 `ConvertFrom-Json` 沒有 `-AsHashtable`。
@@ -26,7 +33,7 @@
 - 含中文的 `.ps1` 存成 UTF-8 with BOM，否則 5.1 會讀成亂碼。
 - 用 `$ErrorActionPreference = 'Stop'` 讓錯誤中斷腳本。
 - 環境變數用 `$env:NAME`，不用 `%NAME%` 或 `$NAME`。
-- 行尾：在 `.gitattributes` 設定 `* text=auto`；`.ps1`、`.bat` 用 CRLF，`.sh` 用 LF。
+- 行尾：在 `.gitattributes` 設定 `* text=auto`；`.ps1`、`.bat` 用 CRLF，`.sh` 用 LF（CRLF 的 `.sh` 在 macOS 跑不起來）。
 
 ## 自動化
 

@@ -73,7 +73,8 @@
 - 使用者設定裡 `Read(/secrets/**)` 的 `/` 錨定在 `~/.claude/`，要套用到所有專案得寫 `Read(.env)`（gitignore 式，任何深度）或 `//` 絕對路徑。
 - Windows 路徑會正規化為 `/c/Users/...`。
 - `Bash(...)` 規則比對指令文字，易被繞過（`sh -c`、變數），官方建議搭配 PreToolUse hook 或 sandbox。
-- Hook：`PreToolUse` 等事件；`matcher` + `hooks[]`（`type: command`，可用 `args` 陣列執行 `powershell.exe -File`）。
+- Hook：`PreToolUse` 等事件；`matcher` + `hooks[]`（`type: command`）。
+- Hook 執行方式（2026-10-01 重查）：有 `args` 是 exec 形式，`command` 當執行檔直接啟動、不經 shell；沒有 `args` 是 shell 形式，macOS 用 `sh -c`、Windows 用 Git Bash（沒裝 Git Bash 時改用 PowerShell）。`shell` 欄位可指定 `"bash"` 或 `"powershell"`。**沒有** `commandWindows` 之類依系統切換的欄位。
 - Hook 阻擋方式：exit code 2（stderr 當理由），或 stdout 輸出 `hookSpecificOutput.permissionDecision: "deny"`。
 - stdin 有 `tool_name`、`tool_input.command`、`tool_input.file_path`。
 - `deny` 與 `ask` 規則在專案未被信任前就生效；`allow` 要信任後才生效。
@@ -119,7 +120,8 @@
 - 事件與 Claude Code 類似（`PreToolUse`、`PostToolUse`、`Stop`…），格式也幾乎相同（`matcher` + `hooks[]`）。
 - 涵蓋 shell（`Bash`）、`apply_patch`（可用 `Edit`/`Write` 比對）、MCP。
 - 阻擋：exit 2 或 `hookSpecificOutput.permissionDecision: "deny"`。
-- Windows：repo 層級 hook 可用 `commandWindows` 覆寫指令。
+- 指令經 shell 執行，工作目錄是 session 的 `cwd`。
+- `commandWindows`（TOML 寫 `command_windows`）是 Windows 專用的覆寫：`command` 給 macOS / Linux，`commandWindows` 給 Windows；全域與 repo 層級都可以用（2026-10-01 重查）。
 
 **Skills**
 - 專案：cwd、上層資料夾、repo root 的 `.agents/skills/`。
@@ -174,6 +176,19 @@
 - stdin 是 `toolCall.name` / `toolCall.args`；stdout 輸出 `{"decision":"deny","reason":"..."}` 就能阻擋。
 - 工具名稱：`run_command`、`view_file`、`write_to_file`、`replace_file_content`。
 
+## Windows 與 macOS
+
+來源：
+- https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_pwsh
+- https://github.com/PowerShell/PowerShell/releases
+
+- macOS 沒有 Windows PowerShell 5.1，只能用 PowerShell 7（`pwsh`）；官方提供 Homebrew、`.pkg` 與免安裝 `.tar.gz`。
+- `pwsh -ExecutionPolicy` 只在 Windows 有作用，其他平台會忽略，所以 hook 參數兩個系統可以一樣。
+- PowerShell 7 在 macOS 不接受 `\` 當路徑分隔；`/` 在兩個系統都可以。
+- macOS 桌面 App 從 Dock 啟動時 PATH 只有系統路徑，常常找不到 Homebrew 裝的 `pwsh`（`/opt/homebrew/bin`）；所以全域設定寫完整路徑，sh 啟動片段也直接檢查 `/usr/local/bin/pwsh`、`/opt/homebrew/bin/pwsh`。
+- 三個工具在 macOS 的設定資料夾和 Windows 相同：`~/.claude`、`~/.codex`、`~/.gemini`。
+- 本機實測（macOS arm64、PowerShell 7.6.6）：build 結果和 Windows 版內容相同（只有 hook 相關檔案因這次修改而不同）；verify 與 38 個 hook 測試案例通過；install / new-project 裝到暫存資料夾後，用各工具的方式（exec、`sh -c`、`bash -c`）實際執行 hook，危險指令被擋、一般指令放行。
+
 ## 共通標準
 
 - **AGENTS.md**（https://agents.md/）：純 Markdown、沒有必填欄位、最近的檔案優先；由 Linux Foundation 底下的 Agentic AI Foundation 維護。
@@ -203,7 +218,7 @@
 1. `~/.claude/rules/` 裡帶 `paths:` 的規則會不會照專案路徑條件載入：文件只說使用者規則「套用到每個專案」，沒說 paths 行為。**處理方式**：全域只放無條件規則，領域規範一律做成 skill。
 2. Antigravity 全域 workflows 的路徑：官方文件沒寫；社群說法有 `~/.antigravity/`、`~/.gemini/antigravity/global_workflows/` 互相矛盾。**處理方式**：workflows 一律做成 skills（反正 11/1 就棄用）。
 3. Antigravity 2.0 App、IDE、CLI 三者各讀哪個全域規則檔：文件列了四個位置但沒說哪個產品讀哪個。**處理方式**：安裝到 `~/.gemini/GEMINI.md`（使用者指定且文件列出），README 註明。
-4. Antigravity hooks 在 Windows 的行為：文件沒寫。
-5. Codex 全域 hooks（`~/.codex/hooks.json`）能否用 `commandWindows`：文件只說 repo 層級可用。**處理方式**：直接寫 `powershell.exe ...` 指令。
+4. Antigravity hooks 在 Windows、macOS 用哪個 shell 執行、工作目錄在哪：文件沒寫，也沒有依系統切換的欄位。**處理方式**：指令開頭寫 `{{PS}}`，由 install.ps1 換成這台電腦的 PowerShell（Windows `powershell.exe`、macOS `pwsh` 完整路徑）。
+5. ~~Codex 全域 hooks 能否用 `commandWindows`~~：2026-10-01 重查文件，全域與 repo 層級都可以。已改成 `command`（macOS）+ `commandWindows`（Windows）。
 6. Claude Code 專屬的 SKILL.md 欄位（如 `disable-model-invocation`）放進 Codex / Antigravity 會不會報錯：Codex 與 Antigravity 文件沒提。**處理方式**：build 時依工具產生不同 frontmatter，各工具只拿到自己支援的欄位。
 7. 自訂 skill 和 Claude Code 內建 skill 同名（例如 `/code-review`、`/review`）時誰優先：文件沒寫。**處理方式**：改名避開。

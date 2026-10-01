@@ -1,10 +1,27 @@
-﻿# ai-dev-rules 腳本共用函式。相容 Windows PowerShell 5.1 與 PowerShell 7。
+﻿# ai-dev-rules 腳本共用函式。相容 Windows PowerShell 5.1 與 PowerShell 7（Windows、macOS）。
+# 路徑一律用 / 組合：Windows 也接受 /，macOS 不接受 \。
 
 $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $script:Utf8Bom = New-Object System.Text.UTF8Encoding($true)
 
 function Get-RepoRoot {
-    return (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    return (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+}
+
+function Test-IsWindows {
+    # 5.1 只有 Windows 版，沒有 $IsWindows 變數
+    return ($PSVersionTable.PSEdition -eq 'Desktop') -or [bool]$IsWindows
+}
+
+function Get-PowerShellExe {
+    # 執行 hook 用的 PowerShell：Windows 用內建的 5.1，macOS 用 PowerShell 7
+    if (Test-IsWindows) { return 'powershell.exe' }
+    return 'pwsh'
+}
+
+function Get-RelativePath([string]$Base, [string]$Full) {
+    # 回傳以 / 分隔的相對路徑，兩個平台結果相同
+    return $Full.Substring($Base.Length).Replace('\', '/').TrimStart('/')
 }
 
 function Read-TextFile([string]$Path) {
@@ -115,7 +132,7 @@ function Get-FileTokenEstimate([string]$Text) {
 function Invoke-HookScript([string]$ScriptPath, [string]$Tool, [string]$StdinJson) {
     # 用真正的 stdin 呼叫 hook（PowerShell 管線傳給原生程式時編碼不可靠）
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = 'powershell.exe'
+    $psi.FileName = Get-PowerShellExe
     $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Tool $Tool"
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true

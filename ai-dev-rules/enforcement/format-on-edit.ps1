@@ -1,6 +1,6 @@
 ﻿# 由 ai-dev-rules 提供。PostToolUse hook：檔案被修改後，用專案自己安裝的 Prettier 格式化。
 # 專案沒有安裝 Prettier（node_modules/.bin/prettier）時什麼都不做。
-# 用 -Tool 指定輸入格式：claude / codex / antigravity。相容 PowerShell 5.1 與 7。
+# 用 -Tool 指定輸入格式：claude / codex / antigravity。相容 Windows PowerShell 5.1 與 PowerShell 7（Windows、macOS）。
 param(
     [ValidateSet('claude', 'codex', 'antigravity')]
     [string]$Tool = 'claude'
@@ -12,8 +12,9 @@ $Extensions = @('.vue', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.css', '.
 function Find-Prettier([string]$file) {
     $dir = Split-Path -Parent $file
     while ($dir) {
+        # Windows 用 prettier.cmd；macOS 用 prettier（shell 腳本）
         foreach ($name in 'prettier.cmd', 'prettier') {
-            $candidate = Join-Path $dir (Join-Path 'node_modules\.bin' $name)
+            $candidate = Join-Path $dir (Join-Path 'node_modules/.bin' $name)
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
         $parent = Split-Path -Parent $dir
