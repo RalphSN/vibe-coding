@@ -56,3 +56,4 @@ if (!reduce) {
 - Vue 元件卸載時清掉 GSAP / Three.js 實例（`onBeforeUnmount`），避免記憶體洩漏。
 - Three.js：限制 `devicePixelRatio` 最多 2；不在畫面上時暫停渲染。
 - 閃爍頻率不超過每秒 3 次。
+- 動畫屬於整頁製作時，品質以 Awwwards、Webby Awards、FWA 得獎程度為目標，照 `domain-web-frontend` 的「品質目標：得獎等級」自我檢查迴圈反覆提升到達標；動畫要服務內容與敘事，不為了炫技犧牲效能或易用。

@@ -2,6 +2,22 @@
 
 格式依 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)。
 
+## [Unreleased]
+
+### Added
+
+- `course-web-neo-brutalism` skill：新野獸派課程網站規範，整理自 ai-chat-prompt-agent-course，並加入內文 7:1 對比、可拖曳側欄與字級調整、hover 單一訊號、完整進退場轉場、術語 popup、有鑑別度且每個選項附解析的選擇題、視覺化數量、查證到當下日期等規則。
+- `course-web-neo-brutalism` 第 11 條規則：短文字換行以字詞完整為準（詞組斷點、不留孤行、避頭尾，仍有孤行時動態縮小字級），附實測過的詞組斷行寫法與檢查腳本。
+- `course-web-neo-brutalism` 第 12 條規則與 `references/layout-geometry.md`：頂部列高度量測後寫回、側欄與把手同格 sticky 不蓋過頁尾、按鈕不被壓縮、不留空欄、SVG 線段端點接在圖形上、SVG 文字不壓框不壓線不單字成行；附 10 種裝置寬度清單與 4 支檢查腳本。
+- `course-web-neo-brutalism` 選擇題：全站正確答案是最長選項的比例不超過 35%，檢查腳本會算出比例並納入 reference 頁的題目。
+- `domain-web-frontend`「品質目標：得獎等級」：製作網頁以 Awwwards、Webby Awards、FWA 得獎程度為目標，用四維度評分的自我檢查迴圈反覆提升到達標；`web-animation` 與 `course-web-neo-brutalism` 引用這個迴圈。
+
+### Changed
+
+- `course-web-neo-brutalism` 參考站改為優先參考 `claude-code-secure-dev-course/`；驗證寬度從 3 種改為 10 種，並要求在頁面最上方與捲到最底各量一次。
+- core 測試規範的 UI 改動：檢查寬度從 375、1280 兩種改為 10 種主流裝置寬度，並要求在頁面最上方與捲到最底各看一次、量測對齊、截圖失敗時寫明。
+- `course-web-neo-brutalism` 詞組斷行：中英交界補回空格、14 字元內的英文詞組不拆行、課程編號和標題黏在一起。
+
 ## [0.2.0] - 2026-10-01
 
 ### Added
