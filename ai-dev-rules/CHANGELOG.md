@@ -11,6 +11,9 @@
 - `course-web-neo-brutalism` 第 12 條規則與 `references/layout-geometry.md`：頂部列高度量測後寫回、側欄與把手同格 sticky 不蓋過頁尾、按鈕不被壓縮、不留空欄、SVG 線段端點接在圖形上、SVG 文字不壓框不壓線不單字成行；附 10 種裝置寬度清單與 4 支檢查腳本。
 - `course-web-neo-brutalism` 選擇題：全站正確答案是最長選項的比例不超過 35%，檢查腳本會算出比例並納入 reference 頁的題目。
 - `domain-web-frontend`「品質目標：得獎等級」：製作網頁以 Awwwards、Webby Awards、FWA 得獎程度為目標，用四維度評分的自我檢查迴圈反覆提升到達標；`web-animation` 與 `course-web-neo-brutalism` 引用這個迴圈。
+- `domain-web-frontend`「跨瀏覽器（Chrome 與 Safari）」：交付前兩邊都實測；Playwright 的 WebKit 不能代替 Safari；橫排容器裡的直排文字，容器寫 `width: max-content`（Safari 27 直排書名被裁掉的實例）。
+- `domain-web-frontend`、`web-animation` 與 `domain-media-image-video-animation` 動畫規則：3D 場景裡的明暗遮罩不做 `opacity` 動畫，改動 `background-color` 或 `filter: brightness()`（Safari 翻頁閃動的實例）；有 `delay` 的 Web Animations 用 `fill: 'both'`；動畫要在播放中檢查，暫停截圖看不到合成圖層的閃動。
+- core 測試規範的 UI 改動：網頁至少在 Chrome 與 Safari 各看一次。
 
 ### Changed
 

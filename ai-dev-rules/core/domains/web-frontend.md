@@ -79,7 +79,15 @@ globs: ["**/*.vue", "**/*.ts", "**/*.tsx", "**/*.css", "**/*.scss", "**/*.html"]
 
 至少跑 2 輪。跑到第 5 輪還沒達標，停下來回報各維度分數、剩下的差距與推測原因，問使用者要不要繼續。回報時附上每一輪的分數變化。
 
+## 跨瀏覽器（Chrome 與 Safari）
+
+- 交付前在 Chrome 與 Safari 都實際看過；只修一邊的問題時，確認另一邊沒有壞。
+- Playwright 的 WebKit 不能代替 Safari 驗收：排版結果會不同，3D 截圖也不做合成。Safari 結論要用 Safari 本身（`safaridriver` 或請使用者截圖）。
+- 直排文字（`writing-mode: vertical-*`）放在橫排容器裡、容器寬度又是自動算（置中、`fit-content`）時，容器寫 `width: max-content`。否則 Safari 把容器算成只有內距寬，直排文字被 `overflow: hidden` 整個裁掉。
+
 ## 動畫
 
 - 所有動畫都要處理 `@media (prefers-reduced-motion: reduce)`：關閉或改成淡入淡出。
-- 只對 `transform` 和 `opacity` 做動畫。
+- 只對 `transform` 和 `opacity` 做動畫。例外：3D 場景（`transform-style: preserve-3d`）裡，疊在某一面上的明暗遮罩不做 `opacity` 動畫，改動 `background-color`，或對那一面本身做 `filter: brightness()`。`opacity` 動畫會被拆成獨立合成圖層，和那一面在同一平面，Safari 每一格的前後順序不固定，畫面會閃。
+- Web Animations 有 `delay` 時用 `fill: 'both'`，延遲期間就停在第一格，開始播放那一刻不會跳。
+- 動畫的問題要在播放中檢查（可把 `playbackRate` 設 0.25 慢速看）；暫停後截圖看不到合成圖層造成的閃動。

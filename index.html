@@ -275,8 +275,11 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .spine-icon { width: 22px; height: 22px; filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.45)); }
 .spine-icon svg { width: 100%; height: 100%; display: block; }
 
-/* 深色書名標籤，燙金字 */
+/* 深色書名標籤，燙金字。
+   寬度要寫 max-content：裡面是直排書名（和標籤方向不同），Safari 自動算寬時不計直排內容，
+   標籤會只剩內距寬、書名被 overflow 裁掉；Chrome 兩種寫法結果相同 */
 .spine-label {
+  width: max-content;
   min-height: 0;
   max-height: 100%;
   overflow: hidden;
@@ -384,7 +387,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   transform-origin: 50% 50%;
 }
 .b3 { position: absolute; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
-.shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+/* 明暗遮罩只動 background-color，不動 opacity：opacity 動畫會被拆成獨立合成圖層，
+   和所在頁面同一平面，Safari 每格排序不定，翻頁時左頁會閃 */
+.shade { position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0); pointer-events: none; }
 
 .cloth {
   background:
@@ -841,6 +846,11 @@ function pose(x, y, extra) {
   return `translate(${x}px, ${y}px) ${extra}`;
 }
 
+/** 明暗遮罩的關鍵影格：黑色從 from 到 to 的濃度。用 background-color 而不是 opacity，原因見 .shade */
+function shadeFrames(from, to) {
+  return [{ backgroundColor: `rgba(0, 0, 0, ${from})` }, { backgroundColor: `rgba(0, 0, 0, ${to})` }];
+}
+
 async function openBook(book, site) {
   isOpening = true;
 
@@ -893,8 +903,8 @@ async function openBook(book, site) {
       { transform: pose(midX, midY, `scale3d(${(start.s + 1) / 2}, ${(start.s + 1) / 2}, ${(start.s + 1) / 2}) rotateY(48deg) rotateX(10deg) rotateZ(-4deg)`), offset: 0.5 },
       { transform: pose(endX, endY, 'scale3d(1, 1, 1) rotateY(0deg)') },
     ], flight).finished,
-    q('.b3-spine .shade').animate([{ opacity: 0 }, { opacity: 0.6 }], flight).finished,
-    q('.cover-front .shade').animate([{ opacity: 0.6 }, { opacity: 0 }], flight).finished,
+    q('.b3-spine .shade').animate(shadeFrames(0, 0.6), flight).finished,
+    q('.cover-front .shade').animate(shadeFrames(0.6, 0), flight).finished,
     shadow.animate([{ opacity: 0, transform: 'scaleX(0.3)' }, { opacity: 0.8, transform: 'scaleX(1)' }], flight).finished,
   ]);
 
@@ -903,7 +913,8 @@ async function openBook(book, site) {
   const leafZ = `translateZ(${D / 2 - 1.5}px)`;
   const leafFlatZ = `translateZ(${D / 2 + 1.5}px)`;
   const openCover = { duration: 900, easing: EASE_IN_OUT, fill: 'forwards' };
-  const openLeaf = { duration: 800, delay: 260, easing: EASE_IN_OUT, fill: 'forwards' };
+  // 有延遲的動畫用 both：延遲期間就停在第一格，遮罩不會在開始那一刻從 0 跳到起始值
+  const openLeaf = { duration: 800, delay: 260, easing: EASE_IN_OUT, fill: 'both' };
   await Promise.all([
     book3d.animate([
       { transform: pose(endX, endY, 'scale3d(1, 1, 1) rotateY(0deg)') },
@@ -914,12 +925,12 @@ async function openBook(book, site) {
       { opacity: 0.8, transform: `translateX(${W / 2}px) scaleX(1.9)` },
     ], openCover).finished,
     q('.b3-cover').animate([{ transform: `${coverZ} rotateY(0deg)` }, { transform: `${coverZ} rotateY(-180deg)` }], openCover).finished,
-    q('.cover-front .shade').animate([{ opacity: 0 }, { opacity: 0.5 }], openCover).finished,
-    q('.cover-inside .shade').animate([{ opacity: 0.5 }, { opacity: 0 }], openCover).finished,
+    q('.cover-front .shade').animate(shadeFrames(0, 0.5), openCover).finished,
+    q('.cover-inside .shade').animate(shadeFrames(0.5, 0), openCover).finished,
     // 扉頁翻到 -180° 平放；高度同時墊到封面之上，翻完不會被封面蓋住
     q('.b3-leaf').animate([{ transform: `${leafZ} rotateY(0deg)` }, { transform: `${leafFlatZ} rotateY(-180deg)` }], openLeaf).finished,
-    q('.leaf-front .shade').animate([{ opacity: 0 }, { opacity: 0.35 }], openLeaf).finished,
-    q('.leaf-back .shade').animate([{ opacity: 0.35 }, { opacity: 0 }], openLeaf).finished,
+    q('.leaf-front .shade').animate(shadeFrames(0, 0.35), openLeaf).finished,
+    q('.leaf-back .shade').animate(shadeFrames(0.35, 0), openLeaf).finished,
   ]);
 
   // 4. 讀取條跑完就跳轉

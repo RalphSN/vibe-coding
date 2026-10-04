@@ -10,12 +10,12 @@
 | 交接 | 0ms | 量抽出後的 `.spine` rect，建立 3D 書並疊在同一位置，隱藏原書（`visibility: hidden`） |
 | 空中轉身 | 1000ms | 3D 書從 `rotateY(90deg)`（書脊朝你）轉到 `rotateY(0)`（封面朝你），移到畫面中央；中途 `rotateY(48deg) rotateX(10deg) rotateZ(-4deg)` 並往上抬 40px。背景模糊淡入 500ms；桌面影子從 0.3 倍寬長出來 |
 | 翻封面 | 900ms | 封面以左緣為軸 `rotateY(0 → -180deg)`；整本書同時右移半本寬，讓攤開的兩頁置中；影子跟著右移、放寬到 1.9 倍 |
-| 翻扉頁 | 800ms，延遲 260ms | 扉頁 `translateZ(D/2 − 1.5 → D/2 + 1.5px) rotateY(0 → -180deg)` |
+| 翻扉頁 | 800ms，延遲 260ms，`fill: 'both'` | 扉頁 `translateZ(D/2 − 1.5 → D/2 + 1.5px) rotateY(0 → -180deg)` |
 | 讀取條 | 450ms | 右頁「正在打開…」下方的條從 0 填滿，結束後 `location.href = href` |
 
 緩動：抽出與讀取條用 `cubic-bezier(0.16, 1, 0.3, 1)`；轉身與翻頁用 `cubic-bezier(0.45, 0, 0.2, 1)`。
 
-每個面都有 `<i class="shade">` 黑色遮罩，跟著角度改透明度，讓轉動時有明暗：
+每個面都有 `<i class="shade">` 黑色遮罩，跟著角度改黑色濃度，讓轉動時有明暗。遮罩本身 `opacity` 固定為 1，動畫只改 `background-color`（用 `shadeFrames(from, to)` 產生 `rgba(0, 0, 0, x)` 的關鍵影格）：
 - 轉身：書脊 0 → 0.6，封面 0.6 → 0。
 - 翻封面：封面正面 0 → 0.5，封面內側 0.5 → 0。
 - 翻扉頁：正面 0 → 0.35，背面 0.35 → 0。
@@ -63,3 +63,5 @@
 | 右頁四周沒有書板邊、左右不對稱 | 右頁只有紙沒有底板 | 右頁＝布底＋內縮紙；封面內側＝布底＋內縮蝴蝶頁 |
 | 封面標題詞組被拆開 | `.phrase` 沒有 inline-block | 封面、扉頁、右頁的 `.phrase` 都要 `display: inline-block` |
 | 書名字級在 3D 書脊不同 | 3D 書脊是重新產生的標記 | 建立舞台後複製書櫃書名的 `style.fontSize` |
+| Safari 翻頁時左頁閃動，Chrome 正常 | 遮罩做 `opacity` 動畫，被拆成獨立合成圖層，和所在頁面同一平面，Safari 每格前後順序不定。補 `backface-visibility` 沒用 | 遮罩只動 `background-color`；不要在 preserve-3d 的頁面上疊會做 opacity／transform 動畫的子元素 |
+| 扉頁開始翻的瞬間遮罩跳一下 | 延遲 260ms 又只有 `fill: 'forwards'`，延遲期間用 CSS 值，開始時跳到第一格 | 有 `delay` 的動畫用 `fill: 'both'` |

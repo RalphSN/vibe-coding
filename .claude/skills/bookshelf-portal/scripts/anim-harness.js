@@ -8,10 +8,13 @@
  *   f=<0-1>     停在該段動畫的哪個進度
  *   noclick     不點書，只看書櫃
  *   inspect     模擬游標停在該書上（書抬起、說明欄展開）
+ *   rate=<0-1>  不停格，改成以這個速度實際播放（例如 0.25 是 4 倍慢）。
+ *               合成圖層造成的閃動只在播放中出現，停格截圖看不到，要用這個模式在 Safari 親眼看。
  */
 const params = new URLSearchParams(location.search);
 const stopFrom = Number(params.get('start') || 99);
 const fraction = Number(params.get('f') || 0);
+const playbackRate = params.has('rate') ? Number(params.get('rate')) : null;
 const firstBook = document.querySelector('.book');
 const bookId = params.get('book') || (firstBook && firstBook.dataset.id);
 const targetBook = document.querySelector(`.book[data-id="${bookId}"]`);
@@ -21,7 +24,9 @@ let callIndex = 0;
 Element.prototype.animate = function patchedAnimate(keyframes, options) {
   callIndex += 1;
   const animation = originalAnimate.call(this, keyframes, options);
-  if (callIndex < stopFrom) {
+  if (playbackRate !== null) {
+    animation.playbackRate = playbackRate;
+  } else if (callIndex < stopFrom) {
     animation.finish();
   } else {
     animation.pause();

@@ -40,7 +40,7 @@
 
 元件：
 - 壓條 `.band`：高 7px，上下各一條燙金 1px 細線（55% 透明），中間凸起的明暗漸層。
-- 書名標籤 `.spine-label`：黑 26% 底、燙金 1px 細框、內陰影，像貼上去的皮標。
+- 書名標籤 `.spine-label`：黑 26% 底、燙金 1px 細框、內陰影，像貼上去的皮標。寬度 `width: max-content`（不寫的話 Safari 會把標籤算成只有內距寬，直排書名被裁掉）。
 - 書名 `.spine-title`：`writing-mode: vertical-rl`、15px、600、燙金色、浮雕陰影 `0 -1px 0 黑50%, 0 1px 0 白14%`。
 - 圖示 22px、燙金、`drop-shadow(0 -1px 0 黑45%)`。
 - 底部 `.spine-foot`：等寬 11px，完成顯示 `29 課`，製作中顯示 `25/50`。

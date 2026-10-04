@@ -1,6 +1,6 @@
 # 驗證
 
-四步都做完才回報。任何一步沒做，回報時寫「未驗證」與原因。
+五步都做完才回報。任何一步沒做，回報時寫「未驗證」與原因。
 
 ## 1. 連結與錯誤
 
@@ -38,6 +38,8 @@ node .claude/skills/bookshelf-portal/scripts/shoot.mjs index.html
 | 7–14 | 書右移、影子、封面翻、封面兩面明暗、扉頁翻、扉頁兩面明暗 |
 | 15 | 讀取條 |
 
+停格截圖只看得到「位置與角度對不對」。動畫播放中才出現的問題（合成圖層前後順序跳動造成的閃動）停格拍不到，要用第 5 節在 Safari 實際播放。
+
 ## 4. 環境限制（照實寫進回報）
 
 | 現象 | 原因 | 做法 |
@@ -47,5 +49,24 @@ node .claude/skills/bookshelf-portal/scripts/shoot.mjs index.html
 | 持續播放的 rAF 讓截圖停在第一格 | 無頭模式的虛擬時間被 rAF 佔住 | 入口頁不要放常駐動畫 |
 | 390px 截圖右邊被切掉 | 無頭視窗有最小寬度 | 手機寬度用 iframe 包一層（`<iframe style="width:360px">`）再截，或用裝置模擬量測 |
 | focus 事件沒觸發 | 視窗沒有焦點（`document.hasFocus()` 是 false） | 手動 `dispatchEvent(new FocusEvent('focusin', { bubbles: true }))` |
+| Playwright WebKit 量起來正常，Safari 卻跑版 | Playwright 的 WebKit 不是 Safari，直排內容的寬度算法不同 | Safari 相關結論一律用第 5 節的實機檢查 |
+| 無頭 WebKit 的 3D 截圖被壓平、背面也看得到 | Playwright 的 WebKit 截圖走軟體繪製，不做 3D 合成 | 3D 動畫在 Safari 實機看；無頭 Chrome 的 3D 截圖是正確的 |
+| safaridriver 建立工作階段逾時 | Safari 還開著開啟遠端自動化之前的程序 | 請使用者完全結束 Safari 再試 |
+| Safari 自動化視窗回報 `document.visibilityState` 是 hidden，動畫不前進 | 視窗被擋住或在別的桌面空間 | 不要用自動化錄播放中的畫面；請使用者自己用 `?rate=0.25` 慢速看 |
 
 實際播放的流暢度與節奏，只能在正常顯示的瀏覽器親眼看；沒看過就寫「未驗證」，並請使用者點一本書確認。
+
+## 5. Safari 實機
+
+Chrome 正常不代表 Safari 正常。這個書櫃在 Safari 出過兩個 Chrome 沒有的問題：直排書名整個消失、翻頁時左頁閃動。兩項都要在 Safari 確認。
+
+1. 請使用者先做（各一次）：Safari →「設定」→「進階」勾選「顯示網頁開發者功能」，再到「開發」選單勾選「允許遠端自動化」；終端機執行 `safaridriver --enable`（要輸入管理者密碼，由使用者自己輸入）。
+2. 用 HTTP 伺服器開入口（safaridriver 不能開 `file://`），跑：
+   ```bash
+   node .claude/skills/bookshelf-portal/scripts/safari-check.mjs http://127.0.0.1:8770/index.html
+   ```
+   每種寬度都要 `OK`：書名標籤放得下直排書名、沒有水平捲軸。截圖逐張看過。
+3. 翻頁閃動：請使用者用 Safari 打開第 3 步產生的 `harness.html?rate=0.25`（4 倍慢實際播放），看翻封面、翻扉頁時左右兩頁有沒有忽明忽暗。改動有疑慮時做對照版（例如拿掉遮罩）讓使用者比較。
+4. 測完請使用者取消勾選「允許遠端自動化」。
+
+使用者沒有開啟自動化時，第 2 步改成請使用者用 Safari 開入口頁截圖給你；不能用 Playwright WebKit 的結果代替。
