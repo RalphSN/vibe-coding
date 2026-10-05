@@ -12,7 +12,7 @@
 | 1 | **Prefill 在目前的模型上已不再支援**：從 Claude 4.6 世代起，在最後一個 assistant turn 預填內容會回傳 400 錯誤。官方提供了遷移方式（改用結構化輸出、在 user 訊息裡下指令等）。 | 模組 3「prefill」要改教成「舊技巧＋現在的替代做法」 |
 | 2 | **Extended thinking（`budget_tokens`）已被 adaptive thinking ＋ `effort` 參數取代**：4.6 上已棄用，4.7 以後的模型直接拒收（400）。Fable 5.1 / Opus 5.5 的思考是「永遠開啟、模型自行決定思考多少」。 | 模組 1「推理模式」改教 adaptive thinking ＋ effort |
 | 3 | **明確的思考鏈（CoT）與 prompt chaining 的必要性降低**：官方說多數多步驟推理模型會在內部完成；只有需要檢查中間產出或強制固定流程時，chaining 才仍然有用。 | 模組 3 要說明「什麼時候還需要」 |
-| 4 | **Claude Code v2.1.283 起，auto mode 是互動式終端機與 VS Code 的預設權限模式**：由另一個分類器模型（classifier）審查動作，取代逐一詢問使用者。 | 模組 7、10 |
+| 4 | **auto mode 是互動式終端機與 VS Code 的預設權限模式**（2026-10-05 修正版本：v2.1.287 起所有方案都適用，見第 11 節）：由另一個分類器模型（classifier）審查動作，取代逐一詢問使用者。 | 模組 7、10 |
 | 5 | **Slash commands 已併入 skills**：`.claude/commands/` 仍可用，但官方建議改用 `.claude/skills/<name>/SKILL.md`。Skills 遵循開放標準 Agent Skills（agentskills.io）。 | 模組 4、7 |
 | 6 | **Claude Code 現在會原生讀取 AGENTS.md**（v2.1.277+），Codex CLI 也使用 AGENTS.md → 跨工具共用指示檔已成為事實上的慣例。 | 模組 6 harness 比較 |
 | 7 | **MCP 2026-07-28 規格是改版幅度最大的一次**：協定改為無狀態（stateless），並加入擴充機制（Tasks、MCP Apps、Skills over MCP）、對齊 OAuth/OIDC 的授權，以及正式的棄用政策。 | 模組 5 |
@@ -286,3 +286,20 @@
 | 語法高亮 | ✅ 使用 cdnjs 的 highlight.js 11.11.2（HTTP 200，附 SRI）。cdnjs 上 Prism 的最新版號顯示為 9000.0.1，版號異常，不採用 | https://api.cdnjs.com/libraries/highlight.js |
 
 第 5.2 節的 Gemini「headless 確切 flag ⚠️」已解除。
+
+---
+
+## 11. 抽查（2026-10-05，撰寫模組 6–11 前）
+
+| 項目 | 結果 | 來源 |
+|------|------|------|
+| Claude Code 最新版 | ✅ npm 上為 **2.1.289**（`time.modified` 2026-10-03） | `npm view @anthropic-ai/claude-code version` |
+| What's new 週報 | ✅ 最新一期仍是 Week 37（2026-09-07～11）；10-02 之後沒有新週報 | https://code.claude.com/docs/en/whats-new/index.md |
+| auto mode 成為預設 | ✅ **修正第 0 節第 4 點**：v2.1.282 起互動式 session 預設 auto；v2.1.283／2.1.285 擴大到第三方供應商；**v2.1.287 起「互動式終端機與 VS Code，所有方案與供應商」**；`permissions.defaultMode` 可覆寫。課程寫「截至 2026-10（v2.1.287 起）」 | https://code.claude.com/docs/en/changelog |
+| 2.1.287～2.1.289 其他變更 | ✅ 新增 Claude Mods（plugin 可修改更深層的行為）；`/code-review` 新增 `--max-findings`；`.claude/rules` 的路徑規則在 Write／Edit 時也會載入。課程不需要改寫 | 同上 |
+| 指令 | ✅ `/init`（找到 Codex／Gemini 設定時會提議用 `/import` 搬過來）、`/memory`、`/context`、`/clear`、`/compact`、`/rewind`（別名 `/checkpoint`、`/undo`）、`/hooks`、`/permissions`、`/sandbox`、`/mcp`、`/plugin`（`list`／`install`／`enable`／`disable`）、`/batch`（拆成 5～30 個單元）、`/code-review`、`/goal`、`/subtask`、`/fork`、`/btw`、`/plan [description]`、`/usage`、`/skills`（按 `t` 依 token 數排序）、`/doctor prompt-audit` 皆存在 | https://code.claude.com/docs/en/commands |
+| `/agents` 的行為改變 | ✅ v2.1.198 起不再開啟互動介面，改成提示你請 Claude 建立或直接編輯 `.claude/agents/` | 同上 |
+| 快捷鍵 | ✅ `Esc` 中斷（保留已完成的工作）；`Esc Esc` 輸入框為空時開 rewind 選單；`Shift+Tab` 依序切換 default（Manual）→ acceptEdits → plan →（可用時）bypassPermissions → auto；`Ctrl+G` 用編輯器編輯；`Ctrl+B` 把執行中的工作移到背景；`!` 開頭為 shell 模式 | https://code.claude.com/docs/en/interactive-mode |
+| Agent SDK quickstart 程式碼 | ✅ 逐字取得 TypeScript 與 Python 範例（`query`、`allowedTools`、`permissionMode: "acceptEdits"`、`message.type === "result"` 時印出 `message.subtype`）；SDK 內含 Claude Code 執行檔；不會自動讀 `.env` | https://code.claude.com/docs/en/agent-sdk/quickstart |
+
+下次重新查證：**2027-01-05**。
