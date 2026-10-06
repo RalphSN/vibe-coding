@@ -456,17 +456,6 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .lb-block.right::before { left: 12px; right: 9px; }
 .lb-block.left::after { left: 24px; width: 32px; }
 .lb-block.right::after { left: 26px; width: 26px; background: #7a2a28; } /* 右頁的朱色章名 */
-/* 書籤絲帶：從書溝垂出書根 */
-.lb-ribbon {
-  position: absolute;
-  left: 83px;
-  top: 74px;
-  width: 4px;
-  height: 52px;
-  background: linear-gradient(90deg, #5e1a1d, #8c2a2c 50%, #5e1a1d);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 92%, 0 100%);
-  transform: translateZ(calc(var(--t) + 2.2px)) rotateZ(4deg);
-}
 /* 堵頭布：書脊上下的紅白絲線 */
 .lb-headband {
   position: absolute;
@@ -526,6 +515,44 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   animation: lb-shade 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
   animation-delay: var(--d);
 }
+/* 翻頁投下的影子（照真實光線）：
+   - 右頁：紙剛掀起時，書溝旁出現一道影子，紙越立越高影子越淡、越窄
+   - 左頁：紙快落到左邊時，影子從書溝往外漸漸加深、變寬，紙一蓋上就消失
+   用 @property 讓漸層的濃度可以做動畫，不用 opacity（避免 3D 合成圖層前後跳動） */
+@property --cast { syntax: '<number>'; inherits: false; initial-value: 0; }
+.lb-cast {
+  position: absolute;
+  top: 0;
+  width: 80px;
+  height: 112px;
+  pointer-events: none;
+  animation: 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  animation-delay: var(--d);
+}
+.lb-cast.r {
+  left: 82px;
+  background: linear-gradient(90deg, rgba(40, 24, 6, calc(var(--cast) * 0.6)), rgba(40, 24, 6, calc(var(--cast) * 0.22)) calc(8% + var(--cast) * 30%), transparent calc(14% + var(--cast) * 70%));
+  transform: translateZ(calc(var(--t) + var(--z) - 0.2px));
+  animation-name: lb-cast-right;
+}
+.lb-cast.l {
+  left: 2px;
+  background: linear-gradient(270deg, rgba(40, 24, 6, calc(var(--cast) * 0.75)), rgba(40, 24, 6, calc(var(--cast) * 0.32)) calc(10% + var(--cast) * 35%), transparent calc(18% + var(--cast) * 75%));
+  transform: translateZ(calc(var(--t) + 2.2px));
+  animation-name: lb-cast-left;
+}
+@keyframes lb-cast-right {
+  0%, 8% { --cast: 0; }
+  14% { --cast: 0.9; }
+  26% { --cast: 0.45; }
+  38%, 100% { --cast: 0; }
+}
+@keyframes lb-cast-left {
+  0%, 36% { --cast: 0; }
+  48% { --cast: 0.35; }
+  58% { --cast: 1; }
+  62%, 100% { --cast: 0; }
+}
 @keyframes lb-flip {
   /* 每頁的高度差一點點（--z），平放時不會和其他頁或書頁塊擠在同一平面而閃出黑線 */
   0%, 8% { transform: translateZ(calc(var(--t) + var(--z))) rotateY(0deg); }
@@ -546,7 +573,7 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   62%, 100% { background-color: rgba(50, 30, 8, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lb-page, .lb-page .s .s, .lb-page .s::after { animation: none; }
+  .lb-page, .lb-page .s .s, .lb-page .s::after, .lb-cast { animation: none; }
 }
 
 /* ---------- 打開書的舞台：書從書櫃的 canvas 交給全螢幕的 canvas ---------- */
@@ -632,9 +659,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
             <span class="lb-cover right"><i class="side"></i><i class="bottom"></i></span>
             <span class="lb-block left"><i class="side"></i><i class="bottom"></i></span>
             <span class="lb-block right"><i class="side"></i><i class="bottom"></i></span>
+            <span class="lb-cast r" style="--d:0s;--z:1.8px"></span><span class="lb-cast l" style="--d:0s"></span><span class="lb-cast r" style="--d:0.18s;--z:1.4px"></span><span class="lb-cast l" style="--d:0.18s"></span><span class="lb-cast r" style="--d:0.36s;--z:1.0px"></span><span class="lb-cast l" style="--d:0.36s"></span><span class="lb-cast r" style="--d:0.54s;--z:0.6px"></span><span class="lb-cast l" style="--d:0.54s"></span>
             <span class="lb-headband top"></span><span class="lb-headband bottom"></span>
-            <span class="lb-page" style="--d:0s;--z:0.6px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.18s;--z:1.0px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.36s;--z:1.4px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.54s;--z:1.8px"><span class="s"><span class="s"><span class="s"></span></span></span></span>
-            <span class="lb-ribbon"></span>
+            <span class="lb-page" style="--d:0s;--z:1.8px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.18s;--z:1.4px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.36s;--z:1.0px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.54s;--z:0.6px"><span class="s"><span class="s"><span class="s"></span></span></span></span>
           </div>
         </div>
       </div>
