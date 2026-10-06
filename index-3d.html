@@ -286,7 +286,7 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .prop-candle { width: 46px; height: calc(var(--shelf-h) * 0.42); }
 .deco-book { height: calc(var(--shelf-h) * var(--h)); width: var(--w); margin-right: 3px; }
 .deco-lean { width: calc(var(--shelf-h) * var(--h) * var(--s) + var(--w) * var(--c)); }
-.deco-stack { width: calc(var(--shelf-h) * 0.62); margin: 0 14px; }
+.deco-stack { width: calc(var(--shelf-h) * var(--len)); margin: 0 14px; }
 .prop-spacer { flex: 1; }
 
 /* ---------- 介紹卡：一卷攤開的舊羊皮紙，上下是捲軸 ----------
@@ -941,11 +941,10 @@ const CLASSICS = [
 const CLASSIC_LAYOUT = [
   { type: 'stand', i: 0 }, { type: 'stand', i: 1 }, { type: 'stand', i: 2 }, { type: 'stand', i: 6 },
   { type: 'lean', i: 3, deg: 12 },
-  { type: 'stack', ids: [4, 10, 5] },
+  { type: 'stack', ids: [4, 10, 5] }, // 紅樓夢 0.96、基督山 0.9、罪與罰 0.86
   { type: 'stand', i: 7 }, { type: 'stand', i: 8 }, { type: 'stand', i: 9 }, { type: 'stand', i: 11 }, { type: 'stand', i: 12 }, { type: 'stand', i: 13 },
 ];
-const STACK_LENGTH = 0.62; // 橫躺書的長度（相對書櫃高度）
-const LYING_THICKNESS = [36, 34, 33]; // 橫疊由下到上每本的厚度（px），差距小，看起來是同一套書
+// 橫躺的書和直立時完全同一本：長度＝書高、厚度＝書背寬，書背的字也跟著書一起轉。由下到上放長的到短的
 const classicSite = (c, i) => ({
   id: `classic-${i}`,
   deco: true,
@@ -968,8 +967,9 @@ function classicPieceHtml(piece) {
     const rad = (piece.deg * Math.PI) / 180;
     return `<li class="deco-book deco-lean" data-classic="${piece.i}" data-lean="${piece.deg}" aria-hidden="true" style="--w:${c.w}px;--h:${c.h};--s:${Math.sin(rad).toFixed(4)};--c:${Math.cos(rad).toFixed(4)}"></li>`;
   }
-  const height = piece.ids.reduce((sum, i, k) => sum + LYING_THICKNESS[k], 0);
-  return `<li class="deco-stack" data-stack="${piece.ids.join(',')}" aria-hidden="true" style="height:${height}px"></li>`;
+  const height = piece.ids.reduce((sum, i) => sum + CLASSICS[i].w, 0);
+  const len = Math.max(...piece.ids.map((i) => CLASSICS[i].h));
+  return `<li class="deco-stack" data-stack="${piece.ids.join(',')}" aria-hidden="true" style="height:${height}px;--len:${len}"></li>`;
 }
 /** 依可用寬度從 CLASSIC_LAYOUT 依序取，放得下多少就放多少；最後補一個書擋 */
 function classicsHtml(available, shelfH) {
@@ -981,7 +981,7 @@ function classicsHtml(available, shelfH) {
     else if (piece.type === 'lean') {
       const rad = (piece.deg * Math.PI) / 180;
       w = shelfH * CLASSICS[piece.i].h * Math.sin(rad) + CLASSICS[piece.i].w * Math.cos(rad) + 3;
-    } else w = shelfH * STACK_LENGTH + 28;
+    } else w = shelfH * Math.max(...piece.ids.map((i) => CLASSICS[i].h)) + 28;
     if (used + w > available) break;
     used += w;
     out.push(classicPieceHtml(piece));
@@ -1579,21 +1579,7 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
   ctx.rect(lx, L.labelTop, labelW, labelH);
   ctx.clip();
   const titleTop = L.labelTop + 10;
-  // 橫躺的書：書名改成沿書背橫寫（畫布轉 90°），放倒後在畫面上是正著的橫排字
-  const drawTitle = (dy) => {
-    if (!site.lying) {
-      drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop + dy, titleSize);
-      return;
-    }
-    ctx.save();
-    ctx.translate(w / 2 - dy, (L.labelTop + L.labelBottom) / 2);
-    ctx.rotate(Math.PI / 2);
-    ctx.font = `600 ${titleSize}px ${FONT}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(siteText(site).spineTitle, 0, 0);
-    ctx.restore();
-  };
+  const drawTitle = (dy) => drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop + dy, titleSize);
   if (!mask) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     drawTitle(-1);
@@ -1610,21 +1596,12 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
   ctx.font = `400 11px ${MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.save();
-  if (site.lying) {
-    // 橫躺：年份也轉成橫排
-    ctx.translate(w / 2, L.foot - 4);
-    ctx.rotate(Math.PI / 2);
-    ctx.translate(-w / 2, -(L.foot - 4));
-    ctx.translate(0, -4);
-  }
   if (!mask) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillText(foot, w / 2, L.foot - 1);
   }
   ctx.fillStyle = foil;
   ctx.fillText(foot, w / 2, L.foot);
-  ctx.restore();
 
   // 閱讀進度：右側一條燙金細線，從下往上
   const trackTop = 26;
@@ -1644,14 +1621,7 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
 function spineTextures(site, w, h) {
   const k = Math.min(4, 2048 / h);
   const L = spineLayout(w, h);
-  let titleSize = fitSpineTitle(siteText(site).spineTitle, L.labelBottom - L.labelTop - 20);
-  if (site.lying) {
-    // 橫寫：字高受書背寬限制，字寬受標籤長度限制
-    const ctx = makeCanvas(2, 2).getContext('2d');
-    ctx.font = `600 ${SPINE_TITLE_PX}px ${FONT}`;
-    const width = ctx.measureText(siteText(site).spineTitle).width;
-    titleSize = Math.max(10, Math.min(SPINE_TITLE_PX, (w - 12) / 1.25, (SPINE_TITLE_PX * (L.labelBottom - L.labelTop - 16)) / width));
-  }
+  const titleSize = fitSpineTitle(siteText(site).spineTitle, L.labelBottom - L.labelTop - 20);
   const color = makeCanvas(w * k, h * k);
   const mask = makeCanvas(w * k, h * k);
   const bump = makeCanvas(w * k, h * k);
@@ -2709,8 +2679,8 @@ function createShelf() {
     });
 
     // 名著：和課程書一樣的 3D 書，只是不能點、不會抬起。旋轉順序 ZYX：先讓書背朝前，再繞畫面的 z 軸傾斜或放倒
-    const addDeco = (index, spineW, spineH, x, y, tilt, yaw = 0, lying = false) => {
-      const deco = makeBook({ ...classicSite(CLASSICS[index], index), lying }, spineW, spineH);
+    const addDeco = (index, spineW, spineH, x, y, tilt, yaw = 0) => {
+      const deco = makeBook(classicSite(CLASSICS[index], index), spineW, spineH);
       deco.group.rotation.order = 'ZYX';
       deco.group.rotation.set(0, Math.PI / 2 + yaw, tilt);
       deco.group.position.set(x, y, -deco.W / 2);
@@ -2738,12 +2708,14 @@ function createShelf() {
       const r = rel(el.getBoundingClientRect());
       const boardTop = boardTopOf(el);
       let y = boardTop;
-      el.dataset.stack.split(',').map(Number).forEach((index, k) => {
-        const D = LYING_THICKNESS[k];
-        const L = r.width * [1, 0.96, 0.93][k];
-        const offset = [0, r.width * 0.025, r.width * 0.01][k];
+      const ids = el.dataset.stack.split(',').map(Number);
+      const maxH = Math.max(...ids.map((i) => CLASSICS[i].h));
+      ids.forEach((index, k) => {
+        const D = CLASSICS[index].w;
+        const L = r.width * (CLASSICS[index].h / maxH);
+        const offset = [0, 6, 2][k] || 0;
         // 橫躺：書頂朝左，書背仍朝前；每本微微錯開、轉一點角度
-        addDeco(index, D, L, r.left + offset + L / 2, -(y - D / 2), Math.PI / 2, [0, -0.025, 0.02][k], true);
+        addDeco(index, D, L, r.left + offset + L / 2, -(y - D / 2), Math.PI / 2, [0, -0.025, 0.02][k]);
         y -= D;
       });
     });
