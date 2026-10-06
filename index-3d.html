@@ -20,10 +20,11 @@
 </script>
 <style>
 :root {
-  --bg: #efeae1;
-  --surface: #f8f4ec;
+  --bg: #ddd5c7;
+  --surface: #e9e2d5;
   --text: #2a241c;
-  --text-2: #6b6255;
+  --text-2: #5f5649;
+  --card-aura: drop-shadow(0 18px 22px rgba(45, 28, 8, 0.45)) drop-shadow(0 3px 4px rgba(45, 28, 8, 0.3));
   --hairline: rgba(0, 0, 0, 0.1);
   --focus: #0071e3;
   --selection: rgba(0, 113, 227, 0.2);
@@ -39,7 +40,7 @@
   --metal-top: linear-gradient(#ffffff, #dcdce1);
   --metal-front: linear-gradient(#d2d2d8, #b4b4bc 55%, #a3a3ac);
   --metal-brush: rgba(255, 255, 255, 0.16);
-  --stage-bg: rgba(233, 226, 214, 0.9);
+  --stage-bg: rgba(214, 205, 190, 0.9);
   --linen:
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 3px);
@@ -56,6 +57,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #12100e;
+    --card-aura: drop-shadow(0 0 7px rgba(255, 222, 165, 0.28)) drop-shadow(0 0 2px rgba(255, 225, 175, 0.35)) drop-shadow(0 16px 18px rgba(0, 0, 0, 0.6));
     --surface: #221f1b;
     --text: #efe8dc;
     --text-2: #aca293;
@@ -73,6 +75,7 @@
 
 :root[data-theme="dark"] {
   --bg: #12100e;
+  --card-aura: drop-shadow(0 0 7px rgba(255, 222, 165, 0.28)) drop-shadow(0 0 2px rgba(255, 225, 175, 0.35)) drop-shadow(0 16px 18px rgba(0, 0, 0, 0.6));
   --surface: #221f1b;
   --text: #efe8dc;
   --text-2: #aca293;
@@ -291,7 +294,8 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   transform: rotate(-0.6deg) scaleY(0.55);
   transform-origin: center top;
   /* 第一層 drop-shadow 貼著破邊描一圈深褐：舊羊皮紙邊緣受潮、磨損變深 */
-  filter: drop-shadow(0 0 0.7px rgba(62, 32, 8, 0.95)) drop-shadow(0 0 2px rgba(80, 45, 12, 0.5)) drop-shadow(0 16px 18px rgba(30, 18, 4, 0.35));
+  /* 淺色：明顯的投影把紙和背景分開；深色：邊緣一圈微微的暖光（--card-aura） */
+  filter: drop-shadow(0 0 0.7px rgba(62, 32, 8, 0.95)) drop-shadow(0 0 2px rgba(80, 45, 12, 0.5)) var(--card-aura);
   transition: opacity 220ms var(--ease-out), transform 420ms var(--ease-out), left 260ms var(--ease-out), top 260ms var(--ease-out);
 }
 .book-card.is-visible { opacity: 1; transform: rotate(-0.6deg); }
@@ -303,19 +307,14 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   background-image:
     /* 摺痕 */
     linear-gradient(180deg, transparent 32%, rgba(110, 75, 30, 0.12) 33%, rgba(255, 245, 220, 0.25) 33.6%, transparent 35%, transparent 65%, rgba(110, 75, 30, 0.12) 66%, rgba(255, 245, 220, 0.25) 66.6%, transparent 68%),
-    /* 污漬：一圈咖啡色水痕、幾個深色斑點（foxing）、角落一抹手垢 */
-    radial-gradient(circle at 78% 24%, transparent 0 5%, rgba(95, 55, 15, 0.32) 5.6%, rgba(95, 55, 15, 0.08) 7%, transparent 9%),
-    radial-gradient(circle at 12% 30%, rgba(75, 40, 10, 0.5) 0 0.8%, transparent 1.6%),
-    radial-gradient(circle at 64% 82%, rgba(75, 40, 10, 0.45) 0 0.6%, transparent 1.3%),
-    radial-gradient(circle at 88% 62%, rgba(75, 40, 10, 0.4) 0 1%, transparent 2.2%),
-    radial-gradient(circle at 40% 92%, rgba(75, 40, 10, 0.35) 0 0.5%, transparent 1.1%),
+    /* 深淺：角落的陳舊色塊 */
     radial-gradient(ellipse 30% 18% at 94% 96%, rgba(60, 32, 8, 0.45), transparent 70%),
     radial-gradient(ellipse 22% 14% at 3% 4%, rgba(60, 32, 8, 0.4), transparent 70%),
     /* 左右兩側磨損變深的邊 */
     linear-gradient(90deg, rgba(70, 38, 10, 0.5), rgba(90, 55, 18, 0.12) 6%, transparent 12%, transparent 88%, rgba(90, 55, 18, 0.12) 94%, rgba(70, 38, 10, 0.5)),
     /* 大片不均勻的陳舊斑塊 */
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='330' height='330'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018' numOctaves='3' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.22 0 0 0 0 0.07 0 0 0 -2.2 1.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)' opacity='0.4'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse at 18% 78%, rgba(105, 70, 25, 0.2), transparent 30%),
+    radial-gradient(ellipse at 18% 78%, rgba(105, 70, 25, 0.16), transparent 34%),
     radial-gradient(ellipse at 30% 18%, rgba(255, 248, 225, 0.6), transparent 52%),
     /* 邊緣焦黃 */
     radial-gradient(ellipse at center, transparent 52%, rgba(120, 72, 20, 0.38) 100%),
@@ -456,13 +455,14 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   position: absolute;
   top: 0;
   left: 0;
-  width: 27px;
+  width: 27.6px; /* 三段之間重疊 0.6px，接縫不會透出背後的暗色 */
   height: 100%;
   background: var(--page);
   transform-origin: left center;
+  backface-visibility: visible;
 }
-.lb-page > .s { background: linear-gradient(90deg, #c9b994, var(--page) 45%); }
-.lb-page .s .s { left: 100%; animation: lb-bend 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite; animation-delay: var(--d); }
+.lb-page > .s { background: linear-gradient(90deg, #ddd0b2, var(--page) 40%); }
+.lb-page .s .s { left: calc(100% - 0.6px); animation: lb-bend 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite; animation-delay: var(--d); }
 .lb-page .s .s .s { background: linear-gradient(90deg, var(--page), #ddd0b1); }
 /* 光影：翻起來的紙轉到側面時變暗，攤平時回亮。只動 background-color，不用 filter（filter 會把 3D 壓平） */
 .lb-page .s::after {
@@ -474,8 +474,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   animation-delay: var(--d);
 }
 @keyframes lb-flip {
-  0%, 8% { transform: translateZ(calc(var(--t) + 0.5px)) rotateY(0deg); }
-  62%, 100% { transform: translateZ(calc(var(--t) + 0.5px)) rotateY(-180deg); }
+  /* 每頁的高度差一點點（--z），平放時不會和其他頁或書頁塊擠在同一平面而閃出黑線 */
+  0%, 8% { transform: translateZ(calc(var(--t) + var(--z))) rotateY(0deg); }
+  62%, 100% { transform: translateZ(calc(var(--t) + var(--z))) rotateY(-180deg); }
 }
 /* 每一段在翻的途中往回彎一點，翻完再攤平：紙的彎曲 */
 @keyframes lb-bend {
@@ -578,7 +579,7 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
             <span class="lb-cover right"><i class="side"></i><i class="bottom"></i></span>
             <span class="lb-block left"><i class="side"></i><i class="bottom"></i></span>
             <span class="lb-block right"><i class="side"></i><i class="bottom"></i></span>
-            <span class="lb-page" style="--d:0s"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.18s"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.36s"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.54s"><span class="s"><span class="s"><span class="s"></span></span></span></span>
+            <span class="lb-page" style="--d:0s;--z:0.6px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.18s;--z:1.0px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.36s;--z:1.4px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.54s;--z:1.8px"><span class="s"><span class="s"><span class="s"></span></span></span></span>
           </div>
         </div>
       </div>
@@ -2204,7 +2205,7 @@ let shelf = null;
 
 const CASE_THEME = {
   // 書櫃的材質參考 Apple Store 的陳列架：霧面牆、陽極鋁框、淺橡木層板、上方內嵌的暖白燈條
-  light: { back: ['#e6e0d5', '#dfd8cb', '#d6cebf'], alu: '#b9b5ad', wood: '#9c7a55', ceramic: '#ddd5c7', led: 2.2, hemi: 0.28, key: 0.9, env: 0.42, ao: 0.28 },
+  light: { back: ['#d6cebf', '#cfc6b6', '#c6bcab'], alu: '#b9b5ad', wood: '#9c7a55', ceramic: '#ddd5c7', led: 1.5, hemi: 0.26, key: 0.8, env: 0.42, ao: 0.28 },
   dark: { back: ['#211e1b', '#1b1916', '#151311'], alu: '#4a4740', wood: '#5a3e2a', ceramic: '#3a3631', led: 3.4, hemi: 0.2, key: 0.7, env: 0.3, ao: 0.6 },
 };
 
