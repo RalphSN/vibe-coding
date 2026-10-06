@@ -276,9 +276,13 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .bookcase.is-3d .book-fallback { visibility: hidden; }
 
 .bookend { width: 46px; height: calc(var(--shelf-h) * 0.48); margin-left: 8px; }
+.prop { margin: 0 18px; }
 .prop-stack { width: 120px; height: 40px; }
-.prop-vase { width: 56px; height: calc(var(--shelf-h) * 0.42); margin-right: 18px; }
-.prop-vase-tall { height: calc(var(--shelf-h) * 0.55); margin: 0 0 0 18px; }
+.prop-vase { width: 56px; height: calc(var(--shelf-h) * 0.48); }
+.prop-globe { width: 76px; height: calc(var(--shelf-h) * 0.4); }
+.prop-hourglass { width: 44px; height: calc(var(--shelf-h) * 0.3); }
+.prop-plant { width: 72px; height: calc(var(--shelf-h) * 0.26); }
+.prop-candle { width: 46px; height: calc(var(--shelf-h) * 0.42); }
 .prop-spacer { flex: 1; }
 
 /* ---------- 介紹卡：一卷攤開的舊羊皮紙，上下是捲軸 ----------
@@ -908,11 +912,10 @@ function renderBook(site) {
     </li>`;
 }
 
-/* 空的層放擺飾：橫躺的一疊書、陶瓶，讓書櫃不會空蕩蕩；只是排版用的盒子，3D 依它們的位置擺放 */
-const PROPS = [
-  '<li class="prop prop-stack" data-prop="stack" aria-hidden="true"></li><li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-vase" data-prop="vase" aria-hidden="true"></li>',
-  '<li class="prop prop-vase prop-vase-tall" data-prop="vase" aria-hidden="true"></li><li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-stack" data-prop="stack" aria-hidden="true"></li><li class="bookend" data-bookend aria-hidden="true"></li>',
-];
+/* 擺飾：只是排版用的盒子，3D 依它們的位置與種類擺放。每一層輪流用不同的組合，不會每層都一樣 */
+const PROP_KINDS = ['vase', 'globe', 'hourglass', 'plant', 'candle', 'stack'];
+const propLi = (kind, extra = '') => `<li class="prop prop-${kind}${extra}" data-prop="${kind}" aria-hidden="true"></li>`;
+const SPACER = '<li class="prop-spacer" aria-hidden="true"></li>';
 
 /** 依書櫃寬度把書分到各層，放不下就換到下一層 */
 function distributeBooks() {
@@ -934,20 +937,21 @@ function distributeBooks() {
   // 層數依書的數量與寬度決定：放滿書的層數＋備用層，至少 SHELF_MIN_ROWS 層
   const target = Math.max(SHELF_MIN_ROWS, rows.length + SHELF_SPARE_ROWS);
   while (rows.length < target) rows.push([]);
+  // 依序從擺飾清單取，連續幾層不會重複
   let propIndex = 0;
+  const nextProp = () => PROP_KINDS[propIndex++ % PROP_KINDS.length];
   rowsEl.innerHTML = rows.map((row, i) => {
     let content;
     if (row.length) {
       content = row.map(renderBook).join('') + '<li class="bookend" data-bookend aria-hidden="true"></li>';
-      // 這一層還很空：尾端擺一只陶瓶或一疊書
+      // 這一層還很空：最右邊擺一件擺飾
       const rowWidth = row.reduce((sum, s) => sum + spineWidth(s) + 3, 0) + BOOKEND_SPACE;
-      if (inner - rowWidth >= PROP_MIN_SPACE) {
-        content += i % 2
-          ? '<li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-stack" data-prop="stack" aria-hidden="true"></li>'
-          : '<li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-vase" data-prop="vase" aria-hidden="true"></li>';
-      }
+      if (inner - rowWidth >= PROP_MIN_SPACE) content += SPACER + propLi(nextProp());
     } else {
-      content = PROPS[propIndex++ % PROPS.length];
+      // 空層：左右各一件，窄螢幕只放一件
+      const left = nextProp();
+      const right = nextProp();
+      content = inner >= 360 ? propLi(left) + SPACER + propLi(right) : SPACER + propLi(right);
     }
     return `
       <div class="shelf-row">
@@ -2349,8 +2353,8 @@ let shelf = null;
 
 const CASE_THEME = {
   // 書櫃的材質參考 Apple Store 的陳列架：霧面牆、陽極鋁框、淺橡木層板、上方內嵌的暖白燈條
-  light: { back: ['#d6cebf', '#cfc6b6', '#c6bcab'], alu: '#b9b5ad', wood: '#9c7a55', ceramic: '#ddd5c7', led: 1.5, hemi: 0.26, key: 0.8, env: 0.42, ao: 0.28 },
-  dark: { back: ['#211e1b', '#1b1916', '#151311'], alu: '#4a4740', wood: '#5a3e2a', ceramic: '#3a3631', led: 3.4, hemi: 0.2, key: 0.7, env: 0.3, ao: 0.6 },
+  light: { back: ['#d6cebf', '#cfc6b6', '#c6bcab'], alu: '#b9b5ad', wood: '#9c7a55', ceramic: '#3d3a35', led: 1.5, hemi: 0.26, key: 0.8, env: 0.42, ao: 0.28 },
+  dark: { back: ['#211e1b', '#1b1916', '#151311'], alu: '#4a4740', wood: '#5a3e2a', ceramic: '#e4ddd0', led: 3.4, hemi: 0.2, key: 0.7, env: 0.3, ao: 0.6 },
 };
 
 function createShelf() {
@@ -2392,6 +2396,16 @@ function createShelf() {
   const foilMat = new THREE.MeshStandardMaterial({ color: FOIL, roughness: 0.45 });
   const ceramicMat = new THREE.MeshPhysicalMaterial({ roughness: 0.6, clearcoat: 0.25, clearcoatRoughness: 0.6 });
   const stemMat = new THREE.MeshStandardMaterial({ color: '#8a7a5c', roughness: 0.9 });
+  const woodPropMat = new THREE.MeshPhysicalMaterial({ color: '#4a2f1c', roughness: 0.55, clearcoat: 0.4 });
+  const brassMat = new THREE.MeshStandardMaterial({ color: '#a98a52', metalness: 0.9, roughness: 0.38 });
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: '#e8eef0', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide });
+  const sandMat = new THREE.MeshStandardMaterial({ color: '#c9a978', roughness: 1 });
+  const terracottaMat = new THREE.MeshStandardMaterial({ color: '#9a5a3c', roughness: 0.9 });
+  const soilMat = new THREE.MeshStandardMaterial({ color: '#3a2a1e', roughness: 1 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: '#6f8466', roughness: 0.7 });
+  const waxMat = new THREE.MeshStandardMaterial({ color: '#ece3cf', roughness: 0.6 });
+  const wickMat = new THREE.MeshStandardMaterial({ color: '#2a2018', roughness: 1 });
+  const globeMat = new THREE.MeshStandardMaterial({ map: globeTexture(), roughness: 0.55 });
 
   let lights = null;
   const books = new Map();
@@ -2562,6 +2576,10 @@ function createShelf() {
     bookcase.querySelectorAll('[data-bookend]').forEach((end) => addBookend(rel(end.getBoundingClientRect()), boardTopOf(end), depth));
     bookcase.querySelectorAll('[data-prop="stack"]').forEach((el, i) => addStack(rel(el.getBoundingClientRect()), boardTopOf(el), depth, i));
     bookcase.querySelectorAll('[data-prop="vase"]').forEach((el, i) => addVase(rel(el.getBoundingClientRect()), boardTopOf(el), depth, i));
+    const builders = { globe: addGlobe, hourglass: addHourglass, plant: addPlant, candle: addCandle };
+    Object.entries(builders).forEach(([kind, fn]) => {
+      bookcase.querySelectorAll(`[data-prop="${kind}"]`).forEach((el) => fn(rel(el.getBoundingClientRect()), boardTopOf(el), depth));
+    });
 
     // 書：書背貼齊 DOM 連結的位置，底部站在層板上；背後一片停留時才亮的光暈
     links.forEach((link) => {
@@ -2628,6 +2646,81 @@ function createShelf() {
       });
       y -= h;
     });
+  }
+
+  /** 小地球儀：木底座、黃銅子午環、褪色的海陸，地軸傾斜 23.4° */
+  function addGlobe(r, boardTop, depth) {
+    const cx = r.left + r.width / 2;
+    const z = -depth * 0.4;
+    const R = Math.min(r.width * 0.42, r.height * 0.32);
+    addMesh(new THREE.CylinderGeometry(R * 0.7, R * 0.8, 6, 32), woodPropMat, cx, -(boardTop - 3), z);
+    addMesh(new THREE.CylinderGeometry(1.4, 2, r.height - R * 2 - 12, 10), brassMat, cx, -(boardTop - 6 - (r.height - R * 2 - 12) / 2), z);
+    const cy = -(boardTop - r.height + R + 2);
+    const globe = addMesh(new THREE.SphereGeometry(R, 40, 28), globeMat, cx, cy, z);
+    globe.rotation.set(0.15, -0.6, 0.41);
+    const ring = addMesh(new THREE.TorusGeometry(R + 2.5, 0.9, 8, 48, Math.PI * 1.3), brassMat, cx, cy, z, { receive: false });
+    ring.rotation.set(0, 0, Math.PI * 0.5 + 0.41);
+  }
+
+  /** 沙漏：上下木座、三根黃銅柱、玻璃瓶身與漏到一半的沙 */
+  function addHourglass(r, boardTop, depth) {
+    const cx = r.left + r.width / 2;
+    const z = -depth * 0.4;
+    const H = r.height;
+    const W = r.width / 2;
+    addMesh(new THREE.CylinderGeometry(W, W, 5, 28), woodPropMat, cx, -(boardTop - 2.5), z);
+    addMesh(new THREE.CylinderGeometry(W, W, 5, 28), woodPropMat, cx, -(boardTop - H + 2.5), z);
+    for (let k = 0; k < 3; k += 1) {
+      const a = (k / 3) * Math.PI * 2 + 0.5;
+      addMesh(new THREE.CylinderGeometry(1, 1, H - 10, 8), brassMat, cx + Math.cos(a) * (W - 3), -(boardTop - H / 2), z + Math.sin(a) * (W - 3));
+    }
+    const inner = H - 12;
+    const profile = [[0.05, 0], [0.82, 0.02], [0.88, 0.2], [0.6, 0.4], [0.12, 0.5], [0.6, 0.6], [0.88, 0.8], [0.82, 0.98], [0.05, 1]]
+      .map(([x, y]) => new THREE.Vector2(x * (W - 5), y * inner));
+    addMesh(new THREE.LatheGeometry(profile, 32), glassMat, cx, -(boardTop - 6), z, { cast: false });
+    // 下半的沙堆與上半剩下的沙
+    addMesh(new THREE.ConeGeometry((W - 6) * 0.78, inner * 0.22, 24), sandMat, cx, -(boardTop - 6 - inner * 0.11), z, { cast: false });
+    const top = addMesh(new THREE.ConeGeometry((W - 6) * 0.62, inner * 0.16, 24), sandMat, cx, -(boardTop - 6 - inner * 0.62), z, { cast: false });
+    top.rotation.x = Math.PI;
+  }
+
+  /** 陶盆多肉：赤陶盆、土、蓮座狀的葉片 */
+  function addPlant(r, boardTop, depth) {
+    const cx = r.left + r.width / 2;
+    const z = -depth * 0.42;
+    const potH = r.height * 0.42;
+    const R = r.width / 2;
+    const profile = [[0, 0], [0.7, 0], [0.74, 0.04], [0.86, 0.82], [0.98, 0.84], [1, 1], [0.9, 1], [0.84, 0.9]]
+      .map(([x, y]) => new THREE.Vector2(x * R, y * potH));
+    addMesh(new THREE.LatheGeometry(profile, 36), terracottaMat, cx, -boardTop, z);
+    addMesh(new THREE.CylinderGeometry(R * 0.82, R * 0.82, 1, 24), soilMat, cx, -(boardTop - potH * 0.9), z, { cast: false });
+    const rings = [[7, 0.62, 0.95], [6, 0.45, 0.6], [5, 0.28, 0.3]];
+    rings.forEach(([count, spread, tilt], ring) => {
+      for (let k = 0; k < count; k += 1) {
+        const a = (k / count) * Math.PI * 2 + ring * 0.4;
+        const len = R * (0.9 - ring * 0.18);
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8).scale(len * 0.5, len * 0.18, len * 0.22), leafMat);
+        leaf.position.set(cx + Math.cos(a) * len * spread * 0.6, -(boardTop - potH - 2 - ring * 4), z + Math.sin(a) * len * spread * 0.6);
+        leaf.rotation.set(0, -a, tilt * 0.6);
+        leaf.castShadow = true;
+        caseGroup.add(leaf);
+      }
+    });
+  }
+
+  /** 黃銅燭台與蠟燭（不點火，避免和停留的提醒光暈搶注意力） */
+  function addCandle(r, boardTop, depth) {
+    const cx = r.left + r.width / 2;
+    const z = -depth * 0.42;
+    const H = r.height;
+    const R = r.width / 2;
+    const profile = [[0, 0], [1, 0], [1, 0.03], [0.55, 0.08], [0.22, 0.14], [0.16, 0.3], [0.26, 0.34], [0.14, 0.38], [0.14, 0.42], [0.5, 0.45], [0.5, 0.47], [0.3, 0.48], [0, 0.48]]
+      .map(([x, y]) => new THREE.Vector2(x * R, y * H * 0.62));
+    addMesh(new THREE.LatheGeometry(profile, 36), brassMat, cx, -boardTop, z);
+    const baseTop = H * 0.62 * 0.48;
+    const candleH = H - baseTop - 6;
+    addMesh(new THREE.CylinderGeometry(R * 0.26, R * 0.28, candleH, 20), waxMat, cx, -(boardTop - baseTop - candleH / 2), z);
+    addMesh(new THREE.CylinderGeometry(0.4, 0.4, 4, 6), wickMat, cx, -(boardTop - baseTop - candleH - 2), z, { cast: false });
   }
 
   /** 霧面陶瓶，插幾枝乾燥的細枝 */
@@ -2754,6 +2847,33 @@ function createShelf() {
 /* ---------- 開書：抽出 → 空中從書背轉到封面 → 翻開封面與扉頁 → 跳轉 ---------- */
 let isOpening = false;
 let stage = null;
+
+/** 地球儀的貼圖：舊地圖的米黃海洋與褐綠陸塊（隨機但固定種子的雜訊形狀） */
+function globeTexture() {
+  const canvas = makeCanvas(512, 256);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#c9b88f';
+  ctx.fillRect(0, 0, 512, 256);
+  let seed = 21;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < 14; i += 1) {
+    const x = rand() * 512;
+    const y = 50 + rand() * 156;
+    ctx.fillStyle = rand() < 0.5 ? '#7d7a52' : '#8f7a52';
+    ctx.beginPath();
+    for (let k = 0; k < 12; k += 1) {
+      const a = (k / 12) * Math.PI * 2;
+      const rr = 18 + rand() * 30;
+      ctx.lineTo(x + Math.cos(a) * rr * 1.4, y + Math.sin(a) * rr);
+    }
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(80, 55, 25, 0.35)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < 512; x += 43) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke(); }
+  for (let y = 32; y < 256; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke(); }
+  return canvasTexture(canvas);
+}
 
 /** 停留時書後的光暈：中心是和書一樣大的圓角矩形，往外 PAD px 平滑淡出（逐像素算，不靠 ctx.filter） */
 const HALO_PAD = 30;
