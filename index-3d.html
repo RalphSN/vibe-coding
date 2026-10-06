@@ -762,7 +762,7 @@ function linenBumpCanvas() {
 
 /* 燙金與金屬度遮罩：G 是粗糙度、B 是金屬度（three.js 的 roughnessMap / metalnessMap） */
 const MASK_BASE = 'rgb(0, 225, 0)';
-const MASK_FOIL = 'rgb(0, 85, 150)';
+const MASK_FOIL = 'rgb(0, 110, 0)'; // 燙金：粗糙度低一點但不是金屬，顏色維持 #efe2bf
 /* 凹凸貼圖：灰 50% 是書布平面，燙金是壓下去的（較暗），壓條是凸起的 */
 const BUMP_BASE = '#808080';
 const BUMP_DEBOSS = '#4a4a4a';
@@ -1040,10 +1040,12 @@ function paintPaper(ctx, x, y, width, height) {
   glare.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = glare;
   ctx.fillRect(x, y, width, height * 0.3);
-  // 紙纖維
+  // 紙纖維：固定亂數種子，重畫（例如讀取條）時紋路不會每格跳動
+  let seed = 12345;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   for (let i = 0; i < (width * height) / 1400; i += 1) {
-    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(120, 100, 60, 0.035)' : 'rgba(255, 255, 255, 0.25)';
-    ctx.fillRect(x + Math.random() * width, y + Math.random() * height, 1 + Math.random() * 3, 1);
+    ctx.fillStyle = rand() < 0.5 ? 'rgba(120, 100, 60, 0.035)' : 'rgba(255, 255, 255, 0.25)';
+    ctx.fillRect(x + rand() * width, y + rand() * height, 1 + rand() * 3, 1);
   }
 }
 
@@ -1379,9 +1381,11 @@ function makeBook(site, spineW, spineH) {
   group.add(spineMesh);
 
   // 書頁：跟著書脊一起彎，書口自然內凹；頂面是右頁
-  const blockGeo = roundBack(new THREE.BoxGeometry(pageW, pageH, D - t * 2, 12, 1, 16), bulge * 0.85);
+  // 書頁頂面比封面內側低 PAGE_GAP，扉頁夾在中間，各層之間都留空隙，避免深度互搶（z-fighting）造成閃爍
+  const PAGE_GAP = 1;
+  const blockGeo = roundBack(new THREE.BoxGeometry(pageW, pageH, D - t * 2 - PAGE_GAP, 12, 1, 16), bulge * 0.85);
   const block = mesh(blockGeo, [edgeX, paper, edgeY, edgeY, rightMat, paper]);
-  block.position.set(-W / 2 + t + pageW / 2, 0, 0);
+  block.position.set(-W / 2 + t + pageW / 2, 0, -PAGE_GAP / 2);
   group.add(block);
 
   // 堵頭布（headband）：書頁上下靠書脊處的雙色細條
@@ -1395,12 +1399,12 @@ function makeBook(site, spineW, spineH) {
 
   // 右頁的布底：和書頁頂面幾乎同高，攤開時右頁四周才看得到和左頁一樣寬的布邊
   const base = mesh(new THREE.BoxGeometry(W - t, H, 0.3), cloth);
-  base.position.set(t / 2, 0, D / 2 - t - 0.2);
+  base.position.set(t / 2, 0, D / 2 - t - PAGE_GAP - 0.8);
   group.add(base);
 
   // 扉頁：會彎的紙。正反兩面各一個網格，共用同一份頂點
   const SEG = 40;
-  const leafZ = D / 2 - t - 0.35;
+  const leafZ = D / 2 - t - PAGE_GAP / 2;
   const leafPivot = new THREE.Group();
   leafPivot.position.set(-W / 2 + t, 0, leafZ);
   const leafGeo = keep(new THREE.PlaneGeometry(pageW, pageH, SEG, 6).translate(pageW / 2, 0, 0));
@@ -1415,6 +1419,7 @@ function makeBook(site, spineW, spineH) {
   const leafBack = new THREE.Mesh(leafBackGeo, leafBackMat);
   leafFront.castShadow = true;
   leafFront.receiveShadow = leafBack.receiveShadow = true;
+  leafFront.frustumCulled = leafBack.frustumCulled = false;
   leafPivot.add(leafFront, leafBack);
   group.add(leafPivot);
   const leafRest = Float32Array.from(leafGeo.attributes.position.array);
@@ -1423,7 +1428,7 @@ function makeBook(site, spineW, spineH) {
    * 紙張翻頁：靠書脊的地方先轉，越往外越慢跟上，紙在中途自然彎成弧形；
    * 加上一點因重量往下垂的弧度。p = 0 平放在右邊，p = 1 平放在左邊（正好 -180°）。
    */
-  function bendLeaf(p) {
+  function bendLeaf(p, limit = Math.PI) {
     const pos = leafGeo.attributes.position;
     const cols = SEG + 1;
     const step = pageW / SEG;
@@ -1441,7 +1446,8 @@ function makeBook(site, spineW, spineH) {
       let angle = Math.PI * (local * local * (3 - 2 * local));
       // 紙的重量：立起來的時候外緣往後垂一點
       angle += sag * 0.35 * s * s;
-      angle = Math.min(Math.PI, angle);
+      // 不能超過封面已經翻到的角度，否則紙會穿過還沒平放的封面
+      angle = Math.min(Math.PI, limit, angle);
       x += Math.cos(angle) * step;
       z += Math.sin(angle) * step;
     }
@@ -1909,7 +1915,7 @@ function createStage(book) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.VSMShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap; // VSM 遇到很薄的紙會漏光、拖出殘影
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(vw, vh, false);
 
@@ -2016,31 +2022,26 @@ async function openBook(link, site) {
     }),
   ]);
 
-  // 4. 翻開封面，再翻一張扉頁；整本書往右移，讓書溝在畫面正中央
+  // 4. 翻開封面，再翻一張扉頁；整本書往右移，讓書溝在畫面正中央。
+  //    兩段動作用同一條時間軸計算（openPose），每格先算封面角度，再用它限制扉頁，保證扉頁不會穿過封面
   const shift = (book.W / 2 - book.t) * sEnd;
-  const leafLift = book.D / 2 + 0.6;
-  await Promise.all([
-    tween({
-      duration: 900,
-      easing: EASE_IN_OUT,
-      update: (e) => {
-        g.position.x = end.x + shift * e;
-        blob.position.x = end.x + shift * e - shift * 0.5 * e;
-        blob.scale.x = Wend * 1.25 * lerp(1, 1.9, e);
-        book.coverPivot.rotation.y = -Math.PI * e;
-      },
-    }),
-    // 扉頁像紙一樣彎著翻過去，最後正好平放在 -180°；高度同時墊到封面之上，翻完不會被封面蓋住
-    tween({
-      duration: 1100,
-      delay: 220,
-      easing: EASE_IN_OUT,
-      update: (e) => {
-        book.bendLeaf(e);
-        book.leafPivot.position.z = lerp(book.leafZ, leafLift, Math.min(1, e * 1.4));
-      },
-    }),
-  ]);
+  const leafLift = book.D / 2 + 0.8;
+  const COVER_MS = 900;
+  const LEAF_DELAY = 320;
+  const LEAF_MS = 1100;
+  const OPEN_MS = LEAF_DELAY + LEAF_MS;
+  const openPose = (ms) => {
+    const c = EASE_IN_OUT(Math.min(1, ms / COVER_MS));
+    g.position.x = end.x + shift * c;
+    blob.position.x = end.x + shift * c * 0.5;
+    blob.scale.x = Wend * 1.25 * lerp(1, 1.9, c);
+    book.coverPivot.rotation.y = -Math.PI * c;
+    const l = EASE_IN_OUT(Math.min(1, Math.max(0, (ms - LEAF_DELAY) / LEAF_MS)));
+    // 扉頁先墊高到封面內側之上，再開始翻
+    book.leafPivot.position.z = lerp(book.leafZ, leafLift, Math.min(1, l * 3));
+    book.bendLeaf(l, Math.PI * c - 0.04 * (1 - c));
+  };
+  await tween({ duration: OPEN_MS, update: (_, raw) => openPose(raw * OPEN_MS) });
 
   // 5. 讀取條跑完就跳轉
   await tween({ duration: 450, easing: EASE_OUT, update: (e) => book.setProgress(e) });
