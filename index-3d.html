@@ -939,13 +939,13 @@ const CLASSICS = [
 /* 名著的擺法：參考室內設計常見的書架配置——直立書之間穿插斜靠的書與橫疊的書（3 本以內、大本在下）。
    stand 直立、lean 斜靠在左邊那本上（角度）、stack 橫躺疊起（由下到上） */
 const CLASSIC_LAYOUT = [
-  { type: 'stand', i: 0 }, { type: 'stand', i: 1 }, { type: 'stand', i: 2 }, { type: 'lean', i: 3, deg: 14 },
-  { type: 'stack', ids: [4, 5, 6] },
-  { type: 'stand', i: 7 }, { type: 'stand', i: 8 }, { type: 'lean', i: 9, deg: 11 },
-  { type: 'stack', ids: [10, 11] },
+  { type: 'stand', i: 0 }, { type: 'stand', i: 1 }, { type: 'stand', i: 2 }, { type: 'stand', i: 6 },
+  { type: 'lean', i: 3, deg: 12 },
+  { type: 'stack', ids: [4, 10, 5] },
+  { type: 'stand', i: 7 }, { type: 'stand', i: 8 }, { type: 'stand', i: 9 }, { type: 'stand', i: 11 }, { type: 'stand', i: 12 }, { type: 'stand', i: 13 },
 ];
 const STACK_LENGTH = 0.62; // 橫躺書的長度（相對書櫃高度）
-const LYING_THICKNESS = 0.6; // 橫躺時的厚度＝直立書背寬 × 這個比例
+const LYING_THICKNESS = [36, 34, 33]; // 橫疊由下到上每本的厚度（px），差距小，看起來是同一套書
 const classicSite = (c, i) => ({
   id: `classic-${i}`,
   deco: true,
@@ -968,7 +968,7 @@ function classicPieceHtml(piece) {
     const rad = (piece.deg * Math.PI) / 180;
     return `<li class="deco-book deco-lean" data-classic="${piece.i}" data-lean="${piece.deg}" aria-hidden="true" style="--w:${c.w}px;--h:${c.h};--s:${Math.sin(rad).toFixed(4)};--c:${Math.cos(rad).toFixed(4)}"></li>`;
   }
-  const height = piece.ids.reduce((sum, i) => sum + Math.round(CLASSICS[i].w * LYING_THICKNESS), 0);
+  const height = piece.ids.reduce((sum, i, k) => sum + LYING_THICKNESS[k], 0);
   return `<li class="deco-stack" data-stack="${piece.ids.join(',')}" aria-hidden="true" style="height:${height}px"></li>`;
 }
 /** 依可用寬度從 CLASSIC_LAYOUT 依序取，放得下多少就放多少；最後補一個書擋 */
@@ -1030,10 +1030,8 @@ function distributeBooks() {
       content = row.map(renderBook).join('') + '<li class="bookend" data-bookend aria-hidden="true"></li>';
       // 這一層還很空：最右邊擺一件擺飾
       const rowWidth = row.reduce((sum, s) => sum + spineWidth(s) + 3, 0) + BOOKEND_SPACE;
-      // 還很空：先放一小疊橫躺的名著（神曲、浮士德），再放一件擺飾
-      const spare = inner - rowWidth;
-      if (spare >= measureShelfH() * STACK_LENGTH + PROP_MIN_SPACE) content += SPACER + classicPieceHtml({ type: 'stack', ids: [12, 13] }) + propLi(nextProp());
-      else if (spare >= PROP_MIN_SPACE) content += SPACER + propLi(nextProp());
+      // 這一層還很空：最右邊擺一件擺飾（名著只放在沒有課程書的層）
+      if (inner - rowWidth >= PROP_MIN_SPACE) content += SPACER + propLi(nextProp());
     } else {
       // 空層：左右各一件，窄螢幕只放一件；最下面一層在中間再擺一組小東西（寬度夠才放）
       const left = nextProp();
@@ -1581,14 +1579,29 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
   ctx.rect(lx, L.labelTop, labelW, labelH);
   ctx.clip();
   const titleTop = L.labelTop + 10;
+  // 橫躺的書：書名改成沿書背橫寫（畫布轉 90°），放倒後在畫面上是正著的橫排字
+  const drawTitle = (dy) => {
+    if (!site.lying) {
+      drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop + dy, titleSize);
+      return;
+    }
+    ctx.save();
+    ctx.translate(w / 2 - dy, (L.labelTop + L.labelBottom) / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.font = `600 ${titleSize}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(siteText(site).spineTitle, 0, 0);
+    ctx.restore();
+  };
   if (!mask) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop - 1, titleSize);
+    drawTitle(-1);
     ctx.fillStyle = 'rgba(255,255,255,0.14)';
-    drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop + 1, titleSize);
+    drawTitle(1);
   }
   ctx.fillStyle = foil;
-  drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop, titleSize);
+  drawTitle(0);
   ctx.restore();
 
   // 底部數字
@@ -1597,12 +1610,21 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
   ctx.font = `400 11px ${MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.save();
+  if (site.lying) {
+    // 橫躺：年份也轉成橫排
+    ctx.translate(w / 2, L.foot - 4);
+    ctx.rotate(Math.PI / 2);
+    ctx.translate(-w / 2, -(L.foot - 4));
+    ctx.translate(0, -4);
+  }
   if (!mask) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillText(foot, w / 2, L.foot - 1);
   }
   ctx.fillStyle = foil;
   ctx.fillText(foot, w / 2, L.foot);
+  ctx.restore();
 
   // 閱讀進度：右側一條燙金細線，從下往上
   const trackTop = 26;
@@ -1622,7 +1644,14 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
 function spineTextures(site, w, h) {
   const k = Math.min(4, 2048 / h);
   const L = spineLayout(w, h);
-  const titleSize = fitSpineTitle(siteText(site).spineTitle, L.labelBottom - L.labelTop - 20);
+  let titleSize = fitSpineTitle(siteText(site).spineTitle, L.labelBottom - L.labelTop - 20);
+  if (site.lying) {
+    // 橫寫：字高受書背寬限制，字寬受標籤長度限制
+    const ctx = makeCanvas(2, 2).getContext('2d');
+    ctx.font = `600 ${SPINE_TITLE_PX}px ${FONT}`;
+    const width = ctx.measureText(siteText(site).spineTitle).width;
+    titleSize = Math.max(10, Math.min(SPINE_TITLE_PX, (w - 12) / 1.25, (SPINE_TITLE_PX * (L.labelBottom - L.labelTop - 16)) / width));
+  }
   const color = makeCanvas(w * k, h * k);
   const mask = makeCanvas(w * k, h * k);
   const bump = makeCanvas(w * k, h * k);
@@ -2680,8 +2709,8 @@ function createShelf() {
     });
 
     // 名著：和課程書一樣的 3D 書，只是不能點、不會抬起。旋轉順序 ZYX：先讓書背朝前，再繞畫面的 z 軸傾斜或放倒
-    const addDeco = (index, spineW, spineH, x, y, tilt, yaw = 0) => {
-      const deco = makeBook(classicSite(CLASSICS[index], index), spineW, spineH);
+    const addDeco = (index, spineW, spineH, x, y, tilt, yaw = 0, lying = false) => {
+      const deco = makeBook({ ...classicSite(CLASSICS[index], index), lying }, spineW, spineH);
       deco.group.rotation.order = 'ZYX';
       deco.group.rotation.set(0, Math.PI / 2 + yaw, tilt);
       deco.group.position.set(x, y, -deco.W / 2);
@@ -2710,11 +2739,11 @@ function createShelf() {
       const boardTop = boardTopOf(el);
       let y = boardTop;
       el.dataset.stack.split(',').map(Number).forEach((index, k) => {
-        const D = Math.round(CLASSICS[index].w * LYING_THICKNESS);
-        const L = r.width * [1, 0.88, 0.8][k];
-        const offset = [0, r.width * 0.07, r.width * 0.03][k];
+        const D = LYING_THICKNESS[k];
+        const L = r.width * [1, 0.96, 0.93][k];
+        const offset = [0, r.width * 0.025, r.width * 0.01][k];
         // 橫躺：書頂朝左，書背仍朝前；每本微微錯開、轉一點角度
-        addDeco(index, D, L, r.left + offset + L / 2, -(y - D / 2), Math.PI / 2, [0, -0.05, 0.04][k]);
+        addDeco(index, D, L, r.left + offset + L / 2, -(y - D / 2), Math.PI / 2, [0, -0.025, 0.02][k], true);
         y -= D;
       });
     });
