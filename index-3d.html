@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>端點星</title>
-<meta name="description" content="端點星：個人課程書櫃，Prompt 與 Agent、Claude Code 安全開發。">
+<meta name="description" content="端點星：個人課程書櫃，Prompt 與 Agent、Claude Code 安全開發、PAPAYA 電腦教室。">
 <meta name="color-scheme" content="light dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -739,6 +739,29 @@ const SITES = [
     height: 0.92,
     progressKey: 'claude-secure-dev-course.v1',
   },
+  {
+    // 外部連結（YouTube 頻道）：沒有單元與進度，厚度直接指定
+    id: 'papaya',
+    external: true,
+    color: '#7d4524', // 赭褐書布
+    icon: 'play',
+    href: 'https://www.youtube.com/@papayaclass',
+    text: {
+      zh: {
+        spineTitle: 'PAPAYA 電腦教室',
+        titlePhrases: ['PAPAYA', '電腦教室'],
+        desc: 'YouTube 頻道：電腦軟體與工具的實用教學影片。',
+      },
+      en: {
+        spineTitle: 'PAPAYA Computer Class',
+        titlePhrases: ['PAPAYA', 'Computer Class'],
+        desc: 'YouTube channel with practical tutorials on computer software and tools.',
+      },
+    },
+    spineWidth: 58,
+    updated: '2026-10',
+    height: 0.96,
+  },
 ];
 
 const THEME_KEY = 'vibe-coding-home.theme.v1';
@@ -781,7 +804,9 @@ const STRINGS = {
     footer: '進度只存在這個瀏覽器。',
     skip: '點一下直接打開', opening: '正在打開…',
     colophon: (m, l) => `全書 ${m} 模組 · ${l} 單元`, stamp: (d, l) => `已讀 ${d} / ${l}`,
-    imprint: '端點星 藏書', runningHead: '端點星 · 書目', chapter: '卷首',
+    imprint: '端點星 藏書',
+    channelLabel: (title) => `${title}，YouTube 頻道（外部連結）`, channelContent: 'YouTube 影音頻道', externalLink: '外部連結',
+    channelStamp: '影音典藏', lessonUnit: '單元', runningHead: '端點星 · 書目', chapter: '卷首',
   },
   en: {
     brand: '端點星', motto: 'Stars between the pages', loading: 'Leafing through the shelves',
@@ -796,7 +821,9 @@ const STRINGS = {
     footer: 'Progress is stored only in this browser.',
     skip: 'Click to open now', opening: 'Opening…',
     colophon: (m, l) => `${m} modules · ${l} lessons`, stamp: (d, l) => `Read ${d} / ${l}`,
-    imprint: 'From the library of 端點星', runningHead: '端點星 · Catalogue', chapter: 'Prologue',
+    imprint: 'From the library of 端點星',
+    channelLabel: (title) => `${title}, YouTube channel (external link)`, channelContent: 'YouTube video channel', externalLink: 'External link',
+    channelStamp: 'Video archive', lessonUnit: 'lessons', runningHead: '端點星 · Catalogue', chapter: 'Prologue',
   },
 };
 
@@ -815,6 +842,7 @@ const siteText = (site) => site.text[lang];
 
 const ICONS = {
   loop: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="4.5" r="2.2" fill="currentColor"/><circle cx="18.5" cy="15.8" r="2.2" fill="currentColor"/><circle cx="5.5" cy="15.8" r="2.2" fill="currentColor"/></svg>',
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9.2v5.6l4.8-2.8Z" fill="currentColor"/></svg>',
   layers: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="4" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.6"/><rect x="6" y="6" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.8"/><path d="M10.5 10 8.6 12l1.9 2M13.5 10l1.9 2-1.9 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
@@ -846,8 +874,8 @@ function phrasesHtml(phrases) {
 
 function siteStats(site) {
   return {
-    done: Math.min(readDoneCount(site.progressKey), site.lessons),
-    isComplete: site.readyLessons >= site.lessons,
+    done: site.external ? 0 : Math.min(readDoneCount(site.progressKey), site.lessons),
+    isComplete: site.external || site.readyLessons >= site.lessons,
   };
 }
 
@@ -857,6 +885,7 @@ function findSite(element) {
 }
 
 function spineWidth(site) {
+  if (site.spineWidth) return site.spineWidth;
   return Math.round(SPINE_BASE_WIDTH + site.lessons * SPINE_WIDTH_PER_LESSON);
 }
 
@@ -868,7 +897,7 @@ function renderBook(site) {
     <li>
       <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}" draggable="false"
          style="--accent:${site.color};--w:${spineWidth(site)}px;--h:${site.height}"
-         aria-label="${escapeHtml(t('bookLabel', text.titlePhrases.join(' '), site.lessons, done))}">
+         aria-label="${escapeHtml(site.external ? t('channelLabel', text.titlePhrases.join(' ')) : t('bookLabel', text.titlePhrases.join(' '), site.lessons, done))}">
         <span class="book-fallback" aria-hidden="true">${escapeHtml(text.spineTitle)}</span>
       </a>
     </li>`;
@@ -913,7 +942,7 @@ function distributeBooks() {
 
 function renderShelfDom() {
   distributeBooks();
-  const totalLessons = SITES.reduce((sum, s) => sum + s.lessons, 0);
+  const totalLessons = SITES.reduce((sum, s) => sum + (s.external ? 0 : s.lessons), 0);
   const totalDone = SITES.reduce((sum, s) => sum + siteStats(s).done, 0);
   document.getElementById('shelf-summary').textContent = t('summary', SITES.length, totalLessons, totalDone);
   document.getElementById('shelf-hint').textContent = window.matchMedia('(hover: hover)').matches ? t('hintHover') : t('hintTouch');
@@ -938,6 +967,22 @@ function tornEdges() {
 function cardHtml(site) {
   const { done, isComplete } = siteStats(site);
   const text = siteText(site);
+  if (site.external) {
+    return `
+    <span class="scroll-roll top" aria-hidden="true"></span>
+    <div class="scroll-body" style="clip-path:${tornEdges()}">
+    <h2>${phrasesHtml(text.titlePhrases)}</h2>
+    <p>${escapeHtml(text.desc)}</p>
+    <div class="card-progress" aria-hidden="true"></div>
+    <dl>
+      <dt>${t('path')}</dt><dd>${escapeHtml(site.href.replace(/^https?:\/\/(www\.)?/, ''))}</dd>
+      <dt>${t('content')}</dt><dd>${escapeHtml(t('channelContent'))}</dd>
+      <dt>${t('status')}</dt><dd>${escapeHtml(t('externalLink'))}</dd>
+      <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
+    </dl>
+    </div>
+    <span class="scroll-roll bottom" aria-hidden="true"></span>`;
+  }
   const status = isComplete ? t('complete') : t('inProgress', site.readyLessons);
   return `
     <span class="scroll-roll top" aria-hidden="true"></span>
@@ -1432,7 +1477,7 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
 
   // 底部數字
   // 完成與製作中統一格式：可讀單元／總單元
-  const foot = `${site.readyLessons}/${site.lessons}`;
+  const foot = site.external ? 'YouTube' : `${site.readyLessons}/${site.lessons}`;
   ctx.font = `400 11px ${MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1450,7 +1495,7 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fillRect(w - 8, trackTop, 2, trackH);
   }
-  const fill = trackH * (done / site.lessons);
+  const fill = site.external ? 0 : trackH * (done / site.lessons);
   if (fill > 0) {
     ctx.fillStyle = foil;
     ctx.fillRect(w - 8, trackTop + trackH - fill, 2, fill);
@@ -1694,12 +1739,12 @@ function paintLeafBack(canvas, site) {
   drawOrnament(ctx, cx, H * 0.62, 70 * u, u, 'rgba(42, 33, 24, 0.4)');
   ctx.fillStyle = INK_2;
   ctx.font = `400 ${10.5 * u}px ${SERIF}`;
-  ctx.fillText(t('colophon', site.modules, site.lessons), cx, H * 0.62 + 24 * u);
+  ctx.fillText(site.external ? t('channelContent') : t('colophon', site.modules, site.lessons), cx, H * 0.62 + 24 * u);
   ctx.font = `400 ${9 * u}px ${SERIF}`;
   ctx.fillText(`© ${site.updated.slice(0, 4)} ${t('brand')}`, cx, H * 0.62 + 42 * u);
 
-  // 印章：方形朱紅框，字壓在裡面，略微傾斜、邊緣不勻
-  const stamp = t('stamp', done, site.lessons);
+  // 印章：方形朱紅框，字壓在裡面，略微傾斜、邊緣不勻（外部頻道沒有閱讀進度，蓋「影音」章）
+  const stamp = site.external ? t('channelStamp') : t('stamp', done, site.lessons);
   ctx.font = `600 ${11 * u}px ${SERIF}`;
   const sw = ctx.measureText(stamp).width + 22 * u;
   const sh = 30 * u;
@@ -1878,7 +1923,7 @@ function paintCover(canvas, site, mode) {
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'right';
   ctx.font = `500 ${12 * u}px ${MONO}`;
-  ctx.fillText(`${site.lessons} 單元`, W - inset - 18 * u, inset + 38 * u);
+  ctx.fillText(site.external ? 'YouTube' : `${site.lessons} ${t('lessonUnit')}`, W - inset - 18 * u, inset + 38 * u);
 
   // 書名：按詞組換行，靠左下
   const titleSize = 30 * u;
