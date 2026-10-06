@@ -49,7 +49,7 @@
   --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --gutter: clamp(16px, 4vw, 40px);
-  --max: 1080px;
+  --max: 1200px; /* 頂部列、標題列、書櫃、頁尾共用的最大內容寬度 */
   --nav-h: 48px;
   --shelf-h: clamp(340px, 36vw, 360px);
 }
@@ -191,9 +191,10 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 }
 
 /* 滿版書櫃：寬度跟著視窗，兩側留一點點牆面 */
+/* 書櫃寬度跟著視窗，但不超過 --max，和頂部列、標題列對齊 */
 .bookcase {
   position: relative;
-  width: calc(100% - clamp(16px, 3vw, 48px));
+  width: min(calc(100% - var(--gutter) * 2), var(--max));
   margin: 0 auto;
   padding: 0 clamp(16px, 3vw, 36px);
   border-radius: 10px 10px 0 0;
@@ -633,7 +634,7 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
         <path d="M12 10.8v10.7" fill="none" stroke="currentColor" stroke-width="1.1"/>
       </svg>
       <span class="brand-name" data-i18n="brand">端點星</span>
-      <span class="motto" data-i18n="motto">書頁之間，自有星辰</span>
+      <span class="motto" data-i18n="motto">位於銀河旋臂的最邊緣</span>
     </span>
     <div class="nav-controls">
       <div class="theme-switch" role="group" data-i18n-label="langGroup" aria-label="語言">
@@ -801,7 +802,7 @@ const RATE = Math.max(0.05, Number(new URLSearchParams(window.location.search).g
 /* ---------- 中英文 ---------- */
 const STRINGS = {
   zh: {
-    brand: '端點星', motto: '書頁之間，自有星辰', loading: '翻閱書架中',
+    brand: '端點星', motto: '位於銀河旋臂的最邊緣', loading: '翻閱書架中',
     themeGroup: '配色', auto: '自動', light: '淺色', dark: '深色', langGroup: '語言',
     shelfLabel: '課程書櫃', rowLabel: (n) => `第 ${n} 層`,
     summary: (books, lessons, done) => `${books} 本 · ${lessons} 單元 · 已讀 ${done}`,
@@ -818,7 +819,7 @@ const STRINGS = {
     channelStamp: '影音典藏', lessonUnit: '單元', runningHead: '端點星 · 書目', chapter: '卷首',
   },
   en: {
-    brand: '端點星', motto: 'Stars between the pages', loading: 'Leafing through the shelves',
+    brand: 'Terminus', motto: 'On the very fringe of the Galactic spiral', loading: 'Leafing through the shelves',
     themeGroup: 'Appearance', auto: 'Auto', light: 'Light', dark: 'Dark', langGroup: 'Language',
     shelfLabel: 'Course bookshelf', rowLabel: (n) => `Shelf ${n}`,
     summary: (books, lessons, done) => `${books} books · ${lessons} lessons · ${done} read`,
@@ -830,9 +831,9 @@ const STRINGS = {
     footer: 'Progress is stored only in this browser.',
     skip: 'Click to open now', opening: 'Opening…',
     colophon: (m, l) => `${m} modules · ${l} lessons`, stamp: (d, l) => `Read ${d} / ${l}`,
-    imprint: 'From the library of 端點星',
+    imprint: 'From the library of Terminus',
     channelLabel: (title) => `${title}, YouTube channel (external link)`, channelContent: 'YouTube video channel', externalLink: 'External link',
-    channelStamp: 'Video archive', lessonUnit: 'lessons', runningHead: '端點星 · Catalogue', chapter: 'Prologue',
+    channelStamp: 'Video archive', lessonUnit: 'lessons', runningHead: 'Terminus · Catalogue', chapter: 'Prologue',
   },
 };
 
@@ -1140,6 +1141,7 @@ function applyLang(next, rebuild = true) {
   lang = next;
   document.documentElement.lang = lang === 'en' ? 'en' : 'zh-Hant-TW';
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.title = t('brand');
   document.querySelectorAll('[data-i18n-label]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nLabel)); });
   document.querySelectorAll('[data-lang-choice]').forEach((btn) => {
     btn.setAttribute('aria-pressed', String(btn.dataset.langChoice === lang));
@@ -2398,7 +2400,7 @@ function createShelf() {
   const stemMat = new THREE.MeshStandardMaterial({ color: '#8a7a5c', roughness: 0.9 });
   const woodPropMat = new THREE.MeshPhysicalMaterial({ color: '#4a2f1c', roughness: 0.55, clearcoat: 0.4 });
   const brassMat = new THREE.MeshStandardMaterial({ color: '#a98a52', metalness: 0.9, roughness: 0.38 });
-  const glassMat = new THREE.MeshPhysicalMaterial({ color: '#e8eef0', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide });
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: '#eef3f4', roughness: 0.04, metalness: 0, transparent: true, opacity: 0.16, clearcoat: 1, clearcoatRoughness: 0.05, depthWrite: false });
   const sandMat = new THREE.MeshStandardMaterial({ color: '#c9a978', roughness: 1 });
   const terracottaMat = new THREE.MeshStandardMaterial({ color: '#9a5a3c', roughness: 0.9 });
   const soilMat = new THREE.MeshStandardMaterial({ color: '#3a2a1e', roughness: 1 });
@@ -2674,14 +2676,36 @@ function createShelf() {
       const a = (k / 3) * Math.PI * 2 + 0.5;
       addMesh(new THREE.CylinderGeometry(1, 1, H - 10, 8), brassMat, cx + Math.cos(a) * (W - 3), -(boardTop - H / 2), z + Math.sin(a) * (W - 3));
     }
+    // 玻璃：上下兩個圓潤的球、中間細頸。半徑是高度 y（0–1）的平滑函數
     const inner = H - 12;
-    const profile = [[0.05, 0], [0.82, 0.02], [0.88, 0.2], [0.6, 0.4], [0.12, 0.5], [0.6, 0.6], [0.88, 0.8], [0.82, 0.98], [0.05, 1]]
-      .map(([x, y]) => new THREE.Vector2(x * (W - 5), y * inner));
-    addMesh(new THREE.LatheGeometry(profile, 32), glassMat, cx, -(boardTop - 6), z, { cast: false });
-    // 下半的沙堆與上半剩下的沙
-    addMesh(new THREE.ConeGeometry((W - 6) * 0.78, inner * 0.22, 24), sandMat, cx, -(boardTop - 6 - inner * 0.11), z, { cast: false });
-    const top = addMesh(new THREE.ConeGeometry((W - 6) * 0.62, inner * 0.16, 24), sandMat, cx, -(boardTop - 6 - inner * 0.62), z, { cast: false });
-    top.rotation.x = Math.PI;
+    const maxR = W - 6;
+    const neck = 0.09;
+    const glassR = (y) => {
+      const t = y < 0.5 ? y / 0.5 : (1 - y) / 0.5; // 0 在瓶底／瓶口、1 在細頸
+      return maxR * (neck + (1 - neck) * Math.sin(Math.PI * (0.3 + 0.7 * t)));
+    };
+    const SEG = 48;
+    const glassProfile = [new THREE.Vector2(0, 0)];
+    for (let i = 0; i <= SEG; i += 1) {
+      const y = i / SEG;
+      glassProfile.push(new THREE.Vector2(glassR(y), y * inner));
+    }
+    glassProfile.push(new THREE.Vector2(0, inner));
+    addMesh(new THREE.LatheGeometry(glassProfile, 40), glassMat, cx, -(boardTop - 6), z, { cast: false });
+    // 沙：照瓶身形狀填，比玻璃略小。下半到 0.2 高再堆成小丘，上半剩到 0.66 高、表面略凹
+    const sandProfile = (from, to, topCone) => {
+      const pts = [new THREE.Vector2(0, from * inner)];
+      for (let i = 0; i <= 16; i += 1) {
+        const y = from + ((to - from) * i) / 16;
+        pts.push(new THREE.Vector2(glassR(y) * 0.92, y * inner));
+      }
+      pts.push(new THREE.Vector2(0, (to + topCone) * inner));
+      return pts;
+    };
+    addMesh(new THREE.LatheGeometry(sandProfile(0.015, 0.2, 0.07), 32), sandMat, cx, -(boardTop - 6), z, { cast: false });
+    addMesh(new THREE.LatheGeometry(sandProfile(0.5, 0.66, -0.025), 32), sandMat, cx, -(boardTop - 6), z, { cast: false });
+    // 從細頸落下的一縷沙
+    addMesh(new THREE.CylinderGeometry(0.35, 0.35, inner * 0.23, 6), sandMat, cx, -(boardTop - 6 - inner * 0.385), z, { cast: false });
   }
 
   /** 陶盆多肉：赤陶盆、土、蓮座狀的葉片 */
