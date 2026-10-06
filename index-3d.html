@@ -190,8 +190,11 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   .theme-switch button { padding: 0; }
 }
 
+/* 滿版書櫃：寬度跟著視窗，兩側留一點點牆面 */
 .bookcase {
   position: relative;
+  width: calc(100% - clamp(16px, 3vw, 48px));
+  margin: 0 auto;
   padding: 0 clamp(16px, 3vw, 36px);
   border-radius: 10px 10px 0 0;
   background: var(--case-back);
@@ -649,7 +652,8 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
       <p id="shelf-hint" class="shelf-hint"></p>
       <p id="shelf-summary"></p>
     </div>
-    <div class="bookcase is-loading" id="bookcase" aria-busy="true" data-i18n-label="shelfLabel" role="region" aria-label="課程書櫃">
+  </div>
+  <div class="bookcase is-loading" id="bookcase" aria-busy="true" data-i18n-label="shelfLabel" role="region" aria-label="課程書櫃">
       <div class="shelf-loader" role="status">
         <span class="visually-hidden" data-i18n="loading">翻閱書架中</span>
         <div class="lb-scene" aria-hidden="true">
@@ -667,7 +671,6 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
       </div>
       <div id="rows"></div>
       <div class="book-card" id="book-card" aria-live="polite"></div>
-    </div>
   </div>
 </main>
 
@@ -766,7 +769,9 @@ const SITES = [
 
 const THEME_KEY = 'vibe-coding-home.theme.v1';
 const LANG_KEY = 'vibe-coding-home.lang.v1';
-const SHELF_ROWS = 3; // 書櫃至少幾層；書多了會自動加層
+const SHELF_MIN_ROWS = 2; // 書櫃至少幾層
+const SHELF_SPARE_ROWS = 1; // 放完書後再多留幾層空的（放擺飾，以後加書用）
+const PROP_MIN_SPACE = 240; // 有書的那一層剩下這麼多空間，就在尾端擺一件擺飾
 const SPINE_BASE_WIDTH = 40;
 const SPINE_WIDTH_PER_LESSON = 0.7;
 const BOOKEND_SPACE = 54; // 書擋寬度＋間距
@@ -926,12 +931,24 @@ function distributeBooks() {
     rows[rows.length - 1].push(site);
     used += w;
   });
-  while (rows.length < SHELF_ROWS) rows.push([]);
+  // 層數依書的數量與寬度決定：放滿書的層數＋備用層，至少 SHELF_MIN_ROWS 層
+  const target = Math.max(SHELF_MIN_ROWS, rows.length + SHELF_SPARE_ROWS);
+  while (rows.length < target) rows.push([]);
   let propIndex = 0;
   rowsEl.innerHTML = rows.map((row, i) => {
-    const content = row.length
-      ? row.map(renderBook).join('') + '<li class="bookend" data-bookend aria-hidden="true"></li>'
-      : PROPS[propIndex++ % PROPS.length];
+    let content;
+    if (row.length) {
+      content = row.map(renderBook).join('') + '<li class="bookend" data-bookend aria-hidden="true"></li>';
+      // 這一層還很空：尾端擺一只陶瓶或一疊書
+      const rowWidth = row.reduce((sum, s) => sum + spineWidth(s) + 3, 0) + BOOKEND_SPACE;
+      if (inner - rowWidth >= PROP_MIN_SPACE) {
+        content += i % 2
+          ? '<li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-stack" data-prop="stack" aria-hidden="true"></li>'
+          : '<li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-vase" data-prop="vase" aria-hidden="true"></li>';
+      }
+    } else {
+      content = PROPS[propIndex++ % PROPS.length];
+    }
     return `
       <div class="shelf-row">
         <ul class="books" aria-label="${escapeHtml(t('rowLabel', i + 1))}">${content}</ul>
