@@ -1,0 +1,1894 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe Coding 3D</title>
+<meta name="description" content="個人課程書櫃（three.js 版）：Prompt 與 Agent、Claude Code 安全開發。">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<script>
+  /* 在第一次繪製前套用主題，避免深色模式閃白 */
+  try {
+    const savedTheme = window.localStorage.getItem('vibe-coding-home.theme.v1');
+    if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+  } catch (err) {
+    console.warn('無法讀取主題偏好，改用系統設定：', err);
+  }
+</script>
+<style>
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --text: #1d1d1f;
+  --text-2: #6e6e73;
+  --hairline: rgba(0, 0, 0, 0.1);
+  --focus: #0071e3;
+  --selection: rgba(0, 113, 227, 0.2);
+
+  /* 實體材質：紙、燙金、櫃子背板、金屬層板 */
+  --paper: #f8f4ea;
+  --paper-2: #efe8d8;
+  --paper-line: #e3dac6;
+  --ink: #1d1d1f;
+  --foil: #efe2bf;
+  --case-back: linear-gradient(#e4e4e9, #ececf0 60%, #e9e9ee);
+  --case-shade: rgba(0, 0, 0, 0.28);
+  --metal-top: linear-gradient(#ffffff, #dcdce1);
+  --metal-front: linear-gradient(#d2d2d8, #b4b4bc 55%, #a3a3ac);
+  --metal-brush: rgba(255, 255, 255, 0.16);
+  --stage-bg: rgba(236, 236, 240, 0.9);
+  --linen:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 3px);
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --gutter: clamp(16px, 4vw, 40px);
+  --max: 1080px;
+  --nav-h: 48px;
+  --shelf-h: clamp(340px, 36vw, 360px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --surface: #1d1d1f;
+    --text: #f5f5f7;
+    --text-2: #a1a1a6;
+    --hairline: rgba(255, 255, 255, 0.14);
+    --focus: #2997ff;
+    --selection: rgba(41, 151, 255, 0.35);
+    --case-back: linear-gradient(#0e0e10, #151517 60%, #121214);
+    --case-shade: rgba(0, 0, 0, 0.7);
+    --metal-top: linear-gradient(#6a6a72, #44444b);
+    --metal-front: linear-gradient(#3c3c43, #2b2b31 55%, #222227);
+    --metal-brush: rgba(255, 255, 255, 0.05);
+    --stage-bg: rgba(0, 0, 0, 0.86);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1d1d1f;
+  --text: #f5f5f7;
+  --text-2: #a1a1a6;
+  --hairline: rgba(255, 255, 255, 0.14);
+  --focus: #2997ff;
+  --selection: rgba(41, 151, 255, 0.35);
+  --case-back: linear-gradient(#0e0e10, #151517 60%, #121214);
+  --case-shade: rgba(0, 0, 0, 0.7);
+  --metal-top: linear-gradient(#6a6a72, #44444b);
+  --metal-front: linear-gradient(#3c3c43, #2b2b31 55%, #222227);
+  --metal-brush: rgba(255, 255, 255, 0.05);
+  --stage-bg: rgba(0, 0, 0, 0.86);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scrollbar-color: var(--text-2) var(--bg); }
+
+/* 中文字距維持 0 以上，負字距會讓方塊字擠在一起 */
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 400ms var(--ease-out), color 400ms var(--ease-out);
+}
+
+::selection { background: var(--selection); }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
+
+.wrap {
+  width: 100%;
+  max-width: calc(var(--max) + var(--gutter) * 2);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* ---------- 頂部列 ---------- */
+.nav { height: var(--nav-h); border-bottom: 1px solid var(--hairline); }
+.nav .wrap { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.brand svg { width: 20px; height: 20px; flex: none; }
+@media (max-width: 479px) {
+  .brand .path { display: none; }
+}
+.brand .path { color: var(--text-2); font-family: var(--mono); font-weight: 400; font-size: 12px; }
+
+.theme-switch { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--hairline); flex: none; }
+.theme-switch button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  min-width: 44px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 250ms var(--ease-out), color 250ms var(--ease-out);
+}
+.theme-switch button:hover { color: var(--text); }
+.theme-switch button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+/* ---------- 標題列 ---------- */
+main { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: clamp(40px, 8vh, 96px) 0; }
+
+.shelf-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin-bottom: clamp(24px, 4vh, 40px);
+}
+.shelf-head h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); line-height: 1.2; font-weight: 700; letter-spacing: 0.04em; }
+.shelf-head p { margin: 0; color: var(--text-2); font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* ---------- 書櫃：three.js 畫在 canvas 上，DOM 只負責排版與互動 ----------
+   .books 裡的連結照原本的 flex 排版（寬＝書背寬、高＝書高），3D 書直接讀這些 rect 擺位置，
+   所以版面檢查、Tab 聚焦、Ctrl／Cmd 點擊開新分頁都和 2D 版一樣。 */
+.bookcase {
+  position: relative;
+  padding: 44px clamp(16px, 3vw, 36px) 0;
+  border-radius: 10px 10px 0 0;
+  background: var(--case-back);
+}
+.bookcase.is-3d { background: transparent; }
+
+.shelf-canvas {
+  position: absolute;
+  inset: 0 0 -24px 0; /* 往下多留 24px，層板的投影才不會被切掉 */
+  z-index: 0;
+  width: 100%;
+  height: calc(100% + 24px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-out);
+}
+.bookcase.is-3d .shelf-canvas { opacity: 1; }
+
+.books {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-height: var(--shelf-h);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.books li { display: flex; align-items: flex-end; }
+
+.board {
+  position: relative;
+  height: 20px;
+  margin: 0 calc(-1 * clamp(16px, 3vw, 36px));
+  border-radius: 0 0 6px 6px;
+  background: var(--metal-front);
+}
+.bookcase.is-3d .board { background: transparent; }
+
+.book {
+  --accent: #1e4fb3;
+  position: relative;
+  display: block;
+  width: var(--w, 64px);
+  height: calc(var(--shelf-h) * var(--h, 1));
+  margin-bottom: -3px;
+  border-radius: 2px;
+  color: var(--foil);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.book:focus-visible { outline-offset: 5px; }
+
+/* three.js 載入前與無法使用 WebGL 時的簡易書背；3D 準備好就隱藏 */
+.book-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.1) 22%, rgba(0, 0, 0, 0.35)), var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.bookcase.is-3d .book-fallback { visibility: hidden; }
+
+.bookend { width: 46px; height: calc(var(--shelf-h) * 0.48); margin-left: 8px; }
+
+/* ---------- 書櫃下方的說明欄 ---------- */
+.inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px 32px;
+  min-height: 140px;
+  margin-top: 28px;
+  padding: 0 clamp(4px, 1vw, 12px);
+}
+@media (min-width: 768px) {
+  .inspector { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+}
+.inspector h2 { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 700; letter-spacing: 0.02em; text-wrap: balance; }
+.inspector .phrase { display: inline-block; }
+.inspector p { margin: 6px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.7; text-wrap: pretty; }
+.inspector dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 13px; line-height: 1.5; align-content: start; }
+.inspector dt { color: var(--text-2); letter-spacing: 0.08em; }
+.inspector dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.inspector .hint { color: var(--text-2); font-size: 15px; margin: 0; }
+
+/* ---------- 打開書的舞台：書從書櫃的 canvas 交給全螢幕的 canvas ---------- */
+.stage { position: fixed; inset: 0; z-index: 50; cursor: pointer; }
+.stage-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--stage-bg);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  opacity: 0;
+}
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage-skip {
+  position: absolute;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  color: var(--text-2);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.footer { padding: 16px 0 24px; color: var(--text-2); font-size: 12px; letter-spacing: 0.04em; }
+.footer p { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <span class="brand">
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <rect x="1" y="1" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M5.8 7.6 8.2 10l-2.4 2.4M10.6 12.8h3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Vibe Coding
+      <span class="path">~/course-web</span>
+    </span>
+    <div class="theme-switch" role="group" aria-label="配色">
+      <button type="button" data-theme-choice="auto">自動</button>
+      <button type="button" data-theme-choice="light">淺色</button>
+      <button type="button" data-theme-choice="dark">深色</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="shelf-head">
+      <h1>書櫃</h1>
+      <p id="shelf-summary"></p>
+    </div>
+    <div class="bookcase" id="bookcase">
+      <ul class="books" id="books" aria-label="課程"></ul>
+      <div class="board" id="board" aria-hidden="true"></div>
+    </div>
+    <section class="inspector" id="inspector" aria-live="polite"></section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap"><p>進度只存在這個瀏覽器。</p></div>
+</footer>
+
+<!--
+  three.js 版的書櫃。和 index.html 用同一份 SITES 格式：新增一本書就在 SITES 加一筆。
+  書的厚度依單元數自動計算，高度用 height（相對書櫃高度）調整。
+  DOM 的 .book 連結負責排版與互動（Tab、Ctrl／Cmd 點擊、讀屏），three.js 依連結的 rect 擺放 3D 書。
+  three.js 從 CDN 載入；載入失敗或沒有 WebGL 時，書櫃退回簡易的 CSS 書背，連結照常可用。
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+const SITES = [
+  {
+    id: 'prompt',
+    color: '#1e4fb3',
+    icon: 'loop',
+    href: 'course-web/ai-chat-prompt-agent-course/index.html',
+    spineTitle: 'Prompt × Agent 實戰課',
+    titlePhrases: ['AI 對話', '× Prompt', '× Agent', '實戰課'],
+    desc: '從跟 AI 對話、寫 prompt，到操作 AI Agent、CLI 與 harness。',
+    modules: 12,
+    lessons: 50,
+    readyLessons: 25,
+    updated: '2026-10',
+    height: 1,
+    progressKey: 'ai-chat-prompt-agent-course.v1',
+  },
+  {
+    id: 'secure',
+    color: '#1d6338',
+    icon: 'layers',
+    href: 'course-web/claude-code-secure-dev-course/index.html',
+    spineTitle: 'Claude Code 安全開發',
+    titlePhrases: ['Claude Code', '× 安全開發', '實戰課'],
+    desc: '用 Claude Code CLI 與 Cowork 開發軟體：工作流、權限與隔離、資安防護、效能與成本。',
+    modules: 9,
+    lessons: 29,
+    readyLessons: 29,
+    updated: '2026-10',
+    height: 0.92,
+    progressKey: 'claude-secure-dev-course.v1',
+  },
+];
+
+const THEME_KEY = 'vibe-coding-home.theme.v1';
+const SPINE_BASE_WIDTH = 40;
+const SPINE_WIDTH_PER_LESSON = 0.7;
+const COVER_MAX_HEIGHT = 400;
+const COVER_RATIO = 4 / 3;
+const SHELF_CAMERA_DISTANCE = 4000; // 書櫃幾乎是正視圖，只留一點點透視
+const STAGE_CAMERA_DISTANCE = 2000;
+const SPINE_TITLE_PX = 15;
+const SPINE_TITLE_MIN_PX = 11;
+const HOVER_LIFT = 12;
+const FOIL = '#efe2bf';
+const PAPER = '#f8f4ea';
+const PAPER_2 = '#efe8d8';
+const INK = '#1d1d1f';
+const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+const MONO = '"SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
+// ?rate=0.25 會把所有動畫放慢 4 倍，方便逐格檢查
+const RATE = Math.max(0.05, Number(new URLSearchParams(window.location.search).get('rate')) || 1);
+
+const ICONS = {
+  loop: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="4.5" r="2.2" fill="currentColor"/><circle cx="18.5" cy="15.8" r="2.2" fill="currentColor"/><circle cx="5.5" cy="15.8" r="2.2" fill="currentColor"/></svg>',
+  layers: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="4" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.6"/><rect x="6" y="6" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.8"/><path d="M10.5 10 8.6 12l1.9 2M13.5 10l1.9 2-1.9 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+
+/**
+ * 讀課程自己存在 localStorage 的進度。同網域（GitHub Pages 的同一個 repo）才讀得到。
+ * @param {string} key 課程的 STORAGE_KEY
+ * @returns {number} 已完成的單元數；讀不到時回傳 0
+ */
+function readDoneCount(key) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.done !== 'object' || parsed.done === null) return 0;
+    return Object.values(parsed.done).filter(Boolean).length;
+  } catch (err) {
+    console.warn(`無法讀取課程進度「${key}」：`, err);
+    return 0;
+  }
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function phrasesHtml(phrases) {
+  return phrases.map((p) => `<span class="phrase">${escapeHtml(p)}</span>`).join(' ');
+}
+
+function siteStats(site) {
+  return {
+    done: Math.min(readDoneCount(site.progressKey), site.lessons),
+    isComplete: site.readyLessons >= site.lessons,
+  };
+}
+
+function findSite(element) {
+  const book = element && element.closest && element.closest('.book');
+  return book ? SITES.find((s) => s.id === book.dataset.id) : null;
+}
+
+function spineWidth(site) {
+  return Math.round(SPINE_BASE_WIDTH + site.lessons * SPINE_WIDTH_PER_LESSON);
+}
+
+/* ---------- 書櫃的 DOM：連結負責排版與互動，外觀交給 three.js ---------- */
+function renderBook(site) {
+  const { done } = siteStats(site);
+  const fullTitle = site.titlePhrases.join(' ');
+  return `
+    <li>
+      <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}"
+         style="--accent:${site.color};--w:${spineWidth(site)}px;--h:${site.height}"
+         aria-label="${escapeHtml(fullTitle)}，${site.lessons} 個單元，已讀 ${done} 個">
+        <span class="book-fallback" aria-hidden="true">${escapeHtml(site.spineTitle)}</span>
+      </a>
+    </li>`;
+}
+
+function renderShelfDom() {
+  document.getElementById('books').innerHTML = SITES.map(renderBook).join('') + '<li aria-hidden="true" class="bookend" id="bookend"></li>';
+  const totalLessons = SITES.reduce((sum, s) => sum + s.lessons, 0);
+  const totalDone = SITES.reduce((sum, s) => sum + siteStats(s).done, 0);
+  document.getElementById('shelf-summary').textContent = `${SITES.length} 本 · ${totalLessons} 單元 · 已讀 ${totalDone}`;
+  inspectedId = undefined;
+  showInspector(null);
+}
+
+/* ---------- 說明欄：游標停在書背或用 Tab 聚焦時顯示 ---------- */
+let inspectedId;
+
+function inspectorHtml(site) {
+  if (!site) {
+    const hint = window.matchMedia('(hover: hover)').matches ? '游標停在書背上看介紹，點一下打開。' : '點一下書背打開。';
+    return `<p class="hint">${hint}</p>`;
+  }
+  const { done, isComplete } = siteStats(site);
+  const status = isComplete ? '已完成' : `製作中，${site.readyLessons} 個單元可讀`;
+  return `
+    <div>
+      <h2>${phrasesHtml(site.titlePhrases)}</h2>
+      <p>${escapeHtml(site.desc)}</p>
+    </div>
+    <dl>
+      <dt>路徑</dt><dd>${escapeHtml(site.href.replace(/index\.html$/, ''))}</dd>
+      <dt>內容</dt><dd>${site.modules} 模組 · ${site.lessons} 單元</dd>
+      <dt>狀態</dt><dd>${escapeHtml(status)}</dd>
+      <dt>已讀</dt><dd>${done} / ${site.lessons}</dd>
+      <dt>查證</dt><dd>${escapeHtml(site.updated)}</dd>
+    </dl>`;
+}
+
+function showInspector(site) {
+  const id = site ? site.id : null;
+  if (id === inspectedId) return;
+  inspectedId = id;
+  document.getElementById('inspector').innerHTML = inspectorHtml(site);
+}
+
+/* 停在哪本書上：說明欄與 3D 書抬起共用 */
+let hoveredId = null;
+let focusedId = null;
+
+function updateHover() {
+  if (shelf) shelf.setActive(hoveredId || focusedId);
+}
+
+function setupInspector() {
+  const books = document.getElementById('books');
+  books.addEventListener('pointerover', (event) => {
+    const site = findSite(event.target);
+    if (!site) return;
+    showInspector(site);
+    hoveredId = site.id;
+    updateHover();
+  });
+  books.addEventListener('pointermove', (event) => {
+    const book = event.target.closest && event.target.closest('.book');
+    if (!book || !shelf) return;
+    const rect = book.getBoundingClientRect();
+    shelf.setTilt(book.dataset.id, (event.clientX - rect.left) / rect.width - 0.5, (event.clientY - rect.top) / rect.height - 0.5);
+  });
+  books.addEventListener('pointerout', (event) => {
+    const from = findSite(event.target);
+    const to = findSite(event.relatedTarget);
+    if (from && (!to || to.id !== from.id)) {
+      hoveredId = null;
+      if (shelf) shelf.setTilt(from.id, 0, 0);
+      updateHover();
+    }
+  });
+  books.addEventListener('focusin', (event) => {
+    const site = findSite(event.target);
+    showInspector(site);
+    focusedId = site ? site.id : null;
+    updateHover();
+  });
+  books.addEventListener('pointerleave', () => {
+    if (!books.contains(document.activeElement)) showInspector(null);
+  });
+  books.addEventListener('focusout', (event) => {
+    if (!books.contains(event.relatedTarget)) showInspector(null);
+    focusedId = null;
+    updateHover();
+  });
+
+  // 左右方向鍵在書之間移動
+  books.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const list = [...books.querySelectorAll('.book')];
+    const index = list.indexOf(document.activeElement);
+    if (index < 0) return;
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    list[(index + step + list.length) % list.length].focus();
+    event.preventDefault();
+  });
+}
+
+/* ---------- 主題 ---------- */
+function applyTheme(choice) {
+  if (choice === 'light' || choice === 'dark') document.documentElement.dataset.theme = choice;
+  else delete document.documentElement.dataset.theme;
+  document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.themeChoice === choice));
+  });
+  if (shelf) shelf.applyTheme();
+}
+
+function setupThemeSwitch() {
+  applyTheme(document.documentElement.dataset.theme || 'auto');
+  document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const choice = btn.dataset.themeChoice;
+      applyTheme(choice);
+      try {
+        if (choice === 'auto') window.localStorage.removeItem(THEME_KEY);
+        else window.localStorage.setItem(THEME_KEY, choice);
+      } catch (err) {
+        console.warn(`無法儲存主題偏好「${choice}」：`, err);
+      }
+    });
+  });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (shelf) shelf.applyTheme();
+  });
+}
+
+function isDarkTheme() {
+  const t = document.documentElement.dataset.theme;
+  if (t === 'dark') return true;
+  if (t === 'light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+/* ---------- 動畫時間軸：只在有東西在動時跑 requestAnimationFrame ---------- */
+function cubicBezier(x1, y1, x2, y2) {
+  const sample = (a, b, t) => 3 * a * (1 - t) * (1 - t) * t + 3 * b * (1 - t) * t * t + t * t * t;
+  const slope = (a, b, t) => 3 * a * (1 - t) * (1 - t) + 6 * (b - a) * (1 - t) * t + 3 * (1 - b) * t * t;
+  return (x) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i += 1) {
+      const err = sample(x1, x2, t) - x;
+      if (Math.abs(err) < 1e-6) break;
+      const d = slope(x1, x2, t);
+      if (Math.abs(d) < 1e-6) break;
+      t -= err / d;
+    }
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 20 && Math.abs(sample(x1, x2, t) - x) > 1e-6; i += 1) {
+      t = (lo + hi) / 2;
+      if (sample(x1, x2, t) < x) lo = t; else hi = t;
+    }
+    return sample(y1, y2, t);
+  };
+}
+const EASE_OUT = cubicBezier(0.16, 1, 0.3, 1);
+const EASE_IN_OUT = cubicBezier(0.45, 0, 0.2, 1);
+const LINEAR = (t) => t;
+
+const tweens = new Set();
+const frameHooks = new Set(); // 每格都要跑、回傳 true 代表還在動
+let rafId = 0;
+let lastFrame = 0;
+
+/** 跑一段動畫，update(eased, raw) 每格呼叫；回傳完成的 Promise */
+function tween({ duration, delay = 0, easing = LINEAR, update }) {
+  return new Promise((resolve) => {
+    const start = performance.now() + delay / RATE;
+    const item = { start, duration: Math.max(1, duration / RATE), easing, update, resolve };
+    update(easing(0), 0);
+    tweens.add(item);
+    kick();
+  });
+}
+
+function kick() {
+  if (!rafId) rafId = requestAnimationFrame(frame);
+}
+
+function frame(now) {
+  rafId = 0;
+  const dt = Math.min(64, now - (lastFrame || now));
+  lastFrame = now;
+  let active = false;
+  tweens.forEach((item) => {
+    const raw = Math.min(1, Math.max(0, (now - item.start) / item.duration));
+    item.update(item.easing(raw), raw);
+    if (raw >= 1) {
+      tweens.delete(item);
+      item.resolve();
+    } else {
+      active = true;
+    }
+  });
+  frameHooks.forEach((hook) => { if (hook(dt)) active = true; });
+  if (shelf) shelf.render();
+  if (stage) stage.render();
+  if (active) kick();
+  else lastFrame = 0;
+}
+
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* ---------- 材質貼圖：全部用 canvas 畫，書背與封面的燙金另外畫一張金屬度遮罩 ---------- */
+let THREE;
+let RoomEnvironment;
+const iconImages = {};
+
+function svgImage(svg, color) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('圖示載入失敗'));
+    const markup = svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" ').replace(/currentColor/g, color);
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+  });
+}
+
+async function loadIcons() {
+  await Promise.all(Object.entries(ICONS).map(async ([key, svg]) => {
+    iconImages[key] = { foil: await svgImage(svg, FOIL), mask: await svgImage(svg, '#ffffff') };
+  }));
+}
+
+function makeCanvas(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(2, Math.round(width));
+  canvas.height = Math.max(2, Math.round(height));
+  return canvas;
+}
+
+function canvasTexture(canvas, { srgb = true, repeat = false } = {}) {
+  const texture = new THREE.CanvasTexture(canvas);
+  if (srgb) texture.colorSpace = THREE.SRGBColorSpace;
+  if (repeat) texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = maxAnisotropy;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/* 布紋：水平白 4.5%、垂直黑 6%，1px 線、3px 間距（單位是畫面 px，k 是貼圖解析度倍率） */
+function paintLinen(ctx, width, height, k) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+  for (let y = 0; y < height; y += 3 * k) ctx.fillRect(0, y, width, k);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+  for (let x = 0; x < width; x += 3 * k) ctx.fillRect(x, 0, k, height);
+  // 一點點不規則的纖維，近看才不會像網格
+  for (let i = 0; i < (width * height) / (90 * k * k); i += 1) {
+    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255, 255, 255, 0.035)' : 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(Math.random() * width, Math.random() * height, (2 + Math.random() * 6) * k, k * 0.6);
+  }
+  ctx.restore();
+}
+
+function clothCanvas(color) {
+  const k = 4;
+  const canvas = makeCanvas(96 * k, 96 * k);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  paintLinen(ctx, canvas.width, canvas.height, k);
+  return canvas;
+}
+
+function linenBumpCanvas() {
+  const k = 4;
+  const canvas = makeCanvas(96 * k, 96 * k);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#a8a8a8';
+  for (let y = 0; y < canvas.height; y += 3 * k) ctx.fillRect(0, y, canvas.width, k);
+  ctx.fillStyle = 'rgba(40, 40, 40, 0.5)';
+  for (let x = 0; x < canvas.width; x += 3 * k) ctx.fillRect(x, 0, k, canvas.height);
+  return canvas;
+}
+
+/* 燙金與金屬度遮罩：G 是粗糙度、B 是金屬度（three.js 的 roughnessMap / metalnessMap） */
+const MASK_BASE = 'rgb(0, 225, 0)';
+const MASK_FOIL = 'rgb(0, 85, 150)';
+
+function isUpright(ch) {
+  return /[×⺀-鿿豈-﫿＀-￯　-〿]/.test(ch);
+}
+
+/** 直排書名拆段：中日文字直立，英數連成一段轉 90° */
+function verticalRuns(text) {
+  const runs = [];
+  for (const ch of text) {
+    const upright = isUpright(ch);
+    const last = runs[runs.length - 1];
+    if (!upright && last && !last.upright) last.text += ch;
+    else runs.push({ upright, text: ch });
+  }
+  return runs;
+}
+
+/** 直排書名的總長（px），字距 0.14em，和 CSS letter-spacing 一樣每個字後面都加 */
+function verticalLength(ctx, text, size) {
+  ctx.font = `600 ${size}px ${FONT}`;
+  const spacing = size * 0.14;
+  return verticalRuns(text).reduce((sum, run) => {
+    if (run.upright) return sum + [...run.text].length * (size + spacing);
+    return sum + [...run.text].reduce((s, ch) => s + ctx.measureText(ch).width + spacing, 0);
+  }, 0);
+}
+
+function drawVertical(ctx, text, cx, top, size) {
+  ctx.font = `600 ${size}px ${FONT}`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  const spacing = size * 0.14;
+  let y = top;
+  verticalRuns(text).forEach((run) => {
+    if (run.upright) {
+      [...run.text].forEach((ch) => {
+        ctx.fillText(ch, cx, y + size / 2);
+        y += size + spacing;
+      });
+      return;
+    }
+    [...run.text].forEach((ch) => {
+      const w = ctx.measureText(ch).width;
+      ctx.save();
+      ctx.translate(cx, y + w / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+      y += w + spacing;
+    });
+  });
+}
+
+/** 書名放不下標籤時等比縮小字級，下限 11px（和 2D 版的 fitSpineTitles 一樣） */
+function fitSpineTitle(text, available) {
+  const ctx = makeCanvas(2, 2).getContext('2d');
+  const length = verticalLength(ctx, text, SPINE_TITLE_PX);
+  if (length <= available) return SPINE_TITLE_PX;
+  return Math.max(SPINE_TITLE_MIN_PX, Math.floor(SPINE_TITLE_PX * (available / length) * 10) / 10);
+}
+
+/* 書背的版面（畫面 px），和 2D 版 .spine 的 grid 一樣：壓條／圖示／書名標籤／底部數字／壓條 */
+function spineLayout(w, h) {
+  return { bandTop: 8, icon: 27, labelTop: 59, labelBottom: h - 55, foot: h - 36, bandBottom: h - 17 };
+}
+
+/** 畫書背。mask=true 時畫金屬度遮罩，只畫燙金的部分 */
+function paintSpine(ctx, site, w, h, k, titleSize, mask) {
+  const { done, isComplete } = siteStats(site);
+  const L = spineLayout(w, h);
+  const foil = mask ? MASK_FOIL : FOIL;
+  ctx.save();
+  ctx.scale(k, k);
+  if (mask) {
+    ctx.fillStyle = MASK_BASE;
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.fillStyle = site.color;
+    ctx.fillRect(0, 0, w, h);
+    paintLinen(ctx, w, h, 1);
+    // 圓弧書脊的明暗：兩側暗、左側偏亮的高光（3D 光影之外再加一層，讓書背有圓度）
+    const arc = ctx.createLinearGradient(0, 0, w, 0);
+    [[0, 'rgba(0,0,0,0.42)'], [0.07, 'rgba(0,0,0,0.1)'], [0.22, 'rgba(255,255,255,0.13)'], [0.4, 'rgba(255,255,255,0.04)'], [0.64, 'rgba(0,0,0,0.05)'], [0.9, 'rgba(0,0,0,0.24)'], [1, 'rgba(0,0,0,0.45)']]
+      .forEach(([o, c]) => arc.addColorStop(o, c));
+    ctx.fillStyle = arc;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // 壓條：凸起的橫紋加兩道燙金細線
+  [L.bandTop, L.bandBottom].forEach((y) => {
+    if (!mask) {
+      const band = ctx.createLinearGradient(0, y, 0, y + 9);
+      band.addColorStop(0, 'rgba(0,0,0,0.28)');
+      band.addColorStop(0.45, 'rgba(255,255,255,0.16)');
+      band.addColorStop(1, 'rgba(0,0,0,0.3)');
+      ctx.fillStyle = band;
+      ctx.fillRect(0, y, w, 9);
+    }
+    ctx.fillStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.55)';
+    ctx.fillRect(0, y, w, 1);
+    ctx.fillRect(0, y + 8, w, 1);
+  });
+
+  // 圖示
+  const icon = iconImages[site.icon];
+  if (icon) {
+    if (!mask) {
+      ctx.globalAlpha = 0.45;
+      ctx.filter = 'brightness(0)';
+      ctx.drawImage(icon.foil, w / 2 - 11, L.icon - 1, 22, 22);
+      ctx.filter = 'none';
+      ctx.globalAlpha = 1;
+    }
+    ctx.drawImage(mask ? icon.mask : icon.foil, w / 2 - 11, L.icon, 22, 22);
+  }
+
+  // 書名標籤：深色皮標＋燙金細框
+  const labelW = Math.ceil(titleSize * 1.2) + 8;
+  const lx = Math.round(w / 2 - labelW / 2);
+  const labelH = L.labelBottom - L.labelTop;
+  if (!mask) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+    ctx.fillRect(lx, L.labelTop, labelW, labelH);
+    const inner = ctx.createLinearGradient(0, L.labelTop, 0, L.labelTop + 4);
+    inner.addColorStop(0, 'rgba(0,0,0,0.4)');
+    inner.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = inner;
+    ctx.fillRect(lx, L.labelTop, labelW, 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(lx, L.labelBottom, labelW, 1);
+  }
+  ctx.strokeStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.45)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(lx + 0.5, L.labelTop + 0.5, labelW - 1, labelH - 1);
+
+  // 書名：浮雕陰影＋燙金
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(lx, L.labelTop, labelW, labelH);
+  ctx.clip();
+  const titleTop = L.labelTop + 10;
+  if (!mask) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    drawVertical(ctx, site.spineTitle, w / 2, titleTop - 1, titleSize);
+    ctx.fillStyle = 'rgba(255,255,255,0.14)';
+    drawVertical(ctx, site.spineTitle, w / 2, titleTop + 1, titleSize);
+  }
+  ctx.fillStyle = foil;
+  drawVertical(ctx, site.spineTitle, w / 2, titleTop, titleSize);
+  ctx.restore();
+
+  // 底部數字
+  const foot = isComplete ? `${site.lessons} 課` : `${site.readyLessons}/${site.lessons}`;
+  ctx.font = `400 11px ${MONO}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (!mask) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillText(foot, w / 2, L.foot - 1);
+  }
+  ctx.fillStyle = foil;
+  ctx.fillText(foot, w / 2, L.foot);
+
+  // 閱讀進度：右側一條燙金細線，從下往上
+  const trackTop = 26;
+  const trackH = h - 52;
+  if (!mask) {
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(w - 8, trackTop, 2, trackH);
+  }
+  const fill = trackH * (done / site.lessons);
+  if (fill > 0) {
+    ctx.fillStyle = foil;
+    ctx.fillRect(w - 8, trackTop + trackH - fill, 2, fill);
+  }
+  ctx.restore();
+}
+
+function spineTextures(site, w, h) {
+  const k = Math.min(4, 2048 / h);
+  const L = spineLayout(w, h);
+  const titleSize = fitSpineTitle(site.spineTitle, L.labelBottom - L.labelTop - 20);
+  const color = makeCanvas(w * k, h * k);
+  const mask = makeCanvas(w * k, h * k);
+  paintSpine(color.getContext('2d'), site, w, h, k, titleSize, false);
+  paintSpine(mask.getContext('2d'), site, w, h, k, titleSize, true);
+  return { map: canvasTexture(color), orm: canvasTexture(mask, { srgb: false }), titleSize };
+}
+
+/* 封面、扉頁、內頁都在 300×400 的「設計尺寸」上排版，再依實際比例縮放 */
+const PAGE_RES = 1024;
+
+function wrapPhrases(ctx, phrases, maxWidth) {
+  const lines = [];
+  let line = '';
+  phrases.forEach((phrase) => {
+    const next = line ? `${line} ${phrase}` : phrase;
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line);
+      line = phrase;
+    } else {
+      line = next;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+/** 中文可以在任何字之間換行，英文單字不拆 */
+function wrapText(ctx, text, maxWidth) {
+  const tokens = text.match(/[A-Za-z0-9.\-]+|\s+|./gu) || [];
+  const lines = [];
+  let line = '';
+  tokens.forEach((token) => {
+    const next = line + token;
+    if (line && ctx.measureText(next).width > maxWidth && !/^\s+$/.test(token)) {
+      // 標點不放行首，掛在上一行行尾
+      if (/^[，。、：；）」]$/.test(token)) {
+        lines.push(next);
+        line = '';
+      } else {
+        lines.push(line.trimEnd());
+        line = token;
+      }
+    } else {
+      line = next;
+    }
+  });
+  if (line.trim()) lines.push(line.trim());
+  return lines;
+}
+
+function paintCloth(ctx, color, width, height, k) {
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, width, height);
+  paintLinen(ctx, width, height, k);
+  // 斜向的柔和高光
+  const sheen = ctx.createLinearGradient(0, 0, width, height);
+  sheen.addColorStop(0, 'rgba(255,255,255,0.1)');
+  sheen.addColorStop(0.45, 'rgba(255,255,255,0)');
+  sheen.addColorStop(1, 'rgba(0,0,0,0.16)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, width, height);
+}
+
+function paintPaper(ctx, x, y, width, height) {
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(x, y, width, height);
+  const glare = ctx.createLinearGradient(0, y, 0, y + height * 0.3);
+  glare.addColorStop(0, 'rgba(255,255,255,0.5)');
+  glare.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glare;
+  ctx.fillRect(x, y, width, height * 0.3);
+  // 紙纖維
+  for (let i = 0; i < (width * height) / 1400; i += 1) {
+    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(120, 100, 60, 0.035)' : 'rgba(255, 255, 255, 0.25)';
+    ctx.fillRect(x + Math.random() * width, y + Math.random() * height, 1 + Math.random() * 3, 1);
+  }
+}
+
+/** 書溝：靠書脊那側的內陰影。side 是書脊在哪一側 */
+function paintGutter(ctx, x, y, width, height, side, u) {
+  const size = 14 * u;
+  const g = side === 'left'
+    ? ctx.createLinearGradient(x, 0, x + size * 2, 0)
+    : ctx.createLinearGradient(x + width, 0, x + width - size * 2, 0);
+  g.addColorStop(0, 'rgba(60, 45, 20, 0.28)');
+  g.addColorStop(0.35, 'rgba(60, 45, 20, 0.08)');
+  g.addColorStop(1, 'rgba(60, 45, 20, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(side === 'left' ? x : x + width - size * 2, y, size * 2, height);
+}
+
+function pageCanvas(aspect) {
+  return makeCanvas(PAGE_RES * aspect, PAGE_RES);
+}
+
+/** 封面正面（mask=true 畫燙金遮罩） */
+function paintCover(canvas, site, mask) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 300; // 設計尺寸 300 寬
+  const foil = mask ? MASK_FOIL : FOIL;
+  if (mask) {
+    ctx.fillStyle = MASK_BASE;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    paintCloth(ctx, site.color, W, H, u);
+    // 靠書脊的折痕
+    const crease = ctx.createLinearGradient(W * 0.05, 0, W * 0.075, 0);
+    crease.addColorStop(0, 'rgba(0,0,0,0)');
+    crease.addColorStop(0.45, 'rgba(0,0,0,0.3)');
+    crease.addColorStop(0.55, 'rgba(255,255,255,0.12)');
+    crease.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = crease;
+    ctx.fillRect(W * 0.05, 0, W * 0.025, H);
+  }
+  // 燙金外框
+  const inset = W * 0.05;
+  ctx.strokeStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.55)';
+  ctx.lineWidth = 1.2 * u;
+  ctx.strokeRect(inset + W * 0.04, inset, W - inset * 2 - W * 0.04, H - inset * 2);
+  ctx.lineWidth = 0.6 * u;
+  ctx.strokeRect(inset + W * 0.04 + 4 * u, inset + 4 * u, W - inset * 2 - W * 0.04 - 8 * u, H - inset * 2 - 8 * u);
+
+  const padX = inset + W * 0.04 + 18 * u;
+  const icon = iconImages[site.icon];
+  if (icon) ctx.drawImage(mask ? icon.mask : icon.foil, padX, inset + 18 * u, 30 * u, 30 * u);
+  ctx.fillStyle = foil;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'right';
+  ctx.font = `500 ${12 * u}px ${MONO}`;
+  ctx.fillText(`${site.lessons} 單元`, W - inset - 18 * u, inset + 38 * u);
+
+  // 書名：按詞組換行，靠左下
+  const titleSize = 30 * u;
+  ctx.font = `700 ${titleSize}px ${FONT}`;
+  ctx.textAlign = 'left';
+  const maxWidth = W - padX - inset - 18 * u;
+  const lines = wrapPhrases(ctx, site.titlePhrases, maxWidth);
+  const lineH = titleSize * 1.25;
+  const bottom = H - inset - 46 * u;
+  lines.forEach((line, i) => {
+    const y = bottom - (lines.length - 1 - i) * lineH;
+    if (!mask) {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillText(line, padX, y - u);
+    }
+    ctx.fillStyle = foil;
+    ctx.fillText(line, padX, y);
+  });
+  // VIBE CODING · 年月：不換行，放不下就縮小，下限 8px
+  let small = 11 * u;
+  const tag = `VIBE CODING · ${site.updated}`;
+  ctx.font = `500 ${small}px ${MONO}`;
+  while (ctx.measureText(tag).width > maxWidth && small > 8 * u) {
+    small -= 0.5 * u;
+    ctx.font = `500 ${small}px ${MONO}`;
+  }
+  ctx.fillStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.8)';
+  ctx.fillText(tag, padX, H - inset - 22 * u);
+}
+
+/** 封面內側：書布底＋內縮的蝴蝶頁（書脊在右邊） */
+function paintCoverInside(canvas, site, rim) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 300;
+  paintCloth(ctx, site.color, W, H, u);
+  const x = rim;
+  const y = rim;
+  const pw = W - rim;
+  const ph = H - rim * 2;
+  ctx.fillStyle = PAPER_2;
+  ctx.fillRect(x, y, pw, ph);
+  ctx.fillStyle = hexAlpha(site.color, 0.16);
+  for (let dy = y + 5 * u; dy < y + ph; dy += 10 * u) {
+    for (let dx = x + 5 * u; dx < x + pw; dx += 10 * u) {
+      ctx.beginPath();
+      ctx.arc(dx, dy, 0.8 * u, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  paintGutter(ctx, x, y, pw, ph, 'right', u);
+}
+
+function hexAlpha(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/** 扉頁正面：書名頁 */
+function paintLeafFront(canvas, site) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 290;
+  paintPaper(ctx, 0, 0, W, H);
+  paintGutter(ctx, 0, 0, W, H, 'left', u);
+  ctx.fillStyle = INK;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `700 ${22 * u}px ${FONT}`;
+  const lines = wrapPhrases(ctx, site.titlePhrases, W - 60 * u);
+  const lineH = 30 * u;
+  const top = H * 0.42 - ((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, W / 2, top + i * lineH));
+  ctx.fillStyle = 'rgba(29, 29, 31, 0.25)';
+  ctx.fillRect(W / 2 - 16 * u, top + lines.length * lineH - 6 * u, 32 * u, u);
+  ctx.fillStyle = '#6e6e73';
+  ctx.font = `500 ${11 * u}px ${MONO}`;
+  ctx.fillText('Vibe Coding', W / 2, H - 40 * u);
+}
+
+/** 扉頁背面（攤開後的左頁，書脊在右邊） */
+function paintLeafBack(canvas, site) {
+  const { done } = siteStats(site);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 290;
+  paintPaper(ctx, 0, 0, W, H);
+  paintGutter(ctx, 0, 0, W, H, 'right', u);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#6e6e73';
+  ctx.font = `500 ${12 * u}px ${MONO}`;
+  ctx.fillText(`${site.modules} 模組 · ${site.lessons} 單元`, 28 * u, H - 64 * u);
+  // 已讀章：細框圓角，像蓋上去的
+  const stamp = `已讀 ${done} / ${site.lessons}`;
+  ctx.font = `600 ${12 * u}px ${FONT}`;
+  const sw = ctx.measureText(stamp).width + 20 * u;
+  ctx.save();
+  ctx.translate(28 * u, H - 48 * u);
+  ctx.rotate(-0.04);
+  ctx.strokeStyle = hexAlpha(site.color, 0.75);
+  ctx.lineWidth = 1.2 * u;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, sw, 24 * u, 4 * u);
+  ctx.stroke();
+  ctx.fillStyle = hexAlpha(site.color, 0.85);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(stamp, 10 * u, 12.5 * u);
+  ctx.restore();
+}
+
+/** 右頁：書名、簡介、讀取條（progress 0–1） */
+function paintRightPage(canvas, site, progress) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 290;
+  paintPaper(ctx, 0, 0, W, H);
+  paintGutter(ctx, 0, 0, W, H, 'left', u);
+  const pad = 30 * u;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = INK;
+  ctx.font = `700 ${19 * u}px ${FONT}`;
+  const titleLines = wrapPhrases(ctx, site.titlePhrases, W - pad * 2);
+  let y = pad + 24 * u;
+  titleLines.forEach((line) => { ctx.fillText(line, pad, y); y += 27 * u; });
+  y += 8 * u;
+  ctx.fillStyle = '#6e6e73';
+  ctx.font = `400 ${13 * u}px ${FONT}`;
+  wrapText(ctx, site.desc, W - pad * 2).forEach((line) => { ctx.fillText(line, pad, y); y += 13 * u * 1.7; });
+
+  ctx.fillStyle = '#6e6e73';
+  ctx.font = `400 ${12 * u}px ${FONT}`;
+  ctx.fillText('正在打開…', pad, H - pad - 18 * u);
+  ctx.fillStyle = 'rgba(29, 29, 31, 0.1)';
+  ctx.beginPath();
+  ctx.roundRect(pad, H - pad - 6 * u, W - pad * 2, 3 * u, 1.5 * u);
+  ctx.fill();
+  if (progress > 0) {
+    ctx.fillStyle = site.color;
+    ctx.beginPath();
+    ctx.roundRect(pad, H - pad - 6 * u, (W - pad * 2) * progress, 3 * u, 1.5 * u);
+    ctx.fill();
+  }
+}
+
+/** 書口與上下書頂的紙頁紋：細線疊在紙色上。vertical 決定線的方向 */
+function pageEdgeCanvas(vertical) {
+  const canvas = makeCanvas(vertical ? 256 : 8, vertical ? 8 : 256);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PAPER_2;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < 256; i += 2) {
+    ctx.fillStyle = `rgba(150, 130, 95, ${0.12 + Math.random() * 0.12})`;
+    if (vertical) ctx.fillRect(i, 0, 1, canvas.height);
+    else ctx.fillRect(0, i, canvas.width, 1);
+  }
+  return canvas;
+}
+
+/* ---------- 3D 書 ---------- */
+let maxAnisotropy = 8;
+let linenBump;
+let pageEdgeX;
+let pageEdgeY;
+
+/**
+ * 建一本 3D 書。本地座標：x 是封面寬（書脊在 -x）、y 是書高、z 是厚度（封面在 +z）。
+ * 單位是書櫃上的畫面 px；書轉 90° 時書脊朝向鏡頭，寬度剛好等於書背寬。
+ */
+function makeBook(site, spineW, spineH) {
+  const W = spineH / COVER_RATIO;
+  const H = spineH;
+  const D = spineW;
+  const t = Math.min(3, Math.max(1.4, D * 0.045)); // 書板厚
+  const rim = H * (5 / 400); // 布邊
+  const pageW = W - t - rim;
+  const pageH = H - rim * 2;
+  const disposables = [];
+  const keep = (x) => { disposables.push(x); return x; };
+
+  const clothTex = keep(canvasTexture(clothCanvas(site.color), { repeat: true }));
+  clothTex.repeat.set(W / 96, H / 96);
+  const cloth = keep(new THREE.MeshStandardMaterial({ map: clothTex, bumpMap: linenBump, bumpScale: 0.6, roughness: 0.82, metalness: 0 }));
+  const paper = keep(new THREE.MeshStandardMaterial({ color: PAPER, roughness: 0.95 }));
+  const edgeX = keep(new THREE.MeshStandardMaterial({ map: pageEdgeX, roughness: 0.95 }));
+  const edgeY = keep(new THREE.MeshStandardMaterial({ map: pageEdgeY, roughness: 0.95 }));
+
+  const spine = spineTextures(site, spineW, spineH);
+  keep(spine.map); keep(spine.orm);
+  const spineMat = keep(new THREE.MeshStandardMaterial({ map: spine.map, roughnessMap: spine.orm, metalnessMap: spine.orm, roughness: 1, metalness: 1, bumpMap: linenBump, bumpScale: 0.3 }));
+
+  const coverAspect = (W - t) / H;
+  const coverColor = pageCanvas(coverAspect);
+  const coverMask = pageCanvas(coverAspect);
+  paintCover(coverColor, site, false);
+  paintCover(coverMask, site, true);
+  const coverOrm = keep(canvasTexture(coverMask, { srgb: false }));
+  const coverMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(coverColor)), roughnessMap: coverOrm, metalnessMap: coverOrm, roughness: 1, metalness: 1, bumpMap: linenBump, bumpScale: 0.3 }));
+  const insideCanvas = pageCanvas(coverAspect);
+  paintCoverInside(insideCanvas, site, (rim / H) * PAGE_RES);
+  const insideMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(insideCanvas)), roughness: 0.9 }));
+
+  const pageAspect = pageW / pageH;
+  const leafFrontCanvas = pageCanvas(pageAspect);
+  const leafBackCanvas = pageCanvas(pageAspect);
+  const rightCanvas = pageCanvas(pageAspect);
+  paintLeafFront(leafFrontCanvas, site);
+  paintLeafBack(leafBackCanvas, site);
+  paintRightPage(rightCanvas, site, 0);
+  const rightTex = keep(canvasTexture(rightCanvas));
+  const leafFrontMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(leafFrontCanvas)), roughness: 0.95 }));
+  const leafBackMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(leafBackCanvas)), roughness: 0.95 }));
+  const rightMat = keep(new THREE.MeshStandardMaterial({ map: rightTex, roughness: 0.95 }));
+
+  const box = (w, h, d, materials) => {
+    const mesh = new THREE.Mesh(keep(new THREE.BoxGeometry(w, h, d)), materials);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+
+  const group = new THREE.Group();
+  group.rotation.order = 'YXZ';
+
+  // 封底
+  const back = box(W, H, t, cloth);
+  back.position.set(0, 0, -D / 2 + t / 2);
+  group.add(back);
+
+  // 書脊：-x 面貼書背圖
+  const spineMesh = box(t, H, D, [cloth, spineMat, cloth, cloth, cloth, cloth]);
+  spineMesh.position.set(-W / 2 + t / 2, 0, 0);
+  group.add(spineMesh);
+
+  // 書頁：上面是右頁，三邊是紙頁紋；四周內縮 rim，露出書板的布邊
+  const block = box(pageW, pageH, D - t * 2, [edgeX, paper, edgeY, edgeY, rightMat, paper]);
+  block.position.set(-W / 2 + t + pageW / 2, 0, 0);
+  group.add(block);
+
+  // 右頁的布底：和書頁頂面幾乎同高，攤開時右頁四周才看得到和左頁一樣寬的布邊
+  const base = box(W - t, H, 0.3, cloth);
+  base.position.set(t / 2, 0, D / 2 - t - 0.2);
+  group.add(base);
+
+  // 扉頁：以書脊內側為軸
+  const leafZ = D / 2 - t - 0.35;
+  const leafPivot = new THREE.Group();
+  leafPivot.position.set(-W / 2 + t, 0, leafZ);
+  const leaf = box(pageW, pageH, 0.4, [paper, paper, paper, paper, leafFrontMat, leafBackMat]);
+  leaf.position.x = pageW / 2;
+  leafPivot.add(leaf);
+  group.add(leafPivot);
+
+  // 封面：以書脊內側為軸，翻開後和右頁對稱
+  const coverPivot = new THREE.Group();
+  coverPivot.position.set(-W / 2 + t, 0, D / 2 - t / 2);
+  const cover = box(W - t, H, t, [cloth, cloth, cloth, cloth, coverMat, insideMat]);
+  cover.position.x = (W - t) / 2;
+  coverPivot.add(cover);
+  group.add(coverPivot);
+
+  return {
+    site,
+    group,
+    coverPivot,
+    leafPivot,
+    W, H, D, t, leafZ,
+    titleSize: spine.titleSize,
+    setProgress(progress) {
+      paintRightPage(rightCanvas, site, progress);
+      rightTex.needsUpdate = true;
+    },
+    dispose() { disposables.forEach((x) => x.dispose()); },
+  };
+}
+
+/* ---------- 鏡頭：畫面 px 一比一對應 z = 0 的平面，眼睛位置可以任意移動 ----------
+   世界座標 (x, -y, 0) 就是畫面上的 (x, y)。改眼睛位置只會改變有深度的東西怎麼透視，
+   書背（z = 0）永遠留在 DOM 連結的位置。 */
+function setOffAxisCamera(camera, eyeX, eyeY, distance, viewW, viewH) {
+  const near = 10;
+  const far = distance + 4000;
+  const f = near / distance;
+  camera.position.set(eyeX, -eyeY, distance);
+  camera.near = near;
+  camera.far = far;
+  camera.projectionMatrix.makePerspective(-eyeX * f, (viewW - eyeX) * f, eyeY * f, (eyeY - viewH) * f, near, far);
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+  camera.updateMatrixWorld(true);
+}
+
+function addLights(scene, centerX, centerY, span) {
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x8c8c94, 0.3);
+  scene.add(hemi);
+  // 主光從左上前方來，影子落在右下
+  const key = new THREE.DirectionalLight(0xfff8f0, 1.15);
+  key.position.set(centerX - span * 0.25, centerY + span * 0.45, span * 1.3);
+  key.target.position.set(centerX, centerY, 0);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  const r = span * 0.9;
+  Object.assign(key.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 10, far: span * 4 });
+  key.shadow.camera.updateProjectionMatrix();
+  key.shadow.bias = -0.0004;
+  key.shadow.normalBias = 0.6;
+  key.shadow.radius = 10;
+  key.shadow.blurSamples = 16;
+  scene.add(key, key.target);
+  // 右側補光，讓暗面不死黑
+  const fill = new THREE.DirectionalLight(0xe6edff, 0.25);
+  fill.position.set(centerX + span, centerY + span * 0.2, span * 0.6);
+  fill.target.position.set(centerX, centerY, 0);
+  scene.add(fill, fill.target);
+  return { hemi, key, fill };
+}
+
+/* 環境光貼圖是 render target，不能跨 WebGL context 共用，每個 renderer 各做一張 */
+const envTextures = new WeakMap();
+function environmentTexture(renderer) {
+  if (!envTextures.has(renderer)) {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    envTextures.set(renderer, pmrem.fromScene(new RoomEnvironment(), 0.04).texture);
+    pmrem.dispose();
+  }
+  return envTextures.get(renderer);
+}
+
+/* ---------- 3D 書櫃 ---------- */
+let shelf = null;
+
+const CASE_THEME = {
+  light: { back: ['#e4e4e9', '#ececf0', '#e9e9ee'], metal: '#c9c9d0', topBand: 0.85, hemi: 0.3, key: 1.15, env: 0.45 },
+  dark: { back: ['#0e0e10', '#151517', '#121214'], metal: '#3c3c43', topBand: 0.35, hemi: 0.25, key: 1.0, env: 0.35 },
+};
+
+function createShelf() {
+  const bookcase = document.getElementById('bookcase');
+  const canvas = document.createElement('canvas');
+  canvas.className = 'shelf-canvas';
+  canvas.setAttribute('aria-hidden', 'true');
+  bookcase.prepend(canvas);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.VSMShadowMap;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  const scene = new THREE.Scene();
+  scene.environment = environmentTexture(renderer);
+  const camera = new THREE.PerspectiveCamera();
+  const caseGroup = new THREE.Group();
+  scene.add(caseGroup);
+
+  const backCanvas = makeCanvas(512, 256);
+  const backTex = canvasTexture(backCanvas);
+  const backMat = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.92 });
+  const brushCanvas = makeCanvas(512, 40);
+  const brushTex = canvasTexture(brushCanvas);
+  const metalFront = new THREE.MeshStandardMaterial({ map: brushTex, metalness: 0.85, roughness: 0.38 });
+  const metalPlain = new THREE.MeshStandardMaterial({ metalness: 0.85, roughness: 0.4 });
+  const bookendMat = new THREE.MeshStandardMaterial({ color: '#e2e2e8', metalness: 1, roughness: 0.28 });
+
+  let lights = null;
+  const books = new Map();
+  const state = new Map(); // id → { lift, liftTarget, tiltX, tiltY, tiltXTarget, tiltYTarget }
+  let layout = null;
+  let activeId = null;
+
+  function paintCaseTextures() {
+    const theme = CASE_THEME[isDarkTheme() ? 'dark' : 'light'];
+    const ctx = backCanvas.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, backCanvas.height);
+    g.addColorStop(0, theme.back[0]);
+    g.addColorStop(0.6, theme.back[1]);
+    g.addColorStop(1, theme.back[2]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, backCanvas.width, backCanvas.height);
+    // 上方層板與兩側的內陰影（和 2D 版一樣：上 26px、左右 14px，這裡以書櫃寬高換算）
+    const sx = backCanvas.width / Math.max(1, layout ? layout.width : 1000);
+    const sy = backCanvas.height / Math.max(1, layout ? layout.boardTop : 360);
+    const edge = (x0, y0, x1, y1, size, alpha) => {
+      const s = ctx.createLinearGradient(x0, y0, x1, y1);
+      s.addColorStop(0, `rgba(0,0,0,${alpha})`);
+      s.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = s;
+      ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0) || backCanvas.width, Math.abs(y1 - y0) || backCanvas.height);
+    };
+    const shade = theme === CASE_THEME.dark ? 0.7 : 0.26;
+    edge(0, 0, 0, 30 * sy, 0, shade);
+    edge(0, 0, 16 * sx, 0, 0, shade * 0.8);
+    edge(backCanvas.width, 0, backCanvas.width - 16 * sx, 0, 0, shade * 0.8);
+    backTex.needsUpdate = true;
+
+    // 層板正面：拉絲＋頂端 6px 的亮金屬帶
+    const b = brushCanvas.getContext('2d');
+    const base = new THREE.Color(theme.metal);
+    const front = b.createLinearGradient(0, 0, 0, brushCanvas.height);
+    front.addColorStop(0, `#${base.clone().offsetHSL(0, 0, 0.12).getHexString()}`);
+    front.addColorStop(0.3, `#${base.getHexString()}`);
+    front.addColorStop(1, `#${base.clone().offsetHSL(0, 0, -0.1).getHexString()}`);
+    b.fillStyle = front;
+    b.fillRect(0, 0, brushCanvas.width, brushCanvas.height);
+    for (let x = 0; x < brushCanvas.width; x += 3) {
+      b.fillStyle = `rgba(255,255,255,${0.05 + Math.random() * 0.1})`;
+      b.fillRect(x, 0, 1, brushCanvas.height);
+    }
+    const top = b.createLinearGradient(0, 0, 0, 12);
+    top.addColorStop(0, `rgba(255,255,255,${theme.topBand})`);
+    top.addColorStop(1, 'rgba(255,255,255,0.1)');
+    b.fillStyle = top;
+    b.fillRect(0, 0, brushCanvas.width, 12);
+    b.fillStyle = 'rgba(0,0,0,0.3)';
+    b.fillRect(0, brushCanvas.height - 2, brushCanvas.width, 2);
+    brushTex.needsUpdate = true;
+    metalPlain.color.set(theme.metal);
+    const dark = theme === CASE_THEME.dark;
+    metalFront.metalness = metalPlain.metalness = dark ? 0.55 : 0.85;
+    bookendMat.color.set(dark ? '#8e8e96' : '#e2e2e8');
+
+    if (lights) {
+      lights.hemi.intensity = theme.hemi;
+      lights.key.intensity = theme.key;
+    }
+    scene.environmentIntensity = theme.env;
+  }
+
+  function clearCase() {
+    while (caseGroup.children.length) {
+      const child = caseGroup.children.pop();
+      child.geometry.dispose();
+    }
+    if (lights) {
+      scene.remove(lights.hemi, lights.key, lights.key.target, lights.fill, lights.fill.target);
+      lights.key.shadow.dispose();
+      lights = null;
+    }
+  }
+
+  function addMesh(geometry, material, x, y, z, { cast = true, receive = true } = {}) {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = cast;
+    mesh.receiveShadow = receive;
+    caseGroup.add(mesh);
+    return mesh;
+  }
+
+  /** 依 DOM 排版重建整座書櫃：背板、側板、層板、書擋、書 */
+  function build() {
+    const caseRect = bookcase.getBoundingClientRect();
+    const boardRect = document.getElementById('board').getBoundingClientRect();
+    const width = caseRect.width;
+    const height = caseRect.height + 24;
+    const boardTop = boardRect.top - caseRect.top;
+    const rel = (rect) => ({ left: rect.left - caseRect.left, top: rect.top - caseRect.top, width: rect.width, height: rect.height });
+
+    renderer.setSize(width, height, false);
+    clearCase();
+    books.forEach((book) => { scene.remove(book.group); book.dispose(); });
+    books.clear();
+
+    const links = [...document.querySelectorAll('#books .book')];
+    const tallest = Math.max(...links.map((a) => a.getBoundingClientRect().height));
+    const depth = tallest / COVER_RATIO + 26; // 書櫃深度：最大的書再留一點空隙
+
+    // 背板：尺寸反推透視，投影後剛好蓋滿書櫃（畫面 0..width × 0..boardTop），貼圖上的內陰影才會落在邊緣
+    const m = SHELF_CAMERA_DISTANCE / (SHELF_CAMERA_DISTANCE + depth);
+    const unproject = (s, eye) => eye + (s - eye) / m;
+    const bx0 = unproject(0, width / 2);
+    const bx1 = unproject(width, width / 2);
+    const by0 = unproject(0, boardTop);
+    const by1 = boardTop + 6;
+    addMesh(new THREE.PlaneGeometry(bx1 - bx0, by1 - by0), backMat, (bx0 + bx1) / 2, -(by0 + by1) / 2, -depth, { cast: false });
+    // 金屬層板：頂面和眼睛同高，只看得到正面
+    addMesh(new THREE.BoxGeometry(width, 20, depth + 6), [metalPlain, metalPlain, metalPlain, metalPlain, metalFront, metalPlain], width / 2, -(boardTop + 10), -depth / 2 + 3);
+
+    // 書擋：L 形金屬片
+    const end = document.getElementById('bookend');
+    if (end) {
+      const r = rel(end.getBoundingClientRect());
+      const bottom = boardTop;
+      const plateH = r.height;
+      addMesh(new THREE.BoxGeometry(11, plateH, depth * 0.55), bookendMat, r.left + 7.5, -(bottom - plateH / 2), -depth * 0.3);
+      addMesh(new THREE.BoxGeometry(r.width - 2, 3, depth * 0.55), bookendMat, r.left + 1 + (r.width - 2) / 2, -(bottom - 1.5), -depth * 0.3);
+    }
+
+    // 書：書背貼齊 DOM 連結的位置，底部站在層板上
+    links.forEach((link) => {
+      const site = findSite(link);
+      const r = rel(link.getBoundingClientRect());
+      const book = makeBook(site, r.width, r.height);
+      book.base = new THREE.Vector3(r.left + r.width / 2, -(boardTop - r.height / 2), -book.W / 2);
+      book.group.position.copy(book.base);
+      book.group.rotation.set(0, Math.PI / 2, 0);
+      scene.add(book.group);
+      books.set(site.id, book);
+      if (!state.has(site.id)) state.set(site.id, { lift: 0, liftTarget: 0, tiltX: 0, tiltY: 0, tiltXTarget: 0, tiltYTarget: 0 });
+    });
+
+    lights = addLights(scene, width / 2, -boardTop / 2, Math.max(width, boardTop) * 1.1);
+    // 眼睛和層板頂面同高：書頂永遠看不到，符合正視圖
+    layout = { width, height, eyeX: width / 2, eyeY: boardTop, boardTop };
+    paintCaseTextures();
+    setOffAxisCamera(camera, layout.eyeX, layout.eyeY, SHELF_CAMERA_DISTANCE, width, height);
+    bookcase.classList.add('is-3d');
+    syncBooks();
+    kick();
+  }
+
+  function syncBooks() {
+    books.forEach((book, id) => {
+      if (book.detached) return;
+      const s = state.get(id);
+      book.group.position.set(book.base.x, book.base.y + s.lift, book.base.z + s.lift * 0.6);
+      book.group.rotation.set(s.tiltX, Math.PI / 2 + s.tiltY, 0);
+    });
+  }
+
+  // 抬起與傾斜用阻尼趨近目標值，滑鼠移開後自然落回
+  const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  frameHooks.add((dt) => {
+    let moving = false;
+    const k = reduceMotion() ? 1 : 1 - Math.exp(-dt / 90);
+    state.forEach((s) => {
+      ['lift', 'tiltX', 'tiltY'].forEach((key) => {
+        const target = s[`${key}Target`];
+        const diff = target - s[key];
+        if (Math.abs(diff) < (key === 'lift' ? 0.01 : 0.0001)) { s[key] = target; return; }
+        s[key] += diff * k;
+        moving = true;
+      });
+    });
+    syncBooks();
+    return moving;
+  });
+
+  return {
+    build,
+    books,
+    get layout() { return layout; },
+    canvas,
+    renderer,
+    applyTheme() { paintCaseTextures(); kick(); },
+    setActive(id) {
+      activeId = id;
+      state.forEach((s, key) => { s.liftTarget = key === activeId ? HOVER_LIFT : 0; });
+      kick();
+    },
+    setTilt(id, x, y) {
+      const s = state.get(id);
+      if (!s) return;
+      s.tiltYTarget = x * 0.14; // 跟著游標微微轉頭
+      s.tiltXTarget = y * 0.05;
+      kick();
+    },
+    /** 把書從書櫃拿走（交給舞台），回傳它在書櫃 canvas 裡的世界座標 */
+    detach(id) {
+      const book = books.get(id);
+      book.detached = true;
+      scene.remove(book.group);
+      kick();
+      return book;
+    },
+    render() { if (layout) renderer.render(scene, camera); },
+  };
+}
+
+/* ---------- 開書：抽出 → 空中從書背轉到封面 → 翻開封面與扉頁 → 跳轉 ---------- */
+let isOpening = false;
+let stage = null;
+
+function shadowBlobTexture() {
+  const canvas = makeCanvas(256, 64);
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(128, 32, 0, 128, 32, 128);
+  g.addColorStop(0, 'rgba(0,0,0,0.55)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0.18)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.save();
+  ctx.scale(1, 0.25);
+  ctx.fillRect(0, 0, 256, 256);
+  ctx.restore();
+  return canvasTexture(canvas);
+}
+
+function createStage(book) {
+  const root = document.createElement('div');
+  root.className = 'stage';
+  root.setAttribute('aria-hidden', 'true');
+  root.innerHTML = '<div class="stage-backdrop"></div><canvas></canvas><span class="stage-skip">點一下直接打開</span>';
+  document.body.append(root);
+  const canvas = root.querySelector('canvas');
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.VSMShadowMap;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(vw, vh, false);
+
+  const scene = new THREE.Scene();
+  scene.environment = environmentTexture(renderer);
+  const theme = CASE_THEME[isDarkTheme() ? 'dark' : 'light'];
+  scene.environmentIntensity = theme.env;
+  const lights = addLights(scene, vw / 2, -vh / 2, Math.max(vw, vh) * 0.8);
+  lights.hemi.intensity = theme.hemi;
+  lights.key.intensity = theme.key;
+  const camera = new THREE.PerspectiveCamera();
+
+  // 桌面影子：書底下的一團柔和橢圓
+  const blobTex = shadowBlobTexture();
+  const blob = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0 }));
+  scene.add(blob);
+  scene.add(book.group);
+
+  return {
+    root,
+    canvas,
+    scene,
+    camera,
+    blob,
+    vw,
+    vh,
+    render() { renderer.render(scene, camera); },
+    dispose() {
+      environmentTexture(renderer).dispose();
+      renderer.dispose();
+      blobTex.dispose();
+      blob.geometry.dispose();
+      blob.material.dispose();
+      root.remove();
+    },
+  };
+}
+
+async function openBook(link, site) {
+  isOpening = true;
+  const book = shelf.books.get(site.id);
+  const g = book.group;
+  const caseCanvasRect = shelf.canvas.getBoundingClientRect();
+  const { eyeX, eyeY } = shelf.layout;
+
+  // 1. 先把書從書櫃往前、往上抽出來
+  shelf.setActive(site.id);
+  shelf.setTilt(site.id, 0, 0);
+  const from = g.position.clone();
+  await tween({
+    duration: 380,
+    easing: EASE_OUT,
+    update: (e) => {
+      g.position.set(from.x, lerp(from.y, book.base.y + 36, e), lerp(from.z, book.base.z + 40, e));
+      g.rotation.set(0, Math.PI / 2, 0);
+      g.scale.setScalar(lerp(1, 1.06, e));
+    },
+  });
+
+  // 2. 交接：同一個物件、同一套鏡頭換算，搬到全螢幕 canvas，位置換成視窗座標，畫面不跳
+  shelf.detach(site.id);
+  const start = g.position.clone().add(new THREE.Vector3(caseCanvasRect.left, -caseCanvasRect.top, 0));
+  g.position.copy(start);
+  stage = createStage(book);
+  const { vw, vh, camera, blob } = stage;
+  const startEye = { x: caseCanvasRect.left + eyeX, y: caseCanvasRect.top + eyeY };
+  setOffAxisCamera(camera, startEye.x, startEye.y, SHELF_CAMERA_DISTANCE, vw, vh);
+  stage.root.addEventListener('click', () => { window.location.href = link.href; });
+  stage.render();
+
+  const H = Math.min(COVER_MAX_HEIGHT, vh - 120, ((vw - 48) / 2) * COVER_RATIO);
+  const sEnd = H / book.H;
+  const sStart = 1.06;
+  const end = new THREE.Vector3(vw / 2, -vh / 2, 0);
+  const mid = new THREE.Vector3((start.x + end.x) / 2, Math.max(start.y, end.y) + 40, 60);
+  const ctrl = mid.clone().multiplyScalar(2).sub(start.clone().add(end).multiplyScalar(0.5)); // 二次貝茲曲線剛好經過 mid
+  const Wend = book.W * sEnd;
+  const Dend = book.D * sEnd;
+  blob.position.set(end.x, end.y - H / 2 - 6, -Dend);
+  blob.scale.set(Wend * 1.25, 34, 1);
+
+  // 3. 空中轉身：書背轉開、封面轉向你，途中帶一點傾斜；鏡頭同時移到畫面中央
+  const backdrop = stage.root.querySelector('.stage-backdrop');
+  const rotations = [[0, Math.PI / 2, 0], [10, 48, -4].map((d) => (d * Math.PI) / 180), [0, 0, 0]];
+  const rotAt = (e) => {
+    const [a, b, i] = e < 0.5 ? [rotations[0], rotations[1], e / 0.5] : [rotations[1], rotations[2], (e - 0.5) / 0.5];
+    return a.map((v, n) => lerp(v, b[n], i));
+  };
+  await Promise.all([
+    tween({ duration: 500, update: (e) => { backdrop.style.opacity = String(e); } }),
+    tween({
+      duration: 1000,
+      easing: EASE_IN_OUT,
+      update: (e) => {
+        const p = (a, c, b) => (1 - e) * (1 - e) * a + 2 * (1 - e) * e * c + e * e * b;
+        g.position.set(p(start.x, ctrl.x, end.x), p(start.y, ctrl.y, end.y), p(start.z, ctrl.z, end.z));
+        const [rx, ry, rz] = rotAt(e);
+        g.rotation.set(rx, ry, rz);
+        g.scale.setScalar(lerp(sStart, sEnd, e));
+        setOffAxisCamera(camera, lerp(startEye.x, vw / 2, e), lerp(startEye.y, vh / 2, e), lerp(SHELF_CAMERA_DISTANCE, STAGE_CAMERA_DISTANCE, e), vw, vh);
+        blob.material.opacity = e * 0.85;
+        blob.scale.x = Wend * 1.25 * lerp(0.3, 1, e);
+      },
+    }),
+  ]);
+
+  // 4. 翻開封面，再翻一張扉頁；整本書往右移，讓書溝在畫面正中央
+  const shift = (book.W / 2 - book.t) * sEnd;
+  const leafLift = book.D / 2 + 0.6;
+  await Promise.all([
+    tween({
+      duration: 900,
+      easing: EASE_IN_OUT,
+      update: (e) => {
+        g.position.x = end.x + shift * e;
+        blob.position.x = end.x + shift * e - shift * 0.5 * e;
+        blob.scale.x = Wend * 1.25 * lerp(1, 1.9, e);
+        book.coverPivot.rotation.y = -Math.PI * e;
+      },
+    }),
+    // 扉頁翻到正好 -180° 平放；高度同時墊到封面之上，翻完不會被封面蓋住
+    tween({
+      duration: 800,
+      delay: 260,
+      easing: EASE_IN_OUT,
+      update: (e) => {
+        book.leafPivot.rotation.y = -Math.PI * e;
+        book.leafPivot.position.z = lerp(book.leafZ, leafLift, e);
+        // 翻到一半時紙會微微拱起
+        book.leafPivot.position.z += Math.sin(Math.PI * e) * book.W * 0.04;
+      },
+    }),
+  ]);
+
+  // 5. 讀取條跑完就跳轉
+  await tween({ duration: 450, easing: EASE_OUT, update: (e) => book.setProgress(e) });
+  window.location.href = link.href;
+}
+
+function resetOpening() {
+  tweens.clear();
+  if (stage) {
+    stage.dispose();
+    stage = null;
+  }
+  isOpening = false;
+}
+
+function setupOpening() {
+  document.getElementById('books').addEventListener('click', (event) => {
+    const link = event.target.closest('.book');
+    if (!link) return;
+    // 開新分頁、新視窗的修飾鍵點擊交給瀏覽器
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    const site = findSite(link);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!site || reduceMotion || !shelf || !shelf.books.has(site.id)) return;
+    event.preventDefault();
+    if (isOpening) return;
+    openBook(link, site).catch((err) => {
+      console.warn(`開書動畫失敗，直接前往「${link.href}」：`, err);
+      window.location.href = link.href;
+    });
+  });
+}
+
+/* ---------- 啟動 ---------- */
+renderShelfDom();
+setupInspector();
+setupOpening();
+setupThemeSwitch();
+
+async function start3d() {
+  try {
+    THREE = await import('three');
+    ({ RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js'));
+    await Promise.all([document.fonts.ready, loadIcons()]);
+    linenBump = canvasTexture(linenBumpCanvas(), { srgb: false, repeat: true });
+    pageEdgeX = canvasTexture(pageEdgeCanvas(true));
+    pageEdgeY = canvasTexture(pageEdgeCanvas(false));
+    shelf = createShelf();
+    shelf.build();
+  } catch (err) {
+    console.warn('three.js 書櫃無法啟動，改用簡易書背：', err);
+    shelf = null;
+  }
+}
+
+await start3d();
+
+let resizeTimer = 0;
+window.addEventListener('resize', () => {
+  window.clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    if (shelf && !isOpening) shelf.build();
+  }, 120);
+});
+
+// 從課程按返回時（bfcache），收掉打開到一半的書並更新進度
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  resetOpening();
+  renderShelfDom();
+  if (shelf) shelf.build();
+});
+</script>
+</body>
+</html>
