@@ -290,7 +290,8 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   opacity: 0;
   transform: rotate(-0.6deg) scaleY(0.55);
   transform-origin: center top;
-  filter: drop-shadow(0 16px 18px rgba(30, 18, 4, 0.35)) drop-shadow(0 2px 2px rgba(30, 18, 4, 0.2));
+  /* 第一層 drop-shadow 貼著破邊描一圈深褐：舊羊皮紙邊緣受潮、磨損變深 */
+  filter: drop-shadow(0 0 0.7px rgba(62, 32, 8, 0.95)) drop-shadow(0 0 2px rgba(80, 45, 12, 0.5)) drop-shadow(0 16px 18px rgba(30, 18, 4, 0.35));
   transition: opacity 220ms var(--ease-out), transform 420ms var(--ease-out), left 260ms var(--ease-out), top 260ms var(--ease-out);
 }
 .book-card.is-visible { opacity: 1; transform: rotate(-0.6deg); }
@@ -302,8 +303,18 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   background-image:
     /* 摺痕 */
     linear-gradient(180deg, transparent 32%, rgba(110, 75, 30, 0.12) 33%, rgba(255, 245, 220, 0.25) 33.6%, transparent 35%, transparent 65%, rgba(110, 75, 30, 0.12) 66%, rgba(255, 245, 220, 0.25) 66.6%, transparent 68%),
-    /* 污漬與水痕 */
-    radial-gradient(circle at 78% 24%, rgba(120, 80, 30, 0.16) 0 6%, rgba(120, 80, 30, 0.05) 9%, transparent 12%),
+    /* 污漬：一圈咖啡色水痕、幾個深色斑點（foxing）、角落一抹手垢 */
+    radial-gradient(circle at 78% 24%, transparent 0 5%, rgba(95, 55, 15, 0.32) 5.6%, rgba(95, 55, 15, 0.08) 7%, transparent 9%),
+    radial-gradient(circle at 12% 30%, rgba(75, 40, 10, 0.5) 0 0.8%, transparent 1.6%),
+    radial-gradient(circle at 64% 82%, rgba(75, 40, 10, 0.45) 0 0.6%, transparent 1.3%),
+    radial-gradient(circle at 88% 62%, rgba(75, 40, 10, 0.4) 0 1%, transparent 2.2%),
+    radial-gradient(circle at 40% 92%, rgba(75, 40, 10, 0.35) 0 0.5%, transparent 1.1%),
+    radial-gradient(ellipse 30% 18% at 94% 96%, rgba(60, 32, 8, 0.45), transparent 70%),
+    radial-gradient(ellipse 22% 14% at 3% 4%, rgba(60, 32, 8, 0.4), transparent 70%),
+    /* 左右兩側磨損變深的邊 */
+    linear-gradient(90deg, rgba(70, 38, 10, 0.5), rgba(90, 55, 18, 0.12) 6%, transparent 12%, transparent 88%, rgba(90, 55, 18, 0.12) 94%, rgba(70, 38, 10, 0.5)),
+    /* 大片不均勻的陳舊斑塊 */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='330' height='330'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018' numOctaves='3' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.22 0 0 0 0 0.07 0 0 0 -2.2 1.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)' opacity='0.4'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 18% 78%, rgba(105, 70, 25, 0.2), transparent 30%),
     radial-gradient(ellipse at 30% 18%, rgba(255, 248, 225, 0.6), transparent 52%),
     /* 邊緣焦黃 */
@@ -373,6 +384,7 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   --leather-2: #3f1c1a;
   --page: #ece2cb;
   --page-edge: #d3c4a2;
+  --t: 9px; /* 書頁厚度 */
   position: relative;
   width: 164px;
   height: 112px;
@@ -380,43 +392,63 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   transform-style: preserve-3d;
   transform: rotateX(56deg) rotateZ(-30deg);
 }
+.lb-book * { transform-style: preserve-3d; }
 .lb-shadow {
   position: absolute;
-  inset: 10px -6px -14px 6px;
+  inset: 8px -10px -18px 4px;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(20, 12, 4, 0.45), transparent);
-  filter: blur(6px);
-  transform: translateZ(-6px);
+  background: radial-gradient(closest-side, rgba(20, 12, 4, 0.5), transparent);
+  filter: blur(7px);
+  transform: translateZ(-4px);
 }
+/* 書殼：有厚度的皮面書板，外緣與下緣各補一面 */
 .lb-cover {
   position: absolute;
-  top: -4px;
-  bottom: -4px;
-  width: 86px;
-  background: linear-gradient(135deg, var(--leather), var(--leather-2));
-  box-shadow: inset 0 0 0 1px rgba(205, 179, 122, 0.25);
-  transform: translateZ(-3px);
+  top: -5px;
+  bottom: -5px;
+  width: 87px;
+  background: linear-gradient(135deg, #6a322d, var(--leather) 45%, var(--leather-2));
+  box-shadow: inset 0 0 0 1px rgba(205, 179, 122, 0.22);
 }
-.lb-cover.left { left: -4px; border-radius: 4px 1px 1px 4px; }
+.lb-cover.left { left: -5px; border-radius: 4px 1px 1px 4px; }
 .lb-cover.right { left: 82px; border-radius: 1px 4px 4px 1px; }
-/* 書頁的厚度：往下疊幾層邊色，斜側看就像一疊紙 */
+.lb-cover i { position: absolute; background: var(--leather-2); }
+.lb-cover .bottom { left: 0; right: 0; top: 100%; height: 3px; transform-origin: top; transform: rotateX(-90deg); background: #2e1412; }
+.lb-cover.left .side { right: 100%; top: 0; bottom: 0; width: 3px; transform-origin: right; transform: rotateY(-90deg); background: #34171a; }
+.lb-cover.right .side { left: 100%; top: 0; bottom: 0; width: 3px; transform-origin: left; transform: rotateY(90deg); background: #241010; }
+/* 書頁塊：墊高 --t，外緣（書口）與下緣（書根）是一疊紙的細紋 */
 .lb-block {
   position: absolute;
   top: 0;
   width: 80px;
   height: 112px;
-  background: var(--page);
-  box-shadow: 0 1px 0 var(--page-edge), 0 2px 0 var(--page-edge), 0 3px 0 #c6b590, 0 4px 0 var(--leather-2);
+  transform: translateZ(var(--t));
 }
-.lb-block.left { left: 2px; background: linear-gradient(90deg, var(--page) 80%, #d9cba9); }
-.lb-block.right { left: 82px; background: linear-gradient(90deg, #d9cba9, var(--page) 20%); }
+.lb-block.left { left: 2px; background: linear-gradient(90deg, #e6dbc2, var(--page) 20%, var(--page) 70%, #cdbd99 92%, #b8a67f); }
+.lb-block.right { left: 82px; background: linear-gradient(90deg, #a9976f, #cbbb97 6%, var(--page) 26%, var(--page) 85%, #e2d6bb); }
+.lb-block i { position: absolute; }
+.lb-block .bottom {
+  left: 0; right: 0; top: 100%; height: var(--t);
+  transform-origin: top; transform: rotateX(-90deg);
+  background: repeating-linear-gradient(0deg, #e0d3b4 0 1px, #c4b28b 1px 2px);
+}
+.lb-block.left .bottom { background: repeating-linear-gradient(0deg, #d8caa8 0 1px, #b9a67e 1px 2px); }
+.lb-block.left .side {
+  right: 100%; top: 0; bottom: 0; width: var(--t);
+  transform-origin: right; transform: rotateY(-90deg);
+  background: repeating-linear-gradient(90deg, #e9dec4 0 1px, #cdbd98 1px 2px);
+}
+.lb-block.right .side {
+  left: 100%; top: 0; bottom: 0; width: var(--t);
+  transform-origin: left; transform: rotateY(90deg);
+  background: repeating-linear-gradient(90deg, #b9a780 0 1px, #9c8a63 1px 2px); /* 背光的一側較暗 */
+}
 .lb-page {
   position: absolute;
   left: 82px;
   top: 0;
   height: 112px;
   transform-origin: left center;
-  transform-style: preserve-3d;
   animation: lb-flip 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
   animation-delay: var(--d);
 }
@@ -428,13 +460,22 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   height: 100%;
   background: var(--page);
   transform-origin: left center;
-  transform-style: preserve-3d;
 }
+.lb-page > .s { background: linear-gradient(90deg, #c9b994, var(--page) 45%); }
 .lb-page .s .s { left: 100%; animation: lb-bend 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite; animation-delay: var(--d); }
-.lb-page .s .s .s { background: linear-gradient(90deg, var(--page), #e2d6ba); }
+.lb-page .s .s .s { background: linear-gradient(90deg, var(--page), #ddd0b1); }
+/* 光影：翻起來的紙轉到側面時變暗，攤平時回亮。只動 background-color，不用 filter（filter 會把 3D 壓平） */
+.lb-page .s::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(50, 30, 8, 0);
+  animation: lb-shade 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  animation-delay: var(--d);
+}
 @keyframes lb-flip {
-  0%, 8% { transform: rotateY(0deg); }
-  62%, 100% { transform: rotateY(-180deg); }
+  0%, 8% { transform: translateZ(calc(var(--t) + 0.5px)) rotateY(0deg); }
+  62%, 100% { transform: translateZ(calc(var(--t) + 0.5px)) rotateY(-180deg); }
 }
 /* 每一段在翻的途中往回彎一點，翻完再攤平：紙的彎曲 */
 @keyframes lb-bend {
@@ -443,8 +484,15 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   48% { transform: rotateY(-14deg); }
   62%, 100% { transform: rotateY(0deg); }
 }
+@keyframes lb-shade {
+  0%, 8% { background-color: rgba(50, 30, 8, 0); }
+  24% { background-color: rgba(50, 30, 8, 0.1); }
+  36% { background-color: rgba(50, 30, 8, 0.34); }
+  48% { background-color: rgba(50, 30, 8, 0.14); }
+  62%, 100% { background-color: rgba(50, 30, 8, 0); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .lb-page, .lb-page .s .s { animation: none; }
+  .lb-page, .lb-page .s .s, .lb-page .s::after { animation: none; }
 }
 
 /* ---------- 打開書的舞台：書從書櫃的 canvas 交給全螢幕的 canvas ---------- */
@@ -526,8 +574,10 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
         <div class="lb-scene" aria-hidden="true">
           <div class="lb-book">
             <span class="lb-shadow"></span>
-            <span class="lb-cover left"></span><span class="lb-cover right"></span>
-            <span class="lb-block left"></span><span class="lb-block right"></span>
+            <span class="lb-cover left"><i class="side"></i><i class="bottom"></i></span>
+            <span class="lb-cover right"><i class="side"></i><i class="bottom"></i></span>
+            <span class="lb-block left"><i class="side"></i><i class="bottom"></i></span>
+            <span class="lb-block right"><i class="side"></i><i class="bottom"></i></span>
             <span class="lb-page" style="--d:0s"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.18s"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.36s"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.54s"><span class="s"><span class="s"><span class="s"></span></span></span></span>
           </div>
         </div>
