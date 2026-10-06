@@ -686,6 +686,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 /* ---------- 材質貼圖：全部用 canvas 畫，書背與封面的燙金另外畫一張金屬度遮罩 ---------- */
 let THREE;
 let RoomEnvironment;
+let RoundedBoxGeometry;
+let RectAreaLightUniformsLib;
 const iconImages = {};
 
 function svgImage(svg, color) {
@@ -761,6 +763,9 @@ function linenBumpCanvas() {
 /* 燙金與金屬度遮罩：G 是粗糙度、B 是金屬度（three.js 的 roughnessMap / metalnessMap） */
 const MASK_BASE = 'rgb(0, 225, 0)';
 const MASK_FOIL = 'rgb(0, 85, 150)';
+/* 凹凸貼圖：灰 50% 是書布平面，燙金是壓下去的（較暗），壓條是凸起的 */
+const BUMP_BASE = '#808080';
+const BUMP_DEBOSS = '#4a4a4a';
 
 function isUpright(ch) {
   return /[×⺀-鿿豈-﫿＀-￯　-〿]/.test(ch);
@@ -828,22 +833,26 @@ function spineLayout(w, h) {
 }
 
 /** 畫書背。mask=true 時畫金屬度遮罩，只畫燙金的部分 */
-function paintSpine(ctx, site, w, h, k, titleSize, mask) {
+function paintSpine(ctx, site, w, h, k, titleSize, mode) {
   const { done, isComplete } = siteStats(site);
   const L = spineLayout(w, h);
-  const foil = mask ? MASK_FOIL : FOIL;
+  const mask = mode !== 'color';
+  const bump = mode === 'bump';
+  const line = bump ? BUMP_DEBOSS : MASK_FOIL;
+  const foil = mode === 'mask' ? MASK_FOIL : bump ? BUMP_DEBOSS : FOIL;
   ctx.save();
   ctx.scale(k, k);
   if (mask) {
-    ctx.fillStyle = MASK_BASE;
+    ctx.fillStyle = bump ? BUMP_BASE : MASK_BASE;
     ctx.fillRect(0, 0, w, h);
+    if (bump) paintLinen(ctx, w, h, 1);
   } else {
     ctx.fillStyle = site.color;
     ctx.fillRect(0, 0, w, h);
     paintLinen(ctx, w, h, 1);
-    // 圓弧書脊的明暗：兩側暗、左側偏亮的高光（3D 光影之外再加一層，讓書背有圓度）
+    // 書脊本身是圓弧幾何，光影由 3D 算；這裡只補兩側與書板相接處的磨損暗邊
     const arc = ctx.createLinearGradient(0, 0, w, 0);
-    [[0, 'rgba(0,0,0,0.42)'], [0.07, 'rgba(0,0,0,0.1)'], [0.22, 'rgba(255,255,255,0.13)'], [0.4, 'rgba(255,255,255,0.04)'], [0.64, 'rgba(0,0,0,0.05)'], [0.9, 'rgba(0,0,0,0.24)'], [1, 'rgba(0,0,0,0.45)']]
+    [[0, 'rgba(0,0,0,0.3)'], [0.05, 'rgba(0,0,0,0.06)'], [0.2, 'rgba(255,255,255,0.05)'], [0.8, 'rgba(0,0,0,0)'], [0.95, 'rgba(0,0,0,0.08)'], [1, 'rgba(0,0,0,0.3)']]
       .forEach(([o, c]) => arc.addColorStop(o, c));
     ctx.fillStyle = arc;
     ctx.fillRect(0, 0, w, h);
@@ -859,7 +868,16 @@ function paintSpine(ctx, site, w, h, k, titleSize, mask) {
       ctx.fillStyle = band;
       ctx.fillRect(0, y, w, 9);
     }
-    ctx.fillStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.55)';
+    if (bump) {
+      // 壓條是凸起的：中間亮、兩側暗
+      const ridge = ctx.createLinearGradient(0, y, 0, y + 9);
+      ridge.addColorStop(0, '#707070');
+      ridge.addColorStop(0.5, '#c8c8c8');
+      ridge.addColorStop(1, '#707070');
+      ctx.fillStyle = ridge;
+      ctx.fillRect(0, y, w, 9);
+    }
+    ctx.fillStyle = mask ? line : 'rgba(239, 226, 191, 0.55)';
     ctx.fillRect(0, y, w, 1);
     ctx.fillRect(0, y + 8, w, 1);
   });
@@ -874,7 +892,9 @@ function paintSpine(ctx, site, w, h, k, titleSize, mask) {
       ctx.filter = 'none';
       ctx.globalAlpha = 1;
     }
+    if (bump) ctx.filter = 'brightness(0.35)';
     ctx.drawImage(mask ? icon.mask : icon.foil, w / 2 - 11, L.icon, 22, 22);
+    ctx.filter = 'none';
   }
 
   // 書名標籤：深色皮標＋燙金細框
@@ -892,7 +912,11 @@ function paintSpine(ctx, site, w, h, k, titleSize, mask) {
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.fillRect(lx, L.labelBottom, labelW, 1);
   }
-  ctx.strokeStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.45)';
+  if (bump) {
+    ctx.fillStyle = '#727272'; // 皮標比書布低一點
+    ctx.fillRect(lx, L.labelTop, labelW, labelH);
+  }
+  ctx.strokeStyle = mask ? line : 'rgba(239, 226, 191, 0.45)';
   ctx.lineWidth = 1;
   ctx.strokeRect(lx + 0.5, L.labelTop + 0.5, labelW - 1, labelH - 1);
 
@@ -945,9 +969,11 @@ function spineTextures(site, w, h) {
   const titleSize = fitSpineTitle(site.spineTitle, L.labelBottom - L.labelTop - 20);
   const color = makeCanvas(w * k, h * k);
   const mask = makeCanvas(w * k, h * k);
-  paintSpine(color.getContext('2d'), site, w, h, k, titleSize, false);
-  paintSpine(mask.getContext('2d'), site, w, h, k, titleSize, true);
-  return { map: canvasTexture(color), orm: canvasTexture(mask, { srgb: false }), titleSize };
+  const bump = makeCanvas(w * k, h * k);
+  paintSpine(color.getContext('2d'), site, w, h, k, titleSize, 'color');
+  paintSpine(mask.getContext('2d'), site, w, h, k, titleSize, 'mask');
+  paintSpine(bump.getContext('2d'), site, w, h, k, titleSize, 'bump');
+  return { map: canvasTexture(color), orm: canvasTexture(mask, { srgb: false }), bump: canvasTexture(bump, { srgb: false }), titleSize };
 }
 
 /* 封面、扉頁、內頁都在 300×400 的「設計尺寸」上排版，再依實際比例縮放 */
@@ -1038,16 +1064,30 @@ function pageCanvas(aspect) {
   return makeCanvas(PAGE_RES * aspect, PAGE_RES);
 }
 
-/** 封面正面（mask=true 畫燙金遮罩） */
-function paintCover(canvas, site, mask) {
+/** 封面正面。mode：color 顏色、mask 燙金金屬度遮罩、bump 凹凸（書槽與燙金壓痕） */
+function paintCover(canvas, site, mode) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width;
   const H = canvas.height;
   const u = W / 300; // 設計尺寸 300 寬
-  const foil = mask ? MASK_FOIL : FOIL;
+  const mask = mode !== 'color';
+  const bump = mode === 'bump';
+  const line = bump ? BUMP_DEBOSS : MASK_FOIL;
+  const foil = mode === 'mask' ? MASK_FOIL : bump ? BUMP_DEBOSS : FOIL;
   if (mask) {
-    ctx.fillStyle = MASK_BASE;
+    ctx.fillStyle = bump ? BUMP_BASE : MASK_BASE;
     ctx.fillRect(0, 0, W, H);
+    if (bump) {
+      paintLinen(ctx, W, H, u);
+      // 書槽（joint）：封面靠書脊處壓下去的一道溝，翻開時封面從這裡彎
+      const groove = ctx.createLinearGradient(W * 0.035, 0, W * 0.075, 0);
+      groove.addColorStop(0, BUMP_BASE);
+      groove.addColorStop(0.35, '#2a2a2a');
+      groove.addColorStop(0.65, '#3a3a3a');
+      groove.addColorStop(1, BUMP_BASE);
+      ctx.fillStyle = groove;
+      ctx.fillRect(W * 0.035, 0, W * 0.04, H);
+    }
   } else {
     paintCloth(ctx, site.color, W, H, u);
     // 靠書脊的折痕
@@ -1061,7 +1101,7 @@ function paintCover(canvas, site, mask) {
   }
   // 燙金外框
   const inset = W * 0.05;
-  ctx.strokeStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.55)';
+  ctx.strokeStyle = mask ? line : 'rgba(239, 226, 191, 0.55)';
   ctx.lineWidth = 1.2 * u;
   ctx.strokeRect(inset + W * 0.04, inset, W - inset * 2 - W * 0.04, H - inset * 2);
   ctx.lineWidth = 0.6 * u;
@@ -1069,7 +1109,11 @@ function paintCover(canvas, site, mask) {
 
   const padX = inset + W * 0.04 + 18 * u;
   const icon = iconImages[site.icon];
-  if (icon) ctx.drawImage(mask ? icon.mask : icon.foil, padX, inset + 18 * u, 30 * u, 30 * u);
+  if (icon) {
+    if (bump) ctx.filter = 'brightness(0.3)';
+    ctx.drawImage(mask ? icon.mask : icon.foil, padX, inset + 18 * u, 30 * u, 30 * u);
+    ctx.filter = 'none';
+  }
   ctx.fillStyle = foil;
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'right';
@@ -1101,7 +1145,7 @@ function paintCover(canvas, site, mask) {
     small -= 0.5 * u;
     ctx.font = `500 ${small}px ${MONO}`;
   }
-  ctx.fillStyle = mask ? MASK_FOIL : 'rgba(239, 226, 191, 0.8)';
+  ctx.fillStyle = mask ? line : 'rgba(239, 226, 191, 0.8)';
   ctx.fillText(tag, padX, H - inset - 22 * u);
 }
 
@@ -1253,31 +1297,50 @@ function makeBook(site, spineW, spineH) {
   const W = spineH / COVER_RATIO;
   const H = spineH;
   const D = spineW;
-  const t = Math.min(3, Math.max(1.4, D * 0.045)); // 書板厚
-  const rim = H * (5 / 400); // 布邊
+  const t = Math.min(3, Math.max(1.6, D * 0.05)); // 書板厚
+  const rim = H * (5 / 400); // 書板比書頁多出來的「書耳」（squares）
   const pageW = W - t - rim;
   const pageH = H - rim * 2;
+  // 圓背：書脊往外拱，書口相對往內凹，和精裝書「起脊」後的形狀一樣
+  const bulge = Math.min(D * 0.16, 9);
   const disposables = [];
   const keep = (x) => { disposables.push(x); return x; };
 
+  /** 沿 z（書的厚度方向）把頂點往 -x 推成拋物線，做出圓背與內凹的書口 */
+  const roundBack = (geometry, amount) => {
+    const pos = geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 1) {
+      const z = pos.getZ(i) / (D / 2);
+      pos.setX(i, pos.getX(i) - amount * (1 - Math.min(1, z * z)));
+    }
+    geometry.computeVertexNormals();
+    return geometry;
+  };
+
   const clothTex = keep(canvasTexture(clothCanvas(site.color), { repeat: true }));
   clothTex.repeat.set(W / 96, H / 96);
-  const cloth = keep(new THREE.MeshStandardMaterial({ map: clothTex, bumpMap: linenBump, bumpScale: 0.6, roughness: 0.82, metalness: 0 }));
+  const clothBump = linenBump.clone();
+  keep(clothBump).repeat.set(W / 96, H / 96);
+  // 書布：sheen 讓布面在斜光下有絨絨的反光，和真的裱布一樣
+  const clothParams = { sheen: 0.7, sheenRoughness: 0.75, sheenColor: new THREE.Color(site.color).lerp(new THREE.Color('#ffffff'), 0.45), roughness: 0.86, metalness: 0 };
+  const cloth = keep(new THREE.MeshPhysicalMaterial({ ...clothParams, map: clothTex, bumpMap: clothBump, bumpScale: 0.8 }));
   const paper = keep(new THREE.MeshStandardMaterial({ color: PAPER, roughness: 0.95 }));
-  const edgeX = keep(new THREE.MeshStandardMaterial({ map: pageEdgeX, roughness: 0.95 }));
-  const edgeY = keep(new THREE.MeshStandardMaterial({ map: pageEdgeY, roughness: 0.95 }));
+  const edgeX = keep(new THREE.MeshStandardMaterial({ map: pageEdgeX, roughness: 0.92 }));
+  const edgeY = keep(new THREE.MeshStandardMaterial({ map: pageEdgeY, roughness: 0.92 }));
 
   const spine = spineTextures(site, spineW, spineH);
-  keep(spine.map); keep(spine.orm);
-  const spineMat = keep(new THREE.MeshStandardMaterial({ map: spine.map, roughnessMap: spine.orm, metalnessMap: spine.orm, roughness: 1, metalness: 1, bumpMap: linenBump, bumpScale: 0.3 }));
+  keep(spine.map); keep(spine.orm); keep(spine.bump);
+  const spineMat = keep(new THREE.MeshPhysicalMaterial({ ...clothParams, map: spine.map, roughnessMap: spine.orm, metalnessMap: spine.orm, roughness: 1, metalness: 1, bumpMap: spine.bump, bumpScale: 1.6 }));
 
   const coverAspect = (W - t) / H;
   const coverColor = pageCanvas(coverAspect);
   const coverMask = pageCanvas(coverAspect);
-  paintCover(coverColor, site, false);
-  paintCover(coverMask, site, true);
+  const coverBump = pageCanvas(coverAspect);
+  paintCover(coverColor, site, 'color');
+  paintCover(coverMask, site, 'mask');
+  paintCover(coverBump, site, 'bump');
   const coverOrm = keep(canvasTexture(coverMask, { srgb: false }));
-  const coverMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(coverColor)), roughnessMap: coverOrm, metalnessMap: coverOrm, roughness: 1, metalness: 1, bumpMap: linenBump, bumpScale: 0.3 }));
+  const coverMat = keep(new THREE.MeshPhysicalMaterial({ ...clothParams, map: keep(canvasTexture(coverColor)), roughnessMap: coverOrm, metalnessMap: coverOrm, roughness: 1, metalness: 1, bumpMap: keep(canvasTexture(coverBump, { srgb: false })), bumpScale: 2 }));
   const insideCanvas = pageCanvas(coverAspect);
   paintCoverInside(insideCanvas, site, (rim / H) * PAGE_RES);
   const insideMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(insideCanvas)), roughness: 0.9 }));
@@ -1290,53 +1353,113 @@ function makeBook(site, spineW, spineH) {
   paintLeafBack(leafBackCanvas, site);
   paintRightPage(rightCanvas, site, 0);
   const rightTex = keep(canvasTexture(rightCanvas));
-  const leafFrontMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(leafFrontCanvas)), roughness: 0.95 }));
-  const leafBackMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(leafBackCanvas)), roughness: 0.95 }));
+  const leafFrontMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(leafFrontCanvas)), roughness: 0.95, side: THREE.FrontSide }));
+  const leafBackMat = keep(new THREE.MeshStandardMaterial({ map: keep(canvasTexture(leafBackCanvas)), roughness: 0.95, side: THREE.BackSide }));
   const rightMat = keep(new THREE.MeshStandardMaterial({ map: rightTex, roughness: 0.95 }));
 
-  const box = (w, h, d, materials) => {
-    const mesh = new THREE.Mesh(keep(new THREE.BoxGeometry(w, h, d)), materials);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+  const mesh = (geometry, materials) => {
+    const m = new THREE.Mesh(keep(geometry), materials);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    return m;
   };
 
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
 
-  // 封底
-  const back = box(W, H, t, cloth);
-  back.position.set(0, 0, -D / 2 + t / 2);
+  // 封底：圓角書板
+  const back = mesh(new RoundedBoxGeometry(W - t, H, t, 2, Math.min(0.9, t / 2.2)), cloth);
+  back.position.set(t / 2, 0, -D / 2 + t / 2);
   group.add(back);
 
-  // 書脊：-x 面貼書背圖
-  const spineMesh = box(t, H, D, [cloth, spineMat, cloth, cloth, cloth, cloth]);
+  // 書脊：一片沿厚度方向拱起的弧形書板，-x 面貼書背圖
+  const spineGeo = roundBack(new THREE.BoxGeometry(t, H, D, 1, 1, 24), bulge);
+  const spineMesh = mesh(spineGeo, [cloth, spineMat, cloth, cloth, cloth, cloth]);
   spineMesh.position.set(-W / 2 + t / 2, 0, 0);
   group.add(spineMesh);
 
-  // 書頁：上面是右頁，三邊是紙頁紋；四周內縮 rim，露出書板的布邊
-  const block = box(pageW, pageH, D - t * 2, [edgeX, paper, edgeY, edgeY, rightMat, paper]);
+  // 書頁：跟著書脊一起彎，書口自然內凹；頂面是右頁
+  const blockGeo = roundBack(new THREE.BoxGeometry(pageW, pageH, D - t * 2, 12, 1, 16), bulge * 0.85);
+  const block = mesh(blockGeo, [edgeX, paper, edgeY, edgeY, rightMat, paper]);
   block.position.set(-W / 2 + t + pageW / 2, 0, 0);
   group.add(block);
 
+  // 堵頭布（headband）：書頁上下靠書脊處的雙色細條
+  const headbandMat = keep(new THREE.MeshStandardMaterial({ map: headbandTexture(site.color), roughness: 0.6 }));
+  [1, -1].forEach((sign) => {
+    const geo = roundBack(new THREE.CylinderGeometry(1.1, 1.1, D - t * 2.4, 8, 12).rotateX(Math.PI / 2), bulge * 0.85);
+    const band = mesh(geo, headbandMat);
+    band.position.set(-W / 2 + t + 1.2, sign * (pageH / 2 + 0.2), 0);
+    group.add(band);
+  });
+
   // 右頁的布底：和書頁頂面幾乎同高，攤開時右頁四周才看得到和左頁一樣寬的布邊
-  const base = box(W - t, H, 0.3, cloth);
+  const base = mesh(new THREE.BoxGeometry(W - t, H, 0.3), cloth);
   base.position.set(t / 2, 0, D / 2 - t - 0.2);
   group.add(base);
 
-  // 扉頁：以書脊內側為軸
+  // 扉頁：會彎的紙。正反兩面各一個網格，共用同一份頂點
+  const SEG = 40;
   const leafZ = D / 2 - t - 0.35;
   const leafPivot = new THREE.Group();
   leafPivot.position.set(-W / 2 + t, 0, leafZ);
-  const leaf = box(pageW, pageH, 0.4, [paper, paper, paper, paper, leafFrontMat, leafBackMat]);
-  leaf.position.x = pageW / 2;
-  leafPivot.add(leaf);
+  const leafGeo = keep(new THREE.PlaneGeometry(pageW, pageH, SEG, 6).translate(pageW / 2, 0, 0));
+  const leafBackGeo = keep(new THREE.BufferGeometry());
+  leafBackGeo.setIndex(leafGeo.index);
+  leafBackGeo.setAttribute('position', leafGeo.attributes.position);
+  leafBackGeo.setAttribute('normal', leafGeo.attributes.normal);
+  const flippedUv = leafGeo.attributes.uv.clone();
+  for (let i = 0; i < flippedUv.count; i += 1) flippedUv.setX(i, 1 - flippedUv.getX(i));
+  leafBackGeo.setAttribute('uv', flippedUv);
+  const leafFront = new THREE.Mesh(leafGeo, leafFrontMat);
+  const leafBack = new THREE.Mesh(leafBackGeo, leafBackMat);
+  leafFront.castShadow = true;
+  leafFront.receiveShadow = leafBack.receiveShadow = true;
+  leafPivot.add(leafFront, leafBack);
   group.add(leafPivot);
+  const leafRest = Float32Array.from(leafGeo.attributes.position.array);
+
+  /**
+   * 紙張翻頁：靠書脊的地方先轉，越往外越慢跟上，紙在中途自然彎成弧形；
+   * 加上一點因重量往下垂的弧度。p = 0 平放在右邊，p = 1 平放在左邊（正好 -180°）。
+   */
+  function bendLeaf(p) {
+    const pos = leafGeo.attributes.position;
+    const cols = SEG + 1;
+    const step = pageW / SEG;
+    const lag = 0.55;
+    const xs = new Float32Array(cols);
+    const zs = new Float32Array(cols);
+    let x = 0;
+    let z = 0;
+    const sag = Math.sin(Math.PI * p);
+    for (let i = 0; i < cols; i += 1) {
+      xs[i] = x;
+      zs[i] = z;
+      const s = (i + 0.5) / SEG;
+      const local = Math.min(1, Math.max(0, p * (1 + lag) - lag * s));
+      let angle = Math.PI * (local * local * (3 - 2 * local));
+      // 紙的重量：立起來的時候外緣往後垂一點
+      angle += sag * 0.35 * s * s;
+      angle = Math.min(Math.PI, angle);
+      x += Math.cos(angle) * step;
+      z += Math.sin(angle) * step;
+    }
+    for (let i = 0; i < pos.count; i += 1) {
+      const col = Math.round((leafRest[i * 3] / pageW) * SEG);
+      pos.setXYZ(i, xs[col], leafRest[i * 3 + 1], zs[col]);
+    }
+    pos.needsUpdate = true;
+    leafGeo.computeVertexNormals();
+    leafGeo.computeBoundingSphere();
+  }
 
   // 封面：以書脊內側為軸，翻開後和右頁對稱
   const coverPivot = new THREE.Group();
   coverPivot.position.set(-W / 2 + t, 0, D / 2 - t / 2);
-  const cover = box(W - t, H, t, [cloth, cloth, cloth, cloth, coverMat, insideMat]);
+  const coverGeo = new RoundedBoxGeometry(W - t, H, t, 2, Math.min(0.9, t / 2.2));
+  // RoundedBoxGeometry 只有一組材質；依法向量把正面、內側分成不同群組
+  const cover = mesh(splitByNormalZ(coverGeo), [cloth, coverMat, insideMat]);
   cover.position.x = (W - t) / 2;
   coverPivot.add(cover);
   group.add(coverPivot);
@@ -1348,12 +1471,82 @@ function makeBook(site, spineW, spineH) {
     leafPivot,
     W, H, D, t, leafZ,
     titleSize: spine.titleSize,
+    bendLeaf,
     setProgress(progress) {
       paintRightPage(rightCanvas, site, progress);
       rightTex.needsUpdate = true;
     },
     dispose() { disposables.forEach((x) => x.dispose()); },
   };
+}
+
+/**
+ * 把一個沒有材質群組的幾何依法向量分三組：0 其他面、1 朝 +z（封面正面）、2 朝 -z（封面內側）。
+ * 正面與內側的 UV 依頂點位置重算成 0–1，貼圖才會蓋滿整片書板。
+ */
+function splitByNormalZ(source) {
+  const geometry = source.index ? source.toNonIndexed() : source;
+  const pos = geometry.attributes.position;
+  const normal = geometry.attributes.normal;
+  geometry.computeBoundingBox();
+  const { min, max } = geometry.boundingBox;
+  const uv = geometry.attributes.uv;
+  const groups = [[], [], []];
+  for (let f = 0; f < pos.count / 3; f += 1) {
+    let nz = 0;
+    for (let k = 0; k < 3; k += 1) nz += normal.getZ(f * 3 + k);
+    nz /= 3;
+    groups[nz > 0.7 ? 1 : nz < -0.7 ? 2 : 0].push(f);
+  }
+  const order = [...groups[0], ...groups[1], ...groups[2]];
+  const out = new THREE.BufferGeometry();
+  const copy = (attr) => {
+    const arr = new Float32Array(order.length * 3 * attr.itemSize);
+    order.forEach((f, n) => {
+      for (let k = 0; k < 3; k += 1) {
+        for (let c = 0; c < attr.itemSize; c += 1) arr[(n * 3 + k) * attr.itemSize + c] = attr.array[(f * 3 + k) * attr.itemSize + c];
+      }
+    });
+    return new THREE.BufferAttribute(arr, attr.itemSize);
+  };
+  out.setAttribute('position', copy(pos));
+  out.setAttribute('normal', copy(normal));
+  const newUv = copy(uv);
+  const p = out.attributes.position;
+  const n = out.attributes.normal;
+  for (let i = 0; i < p.count; i += 1) {
+    const u = (p.getX(i) - min.x) / (max.x - min.x);
+    const v = (p.getY(i) - min.y) / (max.y - min.y);
+    // 內側從背面看，u 要反過來，書脊才會在右邊
+    if (n.getZ(i) > 0.7) newUv.setXY(i, u, v);
+    else if (n.getZ(i) < -0.7) newUv.setXY(i, 1 - u, v);
+  }
+  out.setAttribute('uv', newUv);
+  let start = 0;
+  groups.forEach((g, index) => {
+    out.addGroup(start * 3, g.length * 3, index);
+    start += g.length;
+  });
+  source.dispose();
+  if (geometry !== source) geometry.dispose();
+  return out;
+}
+
+/** 堵頭布：斜紋的雙色絲線 */
+function headbandTexture(color) {
+  const canvas = makeCanvas(64, 16);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PAPER_2;
+  ctx.fillRect(0, 0, 64, 16);
+  for (let x = 0; x < 64; x += 8) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, 0); ctx.lineTo(x + 4, 0); ctx.lineTo(x + 8, 16); ctx.lineTo(x + 4, 16);
+    ctx.fill();
+  }
+  const texture = canvasTexture(canvas, { repeat: true });
+  texture.repeat.set(1, 6);
+  return texture;
 }
 
 /* ---------- 鏡頭：畫面 px 一比一對應 z = 0 的平面，眼睛位置可以任意移動 ----------
@@ -1408,11 +1601,13 @@ function environmentTexture(renderer) {
 }
 
 /* ---------- 3D 書櫃 ---------- */
+const FRAME = { cap: 14, side: 12 }; // 鋁框：上方燈槽高度、左右立柱寬度（畫面 px）
 let shelf = null;
 
 const CASE_THEME = {
-  light: { back: ['#e4e4e9', '#ececf0', '#e9e9ee'], metal: '#c9c9d0', topBand: 0.85, hemi: 0.3, key: 1.15, env: 0.45 },
-  dark: { back: ['#0e0e10', '#151517', '#121214'], metal: '#3c3c43', topBand: 0.35, hemi: 0.25, key: 1.0, env: 0.35 },
+  // 書櫃的材質參考 Apple Store 的陳列架：霧面牆、陽極鋁框、淺橡木層板、上方內嵌的暖白燈條
+  light: { back: ['#f2f2f4', '#ececef', '#e5e5e9'], alu: '#d4d4d9', wood: '#c9a47c', led: 3.2, hemi: 0.3, key: 1.0, env: 0.5, ao: 0.22 },
+  dark: { back: ['#202022', '#1a1a1c', '#141416'], alu: '#4a4a50', wood: '#6e4b33', led: 4.5, hemi: 0.22, key: 0.75, env: 0.35, ao: 0.6 },
 };
 
 function createShelf() {
@@ -1438,12 +1633,16 @@ function createShelf() {
 
   const backCanvas = makeCanvas(512, 256);
   const backTex = canvasTexture(backCanvas);
-  const backMat = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.92 });
-  const brushCanvas = makeCanvas(512, 40);
-  const brushTex = canvasTexture(brushCanvas);
-  const metalFront = new THREE.MeshStandardMaterial({ map: brushTex, metalness: 0.85, roughness: 0.38 });
-  const metalPlain = new THREE.MeshStandardMaterial({ metalness: 0.85, roughness: 0.4 });
-  const bookendMat = new THREE.MeshStandardMaterial({ color: '#e2e2e8', metalness: 1, roughness: 0.28 });
+  const backMat = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.95 });
+  const wallMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
+  const aluMat = new THREE.MeshPhysicalMaterial({ metalness: 1, roughness: 0.42, clearcoat: 0.3, clearcoatRoughness: 0.5 });
+  const woodCanvas = makeCanvas(2048, 128);
+  const woodTex = canvasTexture(woodCanvas);
+  const woodMat = new THREE.MeshPhysicalMaterial({ map: woodTex, roughness: 0.62, clearcoat: 0.35, clearcoatRoughness: 0.55 });
+  const ledMat = new THREE.MeshBasicMaterial({ color: '#fff3e0' });
+  const underShadowTex = shadowBlobTexture();
+  const underShadowMat = new THREE.MeshBasicMaterial({ map: underShadowTex, transparent: true, depthWrite: false, opacity: 0.55 });
+  const woodSeed = Math.random();
 
   let lights = null;
   const books = new Map();
@@ -1460,51 +1659,54 @@ function createShelf() {
     g.addColorStop(1, theme.back[2]);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, backCanvas.width, backCanvas.height);
-    // 上方層板與兩側的內陰影（和 2D 版一樣：上 26px、左右 14px，這裡以書櫃寬高換算）
+    // 牆角的環境遮蔽：上方燈槽底下與兩側鋁框旁邊稍暗
     const sx = backCanvas.width / Math.max(1, layout ? layout.width : 1000);
     const sy = backCanvas.height / Math.max(1, layout ? layout.boardTop : 360);
-    const edge = (x0, y0, x1, y1, size, alpha) => {
+    const edge = (x0, y0, x1, y1, alpha) => {
       const s = ctx.createLinearGradient(x0, y0, x1, y1);
       s.addColorStop(0, `rgba(0,0,0,${alpha})`);
       s.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = s;
       ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0) || backCanvas.width, Math.abs(y1 - y0) || backCanvas.height);
     };
-    const shade = theme === CASE_THEME.dark ? 0.7 : 0.26;
-    edge(0, 0, 0, 30 * sy, 0, shade);
-    edge(0, 0, 16 * sx, 0, 0, shade * 0.8);
-    edge(backCanvas.width, 0, backCanvas.width - 16 * sx, 0, 0, shade * 0.8);
+    edge(0, FRAME.cap * sy, 0, (FRAME.cap + 14) * sy, theme.ao * 0.6);
+    edge(FRAME.side * sx, 0, (FRAME.side + 18) * sx, 0, theme.ao);
+    edge(backCanvas.width - FRAME.side * sx, 0, backCanvas.width - (FRAME.side + 18) * sx, 0, theme.ao);
+    edge(0, backCanvas.height, 0, backCanvas.height - 22 * sy, theme.ao * 0.7);
     backTex.needsUpdate = true;
 
-    // 層板正面：拉絲＋頂端 6px 的亮金屬帶
-    const b = brushCanvas.getContext('2d');
-    const base = new THREE.Color(theme.metal);
-    const front = b.createLinearGradient(0, 0, 0, brushCanvas.height);
-    front.addColorStop(0, `#${base.clone().offsetHSL(0, 0, 0.12).getHexString()}`);
-    front.addColorStop(0.3, `#${base.getHexString()}`);
-    front.addColorStop(1, `#${base.clone().offsetHSL(0, 0, -0.1).getHexString()}`);
-    b.fillStyle = front;
-    b.fillRect(0, 0, brushCanvas.width, brushCanvas.height);
-    for (let x = 0; x < brushCanvas.width; x += 3) {
-      b.fillStyle = `rgba(255,255,255,${0.05 + Math.random() * 0.1})`;
-      b.fillRect(x, 0, 1, brushCanvas.height);
+    // 橡木：沿長邊的木紋，用固定亂數種子，換主題時紋路不變
+    const w = woodCanvas.getContext('2d');
+    w.fillStyle = theme.wood;
+    w.fillRect(0, 0, woodCanvas.width, woodCanvas.height);
+    let seed = woodSeed * 1e6;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 70; i += 1) {
+      const y0 = rand() * woodCanvas.height;
+      const amp = 2 + rand() * 6;
+      const freq = 0.002 + rand() * 0.006;
+      const phase = rand() * 10;
+      w.strokeStyle = rand() < 0.6 ? `rgba(90, 55, 25, ${0.05 + rand() * 0.12})` : `rgba(255, 240, 215, ${0.04 + rand() * 0.08})`;
+      w.lineWidth = 0.6 + rand() * 2.2;
+      w.beginPath();
+      for (let x = 0; x <= woodCanvas.width; x += 16) {
+        const y = y0 + Math.sin(x * freq + phase) * amp + Math.sin(x * freq * 3.7) * amp * 0.25;
+        if (x === 0) w.moveTo(x, y); else w.lineTo(x, y);
+      }
+      w.stroke();
     }
-    const top = b.createLinearGradient(0, 0, 0, 12);
-    top.addColorStop(0, `rgba(255,255,255,${theme.topBand})`);
-    top.addColorStop(1, 'rgba(255,255,255,0.1)');
-    b.fillStyle = top;
-    b.fillRect(0, 0, brushCanvas.width, 12);
-    b.fillStyle = 'rgba(0,0,0,0.3)';
-    b.fillRect(0, brushCanvas.height - 2, brushCanvas.width, 2);
-    brushTex.needsUpdate = true;
-    metalPlain.color.set(theme.metal);
-    const dark = theme === CASE_THEME.dark;
-    metalFront.metalness = metalPlain.metalness = dark ? 0.55 : 0.85;
-    bookendMat.color.set(dark ? '#8e8e96' : '#e2e2e8');
+    for (let i = 0; i < 1400; i += 1) {
+      w.fillStyle = `rgba(70, 40, 15, ${rand() * 0.08})`;
+      w.fillRect(rand() * woodCanvas.width, rand() * woodCanvas.height, 1 + rand() * 8, 1);
+    }
+    woodTex.needsUpdate = true;
 
+    aluMat.color.set(theme.alu);
+    wallMat.color.set(theme.back[1]);
     if (lights) {
       lights.hemi.intensity = theme.hemi;
       lights.key.intensity = theme.key;
+      if (lights.strip) lights.strip.intensity = theme.led;
     }
     scene.environmentIntensity = theme.env;
   }
@@ -1515,7 +1717,7 @@ function createShelf() {
       child.geometry.dispose();
     }
     if (lights) {
-      scene.remove(lights.hemi, lights.key, lights.key.target, lights.fill, lights.fill.target);
+      scene.remove(lights.hemi, lights.key, lights.key.target, lights.fill, lights.fill.target, lights.strip);
       lights.key.shadow.dispose();
       lights = null;
     }
@@ -1548,7 +1750,7 @@ function createShelf() {
     const tallest = Math.max(...links.map((a) => a.getBoundingClientRect().height));
     const depth = tallest / COVER_RATIO + 26; // 書櫃深度：最大的書再留一點空隙
 
-    // 背板：尺寸反推透視，投影後剛好蓋滿書櫃（畫面 0..width × 0..boardTop），貼圖上的內陰影才會落在邊緣
+    // 背板：尺寸反推透視，投影後剛好蓋滿書櫃（畫面 0..width × 0..boardTop），貼圖上的陰影才會落在邊緣
     const m = SHELF_CAMERA_DISTANCE / (SHELF_CAMERA_DISTANCE + depth);
     const unproject = (s, eye) => eye + (s - eye) / m;
     const bx0 = unproject(0, width / 2);
@@ -1556,17 +1758,37 @@ function createShelf() {
     const by0 = unproject(0, boardTop);
     const by1 = boardTop + 6;
     addMesh(new THREE.PlaneGeometry(bx1 - bx0, by1 - by0), backMat, (bx0 + bx1) / 2, -(by0 + by1) / 2, -depth, { cast: false });
-    // 金屬層板：頂面和眼睛同高，只看得到正面
-    addMesh(new THREE.BoxGeometry(width, 20, depth + 6), [metalPlain, metalPlain, metalPlain, metalPlain, metalFront, metalPlain], width / 2, -(boardTop + 10), -depth / 2 + 3);
 
-    // 書擋：L 形金屬片
+    // 櫃體內側：和背板同樣的霧面材質，燈條會把它們照亮
+    const fullH = boardTop + 20;
+    const ceiling = addMesh(new THREE.PlaneGeometry(width, depth), wallMat, width / 2, -FRAME.cap, -depth / 2, { cast: false });
+    ceiling.rotation.x = Math.PI / 2;
+    [[FRAME.side, Math.PI / 2], [width - FRAME.side, -Math.PI / 2]].forEach(([x, rot]) => {
+      const wall = addMesh(new THREE.PlaneGeometry(depth, boardTop), wallMat, x, -boardTop / 2, -depth / 2, { cast: false });
+      wall.rotation.y = rot;
+    });
+    // 陽極鋁前框：上方燈槽與左右立柱，細、圓角
+    const frameDepth = 10;
+    addMesh(new RoundedBoxGeometry(width, FRAME.cap, frameDepth, 3, 3), aluMat, width / 2, -FRAME.cap / 2, 0);
+    [FRAME.side / 2, width - FRAME.side / 2].forEach((x) => {
+      addMesh(new RoundedBoxGeometry(FRAME.side, fullH, frameDepth, 3, 3.5), aluMat, x, -fullH / 2, 0);
+    });
+    // 燈槽底下的暖白燈條：看得到的一條亮線，加上一片往下打的面光源
+    addMesh(new THREE.BoxGeometry(width - FRAME.side * 2 - 8, 1.6, 4), ledMat, width / 2, -FRAME.cap - 0.6, -depth * 0.35, { cast: false, receive: false });
+
+    // 淺橡木層板：前緣倒圓角，比鋁框稍微突出
+    addMesh(new RoundedBoxGeometry(width - FRAME.side * 2, 20, depth + 14, 4, 5), woodMat, width / 2, -(boardTop + 10), -depth / 2 + 7);
+    // 層板下方投在牆上的柔和影子（canvas 往下多留的 24px）
+    const under = addMesh(new THREE.PlaneGeometry(width * 0.98, 30), underShadowMat, width / 2, -(boardTop + 26), -2, { cast: false, receive: false });
+    under.renderOrder = -1;
+
+    // 書擋：圓角鋁片，L 形
     const end = document.getElementById('bookend');
     if (end) {
       const r = rel(end.getBoundingClientRect());
-      const bottom = boardTop;
       const plateH = r.height;
-      addMesh(new THREE.BoxGeometry(11, plateH, depth * 0.55), bookendMat, r.left + 7.5, -(bottom - plateH / 2), -depth * 0.3);
-      addMesh(new THREE.BoxGeometry(r.width - 2, 3, depth * 0.55), bookendMat, r.left + 1 + (r.width - 2) / 2, -(bottom - 1.5), -depth * 0.3);
+      addMesh(new RoundedBoxGeometry(8, plateH, depth * 0.55, 3, 2.5), aluMat, r.left + 6, -(boardTop - plateH / 2), -depth * 0.3);
+      addMesh(new RoundedBoxGeometry(r.width - 2, 3, depth * 0.55, 2, 1.2), aluMat, r.left + 1 + (r.width - 2) / 2, -(boardTop - 1.5), -depth * 0.3);
     }
 
     // 書：書背貼齊 DOM 連結的位置，底部站在層板上
@@ -1583,6 +1805,10 @@ function createShelf() {
     });
 
     lights = addLights(scene, width / 2, -boardTop / 2, Math.max(width, boardTop) * 1.1);
+    lights.strip = new THREE.RectAreaLight('#ffeedd', 3, width - FRAME.side * 2 - 8, depth * 0.6);
+    lights.strip.position.set(width / 2, -FRAME.cap - 1, -depth * 0.5);
+    lights.strip.lookAt(width / 2, -FRAME.cap - 1000, -depth * 0.5);
+    scene.add(lights.strip);
     // 眼睛和層板頂面同高：書頂永遠看不到，符合正視圖
     layout = { width, height, eyeX: width / 2, eyeY: boardTop, boardTop };
     paintCaseTextures();
@@ -1804,16 +2030,14 @@ async function openBook(link, site) {
         book.coverPivot.rotation.y = -Math.PI * e;
       },
     }),
-    // 扉頁翻到正好 -180° 平放；高度同時墊到封面之上，翻完不會被封面蓋住
+    // 扉頁像紙一樣彎著翻過去，最後正好平放在 -180°；高度同時墊到封面之上，翻完不會被封面蓋住
     tween({
-      duration: 800,
-      delay: 260,
+      duration: 1100,
+      delay: 220,
       easing: EASE_IN_OUT,
       update: (e) => {
-        book.leafPivot.rotation.y = -Math.PI * e;
-        book.leafPivot.position.z = lerp(book.leafZ, leafLift, e);
-        // 翻到一半時紙會微微拱起
-        book.leafPivot.position.z += Math.sin(Math.PI * e) * book.W * 0.04;
+        book.bendLeaf(e);
+        book.leafPivot.position.z = lerp(book.leafZ, leafLift, Math.min(1, e * 1.4));
       },
     }),
   ]);
@@ -1859,7 +2083,12 @@ setupThemeSwitch();
 async function start3d() {
   try {
     THREE = await import('three');
-    ({ RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js'));
+    [{ RoomEnvironment }, { RoundedBoxGeometry }, { RectAreaLightUniformsLib }] = await Promise.all([
+      import('three/addons/environments/RoomEnvironment.js'),
+      import('three/addons/geometries/RoundedBoxGeometry.js'),
+      import('three/addons/lights/RectAreaLightUniformsLib.js'),
+    ]);
+    RectAreaLightUniformsLib.init();
     await Promise.all([document.fonts.ready, loadIcons()]);
     linenBump = canvasTexture(linenBumpCanvas(), { srgb: false, repeat: true });
     pageEdgeX = canvasTexture(pageEdgeCanvas(true));
