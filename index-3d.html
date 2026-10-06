@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vibe Coding 3D</title>
-<meta name="description" content="個人課程書櫃（three.js 版）：Prompt 與 Agent、Claude Code 安全開發。">
+<title>端點星</title>
+<meta name="description" content="端點星：個人課程書櫃，Prompt 與 Agent、Claude Code 安全開發。">
 <meta name="color-scheme" content="light dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap">
 <script>
   /* 在第一次繪製前套用主題，避免深色模式閃白 */
   try {
@@ -169,15 +169,21 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   gap: 4px 24px;
   margin-bottom: clamp(24px, 4vh, 40px);
 }
-.shelf-head h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); line-height: 1.2; font-weight: 700; letter-spacing: 0.04em; }
+.shelf-head .shelf-hint { font-family: var(--font); font-size: 14px; letter-spacing: 0.01em; }
 .shelf-head p { margin: 0; color: var(--text-2); font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
 
 /* ---------- 書櫃：three.js 畫在 canvas 上，DOM 只負責排版與互動 ----------
    .books 裡的連結照原本的 flex 排版（寬＝書背寬、高＝書高），3D 書直接讀這些 rect 擺位置，
    所以版面檢查、Tab 聚焦、Ctrl／Cmd 點擊開新分頁都和 2D 版一樣。 */
+.nav-controls { display: flex; align-items: center; gap: 8px; flex: none; }
+@media (max-width: 479px) {
+  .nav .wrap { gap: 8px; }
+  .theme-switch button { padding: 0; }
+}
+
 .bookcase {
   position: relative;
-  padding: 44px clamp(16px, 3vw, 36px) 0;
+  padding: 0 clamp(16px, 3vw, 36px);
   border-radius: 10px 10px 0 0;
   background: var(--case-back);
 }
@@ -194,6 +200,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   transition: opacity 600ms var(--ease-out);
 }
 .bookcase.is-3d .shelf-canvas { opacity: 1; }
+
+.shelf-row { padding-top: 40px; }
+.shelf-row:first-child { padding-top: 44px; }
 
 .books {
   position: relative;
@@ -228,7 +237,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   color: var(--foil);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
+  cursor: grab;
 }
+.book:active { cursor: grabbing; }
 .book:focus-visible { outline-offset: 5px; }
 
 /* three.js 載入前與無法使用 WebGL 時的簡易書背；3D 準備好就隱藏 */
@@ -251,26 +262,40 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .bookcase.is-3d .book-fallback { visibility: hidden; }
 
 .bookend { width: 46px; height: calc(var(--shelf-h) * 0.48); margin-left: 8px; }
+.prop-stack { width: 120px; height: 40px; }
+.prop-vase { width: 56px; height: calc(var(--shelf-h) * 0.42); margin-right: 18px; }
+.prop-vase-tall { height: calc(var(--shelf-h) * 0.55); margin: 0 0 0 18px; }
+.prop-spacer { flex: 1; }
 
 /* ---------- 書櫃下方的說明欄 ---------- */
-.inspector {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px 32px;
-  min-height: 140px;
-  margin-top: 28px;
-  padding: 0 clamp(4px, 1vw, 12px);
+/* ---------- 介紹卡：浮在書的旁邊，毛玻璃 ---------- */
+.book-card {
+  position: absolute;
+  z-index: 5;
+  width: min(320px, calc(100% - 24px));
+  padding: 18px 20px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 18px 40px -12px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  transform-origin: left top;
+  transition: opacity 220ms var(--ease-out), transform 320ms var(--ease-out), left 260ms var(--ease-out), top 260ms var(--ease-out);
 }
-@media (min-width: 768px) {
-  .inspector { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
-}
-.inspector h2 { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 700; letter-spacing: 0.02em; text-wrap: balance; }
-.inspector .phrase { display: inline-block; }
-.inspector p { margin: 6px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.7; text-wrap: pretty; }
-.inspector dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 13px; line-height: 1.5; align-content: start; }
-.inspector dt { color: var(--text-2); letter-spacing: 0.08em; }
-.inspector dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.inspector .hint { color: var(--text-2); font-size: 15px; margin: 0; }
+.book-card.is-visible { opacity: 1; transform: none; }
+.book-card.is-sheet { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); top: auto; width: auto; }
+.book-card h2 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 700; letter-spacing: 0.02em; text-wrap: balance; }
+.book-card .phrase { display: inline-block; }
+.book-card p { margin: 6px 0 0; color: var(--text-2); font-size: 14px; line-height: 1.7; text-wrap: pretty; }
+.card-progress { height: 3px; margin: 12px 0; border-radius: 2px; background: var(--hairline); overflow: hidden; }
+.card-progress span { display: block; height: 100%; width: calc(var(--ratio, 0) * 100%); background: var(--accent); }
+.book-card dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 12px; line-height: 1.5; }
+.book-card dt { color: var(--text-2); letter-spacing: 0.08em; }
+.book-card dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 /* ---------- 打開書的舞台：書從書櫃的 canvas 交給全螢幕的 canvas ---------- */
 .stage { position: fixed; inset: 0; z-index: 50; cursor: pointer; }
@@ -319,33 +344,39 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
         <rect x="1" y="1" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
         <path d="M5.8 7.6 8.2 10l-2.4 2.4M10.6 12.8h3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      Vibe Coding
+      <span data-i18n="brand">端點星</span>
       <span class="path">~/course-web</span>
     </span>
-    <div class="theme-switch" role="group" aria-label="配色">
-      <button type="button" data-theme-choice="auto">自動</button>
-      <button type="button" data-theme-choice="light">淺色</button>
-      <button type="button" data-theme-choice="dark">深色</button>
+    <div class="nav-controls">
+      <div class="theme-switch" role="group" data-i18n-label="langGroup" aria-label="語言">
+        <button type="button" data-lang-choice="zh" lang="zh-Hant-TW">中</button>
+        <button type="button" data-lang-choice="en" lang="en">EN</button>
+      </div>
+      <div class="theme-switch" role="group" data-i18n-label="themeGroup" aria-label="配色">
+        <button type="button" data-theme-choice="auto" data-i18n="auto">自動</button>
+        <button type="button" data-theme-choice="light" data-i18n="light">淺色</button>
+        <button type="button" data-theme-choice="dark" data-i18n="dark">深色</button>
+      </div>
     </div>
   </div>
 </header>
 
 <main>
   <div class="wrap">
+    <h1 class="visually-hidden" data-i18n="brand">端點星</h1>
     <div class="shelf-head">
-      <h1>書櫃</h1>
+      <p id="shelf-hint" class="shelf-hint"></p>
       <p id="shelf-summary"></p>
     </div>
-    <div class="bookcase" id="bookcase">
-      <ul class="books" id="books" aria-label="課程"></ul>
-      <div class="board" id="board" aria-hidden="true"></div>
+    <div class="bookcase" id="bookcase" data-i18n-label="shelfLabel" role="region" aria-label="課程書櫃">
+      <div id="rows"></div>
+      <div class="book-card" id="book-card" aria-live="polite"></div>
     </div>
-    <section class="inspector" id="inspector" aria-live="polite"></section>
   </div>
 </main>
 
 <footer class="footer">
-  <div class="wrap"><p>進度只存在這個瀏覽器。</p></div>
+  <div class="wrap"><p data-i18n="footer">進度只存在這個瀏覽器。</p></div>
 </footer>
 
 <!--
@@ -369,9 +400,18 @@ const SITES = [
     color: '#1e4fb3',
     icon: 'loop',
     href: 'course-web/ai-chat-prompt-agent-course/index.html',
-    spineTitle: 'Prompt × Agent 實戰課',
-    titlePhrases: ['AI 對話', '× Prompt', '× Agent', '實戰課'],
-    desc: '從跟 AI 對話、寫 prompt，到操作 AI Agent、CLI 與 harness。',
+    text: {
+      zh: {
+        spineTitle: 'Prompt × Agent 實戰課',
+        titlePhrases: ['AI 對話', '× Prompt', '× Agent', '實戰課'],
+        desc: '從跟 AI 對話、寫 prompt，到操作 AI Agent、CLI 與 harness。',
+      },
+      en: {
+        spineTitle: 'Prompt × Agent Workshop',
+        titlePhrases: ['AI Chat', '× Prompt', '× Agent', 'Workshop'],
+        desc: 'From chatting with AI and writing prompts to driving AI agents, CLIs and harnesses.',
+      },
+    },
     modules: 12,
     lessons: 50,
     readyLessons: 25,
@@ -384,9 +424,18 @@ const SITES = [
     color: '#1d6338',
     icon: 'layers',
     href: 'course-web/claude-code-secure-dev-course/index.html',
-    spineTitle: 'Claude Code 安全開發',
-    titlePhrases: ['Claude Code', '× 安全開發', '實戰課'],
-    desc: '用 Claude Code CLI 與 Cowork 開發軟體：工作流、權限與隔離、資安防護、效能與成本。',
+    text: {
+      zh: {
+        spineTitle: 'Claude Code 安全開發',
+        titlePhrases: ['Claude Code', '× 安全開發', '實戰課'],
+        desc: '用 Claude Code CLI 與 Cowork 開發軟體：工作流、權限與隔離、資安防護、效能與成本。',
+      },
+      en: {
+        spineTitle: 'Claude Code Secure Dev',
+        titlePhrases: ['Claude Code', '× Secure', 'Development'],
+        desc: 'Building software with the Claude Code CLI and Cowork: workflows, permissions and isolation, security, performance and cost.',
+      },
+    },
     modules: 9,
     lessons: 29,
     readyLessons: 29,
@@ -397,23 +446,75 @@ const SITES = [
 ];
 
 const THEME_KEY = 'vibe-coding-home.theme.v1';
+const LANG_KEY = 'vibe-coding-home.lang.v1';
+const SHELF_ROWS = 3; // 書櫃至少幾層；書多了會自動加層
 const SPINE_BASE_WIDTH = 40;
 const SPINE_WIDTH_PER_LESSON = 0.7;
+const BOOKEND_SPACE = 54; // 書擋寬度＋間距
 const COVER_MAX_HEIGHT = 400;
 const COVER_RATIO = 4 / 3;
-const SHELF_CAMERA_DISTANCE = 4000; // 書櫃幾乎是正視圖，只留一點點透視
+const SHELF_CAMERA_DISTANCE = 4000; // 書櫃幾乎是正視圖，只留一點點透視；書櫃越高鏡頭放越遠（見 build）
 const STAGE_CAMERA_DISTANCE = 2000;
 const SPINE_TITLE_PX = 15;
 const SPINE_TITLE_MIN_PX = 11;
 const HOVER_LIFT = 12;
 const FOIL = '#efe2bf';
-const PAPER = '#f8f4ea';
-const PAPER_2 = '#efe8d8';
-const INK = '#1d1d1f';
+const PAPER = '#f4ecdb';
+const PAPER_2 = '#ebe0c8';
+const INK = '#2a2118';
+const INK_2 = '#6b5d4a';
 const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+const SERIF = '"Noto Serif TC", "Songti TC", "Source Han Serif TC", "PMingLiU", Georgia, serif';
 const MONO = '"SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
 // ?rate=0.25 會把所有動畫放慢 4 倍，方便逐格檢查
 const RATE = Math.max(0.05, Number(new URLSearchParams(window.location.search).get('rate')) || 1);
+
+/* ---------- 中英文 ---------- */
+const STRINGS = {
+  zh: {
+    brand: '端點星',
+    themeGroup: '配色', auto: '自動', light: '淺色', dark: '深色', langGroup: '語言',
+    shelfLabel: '課程書櫃', rowLabel: (n) => `第 ${n} 層`,
+    summary: (books, lessons, done) => `${books} 本 · ${lessons} 單元 · 已讀 ${done}`,
+    hintHover: '游標停在書背上看介紹，點一下打開。', hintTouch: '點一下書背打開。',
+    bookLabel: (title, lessons, done) => `${title}，${lessons} 個單元，已讀 ${done} 個`,
+    path: '路徑', content: '內容', status: '狀態', read: '已讀', verified: '查證',
+    contentValue: (m, l) => `${m} 模組 · ${l} 單元`,
+    complete: '已完成', inProgress: (n) => `製作中，${n} 個單元可讀`,
+    footer: '進度只存在這個瀏覽器。',
+    skip: '點一下直接打開', opening: '正在打開…',
+    colophon: (m, l) => `全書 ${m} 模組 · ${l} 單元`, stamp: (d, l) => `已讀 ${d} / ${l}`,
+    imprint: '端點星 藏書', runningHead: '端點星 · 書目', chapter: '卷首',
+  },
+  en: {
+    brand: '端點星',
+    themeGroup: 'Appearance', auto: 'Auto', light: 'Light', dark: 'Dark', langGroup: 'Language',
+    shelfLabel: 'Course bookshelf', rowLabel: (n) => `Shelf ${n}`,
+    summary: (books, lessons, done) => `${books} books · ${lessons} lessons · ${done} read`,
+    hintHover: 'Hover a spine to see details. Click to open.', hintTouch: 'Tap a spine to open.',
+    bookLabel: (title, lessons, done) => `${title}, ${lessons} lessons, ${done} read`,
+    path: 'Path', content: 'Content', status: 'Status', read: 'Read', verified: 'Verified',
+    contentValue: (m, l) => `${m} modules · ${l} lessons`,
+    complete: 'Complete', inProgress: (n) => `In progress, ${n} lessons ready`,
+    footer: 'Progress is stored only in this browser.',
+    skip: 'Click to open now', opening: 'Opening…',
+    colophon: (m, l) => `${m} modules · ${l} lessons`, stamp: (d, l) => `Read ${d} / ${l}`,
+    imprint: 'From the library of 端點星', runningHead: '端點星 · Catalogue', chapter: 'Prologue',
+  },
+};
+
+let lang = 'zh';
+try {
+  const saved = window.localStorage.getItem(LANG_KEY);
+  if (saved === 'zh' || saved === 'en') lang = saved;
+} catch (err) {
+  console.warn('無法讀取語言偏好，改用中文：', err);
+}
+const t = (key, ...args) => {
+  const value = STRINGS[lang][key];
+  return typeof value === 'function' ? value(...args) : value;
+};
+const siteText = (site) => site.text[lang];
 
 const ICONS = {
   loop: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="4.5" r="2.2" fill="currentColor"/><circle cx="18.5" cy="15.8" r="2.2" fill="currentColor"/><circle cx="5.5" cy="15.8" r="2.2" fill="currentColor"/></svg>',
@@ -462,61 +563,114 @@ function spineWidth(site) {
   return Math.round(SPINE_BASE_WIDTH + site.lessons * SPINE_WIDTH_PER_LESSON);
 }
 
-/* ---------- 書櫃的 DOM：連結負責排版與互動，外觀交給 three.js ---------- */
+/* ---------- 書櫃的 DOM：每一層一個 .shelf-row，連結負責排版與互動，外觀交給 three.js ---------- */
 function renderBook(site) {
   const { done } = siteStats(site);
-  const fullTitle = site.titlePhrases.join(' ');
+  const text = siteText(site);
   return `
     <li>
       <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}"
          style="--accent:${site.color};--w:${spineWidth(site)}px;--h:${site.height}"
-         aria-label="${escapeHtml(fullTitle)}，${site.lessons} 個單元，已讀 ${done} 個">
-        <span class="book-fallback" aria-hidden="true">${escapeHtml(site.spineTitle)}</span>
+         aria-label="${escapeHtml(t('bookLabel', text.titlePhrases.join(' '), site.lessons, done))}">
+        <span class="book-fallback" aria-hidden="true">${escapeHtml(text.spineTitle)}</span>
       </a>
     </li>`;
 }
 
-function renderShelfDom() {
-  document.getElementById('books').innerHTML = SITES.map(renderBook).join('') + '<li aria-hidden="true" class="bookend" id="bookend"></li>';
-  const totalLessons = SITES.reduce((sum, s) => sum + s.lessons, 0);
-  const totalDone = SITES.reduce((sum, s) => sum + siteStats(s).done, 0);
-  document.getElementById('shelf-summary').textContent = `${SITES.length} 本 · ${totalLessons} 單元 · 已讀 ${totalDone}`;
-  inspectedId = undefined;
-  showInspector(null);
+/* 空的層放擺飾：橫躺的一疊書、陶瓶，讓書櫃不會空蕩蕩；只是排版用的盒子，3D 依它們的位置擺放 */
+const PROPS = [
+  '<li class="prop prop-stack" data-prop="stack" aria-hidden="true"></li><li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-vase" data-prop="vase" aria-hidden="true"></li>',
+  '<li class="prop prop-vase prop-vase-tall" data-prop="vase" aria-hidden="true"></li><li class="prop-spacer" aria-hidden="true"></li><li class="prop prop-stack" data-prop="stack" aria-hidden="true"></li><li class="bookend" data-bookend aria-hidden="true"></li>',
+];
+
+/** 依書櫃寬度把書分到各層，放不下就換到下一層 */
+function distributeBooks() {
+  const rowsEl = document.getElementById('rows');
+  const style = getComputedStyle(document.getElementById('bookcase'));
+  const inner = document.getElementById('bookcase').clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const available = inner - BOOKEND_SPACE;
+  const rows = [[]];
+  let used = 0;
+  SITES.forEach((site) => {
+    const w = spineWidth(site) + 3;
+    if (used + w > available && rows[rows.length - 1].length) {
+      rows.push([]);
+      used = 0;
+    }
+    rows[rows.length - 1].push(site);
+    used += w;
+  });
+  while (rows.length < SHELF_ROWS) rows.push([]);
+  let propIndex = 0;
+  rowsEl.innerHTML = rows.map((row, i) => {
+    const content = row.length
+      ? row.map(renderBook).join('') + '<li class="bookend" data-bookend aria-hidden="true"></li>'
+      : PROPS[propIndex++ % PROPS.length];
+    return `
+      <div class="shelf-row">
+        <ul class="books" aria-label="${escapeHtml(t('rowLabel', i + 1))}">${content}</ul>
+        <div class="board" aria-hidden="true"></div>
+      </div>`;
+  }).join('');
 }
 
-/* ---------- 說明欄：游標停在書背或用 Tab 聚焦時顯示 ---------- */
-let inspectedId;
+function renderShelfDom() {
+  distributeBooks();
+  const totalLessons = SITES.reduce((sum, s) => sum + s.lessons, 0);
+  const totalDone = SITES.reduce((sum, s) => sum + siteStats(s).done, 0);
+  document.getElementById('shelf-summary').textContent = t('summary', SITES.length, totalLessons, totalDone);
+  document.getElementById('shelf-hint').textContent = window.matchMedia('(hover: hover)').matches ? t('hintHover') : t('hintTouch');
+  hideCard();
+}
 
-function inspectorHtml(site) {
-  if (!site) {
-    const hint = window.matchMedia('(hover: hover)').matches ? '游標停在書背上看介紹，點一下打開。' : '點一下書背打開。';
-    return `<p class="hint">${hint}</p>`;
-  }
+/* ---------- 介紹卡：浮在書旁邊；窄螢幕改成貼底的卡片 ---------- */
+let cardId = null;
+
+function cardHtml(site) {
   const { done, isComplete } = siteStats(site);
-  const status = isComplete ? '已完成' : `製作中，${site.readyLessons} 個單元可讀`;
+  const text = siteText(site);
+  const status = isComplete ? t('complete') : t('inProgress', site.readyLessons);
   return `
-    <div>
-      <h2>${phrasesHtml(site.titlePhrases)}</h2>
-      <p>${escapeHtml(site.desc)}</p>
-    </div>
+    <h2>${phrasesHtml(text.titlePhrases)}</h2>
+    <p>${escapeHtml(text.desc)}</p>
+    <div class="card-progress" aria-hidden="true"><span style="--ratio:${done / site.lessons};--accent:${site.color}"></span></div>
     <dl>
-      <dt>路徑</dt><dd>${escapeHtml(site.href.replace(/index\.html$/, ''))}</dd>
-      <dt>內容</dt><dd>${site.modules} 模組 · ${site.lessons} 單元</dd>
-      <dt>狀態</dt><dd>${escapeHtml(status)}</dd>
-      <dt>已讀</dt><dd>${done} / ${site.lessons}</dd>
-      <dt>查證</dt><dd>${escapeHtml(site.updated)}</dd>
+      <dt>${t('path')}</dt><dd>${escapeHtml(site.href.replace(/index\.html$/, ''))}</dd>
+      <dt>${t('content')}</dt><dd>${escapeHtml(t('contentValue', site.modules, site.lessons))}</dd>
+      <dt>${t('status')}</dt><dd>${escapeHtml(status)}</dd>
+      <dt>${t('read')}</dt><dd>${done} / ${site.lessons}</dd>
+      <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>`;
 }
 
-function showInspector(site) {
-  const id = site ? site.id : null;
-  if (id === inspectedId) return;
-  inspectedId = id;
-  document.getElementById('inspector').innerHTML = inspectorHtml(site);
+function showCard(site, link) {
+  const card = document.getElementById('book-card');
+  if (cardId !== site.id) {
+    card.innerHTML = cardHtml(site);
+    cardId = site.id;
+  }
+  const caseRect = document.getElementById('bookcase').getBoundingClientRect();
+  const r = link.getBoundingClientRect();
+  const sheet = window.innerWidth < 640;
+  card.classList.toggle('is-sheet', sheet);
+  if (!sheet) {
+    const width = card.offsetWidth || 300;
+    let left = r.right - caseRect.left + 20;
+    if (left + width > caseRect.width - 12) left = r.left - caseRect.left - 20 - width;
+    card.style.left = `${Math.max(12, left)}px`;
+    card.style.top = `${r.top - caseRect.top + 16}px`;
+  } else {
+    card.style.left = card.style.top = '';
+  }
+  card.classList.add('is-visible');
 }
 
-/* 停在哪本書上：說明欄與 3D 書抬起共用 */
+function hideCard() {
+  const card = document.getElementById('book-card');
+  if (card) card.classList.remove('is-visible');
+}
+
+/* 停在哪本書上：介紹卡與 3D 書抬起、發光共用 */
 let hoveredId = null;
 let focusedId = null;
 
@@ -525,57 +679,55 @@ function updateHover() {
 }
 
 function setupInspector() {
-  const books = document.getElementById('books');
-  books.addEventListener('pointerover', (event) => {
+  const rows = document.getElementById('rows');
+  rows.addEventListener('pointerover', (event) => {
     const site = findSite(event.target);
     if (!site) return;
-    showInspector(site);
+    showCard(site, event.target.closest('.book'));
     hoveredId = site.id;
     updateHover();
   });
-  books.addEventListener('pointermove', (event) => {
+  rows.addEventListener('pointermove', (event) => {
     const book = event.target.closest && event.target.closest('.book');
     if (!book || !shelf) return;
     const rect = book.getBoundingClientRect();
     shelf.setTilt(book.dataset.id, (event.clientX - rect.left) / rect.width - 0.5, (event.clientY - rect.top) / rect.height - 0.5);
   });
-  books.addEventListener('pointerout', (event) => {
+  rows.addEventListener('pointerout', (event) => {
     const from = findSite(event.target);
     const to = findSite(event.relatedTarget);
     if (from && (!to || to.id !== from.id)) {
       hoveredId = null;
       if (shelf) shelf.setTilt(from.id, 0, 0);
+      if (!focusedId) hideCard();
       updateHover();
     }
   });
-  books.addEventListener('focusin', (event) => {
+  rows.addEventListener('focusin', (event) => {
     const site = findSite(event.target);
-    showInspector(site);
+    if (site) showCard(site, event.target.closest('.book'));
     focusedId = site ? site.id : null;
     updateHover();
   });
-  books.addEventListener('pointerleave', () => {
-    if (!books.contains(document.activeElement)) showInspector(null);
-  });
-  books.addEventListener('focusout', (event) => {
-    if (!books.contains(event.relatedTarget)) showInspector(null);
+  rows.addEventListener('focusout', (event) => {
+    if (!rows.contains(event.relatedTarget)) hideCard();
     focusedId = null;
     updateHover();
   });
 
-  // 左右方向鍵在書之間移動
-  books.addEventListener('keydown', (event) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    const list = [...books.querySelectorAll('.book')];
+  // 方向鍵在書之間移動（跨層）
+  rows.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    const list = [...rows.querySelectorAll('.book')];
     const index = list.indexOf(document.activeElement);
     if (index < 0) return;
-    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
     list[(index + step + list.length) % list.length].focus();
     event.preventDefault();
   });
 }
 
-/* ---------- 主題 ---------- */
+/* ---------- 主題與語言 ---------- */
 function applyTheme(choice) {
   if (choice === 'light' || choice === 'dark') document.documentElement.dataset.theme = choice;
   else delete document.documentElement.dataset.theme;
@@ -601,6 +753,35 @@ function setupThemeSwitch() {
   });
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (shelf) shelf.applyTheme();
+  });
+}
+
+/** 套用語言：介面文字、書櫃 DOM、3D 貼圖都重做 */
+function applyLang(next, rebuild = true) {
+  lang = next;
+  document.documentElement.lang = lang === 'en' ? 'en' : 'zh-Hant-TW';
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-label]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nLabel)); });
+  document.querySelectorAll('[data-lang-choice]').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.langChoice === lang));
+  });
+  if (!rebuild) return;
+  renderShelfDom();
+  if (shelf && !isOpening) shelf.build();
+}
+
+function setupLangSwitch() {
+  applyLang(lang, false);
+  document.querySelectorAll('[data-lang-choice]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.langChoice === lang) return;
+      try {
+        window.localStorage.setItem(LANG_KEY, btn.dataset.langChoice);
+      } catch (err) {
+        console.warn('無法儲存語言偏好：', err);
+      }
+      applyLang(btn.dataset.langChoice);
+    });
   });
 }
 
@@ -834,7 +1015,7 @@ function spineLayout(w, h) {
 
 /** 畫書背。mask=true 時畫金屬度遮罩，只畫燙金的部分 */
 function paintSpine(ctx, site, w, h, k, titleSize, mode) {
-  const { done, isComplete } = siteStats(site);
+  const { done } = siteStats(site);
   const L = spineLayout(w, h);
   const mask = mode !== 'color';
   const bump = mode === 'bump';
@@ -928,16 +1109,17 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
   const titleTop = L.labelTop + 10;
   if (!mask) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    drawVertical(ctx, site.spineTitle, w / 2, titleTop - 1, titleSize);
+    drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop - 1, titleSize);
     ctx.fillStyle = 'rgba(255,255,255,0.14)';
-    drawVertical(ctx, site.spineTitle, w / 2, titleTop + 1, titleSize);
+    drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop + 1, titleSize);
   }
   ctx.fillStyle = foil;
-  drawVertical(ctx, site.spineTitle, w / 2, titleTop, titleSize);
+  drawVertical(ctx, siteText(site).spineTitle, w / 2, titleTop, titleSize);
   ctx.restore();
 
   // 底部數字
-  const foot = isComplete ? `${site.lessons} 課` : `${site.readyLessons}/${site.lessons}`;
+  // 完成與製作中統一格式：可讀單元／總單元
+  const foot = `${site.readyLessons}/${site.lessons}`;
   ctx.font = `400 11px ${MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -966,7 +1148,7 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
 function spineTextures(site, w, h) {
   const k = Math.min(4, 2048 / h);
   const L = spineLayout(w, h);
-  const titleSize = fitSpineTitle(site.spineTitle, L.labelBottom - L.labelTop - 20);
+  const titleSize = fitSpineTitle(siteText(site).spineTitle, L.labelBottom - L.labelTop - 20);
   const color = makeCanvas(w * k, h * k);
   const mask = makeCanvas(w * k, h * k);
   const bump = makeCanvas(w * k, h * k);
@@ -1033,21 +1215,284 @@ function paintCloth(ctx, color, width, height, k) {
 }
 
 function paintPaper(ctx, x, y, width, height) {
+  // 微黃的舊紙：中間亮、四周略深，像存放多年的書頁
   ctx.fillStyle = PAPER;
   ctx.fillRect(x, y, width, height);
-  const glare = ctx.createLinearGradient(0, y, 0, y + height * 0.3);
-  glare.addColorStop(0, 'rgba(255,255,255,0.5)');
-  glare.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = glare;
-  ctx.fillRect(x, y, width, height * 0.3);
-  // 紙纖維：固定亂數種子，重畫（例如讀取條）時紋路不會每格跳動
+  const vignette = ctx.createRadialGradient(x + width / 2, y + height * 0.45, Math.min(width, height) * 0.25, x + width / 2, y + height / 2, Math.max(width, height) * 0.75);
+  vignette.addColorStop(0, 'rgba(255, 250, 238, 0.35)');
+  vignette.addColorStop(1, 'rgba(150, 115, 60, 0.16)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(x, y, width, height);
+  // 紙纖維與零星的斑點；固定亂數種子，重畫（例如讀取條）時紋路不會每格跳動
   let seed = 12345;
   const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-  for (let i = 0; i < (width * height) / 1400; i += 1) {
-    ctx.fillStyle = rand() < 0.5 ? 'rgba(120, 100, 60, 0.035)' : 'rgba(255, 255, 255, 0.25)';
-    ctx.fillRect(x + rand() * width, y + rand() * height, 1 + rand() * 3, 1);
+  for (let i = 0; i < (width * height) / 1200; i += 1) {
+    ctx.fillStyle = rand() < 0.55 ? 'rgba(120, 95, 50, 0.04)' : 'rgba(255, 252, 240, 0.3)';
+    ctx.fillRect(x + rand() * width, y + rand() * height, 1 + rand() * 4, 1);
+  }
+  for (let i = 0; i < (width * height) / 90000; i += 1) {
+    ctx.fillStyle = `rgba(150, 105, 50, ${0.04 + rand() * 0.05})`;
+    ctx.beginPath();
+    ctx.arc(x + rand() * width, y + rand() * height, 1 + rand() * 3, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
+
+function toRoman(n) {
+  const table = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  let out = '';
+  table.forEach(([v, s]) => { while (n >= v) { out += s; n -= v; } });
+  return out;
+}
+
+/** 古典分隔飾：兩側細線、中間菱形與小圓點 */
+function drawOrnament(ctx, cx, cy, width, u, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 0.7 * u;
+  const gap = 9 * u;
+  ctx.beginPath();
+  ctx.moveTo(cx - width / 2, cy); ctx.lineTo(cx - gap, cy);
+  ctx.moveTo(cx + gap, cy); ctx.lineTo(cx + width / 2, cy);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 4 * u); ctx.lineTo(cx + 4 * u, cy); ctx.lineTo(cx, cy + 4 * u); ctx.lineTo(cx - 4 * u, cy);
+  ctx.closePath();
+  ctx.fill();
+  [-1, 1].forEach((side) => {
+    ctx.beginPath();
+    ctx.arc(cx + side * 6.5 * u, cy, 1.1 * u, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + side * width / 2, cy, 1.3 * u, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+/** 字距（canvas 的 letterSpacing 不是每個瀏覽器都有，自己排） */
+function fillSpaced(ctx, text, x, y, spacing, align = 'center') {
+  const chars = [...text];
+  const widths = chars.map((ch) => ctx.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1);
+  let cx = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
+  const saved = ctx.textAlign;
+  ctx.textAlign = 'left';
+  chars.forEach((ch, i) => { ctx.fillText(ch, cx, y); cx += widths[i] + spacing; });
+  ctx.textAlign = saved;
+}
+
+/** 封面內側：書布底＋內縮的蝴蝶頁（書脊在右邊），蝴蝶頁印古典的四瓣花格紋 */
+function paintCoverInside(canvas, site, rim) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 300;
+  paintCloth(ctx, site.color, W, H, u);
+  const x = rim;
+  const y = rim;
+  const pw = W - rim;
+  const ph = H - rim * 2;
+  ctx.fillStyle = PAPER_2;
+  ctx.fillRect(x, y, pw, ph);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, pw, ph);
+  ctx.clip();
+  const step = 22 * u;
+  ctx.fillStyle = hexAlpha(site.color, 0.2);
+  ctx.strokeStyle = hexAlpha(site.color, 0.14);
+  ctx.lineWidth = 0.6 * u;
+  for (let row = 0, dy = y; dy < y + ph + step; dy += step, row += 1) {
+    for (let dx = x + (row % 2 ? step / 2 : 0); dx < x + pw + step; dx += step) {
+      // 四瓣花
+      for (let k = 0; k < 4; k += 1) {
+        const a = (Math.PI / 2) * k;
+        ctx.beginPath();
+        ctx.ellipse(dx + Math.cos(a) * 2.6 * u, dy + Math.sin(a) * 2.6 * u, 2.4 * u, 1.3 * u, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // 花與花之間的菱形格線
+      ctx.beginPath();
+      ctx.moveTo(dx + step / 2, dy); ctx.lineTo(dx, dy + step / 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  paintGutter(ctx, x, y, pw, ph, 'right', u);
+}
+
+function hexAlpha(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/** 扉頁正面：古典書名頁，雙線框、書名、花飾與出版年 */
+function paintLeafFront(canvas, site) {
+  const text = siteText(site);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 290;
+  paintPaper(ctx, 0, 0, W, H);
+  paintGutter(ctx, 0, 0, W, H, 'left', u);
+  const m = 22 * u;
+  ctx.strokeStyle = 'rgba(42, 33, 24, 0.55)';
+  ctx.lineWidth = 1.1 * u;
+  ctx.strokeRect(m, m, W - m * 2, H - m * 2);
+  ctx.lineWidth = 0.5 * u;
+  ctx.strokeRect(m + 4 * u, m + 4 * u, W - m * 2 - 8 * u, H - m * 2 - 8 * u);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = INK_2;
+  ctx.font = `400 ${9 * u}px ${SERIF}`;
+  fillSpaced(ctx, t('brand'), W / 2, m + 34 * u, 6 * u);
+  drawOrnament(ctx, W / 2, m + 48 * u, 60 * u, u, 'rgba(42, 33, 24, 0.45)');
+
+  ctx.fillStyle = INK;
+  ctx.font = `700 ${21 * u}px ${SERIF}`;
+  const lines = wrapPhrases(ctx, text.titlePhrases, W - 80 * u);
+  const lineH = 31 * u;
+  const top = H * 0.42 - ((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, W / 2, top + i * lineH));
+  drawOrnament(ctx, W / 2, top + lines.length * lineH - 4 * u, 120 * u, u, hexAlpha(site.color, 0.85));
+
+  ctx.fillStyle = INK_2;
+  ctx.font = `400 ${10 * u}px ${SERIF}`;
+  fillSpaced(ctx, toRoman(Number(site.updated.slice(0, 4)) || 2026), W / 2, H - m - 46 * u, 4 * u);
+  ctx.font = `400 ${9 * u}px ${SERIF}`;
+  fillSpaced(ctx, t('imprint'), W / 2, H - m - 28 * u, 2 * u);
+}
+
+/** 扉頁背面（攤開後的左頁，書脊在右邊）：版權頁風格，加一枚朱色印章 */
+function paintLeafBack(canvas, site) {
+  const { done } = siteStats(site);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 290;
+  paintPaper(ctx, 0, 0, W, H);
+  paintGutter(ctx, 0, 0, W, H, 'right', u);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  const cx = W / 2 - 6 * u;
+  drawOrnament(ctx, cx, H * 0.62, 70 * u, u, 'rgba(42, 33, 24, 0.4)');
+  ctx.fillStyle = INK_2;
+  ctx.font = `400 ${10.5 * u}px ${SERIF}`;
+  ctx.fillText(t('colophon', site.modules, site.lessons), cx, H * 0.62 + 24 * u);
+  ctx.font = `400 ${9 * u}px ${SERIF}`;
+  ctx.fillText(`© ${site.updated.slice(0, 4)} ${t('brand')}`, cx, H * 0.62 + 42 * u);
+
+  // 印章：方形朱紅框，字壓在裡面，略微傾斜、邊緣不勻
+  const stamp = t('stamp', done, site.lessons);
+  ctx.font = `600 ${11 * u}px ${SERIF}`;
+  const sw = ctx.measureText(stamp).width + 22 * u;
+  const sh = 30 * u;
+  ctx.save();
+  ctx.translate(cx, H * 0.62 + 82 * u);
+  ctx.rotate(-0.05);
+  ctx.globalAlpha = 0.82;
+  ctx.strokeStyle = '#a3322a';
+  ctx.lineWidth = 2 * u;
+  ctx.strokeRect(-sw / 2, -sh / 2, sw, sh);
+  ctx.lineWidth = 0.7 * u;
+  ctx.strokeRect(-sw / 2 + 3 * u, -sh / 2 + 3 * u, sw - 6 * u, sh - 6 * u);
+  ctx.fillStyle = '#a3322a';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(stamp, 0, 0.5 * u);
+  // 印泥不勻：挖掉幾個小點
+  ctx.globalCompositeOperation = 'destination-out';
+  let seed = 7;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < 40; i += 1) {
+    ctx.beginPath();
+    ctx.arc((rand() - 0.5) * sw, (rand() - 0.5) * sh, rand() * 1.2 * u, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** 右頁：書眉、卷名、書名、首字放大的簡介、讀取條與頁碼（progress 0–1） */
+function paintRightPage(canvas, site, progress) {
+  const text = siteText(site);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const u = W / 290;
+  paintPaper(ctx, 0, 0, W, H);
+  paintGutter(ctx, 0, 0, W, H, 'left', u);
+  const pad = 30 * u;
+  const cx = W / 2 + 4 * u;
+  ctx.textBaseline = 'alphabetic';
+
+  // 書眉＋細線
+  ctx.fillStyle = INK_2;
+  ctx.font = `400 ${8.5 * u}px ${SERIF}`;
+  fillSpaced(ctx, t('runningHead'), cx, pad + 4 * u, 3 * u);
+  ctx.fillStyle = 'rgba(42, 33, 24, 0.3)';
+  ctx.fillRect(pad, pad + 11 * u, W - pad * 2, 0.6 * u);
+
+  // 卷名與書名
+  ctx.textAlign = 'center';
+  ctx.fillStyle = hexAlpha(site.color, 0.9);
+  ctx.font = `600 ${10 * u}px ${SERIF}`;
+  fillSpaced(ctx, t('chapter'), cx, pad + 42 * u, 5 * u);
+  ctx.fillStyle = INK;
+  ctx.font = `700 ${18 * u}px ${SERIF}`;
+  let y = pad + 70 * u;
+  wrapPhrases(ctx, text.titlePhrases, W - pad * 2).forEach((line) => { ctx.fillText(line, cx, y); y += 26 * u; });
+  drawOrnament(ctx, cx, y - 6 * u, 90 * u, u, 'rgba(42, 33, 24, 0.45)');
+  y += 22 * u;
+
+  // 簡介：首字放大（drop cap），前兩行讓出位置
+  const bodySize = 11.5 * u;
+  const lineH = bodySize * 1.85;
+  const chars = [...text.desc];
+  const first = chars[0];
+  const rest = chars.slice(1).join('');
+  ctx.font = `700 ${lineH * 1.75}px ${SERIF}`;
+  const capW = ctx.measureText(first).width + 6 * u;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = site.color;
+  ctx.fillText(first, pad, y + lineH * 0.82);
+  ctx.fillStyle = INK;
+  ctx.font = `400 ${bodySize}px ${SERIF}`;
+  const full = W - pad * 2;
+  const lines = [];
+  let remaining = rest;
+  while (remaining.length && lines.length < 8) {
+    const width = lines.length < 2 ? full - capW : full;
+    const wrapped = wrapText(ctx, remaining, width);
+    const line = wrapped[0] || '';
+    lines.push({ line, indent: lines.length < 2 ? capW : 0 });
+    remaining = remaining.slice(line.length).replace(/^\s+/, '');
+    if (!line.length) break;
+  }
+  lines.forEach(({ line, indent }, i) => ctx.fillText(line, pad + indent, y + i * lineH));
+
+  // 讀取條：兩端帶小圓點的細線
+  ctx.textAlign = 'center';
+  ctx.fillStyle = INK_2;
+  ctx.font = `italic 400 ${10 * u}px ${SERIF}`;
+  ctx.fillText(t('opening'), cx, H - pad - 34 * u);
+  const barY = H - pad - 24 * u;
+  ctx.fillStyle = 'rgba(42, 33, 24, 0.15)';
+  ctx.fillRect(pad + 10 * u, barY, W - pad * 2 - 20 * u, 1.2 * u);
+  if (progress > 0) {
+    ctx.fillStyle = site.color;
+    ctx.fillRect(pad + 10 * u, barY - 0.4 * u, (W - pad * 2 - 20 * u) * progress, 2 * u);
+  }
+  ctx.fillStyle = 'rgba(42, 33, 24, 0.4)';
+  [pad + 6 * u, W - pad - 6 * u].forEach((bx) => { ctx.beginPath(); ctx.arc(bx, barY + 0.6 * u, 1.4 * u, 0, Math.PI * 2); ctx.fill(); });
+
+  // 頁碼
+  ctx.fillStyle = INK_2;
+  ctx.font = `400 ${9 * u}px ${SERIF}`;
+  ctx.fillText('— i —', cx, H - pad + 2 * u);
+}
+
 
 /** 書溝：靠書脊那側的內陰影。side 是書脊在哪一側 */
 function paintGutter(ctx, x, y, width, height, side, u) {
@@ -1127,7 +1572,7 @@ function paintCover(canvas, site, mode) {
   ctx.font = `700 ${titleSize}px ${FONT}`;
   ctx.textAlign = 'left';
   const maxWidth = W - padX - inset - 18 * u;
-  const lines = wrapPhrases(ctx, site.titlePhrases, maxWidth);
+  const lines = wrapPhrases(ctx, siteText(site).titlePhrases, maxWidth);
   const lineH = titleSize * 1.25;
   const bottom = H - inset - 46 * u;
   lines.forEach((line, i) => {
@@ -1139,9 +1584,9 @@ function paintCover(canvas, site, mode) {
     ctx.fillStyle = foil;
     ctx.fillText(line, padX, y);
   });
-  // VIBE CODING · 年月：不換行，放不下就縮小，下限 8px
+  // 端點星 · 年月：不換行，放不下就縮小，下限 8px
   let small = 11 * u;
-  const tag = `VIBE CODING · ${site.updated}`;
+  const tag = `${t('brand')} · ${site.updated}`;
   ctx.font = `500 ${small}px ${MONO}`;
   while (ctx.measureText(tag).width > maxWidth && small > 8 * u) {
     small -= 0.5 * u;
@@ -1151,125 +1596,10 @@ function paintCover(canvas, site, mode) {
   ctx.fillText(tag, padX, H - inset - 22 * u);
 }
 
-/** 封面內側：書布底＋內縮的蝴蝶頁（書脊在右邊） */
-function paintCoverInside(canvas, site, rim) {
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width;
-  const H = canvas.height;
-  const u = W / 300;
-  paintCloth(ctx, site.color, W, H, u);
-  const x = rim;
-  const y = rim;
-  const pw = W - rim;
-  const ph = H - rim * 2;
-  ctx.fillStyle = PAPER_2;
-  ctx.fillRect(x, y, pw, ph);
-  ctx.fillStyle = hexAlpha(site.color, 0.16);
-  for (let dy = y + 5 * u; dy < y + ph; dy += 10 * u) {
-    for (let dx = x + 5 * u; dx < x + pw; dx += 10 * u) {
-      ctx.beginPath();
-      ctx.arc(dx, dy, 0.8 * u, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  paintGutter(ctx, x, y, pw, ph, 'right', u);
-}
 
-function hexAlpha(hex, alpha) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
 
-/** 扉頁正面：書名頁 */
-function paintLeafFront(canvas, site) {
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width;
-  const H = canvas.height;
-  const u = W / 290;
-  paintPaper(ctx, 0, 0, W, H);
-  paintGutter(ctx, 0, 0, W, H, 'left', u);
-  ctx.fillStyle = INK;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = `700 ${22 * u}px ${FONT}`;
-  const lines = wrapPhrases(ctx, site.titlePhrases, W - 60 * u);
-  const lineH = 30 * u;
-  const top = H * 0.42 - ((lines.length - 1) * lineH) / 2;
-  lines.forEach((line, i) => ctx.fillText(line, W / 2, top + i * lineH));
-  ctx.fillStyle = 'rgba(29, 29, 31, 0.25)';
-  ctx.fillRect(W / 2 - 16 * u, top + lines.length * lineH - 6 * u, 32 * u, u);
-  ctx.fillStyle = '#6e6e73';
-  ctx.font = `500 ${11 * u}px ${MONO}`;
-  ctx.fillText('Vibe Coding', W / 2, H - 40 * u);
-}
 
-/** 扉頁背面（攤開後的左頁，書脊在右邊） */
-function paintLeafBack(canvas, site) {
-  const { done } = siteStats(site);
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width;
-  const H = canvas.height;
-  const u = W / 290;
-  paintPaper(ctx, 0, 0, W, H);
-  paintGutter(ctx, 0, 0, W, H, 'right', u);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#6e6e73';
-  ctx.font = `500 ${12 * u}px ${MONO}`;
-  ctx.fillText(`${site.modules} 模組 · ${site.lessons} 單元`, 28 * u, H - 64 * u);
-  // 已讀章：細框圓角，像蓋上去的
-  const stamp = `已讀 ${done} / ${site.lessons}`;
-  ctx.font = `600 ${12 * u}px ${FONT}`;
-  const sw = ctx.measureText(stamp).width + 20 * u;
-  ctx.save();
-  ctx.translate(28 * u, H - 48 * u);
-  ctx.rotate(-0.04);
-  ctx.strokeStyle = hexAlpha(site.color, 0.75);
-  ctx.lineWidth = 1.2 * u;
-  ctx.beginPath();
-  ctx.roundRect(0, 0, sw, 24 * u, 4 * u);
-  ctx.stroke();
-  ctx.fillStyle = hexAlpha(site.color, 0.85);
-  ctx.textBaseline = 'middle';
-  ctx.fillText(stamp, 10 * u, 12.5 * u);
-  ctx.restore();
-}
 
-/** 右頁：書名、簡介、讀取條（progress 0–1） */
-function paintRightPage(canvas, site, progress) {
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width;
-  const H = canvas.height;
-  const u = W / 290;
-  paintPaper(ctx, 0, 0, W, H);
-  paintGutter(ctx, 0, 0, W, H, 'left', u);
-  const pad = 30 * u;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = INK;
-  ctx.font = `700 ${19 * u}px ${FONT}`;
-  const titleLines = wrapPhrases(ctx, site.titlePhrases, W - pad * 2);
-  let y = pad + 24 * u;
-  titleLines.forEach((line) => { ctx.fillText(line, pad, y); y += 27 * u; });
-  y += 8 * u;
-  ctx.fillStyle = '#6e6e73';
-  ctx.font = `400 ${13 * u}px ${FONT}`;
-  wrapText(ctx, site.desc, W - pad * 2).forEach((line) => { ctx.fillText(line, pad, y); y += 13 * u * 1.7; });
-
-  ctx.fillStyle = '#6e6e73';
-  ctx.font = `400 ${12 * u}px ${FONT}`;
-  ctx.fillText('正在打開…', pad, H - pad - 18 * u);
-  ctx.fillStyle = 'rgba(29, 29, 31, 0.1)';
-  ctx.beginPath();
-  ctx.roundRect(pad, H - pad - 6 * u, W - pad * 2, 3 * u, 1.5 * u);
-  ctx.fill();
-  if (progress > 0) {
-    ctx.fillStyle = site.color;
-    ctx.beginPath();
-    ctx.roundRect(pad, H - pad - 6 * u, (W - pad * 2) * progress, 3 * u, 1.5 * u);
-    ctx.fill();
-  }
-}
 
 /** 書口與上下書頂的紙頁紋：細線疊在紙色上。vertical 決定線的方向 */
 function pageEdgeCanvas(vertical) {
@@ -1324,7 +1654,8 @@ function makeBook(site, spineW, spineH) {
   const clothBump = linenBump.clone();
   keep(clothBump).repeat.set(W / 96, H / 96);
   // 書布：sheen 讓布面在斜光下有絨絨的反光，和真的裱布一樣
-  const clothParams = { sheen: 0.7, sheenRoughness: 0.75, sheenColor: new THREE.Color(site.color).lerp(new THREE.Color('#ffffff'), 0.45), roughness: 0.86, metalness: 0 };
+  const glowColor = new THREE.Color(site.color).lerp(new THREE.Color('#ffffff'), 0.55);
+  const clothParams = { emissive: glowColor, emissiveIntensity: 0, sheen: 0.7, sheenRoughness: 0.75, sheenColor: new THREE.Color(site.color).lerp(new THREE.Color('#ffffff'), 0.45), roughness: 0.86, metalness: 0 };
   const cloth = keep(new THREE.MeshPhysicalMaterial({ ...clothParams, map: clothTex, bumpMap: clothBump, bumpScale: 0.8 }));
   const paper = keep(new THREE.MeshStandardMaterial({ color: PAPER, roughness: 0.95 }));
   const edgeX = keep(new THREE.MeshStandardMaterial({ map: pageEdgeX, roughness: 0.92 }));
@@ -1369,8 +1700,9 @@ function makeBook(site, spineW, spineH) {
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
 
-  // 封底：圓角書板
-  const back = mesh(new RoundedBoxGeometry(W - t, H, t, 2, Math.min(0.9, t / 2.2)), cloth);
+  // 封底：書口兩角圓弧、邊緣倒圓的書板
+  const corner = rim * 2.4;
+  const back = mesh(splitByNormalZ(roundedBoard(W - t, H, t, corner)), cloth);
   back.position.set(t / 2, 0, -D / 2 + t / 2);
   group.add(back);
 
@@ -1463,9 +1795,8 @@ function makeBook(site, spineW, spineH) {
   // 封面：以書脊內側為軸，翻開後和右頁對稱
   const coverPivot = new THREE.Group();
   coverPivot.position.set(-W / 2 + t, 0, D / 2 - t / 2);
-  const coverGeo = new RoundedBoxGeometry(W - t, H, t, 2, Math.min(0.9, t / 2.2));
-  // RoundedBoxGeometry 只有一組材質；依法向量把正面、內側分成不同群組
-  const cover = mesh(splitByNormalZ(coverGeo), [cloth, coverMat, insideMat]);
+  // 圓角書板只有一組材質；依法向量把正面、內側分成不同群組
+  const cover = mesh(splitByNormalZ(roundedBoard(W - t, H, t, corner)), [cloth, coverMat, insideMat]);
   cover.position.x = (W - t) / 2;
   coverPivot.add(cover);
   group.add(coverPivot);
@@ -1478,6 +1809,10 @@ function makeBook(site, spineW, spineH) {
     W, H, D, t, leafZ,
     titleSize: spine.titleSize,
     bendLeaf,
+    /** 停留時書本身微微發亮（0–1） */
+    setGlow(v) {
+      [cloth, spineMat, coverMat].forEach((m) => { m.emissiveIntensity = v * 0.07; });
+    },
     setProgress(progress) {
       paintRightPage(rightCanvas, site, progress);
       rightTex.needsUpdate = true;
@@ -1538,6 +1873,32 @@ function splitByNormalZ(source) {
   return out;
 }
 
+/**
+ * 圓角書板：在 x–y 平面畫出書口兩角帶圓弧的外形（靠書脊的兩角保持直角），擠出厚度並倒圓邊緣。
+ * x 從 -width/2 到 width/2、z 置中。
+ */
+function roundedBoard(width, height, thick, radius) {
+  const bevel = Math.min(thick * 0.42, 1.1);
+  const x0 = bevel;
+  const x1 = width - bevel;
+  const y0 = -height / 2 + bevel;
+  const y1 = height / 2 - bevel;
+  const r = Math.max(0.5, radius - bevel);
+  const shape = new THREE.Shape();
+  shape.moveTo(x0, y0);
+  shape.lineTo(x1 - r, y0);
+  shape.quadraticCurveTo(x1, y0, x1, y0 + r);
+  shape.lineTo(x1, y1 - r);
+  shape.quadraticCurveTo(x1, y1, x1 - r, y1);
+  shape.lineTo(x0, y1);
+  shape.lineTo(x0, y0);
+  const depth = Math.max(0.2, thick - bevel * 2);
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 10 });
+  geometry.translate(-width / 2, 0, -depth / 2);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** 堵頭布：斜紋的雙色絲線 */
 function headbandTexture(color) {
   const canvas = makeCanvas(64, 16);
@@ -1559,8 +1920,9 @@ function headbandTexture(color) {
    世界座標 (x, -y, 0) 就是畫面上的 (x, y)。改眼睛位置只會改變有深度的東西怎麼透視，
    書背（z = 0）永遠留在 DOM 連結的位置。 */
 function setOffAxisCamera(camera, eyeX, eyeY, distance, viewW, viewH) {
-  const near = 10;
-  const far = distance + 4000;
+  // 場景都在 z = ±600 以內：near／far 夾緊，深度精度才夠，鏡頭拉遠時也不會 z-fighting
+  const near = Math.max(10, distance - 700);
+  const far = distance + 1200;
   const f = near / distance;
   camera.position.set(eyeX, -eyeY, distance);
   camera.near = near;
@@ -1612,8 +1974,8 @@ let shelf = null;
 
 const CASE_THEME = {
   // 書櫃的材質參考 Apple Store 的陳列架：霧面牆、陽極鋁框、淺橡木層板、上方內嵌的暖白燈條
-  light: { back: ['#f2f2f4', '#ececef', '#e5e5e9'], alu: '#d4d4d9', wood: '#c9a47c', led: 3.2, hemi: 0.3, key: 1.0, env: 0.5, ao: 0.22 },
-  dark: { back: ['#202022', '#1a1a1c', '#141416'], alu: '#4a4a50', wood: '#6e4b33', led: 4.5, hemi: 0.22, key: 0.75, env: 0.35, ao: 0.6 },
+  light: { back: ['#f2f2f4', '#ececef', '#e5e5e9'], alu: '#d4d4d9', wood: '#c9a47c', ceramic: '#ece7df', led: 3.2, hemi: 0.3, key: 1.0, env: 0.5, ao: 0.22 },
+  dark: { back: ['#202022', '#1a1a1c', '#141416'], alu: '#4a4a50', wood: '#6e4b33', ceramic: '#3b3a3f', led: 4.5, hemi: 0.22, key: 0.75, env: 0.35, ao: 0.6 },
 };
 
 function createShelf() {
@@ -1649,6 +2011,12 @@ function createShelf() {
   const underShadowTex = shadowBlobTexture();
   const underShadowMat = new THREE.MeshBasicMaterial({ map: underShadowTex, transparent: true, depthWrite: false, opacity: 0.55 });
   const woodSeed = Math.random();
+  const feltMat = new THREE.MeshStandardMaterial({ color: '#2b2b2e', roughness: 1 });
+  const grooveMat = new THREE.MeshStandardMaterial({ color: '#55555b', metalness: 0.6, roughness: 0.6 });
+  const polishMat = new THREE.MeshPhysicalMaterial({ metalness: 1, roughness: 0.18, color: '#f2f2f5' });
+  const foilMat = new THREE.MeshStandardMaterial({ color: FOIL, roughness: 0.45 });
+  const ceramicMat = new THREE.MeshPhysicalMaterial({ roughness: 0.6, clearcoat: 0.25, clearcoatRoughness: 0.6 });
+  const stemMat = new THREE.MeshStandardMaterial({ color: '#8a7a5c', roughness: 0.9 });
 
   let lights = null;
   const books = new Map();
@@ -1679,6 +2047,11 @@ function createShelf() {
     edge(FRAME.side * sx, 0, (FRAME.side + 18) * sx, 0, theme.ao);
     edge(backCanvas.width - FRAME.side * sx, 0, backCanvas.width - (FRAME.side + 18) * sx, 0, theme.ao);
     edge(0, backCanvas.height, 0, backCanvas.height - 22 * sy, theme.ao * 0.7);
+    // 每塊上層層板底下、下一層燈條附近的牆面略暗，層板上方貼著書底的地方也暗一點
+    (layout ? layout.boardTops : []).forEach((top, i, all) => {
+      if (i < all.length - 1) edge(0, (top + 20) * sy, 0, (top + 34) * sy, theme.ao * 0.5);
+      edge(0, top * sy, 0, (top - 18) * sy, theme.ao * 0.45);
+    });
     backTex.needsUpdate = true;
 
     // 橡木：沿長邊的木紋，用固定亂數種子，換主題時紋路不變
@@ -1708,11 +2081,13 @@ function createShelf() {
     woodTex.needsUpdate = true;
 
     aluMat.color.set(theme.alu);
+    ceramicMat.color.set(theme.ceramic);
+    polishMat.color.set(theme === CASE_THEME.dark ? '#a8a8b0' : '#f2f2f5');
     wallMat.color.set(theme.back[1]);
     if (lights) {
       lights.hemi.intensity = theme.hemi;
       lights.key.intensity = theme.key;
-      if (lights.strip) lights.strip.intensity = theme.led;
+      lights.strips.forEach((strip) => { strip.intensity = theme.led; });
     }
     scene.environmentIntensity = theme.env;
   }
@@ -1720,10 +2095,16 @@ function createShelf() {
   function clearCase() {
     while (caseGroup.children.length) {
       const child = caseGroup.children.pop();
-      child.geometry.dispose();
+      child.traverse((node) => { if (node.geometry) node.geometry.dispose(); });
+      // 每次重建都會新做的材質（擺飾的書布、光暈）要一起釋放；共用材質留著
+      [].concat(child.material || []).forEach((mat) => {
+        if (!mat.userData.owned) return;
+        if (mat.map) mat.map.dispose();
+        mat.dispose();
+      });
     }
     if (lights) {
-      scene.remove(lights.hemi, lights.key, lights.key.target, lights.fill, lights.fill.target, lights.strip);
+      scene.remove(lights.hemi, lights.key, lights.key.target, lights.fill, lights.fill.target, ...lights.strips);
       lights.key.shadow.dispose();
       lights = null;
     }
@@ -1738,39 +2119,45 @@ function createShelf() {
     return mesh;
   }
 
-  /** 依 DOM 排版重建整座書櫃：背板、側板、層板、書擋、書 */
+  /** 依 DOM 排版重建整座書櫃：背板、鋁框、每一層的層板與燈條、書擋、擺飾、書 */
   function build() {
     const caseRect = bookcase.getBoundingClientRect();
-    const boardRect = document.getElementById('board').getBoundingClientRect();
     const width = caseRect.width;
     const height = caseRect.height + 24;
-    const boardTop = boardRect.top - caseRect.top;
     const rel = (rect) => ({ left: rect.left - caseRect.left, top: rect.top - caseRect.top, width: rect.width, height: rect.height });
+    const rows = [...bookcase.querySelectorAll('.shelf-row')].map((row) => ({
+      row,
+      boardTop: row.querySelector('.board').getBoundingClientRect().top - caseRect.top,
+    }));
+    const boardTopOf = (el) => rows.find((r) => r.row.contains(el)).boardTop;
+    const bottomTop = rows[rows.length - 1].boardTop;
 
     renderer.setSize(width, height, false);
     clearCase();
     books.forEach((book) => { scene.remove(book.group); book.dispose(); });
     books.clear();
 
-    const links = [...document.querySelectorAll('#books .book')];
-    const tallest = Math.max(...links.map((a) => a.getBoundingClientRect().height));
+    const links = [...bookcase.querySelectorAll('.book')];
+    const tallest = Math.max(240, ...links.map((a) => a.getBoundingClientRect().height));
     const depth = tallest / COVER_RATIO + 26; // 書櫃深度：最大的書再留一點空隙
 
-    // 背板：尺寸反推透視，投影後剛好蓋滿書櫃（畫面 0..width × 0..boardTop），貼圖上的陰影才會落在邊緣
-    const m = SHELF_CAMERA_DISTANCE / (SHELF_CAMERA_DISTANCE + depth);
+    // 背板：尺寸反推透視，投影後剛好蓋滿書櫃，貼圖上的陰影才會落在邊緣
+    // 眼睛在最下層，上面幾層離眼睛很遠；鏡頭跟著書櫃高度拉遠，上層層板底面才不會露太多
+    const camDist = Math.max(SHELF_CAMERA_DISTANCE, bottomTop * 10);
+    const m = camDist / (camDist + depth);
     const unproject = (s, eye) => eye + (s - eye) / m;
     const bx0 = unproject(0, width / 2);
     const bx1 = unproject(width, width / 2);
-    const by0 = unproject(0, boardTop);
-    const by1 = boardTop + 6;
+    const by0 = unproject(0, bottomTop);
+    const by1 = bottomTop + 6;
     addMesh(new THREE.PlaneGeometry(bx1 - bx0, by1 - by0), backMat, (bx0 + bx1) / 2, -(by0 + by1) / 2, -depth, { cast: false });
 
     // 櫃體內側：和背板同樣的霧面材質，燈條會把它們照亮
-    const fullH = boardTop + 20;
+    const fullH = bottomTop + 20;
     const ceiling = addMesh(new THREE.PlaneGeometry(width, depth), wallMat, width / 2, -FRAME.cap, -depth / 2, { cast: false });
     ceiling.rotation.x = Math.PI / 2;
     [[FRAME.side, Math.PI / 2], [width - FRAME.side, -Math.PI / 2]].forEach(([x, rot]) => {
-      const wall = addMesh(new THREE.PlaneGeometry(depth, boardTop), wallMat, x, -boardTop / 2, -depth / 2, { cast: false });
+      const wall = addMesh(new THREE.PlaneGeometry(depth, bottomTop), wallMat, x, -bottomTop / 2, -depth / 2, { cast: false });
       wall.rotation.y = rot;
     });
     // 陽極鋁前框：上方燈槽與左右立柱，細、圓角
@@ -1779,49 +2166,124 @@ function createShelf() {
     [FRAME.side / 2, width - FRAME.side / 2].forEach((x) => {
       addMesh(new RoundedBoxGeometry(FRAME.side, fullH, frameDepth, 3, 3.5), aluMat, x, -fullH / 2, 0);
     });
-    // 燈槽底下的暖白燈條：看得到的一條亮線，加上一片往下打的面光源
-    addMesh(new THREE.BoxGeometry(width - FRAME.side * 2 - 8, 1.6, 4), ledMat, width / 2, -FRAME.cap - 0.6, -depth * 0.35, { cast: false, receive: false });
 
-    // 淺橡木層板：前緣倒圓角，比鋁框稍微突出
-    addMesh(new RoundedBoxGeometry(width - FRAME.side * 2, 20, depth + 14, 4, 5), woodMat, width / 2, -(boardTop + 10), -depth / 2 + 7);
-    // 層板下方投在牆上的柔和影子（canvas 往下多留的 24px）
-    const under = addMesh(new THREE.PlaneGeometry(width * 0.98, 30), underShadowMat, width / 2, -(boardTop + 26), -2, { cast: false, receive: false });
+    const innerW = width - FRAME.side * 2;
+    const lightYs = [];
+    rows.forEach(({ boardTop }, i) => {
+      // 淺橡木層板：前緣倒圓角，比鋁框稍微突出；兩端嵌進立柱的鋁製托架
+      addMesh(new RoundedBoxGeometry(innerW, 20, depth + 14, 4, 5), woodMat, width / 2, -(boardTop + 10), -depth / 2 + 7);
+      [FRAME.side + 3, width - FRAME.side - 3].forEach((x) => {
+        addMesh(new RoundedBoxGeometry(6, 4, depth * 0.8, 2, 1.5), aluMat, x, -(boardTop + 22), -depth * 0.45);
+      });
+      // 每層上方一條暖白燈條：第一層在燈槽下，其他層在上一層層板的底面
+      const lightY = i === 0 ? FRAME.cap : rows[i - 1].boardTop + 20;
+      lightYs.push(lightY);
+      addMesh(new THREE.BoxGeometry(innerW - 8, 1.6, 4), ledMat, width / 2, -lightY - 0.6, -depth * 0.35, { cast: false, receive: false });
+    });
+    // 最下層層板投在牆上的柔和影子（canvas 往下多留的 24px）
+    const under = addMesh(new THREE.PlaneGeometry(width * 0.98, 30), underShadowMat, width / 2, -(bottomTop + 26), -2, { cast: false, receive: false });
     under.renderOrder = -1;
 
-    // 書擋：圓角鋁片，L 形
-    const end = document.getElementById('bookend');
-    if (end) {
-      const r = rel(end.getBoundingClientRect());
-      const plateH = r.height;
-      addMesh(new RoundedBoxGeometry(8, plateH, depth * 0.55, 3, 2.5), aluMat, r.left + 6, -(boardTop - plateH / 2), -depth * 0.3);
-      addMesh(new RoundedBoxGeometry(r.width - 2, 3, depth * 0.55, 2, 1.2), aluMat, r.left + 1 + (r.width - 2) / 2, -(boardTop - 1.5), -depth * 0.3);
-    }
+    bookcase.querySelectorAll('[data-bookend]').forEach((end) => addBookend(rel(end.getBoundingClientRect()), boardTopOf(end), depth));
+    bookcase.querySelectorAll('[data-prop="stack"]').forEach((el, i) => addStack(rel(el.getBoundingClientRect()), boardTopOf(el), depth, i));
+    bookcase.querySelectorAll('[data-prop="vase"]').forEach((el, i) => addVase(rel(el.getBoundingClientRect()), boardTopOf(el), depth, i));
 
-    // 書：書背貼齊 DOM 連結的位置，底部站在層板上
+    // 書：書背貼齊 DOM 連結的位置，底部站在層板上；背後一片停留時才亮的光暈
     links.forEach((link) => {
       const site = findSite(link);
       const r = rel(link.getBoundingClientRect());
+      const boardTop = boardTopOf(link);
       const book = makeBook(site, r.width, r.height);
       book.base = new THREE.Vector3(r.left + r.width / 2, -(boardTop - r.height / 2), -book.W / 2);
       book.group.position.copy(book.base);
       book.group.rotation.set(0, Math.PI / 2, 0);
       scene.add(book.group);
+      const halo = addMesh(new THREE.PlaneGeometry(r.width + HALO_PAD * 2, r.height + HALO_PAD * 2), new THREE.MeshBasicMaterial({
+        userData: { owned: true }, map: haloTexture(r.width, r.height), color: new THREE.Color(site.color).lerp(new THREE.Color('#ffffff'), 0.15), transparent: true, opacity: 0, depthWrite: false,
+      }), book.base.x, book.base.y, -1, { cast: false, receive: false });
+      book.halo = halo;
       books.set(site.id, book);
       if (!state.has(site.id)) state.set(site.id, { lift: 0, liftTarget: 0, tiltX: 0, tiltY: 0, tiltXTarget: 0, tiltYTarget: 0 });
     });
 
-    lights = addLights(scene, width / 2, -boardTop / 2, Math.max(width, boardTop) * 1.1);
-    lights.strip = new THREE.RectAreaLight('#ffeedd', 3, width - FRAME.side * 2 - 8, depth * 0.6);
-    lights.strip.position.set(width / 2, -FRAME.cap - 1, -depth * 0.5);
-    lights.strip.lookAt(width / 2, -FRAME.cap - 1000, -depth * 0.5);
-    scene.add(lights.strip);
-    // 眼睛和層板頂面同高：書頂永遠看不到，符合正視圖
-    layout = { width, height, eyeX: width / 2, eyeY: boardTop, boardTop };
+    lights = addLights(scene, width / 2, -bottomTop / 2, Math.max(width, bottomTop) * 1.1);
+    lights.strips = lightYs.map((y) => {
+      const strip = new THREE.RectAreaLight('#ffeedd', 3, innerW - 8, depth * 0.6);
+      strip.position.set(width / 2, -y - 1, -depth * 0.5);
+      strip.lookAt(width / 2, -y - 1000, -depth * 0.5);
+      scene.add(strip);
+      return strip;
+    });
+    // 眼睛和最下層層板頂面同高：所有書的書頂都在眼睛之上，永遠看不到，符合正視圖
+    layout = { width, height, camDist, eyeX: width / 2, eyeY: bottomTop, boardTop: bottomTop, boardTops: rows.map((r) => r.boardTop) };
     paintCaseTextures();
-    setOffAxisCamera(camera, layout.eyeX, layout.eyeY, SHELF_CAMERA_DISTANCE, width, height);
+    setOffAxisCamera(camera, layout.eyeX, layout.eyeY, camDist, width, height);
     bookcase.classList.add('is-3d');
     syncBooks();
     kick();
+  }
+
+  /** 書擋：圓角鋁製 L 形，正面刻一道細線，底下墊深色絨布 */
+  function addBookend(r, boardTop, depth) {
+    const d = depth * 0.55;
+    const z = -depth * 0.3;
+    const plateH = r.height;
+    addMesh(new THREE.BoxGeometry(r.width - 4, 1.4, d - 6), feltMat, r.left + r.width / 2, -(boardTop - 0.7), z, { cast: false });
+    addMesh(new RoundedBoxGeometry(r.width - 2, 3, d, 3, 1.3), aluMat, r.left + 1 + (r.width - 2) / 2, -(boardTop - 1.4 - 1.5), z);
+    addMesh(new RoundedBoxGeometry(8, plateH - 1.4, d, 4, 3), aluMat, r.left + 6, -(boardTop - 1.4 - (plateH - 1.4) / 2), z);
+    // 前緣刻線與頂端的拋光倒角
+    addMesh(new THREE.BoxGeometry(1.1, plateH * 0.62, 0.6), grooveMat, r.left + 6, -(boardTop - plateH * 0.45), z + d / 2 + 0.05, { cast: false });
+    addMesh(new RoundedBoxGeometry(8.4, 2, d + 0.4, 2, 0.9), polishMat, r.left + 6, -(boardTop - plateH + 1), z, { cast: false });
+  }
+
+  /** 橫躺的一疊書：素面布書，書背朝前，兩道燙金細線 */
+  function addStack(r, boardTop, depth, index) {
+    const colors = [['#7a1f2b', '#2f3438', '#b9a37a'], ['#3d2a6b', '#5a3a1e', '#1d6338']][index % 2];
+    const heights = [14, 11, 13];
+    let y = boardTop;
+    heights.forEach((h, i) => {
+      const w = r.width * [0.98, 0.86, 0.92][i];
+      const d = depth * [0.7, 0.62, 0.66][i];
+      const x = r.left + w / 2 + [0, 6, 2][i];
+      const mat = new THREE.MeshPhysicalMaterial({ userData: { owned: true }, color: colors[i], roughness: 0.85, sheen: 0.6, sheenRoughness: 0.8, sheenColor: new THREE.Color(colors[i]).lerp(new THREE.Color('#ffffff'), 0.4) });
+      const book = addMesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(2.2, h / 3)), mat, x, -(y - h / 2), -d / 2 - 4);
+      book.rotation.y = [0.02, -0.035, 0.015][i];
+      [-1, 1].forEach((side) => {
+        addMesh(new THREE.BoxGeometry(0.8, h * 0.62, 0.4), foilMat, x + side * w * 0.38, -(y - h / 2), -4 + 0.3, { cast: false });
+      });
+      y -= h;
+    });
+  }
+
+  /** 霧面陶瓶，插幾枝乾燥的細枝 */
+  function addVase(r, boardTop, depth, index) {
+    const H = r.height * 0.62;
+    const R = r.width / 2;
+    const profile = [[0, 0], [0.62, 0], [0.8, 0.04], [0.96, 0.24], [1, 0.42], [0.9, 0.62], [0.58, 0.8], [0.42, 0.9], [0.46, 0.98], [0.4, 1]]
+      .map(([x, y]) => new THREE.Vector2(x * R, y * H));
+    const cx = r.left + r.width / 2;
+    const z = -depth * 0.42;
+    const vase = addMesh(new THREE.LatheGeometry(profile, 48), ceramicMat, cx, -boardTop, z);
+    vase.geometry.computeVertexNormals();
+    // 細枝：從瓶口往上散開，越往上越細
+    const stems = index % 2 ? [[-0.18, 1.0], [0.1, 0.86], [0.28, 0.7]] : [[-0.25, 0.8], [0.06, 1.0], [0.22, 0.9]];
+    stems.forEach(([lean, len]) => {
+      const L = (r.height - H) * len + H * 0.3;
+      const geo = new THREE.CylinderGeometry(0.5, 1, L, 6);
+      geo.translate(0, L / 2, 0);
+      const stem = addMesh(geo, stemMat, cx, -(boardTop - H * 0.75), z, { receive: false });
+      stem.rotation.z = lean;
+      stem.rotation.x = lean * 0.4;
+      // 枝上的小葉片
+      for (let k = 0; k < 4; k += 1) {
+        const leaf = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 6).scale(1, 0.4, 0.6), stemMat);
+        const s = 0.45 + k * 0.15;
+        leaf.position.set((k % 2 ? 3 : -3), L * s, 0);
+        leaf.rotation.z = k % 2 ? -0.6 : 0.6;
+        leaf.castShadow = true;
+        stem.add(leaf);
+      }
+    });
   }
 
   function syncBooks() {
@@ -1830,6 +2292,11 @@ function createShelf() {
       const s = state.get(id);
       book.group.position.set(book.base.x, book.base.y + s.lift, book.base.z + s.lift * 0.6);
       book.group.rotation.set(s.tiltX, Math.PI / 2 + s.tiltY, 0);
+      const glow = s.lift / HOVER_LIFT;
+      book.halo.position.y = book.base.y + s.lift;
+      book.halo.material.opacity = glow * (isDarkTheme() ? 0.75 : 0.6);
+      book.halo.material.blending = isDarkTheme() ? THREE.AdditiveBlending : THREE.NormalBlending;
+      book.setGlow(glow);
     });
   }
 
@@ -1874,6 +2341,8 @@ function createShelf() {
     detach(id) {
       const book = books.get(id);
       book.detached = true;
+      book.halo.material.opacity = 0;
+      book.setGlow(0);
       scene.remove(book.group);
       kick();
       return book;
@@ -1885,6 +2354,30 @@ function createShelf() {
 /* ---------- 開書：抽出 → 空中從書背轉到封面 → 翻開封面與扉頁 → 跳轉 ---------- */
 let isOpening = false;
 let stage = null;
+
+/** 停留時書後的光暈：中心是和書一樣大的圓角矩形，往外 PAD px 平滑淡出（逐像素算，不靠 ctx.filter） */
+const HALO_PAD = 46;
+function haloTexture(w, h) {
+  const cw = Math.round(w + HALO_PAD * 2);
+  const ch = Math.round(h + HALO_PAD * 2);
+  const canvas = makeCanvas(cw, ch);
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(cw, ch);
+  const radius = 6;
+  for (let y = 0; y < ch; y += 1) {
+    for (let x = 0; x < cw; x += 1) {
+      const qx = Math.max(Math.abs(x - cw / 2) - (w / 2 - radius), 0);
+      const qy = Math.max(Math.abs(y - ch / 2) - (h / 2 - radius), 0);
+      const dist = Math.hypot(qx, qy) - radius;
+      const a = dist <= 0 ? 1 : Math.max(0, 1 - dist / HALO_PAD);
+      const i = (y * cw + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+      img.data[i + 3] = Math.round(255 * a * a);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvasTexture(canvas);
+}
 
 function shadowBlobTexture() {
   const canvas = makeCanvas(256, 64);
@@ -1905,7 +2398,7 @@ function createStage(book) {
   const root = document.createElement('div');
   root.className = 'stage';
   root.setAttribute('aria-hidden', 'true');
-  root.innerHTML = '<div class="stage-backdrop"></div><canvas></canvas><span class="stage-skip">點一下直接打開</span>';
+  root.innerHTML = `<div class="stage-backdrop"></div><canvas></canvas><span class="stage-skip">${escapeHtml(t('skip'))}</span>`;
   document.body.append(root);
   const canvas = root.querySelector('canvas');
   const vw = window.innerWidth;
@@ -1959,7 +2452,7 @@ async function openBook(link, site) {
   const book = shelf.books.get(site.id);
   const g = book.group;
   const caseCanvasRect = shelf.canvas.getBoundingClientRect();
-  const { eyeX, eyeY } = shelf.layout;
+  const { eyeX, eyeY, camDist } = shelf.layout;
 
   // 1. 先把書從書櫃往前、往上抽出來
   shelf.setActive(site.id);
@@ -1982,7 +2475,7 @@ async function openBook(link, site) {
   stage = createStage(book);
   const { vw, vh, camera, blob } = stage;
   const startEye = { x: caseCanvasRect.left + eyeX, y: caseCanvasRect.top + eyeY };
-  setOffAxisCamera(camera, startEye.x, startEye.y, SHELF_CAMERA_DISTANCE, vw, vh);
+  setOffAxisCamera(camera, startEye.x, startEye.y, camDist, vw, vh);
   stage.root.addEventListener('click', () => { window.location.href = link.href; });
   stage.render();
 
@@ -2015,7 +2508,7 @@ async function openBook(link, site) {
         const [rx, ry, rz] = rotAt(e);
         g.rotation.set(rx, ry, rz);
         g.scale.setScalar(lerp(sStart, sEnd, e));
-        setOffAxisCamera(camera, lerp(startEye.x, vw / 2, e), lerp(startEye.y, vh / 2, e), lerp(SHELF_CAMERA_DISTANCE, STAGE_CAMERA_DISTANCE, e), vw, vh);
+        setOffAxisCamera(camera, lerp(startEye.x, vw / 2, e), lerp(startEye.y, vh / 2, e), lerp(camDist, STAGE_CAMERA_DISTANCE, e), vw, vh);
         blob.material.opacity = e * 0.85;
         blob.scale.x = Wend * 1.25 * lerp(0.3, 1, e);
       },
@@ -2058,7 +2551,7 @@ function resetOpening() {
 }
 
 function setupOpening() {
-  document.getElementById('books').addEventListener('click', (event) => {
+  document.getElementById('rows').addEventListener('click', (event) => {
     const link = event.target.closest('.book');
     if (!link) return;
     // 開新分頁、新視窗的修飾鍵點擊交給瀏覽器
@@ -2076,6 +2569,7 @@ function setupOpening() {
 }
 
 /* ---------- 啟動 ---------- */
+setupLangSwitch();
 renderShelfDom();
 setupInspector();
 setupOpening();
@@ -2090,7 +2584,13 @@ async function start3d() {
       import('three/addons/lights/RectAreaLightUniformsLib.js'),
     ]);
     RectAreaLightUniformsLib.init();
-    await Promise.all([document.fonts.ready, loadIcons()]);
+    // 內頁用的明體要先載好再畫貼圖；Google Fonts 依字元分包，把會用到的字一起交給 load()
+    const glyphs = [...new Set(JSON.stringify([STRINGS, SITES.map((s) => s.text)]) + '0123456789—·©/ MDCLXVI')].join('');
+    await Promise.all([
+      document.fonts.ready,
+      loadIcons(),
+      ...['400', '600', '700'].map((w) => document.fonts.load(`${w} 16px "Noto Serif TC"`, glyphs).catch(() => [])),
+    ]);
     linenBump = canvasTexture(linenBumpCanvas(), { srgb: false, repeat: true });
     pageEdgeX = canvasTexture(pageEdgeCanvas(true));
     pageEdgeY = canvasTexture(pageEdgeCanvas(false));
@@ -2108,7 +2608,10 @@ let resizeTimer = 0;
 window.addEventListener('resize', () => {
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
-    if (shelf && !isOpening) shelf.build();
+    if (isOpening) return;
+    // 寬度變了，每層放得下的書也會變，先重新分層再重建 3D
+    renderShelfDom();
+    if (shelf) shelf.build();
   }, 120);
 });
 
