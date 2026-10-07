@@ -289,27 +289,25 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .deco-stack { width: calc(var(--shelf-h) * var(--len)); margin: 0 14px; }
 .prop-spacer { flex: 1; }
 
-/* ---------- 介紹卡：一卷攤開的舊羊皮紙，上下是捲軸 ----------
-   紙是實物，深色模式不反轉；墨色固定，對比都 ≥ 4.5:1。破損的左右邊緣由 JS 產生不規則 clip-path */
+/* ---------- 介紹卡：一張四邊破損的舊羊皮紙 ----------
+   紙是實物，深色模式不反轉；墨色固定，對比都 ≥ 4.5:1。四邊的破損由 JS 產生不規則 clip-path */
 .book-card {
   --ink: #3a2a16;
   --ink-2: #5a4224;
   position: absolute;
   z-index: 5;
   width: min(330px, calc(100% - 24px));
-  padding: 14px 0;
   color: var(--ink);
   font-family: "Noto Serif TC", "Songti TC", Georgia, serif;
   pointer-events: none;
   opacity: 0;
-  transform: rotate(-0.6deg) scaleY(0.55);
-  transform-origin: center top;
+  transform: rotate(-0.6deg);
   /* 第一層 drop-shadow 貼著破邊描一圈深褐：舊羊皮紙邊緣受潮、磨損變深 */
   /* 淺色：明顯的投影把紙和背景分開；深色：邊緣一圈微微的暖光（--card-aura） */
   filter: drop-shadow(0 0 0.7px rgba(62, 32, 8, 0.95)) drop-shadow(0 0 2px rgba(80, 45, 12, 0.5)) var(--card-aura);
-  transition: opacity 220ms var(--ease-out), transform 420ms var(--ease-out), left 260ms var(--ease-out), top 260ms var(--ease-out);
+  transition: opacity 220ms var(--ease-out), left 260ms var(--ease-out), top 260ms var(--ease-out);
 }
-.book-card.is-visible { opacity: 1; transform: rotate(-0.6deg); }
+.book-card.is-visible { opacity: 1; }
 .book-card.is-pinned { pointer-events: auto; }
 /* 前往閱讀：朱紅印章，楷書字 */
 .card-enter { display: block; margin: 16px auto 2px; padding: 8px 18px; border: 2.5px solid #9b2a1c; outline: 1px solid #9b2a1c; outline-offset: 3px; border-radius: 4px; background: rgba(155, 42, 28, 0.06); color: #9b2a1c; font-family: "LXGW WenKai TC", "Kaiti TC", "DFKai-SB", "BiauKai", serif; font-weight: 700; font-size: 22px; letter-spacing: 0.2em; line-height: 1.2; transform: rotate(-2deg); cursor: pointer; }
@@ -333,32 +331,8 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
     /* 邊緣焦黃 */
     radial-gradient(ellipse at center, transparent 52%, rgba(120, 72, 20, 0.38) 100%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.4 0 0 0 0 0.28 0 0 0 0 0.12 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-  box-shadow: inset 0 0 18px rgba(110, 66, 18, 0.45), inset 0 10px 10px -8px rgba(60, 35, 10, 0.4), inset 0 -10px 10px -8px rgba(60, 35, 10, 0.4);
+  box-shadow: inset 0 0 22px rgba(110, 66, 18, 0.5);
 }
-/* 捲軸：上下兩支圓柱，兩端木頭軸頭 */
-.scroll-roll {
-  position: absolute;
-  left: -10px;
-  right: -10px;
-  height: 18px;
-  border-radius: 9px;
-  background: linear-gradient(180deg, #9c7f4d 0%, #e3cc9a 30%, #f0dfb4 45%, #c9ab72 70%, #7d6136 100%);
-  box-shadow: 0 2px 3px rgba(40, 25, 5, 0.35);
-  z-index: 1;
-}
-.scroll-roll.top { top: 4px; }
-.scroll-roll.bottom { bottom: 4px; }
-.scroll-roll::before, .scroll-roll::after {
-  content: "";
-  position: absolute;
-  top: -2px;
-  width: 12px;
-  height: 22px;
-  border-radius: 4px;
-  background: linear-gradient(180deg, #3b2614, #7a5530 40%, #4a2f18);
-}
-.scroll-roll::before { left: -8px; }
-.scroll-roll::after { right: -8px; }
 .book-card h2 { margin: 0; font-size: 19px; line-height: 1.45; font-weight: 700; letter-spacing: 0.04em; text-wrap: balance; }
 .book-card .phrase { display: inline-block; }
 .book-card p { margin: 8px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.8; text-wrap: pretty; }
@@ -431,9 +405,12 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .lb-cover.left { left: -5px; border-radius: 4px 1px 1px 4px; }
 .lb-cover.right { left: 82px; border-radius: 1px 4px 4px 1px; }
 .lb-cover i { position: absolute; background: var(--leather-2); }
-.lb-cover .bottom { left: 0; right: 0; top: 100%; height: 3px; transform-origin: top; transform: rotateX(-90deg); background: #2e1412; }
-.lb-cover.left .side { right: 100%; top: 0; bottom: 0; width: 3px; transform-origin: right; transform: rotateY(-90deg); background: #34171a; }
-.lb-cover.right .side { left: 100%; top: 0; bottom: 0; width: 3px; transform-origin: left; transform: rotateY(90deg); background: #241010; }
+/* 書殼的厚度面：書殼四角是圓角，厚度面若跑滿全長，四角會凸出一截深色方塊，所以兩端各縮進圓角半徑 */
+.lb-cover .bottom { top: 100%; height: 3px; transform-origin: top; transform: rotateX(-90deg); background: #2e1412; }
+.lb-cover.left .bottom { left: 4px; right: 1px; }
+.lb-cover.right .bottom { left: 1px; right: 4px; }
+.lb-cover.left .side { right: 100%; top: 4px; bottom: 4px; width: 3px; transform-origin: right; transform: rotateY(-90deg); background: #34171a; }
+.lb-cover.right .side { left: 100%; top: 4px; bottom: 4px; width: 3px; transform-origin: left; transform: rotateY(90deg); background: #241010; }
 /* 書頁塊：墊高 --t，外緣（書口）與下緣（書根）是一疊紙的細紋 */
 .lb-block {
   position: absolute;
@@ -457,19 +434,8 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
 }
-.lb-block::after {
-  content: "";
-  position: absolute;
-  top: 11px;
-  height: 4px;
-  width: 30px;
-  background: rgba(62, 46, 26, 0.55);
-  box-shadow: 0 87px 0 -1px rgba(62, 46, 26, 0.35); /* 頁碼 */
-}
 .lb-block.left::before { left: 9px; right: 12px; }
 .lb-block.right::before { left: 12px; right: 9px; }
-.lb-block.left::after { left: 24px; width: 32px; }
-.lb-block.right::after { left: 26px; width: 26px; background: #7a2a28; } /* 右頁的朱色章名 */
 /* 堵頭布：書脊上下的紅白絲線 */
 .lb-headband {
   position: absolute;
@@ -520,7 +486,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 .lb-page > .s > .s { background: var(--lines) 0 22px / 100% 72px no-repeat, var(--page); }
 .lb-page .s .s { left: calc(100% - 0.6px); animation: lb-bend 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite; animation-delay: var(--d); }
 .lb-page .s .s .s { background: var(--lines) 0 22px / 18px 72px no-repeat, linear-gradient(90deg, var(--page), #ddd0b1); }
-/* 光影：翻起來的紙轉到側面時變暗，攤平時回亮。只動 background-color，不用 filter（filter 會把 3D 壓平） */
+/* 光影：翻起來的紙轉到側面時變暗，攤平時回亮。
+   只動 background-color：不用 filter（會把 3D 壓平），也不用 opacity（Safari 會把半透明的面另外合成，
+   翻頁途中前後疊層與透明度會一跳一跳） */
 .lb-page .s::after {
   content: "";
   position: absolute;
@@ -528,44 +496,6 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   background-color: rgba(50, 30, 8, 0);
   animation: lb-shade 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
   animation-delay: var(--d);
-}
-/* 翻頁投下的影子（照真實光線）：
-   - 右頁：紙剛掀起時，書溝旁出現一道影子，紙越立越高影子越淡、越窄
-   - 左頁：紙快落到左邊時，影子從書溝往外漸漸加深、變寬，紙一蓋上就消失
-   用 @property 讓漸層的濃度可以做動畫，不用 opacity（避免 3D 合成圖層前後跳動） */
-@property --cast { syntax: '<number>'; inherits: false; initial-value: 0; }
-.lb-cast {
-  position: absolute;
-  top: 0;
-  width: 80px;
-  height: 112px;
-  pointer-events: none;
-  animation: 1.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
-  animation-delay: var(--d);
-}
-.lb-cast.r {
-  left: 82px;
-  background: linear-gradient(90deg, rgba(40, 24, 6, calc(var(--cast) * 0.6)), rgba(40, 24, 6, calc(var(--cast) * 0.22)) calc(8% + var(--cast) * 30%), transparent calc(14% + var(--cast) * 70%));
-  transform: translateZ(calc(var(--t) + var(--z) - 0.2px));
-  animation-name: lb-cast-right;
-}
-.lb-cast.l {
-  left: 2px;
-  background: linear-gradient(270deg, rgba(40, 24, 6, calc(var(--cast) * 0.75)), rgba(40, 24, 6, calc(var(--cast) * 0.32)) calc(10% + var(--cast) * 35%), transparent calc(18% + var(--cast) * 75%));
-  transform: translateZ(calc(var(--t) + 2.2px));
-  animation-name: lb-cast-left;
-}
-@keyframes lb-cast-right {
-  0%, 8% { --cast: 0; }
-  14% { --cast: 0.9; }
-  26% { --cast: 0.45; }
-  38%, 100% { --cast: 0; }
-}
-@keyframes lb-cast-left {
-  0%, 36% { --cast: 0; }
-  48% { --cast: 0.35; }
-  58% { --cast: 1; }
-  62%, 100% { --cast: 0; }
 }
 @keyframes lb-flip {
   /* 每頁的高度差一點點（--z），平放時不會和其他頁或書頁塊擠在同一平面而閃出黑線 */
@@ -587,7 +517,7 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   62%, 100% { background-color: rgba(50, 30, 8, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lb-page, .lb-page .s .s, .lb-page .s::after, .lb-cast { animation: none; }
+  .lb-page, .lb-page .s .s, .lb-page .s::after { animation: none; }
 }
 
 /* ---------- 打開書的舞台：書從書櫃的 canvas 交給全螢幕的 canvas ---------- */
@@ -674,9 +604,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
             <span class="lb-cover right"><i class="side"></i><i class="bottom"></i></span>
             <span class="lb-block left"><i class="side"></i><i class="bottom"></i></span>
             <span class="lb-block right"><i class="side"></i><i class="bottom"></i></span>
-            <span class="lb-cast r" style="--d:0s;--z:1.8px"></span><span class="lb-cast l" style="--d:0s"></span><span class="lb-cast r" style="--d:0.18s;--z:1.4px"></span><span class="lb-cast l" style="--d:0.18s"></span><span class="lb-cast r" style="--d:0.36s;--z:1.0px"></span><span class="lb-cast l" style="--d:0.36s"></span><span class="lb-cast r" style="--d:0.54s;--z:0.6px"></span><span class="lb-cast l" style="--d:0.54s"></span>
+            
             <span class="lb-headband top"></span><span class="lb-headband bottom"></span>
-            <span class="lb-page" style="--d:0s;--z:1.8px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.18s;--z:1.4px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.36s;--z:1.0px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.54s;--z:0.6px"><span class="s"><span class="s"><span class="s"></span></span></span></span>
+            <span class="lb-page" style="--d:0s;--z:3.0px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.18s;--z:2.2px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.36s;--z:1.4px"><span class="s"><span class="s"><span class="s"></span></span></span></span><span class="lb-page" style="--d:0.54s;--z:0.6px"><span class="s"><span class="s"><span class="s"></span></span></span></span>
           </div>
         </div>
       </div>
@@ -1123,16 +1053,32 @@ let cardId = null;
 const isTouchUI = () => window.matchMedia('(hover: none)').matches;
 let pinnedId = null;
 
-/** 羊皮紙左右兩側不規則的破損邊（百分比 polygon），每張卡都不一樣 */
+/** 羊皮紙四邊不規則的破損（polygon），每張卡都不一樣。
+ *  像撕過又磨損的舊紙：整條邊緩緩起伏，上面布滿細碎的小鋸齒，偶爾有一個窄而深的 V 形缺口 */
 function tornEdges() {
-  const left = [];
-  const right = [];
-  for (let y = 0; y <= 100; y += 4) {
-    const bite = () => (Math.random() < 0.15 ? 2.5 + Math.random() * 3 : Math.random() * 1.6);
-    left.push(`${bite().toFixed(2)}% ${y}%`);
-    right.push(`${(100 - bite()).toFixed(2)}% ${100 - y}%`);
-  }
-  return `polygon(${left.join(',')},${right.join(',')})`;
+  const pts = [];
+  // 一條邊的內縮深度（px）：低頻起伏＋細鋸齒＋偶發缺口
+  const edge = (n, base) => {
+    const p1 = Math.random() * 6.28, p2 = Math.random() * 6.28;
+    const out = [];
+    let notch = 0;
+    for (let i = 0; i <= n; i++) {
+      const wave = base * (0.45 + 0.3 * Math.sin(i / n * 7 + p1) + 0.2 * Math.sin(i / n * 17 + p2));
+      const tooth = Math.random() * base * 0.55 * (i % 2 ? 1 : 0.35);
+      if (notch <= 0 && Math.random() < 0.025) notch = 3;
+      const v = notch > 0 ? [0.6, 1.2, 0.8][3 - notch--] * base * 1.3 : 0;
+      out.push(Math.max(0, wave + tooth + v));
+    }
+    out[0] = out[n] = Math.min(out[0], base * 0.5);
+    return out;
+  };
+  const N = 90, M = 110;
+  const top = edge(N, 4), right = edge(M, 5), bottom = edge(N, 4), left = edge(M, 5);
+  for (let i = 0; i <= N; i++) pts.push(`${(i / N * 100).toFixed(2)}% ${top[i].toFixed(1)}px`);
+  for (let i = 0; i <= M; i++) pts.push(`calc(100% - ${right[i].toFixed(1)}px) ${(i / M * 100).toFixed(2)}%`);
+  for (let i = N; i >= 0; i--) pts.push(`${(i / N * 100).toFixed(2)}% calc(100% - ${bottom[i].toFixed(1)}px)`);
+  for (let i = M; i >= 0; i--) pts.push(`${left[i].toFixed(1)}px ${(i / M * 100).toFixed(2)}%`);
+  return `polygon(${pts.join(',')})`;
 }
 
 function cardHtml(site) {
@@ -1140,7 +1086,6 @@ function cardHtml(site) {
   const text = siteText(site);
   if (site.external) {
     return `
-    <span class="scroll-roll top" aria-hidden="true"></span>
     <div class="scroll-body" style="clip-path:${tornEdges()}">
     <h2>${phrasesHtml(text.titlePhrases)}</h2>
     <p>${escapeHtml(text.desc)}</p>
@@ -1152,12 +1097,10 @@ function cardHtml(site) {
       <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>
     ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))}</button>` : ''}
-    </div>
-    <span class="scroll-roll bottom" aria-hidden="true"></span>`;
+    </div>`;
   }
   const status = isComplete ? t('complete') : t('inProgress', site.readyLessons);
   return `
-    <span class="scroll-roll top" aria-hidden="true"></span>
     <div class="scroll-body" style="clip-path:${tornEdges()}">
     <h2>${phrasesHtml(text.titlePhrases)}</h2>
     <p>${escapeHtml(text.desc)}</p>
@@ -1170,8 +1113,7 @@ function cardHtml(site) {
       <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>
     ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))}</button>` : ''}
-    </div>
-    <span class="scroll-roll bottom" aria-hidden="true"></span>`;
+    </div>`;
 }
 
 function showCard(site, link) {
