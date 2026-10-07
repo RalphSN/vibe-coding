@@ -1065,6 +1065,171 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) and (min-width: 1280px) {
   .sidebar:not(.open) { visibility: visible; opacity: 1; }
 }
+
+/* 從終端機課移植的互動元件 */
+/* ==========================================================================
+   終端機主題元件（本課專用）
+   ========================================================================== */
+/* 指令各部分的顏色：全站固定，圖、拆解器、速查表都用同一組 */
+:root {
+  --k-prog: var(--m1);
+  --k-sub: var(--m2);
+  --k-opt: var(--m4);
+  --k-arg: var(--m3);
+  --k-op: var(--m0);
+  --k-var: var(--m5);
+  --term-prompt: #7CE577;
+  --term-dim: #A3A3A3;
+  --term-err: #FF8F8F;
+}
+
+/* 品牌的游標 */
+.brand .cursor { display: inline-block; width: .55em; height: 1em; margin-left: 2px; vertical-align: -.12em; background: currentColor; animation: cursor-blink 1.1s steps(1) infinite; }
+@keyframes cursor-blink { 50% { opacity: 0; } }
+
+/* ---------- 終端機播放器 ---------- */
+.tw { display: grid; gap: var(--sp-4); }
+@media (min-width: 900px) { .tw.side { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; } }
+.tw-win { border: var(--bw-lg) solid var(--ink); background: var(--code-bg); box-shadow: var(--shadow-off) var(--shadow-off) 0 var(--ink); min-width: 0; }
+.tw-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-bottom: var(--bw-sm) solid var(--ink); background: var(--surface); font-family: var(--font-ui); font-size: var(--fs-small); }
+.tw-bar .label { font-size: .75rem; }
+.tw-bar .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.tw-screen { margin: 0; padding: var(--sp-4); min-height: 11rem; max-height: 22rem; overflow: auto; color: var(--code-ink); font-family: var(--font-mono); font-size: var(--fs-code); line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+.tw-screen .ln { display: block; }
+.tw-screen .p { color: var(--term-prompt); font-weight: 700; }
+.tw-screen .c { color: #FFFFFF; }
+.tw-screen .o { color: var(--code-ink); }
+.tw-screen .o.dim { color: var(--term-dim); }
+.tw-screen .o.err { color: var(--term-err); }
+.tw-screen .o.enter { animation: tw-out var(--dur-comp) var(--ease-mech) both; }
+@keyframes tw-out { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tw-screen .caret { display: inline-block; width: .6em; height: 1.1em; vertical-align: -.2em; background: var(--term-prompt); animation: cursor-blink 1.1s steps(1) infinite; }
+.tw-panel { display: grid; gap: var(--sp-3); min-width: 0; }
+.tw-controls { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.tw-note { padding: var(--sp-3) var(--sp-4); border: var(--bw-sm) solid var(--ink); background: var(--surface); min-height: 5.5em; line-height: 1.7; }
+.tw-note .step { display: block; font-family: var(--font-ui); font-weight: 700; font-size: var(--fs-small); margin-bottom: var(--sp-1); }
+.tw-dots { display: flex; flex-wrap: wrap; gap: 6px; }
+.tw-dots span { width: 14px; height: 14px; border: 2px solid var(--ink); background: var(--surface); transition: background-color var(--dur-comp); }
+.tw-dots span.on { background: var(--primary); }
+
+/* ---------- 指令拆解器 ---------- */
+.anat { display: grid; gap: var(--sp-4); }
+.anat-presets, .chip-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.anat > *, .fs-side > *, .pf > *, .pathf > *, .ros > * { min-width: 0; }
+.anat-presets .btn, .fs-actions .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.anat-presets .btn { font-family: var(--font-mono); font-size: .8125rem; text-transform: none; letter-spacing: 0; }
+.anat-input { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.anat-input input { flex: 1 1 16rem; min-width: 0; min-height: 44px; padding: var(--sp-2) var(--sp-3); border: var(--bw-sm) solid var(--ink); background: var(--surface); color: var(--ink); font-family: var(--font-mono); font-size: .9375rem; }
+.anat-line { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-2); align-items: flex-start; padding: var(--sp-4); border: var(--bw-lg) solid var(--ink); background: var(--surface); }
+.tok { display: inline-grid; justify-items: center; gap: 6px; animation: tok-in var(--dur-comp) var(--ease-snap) both; animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes tok-in { from { opacity: 0; transform: translateY(-10px) rotate(-3deg); } to { opacity: 1; transform: none; } }
+.tok code { display: block; padding: 4px 8px; border: var(--bw-sm) solid var(--ink); background: var(--kc, var(--surface)); color: var(--on-color); font-family: var(--font-mono); font-size: 1rem; font-weight: 700; white-space: pre; }
+.tok small { font-family: var(--font-ui); font-size: .75rem; font-weight: 700; line-height: 1.2; text-align: center; }
+.tok[data-k="prog"] { --kc: var(--k-prog); }
+.tok[data-k="sub"] { --kc: var(--k-sub); }
+.tok[data-k="opt"] { --kc: var(--k-opt); }
+.tok[data-k="arg"] { --kc: var(--k-arg); }
+.tok[data-k="op"] { --kc: var(--k-op); }
+.tok[data-k="var"] { --kc: var(--k-var); }
+.anat-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--sp-2); }
+.anat-list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3); align-items: start; margin: 0; padding: var(--sp-2) var(--sp-3); border: 2px solid var(--ink); background: var(--bg); }
+.anat-list code.k { padding: 2px 6px; border: 2px solid var(--ink); background: var(--kc, var(--surface)); color: var(--on-color); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: var(--sp-2); font-size: var(--fs-small); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 16px; height: 16px; border: 2px solid var(--ink); background: var(--kc); }
+
+/* ---------- 資料夾樹 ---------- */
+.fs { display: grid; gap: var(--sp-4); }
+@media (min-width: 900px) { .fs { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; } }
+.fs-tree { margin: 0; padding: var(--sp-3) var(--sp-4); border: var(--bw-lg) solid var(--ink); background: var(--surface); font-family: var(--font-mono); font-size: .9375rem; list-style: none; }
+.fs-tree ul { list-style: none; margin: 0; padding-left: 1.4em; border-left: 2px dashed var(--ink-muted); }
+.fs-tree li { margin: 2px 0; }
+.fs-node { display: inline-flex; align-items: center; gap: 6px; padding: 1px 6px; border: 2px solid transparent; transition: background-color var(--dur-comp), border-color var(--dur-comp), color var(--dur-comp); }
+.fs-node.is-file { color: var(--ink-muted); }
+.fs-node.is-here { background: var(--primary); color: var(--on-color); border-color: var(--ink); font-weight: 700; }
+.fs-node.is-trail { border-color: var(--ink); border-style: dashed; }
+.fs-node .here-tag { font-family: var(--font-ui); font-size: .7rem; padding: 0 4px; background: var(--ink); color: var(--bg); }
+.fs-side { display: grid; gap: var(--sp-3); min-width: 0; }
+.fs-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.fs-actions .btn { font-family: var(--font-mono); text-transform: none; letter-spacing: 0; font-size: .8125rem; }
+
+/* ---------- 管線動畫：直向輸送帶，每站左邊是指令、右邊是流出的資料 ---------- */
+.pf { display: grid; gap: var(--sp-4); }
+.pf-stages { display: grid; gap: var(--sp-6); }
+.pf-stage { position: relative; display: grid; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3); border: var(--bw-lg) solid var(--ink); background: var(--surface); transition: background-color var(--dur-comp), opacity var(--dur-comp), transform var(--dur-comp) var(--ease-snap); }
+@media (min-width: 640px) { .pf-stage { grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr); align-items: start; } }
+.pf-stage.is-active { background: var(--highlight); color: var(--on-color); box-shadow: var(--shadow-off-sm) var(--shadow-off-sm) 0 var(--ink); }
+.pf-stage.is-pending { opacity: .6; }
+.pf-head { display: grid; gap: var(--sp-1); align-content: start; }
+.pf-stage code.cmd { display: block; padding: 4px 8px; background: var(--code-bg); color: var(--code-ink); font-size: .875rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pf-stage + .pf-stage::before { content: ""; position: absolute; left: 2rem; top: calc(-1 * var(--sp-6) - var(--bw-lg)); width: var(--bw-lg); height: var(--sp-6); background: var(--ink); }
+.pf-stage + .pf-stage::after { content: ""; position: absolute; left: calc(2rem - 7px); top: -14px; border: 9px solid transparent; border-top-color: var(--ink); border-bottom: 0; }
+.pf-lines { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; min-height: 2rem; font-family: var(--font-mono); font-size: .8125rem; }
+.pf-lines li { margin: 0; padding: 2px 8px; border: 2px solid var(--ink); background: var(--bg); color: var(--ink); animation: pf-in var(--dur-comp) var(--ease-mech) both; animation-delay: calc(var(--i, 0) * 80ms); }
+.pf-stage.is-active .pf-lines li { background: var(--surface); }
+.pf-lines li.err { background: var(--danger-soft); color: var(--on-color); }
+@keyframes pf-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.pf-label { font-family: var(--font-ui); font-size: .75rem; font-weight: 700; }
+
+/* ---------- PATH 搜尋 ---------- */
+.pathf { display: grid; gap: var(--sp-4); }
+.pathf-dirs { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--sp-2); counter-reset: dir; }
+.pathf-dirs li { counter-increment: dir; display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center; margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--bw-sm) solid var(--ink); background: var(--surface); font-family: var(--font-mono); font-size: .875rem; transition: background-color var(--dur-comp); word-break: break-all; }
+.pathf-dirs li::before { content: counter(dir); font-family: var(--font-display); }
+.pathf-dirs li.is-checking { background: var(--highlight); color: var(--on-color); box-shadow: var(--shadow-off-sm) var(--shadow-off-sm) 0 var(--ink); }
+.pathf-dirs li.is-miss { background: var(--bg); color: var(--ink-muted); }
+.pathf-dirs li.is-hit { background: var(--success); color: var(--on-color); box-shadow: var(--shadow-off-sm) var(--shadow-off-sm) 0 var(--ink); }
+.pathf-dirs .res { font-family: var(--font-ui); font-weight: 700; font-size: .8125rem; white-space: nowrap; }
+
+/* ---------- 方言對照 ---------- */
+.ros { display: grid; gap: var(--sp-4); }
+.ros-grid { display: grid; gap: var(--sp-4); }
+@media (min-width: 900px) { .ros-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ros-card { border: var(--bw-lg) solid var(--ink); background: var(--code-bg); min-width: 0; animation: tw-out var(--dur-comp) var(--ease-mech) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.ros-card header { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-bottom: var(--bw-sm) solid var(--ink); background: var(--surface); font-family: var(--font-ui); font-weight: 700; font-size: var(--fs-small); }
+.ros-card header small { margin-left: auto; font-weight: 500; color: var(--ink-muted); }
+.ros-card pre { margin: 0; padding: var(--sp-3) var(--sp-4); color: var(--code-ink); font-family: var(--font-mono); font-size: .875rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.ros-card.is-legacy header { background: var(--neutral); color: var(--on-color); }
+.ros-card.is-legacy header small { color: var(--on-color); }
+.btn[aria-pressed="true"] { --face: var(--primary); --face-ink: var(--on-color); }
+
+/* ---------- 首頁的拆解動畫 ---------- */
+.hero-grid { display: grid; gap: var(--sp-6); }
+@media (min-width: 1000px) { .hero-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: center; } }
+.herodemo { border: var(--bw-lg) solid var(--ink); background: var(--code-bg); box-shadow: 10px 10px 0 var(--ink); transform: rotate(1deg); }
+.herodemo .tw-screen { min-height: 7.5rem; font-size: 1.0625rem; }
+.herodemo .hd-parts { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4) var(--sp-4); min-height: 5.5rem; align-content: flex-start; border-top: var(--bw-sm) dashed #555; }
+.herodemo .tok small { color: var(--code-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .brand .cursor, .tw-screen .caret { animation: none; }
+  .tok, .pf-lines li, .ros-card, .tw-screen .o.enter { animation: none !important; }
+  .pf-stage.is-active, .pathf-dirs li.is-checking, .pathf-dirs li.is-hit { transform: none; }
+  .herodemo { transform: none; }
+}
+
+/* SVG 裡的終端機畫面：顏色寫在 class，才不會被 .figure svg text 的預設色蓋掉 */
+.figure svg .fill-term { fill: #111111; }
+.figure svg text.t-prompt { fill: #7CE577; font-family: var(--font-mono); font-weight: 700; }
+.figure svg text.t-cmd { fill: #FFFFFF; font-family: var(--font-mono); }
+.figure svg text.t-out { fill: #F2F0E6; font-family: var(--font-mono); }
+.figure svg text.t-dim { fill: #A3A3A3; }
+.figure svg text.t-err { fill: #FF8F8F; font-family: var(--font-mono); }
+.figure svg .mono, .figure svg text.mono { font-family: var(--font-mono); }
+
+/* ---------- 分類練習 ---------- */
+.cls { display: grid; gap: var(--sp-3); }
+.cls-head { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; justify-content: space-between; font-family: var(--font-ui); font-weight: 700; font-size: var(--fs-small); }
+.cls-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.cls-item { margin: 0; display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border: var(--bw-sm) solid var(--ink); background: var(--surface); transition: background-color var(--dur-comp), color var(--dur-comp); }
+.cls-item > * { min-width: 0; }
+.cls-item.is-right { background: var(--success); color: var(--on-color); }
+.cls-item.is-wrong { background: var(--danger-soft); color: var(--on-color); }
+.cls-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.cls-btns .btn { white-space: normal; text-align: left; }
+.cls-fb:empty { display: none; }
+.cls-fb { line-height: 1.7; animation: tw-out var(--dur-comp) var(--ease-mech) both; }
+@media (prefers-reduced-motion: reduce) { .cls-fb { animation: none; } }
 </style>
 </head>
 <body>
@@ -1363,6 +1528,14 @@ defineLessons({
         why: ['指定資料夾，Cowork 只需要碰這一個範圍', '成果是檔案，方便你檢查與轉寄', '程式改動對應到一個明確的項目', '有可驗證的完成條件，模組 1-4 會細講'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'ask', label: '請求（模型可能不照做）' }, { id: 'force', label: '強制（程式保證）' }], items: [
+          { text: '在 CLAUDE.md 寫「不要讀 .env」', answer: 'ask', why: 'CLAUDE.md 是送進對話的說明，模型通常會照做，但不保證。' },
+          { text: '`settings.json` 的 `permissions.deny` 加上 `Read(./.env)`', answer: 'force', why: '權限規則由 Claude Code 執行，模型想讀也會被擋下。' },
+          { text: '在 Cowork 的全域指示寫「不要刪檔案」', answer: 'ask', why: '全域指示一樣是給模型看的文字。' },
+          { text: 'PreToolUse hook 偵測到 `git push` 就 `exit 2`', answer: 'force', why: 'hook 是程式，每次都會執行，exit 2 會擋下這個動作。' },
+          { text: '開啟 sandbox，網路只允許 npm registry', answer: 'force', why: 'sandbox 是作業系統層級的限制。' },
+          { text: '對話開頭說一句「記得不要 push」', answer: 'ask', why: '對話會被壓縮，這句話可能被摘要掉，而且本來就只是請求。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 520" role="img" aria-label="一個功能從需求到上線的時間軸：一、訪談紀錄整理成需求，用 Cowork；二、寫規格 SPEC.md，兩者皆可；三、實作與測試，用 Claude Code；四、PR 審查，用 Claude Code 與 Code Review；五、發布說明，用 Cowork">
           <path d="M60 50 V450" class="stroke-ink" stroke-width="4"/>
           <g font-size="22">
@@ -1469,6 +1642,11 @@ defineLessons({
         why: ['從專案資料夾啟動：trust 被記住，讀取範圍也收斂在專案裡', '第一次只讀，你先觀察它怎麼工作', 'plan mode 讓「只讀」變成強制，不只是請求', '要求列出讀過的檔案，你知道它的答案從哪來'],
       }],
       blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '第一個安全的 session', steps: [
+          { cmd: 'cd ~\\projects\\shop-api', out: '', note: '先進到**專案資料夾**再啟動：trust 會記在這個 repo，讀取範圍也收在這裡。' },
+          { cmd: 'claude --permission-mode plan', out: 'Do you trust the files in this folder?\n  .claude/settings.json grants: Bash(npm run *)\n❯ Yes, proceed   No, exit', note: 'workspace trust 對話框：它會列出這個 repo 想授予的權限。陌生 repo 先選 No，看過設定再回來。' },
+          { cmd: '> 這個專案怎麼啟動、怎麼跑測試？只讀，列出你讀了哪些檔案。', out: '我讀了 package.json、README.md、jest.config.js…\n啟動：npm run dev；測試：npm test', cwd: 'claude', note: 'plan mode 讓「只讀」變成強制。第一個問題問你自己也能核對的事。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 330" role="img" aria-label="比較圖：左邊在家目錄啟動，影響範圍是整個家目錄，含文件、下載、SSH 金鑰等；右邊在專案資料夾啟動，範圍只有 shop-api 這個專案">
           <rect x="10" y="10" width="260" height="310" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4" stroke-dasharray="10 6"/>
           <text x="140" y="48" text-anchor="middle" font-size="24" font-weight="900" class="on-color">✗ 在 ~ 啟動</text>
@@ -1509,6 +1687,14 @@ defineLessons({
       { level: '遷移', type: 'reveal', q: ['你要寫一份給團隊新人的「Claude Code 第一天」清單，最多 4 步。寫完再看參考答案。'], answer: [
         '參考：1. 用官方安裝腳本安裝，`claude --version` 確認。2. 只從專案資料夾啟動，不在家目錄啟動。3. 陌生 repo 先看 `.claude/`、`.mcp.json` 再信任。4. 第一個任務用 plan mode 問唯讀問題，權限提示讀完再按。',
         '判斷依據：每一步都在縮小「它碰得到的範圍」或「你看不到的動作」。少了第 3 步最危險，因為那是別人寫的設定進入你電腦的入口。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1）下列哪一個是「強制」，而不只是「請求」？', options: [
+        { text: '在 CLAUDE.md 寫「不要執行 git push」', why: 'CLAUDE.md 是給模型看的說明，模型通常照做，但不保證。' },
+        { text: '在權限規則裡把 `Bash(git push *)` 設成 deny', correct: true, why: '權限規則由 Claude Code 執行，模型想做也做不到。' },
+        { text: '每次開對話先提醒一次不要 push', why: '一樣是請求，而且長對話壓縮後可能被摘要掉。' },
+        { text: '把提醒改成全大寫並加上「非常重要」', why: '加強語氣不會讓請求變成強制。' },
       ] },
     ],
     keypoints: [
@@ -1698,6 +1884,12 @@ defineLessons({
         why: ['plan mode 讓「不改檔案」變成強制', '指定探索範圍，避免它讀遍整個 repo', '計畫要回答的問題，就是你審查時會問的問題', '在 plan mode 下這句是雙重保險，換到其他模式也成立'],
       }],
       blocks: [
+        { type: 'widget', name: 'pipeflow', props: { stages: [
+          { cmd: '① 探索（plan mode）', out: ['讀 src/auth/', '找到 login()', '發現沒有速率限制'], note: '只讀：讓 Claude 先看懂相關的程式碼，不改任何東西。' },
+          { cmd: '② 計畫', out: ['改 login.ts', '新增 rateLimit.ts', '補 3 個測試'], note: '請它列出要改哪些檔案、怎麼驗證。你在這裡修正方向最便宜。' },
+          { cmd: '③ 實作', out: ['login.ts（+18）', 'rateLimit.ts（新）', 'npm test ✓'], note: '切回會改檔的模式，照計畫做，並跑測試驗證。' },
+          { cmd: '④ 提交', out: ['git diff 審查', 'commit：加入登入速率限制'], note: '你看過 diff 再 commit。一句話說得完的小改動，可以跳過 ①②。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 480" role="img" aria-label="決策樹：一句話說得完這個 diff 嗎？是：直接做。否：需求清楚嗎？不清楚：先讓 Claude 訪談你，寫 SPEC.md。清楚：用 plan mode 先規劃">
           <g font-size="22">
             <rect x="80" y="10" width="400" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
@@ -1822,6 +2014,13 @@ defineLessons({
         why: ['空泛的要求無法驗證，模型本來就會試著寫好程式', '安全規則交給 deny 規則強制，CLAUDE.md 只說明它在哪裡', '模型已經會 TypeScript，教學只是每次都付的成本', '模型猜不到的陷阱，才是最值得寫的內容'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'md', label: 'CLAUDE.md' }, { id: 'rule', label: 'deny 規則或 hook' }, { id: 'paths', label: '.claude/rules（paths:）' }, { id: 'skill', label: 'skill' }], items: [
+          { text: '「測試用 `pnpm test`，不是 npm」', answer: 'md', why: '每次都需要、又猜不到的慣例，適合 CLAUDE.md。' },
+          { text: '「絕對不能讀 `.env`」', answer: 'rule', why: '一定不能發生的事要強制，不能只靠請求。' },
+          { text: '「`migrations/` 底下的檔案改名要照日期格式」', answer: 'paths', why: '只跟特定路徑有關，用 rules 加 `paths:`，碰到那些檔案才載入。' },
+          { text: '「發版的 8 個步驟」', answer: 'skill', why: '一段不常用的流程，做成 skill，需要時才載入全文。' },
+          { text: '「每次改完都要自動跑 prettier」', answer: 'rule', why: '一定要發生的事用 hook（PostToolUse）保證。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 500" role="img" aria-label="決策流程：這條規則一定要發生或一定不能發生嗎？是：用 deny 規則或 hook。否：只跟某些檔案有關嗎？是：放 .claude/rules 並加 paths。否：是某個流程的詳細步驟嗎？是：做成 skill。否：寫進 CLAUDE.md">
           <g font-size="22">
             <rect x="10" y="10" width="360" height="70" class="fill-surface stroke-ink" stroke-width="4"/><text x="30" y="54" font-weight="900">一定要／一定不能？</text>
@@ -1940,6 +2139,11 @@ defineLessons({
         why: ['失敗的測試證明它真的找到了問題', '完成條件讓「做完了」可以被檢查', '堵住最省事的錯誤修法', '回報格式讓你審查時知道從哪裡看起'],
       }],
       blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '讓 Claude 自己驗證', cwd: '~/shop-api', steps: [
+          { cmd: 'claude -p "修好購物車折扣的 bug。完成條件：npm test 全過、npm run lint 無錯誤。不要修改既有測試。"', out: '執行 npm test → 1 failing（cart.discount）\n修改 src/cart.ts\n執行 npm test → 42 passing\n執行 npm run lint → 0 problems', note: '完成條件寫成**能執行的指令**，Claude 才能自己檢查，而不是說「應該好了」。' },
+          { cmd: 'git diff --stat -- "*.test.ts"', out: '', note: '固定看一眼測試檔有沒有被改：空的代表它沒有「改測試讓測試通過」。' },
+          { cmd: 'git diff --stat', out: ' src/cart.ts | 6 ++++--\n 1 file changed', note: '只改了該改的檔案。完成條件＋你的檢查，兩層都有。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 360" role="img" aria-label="比較兩條時間軸。沒有驗證方法：Claude 回報完成，你測試發現錯誤，回頭糾正，再回報，你再測，共繞你三次。有驗證方法：Claude 自己跑測試失敗、修正、再跑通過，只回報一次給你">
           <text x="10" y="34" font-size="24" font-weight="900">沒有驗證方法</text>
           <g font-size="22">
@@ -2088,6 +2292,12 @@ defineLessons({
         why: ['資料夾就是它的世界，縮小資料夾就是縮小風險', '指定輸入位置，結果才可追溯', '指定輸出檔名與位置，方便檢查與交給下一步', '數字類任務最常見的錯誤是「補」資料，要明說不准'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'yes', label: '雲端沙箱擋得住' }, { id: 'no', label: '擋不住（在你授予的範圍內）' }], items: [
+          { text: '任務想連到一個沒被允許的外部網站', answer: 'yes', why: '沙箱限制「連到哪裡」。' },
+          { text: '任務把你連接的資料夾裡的報表改壞了', answer: 'no', why: '那個資料夾是你授予的範圍，裡面發生什麼，沙箱不管。' },
+          { text: '任務想讀你沒有連接的其他本機資料夾', answer: 'yes', why: '沒授予的範圍碰不到。' },
+          { text: '資料夾裡一份文件夾帶了惡意指示，誘導它改別的檔案', answer: 'no', why: '注入發生在授予範圍內，要靠模式選擇和你的審查。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 360" role="img" aria-label="三種權限模式的比較：Manual 每步都問你，Auto 自動審查並擋下不安全的動作，Skip 不做檢查；三種模式底下都有一條刪除保護，永久刪檔一定要你確認">
           <g font-size="22">
             <rect x="10" y="10" width="170" height="220" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
@@ -2204,6 +2414,13 @@ defineLessons({
         why: ['指定輸入檔，結果可以追溯', '指定輸出檔與結構，方便交給下一步', '把判斷標準寫成規則，而不是請它「看著辦」', '數字類任務要明說不准估算'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'cowork', label: 'Cowork' }, { id: 'cc', label: 'Claude Code' }], items: [
+          { text: '把 30 份訪談逐字稿整理成需求清單', answer: 'cowork', why: '成果是文件，資料在資料夾裡。' },
+          { text: '修好 CI 上失敗的整合測試', answer: 'cc', why: '要改程式、跑測試，成果是 commit。' },
+          { text: '把本週的 issue 依標籤統計成試算表', answer: 'cowork', why: '成果是試算表。' },
+          { text: '依 SPEC.md 實作新的 API 端點', answer: 'cc', why: '成果放進 repo。' },
+          { text: '依 CHANGELOG 寫給客戶的發布說明', answer: 'cowork', why: '成果是對外文件，記得發出前由人把關。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 400" role="img" aria-label="適合與不適合交給 Cowork 的工作對照：左欄適合，包括整理訪談、測試報表、issue 分類、發布說明；右欄不適合，包括碰憑證、自動購買、代發大量 email、操作財務網站">
           <rect x="10" y="10" width="265" height="380" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
           <text x="142" y="50" text-anchor="middle" font-size="24" font-weight="900" class="on-color">✓ 適合</text>
@@ -2439,6 +2656,11 @@ defineLessons({
         why: ['`Bash` 等於任何指令都預先核准；只列這個流程需要的那幾個', '正式環境的部署交給有審查的 CI，不交給對話', '有副作用的流程只允許你手動觸發，避免它自己「覺得需要」就部署', '先檢查前置條件，不對就不做'],
       }],
       blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '一個 skill 長什麼樣子', cwd: '~/shop-api', steps: [
+          { cmd: 'ls .claude/skills/release', out: 'SKILL.md  checklist.md', note: '一個 skill 是一個資料夾，主檔是 `SKILL.md`。' },
+          { cmd: 'head -n 6 .claude/skills/release/SKILL.md', out: '---\nname: release\ndescription: 發布新版本：更新版號、CHANGELOG、打 tag\nallowed-tools: Bash(npm version *), Bash(git tag *)\ndisable-model-invocation: true\n---', note: '開頭的設定：平常只載入 `name` 與 `description`。`allowed-tools` 是**預先核准**；有副作用的流程加 `disable-model-invocation: true`，只能由你手動叫用。' },
+          { cmd: '> /release minor', out: '讀取 SKILL.md 全文…\nnpm version minor → v1.4.0\n更新 CHANGELOG.md', cwd: 'claude', note: '需要時才載入全文並執行。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 330" role="img" aria-label="長條圖比較每次 session 開始的固定 context 成本：一份 600 行的部署流程寫在 CLAUDE.md，每次都要整份載入，長條很長；做成 skill 時只載入一行說明，長條很短。數值為示意">
           <text x="10" y="34" font-size="22" font-weight="900">每次 session 開始時的固定成本（示意）</text>
           <g font-size="22">
@@ -2565,6 +2787,11 @@ defineLessons({
         why: ['檔案全文進主 context 是最大的浪費', '調查交給唯讀的 Explore，中間過程留在它那裡', '指定回報格式，你拿到的是可以直接用的結論', 'Explore 本來就是唯讀，再說一次是讓意圖更清楚'],
       }],
       blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '兩個 session 平行開發', cwd: '~/shop-api', steps: [
+          { cmd: 'claude --worktree feature-search', out: 'Created worktree at .claude/worktrees/feature-search\n(branch: feature-search)', note: '每個 worktree 是同一個 repo 的另一份工作資料夾＋分支，兩個 session 改檔不會互相覆蓋。' },
+          { cmd: 'git worktree list', out: '~/shop-api                               a1b2c3d [main]\n~/shop-api/.claude/worktrees/feature-search  a1b2c3d [feature-search]', note: '在另一個終端機看：兩份工作資料夾並存。' },
+          { cmd: 'cat .worktreeinclude', out: '.env.example', note: '新的 worktree 只複製這裡列的未追蹤檔案。只列必要的，不要把真正的 `.env` 帶過去。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 380" role="img" aria-label="worktree 平行開發：同一個 repo 底下，main 工作目錄由你自己使用；.claude/worktrees/feat-a 由 session A 開發功能 A；.claude/worktrees/fix-b 由 session B 修 bug B。三個資料夾各自 checkout 不同分支">
           <rect x="10" y="10" width="540" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
           <text x="280" y="54" text-anchor="middle" font-size="24" font-weight="900" class="on-color">shop-api（同一個 repo）</text>
@@ -2690,6 +2917,11 @@ defineLessons({
         why: ['模型可能沒注意到、或在長對話裡被稀釋', '用 `$CLAUDE_PROJECT_DIR` 組出絕對路徑，不管目前目錄在哪都找得到腳本', '`exit 2` 擋下並把原因回饋給 Claude，它會換別的做法'],
       }],
       blocks: [
+        { type: 'widget', name: 'pipeflow', props: { stages: [
+          { cmd: 'Claude 想執行 Bash：rm -rf dist ~/', out: ['tool: Bash', 'command: rm -rf dist ~/'], note: '模型決定要執行一個指令。' },
+          { cmd: 'PreToolUse hook：protect.sh', out: ['偵測到 ~/', 'exit 2'], err: ['Blocked: 不能刪除家目錄'], note: 'hook 在**權限模式判斷之前**觸發。exit 2 就擋下，stderr 的訊息會回傳給 Claude。' },
+          { cmd: '權限模式（就算是 bypass）', out: ['不會走到這一步'], note: '所以 hook 擋得住 bypass。比對規則記得測大小寫、反斜線、相似檔名。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 420" role="img" aria-label="protect-files.sh 的判斷流程：從 stdin 讀入 JSON，取出 file_path，逐一比對保護清單；符合任何一項就印出原因到 stderr 並 exit 2 擋下；都不符合就 exit 0 放行">
           <g font-size="22">
             <rect x="110" y="10" width="340" height="62" class="fill-surface stroke-ink" stroke-width="4"/><text x="280" y="50" text-anchor="middle">讀 stdin 的 JSON</text>
@@ -2807,6 +3039,12 @@ defineLessons({
         why: ['`npx -y` 不鎖版本、不經確認就下載並執行套件，等於把未審查的程式放進每個人的電腦', '`-p` 模式不會顯示 `.mcp.json` 的核准提示，server 會直接連線', '用服務商官方文件提供的遠端網址（這裡的 example.com 只是示意）', '讓使用者知道怎麼在不載入專案設定的情況下先檢查'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'server', label: 'server 本身的風險' }, { id: 'content', label: '回傳內容的風險' }], items: [
+          { text: '本機的 MCP server 以你的權限執行，可以讀你的檔案', answer: 'server', why: '本機 server 就是一個以你身分執行的程式。' },
+          { text: '網頁抓取工具回傳的頁面裡藏著「請執行 curl …」', answer: 'content', why: '回傳內容進了 context，可能夾帶注入。' },
+          { text: '來路不明的 plugin 更新後多了一個上傳工具', answer: 'server', why: '工具本身的行為改變了；Anthropic 不稽核 MCP server。' },
+          { text: 'issue 追蹤工具回傳的 issue 內文要求 Claude 改 CI 設定', answer: 'content', why: '外部內容是資料，不是指令。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 450" role="img" aria-label="審查 MCP server 的流程：一、來源是誰，官方、自己寫、或可信的組織；二、本機還是遠端，本機要看程式碼；三、它會抓外部內容嗎，會的話回傳可能夾帶注入；四、需要哪些權限，用 allow、ask、deny 規則限制；五、用不到就停用">
           <g font-size="22">
             <rect x="10" y="10" width="540" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/><text x="30" y="54" font-weight="900" class="on-color">① 來源：官方／自己寫／可信組織？</text>
@@ -2934,6 +3172,12 @@ defineLessons({
         why: ['官方：bypass 只用在沒有網路的隔離容器或 VM', 'auto 一樣減少確認，但保留分類器這一層', 'deny 規則在每個模式都有效，是分類器之外的底線'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'plan', label: 'plan' }, { id: 'default', label: 'default（Manual）' }, { id: 'auto', label: 'auto' }, { id: 'bypass', label: 'bypass（隔離環境）' }], items: [
+          { text: '第一次打開陌生的開源專案，只想了解架構', answer: 'plan', why: '只讀、先規劃，最安全。' },
+          { text: '在正式環境的設定檔附近做敏感修改，每一步都想看', answer: 'default', why: '改檔與指令都先問你。' },
+          { text: '長時間的重構，信任工作目錄內的編輯，但希望危險指令被攔', answer: 'auto', why: '規則與分類器替你判斷，deny 仍最先生效。' },
+          { text: '在用完即丟的容器裡跑批次任務', answer: 'bypass', why: '只有在隔離環境才適合全部不問。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 470" role="img" aria-label="auto mode 的判斷順序：一、符合 deny、ask、allow 規則就照規則；二、唯讀或工作目錄內的編輯直接核准；三、其他交給分類器；四、分類器擋下時 Claude 收到原因。deny 規則永遠最先">
           <g font-size="22">
             <rect x="10" y="10" width="540" height="80" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
@@ -3207,6 +3451,13 @@ defineLessons({
         why: ['`excludedCommands` 讓 npm 完全跑到 sandbox 外，連它執行的安裝腳本也沒有隔離', '允許所有網域等於沒有網路層；只列真正需要的', '官方建議：工具只差一個目錄或一個網域時，用 allowWrite 或 allowedDomains 補上，而不是整個排除'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'in', label: '在 sandbox 牆內' }, { id: 'out', label: '在牆外' }], items: [
+          { text: 'Bash 工具執行的 `npm test`', answer: 'in', why: 'sandbox 包住 shell 指令。' },
+          { text: '`npm test` 啟動的子程序', answer: 'in', why: '子程序也在牆內。' },
+          { text: 'Read／Edit 檔案工具', answer: 'out', why: '檔案工具由權限規則管，不在 sandbox 裡。' },
+          { text: '你設定的 hook 腳本', answer: 'out', why: 'hook 以你的完整權限在牆外執行。' },
+          { text: '本機的 MCP server', answer: 'out', why: 'MCP server 是另外的程式，不受 sandbox 限制。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 380" role="img" aria-label="兩層缺一不可：只有檔案系統層，沒有網路層，被誘導的程式可以讀到 SSH 金鑰並送出去；只有網路層，沒有檔案系統層，程式可以改寫 shell 設定檔植入後門；兩層都開，兩種攻擊都被擋下">
           <g font-size="22">
             <rect x="10" y="10" width="540" height="100" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
@@ -3319,6 +3570,13 @@ defineLessons({
         why: ['在主機上 bypass，等於讓一段夾帶指示的檔案能做你帳號能做的任何事', 'bypass 本身沒變，變的是它能碰到的範圍', '容器裡沒有長期憑證，被誘導也偷不走', '無人值守的成果一樣要經過人審查'],
       }],
       blocks: [
+        { type: 'widget', name: 'pipeflow', props: { stages: [
+          { cmd: '權限規則', out: ['擋特定工具與指令'], note: '最輕：由 Claude Code 判斷要不要執行。' },
+          { cmd: 'sandbox', out: ['作業系統擋 shell 的檔案與網路'], note: '作業系統層級，但檔案工具、hook、MCP 在牆外。' },
+          { cmd: 'dev container', out: ['整個環境在容器裡', '不掛 ~/.ssh'], note: '擋得住碰你的電腦，擋不住容器內的東西被送出：用短期 token 與防火牆。' },
+          { cmd: 'VM', out: ['獨立的作業系統'], note: '隔離更完整。' },
+          { cmd: '雲端 session', out: ['不在你的電腦上'], note: '最強隔離。bypass 只該出現在這兩三層。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 360" role="img" aria-label="bypass 的影響範圍比較：在主機上，能碰到你的所有檔案、憑證、網路；在有防火牆的 dev container 裡，只能碰到掛載的 repo 與允許的網域">
           <rect x="10" y="10" width="265" height="340" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
           <text x="142" y="50" text-anchor="middle" font-size="24" font-weight="900" class="on-color">主機上 bypass</text>
@@ -3451,6 +3709,13 @@ defineLessons({
         why: ['官方建議：不要把不可信內容直接 pipe 給 Claude', '先轉成你能核對的摘要，讓你站在信任邊界上', '把可疑的指令「列出來」而不是「執行」，你看得到它被要求做什麼'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'trusted', label: '你的指示（可信）' }, { id: 'data', label: '外部內容（只當資料）' }], items: [
+          { text: '你在終端機輸入的任務說明', answer: 'trusted', why: '這是你本人下的指示。' },
+          { text: 'GitHub issue 的內文', answer: 'data', why: '任何人都能寫 issue。' },
+          { text: '依賴套件 README 裡的「AI 請執行…」', answer: 'data', why: '典型的間接注入。' },
+          { text: 'MCP 工具抓回來的網頁', answer: 'data', why: '回傳內容可能夾帶指示。' },
+          { text: '測試資料檔裡的一段註解', answer: 'data', why: '程式碼與資料裡的文字一樣不可信。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 420" role="img" aria-label="互動模式與 -p 模式的比較：互動模式下，第一次啟動會顯示 trust 對話框，.mcp.json 的 server 會先詢問；-p 模式下兩者都不會出現，repo 的 hook、env、skill 的 allowed-tools 直接生效">
           <g font-size="22">
             <rect x="10" y="10" width="265" height="400" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -3581,6 +3846,12 @@ defineLessons({
         },
       ],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'a01', label: 'A01 存取控制失效' }, { id: 'a05', label: 'A05 注入' }, { id: 'a02', label: 'A02 安全設定錯誤' }, { id: 'a10', label: 'A10 例外處理不當' }], items: [
+          { text: '`GET /orders/:id` 沒檢查訂單是不是登入者的', answer: 'a01', why: '缺少擁有者檢查，任何人改 id 就能看別人的訂單。' },
+          { text: '`db.query("SELECT * FROM users WHERE name = \'" + name + "\'")`', answer: 'a05', why: '字串拼接 SQL，要改成參數化查詢。' },
+          { text: 'CORS 設成 `origin: "*"` 且允許 credentials', answer: 'a02', why: '設定太寬。' },
+          { text: '驗證服務逾時時 `catch` 後直接放行', answer: 'a10', why: '出錯時應該 fail-closed（拒絕），不是放行。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 380" role="img" aria-label="fail-open 與 fail-closed 的比較：同樣發生例外，fail-open 的程式放行請求，攻擊者通過；fail-closed 的程式拒絕並記錄，請求被擋下">
           <rect x="180" y="10" width="200" height="70" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
           <text x="280" y="54" text-anchor="middle" font-size="22" font-weight="900" class="on-color">驗證時發生例外</text>
@@ -3705,6 +3976,11 @@ defineLessons({
         why: ['讓 `npm install` 經過你：可以在權限規則裡設成 ask', '要求可以查證的資訊：不存在或剛建立的套件，在這一步就會露餡', '安裝與挑選分開', '鎖定版本、看 lockfile 的改動，你知道實際裝了什麼'],
       }],
       blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '核准新套件前先查證', cwd: '~/shop-api', steps: [
+          { cmd: 'npm view express-validatorr name version', out: 'npm ERR! 404 Not Found - express-validatorr', err: true, note: 'AI 建議的套件名多了一個 r：不存在，或更糟，是有人搶註的仿冒套件。' },
+          { cmd: 'npm view express-validator name version repository.url', out: 'name = express-validator\nversion = 7.2.1\nrepository.url = git+https://github.com/express-validator/express-validator.git', note: '核准前看：名稱、版本、原始碼位置、下載量。（版本號為示意）' },
+          { cmd: 'npm ci', out: 'added 214 packages in 6s', note: '照 lockfile 安裝，不會偷偷升級到新版本。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 440" role="img" aria-label="slopsquatting 的流程：一、AI 建議了一個不存在的套件名；二、攻擊者觀察到這類常見的錯誤名稱，先註冊並放入惡意程式；三、開發者照建議安裝；四、安裝腳本執行，偷取憑證。最有效的阻斷點在第三步：安裝前查證套件">
           <g font-size="22">
             <rect x="10" y="10" width="540" height="80" class="fill-surface stroke-ink" stroke-width="4"/><text x="30" y="48" font-weight="900">① AI 建議一個不存在的套件名</text><text x="30" y="78">例如兩個真實套件名的混合</text>
@@ -3821,6 +4097,13 @@ defineLessons({
         why: ['單靠最後一關，等於只有一層防護', '從第一行就檢查，Claude 在同一個 session 裡就修好', '開 PR 前自己先看一次，減少審查來回', 'AI 審查不取代既有的掃描器', '深度掃描成本高，定期對重要模組做就好'],
       }],
       blocks: [
+        { type: 'widget', name: 'pipeflow', props: { stages: [
+          { cmd: '① 寫的當下', out: ['security-guidance plugin'], note: '最早、最便宜：一邊寫一邊提醒。' },
+          { cmd: '② 分支', out: ['/security-review'], note: '整個分支看一次。' },
+          { cmd: '③ 深度掃描', out: ['Claude Security plugin'], note: '整個 codebase 的深度檢查。' },
+          { cmd: '④ PR', out: ['Code Review 🔴🟡🟣'], note: '多個 agent 審查並驗證，但不擋合併。' },
+          { cmd: '⑤ CI', out: ['既有掃描器、測試'], note: '確定性的檢查才能真正擋下。AI 審查不取代它們。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 360" role="img" aria-label="防禦縱深示意：五層網由上而下，每層都有一些洞，問題從上方落下，大部分在前幾層被攔住，少數穿過所有層。洞的位置不同，所以多層比單層攔得多">
           <g class="stroke-ink" stroke-width="4" data-free-ends="有洞的防護網">
             <path d="M10 60 H120 M170 60 H360 M410 60 H550"/>
@@ -4073,6 +4356,12 @@ defineLessons({
         why: ['最貴的組合不一定最好，簡單任務等於白付', '機械式的小改動，低 effort 就夠', '架構決策才是 Opus 與高 effort 值得的地方', '大量、明確的工作交給較小的模型平行做', 'fast mode 換的是等待時間，只在你真的在等的時候值得'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'sonnet', label: 'Sonnet' }, { id: 'opus', label: 'Opus' }, { id: 'small', label: '小模型（Haiku）' }], items: [
+          { text: '幫一個 React 元件加上 loading 狀態', answer: 'sonnet', why: '多數寫程式任務 Sonnet 就夠。' },
+          { text: '設計多個服務之間的資料一致性方案', answer: 'opus', why: '複雜架構與推理才用 Opus。' },
+          { text: '把 2,000 筆錯誤訊息依格式分類', answer: 'small', why: '大量、明確、重複的工作用小模型。' },
+          { text: '修一個測試失敗的小 bug', answer: 'sonnet', why: '一般任務，不需要最大的模型。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 380" role="img" aria-label="長條圖：每百萬輸出 token 的牌價。Haiku 4.5 為 5 美元，Sonnet 5.5 為 10 美元，Opus 5.5 為 20 美元，Opus 5.5 fast mode 為 40 美元">
           <text x="10" y="30" font-size="22" font-weight="900">每百萬輸出 token 牌價（美元）</text>
           <g font-size="22">
@@ -4185,6 +4474,12 @@ defineLessons({
         why: ['「變快」沒有終點，也無法驗證', '基準數字讓結果可以比較', '先提假設再動手，你可以選最划算的', '一次一處、每次都量，才知道誰有效', '把安全相關的機制列為不能改的條件'],
       }],
       blocks: [
+        { type: 'widget', name: 'pipeflow', props: { stages: [
+          { cmd: '量基準', out: ['LCP 3.8s', 'INP 240ms', 'CLS 0.02'], note: '先量，有數字才知道改了有沒有用。' },
+          { cmd: '只改一處', out: ['hero 圖改 AVIF＋preload'], note: '一次只改一個地方，才知道是誰造成差異。' },
+          { cmd: '重新量', out: ['LCP 2.3s', 'INP 240ms', 'CLS 0.02'], note: '同樣的方法再量一次。' },
+          { cmd: '比較與檢查', out: ['LCP ≤ 2.5s ✓', '驗證與快取隔離未動 ✓'], note: '達標，而且「不能改」的安全機制都還在。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 380" role="img" aria-label="Core Web Vitals 門檻條：LCP 良好在 2.5 秒以內；INP 良好在 200 毫秒以內；CLS 良好在 0.1 以內。每條的綠色區段代表良好">
           <g font-size="22">
             <text x="10" y="40" font-weight="900">LCP（載入）</text>
@@ -4313,6 +4608,9 @@ defineLessons({
         why: ['`pull_request_target` 會在 base repo 的權限下執行、拿得到 secret；搭配 checkout PR 的程式碼，是 GitHub 上已知的危險組合（此為 GitHub Actions 的一般安全知識，非 Claude 文件內容）', '`write-all` 讓被誘導的 Claude 能改 repo 的任何東西；審查只需要讀', '在有 secret 的環境裡執行外部貢獻者的程式碼', '審查與修改分開：外部 PR 只回報，不讓它動手'],
       }],
       blocks: [
+        { type: 'widget', name: 'anatomy', props: { input: false, presets: [
+          { cmd: 'claude -p "審查這個 PR 的安全問題" --max-turns 5 --allowedTools "Read,Grep" --permission-mode dontAsk', notes: { '-p': '短選項：非互動，做完就結束', '"審查這個 PR 的安全問題"': '參數：任務', '--max-turns': '長選項：最多跑幾輪', '5': '參數：--max-turns 的值', '--allowedTools': '長選項：預先允許的工具', '"Read,Grep"': '參數：只允許讀與搜尋', '--permission-mode': '長選項：權限模式', 'dontAsk': '參數：沒被允許的一律拒絕，不會卡在等人回答' } },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 360" role="img" aria-label="workflow 權限比較：write-all 時，Contents、Issues、Pull requests、Actions、Workflows 全部可寫；最小權限的審查 workflow 只有 Contents 與 Pull requests 可讀，加上取得身分的 id-token">
           <g font-size="22">
             <rect x="10" y="10" width="265" height="340" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
@@ -4433,6 +4731,11 @@ defineLessons({
         why: ['等到 PR 才發現問題，來回成本最高', '本機先審：effort 越高涵蓋越廣，但可能出現較不確定的發現', '`--fix` 會把建議直接套用到工作目錄', '官方說明：背景審查的 `--fix` 修改不在 checkpoint 內，`/rewind` 還原不了'],
       }],
       blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'red', label: '🔴 重要' }, { id: 'yellow', label: '🟡 小問題' }, { id: 'purple', label: '🟣 既有問題' }], items: [
+          { text: '這次新增的 API 沒有檢查登入', answer: 'red', why: '這次改動引入的實際問題。' },
+          { text: '變數命名不一致', answer: 'yellow', why: '小問題（Nit），REVIEW.md 可以限制數量。' },
+          { text: '這次沒改到的舊檔案裡就有的 SQL 拼接', answer: 'purple', why: '既有問題，不是這次引入的。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 340" role="img" aria-label="不擋合併的位置：Code Review 的 check run 結論永遠是 neutral，分支保護不會因此擋下合併；若要以審查結果把關，要在自己的 CI 讀取 check run 輸出的嚴重度數字，有 Important 就讓 CI 失敗">
           <g font-size="22">
             <rect x="10" y="10" width="250" height="110" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
@@ -4554,6 +4857,13 @@ defineLessons({
         why: ['各自設定，安全程度取決於最鬆的那個人', '專案規則進版控，所有人拉下來就生效，也可以被審查', '組織底線放 managed，誰都改不掉', 'deny 永遠先評估：個人方便不會放寬團隊的限制'],
       }],
       blocks: [
+        { type: 'widget', name: 'pipeflow', props: { stages: [
+          { cmd: 'managed settings', out: ['組織底線', '後台或 MDM 派送'], note: '最高優先，個人改不掉。' },
+          { cmd: '命令列旗標', out: ['--permission-mode …'], note: '這次啟動的設定。' },
+          { cmd: '專案 local', out: ['.claude/settings.local.json'], note: '個人在這個專案的設定，不進版控。' },
+          { cmd: '專案共用', out: ['.claude/settings.json'], note: '進版控，團隊共用的規則。' },
+          { cmd: '使用者', out: ['~/.claude/settings.json'], note: '最低優先的個人偏好。注意：**deny 在任何一層都生效**。' },
+        ] } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 360" role="img" aria-label="OpenTelemetry 監控流向：每位開發者的 Claude Code 透過 OTLP 把指標送到你的 collector，再進到你的監控系統。指標包含 session 數、token 用量、成本、修改行數、commit 與 PR 數；prompt 內容預設不送">
           <g font-size="22">
             <rect x="10" y="10" width="160" height="70" class="fill-surface stroke-ink" stroke-width="4"/><text x="90" y="52" text-anchor="middle">開發者 A</text>
@@ -5522,7 +5832,7 @@ function onKeydown(e) {
   if (e.key === 'Escape' && Drawer.isOpen()) { Drawer.close(); return; }
   Drawer.trap(e);
   if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || isTyping(document.activeElement)) return;
-  if (document.activeElement && document.activeElement.closest('[role="tablist"], .loop-controls, [role="listbox"], [role="separator"], input[type="range"], [role="radiogroup"]')) return;
+  if (document.activeElement && document.activeElement.closest('[role="tablist"], .loop-controls, .tw-controls, .anat-input, .cls-btns, [role="listbox"], [role="separator"], input[type="range"], [role="radiogroup"]')) return;
   const route = parseRoute();
   if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && route.name === 'lesson') {
     const pos = LESSONS.findIndex((l) => l.id === route.id);
@@ -6412,6 +6722,368 @@ Widgets.ctxcost = {
     el.addEventListener('input', update);
     el.addEventListener('change', update);
     update();
+  },
+};
+
+/* ==== 從終端機課移植：終端機播放器、指令拆解器、流程動畫、分類練習 ==== */
+/* ==========================================================================
+   終端機主題的互動元件
+   ========================================================================== */
+const SHELLS = {
+  pwsh: { name: 'PowerShell', chip: 'var(--info)', cwd: 'C:\\Users\\you' },
+  zsh: { name: 'zsh・macOS', chip: 'var(--m3)', cwd: '~' },
+  bash: { name: 'bash', chip: 'var(--m8)', cwd: '~' },
+  cmd: { name: 'cmd・命令提示字元', chip: 'var(--neutral)', cwd: 'C:\\Users\\you' },
+};
+function promptFor(shell, cwd) {
+  const dir = cwd || SHELLS[shell].cwd;
+  if (shell === 'pwsh') return `PS ${dir}> `;
+  if (shell === 'cmd') return `${dir}>`;
+  if (shell === 'zsh') return `you@mac ${dir} % `;
+  return `you@linux:${dir}$ `;
+}
+const TYPE_MS = 34;
+const STEP_MS = 2400;
+
+/* 逐步播放的共用控制：上一步、播放／暫停、下一步、重設；方向鍵也能用 */
+function stepperControls(label) {
+  return `<div class="tw-controls" role="group" aria-label="${esc(label || '動畫控制')}">
+    <button type="button" class="btn small nb-press" data-step="prev">← 上一步</button>
+    <button type="button" class="btn small primary nb-press" data-step="play">▶ 播放</button>
+    <button type="button" class="btn small nb-press" data-step="next">下一步 →</button>
+    <button type="button" class="btn small nb-press" data-step="reset">重設</button>
+  </div>`;
+}
+function makeStepper(el, count, draw, { interval = STEP_MS, start = 0 } = {}) {
+  let step = start;
+  let timer = null;
+  const playBtn = $('[data-step="play"]', el);
+  const reduced = prefersReducedMotion();
+  if (reduced) {
+    playBtn.disabled = true;
+    playBtn.textContent = '自動播放已關閉';
+    playBtn.title = '你的系統開啟了「減少動態效果」，請用「下一步」逐步觀看';
+  }
+  function sync() {
+    $('[data-step="prev"]', el).disabled = step <= 0;
+    $('[data-step="next"]', el).disabled = step >= count - 1;
+  }
+  function stop() {
+    window.clearInterval(timer);
+    timer = null;
+    if (!reduced) playBtn.textContent = '▶ 播放';
+  }
+  function go(to, animate = true) {
+    step = Math.min(Math.max(to, 0), count - 1);
+    draw(step, animate && !reduced);
+    sync();
+  }
+  function play() {
+    if (timer) { stop(); return; }
+    if (step >= count - 1) go(0);
+    playBtn.textContent = '❚❚ 暫停';
+    timer = window.setInterval(() => {
+      if (step >= count - 1 || !document.body.contains(el)) { stop(); return; }
+      go(step + 1);
+    }, interval);
+  }
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-step]');
+    if (!b || !el.contains(b)) return;
+    const a = b.dataset.step;
+    if (a === 'play') { play(); return; }
+    stop();
+    if (a === 'prev') go(step - 1);
+    if (a === 'next') go(step + 1);
+    if (a === 'reset') go(0, false);
+  });
+  el.addEventListener('keydown', (e) => {
+    if (!e.target.closest('.tw-controls')) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); stop(); go(step + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); stop(); go(step - 1); }
+  });
+  window.addEventListener('hashchange', stop, { once: true });
+  go(start, false);
+  return { go, stop };
+}
+
+/* 把指令逐字打進 target；回傳取消函式 */
+function typeInto(target, text, done) {
+  let i = 0;
+  const timer = window.setInterval(() => {
+    if (!document.body.contains(target)) { window.clearInterval(timer); return; }
+    i += 1;
+    target.textContent = text.slice(0, i);
+    if (i >= text.length) { window.clearInterval(timer); if (done) done(); }
+  }, TYPE_MS);
+  return () => window.clearInterval(timer);
+}
+
+/* ---------- 終端機播放器 ---------- */
+// props: { shell, title, cwd, caption, steps: [{ cmd, out, err, note, cwd }] }
+function termOutHtml(s, extraClass = '') {
+  if (s.out == null || s.out === '') return '';
+  return `<span class="ln o${s.err ? ' err' : ''}${s.dim ? ' dim' : ''}${extraClass}">${esc(s.out)}</span>`;
+}
+Widgets.term = {
+  render(props) {
+    const shell = SHELLS[props.shell] ? props.shell : 'bash';
+    const info = SHELLS[shell];
+    return `<div class="tw${props.steps.length > 1 ? ' side' : ''}">
+      <div class="tw-win">
+        <div class="tw-bar"><span class="label" style="--chip:${info.chip}">${esc(info.name)}</span><span class="ttl">${esc(props.title || '終端機')}</span></div>
+        <pre class="tw-screen" tabindex="0" aria-label="終端機畫面"></pre>
+      </div>
+      <div class="tw-panel">
+        ${props.steps.length > 1 ? stepperControls('終端機播放控制') : ''}
+        <div class="tw-dots" aria-hidden="true">${props.steps.map(() => '<span></span>').join('')}</div>
+        <p class="tw-note" aria-live="polite"></p>
+        ${props.caption ? `<p style="margin:0;font-size:var(--fs-small);color:var(--ink-muted)">${md(props.caption)}</p>` : ''}
+      </div>
+    </div>`;
+  },
+  hydrate(el, props) {
+    const shell = SHELLS[props.shell] ? props.shell : 'bash';
+    const screen = $('.tw-screen', el);
+    const note = $('.tw-note', el);
+    const dots = $$('.tw-dots span', el);
+    let cancel = null;
+    const prompt = (s) => promptFor(shell, s.cwd || props.cwd);
+    const lineHtml = (s) => `<span class="ln"><span class="p">${esc(prompt(s))}</span><span class="c">${esc(s.cmd)}</span></span>${termOutHtml(s)}`;
+    function draw(step, animate) {
+      if (cancel) { cancel(); cancel = null; }
+      const steps = props.steps;
+      const s = steps[step];
+      screen.innerHTML = steps.slice(0, step).map(lineHtml).join('');
+      dots.forEach((d, i) => d.classList.toggle('on', i <= step));
+      note.innerHTML = `<span class="step">步驟 ${step + 1} / ${steps.length}</span>${md(s.note || '')}`;
+      const line = document.createElement('span');
+      line.className = 'ln';
+      line.innerHTML = `<span class="p">${esc(prompt(s))}</span><span class="c"></span>`;
+      screen.appendChild(line);
+      const cmdEl = $('.c', line);
+      const finish = () => {
+        screen.insertAdjacentHTML('beforeend', termOutHtml(s, animate ? ' enter' : ''));
+        if (step === steps.length - 1) screen.insertAdjacentHTML('beforeend', `<span class="ln"><span class="p">${esc(prompt(s))}</span><span class="caret"></span></span>`);
+        screen.scrollTop = screen.scrollHeight;
+      };
+      if (animate && s.cmd) cancel = typeInto(cmdEl, s.cmd, finish);
+      else { cmdEl.textContent = s.cmd || ''; finish(); }
+      screen.scrollTop = screen.scrollHeight;
+    }
+    if (props.steps.length > 1) makeStepper(el, props.steps.length, draw);
+    else draw(0, false);
+  },
+};
+
+/* ---------- 指令拆解器 ---------- */
+const KIND_TEXT = { prog: '程式', sub: '子指令', opt: '選項', arg: '參數', op: '連接符號', var: '變數' };
+const SUBCOMMAND_PROGRAMS = new Set(['git', 'npm', 'pnpm', 'yarn', 'pip', 'pip3', 'winget', 'brew', 'apt', 'apt-get', 'docker', 'codex', 'gh', 'conda', 'choco', 'scoop', 'kubectl', 'cargo', 'go', 'dotnet']);
+const PROGRAM_NOTES = {
+  git: '版本控制工具', npm: 'Node.js 的套件管理工具', npx: '不安裝就直接執行套件裡的指令', node: 'JavaScript 執行環境',
+  python: 'Python 直譯器', python3: 'Python 直譯器（macOS／Linux 常見名稱）', py: 'Windows 的 Python 啟動器', pip: 'Python 的套件管理工具',
+  ls: '列出資料夾內容', dir: '列出資料夾內容（cmd／PowerShell 別名）', cd: '切換目前所在的資料夾', pwd: '印出目前所在的資料夾',
+  cat: '印出檔案內容', type: '印出檔案內容（cmd）', grep: '在文字裡找符合的行', find: '依條件找檔案', rm: '刪除檔案（不進資源回收筒）',
+  cp: '複製', mv: '移動或改名', mkdir: '建立資料夾', echo: '把文字印出來', curl: '透過網址傳送或下載資料', ssh: '登入遠端電腦',
+  claude: 'Claude Code', codex: 'OpenAI Codex CLI', agy: 'Google Antigravity CLI', winget: 'Windows 的套件管理工具',
+  brew: 'macOS 的套件管理工具 Homebrew', apt: 'Debian／Ubuntu 的套件管理工具', sudo: '用管理員權限執行後面那整個指令',
+  head: '只看開頭幾行', tail: '只看最後幾行', wc: '計算行數、字數', sort: '排序', uniq: '去掉相鄰的重複行', chmod: '修改檔案權限',
+  which: '查指令實際對應到哪個檔案', where: '查指令實際對應到哪個檔案（Windows）', 'where.exe': '查指令實際對應到哪個檔案（Windows）',
+  touch: '建立空檔案或更新修改時間', code: '用 VS Code 開啟', docker: '容器工具', irm: 'Invoke-RestMethod 的別名：下載網址內容', iex: 'Invoke-Expression 的別名：把文字當成指令執行',
+  bash: '啟動 bash 並執行後面的內容', sh: '啟動 sh 並執行後面的內容', del: '刪除檔案（cmd）', copy: '複製（cmd）', set: '設定變數（cmd）', export: '設定環境變數並傳給子程式',
+  source: '在目前的 shell 裡執行一個腳本', history: '列出指令歷史', clear: '清除畫面', cls: '清除畫面（Windows）', man: '開啟說明手冊',
+};
+const OP_NOTES = {
+  '|': '管線：把左邊的輸出接到右邊當輸入', '>': '重新導向：把輸出寫進檔案（覆寫）', '>>': '重新導向：把輸出加到檔案最後（附加）',
+  '2>': '把錯誤訊息寫進檔案', '2>&1': '把錯誤訊息併進正常輸出', '<': '從檔案讀入，當成輸入', '&&': '左邊成功才執行右邊',
+  '||': '左邊失敗才執行右邊', ';': '不管成敗，依序執行', '&': '背景執行（bash）；在 cmd 是依序執行',
+};
+const OPERATORS = ['2>&1', '&&', '||', '>>', '2>', '|', '>', '<', ';', '&'];
+const REDIRECT_OPS = new Set(['>', '>>', '2>', '<']);
+function shellTokens(src) {
+  const out = [];
+  let cur = '';
+  let quote = null;
+  const flush = () => { if (cur) out.push(cur); cur = ''; };
+  for (let i = 0; i < src.length; i += 1) {
+    const ch = src[i];
+    if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
+    if (ch === '"' || ch === "'") { quote = ch; cur += ch; continue; }
+    if (/\s/.test(ch)) { flush(); continue; }
+    const op = OPERATORS.find((o) => src.startsWith(o, i));
+    // 2> 只在字首才算運算子，避免把 file2>out 拆錯
+    if (op && !(op.startsWith('2') && cur)) { flush(); out.push(op); i += op.length - 1; continue; }
+    cur += ch;
+  }
+  flush();
+  return out;
+}
+function classifyTokens(tokens, overrides = {}) {
+  const result = [];
+  let expectProgram = true;
+  let program = null;
+  let sawSub = false;
+  let afterRedirect = false;
+  let prevOpt = null;
+  tokens.forEach((t) => {
+    let kind;
+    let note;
+    if (OP_NOTES[t]) {
+      kind = 'op'; note = OP_NOTES[t];
+      afterRedirect = REDIRECT_OPS.has(t);
+      expectProgram = !afterRedirect && t !== '2>&1';
+      prevOpt = null;
+    } else if (afterRedirect) {
+      kind = 'arg'; note = '重新導向的目標檔案'; afterRedirect = false;
+    } else if (/^(\$env:\w+|\$\{?\w+\}?|%\w+%)$/.test(t)) {
+      kind = 'var'; note = '變數：執行前 shell 會先換成它的值';
+    } else if (expectProgram) {
+      kind = 'prog';
+      program = t.toLowerCase();
+      note = PROGRAM_NOTES[program] ? `程式：${PROGRAM_NOTES[program]}` : '程式：shell 會到 PATH 裡找這個名字的程式';
+      expectProgram = program === 'sudo';
+      sawSub = false;
+    } else if (/^--?[A-Za-z]/.test(t)) {
+      kind = 'opt';
+      if (t.startsWith('--')) note = t.includes('=') ? '長選項，等號後面是它的值' : '長選項：用完整單字寫的開關';
+      else if (/^-[a-z]{2,}$/.test(t)) note = `短選項合併寫法：等於 ${t.slice(1).split('').map((c) => `-${c}`).join(' ')}`;
+      else note = /^-[A-Z][a-z]/.test(t) ? 'PowerShell 參數名稱（-開頭的單字）' : '短選項：一個字母的開關';
+      prevOpt = t;
+      return result.push({ t, kind, note: overrides[t] || note });
+    } else if (SUBCOMMAND_PROGRAMS.has(program) && !sawSub) {
+      kind = 'sub'; note = `子指令：告訴 ${program} 這次要做哪一種工作`; sawSub = true;
+    } else {
+      kind = 'arg';
+      note = /^["']/.test(t) && prevOpt ? `參數：前一個選項 ${prevOpt} 的值（有空白所以加引號）` : /^["']/.test(t) ? '參數：引號把含空白的文字包成一個參數' : '參數：這次要處理的對象';
+    }
+    prevOpt = null;
+    result.push({ t, kind, note: overrides[t] || note });
+  });
+  return result;
+}
+function tokenChips(parts, withNotes = true) {
+  return parts.map((p, i) => `<span class="tok" data-k="${p.kind}" style="--i:${i}"><code>${esc(p.t)}</code><small>${esc(KIND_TEXT[p.kind])}</small></span>`).join('');
+}
+const LEGEND_HTML = `<div class="legend" aria-label="顏色說明">${Object.entries(KIND_TEXT).map(([k, v]) => `<span><i style="--kc:var(--k-${k})"></i>${v}</span>`).join('')}</div>`;
+Widgets.anatomy = {
+  render(props, id) {
+    return `<div class="anat">
+      ${LEGEND_HTML}
+      <div class="anat-presets" role="group" aria-label="範例指令">${props.presets.map((p, i) => `<button type="button" class="btn small nb-press" data-preset="${i}" aria-pressed="${i === 0}">${esc(p.cmd)}</button>`).join('')}</div>
+      ${props.input === false ? '' : `<div class="anat-input"><label class="visually-hidden" for="${id}-in">輸入一行指令</label><input id="${id}-in" type="text" autocomplete="off" spellcheck="false" placeholder="也可以貼上你看到的指令"><button type="button" class="btn small primary nb-press" data-go>拆解</button></div>`}
+      <div class="anat-line" aria-hidden="true"></div>
+      <ol class="anat-list" aria-live="polite"></ol>
+      <p style="margin:0;font-size:var(--fs-small);color:var(--ink-muted)">自己輸入的指令用簡化規則判斷，像「這個參數其實是前一個選項的值」這種情況，要看該程式的說明才能確定（1-3）。</p>
+    </div>`;
+  },
+  hydrate(el, props) {
+    const line = $('.anat-line', el);
+    const list = $('.anat-list', el);
+    const input = $('input', el);
+    function show(cmd, overrides) {
+      const parts = classifyTokens(shellTokens(cmd), overrides || {});
+      line.innerHTML = tokenChips(parts);
+      list.innerHTML = parts.map((p) => `<li><code class="k" style="--kc:var(--k-${p.kind})">${esc(p.t)}</code><span><strong>${esc(KIND_TEXT[p.kind])}</strong>・${md(p.note.replace(/^[^：]{1,12}：/, ''))}</span></li>`).join('');
+    }
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-preset]');
+      if (b) {
+        const p = props.presets[Number(b.dataset.preset)];
+        $$('[data-preset]', el).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        if (input) input.value = p.cmd;
+        show(p.cmd, p.notes);
+        return;
+      }
+      if (e.target.closest('[data-go]') && input.value.trim()) {
+        $$('[data-preset]', el).forEach((x) => x.setAttribute('aria-pressed', 'false'));
+        show(input.value.trim());
+      }
+    });
+    if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && input.value.trim()) { e.preventDefault(); show(input.value.trim()); } });
+    if (input) input.value = props.presets[0].cmd;
+    show(props.presets[0].cmd, props.presets[0].notes);
+  },
+};
+
+/* ---------- 管線動畫 ---------- */
+// props: { shell, stages: [{ cmd, out: [行], note, err?: [行] }] }
+Widgets.pipeflow = {
+  render(props) {
+    return `<div class="pf">
+      <div class="pf-stages">
+        ${props.stages.map((s, i) => `<div class="pf-stage" data-i="${i}">
+          <div class="pf-head"><span class="pf-label">第 ${i + 1} 站</span><code class="cmd">${esc(s.cmd)}</code></div>
+          <div class="pf-head"><span class="pf-label">流出的資料</span><ul class="pf-lines"></ul></div>
+        </div>`).join('')}
+      </div>
+      ${stepperControls('管線播放控制')}
+      <p class="tw-note" aria-live="polite"></p>
+    </div>`;
+  },
+  hydrate(el, props) {
+    const stages = $$('.pf-stage', el);
+    const note = $('.tw-note', el);
+    function draw(step) {
+      stages.forEach((st, i) => {
+        const s = props.stages[i];
+        st.classList.toggle('is-active', i === step);
+        st.classList.toggle('is-pending', i > step);
+        const lines = $('.pf-lines', st);
+        if (i > step) { lines.innerHTML = ''; return; }
+        if (i === step || !lines.innerHTML) {
+          lines.innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
+            + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
+        }
+      });
+      note.innerHTML = `<span class="step">第 ${step + 1} 站 / 共 ${props.stages.length} 站</span>${md(props.stages[step].note || '')}`;
+    }
+    makeStepper(el, props.stages.length, draw, { interval: 2800 });
+  },
+};
+
+
+/* ---------- 分類練習：每個項目點一個類別，立刻看對錯與解析 ---------- */
+// props: { buckets: [{ id, label, color? }], items: [{ text, answer, why }] }
+Widgets.classify = {
+  render(props) {
+    const btns = (i) => props.buckets.map((b) => `<button type="button" class="btn small nb-press" data-cls="${i}:${esc(b.id)}">${esc(b.label)}</button>`).join('');
+    return `<div class="cls">
+      <div class="cls-head"><span class="cls-score" aria-live="polite"></span><button type="button" class="btn small nb-press" data-cls-reset>重做</button></div>
+      <ol class="cls-list">${props.items.map((it, i) => `<li class="cls-item" data-i="${i}">
+        <div class="cls-text">${md(it.text)}</div>
+        <div class="cls-btns" role="group" aria-label="選一個類別">${btns(i)}</div>
+        <div class="cls-fb" aria-live="polite"></div>
+      </li>`).join('')}</ol>
+    </div>`;
+  },
+  hydrate(el, props) {
+    const label = (id) => (props.buckets.find((b) => b.id === id) || {}).label || id;
+    const answered = new Map();
+    const score = $('.cls-score', el);
+    function sync() {
+      const right = [...answered.values()].filter(Boolean).length;
+      score.textContent = `已作答 ${answered.size} / ${props.items.length}・答對 ${right}`;
+    }
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-cls-reset]')) {
+        answered.clear();
+        $$('.cls-item', el).forEach((li) => { li.className = 'cls-item'; $('.cls-fb', li).innerHTML = ''; $$('[data-cls]', li).forEach((b) => b.setAttribute('aria-pressed', 'false')); });
+        sync();
+        return;
+      }
+      const b = e.target.closest('[data-cls]');
+      if (!b) return;
+      const [i, id] = b.dataset.cls.split(':');
+      const it = props.items[Number(i)];
+      const li = b.closest('.cls-item');
+      const ok = it.answer === id;
+      answered.set(i, ok);
+      $$('[data-cls]', li).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      li.className = `cls-item ${ok ? 'is-right' : 'is-wrong'}`;
+      $('.cls-fb', li).innerHTML = `<strong>${ok ? '✓ 正確' : `✗ 應該是「${esc(label(it.answer))}」`}</strong>　${md(it.why)}`;
+      sync();
+    });
+    sync();
   },
 };
 
