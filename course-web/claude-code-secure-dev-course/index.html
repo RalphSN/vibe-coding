@@ -1239,6 +1239,11 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
   .sidebar-prefs .fontctl { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
   .sidebar-prefs .theme-side-btn, .sidebar-prefs .label { justify-self: start; }
 }
+
+/* 靜態階段圖：不播放、不動，只呈現結構 */
+.pf.is-static .pf-lines li { animation: none; }
+.pf.is-static .pf-stage + .pf-stage::before, .pf.is-static .pf-stage + .pf-stage::after { opacity: .55; }
+.pf-note { margin: var(--sp-2) 0 0; font-size: var(--fs-small); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -1903,7 +1908,7 @@ defineLessons({
         why: ['plan mode 讓「不改檔案」變成強制', '指定探索範圍，避免它讀遍整個 repo', '計畫要回答的問題，就是你審查時會問的問題', '在 plan mode 下這句是雙重保險，換到其他模式也成立'],
       }],
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '① 探索（plan mode）', out: ['讀 src/auth/', '找到 login()', '發現沒有速率限制'], note: '只讀：讓 Claude 先看懂相關的程式碼，不改任何東西。' },
           { cmd: '② 計畫', out: ['改 login.ts', '新增 rateLimit.ts', '補 3 個測試'], note: '請它列出要改哪些檔案、怎麼驗證。你在這裡修正方向最便宜。' },
           { cmd: '③ 實作', out: ['login.ts（+18）', 'rateLimit.ts（新）', 'npm test ✓'], note: '切回會改檔的模式，照計畫做，並跑測試驗證。' },
@@ -3589,7 +3594,7 @@ defineLessons({
         why: ['在主機上 bypass，等於讓一段夾帶指示的檔案能做你帳號能做的任何事', 'bypass 本身沒變，變的是它能碰到的範圍', '容器裡沒有長期憑證，被誘導也偷不走', '無人值守的成果一樣要經過人審查'],
       }],
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '權限規則', out: ['擋特定工具與指令'], note: '最輕：由 Claude Code 判斷要不要執行。' },
           { cmd: 'sandbox', out: ['作業系統擋 shell 的檔案與網路'], note: '作業系統層級，但檔案工具、hook、MCP 在牆外。' },
           { cmd: 'dev container', out: ['整個環境在容器裡', '不掛 ~/.ssh'], note: '擋得住碰你的電腦，擋不住容器內的東西被送出：用短期 token 與防火牆。' },
@@ -4116,7 +4121,7 @@ defineLessons({
         why: ['單靠最後一關，等於只有一層防護', '從第一行就檢查，Claude 在同一個 session 裡就修好', '開 PR 前自己先看一次，減少審查來回', 'AI 審查不取代既有的掃描器', '深度掃描成本高，定期對重要模組做就好'],
       }],
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '① 寫的當下', out: ['security-guidance plugin'], note: '最早、最便宜：一邊寫一邊提醒。' },
           { cmd: '② 分支', out: ['/security-review'], note: '整個分支看一次。' },
           { cmd: '③ 深度掃描', out: ['Claude Security plugin'], note: '整個 codebase 的深度檢查。' },
@@ -4493,7 +4498,7 @@ defineLessons({
         why: ['「變快」沒有終點，也無法驗證', '基準數字讓結果可以比較', '先提假設再動手，你可以選最划算的', '一次一處、每次都量，才知道誰有效', '把安全相關的機制列為不能改的條件'],
       }],
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '量基準', out: ['LCP 3.8s', 'INP 240ms', 'CLS 0.02'], note: '先量，有數字才知道改了有沒有用。' },
           { cmd: '只改一處', out: ['hero 圖改 AVIF＋preload'], note: '一次只改一個地方，才知道是誰造成差異。' },
           { cmd: '重新量', out: ['LCP 2.3s', 'INP 240ms', 'CLS 0.02'], note: '同樣的方法再量一次。' },
@@ -4876,7 +4881,7 @@ defineLessons({
         why: ['各自設定，安全程度取決於最鬆的那個人', '專案規則進版控，所有人拉下來就生效，也可以被審查', '組織底線放 managed，誰都改不掉', 'deny 永遠先評估：個人方便不會放寬團隊的限制'],
       }],
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: 'managed settings', out: ['組織底線', '後台或 MDM 派送'], note: '最高優先，個人改不掉。' },
           { cmd: '命令列旗標', out: ['--permission-mode …'], note: '這次啟動的設定。' },
           { cmd: '專案 local', out: ['.claude/settings.local.json'], note: '個人在這個專案的設定，不進版控。' },
@@ -7028,32 +7033,33 @@ Widgets.anatomy = {
 /* ---------- 管線動畫 ---------- */
 // props: { shell, stages: [{ cmd, out: [行], note, err?: [行] }] }
 Widgets.pipeflow = {
+  // static: true → 一次顯示全部階段的靜態圖（概念步驟用）；否則逐站播放（資料真的在流動時用）
   render(props) {
-    return `<div class="pf">
+    const st = !!props.static;
+    return `<div class="pf${st ? ' is-static' : ''}">
       <div class="pf-stages">
         ${props.stages.map((s, i) => `<div class="pf-stage" data-i="${i}">
-          <div class="pf-head"><span class="pf-label">第 ${i + 1} 站</span><code class="cmd">${esc(s.cmd)}</code></div>
-          <div class="pf-head"><span class="pf-label">流出的資料</span><ul class="pf-lines"></ul></div>
+          <div class="pf-head">${st ? '' : `<span class="pf-label">第 ${i + 1} 站</span>`}<code class="cmd">${esc(s.cmd)}</code></div>
+          <div class="pf-head"><span class="pf-label">${st ? '重點' : '流出的資料'}</span><ul class="pf-lines"></ul>${st && s.note ? `<p class="pf-note">${md(s.note)}</p>` : ''}</div>
         </div>`).join('')}
       </div>
-      ${stepperControls('管線播放控制')}
-      <p class="tw-note" aria-live="polite"></p>
+      ${st ? '' : `${stepperControls('管線播放控制')}<p class="tw-note" aria-live="polite"></p>`}
     </div>`;
   },
   hydrate(el, props) {
     const stages = $$('.pf-stage', el);
+    const fill = (st, s) => {
+      $('.pf-lines', st).innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
+        + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
+    };
+    if (props.static) { stages.forEach((st, i) => fill(st, props.stages[i])); return; }
     const note = $('.tw-note', el);
     function draw(step) {
       stages.forEach((st, i) => {
-        const s = props.stages[i];
         st.classList.toggle('is-active', i === step);
         st.classList.toggle('is-pending', i > step);
-        const lines = $('.pf-lines', st);
-        if (i > step) { lines.innerHTML = ''; return; }
-        if (i === step || !lines.innerHTML) {
-          lines.innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
-            + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
-        }
+        if (i > step) { $('.pf-lines', st).innerHTML = ''; return; }
+        if (i === step || !$('.pf-lines', st).innerHTML) fill(st, props.stages[i]);
       });
       note.innerHTML = `<span class="step">第 ${step + 1} 站 / 共 ${props.stages.length} 站</span>${md(props.stages[step].note || '')}`;
     }

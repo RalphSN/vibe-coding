@@ -1124,6 +1124,11 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 .figure svg text.t-dim { fill: #A3A3A3; }
 .figure svg text.t-err { fill: #FF8F8F; font-family: var(--font-mono); }
 .figure svg .mono, .figure svg text.mono { font-family: var(--font-mono); }
+
+/* 靜態階段圖：不播放、不動，只呈現結構 */
+.pf.is-static .pf-lines li { animation: none; }
+.pf.is-static .pf-stage + .pf-stage::before, .pf.is-static .pf-stage + .pf-stage::after { opacity: .55; }
+.pf-note { margin: var(--sp-2) 0 0; font-size: var(--fs-small); line-height: 1.6; }
 /* 來源 */
 .sources { margin-top: var(--sp-7); padding: var(--sp-4); border: var(--bw-sm) dashed var(--ink); font-size: var(--fs-small); }
 .sources ol { margin: var(--sp-2) 0 0; }
@@ -7868,32 +7873,33 @@ Widgets.fstree = {
 /* ---------- 管線動畫 ---------- */
 // props: { shell, stages: [{ cmd, out: [行], note, err?: [行] }] }
 Widgets.pipeflow = {
+  // static: true → 一次顯示全部階段的靜態圖（概念步驟用）；否則逐站播放（資料真的在流動時用）
   render(props) {
-    return `<div class="pf">
+    const st = !!props.static;
+    return `<div class="pf${st ? ' is-static' : ''}">
       <div class="pf-stages">
         ${props.stages.map((s, i) => `<div class="pf-stage" data-i="${i}">
-          <div class="pf-head"><span class="pf-label">第 ${i + 1} 站</span><code class="cmd">${esc(s.cmd)}</code></div>
-          <div class="pf-head"><span class="pf-label">流出的資料</span><ul class="pf-lines"></ul></div>
+          <div class="pf-head">${st ? '' : `<span class="pf-label">第 ${i + 1} 站</span>`}<code class="cmd">${esc(s.cmd)}</code></div>
+          <div class="pf-head"><span class="pf-label">${st ? '重點' : '流出的資料'}</span><ul class="pf-lines"></ul>${st && s.note ? `<p class="pf-note">${md(s.note)}</p>` : ''}</div>
         </div>`).join('')}
       </div>
-      ${stepperControls('管線播放控制')}
-      <p class="tw-note" aria-live="polite"></p>
+      ${st ? '' : `${stepperControls('管線播放控制')}<p class="tw-note" aria-live="polite"></p>`}
     </div>`;
   },
   hydrate(el, props) {
     const stages = $$('.pf-stage', el);
+    const fill = (st, s) => {
+      $('.pf-lines', st).innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
+        + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
+    };
+    if (props.static) { stages.forEach((st, i) => fill(st, props.stages[i])); return; }
     const note = $('.tw-note', el);
     function draw(step) {
       stages.forEach((st, i) => {
-        const s = props.stages[i];
         st.classList.toggle('is-active', i === step);
         st.classList.toggle('is-pending', i > step);
-        const lines = $('.pf-lines', st);
-        if (i > step) { lines.innerHTML = ''; return; }
-        if (i === step || !lines.innerHTML) {
-          lines.innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
-            + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
-        }
+        if (i > step) { $('.pf-lines', st).innerHTML = ''; return; }
+        if (i === step || !$('.pf-lines', st).innerHTML) fill(st, props.stages[i]);
       });
       note.innerHTML = `<span class="step">第 ${step + 1} 站 / 共 ${props.stages.length} 站</span>${md(props.stages[step].note || '')}`;
     }
