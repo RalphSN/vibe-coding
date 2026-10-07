@@ -1274,6 +1274,11 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
   .sidebar-prefs .fontctl { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
   .sidebar-prefs .theme-side-btn, .sidebar-prefs .label { justify-self: start; }
 }
+
+/* 靜態階段圖：不播放、不動，只呈現結構 */
+.pf.is-static .pf-lines li { animation: none; }
+.pf.is-static .pf-stage + .pf-stage::before, .pf.is-static .pf-stage + .pf-stage::after { opacity: .55; }
+.pf-note { margin: var(--sp-2) 0 0; font-size: var(--fs-small); line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -1854,7 +1859,7 @@ defineLessons({
       }),
       caption: '前三站學「怎麼說」，後兩站學「怎麼交辦、怎麼檢查」。模組 11 是速查表與範本庫，隨時可以翻。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '① 懂模型', out: ['token、context、幻覺', 'thinking 與 effort'], note: '模組 1：先知道模型怎麼產生文字，才知道 prompt 為什麼有效。' },
           { cmd: '② 會說話', out: ['清楚具體、背景目的', '範例、XML 標籤'], note: '模組 2–3：把需求說清楚。' },
           { cmd: '③ 會給情境', out: ['context engineering', 'CLAUDE.md、skills'], note: '模組 4：給對的資料，比換措辭更重要。' },
@@ -2176,7 +2181,7 @@ defineLessons({
       }),
       caption: '每次回應時，模型看到的是整個框；昨天的另一個對話不在框裡，它就看不到。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '對話 A：寫履歷', out: ['你的經歷', '目標職缺', '草稿 v1'], note: '這個對話的 context 裡有這些內容。' },
           { cmd: '開新對話 B', out: ['（空的）'], note: '新對話看不到 A 的內容：對話之間預設不共享記憶。' },
           { cmd: '在 B 裡說「照剛剛那樣改」', out: ['模型：我不知道「剛剛」是什麼'], note: '它只看得到 context 裡的東西。' },
@@ -2611,7 +2616,7 @@ defineLessons({
     },
     model: {
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '只有規則', out: ['「不要用省略號」'], note: '模型照做，但不知道為什麼，遇到類似情況不會推廣。' },
           { cmd: '加上原因', out: ['「回應會被語音念出來，', '朗讀引擎念不出省略號」'], note: '它理解了目的。' },
           { cmd: '自動推廣', out: ['也避免了表情符號', '也避免了特殊符號'], note: '說明原因，模型能把規則用到你沒寫到的地方。' },
@@ -2811,7 +2816,7 @@ defineLessons({
     },
     model: {
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '零範例', out: ['格式每次不同'], note: '只用文字描述格式，輸出容易飄。' },
           { cmd: '加 3 個範例', out: ['<example>…</example> ×3'], note: '相關、多樣，用標籤包起來。' },
           { cmd: '加 1 個反例', out: ['<bad_example> + 錯在哪'], note: '明確標示並說明原因。' },
@@ -3173,7 +3178,7 @@ defineLessons({
     },
     model: {
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '任務', out: ['判斷這份合約有沒有違約風險'], note: '需要稽核推理過程的情況。' },
           { cmd: '<analysis>', out: ['條款 4：付款 60 天', '條款 9：沒有違約金'], note: '推理寫在這裡，給人檢查。' },
           { cmd: '<answer>', out: ['中度風險：付款期長、無罰則'], note: '結論分開放，程式可以只取這段。' },
@@ -3283,7 +3288,7 @@ defineLessons({
       }),
       caption: '每一步都是一次獨立的呼叫，所以你可以在中間記錄、檢查、決定要不要繼續。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '① 草稿', out: ['產品說明 v1'], note: '第一個 prompt 只負責寫。' },
           { cmd: '② 審查', out: ['缺價格', '第 2 段太長'], note: '另一個 prompt 依標準獨立審查，不要讓同一段對話自己誇自己。' },
           { cmd: '③ 修訂', out: ['產品說明 v2'], note: '依審查意見改。每一步的結果都能檢查。' },
@@ -3385,7 +3390,7 @@ defineLessons({
       }),
       caption: '官方建議的結構：資料在上、問題在下。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '長文件放上面', out: ['<document source="年報.pdf">', '…12 萬字…'], note: '長資料在上、問題在下。' },
           { cmd: '先引用', out: ['<quotes>', '「營收成長 12%」p.14', '</quotes>'], note: '先找出相關原文。' },
           { cmd: '再作答', out: ['<answer>營收成長主要來自…</answer>'], note: '答案能對回原文，方便核對。' },
@@ -5230,7 +5235,7 @@ defineLessons({
       }),
       caption: 'hook 由 Claude Code 執行，不靠模型自律；Claude 收到原因後，會換別的做法。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: 'PreToolUse', out: ['Bash: rm -rf /'], note: '工具執行前觸發：可以 exit 2 擋下。' },
           { cmd: 'PostToolUse', out: ['Edit: app.ts', '→ 自動跑 prettier'], note: '工具執行後觸發：適合格式化、檢查。' },
           { cmd: 'Stop', out: ['→ 跑 npm test'], note: 'Claude 想結束時觸發：可以要求它先通過測試。' },
@@ -5556,7 +5561,7 @@ defineLessons({
       }),
       caption: '① ② 在 plan mode 裡，Claude 只讀不改；確認計畫後才切換模式動手。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '探索（plan mode）', out: ['讀相關檔案'], note: '先看懂。' },
           { cmd: '規劃（plan mode）', out: ['計畫：改 3 個檔', '用 Ctrl+G 修改計畫'], note: '在計畫階段修正方向最便宜。' },
           { cmd: '實作', out: ['改檔', '跑測試 ✓'], note: '實作的 prompt 要包含跑測試。' },
@@ -5750,7 +5755,7 @@ defineLessons({
       }),
       caption: '越往右越不靠主 agent 自律，但也越花時間；依風險選。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: 'prompt', out: ['「完成後跑 npm test」'], note: '最弱：請求。' },
           { cmd: '/goal', out: ['設定完成目標'], note: '讓它持續朝目標檢查。' },
           { cmd: 'Stop hook', out: ['測試沒過就不能結束'], note: '強制。' },
@@ -5854,7 +5859,7 @@ defineLessons({
       }),
       caption: '訪談的對話很長；新 session 只帶著規格開始，context 比較乾淨。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '訪談', out: ['它問你 10 個問題'], note: '大功能先讓它訪談你。' },
           { cmd: 'SPEC.md', out: ['需求、邊界、驗收條件'], note: '寫成檔案。' },
           { cmd: '新 session 實作', out: ['讀 SPEC.md', 'progress.txt'], note: '狀態寫進檔案，不靠對話記憶。' },
@@ -6060,7 +6065,7 @@ defineLessons({
       }),
       caption: '沒有 ①，後面三步都沒有意義：你不知道在量什麼。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '成功標準', out: ['分類正確率 ≥ 90%'], note: '先定標準，再改 prompt。' },
           { cmd: '測試集', out: ['15 筆真實輸入', '含 3 筆邊界情況'], note: '10–20 筆就夠。' },
           { cmd: 'v1 跑分', out: ['12 / 15'], note: '能自動評分就自動。' },
@@ -6157,7 +6162,7 @@ defineLessons({
       }),
       caption: '數字是示意。v3 的分數沒變，代表格式不是瓶頸；你不一定要退回 v2，但你知道了原因。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: 'v1', out: ['分數 12/15'], note: '基準。' },
           { cmd: 'v2：只加範例', out: ['分數 14/15', '記錄：範例有效'], note: '一次只改一個變因。' },
           { cmd: 'v3：只改語氣', out: ['分數 14/15', '記錄：語氣無影響'], note: '分數沒變也是答案。' },
@@ -9077,32 +9082,33 @@ Widgets.anatomy = {
 /* ---------- 管線動畫 ---------- */
 // props: { shell, stages: [{ cmd, out: [行], note, err?: [行] }] }
 Widgets.pipeflow = {
+  // static: true → 一次顯示全部階段的靜態圖（概念步驟用）；否則逐站播放（資料真的在流動時用）
   render(props) {
-    return `<div class="pf">
+    const st = !!props.static;
+    return `<div class="pf${st ? ' is-static' : ''}">
       <div class="pf-stages">
         ${props.stages.map((s, i) => `<div class="pf-stage" data-i="${i}">
-          <div class="pf-head"><span class="pf-label">第 ${i + 1} 站</span><code class="cmd">${esc(s.cmd)}</code></div>
-          <div class="pf-head"><span class="pf-label">流出的資料</span><ul class="pf-lines"></ul></div>
+          <div class="pf-head">${st ? '' : `<span class="pf-label">第 ${i + 1} 站</span>`}<code class="cmd">${esc(s.cmd)}</code></div>
+          <div class="pf-head"><span class="pf-label">${st ? '重點' : '流出的資料'}</span><ul class="pf-lines"></ul>${st && s.note ? `<p class="pf-note">${md(s.note)}</p>` : ''}</div>
         </div>`).join('')}
       </div>
-      ${stepperControls('管線播放控制')}
-      <p class="tw-note" aria-live="polite"></p>
+      ${st ? '' : `${stepperControls('管線播放控制')}<p class="tw-note" aria-live="polite"></p>`}
     </div>`;
   },
   hydrate(el, props) {
     const stages = $$('.pf-stage', el);
+    const fill = (st, s) => {
+      $('.pf-lines', st).innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
+        + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
+    };
+    if (props.static) { stages.forEach((st, i) => fill(st, props.stages[i])); return; }
     const note = $('.tw-note', el);
     function draw(step) {
       stages.forEach((st, i) => {
-        const s = props.stages[i];
         st.classList.toggle('is-active', i === step);
         st.classList.toggle('is-pending', i > step);
-        const lines = $('.pf-lines', st);
-        if (i > step) { lines.innerHTML = ''; return; }
-        if (i === step || !lines.innerHTML) {
-          lines.innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
-            + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
-        }
+        if (i > step) { $('.pf-lines', st).innerHTML = ''; return; }
+        if (i === step || !$('.pf-lines', st).innerHTML) fill(st, props.stages[i]);
       });
       note.innerHTML = `<span class="step">第 ${step + 1} 站 / 共 ${props.stages.length} 站</span>${md(props.stages[step].note || '')}`;
     }

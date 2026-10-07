@@ -1209,6 +1209,15 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   .ladder-bar, .rc-list li, .kv-row i { animation: none !important; transition: none !important; }
 }
+
+/* 靜態階段圖：不播放、不動，只呈現結構 */
+.pf.is-static .pf-lines li { animation: none; }
+.pf.is-static .pf-stage + .pf-stage::before, .pf.is-static .pf-stage + .pf-stage::after { opacity: .55; }
+.pf-note { margin: var(--sp-2) 0 0; font-size: var(--fs-small); line-height: 1.6; }
+
+.ladder-bar { transform: none !important; opacity: 1 !important; transition: none; }
+.ladder-notes { margin: 0; padding-left: 1.4em; display: grid; gap: var(--sp-2); }
+.ladder-notes li { margin: 0; line-height: 1.7; }
 /* 來源 */
 .sources { margin-top: var(--sp-7); padding: var(--sp-4); border: var(--bw-sm) dashed var(--ink); font-size: var(--fs-small); }
 .sources ol { margin: var(--sp-2) 0 0; }
@@ -1668,7 +1677,6 @@ defineLessons({
       </svg>`,
       caption: '卡帕西介紹完前三級，每次都補一句「But even better」，帶出下一級。',
       blocks: [
-        { type: 'widget', name: 'ladder', props: {} },
         { type: 'table', caption: '4 級比較', head: ['', '1 規範文字', '2 一張圖', '3 互動網頁', '4 解說影片'], rows: [
           ['要準備什麼', '不用', '不用', '瀏覽器就能開', '能執行程式的 AI agent 環境'],
           ['花的時間', '最少', '少', '中', '最多（要渲染）'],
@@ -2130,7 +2138,7 @@ defineLessons({
       caption: '影片和前三級最大的差別：AI 要真的在電腦上執行程式。',
       blocks: [
         { type: 'code', lang: 'text', title: '卡帕西的指令範例', code: '製作一支主題為[主題]、3b1b（3Blue1Brown）風格的解說影片。用我的ElevenLabs API key配音。' },
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '寫分鏡', out: ['1 一個 token 出現', '2 前面的 K、V 重算（紅）', '3 改成存起來（綠）'], note: 'AI 先規劃每一幕要演什麼。（示意）' },
           { cmd: '寫 Manim 程式', out: ['scene.py'], note: '用 Python 描述畫面：方塊出現、移動、變色。' },
           { cmd: '執行與渲染', out: ['渲染第 1 幕…', '渲染第 2 幕…', 'kv_cache.mp4'], note: 'AI agent 在你的電腦上執行程式，把畫面算成影片檔，要花一些時間。' },
@@ -2248,7 +2256,7 @@ defineLessons({
       </svg>`,
       caption: '原文最後一段的三個建議，就是新手的完整路線。',
       blocks: [
-        { type: 'widget', name: 'pipeflow', props: { stages: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
           { cmd: '問法 A：請解釋 KV cache', out: ['5 段文字', '一長串優化技術名詞'], note: '平常的問法。（示意：原文說一般提問版長得多）' },
           { cmd: '問法 B：請用 ASD-STE100 的原則，以中文解釋 KV cache', out: ['短句', '編號步驟', '一句一件事'], note: '同一個問題再問一次，差別馬上看得出來。' },
           { cmd: '追問：剛剛省略了哪些優化技術？請補上', out: ['補上細節'], note: '大方向懂了，再請 AI 補上省略的部分，比一開始就啃長文省力。' },
@@ -4072,32 +4080,33 @@ Widgets.anatomy = {
 /* ---------- 管線動畫 ---------- */
 // props: { shell, stages: [{ cmd, out: [行], note, err?: [行] }] }
 Widgets.pipeflow = {
+  // static: true → 一次顯示全部階段的靜態圖（概念步驟用）；否則逐站播放（資料真的在流動時用）
   render(props) {
-    return `<div class="pf">
+    const st = !!props.static;
+    return `<div class="pf${st ? ' is-static' : ''}">
       <div class="pf-stages">
         ${props.stages.map((s, i) => `<div class="pf-stage" data-i="${i}">
-          <div class="pf-head"><span class="pf-label">第 ${i + 1} 站</span><code class="cmd">${esc(s.cmd)}</code></div>
-          <div class="pf-head"><span class="pf-label">流出的資料</span><ul class="pf-lines"></ul></div>
+          <div class="pf-head">${st ? '' : `<span class="pf-label">第 ${i + 1} 站</span>`}<code class="cmd">${esc(s.cmd)}</code></div>
+          <div class="pf-head"><span class="pf-label">${st ? '重點' : '流出的資料'}</span><ul class="pf-lines"></ul>${st && s.note ? `<p class="pf-note">${md(s.note)}</p>` : ''}</div>
         </div>`).join('')}
       </div>
-      ${stepperControls('管線播放控制')}
-      <p class="tw-note" aria-live="polite"></p>
+      ${st ? '' : `${stepperControls('管線播放控制')}<p class="tw-note" aria-live="polite"></p>`}
     </div>`;
   },
   hydrate(el, props) {
     const stages = $$('.pf-stage', el);
+    const fill = (st, s) => {
+      $('.pf-lines', st).innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
+        + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
+    };
+    if (props.static) { stages.forEach((st, i) => fill(st, props.stages[i])); return; }
     const note = $('.tw-note', el);
     function draw(step) {
       stages.forEach((st, i) => {
-        const s = props.stages[i];
         st.classList.toggle('is-active', i === step);
         st.classList.toggle('is-pending', i > step);
-        const lines = $('.pf-lines', st);
-        if (i > step) { lines.innerHTML = ''; return; }
-        if (i === step || !lines.innerHTML) {
-          lines.innerHTML = s.out.map((l, j) => `<li style="--i:${j}">${esc(l)}</li>`).join('')
-            + (s.err || []).map((l, j) => `<li class="err" style="--i:${s.out.length + j}">${esc(l)}</li>`).join('');
-        }
+        if (i > step) { $('.pf-lines', st).innerHTML = ''; return; }
+        if (i === step || !$('.pf-lines', st).innerHTML) fill(st, props.stages[i]);
       });
       note.innerHTML = `<span class="step">第 ${step + 1} 站 / 共 ${props.stages.length} 站</span>${md(props.stages[step].note || '')}`;
     }
@@ -4167,34 +4176,15 @@ const LADDER_NOTES = [
   '「But even better」→ 第 4 級：量身打造一支 3Blue1Brown 風格的解說影片，卡帕西最看好的形式。',
 ];
 Widgets.ladder = {
+  // 靜態圖：4 級一次全部呈現（概念比較，不需要動畫）
   render(props) {
     return `<div class="ladder${props.hero ? ' is-hero' : ''}">
-      <div class="ladder-steps" aria-hidden="true">${FORMATS.map((f, i) => `<div class="ladder-step" data-i="${i}" style="--h:${(i + 1) * 25}%;--c:${f.color}">
+      <div class="ladder-steps" aria-hidden="true">${FORMATS.map((f, i) => `<div class="ladder-step is-on" data-i="${i}" style="--h:${(i + 1) * 25}%;--c:${f.color}">
         ${i > 0 ? '<span class="ladder-better">But even better</span>' : ''}
         <div class="ladder-bar"><span class="ladder-n">${f.n}</span><strong>${esc(f.name)}</strong><small>${esc(f.sub)}</small></div>
       </div>`).join('')}</div>
-      ${props.hero ? '' : stepperControls('階梯播放控制')}
-      <p class="tw-note" aria-live="polite"></p>
+      ${props.hero ? '<p class="tw-note">一級比一級好懂，也一級比一級更費工。</p>' : `<ol class="ladder-notes">${LADDER_NOTES.map((n) => `<li>${md(n)}</li>`).join('')}</ol>`}
     </div>`;
-  },
-  hydrate(el, props) {
-    const steps = $$('.ladder-step', el);
-    const note = $('.tw-note', el);
-    const draw = (k) => {
-      steps.forEach((s, i) => s.classList.toggle('is-on', i <= k));
-      steps.forEach((s, i) => s.classList.toggle('is-now', i === k));
-      note.innerHTML = md(LADDER_NOTES[k]);
-    };
-    if (!props.hero) { makeStepper(el, 4, draw, { interval: 2600 }); return; }
-    if (prefersReducedMotion()) { draw(3); return; }
-    let k = 0;
-    draw(0);
-    const timer = window.setInterval(() => {
-      if (!document.body.contains(el)) { window.clearInterval(timer); return; }
-      k = (k + 1) % 5;
-      if (k === 4) { steps.forEach((s) => s.classList.remove('is-on', 'is-now')); note.textContent = '一級比一級好懂，也一級比一級更費工。'; return; }
-      draw(k);
-    }, 2200);
   },
 };
 
