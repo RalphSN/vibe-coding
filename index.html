@@ -3222,7 +3222,7 @@ async function openBook(link, site) {
   const { vw, vh, camera, blob } = stage;
   const startEye = { x: caseCanvasRect.left + eyeX, y: caseCanvasRect.top + eyeY };
   setOffAxisCamera(camera, startEye.x, startEye.y, camDist, vw, vh);
-  stage.root.addEventListener('click', () => { window.location.href = link.href; });
+  stage.root.addEventListener('click', () => { goTo(link.href, site); });
   stage.render();
 
   const H = Math.min(COVER_MAX_HEIGHT, vh - 120, ((vw - 48) / 2) * COVER_RATIO);
@@ -3284,8 +3284,30 @@ async function openBook(link, site) {
 
   // 5. 讀取條跑完就跳轉
   await tween({ duration: 450, easing: EASE_OUT, update: (e) => book.setProgress(e) });
-  window.location.href = link.href;
+  goTo(link.href, site);
 }
+
+/* 跳轉：外部連結在手機上常會交給 App（例如 YouTube），原頁面不會卸載、會停在翻開的書。
+   記下「正在跳轉」，回到這一頁（重新可見）或外部連結幾秒後仍停在這裡，就收回書櫃 */
+let pendingNav = null;
+const EXTERNAL_RESET_MS = 3500;
+function goTo(href, site) {
+  pendingNav = { href, at: Date.now() };
+  if (site && site.external) {
+    window.setTimeout(() => { if (pendingNav && document.visibilityState === 'visible') backToShelf(); }, EXTERNAL_RESET_MS);
+  }
+  window.location.href = href;
+}
+function backToShelf() {
+  pendingNav = null;
+  resetOpening();
+  hideCard();
+  renderShelfDom();
+  if (shelf) shelf.build();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && pendingNav) backToShelf();
+});
 
 function resetOpening() {
   tweens.clear();
@@ -3303,7 +3325,7 @@ function startOpen(link, site) {
   hideCard();
   openBook(link, site).catch((err) => {
     console.warn(`開書動畫失敗，直接前往「${link.href}」：`, err);
-    window.location.href = link.href;
+    goTo(link.href, site);
   });
 }
 
@@ -3347,7 +3369,7 @@ function setupOpening() {
     hoveredId = null;
     updateHover();
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion || !shelf || !shelf.books.has(site.id)) window.location.href = link.href;
+    if (reduceMotion || !shelf || !shelf.books.has(site.id)) goTo(link.href, site);
     else startOpen(link, site);
   });
   document.addEventListener('click', (event) => {
@@ -3459,9 +3481,7 @@ window.addEventListener('resize', () => {
 // 從課程按返回時（bfcache），收掉打開到一半的書並更新進度
 window.addEventListener('pageshow', (event) => {
   if (!event.persisted) return;
-  resetOpening();
-  renderShelfDom();
-  if (shelf) shelf.build();
+  backToShelf();
 });
 </script>
 </body>
