@@ -310,6 +310,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   transition: opacity 220ms var(--ease-out), transform 420ms var(--ease-out), left 260ms var(--ease-out), top 260ms var(--ease-out);
 }
 .book-card.is-visible { opacity: 1; transform: rotate(-0.6deg); }
+.book-card.is-pinned { pointer-events: auto; }
+.card-enter { display: block; width: 100%; margin: 0 0 10px; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 10px; background: var(--ink); color: #f4ead2; font: 600 16px/1.2 inherit; cursor: pointer; }
+.card-enter:focus-visible { outline: 3px solid #b8862b; outline-offset: 2px; }
 .book-card.is-sheet { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); top: auto; width: auto; }
 .scroll-body {
   position: relative;
@@ -833,7 +836,7 @@ const STRINGS = {
     themeGroup: '配色', auto: '自動', light: '淺色', dark: '深色', langGroup: '語言',
     shelfLabel: '課程書櫃', rowLabel: (n) => `第 ${n} 層`,
     summary: (books, lessons, done) => `${books} 本 · ${lessons} 單元 · 已讀 ${done}`,
-    hintHover: '游標停在書背上看介紹，點一下打開。', hintTouch: '點一下書背打開。',
+    hintHover: '游標停在書背上看介紹，點一下打開。', hintTouch: '點書背看介紹，再按「進入」打開。', enter: '進入',
     bookLabel: (title, lessons, done) => `${title}，${lessons} 個單元，已讀 ${done} 個`,
     path: '路徑', content: '內容', status: '狀態', read: '已讀', verified: '查證',
     contentValue: (m, l) => `${m} 模組 · ${l} 單元`,
@@ -850,7 +853,7 @@ const STRINGS = {
     themeGroup: 'Appearance', auto: 'Auto', light: 'Light', dark: 'Dark', langGroup: 'Language',
     shelfLabel: 'Course bookshelf', rowLabel: (n) => `Shelf ${n}`,
     summary: (books, lessons, done) => `${books} books · ${lessons} lessons · ${done} read`,
-    hintHover: 'Hover a spine to see details. Click to open.', hintTouch: 'Tap a spine to open.',
+    hintHover: 'Hover a spine to see details. Click to open.', hintTouch: 'Tap a spine for details, then tap Enter.', enter: 'Enter',
     bookLabel: (title, lessons, done) => `${title}, ${lessons} lessons, ${done} read`,
     path: 'Path', content: 'Content', status: 'Status', read: 'Read', verified: 'Verified',
     contentValue: (m, l) => `${m} modules · ${l} lessons`,
@@ -1091,6 +1094,9 @@ function renderShelfDom() {
 
 /* ---------- 介紹卡：浮在書旁邊；窄螢幕改成貼底的卡片 ---------- */
 let cardId = null;
+/* 手機、平板沒有 hover：第一次點書背先打開介紹卡，按卡上的「進入」才打開書 */
+const isTouchUI = () => window.matchMedia('(hover: none)').matches;
+let pinnedId = null;
 
 /** 羊皮紙左右兩側不規則的破損邊（百分比 polygon），每張卡都不一樣 */
 function tornEdges() {
@@ -1111,6 +1117,7 @@ function cardHtml(site) {
     return `
     <span class="scroll-roll top" aria-hidden="true"></span>
     <div class="scroll-body" style="clip-path:${tornEdges()}">
+    ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))} →</button>` : ''}
     <h2>${phrasesHtml(text.titlePhrases)}</h2>
     <p>${escapeHtml(text.desc)}</p>
     <div class="card-progress" aria-hidden="true"></div>
@@ -1127,6 +1134,7 @@ function cardHtml(site) {
   return `
     <span class="scroll-roll top" aria-hidden="true"></span>
     <div class="scroll-body" style="clip-path:${tornEdges()}">
+    ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))} →</button>` : ''}
     <h2>${phrasesHtml(text.titlePhrases)}</h2>
     <p>${escapeHtml(text.desc)}</p>
     <div class="card-progress" aria-hidden="true"><span style="--ratio:${done / site.lessons};--accent:${site.color}"></span></div>
@@ -1165,7 +1173,8 @@ function showCard(site, link) {
 
 function hideCard() {
   const card = document.getElementById('book-card');
-  if (card) card.classList.remove('is-visible');
+  if (card) card.classList.remove('is-visible', 'is-pinned');
+  pinnedId = null;
 }
 
 /* 停在哪本書上：介紹卡與 3D 書抬起、發光共用 */
@@ -1179,6 +1188,7 @@ function updateHover() {
 function setupInspector() {
   const rows = document.getElementById('rows');
   rows.addEventListener('pointerover', (event) => {
+    if (event.pointerType === 'touch' || pinnedId) return;
     const site = findSite(event.target);
     if (!site) return;
     showCard(site, event.target.closest('.book'));
@@ -1192,6 +1202,7 @@ function setupInspector() {
     shelf.setTilt(book.dataset.id, (event.clientX - rect.left) / rect.width - 0.5, (event.clientY - rect.top) / rect.height - 0.5);
   });
   rows.addEventListener('pointerout', (event) => {
+    if (event.pointerType === 'touch' || pinnedId) return;
     const from = findSite(event.target);
     const to = findSite(event.relatedTarget);
     if (from && (!to || to.id !== from.id)) {
@@ -1208,7 +1219,7 @@ function setupInspector() {
     updateHover();
   });
   rows.addEventListener('focusout', (event) => {
-    if (!rows.contains(event.relatedTarget)) hideCard();
+    if (!rows.contains(event.relatedTarget) && !pinnedId) hideCard();
     focusedId = null;
     updateHover();
   });
@@ -3285,10 +3296,40 @@ function setupOpening() {
     // 開新分頁、新視窗的修飾鍵點擊交給瀏覽器
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
     const site = findSite(link);
+    if (site && isTouchUI()) {
+      event.preventDefault();
+      showCard(site, link);
+      document.getElementById('book-card').classList.add('is-pinned');
+      pinnedId = site.id;
+      hoveredId = site.id;
+      updateHover();
+      return;
+    }
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!site || reduceMotion || !shelf || !shelf.books.has(site.id)) return;
     event.preventDefault();
     startOpen(link, site);
+  });
+
+  // 介紹卡上的「進入」：和桌面點書一樣的開書動畫；點卡片以外的地方收起
+  document.getElementById('book-card').addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-enter]');
+    if (!btn) return;
+    const link = rows.querySelector(`.book[data-id="${CSS.escape(btn.dataset.enter)}"]`);
+    const site = link && findSite(link);
+    if (!link || !site) return;
+    hideCard();
+    hoveredId = null;
+    updateHover();
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion || !shelf || !shelf.books.has(site.id)) window.location.href = link.href;
+    else startOpen(link, site);
+  });
+  document.addEventListener('click', (event) => {
+    if (!pinnedId || event.target.closest('#book-card') || event.target.closest('.book')) return;
+    hideCard();
+    hoveredId = null;
+    updateHover();
   });
 
   // 抓住書往外拖：沒放開就跟著游標被拉出來，拖到 PULL_DISTANCE 直接打開；中途放開就彈回去。
