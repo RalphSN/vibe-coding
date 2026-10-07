@@ -8,7 +8,7 @@
 <meta name="color-scheme" content="light dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&family=LXGW+WenKai+TC:wght@700&display=swap">
 <script>
   /* 在第一次繪製前套用主題，避免深色模式閃白 */
   try {
@@ -311,16 +311,16 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 }
 .book-card.is-visible { opacity: 1; transform: rotate(-0.6deg); }
 .book-card.is-pinned { pointer-events: auto; }
-.card-enter { display: block; width: 100%; margin: 0 0 10px; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 10px; background: var(--ink); color: #f4ead2; font: 600 16px/1.2 inherit; cursor: pointer; }
-.card-enter:focus-visible { outline: 3px solid #b8862b; outline-offset: 2px; }
+/* 前往閱讀：朱紅印章，楷書字 */
+.card-enter { display: block; margin: 16px auto 2px; padding: 8px 18px; border: 2.5px solid #9b2a1c; outline: 1px solid #9b2a1c; outline-offset: 3px; border-radius: 4px; background: rgba(155, 42, 28, 0.06); color: #9b2a1c; font-family: "LXGW WenKai TC", "Kaiti TC", "DFKai-SB", "BiauKai", serif; font-weight: 700; font-size: 22px; letter-spacing: 0.2em; line-height: 1.2; transform: rotate(-2deg); cursor: pointer; }
+.card-enter:active { background: rgba(155, 42, 28, 0.16); }
+.card-enter:focus-visible { outline: 3px solid #b8862b; outline-offset: 4px; }
 .book-card.is-sheet { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); top: auto; width: auto; }
 .scroll-body {
   position: relative;
   padding: 22px 26px 20px;
   background-color: #e6d3a8;
   background-image:
-    /* 摺痕 */
-    linear-gradient(180deg, transparent 32%, rgba(110, 75, 30, 0.12) 33%, rgba(255, 245, 220, 0.25) 33.6%, transparent 35%, transparent 65%, rgba(110, 75, 30, 0.12) 66%, rgba(255, 245, 220, 0.25) 66.6%, transparent 68%),
     /* 深淺：角落的陳舊色塊 */
     radial-gradient(ellipse 30% 18% at 94% 96%, rgba(60, 32, 8, 0.45), transparent 70%),
     radial-gradient(ellipse 22% 14% at 3% 4%, rgba(60, 32, 8, 0.4), transparent 70%),
@@ -836,7 +836,7 @@ const STRINGS = {
     themeGroup: '配色', auto: '自動', light: '淺色', dark: '深色', langGroup: '語言',
     shelfLabel: '課程書櫃', rowLabel: (n) => `第 ${n} 層`,
     summary: (books, lessons, done) => `${books} 本 · ${lessons} 單元 · 已讀 ${done}`,
-    hintHover: '游標停在書背上看介紹，點一下打開。', hintTouch: '點書背看介紹，再按「進入」打開。', enter: '進入',
+    hintHover: '游標停在書背上看介紹，點一下打開。', hintTouch: '點書背看介紹，再按「前往閱讀」打開。', enter: '前往閱讀',
     bookLabel: (title, lessons, done) => `${title}，${lessons} 個單元，已讀 ${done} 個`,
     path: '路徑', content: '內容', status: '狀態', read: '已讀', verified: '查證',
     contentValue: (m, l) => `${m} 模組 · ${l} 單元`,
@@ -853,7 +853,7 @@ const STRINGS = {
     themeGroup: 'Appearance', auto: 'Auto', light: 'Light', dark: 'Dark', langGroup: 'Language',
     shelfLabel: 'Course bookshelf', rowLabel: (n) => `Shelf ${n}`,
     summary: (books, lessons, done) => `${books} books · ${lessons} lessons · ${done} read`,
-    hintHover: 'Hover a spine to see details. Click to open.', hintTouch: 'Tap a spine for details, then tap Enter.', enter: 'Enter',
+    hintHover: 'Hover a spine to see details. Click to open.', hintTouch: 'Tap a spine for details, then tap Read.', enter: 'Read',
     bookLabel: (title, lessons, done) => `${title}, ${lessons} lessons, ${done} read`,
     path: 'Path', content: 'Content', status: 'Status', read: 'Read', verified: 'Verified',
     contentValue: (m, l) => `${m} modules · ${l} lessons`,
@@ -1117,7 +1117,6 @@ function cardHtml(site) {
     return `
     <span class="scroll-roll top" aria-hidden="true"></span>
     <div class="scroll-body" style="clip-path:${tornEdges()}">
-    ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))} →</button>` : ''}
     <h2>${phrasesHtml(text.titlePhrases)}</h2>
     <p>${escapeHtml(text.desc)}</p>
     <div class="card-progress" aria-hidden="true"></div>
@@ -1127,6 +1126,7 @@ function cardHtml(site) {
       <dt>${t('status')}</dt><dd>${escapeHtml(t('externalLink'))}</dd>
       <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>
+    ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))}</button>` : ''}
     </div>
     <span class="scroll-roll bottom" aria-hidden="true"></span>`;
   }
@@ -1134,7 +1134,6 @@ function cardHtml(site) {
   return `
     <span class="scroll-roll top" aria-hidden="true"></span>
     <div class="scroll-body" style="clip-path:${tornEdges()}">
-    ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))} →</button>` : ''}
     <h2>${phrasesHtml(text.titlePhrases)}</h2>
     <p>${escapeHtml(text.desc)}</p>
     <div class="card-progress" aria-hidden="true"><span style="--ratio:${done / site.lessons};--accent:${site.color}"></span></div>
@@ -1145,6 +1144,7 @@ function cardHtml(site) {
       <dt>${t('read')}</dt><dd>${done} / ${site.lessons}</dd>
       <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>
+    ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))}</button>` : ''}
     </div>
     <span class="scroll-roll bottom" aria-hidden="true"></span>`;
 }
