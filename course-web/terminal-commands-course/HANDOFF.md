@@ -18,7 +18,7 @@
 | `outline.md` | 模組、單元、間隔複習排程、互動元件位置、取捨表 |
 | `design-system.md` | 新增的 token、對比檢查、元件清單 |
 
-課程資料夾以外的改動：根目錄 `index.html` 與 `index-3d.html` 的 `SITES` 各新增一本書（id `terminal`），`ICONS` 新增 `terminal` 圖示。
+課程資料夾以外的改動：根目錄 `index.html`（3D 書櫃）與 `index-2d.html` 的 `SITES` 各新增一本書（id `terminal`），`ICONS` 新增 `terminal` 圖示。
 
 ## 3. 資料格式（摘要）
 

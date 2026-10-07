@@ -1265,6 +1265,15 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 .cls-fb:empty { display: none; }
 .cls-fb { line-height: 1.7; animation: tw-out var(--dur-comp) var(--ease-mech) both; }
 @media (prefers-reduced-motion: reduce) { .cls-fb { animation: none; } }
+
+/* 手機與平板：字級、深淺色移到側欄，頂部列只留常用的按鈕 */
+.sidebar-prefs { display: none; }
+@media (max-width: 767px) {
+  .topbar .settings, .topbar .theme-btn { display: none; }
+  .sidebar-prefs { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-3); margin-bottom: var(--sp-3); border-bottom: var(--bw-sm) solid var(--ink); }
+  .sidebar-prefs .fontctl { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+  .sidebar-prefs .theme-side-btn, .sidebar-prefs .label { justify-self: start; }
+}
 </style>
 </head>
 <body>
@@ -1275,7 +1284,7 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
     <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M2 5h18M2 11h18M2 17h18" stroke="currentColor" stroke-width="3"/></svg>
   </button>
   <a class="btn icon nb-press shelf-btn" href="../../index.html" aria-label="回到書櫃首頁" title="回到書櫃首頁">
-    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M2 20h18M4 20V4h3v16M8 20V6h3v14M13.5 20l-1.5-13 3-.5 2 13.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg>
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 10 11 3l8 7M5 9v10h12V9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
   </a>
   <a class="brand" href="#/" aria-label="回到課程首頁">
     <span class="brand-short">AI<span class="x">×</span>Agent</span>
@@ -1319,6 +1328,16 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
       <button class="btn icon small nb-press sidebar-close" type="button" aria-label="關閉課程目錄">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" stroke-width="3"/></svg>
       </button>
+    </div>
+    <div class="sidebar-prefs" role="group" aria-label="顯示設定">
+      <span class="label">顯示設定</span>
+      <div class="fontctl" role="group" aria-label="字級">
+        <button class="btn small nb-press" type="button" data-font="down" aria-label="縮小字級">A−</button>
+        <span class="pct" data-font-pct>100%</span>
+        <button class="btn small nb-press" type="button" data-font="up" aria-label="放大字級">A+</button>
+        <button class="btn small nb-press" type="button" data-font="reset" aria-label="重設字級">重設</button>
+      </div>
+      <button class="btn small nb-press theme-side-btn" type="button">切換深淺色</button>
     </div>
     <nav class="nav" id="nav" aria-label="模組與單元"></nav>
   </aside>
@@ -7748,6 +7767,7 @@ $('.menu-btn').addEventListener('click', () => Drawer.open());
 $('.sidebar-close').addEventListener('click', () => Drawer.close());
 $('#scrim').addEventListener('click', () => Drawer.close());
 $('#theme-btn').addEventListener('click', cycleTheme);
+$$('.theme-side-btn').forEach((b) => b.addEventListener('click', cycleTheme));
 window.addEventListener('hashchange', render);
 // 換課動畫結束就拿掉 class：留著的 transform 會讓 main 變成 fixed 元素的定位基準
 $('#main').addEventListener('animationend', (e) => { if (e.target === e.currentTarget) e.currentTarget.classList.remove('view-enter'); });
