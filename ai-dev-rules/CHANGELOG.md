@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `domain-web-frontend`、`web-animation`、`domain-media-image-video-animation`、`bookshelf-portal`：3D 翻面上不再疊明暗遮罩。Safari 只藏住朝後的那一面，上面的遮罩照樣畫出來，翻到背面時閃黑一下；改 `background-color` 或切換 `visibility` 都沒有穩定解決（紅樓夢閱讀器的實例）。2D 書櫃範本拿掉開書動畫的遮罩，`shoot.mjs` 的動畫序號跟著更新。
+- `domain-web-frontend` 設計品質：長文閱讀裡的詩詞、引文不加左縮排，改用較大的上下間距和正文區隔。
+
 ### Added
 
 - `bookshelf-portal` skill 收進 ai-dev-rules，三個工具都會安裝：3D 書櫃為預設首頁（`index.html`）、2D 版為 `index-2d.html`；新增疊放書等尺寸、觸控裝置的「點書 → 羊皮紙介紹 → 前往閱讀」流程、`goTo()` 集中跳轉、`pageshow`／`visibilitychange` 回到書櫃初始狀態、載入字型 3 秒逾時、three.js 版本固定；附 `scripts/mobile-flow.mjs`（模擬 iPhone 測載入、介紹卡與外部跳轉重置）與 `assets/template-3d.html`。

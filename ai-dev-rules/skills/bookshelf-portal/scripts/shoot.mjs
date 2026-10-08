@@ -58,16 +58,16 @@ const harnessUrl = pathToFileURL(join(outDir, 'harness.html')).href;
 const measureUrl = pathToFileURL(join(outDir, 'measure.html')).href;
 const baseArgs = ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--virtual-time-budget=2500'];
 
-// 序號：1 抽出；2–6 空中轉身；7–14 翻封面與扉頁；15 讀取條
+// 序號：1 抽出；2–4 空中轉身；5–8 翻封面與扉頁；9 讀取條
 const SHOTS = [
   ['01-shelf-light', 'noclick', 1, '1440,900'],
   ['02-shelf-dark-hover', 'noclick&inspect', 0, '1440,900'],
   ['03-handoff', 'start=2&f=0', 1, '1200,820'],
   ['04-flight', 'start=2&f=0.5', 1, '1200,820'],
-  ['05-cover-opening', 'start=7&f=0.3', 1, '1200,820'],
-  ['06-leaf-turning', 'start=7&f=0.62', 1, '1200,820'],
-  ['07-spread', 'start=15&f=0.5', 1, '1200,820'],
-  ['08-spread-dark', 'start=15&f=0.5', 0, '1200,820'],
+  ['05-cover-opening', 'start=5&f=0.3', 1, '1200,820'],
+  ['06-leaf-turning', 'start=5&f=0.62', 1, '1200,820'],
+  ['07-spread', 'start=9&f=0.5', 1, '1200,820'],
+  ['08-spread-dark', 'start=9&f=0.5', 0, '1200,820'],
 ];
 
 for (const [name, query, colorScheme, size] of SHOTS) {
