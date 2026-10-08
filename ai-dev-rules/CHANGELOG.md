@@ -23,7 +23,7 @@
 
 - `install.ps1` 會刪除來源已移除的舊 skill 檔（只刪有 build 標記的檔案，先備份；使用者自己的檔案不動），預覽會列出「刪除」。
 - repo 根目錄 `AGENTS.md`（加上指向它的 `CLAUDE.md`、`GEMINI.md`）：三個工具進 repo 時自動讀到的工作說明，寫明來源與產生物的對應、新增／修改／刪除 skill 的步驟、雲端環境限制。
-- `project-skills.txt`：列出的 skill 在 build 時同步到 repo 的 `.claude/skills/`，雲端 Claude Code session 也讀得到；verify 會檢查副本沒有被直接修改。目前同步 `bookshelf-portal`、`course-web-neo-brutalism`。
+- build 把全部規範（`00-core.md` 與各規則檔、領域規則）、skills、子代理同步到上一層 repo 的 `.claude/rules/`、`skills/`、`agents/`，雲端 Claude Code session 和本機同一套；來源刪除的檔案一併移除；verify 檢查副本一致且沒有殘留。hooks 不同步（雲端沒有 PowerShell）。
 - `scripts/install.sh`：macOS／Linux 的安裝入口，檢查 `pwsh` 後把參數交給 `install.ps1`。
 
 ### Fixed

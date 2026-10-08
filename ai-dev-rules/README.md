@@ -70,7 +70,7 @@ pwsh scripts/new-project.ps1 -Starter vue3-vite-ts -Target ~/code/my-app
 4. `scripts/install.ps1` 預覽，再加 `-Apply` 寫入。
 
 - 刪除 skill：刪掉 `skills/<名稱>/` 再 build。install 會把家目錄裡我們裝過、但來源已刪除的檔案一併刪掉（只刪有「由 build.ps1 產生」標記的檔案，先備份），你自己放的 skill 不受影響。
-- 雲端 session 要用的 skill：名稱加進 `project-skills.txt`，build 會同步到上一層 repo 的 `.claude/skills/`。
+- build 會把全部規範、skills、子代理同步到上一層 repo 的 `.claude/`（雲端 session 用）；hooks 不同步。verify 會檢查副本沒有被直接修改、也沒有殘留來源已刪除的檔案。
 - 完整的 AI agent 工作說明在上一層 repo 的 `AGENTS.md`。
 
 寫規則的原則：一條規則一句話、可以被檢查。「回答要好」不行，「先給結論，再給理由」可以。
