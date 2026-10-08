@@ -263,33 +263,16 @@
   /* ---------- 翻頁動畫：和書櫃首頁的扉頁同一套（rotateY 繞書脊，明暗只動 background-color） ---------- */
   const EASE = 'cubic-bezier(0.45, 0, 0.2, 1)';
   const nextFrame = () => new Promise((resolve) => { window.requestAnimationFrame(() => resolve()); });
-  const shadeFrames = (from, to) => [{ backgroundColor: `rgba(0, 0, 0, ${from})` }, { backgroundColor: `rgba(0, 0, 0, ${to})` }];
-
-  const leafPose = (deg) => `translateZ(1px) rotateY(${deg}deg)`;
-  const shadeColor = (alpha) => `rgba(0, 0, 0, ${alpha})`;
-  const LEAF_SHADE = 0.32;
-
   /*
-    正反面不只靠 backface-visibility 隱藏，而是轉過 90° 時明確切換 visibility。
-    Safari 的 backface-visibility 只藏住那一面本身，上面的明暗遮罩（.shade）照樣畫出來；
-    翻頁躺在左頁時，朝後那一面的遮罩是 32% 黑，會閃黑一下。
+    翻頁與封面翻動時不做明暗變化。原本疊一層黑色遮罩（.shade）表現明暗，
+    但 Safari 的 backface-visibility 只藏住朝後的那一面，上面的遮罩照樣畫出來，
+    翻頁躺在左頁時會閃黑一下（拿掉遮罩後實測不閃）。
   */
-  const faceVisibility = (deg, isFront) => ((deg > -90) === isFront ? 'visible' : 'hidden');
-  /** 正反面切換的關鍵影格：和轉動用同一條 easing，進度 50% 就是轉到 90° */
-  const faceFrames = (fromDeg, toDeg, isFront) => [{ visibility: faceVisibility(fromDeg, isFront) }, { visibility: faceVisibility(toDeg, isFront) }];
+  const leafPose = (deg) => `translateZ(1px) rotateY(${deg}deg)`;
 
-  /**
-   * 把翻頁「靜止時」的角度、明暗與正反面直接寫在 style 上，不靠動畫的 fill 撐住，
-   * 動畫還沒套上或剛結束的那一格也是正確的樣子。
-   */
-  function setLeafPose(deg, frontAlpha, backAlpha) {
+  /** 翻頁「靜止時」的角度直接寫在 style 上，不靠動畫的 fill 撐住，動畫還沒套上或剛結束的那一格也是正確角度 */
+  function setLeafPose(deg) {
     leaf.style.transform = leafPose(deg);
-    const frontShade = leafFront.querySelector('.shade');
-    const backShade = leafBack.querySelector('.shade');
-    if (frontShade) frontShade.style.backgroundColor = shadeColor(frontAlpha);
-    if (backShade) backShade.style.backgroundColor = shadeColor(backAlpha);
-    leafFront.style.visibility = faceVisibility(deg, true);
-    leafBack.style.visibility = faceVisibility(deg, false);
   }
 
   /**
@@ -297,27 +280,16 @@
    * 翻頁剛顯示的那一格可能還沒畫好，先換底下會露出下一頁。
    */
   async function animateLeaf(fromDeg, toDeg, swapBeneath) {
-    const forward = toDeg < fromDeg;
-    const [frontFrom, frontTo] = forward ? [0, LEAF_SHADE] : [LEAF_SHADE, 0];
-    const [backFrom, backTo] = forward ? [LEAF_SHADE, 0] : [0, LEAF_SHADE];
-    setLeafPose(fromDeg, frontFrom, backFrom);
+    setLeafPose(fromDeg);
     leaf.hidden = false;
     await nextFrame();
     await nextFrame();
     if (swapBeneath) swapBeneath();
     const opts = { duration: FLIP_MS, easing: EASE };
-    const frontShade = leafFront.querySelector('.shade');
-    const backShade = leafBack.querySelector('.shade');
-    const animations = [
-      leaf.animate([{ transform: leafPose(fromDeg) }, { transform: leafPose(toDeg) }], opts),
-      frontShade && frontShade.animate(shadeFrames(frontFrom, frontTo), opts),
-      backShade && backShade.animate(shadeFrames(backFrom, backTo), opts),
-      leafFront.animate(faceFrames(fromDeg, toDeg, true), opts),
-      leafBack.animate(faceFrames(fromDeg, toDeg, false), opts),
-    ].filter(Boolean);
+    const turn = leaf.animate([{ transform: leafPose(fromDeg) }, { transform: leafPose(toDeg) }], opts);
     // 動畫一開始就把 style 換成終點：動畫播放時蓋過 style，播完那一格直接停在終點
-    setLeafPose(toDeg, frontTo, backTo);
-    await Promise.all(animations.map((a) => a.finished));
+    setLeafPose(toDeg);
+    await turn.finished;
   }
 
   /** 翻完先讓翻頁停著蓋住底下，等底下的頁面畫好兩個畫格才收起（見 animateLeaf） */
@@ -392,9 +364,7 @@
     const cover = $('#cover');
     const params = new URLSearchParams(window.location.search);
     if (params.get('from') === 'shelf' || reduceMotion.matches || typeof cover.animate !== 'function') { cover.remove(); return; }
-    const coverFront = cover.querySelector('.cover-front');
-    const coverInside = cover.querySelector('.cover-inside');
-    const inside = coverInside.querySelector('.page');
+    const inside = cover.querySelector('.cover-inside .page');
     if (layout.isSpread) setFace(inside, cur.ch, cur.page);
     else setBlankPaper(inside);
     pageL.style.visibility = 'hidden';
@@ -402,9 +372,6 @@
     const closed = `translate(-50%, -50%) translateX(${-shift}px)`;
     const open = 'translate(-50%, -50%)';
     bookEl.style.transform = closed;
-    // 封面和翻頁同一個問題：朝後那一面的遮罩 Safari 照樣會畫，正反面要明確切換
-    coverFront.style.visibility = faceVisibility(0, true);
-    coverInside.style.visibility = faceVisibility(0, false);
     cover.hidden = false;
     const hint = $('#stage-hint');
     hint.hidden = false;
@@ -429,10 +396,6 @@
       await Promise.all([
         bookEl.animate([{ transform: closed }, { transform: open }], opts).finished,
         cover.animate([{ transform: 'translateZ(3px) rotateY(0deg)' }, { transform: 'translateZ(3px) rotateY(-180deg)' }], opts).finished,
-        coverFront.querySelector('.shade').animate(shadeFrames(0, 0.5), opts).finished,
-        coverInside.querySelector('.shade').animate(shadeFrames(0.4, 0), opts).finished,
-        coverFront.animate(faceFrames(0, -180, true), opts).finished,
-        coverInside.animate(faceFrames(0, -180, false), opts).finished,
       ]);
     } catch (err) {
       // 被使用者略過時動畫會被 cancel，這是預期的；其他錯誤要記錄
