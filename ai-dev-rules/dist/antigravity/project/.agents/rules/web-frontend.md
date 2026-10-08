@@ -58,6 +58,7 @@ globs: "**/*.vue, **/*.ts, **/*.tsx, **/*.css, **/*.scss, **/*.html"
 - 避免 AI 模板感：預設紫色漸層、所有內容塞進置中大卡片、每個區塊都加陰影、到處都是圓角膠囊按鈕。
 - 色彩、間距、字級用 CSS 變數（design tokens）集中管理。
 - 間距用固定級距（例如 4 / 8 / 12 / 16 / 24 / 32 / 48）。
+- 長文閱讀（書籍、文章）裡的詩詞、引文、名句不加左縮排，用比段落大的上下間距和正文區隔（例如上下各半行）；窄螢幕上縮排會擠掉每行字數。
 
 ## 品質目標：得獎等級
 
@@ -97,7 +98,8 @@ globs: "**/*.vue, **/*.ts, **/*.tsx, **/*.css, **/*.scss, **/*.html"
 ## 動畫
 
 - 所有動畫都要處理 `@media (prefers-reduced-motion: reduce)`：關閉或改成淡入淡出。
-- 只對 `transform` 和 `opacity` 做動畫。例外：3D 場景（`transform-style: preserve-3d`）裡，疊在某一面上的明暗遮罩不做 `opacity` 動畫，改動 `background-color`，或對那一面本身做 `filter: brightness()`。`opacity` 動畫會被拆成獨立合成圖層，和那一面在同一平面，Safari 每一格的前後順序不固定，畫面會閃。
+- 只對 `transform` 和 `opacity` 做動畫。
+- 3D 翻面（`backface-visibility: hidden` 的面）上不疊明暗遮罩子元素，也不對遮罩做動畫。Safari 只藏住朝後的那一面本身，上面的遮罩照樣畫出來，翻到背面時會閃黑一下；要明暗就不做，或實測 Safari 不閃再用。
 - Web Animations 有 `delay` 時用 `fill: 'both'`，延遲期間就停在第一格，開始播放那一刻不會跳。
 - 先問「這裡有東西真的在動嗎」：概念流程、層級、比較用靜態圖；動畫留給真實的機制或狀態轉換。
 - 動畫的問題要在播放中檢查（可把 `playbackRate` 設 0.25 慢速看）；暫停後截圖看不到合成圖層造成的閃動。

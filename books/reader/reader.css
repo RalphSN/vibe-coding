@@ -272,8 +272,6 @@ body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
 .leaf .page.front { border-radius: 1px 4px 4px 1px; box-shadow: inset 18px 0 18px -14px rgba(0, 0, 0, 0.25); }
 .leaf .page.back { transform: rotateY(180deg); border-radius: 4px 1px 1px 4px; box-shadow: inset -18px 0 18px -14px rgba(0, 0, 0, 0.25); }
 .leaf[hidden] { display: none; }
-/* 明暗只動 background-color，不動 opacity：opacity 動畫會被拆成獨立合成圖層，Safari 翻頁時會閃（見 bookshelf-portal） */
-.shade { position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0); pointer-events: none; z-index: 2; }
 
 /* 封面：開場時蓋在右頁上，翻開後內側直接是左頁，交接時看不到跳動 */
 .cover {
@@ -366,10 +364,11 @@ body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
   font-kerning: none;
 }
 .flow p { margin: 0; text-indent: 2em; }
-.flow .poem { margin: 0.6em 0; padding-left: 4em; white-space: pre-line; text-indent: 0; text-align: left; }
-/* 單頁（手機）欄寬窄，詩詞縮排減半，一行才放得下七言 */
-.single .flow .poem { padding-left: 2em; }
+/* 詩詞、引文不縮排，用上下各半行的間距和正文區隔：窄頁面縮排會擠掉字數；
+   上下合起來剛好一整行，不打亂對齊行高的排版 */
+.flow .poem { margin: calc(var(--reader-lh, 1.95) * 0.5em) 0; white-space: pre-line; text-indent: 0; text-align: left; }
 .flow .comment { margin: 0 0 0.8em; font-size: 0.86em; line-height: 1.85; color: var(--cinnabar); text-indent: 2em; white-space: pre-line; }
+.flow .comment.poem { margin: calc(var(--reader-lh, 1.95) * 0.5em) 0; text-indent: 0; }
 .flow .comment-mark { display: block; margin-bottom: 0.2em; font-size: 0.8em; letter-spacing: 0.3em; text-indent: 0; }
 .flow sup { font-size: 0.62em; line-height: 0; color: var(--cinnabar); font-family: var(--font); letter-spacing: 0; padding: 0 1px; }
 .chapter-head { margin: 0 0 1.6em; text-align: center; break-inside: avoid; }

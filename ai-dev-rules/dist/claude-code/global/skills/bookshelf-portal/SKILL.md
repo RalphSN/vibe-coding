@@ -61,7 +61,7 @@ description: 建立或更新「擬真書櫃」風格的個人入口網站（預�
 5. **攤開要對稱**：左頁（扉頁背面）與右頁的紙範圍完全一樣，四周露出同寬的布邊；扉頁翻到正好 -180° 並墊高到封面之上。
 6. **可略過、可退回**：動畫中點一下直接跳轉；Ctrl／Cmd／中鍵點擊交給瀏覽器開新分頁；`prefers-reduced-motion` 時直接跳轉；從子網站按返回（bfcache）要收掉動畫並更新進度。
 7. **書名不能被截斷**：`fitSpineTitles()` 依標籤高度等比縮小字級（下限 11px），3D 書脊沿用同一字級。書名標籤 `.spine-label` 一定寫 `width: max-content`：裡面的直排書名和標籤方向不同，Safari 自動算寬時不計直排內容，標籤只剩內距寬，書名被整個裁掉（2026-10 在 Safari 27 實際發生，Chrome 正常）。
-8. **3D 舞台裡的明暗只動 `background-color`**：`.shade` 遮罩不准做 `opacity` 動畫。opacity 動畫會被拆成獨立合成圖層，和所在的頁面在同一平面，Safari 每一格的前後順序不固定，翻頁時左頁閃動（2026-10 實際發生）。有延遲的動畫用 `fill: 'both'`。
+8. **3D 書的各面不疊明暗遮罩**：Safari 的 `backface-visibility: hidden` 只藏住朝後的那一面本身，上面的 `.shade` 遮罩照樣畫出來，翻到背面時閃黑一下（2026-10 實際發生，改 `background-color`、切換 `visibility` 都沒有穩定解決，拿掉遮罩才不閃）。有延遲的動畫用 `fill: 'both'`。
 9. **Chrome 與 Safari 都要實測**：兩邊都看過才算完成；改一邊的寫法時要確認另一邊沒壞。Playwright 的 WebKit 不等於 Safari，書名消失這個問題它量不出來。流程見 [verification.md](references/verification.md) 第 5 節。
 10. **風格基準**：Apple 系統字體與色票（淺色底 `#f5f5f7`、深色底 `#000`、焦點藍 `#0071e3`／`#2997ff`），遵守 impeccable 的 craft floor：不用漸層文字、不用 eyebrow 小標、不用 emoji 當圖示、對比 ≥ 4.5:1。等寬字只用在路徑、數字、統計這類真的是資料的地方。
 
