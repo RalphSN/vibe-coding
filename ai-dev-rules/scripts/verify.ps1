@@ -276,19 +276,17 @@ if (-not $SkipHookTests) {
     Write-Host "hook 測試：用 $(Get-PowerShellExe) 跑了 $i 個案例"
 }
 
-# ---------- 同步到 repo 的 .claude/skills/ ----------
+# ---------- 同步到 repo 的 .claude/ ----------
 $projectClaude = Join-Path (Split-Path -Parent $Root) '.claude'
-$listFile = Join-Path $Root 'project-skills.txt'
-if ((Test-Path -LiteralPath $projectClaude) -and (Test-Path -LiteralPath $listFile)) {
-    $names = (Read-TextFile $listFile) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }
-    foreach ($n in $names) {
-        $from = Join-Path $Dist "claude-code/global/skills/$n"
-        $to = Join-Path $projectClaude "skills/$n"
-        if (-not (Test-Path -LiteralPath $to)) { Fail $to '沒有同步，請重跑 scripts/build.ps1'; continue }
-        $a = @(Get-ChildItem $from -Recurse -File | ForEach-Object { (Get-RelativePath $from $_.FullName) + '|' + (Get-FileHash $_.FullName).Hash } | Sort-Object)
-        $b = @(Get-ChildItem $to -Recurse -File | ForEach-Object { (Get-RelativePath $to $_.FullName) + '|' + (Get-FileHash $_.FullName).Hash } | Sort-Object)
-        if (($a -join "`n") -ne ($b -join "`n")) { Fail $to '和 dist 不一致：有人直接改了副本，請改 ai-dev-rules/skills/ 後重跑 build' }
+if (Test-Path -LiteralPath $projectClaude) {
+    $map = Get-ProjectSyncMap $Dist $projectClaude
+    foreach ($to in $map.Keys) {
+        if (-not (Test-Path -LiteralPath $to)) { Fail $to '沒有同步到 repo 的 .claude/，請重跑 scripts/build.ps1'; continue }
+        if ((Get-FileHash -LiteralPath $to).Hash -ne (Get-FileHash -LiteralPath $map[$to]).Hash) {
+            Fail $to '和 dist 不一致：有人直接改了副本，請改 ai-dev-rules 的來源後重跑 build'
+        }
     }
+    foreach ($f in @(Get-ProjectSyncStale $projectClaude $map)) { Fail $f '來源已刪除但副本還在，請重跑 scripts/build.ps1' }
 }
 
 # ---------- 結果 ----------

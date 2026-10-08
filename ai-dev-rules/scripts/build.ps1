@@ -395,20 +395,28 @@ Claude Code 專案層與 Codex 的 hook 指令不需要替換：Claude 交給 ba
 "@
 Write-TextFile (Join-Path $Dist 'README.md') $readme
 
-# ===== 同步到上一層 repo 的 .claude/skills/（雲端 session 用）=====
+# ===== 同步到上一層 repo 的 .claude/（雲端 session 用）=====
+# 全部規範、skills、子代理都同步，讓雲端和本機是同樣的開發環境；hooks 不同步（需要 PowerShell，雲端沒有）
 # 只在正式 build（沒有 -OutDir）且上一層有 .claude 資料夾時執行；verify 用 -OutDir 重建比對時不動 repo
 $projectClaude = Join-Path (Split-Path -Parent $Root) '.claude'
-$listFile = Join-Path $Root 'project-skills.txt'
-if (-not $OutDir -and (Test-Path -LiteralPath $projectClaude) -and (Test-Path -LiteralPath $listFile)) {
-    $names = (Read-TextFile $listFile) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }
-    foreach ($n in $names) {
-        $from = Join-Path $Dist "claude-code/global/skills/$n"
-        if (-not (Test-Path -LiteralPath $from)) { throw "project-skills.txt 列了 $n，但 skills/ 裡沒有這個 skill" }
-        $to = Join-Path $projectClaude "skills/$n"
-        if (Test-Path -LiteralPath $to) { Remove-Item -LiteralPath $to -Recurse -Force }
-        Copy-Item -LiteralPath $from -Destination $to -Recurse
+if (-not $OutDir -and (Test-Path -LiteralPath $projectClaude)) {
+    $map = Get-ProjectSyncMap $Dist $projectClaude
+    $stale = @(Get-ProjectSyncStale $projectClaude $map)
+    foreach ($f in $stale) { Remove-Item -LiteralPath $f -Force }
+    foreach ($to in $map.Keys) {
+        $dir = Split-Path -Parent $to
+        if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+        Copy-Item -LiteralPath $map[$to] -Destination $to -Force
     }
-    Write-Host "已同步到 .claude/skills/：$($names -join '、')"
+    # 清掉刪除後變空的資料夾
+    foreach ($sub in $ProjectSyncDirs) {
+        $d = Join-Path $projectClaude $sub
+        if (Test-Path -LiteralPath $d) {
+            Get-ChildItem -LiteralPath $d -Recurse -Directory | Sort-Object { $_.FullName.Length } -Descending |
+                Where-Object { -not (Get-ChildItem -LiteralPath $_.FullName -Force) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+        }
+    }
+    Write-Host ("已同步到 repo 的 .claude/：{0} 個檔案；刪除 {1} 個來源已移除的檔案" -f $map.Count, $stale.Count)
 }
 
 $count = (Get-ChildItem $Dist -Recurse -File).Count

@@ -148,3 +148,46 @@ function Invoke-HookScript([string]$ScriptPath, [string]$Tool, [string]$StdinJso
     $p.WaitForExit()
     return [pscustomobject]@{ ExitCode = $p.ExitCode; Stdout = $out; Stderr = $err }
 }
+
+# ---------- 同步到 repo 的 .claude/（雲端 Claude Code session 用）----------
+# 雲端 session 沒有家目錄的全域安裝，只讀得到 repo 裡的 .claude/。
+# 這裡定義「dist 的哪個檔 → repo .claude/ 的哪個位置」，build 照它複製，verify 照它比對。
+$script:ProjectSyncMarker = '由 scripts/build.ps1 產生'
+$script:ProjectSyncDirs = @('skills', 'agents', 'rules')
+
+function Get-ProjectSyncMap([string]$Dist, [string]$ProjectClaude) {
+    $map = [ordered]@{}
+    $g = Join-Path $Dist 'claude-code/global'
+    $p = Join-Path $Dist 'claude-code/project/.claude'
+    # 全域 CLAUDE.md（溝通、工作流程）在專案層改名成一個規則檔
+    $map[(Join-Path $ProjectClaude 'rules/00-core.md')] = Join-Path $g 'CLAUDE.md'
+    $pairs = @(
+        @((Join-Path $g 'rules'), (Join-Path $ProjectClaude 'rules')),
+        @((Join-Path $p 'rules'), (Join-Path $ProjectClaude 'rules')),
+        @((Join-Path $g 'skills'), (Join-Path $ProjectClaude 'skills')),
+        @((Join-Path $g 'agents'), (Join-Path $ProjectClaude 'agents'))
+    )
+    foreach ($pair in $pairs) {
+        if (-not (Test-Path -LiteralPath $pair[0])) { continue }
+        foreach ($f in Get-ChildItem -LiteralPath $pair[0] -Recurse -File) {
+            $map[(Join-Path $pair[1] (Get-RelativePath $pair[0] $f.FullName))] = $f.FullName
+        }
+    }
+    return $map
+}
+
+function Get-ProjectSyncStale([string]$ProjectClaude, $Map) {
+    # repo .claude/ 裡有 build 標記、但已經不在對應表裡的檔案（來源被刪掉了）；沒有標記的檔案（例如 impeccable）不碰
+    $stale = @()
+    foreach ($sub in $script:ProjectSyncDirs) {
+        $dir = Join-Path $ProjectClaude $sub
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($f in Get-ChildItem -LiteralPath $dir -Recurse -File) {
+            if ($Map.Contains($f.FullName)) { continue }
+            $head = Read-TextFile $f.FullName
+            if ($head.Length -gt 1500) { $head = $head.Substring(0, 1500) }
+            if ($head -like "*$($script:ProjectSyncMarker)*") { $stale += $f.FullName }
+        }
+    }
+    return $stale
+}
