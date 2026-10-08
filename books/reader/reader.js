@@ -265,34 +265,50 @@
   const nextFrame = () => new Promise((resolve) => { window.requestAnimationFrame(() => resolve()); });
   const shadeFrames = (from, to) => [{ backgroundColor: `rgba(0, 0, 0, ${from})` }, { backgroundColor: `rgba(0, 0, 0, ${to})` }];
 
+  const leafPose = (deg) => `translateZ(1px) rotateY(${deg}deg)`;
+  const shadeColor = (alpha) => `rgba(0, 0, 0, ${alpha})`;
+  const LEAF_SHADE = 0.32;
+
   /**
-   * 翻頁停在第一格先畫好、蓋住底下那頁，才換底下的內容（swapBeneath）再開始轉。
-   * 翻頁剛顯示的那一格 Safari 可能還沒畫好，先換底下會露出下一頁，看起來像閃一下。
+   * 把翻頁「靜止時」的角度與明暗直接寫在 style 上，不靠動畫的 fill 撐住。
+   * CSS 預設角度是 0°（蓋在右頁上）；Safari 在動畫還沒套上、或剛結束的那一格會退回預設值，
+   * 躺在左頁（-180°）的翻頁就會跳到右頁一下，看起來像閃一次。
    */
-  async function animateLeaf(fromDeg, toDeg, swapBeneath) {
-    leaf.hidden = false;
-    const opts = { duration: FLIP_MS, easing: EASE, fill: 'forwards' };
-    const forward = toDeg < fromDeg;
+  function setLeafPose(deg, frontAlpha, backAlpha) {
+    leaf.style.transform = leafPose(deg);
     const frontShade = leafFront.querySelector('.shade');
     const backShade = leafBack.querySelector('.shade');
-    const animations = [
-      leaf.animate([{ transform: `translateZ(1px) rotateY(${fromDeg}deg)` }, { transform: `translateZ(1px) rotateY(${toDeg}deg)` }], opts),
-      frontShade && frontShade.animate(forward ? shadeFrames(0, 0.32) : shadeFrames(0.32, 0), opts),
-      backShade && backShade.animate(forward ? shadeFrames(0.32, 0) : shadeFrames(0, 0.32), opts),
-    ].filter(Boolean);
-    animations.forEach((a) => a.pause());
-    await nextFrame();
-    await nextFrame();
-    if (swapBeneath) swapBeneath();
-    animations.forEach((a) => a.play());
-    await Promise.all(animations.map((a) => a.finished));
+    if (frontShade) frontShade.style.backgroundColor = shadeColor(frontAlpha);
+    if (backShade) backShade.style.backgroundColor = shadeColor(backAlpha);
   }
 
   /**
-   * 翻完先讓翻頁停在原位蓋著，底下的頁面換好內容、畫完兩個畫格才收起。
-   * 每回內文是一條很寬的文字流，換頁是平移它；Safari 只先畫看得到的部分，
-   * 直接收起翻頁會露出還沒畫好的新位置，那一頁的字會閃一下。
+   * 翻頁先以起始角度畫好、蓋住底下那頁，才換底下的內容（swapBeneath）再開始轉。
+   * 翻頁剛顯示的那一格可能還沒畫好，先換底下會露出下一頁。
    */
+  async function animateLeaf(fromDeg, toDeg, swapBeneath) {
+    const forward = toDeg < fromDeg;
+    const [frontFrom, frontTo] = forward ? [0, LEAF_SHADE] : [LEAF_SHADE, 0];
+    const [backFrom, backTo] = forward ? [LEAF_SHADE, 0] : [0, LEAF_SHADE];
+    setLeafPose(fromDeg, frontFrom, backFrom);
+    leaf.hidden = false;
+    await nextFrame();
+    await nextFrame();
+    if (swapBeneath) swapBeneath();
+    const opts = { duration: FLIP_MS, easing: EASE };
+    const frontShade = leafFront.querySelector('.shade');
+    const backShade = leafBack.querySelector('.shade');
+    const animations = [
+      leaf.animate([{ transform: leafPose(fromDeg) }, { transform: leafPose(toDeg) }], opts),
+      frontShade && frontShade.animate(shadeFrames(frontFrom, frontTo), opts),
+      backShade && backShade.animate(shadeFrames(backFrom, backTo), opts),
+    ].filter(Boolean);
+    // 動畫一開始就把 style 換成終點：動畫播放時蓋過 style，播完那一格直接停在終點
+    setLeafPose(toDeg, frontTo, backTo);
+    await Promise.all(animations.map((a) => a.finished));
+  }
+
+  /** 翻完先讓翻頁停著蓋住底下，等底下的頁面畫好兩個畫格才收起（見 animateLeaf） */
   async function hideLeafAfterPaint() {
     await nextFrame();
     await nextFrame();
