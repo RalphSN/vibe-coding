@@ -48,6 +48,7 @@
   let cur = { ch: FRONT, page: 0 };
   let busy = false;
   let queued = 0;
+  let needsRepaginate = false;
   let fontIndex = DEFAULT_FONT_INDEX;
   // 讀到最遠的位置：跳去卷首或翻目錄之後，用「回到閱讀進度」回來
   let furthest = { ch: FRONT, ratio: 0 };
@@ -241,8 +242,9 @@
   }
 
   function prefetch() {
+    // 載入後先量一次頁數：新出現的字會提早下載字型子集，不會等到翻過去才重新分頁
     [cur.ch + 1, cur.ch - 1].forEach((n) => {
-      ensure(n).catch((err) => console.warn('預先載入失敗：', err));
+      ensure(n).then(() => pageCount(n)).catch((err) => console.warn(`預先載入第 ${n} 回失敗：`, err));
     });
   }
 
@@ -260,22 +262,31 @@
 
   /* ---------- 翻頁動畫：和書櫃首頁的扉頁同一套（rotateY 繞書脊，明暗只動 background-color） ---------- */
   const EASE = 'cubic-bezier(0.45, 0, 0.2, 1)';
+  const nextFrame = () => new Promise((resolve) => { window.requestAnimationFrame(() => resolve()); });
   const shadeFrames = (from, to) => [{ backgroundColor: `rgba(0, 0, 0, ${from})` }, { backgroundColor: `rgba(0, 0, 0, ${to})` }];
 
-  async function animateLeaf(fromDeg, toDeg) {
+  /**
+   * 翻頁停在第一格先畫好、蓋住底下那頁，才換底下的內容（swapBeneath）再開始轉。
+   * 翻頁剛顯示的那一格 Safari 可能還沒畫好，先換底下會露出下一頁，看起來像閃一下。
+   */
+  async function animateLeaf(fromDeg, toDeg, swapBeneath) {
     leaf.hidden = false;
     const opts = { duration: FLIP_MS, easing: EASE, fill: 'forwards' };
     const forward = toDeg < fromDeg;
     const frontShade = leafFront.querySelector('.shade');
     const backShade = leafBack.querySelector('.shade');
-    await Promise.all([
-      leaf.animate([{ transform: `translateZ(1px) rotateY(${fromDeg}deg)` }, { transform: `translateZ(1px) rotateY(${toDeg}deg)` }], opts).finished,
-      frontShade && frontShade.animate(forward ? shadeFrames(0, 0.32) : shadeFrames(0.32, 0), opts).finished,
-      backShade && backShade.animate(forward ? shadeFrames(0.32, 0) : shadeFrames(0, 0.32), opts).finished,
-    ]);
+    const animations = [
+      leaf.animate([{ transform: `translateZ(1px) rotateY(${fromDeg}deg)` }, { transform: `translateZ(1px) rotateY(${toDeg}deg)` }], opts),
+      frontShade && frontShade.animate(forward ? shadeFrames(0, 0.32) : shadeFrames(0.32, 0), opts),
+      backShade && backShade.animate(forward ? shadeFrames(0.32, 0) : shadeFrames(0, 0.32), opts),
+    ].filter(Boolean);
+    animations.forEach((a) => a.pause());
+    await nextFrame();
+    await nextFrame();
+    if (swapBeneath) swapBeneath();
+    animations.forEach((a) => a.play());
+    await Promise.all(animations.map((a) => a.finished));
   }
-
-  const nextFrame = () => new Promise((resolve) => { window.requestAnimationFrame(() => resolve()); });
 
   /**
    * 翻完先讓翻頁停在原位蓋著，底下的頁面換好內容、畫完兩個畫格才收起。
@@ -308,6 +319,7 @@
       console.error(`翻頁失敗（第 ${cur.ch} 回第 ${cur.page + 1} 頁，方向 ${dir}）：`, err);
     } finally {
       busy = false;
+      if (needsRepaginate) repaginate();
       if (queued) {
         const next = Math.sign(queued);
         queued -= next;
@@ -320,18 +332,15 @@
     if (layout.isSpread && dir > 0) {
       setFace(leafFront, cur.ch, cur.page + 1);
       setFace(leafBack, target.ch, target.page);
-      setFace(pageR, target.ch, target.page + 1);
-      await animateLeaf(0, -180);
+      await animateLeaf(0, -180, () => setFace(pageR, target.ch, target.page + 1));
     } else if (layout.isSpread) {
       setFace(leafBack, cur.ch, cur.page);
       setFace(leafFront, target.ch, target.page + 1);
-      setFace(pageL, target.ch, target.page);
-      await animateLeaf(-180, 0);
+      await animateLeaf(-180, 0, () => setFace(pageL, target.ch, target.page));
     } else if (dir > 0) {
       setFace(leafFront, cur.ch, cur.page);
       setBlankPaper(leafBack);
-      setFace(pageR, target.ch, target.page);
-      await animateLeaf(0, -180);
+      await animateLeaf(0, -180, () => setFace(pageR, target.ch, target.page));
     } else {
       setFace(leafFront, target.ch, target.page);
       setBlankPaper(leafBack);
@@ -587,6 +596,19 @@
     updateFontButtons();
   }
 
+  /**
+   * 字型子集下載完，字寬可能變，頁數要重算。版面尺寸沒變，所以不重建頁面 DOM（重建會閃一下）；
+   * 翻頁中就等翻完再做。
+   */
+  function repaginate() {
+    if (busy) { needsRepaginate = true; return; }
+    needsRepaginate = false;
+    const ratio = cur.page / pageCount(cur.ch);
+    counts.clear();
+    cur.page = pageAtRatio(ratio, pageCount(cur.ch));
+    render();
+  }
+
   /* ---------- 操作 ---------- */
   function setupInput() {
     $('#prev-btn').addEventListener('click', () => flip(-1));
@@ -669,7 +691,7 @@
     render();
     prefetch();
     // 字型的子集是看到新字才下載，下載完字寬可能變，重新分頁一次
-    if (document.fonts) document.fonts.addEventListener('loadingdone', () => relayout());
+    if (document.fonts) document.fonts.addEventListener('loadingdone', repaginate);
     await playOpening();
   }
 
