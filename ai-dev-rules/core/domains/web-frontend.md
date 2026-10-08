@@ -85,9 +85,18 @@ globs: ["**/*.vue", "**/*.ts", "**/*.tsx", "**/*.css", "**/*.scss", "**/*.html"]
 - Playwright 的 WebKit 不能代替 Safari 驗收：排版結果會不同，3D 截圖也不做合成。Safari 結論要用 Safari 本身（`safaridriver` 或請使用者截圖）。
 - 直排文字（`writing-mode: vertical-*`）放在橫排容器裡、容器寬度又是自動算（置中、`fit-content`）時，容器寫 `width: max-content`。否則 Safari 把容器算成只有內距寬，直排文字被 `overflow: hidden` 整個裁掉。
 
+## 手機與跳轉
+
+- 觸控裝置沒有 hover：hover 才出現的資訊，在觸控時改成「點一下顯示，再點入口按鈕前往」。用 `matchMedia('(hover: none)')` 之類的能力判斷，不要只看螢幕寬度。
+- 手機版頂部列只留必要按鈕；字級、深色模式這類不常用的設定移到側欄或選單。
+- 按下狀態用 `box-shadow` 或顏色表現，不用會改變佔位的位移，避免窄螢幕出現水平捲動。
+- 所有頁面跳轉集中到一個函式（例如 `goTo(href)`）。頁面有離場動畫時，在 `pageshow`（bfcache 返回）與 `visibilitychange`（從外部 app 切回）都把畫面重置回初始狀態；外部連結另外加數秒的保險重置。
+- 等待字型或外部資源的 loading 畫面要有逾時，資源失敗時退回簡易版，不能永遠卡住。
+
 ## 動畫
 
 - 所有動畫都要處理 `@media (prefers-reduced-motion: reduce)`：關閉或改成淡入淡出。
 - 只對 `transform` 和 `opacity` 做動畫。例外：3D 場景（`transform-style: preserve-3d`）裡，疊在某一面上的明暗遮罩不做 `opacity` 動畫，改動 `background-color`，或對那一面本身做 `filter: brightness()`。`opacity` 動畫會被拆成獨立合成圖層，和那一面在同一平面，Safari 每一格的前後順序不固定，畫面會閃。
 - Web Animations 有 `delay` 時用 `fill: 'both'`，延遲期間就停在第一格，開始播放那一刻不會跳。
+- 先問「這裡有東西真的在動嗎」：概念流程、層級、比較用靜態圖；動畫留給真實的機制或狀態轉換。
 - 動畫的問題要在播放中檢查（可把 `playbackRate` 設 0.25 慢速看）；暫停後截圖看不到合成圖層造成的閃動。
