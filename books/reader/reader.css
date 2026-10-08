@@ -143,6 +143,10 @@ button { font: inherit; color: inherit; }
 .segmented button:hover { color: var(--text); }
 .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .segmented button:disabled { opacity: 0.35; cursor: default; }
+/* 字級是動作按鈕，不是切換選項：用正常文字色，才不會看起來像停用 */
+.segmented.font-size button { color: var(--text); }
+/* 滑鼠或觸控開啟側欄時焦點在側欄本身，不畫外框 */
+.drawer:focus { outline: none; }
 .font-size button { font-family: var(--serif); min-width: 44px; }
 
 /* ---------- 側欄（目錄＋設定）：所有寬度都是抽屜，閱讀時把畫面全部留給書 ---------- */
@@ -184,7 +188,7 @@ body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
 .toc { flex: 1; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 8px 0 24px; list-style: none; }
 .toc a {
   display: grid;
-  grid-template-columns: 3.4em minmax(0, 1fr) auto;
+  grid-template-columns: 6.6em minmax(0, 1fr) auto; /* 放得下最長的「第一百一十二回」 */
   gap: 8px;
   align-items: baseline;
   padding: 7px 20px;
@@ -195,7 +199,7 @@ body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
   line-height: 1.6;
 }
 .toc a:hover { background: var(--hairline); }
-.toc .no { color: var(--text-2); font-size: 12px; font-family: var(--font); font-variant-numeric: tabular-nums; }
+.toc .no { white-space: nowrap; color: var(--text-2); font-size: 12px; font-family: var(--font); font-variant-numeric: tabular-nums; }
 .toc .read { width: 6px; height: 6px; border-radius: 50%; background: transparent; align-self: center; }
 .toc .is-read .read { background: var(--cinnabar); opacity: 0.55; }
 .toc a[aria-current="true"] { background: color-mix(in srgb, var(--cinnabar) 12%, transparent); box-shadow: inset 3px 0 0 var(--cinnabar); }
@@ -353,14 +357,18 @@ body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
   column-fill: auto;
   font-family: var(--serif);
   font-size: var(--reader-size);
-  line-height: 1.95;
-  letter-spacing: 0.04em;
+  line-height: var(--reader-lh, 1.95);
+  letter-spacing: var(--reader-ls, 0.04em);
   text-align: justify;
+  /* Safari：行尾的標點可以懸在欄外，少一些「標點不能放行首」造成的字距撐開；Chrome 不支援，會忽略 */
+  hanging-punctuation: allow-end;
   color: var(--ink);
   font-kerning: none;
 }
 .flow p { margin: 0; text-indent: 2em; }
 .flow .poem { margin: 0.6em 0; padding-left: 4em; white-space: pre-line; text-indent: 0; text-align: left; }
+/* 單頁（手機）欄寬窄，詩詞縮排減半，一行才放得下七言 */
+.single .flow .poem { padding-left: 2em; }
 .flow .comment { margin: 0 0 0.8em; font-size: 0.86em; line-height: 1.85; color: var(--cinnabar); text-indent: 2em; white-space: pre-line; }
 .flow .comment-mark { display: block; margin-bottom: 0.2em; font-size: 0.8em; letter-spacing: 0.3em; text-indent: 0; }
 .flow sup { font-size: 0.62em; line-height: 0; color: var(--cinnabar); font-family: var(--font); letter-spacing: 0; padding: 0 1px; }
@@ -401,9 +409,13 @@ body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
 .bar .status b { color: var(--text); font-weight: 500; }
 
 /* 手機：五個按鈕加拉桿擠在一列，百分比收進側欄的進度條，拉桿才夠寬 */
+/* 手機：觸控按鈕至少 44×44 */
+@media (max-width: 767px) {
+  .icon-btn { width: 44px; height: 44px; }
+}
 @media (max-width: 479px) {
-  .bar { gap: 2px; padding: 0 4px; }
-  .bar .icon-btn { width: 36px; }
+  .bar { gap: 0; padding: 0 2px; }
+  .bar .status { padding-left: 8px; }
   .bar .status { min-width: 0; }
   .bar .pct { display: none; }
 }
