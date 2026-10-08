@@ -196,7 +196,7 @@
     const key = `${n}`;
     if (!chapter) { el.innerHTML = '<div class="loading-note">載入中…</div>'; delete el.dataset.key; return; }
     if (el.dataset.key !== key) {
-      el.innerHTML = `<div class="page-inner"><div class="running-head"><span></span><span></span></div><div class="window"><div class="flow">${chapter.html}</div></div><div class="folio"></div></div><i class="shade"></i>`;
+      el.innerHTML = `<div class="page-inner"><div class="running-head"><span></span><span></span></div><div class="window"><div class="flow">${chapter.html}</div></div><div class="folio"></div></div>`;
       el.dataset.key = key;
     }
     const flow = el.querySelector('.flow');
@@ -218,7 +218,7 @@
   }
 
   function setBlankPaper(el) {
-    el.innerHTML = '<i class="shade"></i>';
+    el.innerHTML = '';
     delete el.dataset.key;
   }
 
@@ -264,7 +264,7 @@
   const EASE = 'cubic-bezier(0.45, 0, 0.2, 1)';
   const nextFrame = () => new Promise((resolve) => { window.requestAnimationFrame(() => resolve()); });
   /*
-    翻頁與封面翻動時不做明暗變化。原本疊一層黑色遮罩（.shade）表現明暗，
+    翻頁與封面翻動時不做明暗變化。原本疊一層黑色遮罩表現明暗，
     但 Safari 的 backface-visibility 只藏住朝後的那一面，上面的遮罩照樣畫出來，
     翻頁躺在左頁時會閃黑一下（拿掉遮罩後實測不閃）。
   */
