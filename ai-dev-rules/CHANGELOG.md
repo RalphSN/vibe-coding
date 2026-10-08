@@ -21,6 +21,7 @@
 - `domain-web-frontend`、`web-animation` 與 `domain-media-image-video-animation` 動畫規則：3D 場景裡的明暗遮罩不做 `opacity` 動畫，改動 `background-color` 或 `filter: brightness()`（Safari 翻頁閃動的實例）；有 `delay` 的 Web Animations 用 `fill: 'both'`；動畫要在播放中檢查，暫停截圖看不到合成圖層的閃動。
 - core 測試規範的 UI 改動：網頁至少在 Chrome 與 Safari 各看一次。
 
+- `project-skills.txt`：列出的 skill 在 build 時同步到 repo 的 `.claude/skills/`，雲端 Claude Code session 也讀得到；verify 會檢查副本沒有被直接修改。目前同步 `bookshelf-portal`、`course-web-neo-brutalism`。
 - `scripts/install.sh`：macOS／Linux 的安裝入口，檢查 `pwsh` 後把參數交給 `install.ps1`。
 
 ### Fixed

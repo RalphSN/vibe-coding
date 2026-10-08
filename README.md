@@ -18,6 +18,7 @@ Vibe-Coding/
 ├─ ai-dev-rules/           三個 AI 工具共用的規範與 skills（來源 → build → dist → install）
 ├─ .claude/
 │  ├─ skills/impeccable/   前端設計 skill（第三方，Apache-2.0）
+│  ├─ skills/<其他>/       由 ai-dev-rules build 自動同步的副本（給雲端 session 用，不要直接改）
 │  └─ launch.json          本機預覽伺服器設定
 ├─ tools/serve.mjs         本機預覽伺服器（Windows、macOS 都只需要 Node）
 ├─ opus5-5-animations/     Opus 5.5 動畫影片的 prompt 收藏（參考素材）
@@ -62,6 +63,7 @@ Claude Code 的預覽面板會讀 `.claude/launch.json`，裡面已設好首頁�
 
 - 換行一律 LF（`.gitattributes` 會處理），只有 `.ps1`、`.bat`、`.cmd` 是 CRLF。
 - 下載的網頁、原文存檔放 `_inbox/`，不要放進其他資料夾。
-- skills 只改 `ai-dev-rules/skills/`，不要改 `dist/` 或家目錄裡安裝好的副本。
+- skills 只改 `ai-dev-rules/skills/`，改完跑 `build.ps1`。`dist/`、家目錄的安裝版、`.claude/skills/` 的同步副本都是產生出來的，不要直接改；`verify.ps1` 會抓出被直接改過的副本。
+- 要讓雲端 session 也能用某個 skill，把名稱加進 `ai-dev-rules/project-skills.txt` 再 build。
 - 有 `src/` 的課程，改 `src/` 再用 `build.sh` 重建，不要直接改 `index.html`。
 - `.claude/skills/impeccable` 是第三方 skill；要更新時從 [RalphSN/impeccable](https://github.com/RalphSN/impeccable) 的 `.claude/skills/impeccable/` 複製過來，`LICENSE` 與 `NOTICE.md` 要保留。

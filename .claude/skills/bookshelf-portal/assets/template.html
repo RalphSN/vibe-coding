@@ -1,0 +1,1038 @@
+<!doctype html>
+<!-- 由 scripts/build.ps1 產生，請改 ai-dev-rules 的來源（core/、skills/、workflows/、agents/、enforcement/），不要改這裡 -->
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe Coding</title>
+<meta name="description" content="個人課程書櫃：Prompt 與 Agent、Claude Code 安全開發。">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<script>
+  /* 在第一次繪製前套用主題，避免深色模式閃白 */
+  try {
+    const savedTheme = window.localStorage.getItem('vibe-coding-home.theme.v1');
+    if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+  } catch (err) {
+    console.warn('無法讀取主題偏好，改用系統設定：', err);
+  }
+</script>
+<style>
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --text: #1d1d1f;
+  --text-2: #6e6e73;
+  --hairline: rgba(0, 0, 0, 0.1);
+  --focus: #0071e3;
+  --selection: rgba(0, 113, 227, 0.2);
+
+  /* 實體材質：紙、燙金、櫃子背板、金屬層板 */
+  --paper: #f8f4ea;
+  --paper-2: #efe8d8;
+  --paper-line: #e3dac6;
+  --ink: #1d1d1f;
+  --foil: #efe2bf;
+  --case-back: linear-gradient(#e4e4e9, #ececf0 60%, #e9e9ee);
+  --case-shade: rgba(0, 0, 0, 0.28);
+  --metal-top: linear-gradient(#ffffff, #dcdce1);
+  --metal-front: linear-gradient(#d2d2d8, #b4b4bc 55%, #a3a3ac);
+  --metal-brush: rgba(255, 255, 255, 0.16);
+  --stage-bg: rgba(236, 236, 240, 0.9);
+  --linen:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 3px);
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --gutter: clamp(16px, 4vw, 40px);
+  --max: 1080px;
+  --nav-h: 48px;
+  --shelf-h: clamp(340px, 36vw, 360px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --surface: #1d1d1f;
+    --text: #f5f5f7;
+    --text-2: #a1a1a6;
+    --hairline: rgba(255, 255, 255, 0.14);
+    --focus: #2997ff;
+    --selection: rgba(41, 151, 255, 0.35);
+    --case-back: linear-gradient(#0e0e10, #151517 60%, #121214);
+    --case-shade: rgba(0, 0, 0, 0.7);
+    --metal-top: linear-gradient(#6a6a72, #44444b);
+    --metal-front: linear-gradient(#3c3c43, #2b2b31 55%, #222227);
+    --metal-brush: rgba(255, 255, 255, 0.05);
+    --stage-bg: rgba(0, 0, 0, 0.86);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1d1d1f;
+  --text: #f5f5f7;
+  --text-2: #a1a1a6;
+  --hairline: rgba(255, 255, 255, 0.14);
+  --focus: #2997ff;
+  --selection: rgba(41, 151, 255, 0.35);
+  --case-back: linear-gradient(#0e0e10, #151517 60%, #121214);
+  --case-shade: rgba(0, 0, 0, 0.7);
+  --metal-top: linear-gradient(#6a6a72, #44444b);
+  --metal-front: linear-gradient(#3c3c43, #2b2b31 55%, #222227);
+  --metal-brush: rgba(255, 255, 255, 0.05);
+  --stage-bg: rgba(0, 0, 0, 0.86);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scrollbar-color: var(--text-2) var(--bg); }
+
+/* 中文字距維持 0 以上，負字距會讓方塊字擠在一起 */
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 400ms var(--ease-out), color 400ms var(--ease-out);
+}
+
+::selection { background: var(--selection); }
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
+
+.wrap {
+  width: 100%;
+  max-width: calc(var(--max) + var(--gutter) * 2);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* ---------- 頂部列 ---------- */
+.nav { height: var(--nav-h); border-bottom: 1px solid var(--hairline); }
+.nav .wrap { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.brand svg { width: 20px; height: 20px; flex: none; }
+@media (max-width: 479px) {
+  .brand .path { display: none; }
+}
+.brand .path { color: var(--text-2); font-family: var(--mono); font-weight: 400; font-size: 12px; }
+
+.theme-switch { display: inline-flex; padding: 2px; border-radius: 999px; background: var(--hairline); flex: none; }
+.theme-switch button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  min-width: 44px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 250ms var(--ease-out), color 250ms var(--ease-out);
+}
+.theme-switch button:hover { color: var(--text); }
+.theme-switch button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+/* ---------- 標題列 ---------- */
+main { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: clamp(40px, 8vh, 96px) 0; }
+
+.shelf-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin-bottom: clamp(24px, 4vh, 40px);
+}
+.shelf-head h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); line-height: 1.2; font-weight: 700; letter-spacing: 0.04em; }
+.shelf-head p { margin: 0; color: var(--text-2); font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* ---------- 書櫃：背板 + 金屬層板 ---------- */
+.bookcase {
+  position: relative;
+  padding: 44px clamp(16px, 3vw, 36px) 0;
+  border-radius: 10px 10px 0 0;
+  background: var(--case-back);
+  /* 上方層板投下的陰影與兩側的內陰影，讓背板有深度 */
+  box-shadow:
+    inset 0 26px 28px -22px var(--case-shade),
+    inset 14px 0 18px -16px var(--case-shade),
+    inset -14px 0 18px -16px var(--case-shade);
+  transition: background 400ms var(--ease-out);
+}
+
+.books {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-height: var(--shelf-h);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.books li { display: flex; align-items: flex-end; }
+
+.board {
+  position: relative;
+  height: 20px;
+  margin: 0 calc(-1 * clamp(16px, 3vw, 36px));
+  border-radius: 0 0 6px 6px;
+  background:
+    var(--metal-top) top / 100% 6px no-repeat,
+    repeating-linear-gradient(90deg, var(--metal-brush) 0 1px, transparent 1px 3px),
+    var(--metal-front);
+  box-shadow: 0 14px 20px -12px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* ---------- 書 ---------- */
+.book {
+  --accent: #1e4fb3;
+  position: relative;
+  display: block;
+  width: var(--w, 64px);
+  height: calc(var(--shelf-h) * var(--h, 1));
+  margin-bottom: -3px; /* 書站進層板頂面一點點，看起來是放在上面而不是浮著 */
+  color: var(--foil);
+  text-decoration: none;
+  /* 光從左上來，影子落在右側背板 */
+  box-shadow: 12px 2px 18px -10px rgba(0, 0, 0, 0.55);
+  transition: transform 500ms var(--ease-out), box-shadow 500ms var(--ease-out);
+}
+.book:hover,
+.book:focus-visible { transform: translateY(-12px); box-shadow: 16px 8px 24px -10px rgba(0, 0, 0, 0.5); }
+.book:focus-visible { outline-offset: 5px; }
+.book.is-pulled { visibility: hidden; }
+
+/* 落在層板上的接觸陰影；書抬起時留在原地並變淡 */
+.book-contact {
+  position: absolute;
+  left: -4px;
+  right: -10px;
+  bottom: -4px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), transparent);
+  pointer-events: none;
+  transition: transform 500ms var(--ease-out), opacity 500ms var(--ease-out);
+}
+.book:hover .book-contact,
+.book:focus-visible .book-contact { transform: translateY(12px) scaleX(1.15); opacity: 0.45; }
+
+.spine {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  justify-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-radius: 2px 2px 1px 1px;
+  overflow: hidden;
+  color: var(--foil);
+  /* 圓弧書脊的明暗：兩側暗、左側偏亮的高光，再疊布紋 */
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.14) 7%, rgba(255, 255, 255, 0.16) 22%, rgba(255, 255, 255, 0.05) 40%, rgba(0, 0, 0, 0.06) 64%, rgba(0, 0, 0, 0.3) 90%, rgba(0, 0, 0, 0.55) 100%),
+    var(--linen),
+    var(--accent);
+}
+
+/* 書脊上下的壓條：凸起的橫紋加兩道燙金細線 */
+.band {
+  width: 100%;
+  height: 7px;
+  border-top: 1px solid rgba(239, 226, 191, 0.55);
+  border-bottom: 1px solid rgba(239, 226, 191, 0.55);
+  background: linear-gradient(rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.16) 45%, rgba(0, 0, 0, 0.3));
+}
+
+.spine-icon { width: 22px; height: 22px; filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.45)); }
+.spine-icon svg { width: 100%; height: 100%; display: block; }
+
+/* 深色書名標籤，燙金字。
+   寬度要寫 max-content：裡面是直排書名（和標籤方向不同），Safari 自動算寬時不計直排內容，
+   標籤會只剩內距寬、書名被 overflow 裁掉；Chrome 兩種寫法結果相同 */
+.spine-label {
+  width: max-content;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  padding: 10px 3px;
+  border: 1px solid rgba(239, 226, 191, 0.45);
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.26);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.spine-title {
+  display: block;
+  writing-mode: vertical-rl;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.spine-foot {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* 閱讀進度：書脊右側的一條燙金細線 */
+.spine-progress {
+  position: absolute;
+  top: 26px;
+  bottom: 26px;
+  right: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.spine-progress span { position: absolute; inset: auto 0 0 0; height: calc(var(--ratio, 0) * 100%); background: var(--foil); }
+
+.bookend { width: 46px; height: calc(var(--shelf-h) * 0.48); margin-left: 8px; filter: drop-shadow(10px 2px 8px rgba(0, 0, 0, 0.35)); }
+.bookend svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+/* ---------- 書櫃下方的說明欄 ---------- */
+.inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px 32px;
+  min-height: 140px;
+  margin-top: 28px;
+  padding: 0 clamp(4px, 1vw, 12px);
+}
+@media (min-width: 768px) {
+  .inspector { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+}
+.inspector h2 { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 700; letter-spacing: 0.02em; text-wrap: balance; }
+.inspector .phrase { display: inline-block; }
+.inspector p { margin: 6px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.7; text-wrap: pretty; }
+.inspector dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: 13px; line-height: 1.5; align-content: start; }
+.inspector dt { color: var(--text-2); letter-spacing: 0.08em; }
+.inspector dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.inspector .hint { color: var(--text-2); font-size: 15px; margin: 0; }
+
+/* ---------- 打開書的舞台：真的 3D 書 ---------- */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  perspective: 2000px;
+  perspective-origin: 50% 50%;
+  cursor: pointer;
+}
+.stage-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--stage-bg);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.stage-shadow {
+  position: absolute;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.5), transparent);
+  filter: blur(6px);
+  opacity: 0;
+}
+.stage-skip {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  color: var(--text-2);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.book3d {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--W);
+  height: var(--H);
+  transform-style: preserve-3d;
+  transform-origin: 50% 50%;
+}
+.b3 { position: absolute; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+/* 明暗遮罩只動 background-color，不動 opacity：opacity 動畫會被拆成獨立合成圖層，
+   和所在頁面同一平面，Safari 每格排序不定，翻頁時左頁會閃 */
+.shade { position: absolute; inset: 0; background-color: rgba(0, 0, 0, 0); pointer-events: none; }
+
+.cloth {
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.2)),
+    var(--linen),
+    var(--accent);
+}
+
+.b3-back { inset: 0; border-radius: 6px 3px 3px 6px; transform: rotateY(180deg) translateZ(calc(var(--D) / 2)); }
+.b3-spine {
+  top: 0;
+  left: calc((var(--W) - var(--D)) / 2);
+  width: var(--D);
+  height: var(--H);
+  transform: rotateY(-90deg) translateZ(calc(var(--W) / 2));
+}
+/* 書脊內容用書櫃上的尺寸排版，再等比放大，交接時看起來是同一本書 */
+.b3-spine .spine { inset: auto; left: 0; top: 0; width: var(--sw); height: var(--sh); transform-origin: 0 0; transform: scale(var(--spine-scale)); }
+
+.pages-x { background: repeating-linear-gradient(90deg, var(--paper) 0 1px, var(--paper-line) 1px 2px); }
+.pages-y { background: repeating-linear-gradient(0deg, var(--paper) 0 1px, var(--paper-line) 1px 2px); }
+.b3-edge {
+  top: 4px;
+  left: calc((var(--W) - var(--D)) / 2 + 2px);
+  width: calc(var(--D) - 4px);
+  height: calc(var(--H) - 8px);
+  transform: rotateY(90deg) translateZ(calc(var(--W) / 2 - 4px));
+}
+.b3-top,
+.b3-bottom {
+  left: 0;
+  top: calc((var(--H) - var(--D)) / 2 + 2px);
+  width: calc(var(--W) - 4px);
+  height: calc(var(--D) - 4px);
+}
+.b3-top { transform: rotateX(90deg) translateZ(calc(var(--H) / 2 - 4px)); }
+.b3-bottom { transform: rotateX(-90deg) translateZ(calc(var(--H) / 2 - 4px)); }
+
+/* 紙面：書板四周留一圈布邊（--rim），紙貼在裡面。右頁、扉頁、蝴蝶頁共用同一個範圍，翻開後左右對稱 */
+.book3d { --rim: 5px; }
+.paper {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 60%),
+    var(--paper);
+  color: var(--ink);
+}
+/* 書溝陰影：靠書脊那一側 */
+.gutter-left { box-shadow: inset 14px 0 14px -10px rgba(0, 0, 0, 0.22); }
+.gutter-right { box-shadow: inset -14px 0 14px -10px rgba(0, 0, 0, 0.22); }
+
+/* 右頁：封底板內側（布）＋紙頁 */
+.b3-page { inset: 0; border-radius: 3px 6px 6px 3px; transform: translateZ(calc(var(--D) / 2 - 3px)); }
+.page-panel {
+  position: absolute;
+  top: var(--rim);
+  bottom: var(--rim);
+  left: 0;
+  right: var(--rim);
+  border-radius: 0 2px 2px 0;
+  padding: 9cqw 9cqw 8cqw 11cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 4cqw;
+}
+
+/* 扉頁：封面之後再翻的一張紙，範圍和右頁的紙一樣 */
+.b3-leaf {
+  position: absolute;
+  top: var(--rim);
+  bottom: var(--rim);
+  left: 0;
+  right: var(--rim);
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--D) / 2 - 1.5px));
+}
+.leaf-front,
+.leaf-back { inset: 0; display: grid; place-items: center; text-align: center; padding: 10cqw; }
+.leaf-front { border-radius: 0 2px 2px 0; }
+.leaf-back { transform: rotateY(180deg); border-radius: 2px 0 0 2px; }
+
+.b3-cover {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  transform: translateZ(calc(var(--D) / 2));
+}
+.cover-front { inset: 0; border-radius: 3px 6px 6px 3px; color: var(--foil); padding: 10cqw 10cqw 9cqw 14cqw; display: flex; flex-direction: column; justify-content: space-between; }
+/* 封面靠書脊處的折痕 */
+.cover-front::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 6cqw;
+  width: 2.4cqw;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.35), rgba(255, 255, 255, 0.12) 55%, rgba(0, 0, 0, 0.1));
+}
+/* 燙金外框 */
+.cover-front::after {
+  content: "";
+  position: absolute;
+  inset: 5cqw 5cqw 5cqw 11cqw;
+  border: 1px solid rgba(239, 226, 191, 0.5);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.cover-head { display: flex; justify-content: space-between; align-items: flex-start; position: relative; }
+.cover-head svg { width: 22cqw; height: 22cqw; filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.45)); }
+.cover-front h3 { margin: 0 0 3cqw; font-size: max(14px, 9.5cqw); line-height: 1.25; letter-spacing: 0.02em; font-weight: 700; text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.14); }
+.cover-front small,
+.cover-head small { font-family: var(--mono); font-size: max(8px, 3.4cqw); letter-spacing: 0.04em; white-space: nowrap; opacity: 0.9; }
+.cover-front > div { position: relative; }
+.cover-front .phrase { display: inline-block; }
+
+/* 封面內側：布面包邊，中間貼蝴蝶頁（書本色細點花紋）。翻過來後外緣在左、書脊在右 */
+.cover-inside { inset: 0; transform: rotateY(180deg); border-radius: 6px 3px 3px 6px; }
+.endpaper {
+  position: absolute;
+  top: var(--rim);
+  bottom: var(--rim);
+  left: var(--rim);
+  right: 0;
+  border-radius: 2px 0 0 2px;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent) 0.8px, transparent 1.4px) 0 0 / 10px 10px,
+    var(--paper-2);
+}
+
+.book3d { container-type: inline-size; }
+.b3-page h3,
+.leaf-front strong { margin: 0; font-size: max(13px, 7.4cqw); line-height: 1.35; letter-spacing: 0.02em; }
+.b3-page .phrase,
+.leaf-front .phrase { display: inline-block; }
+.b3-page p { margin: 0; font-size: max(10px, 4.4cqw); line-height: 1.75; color: #4a4a4f; letter-spacing: 0.02em; }
+.leaf-front span,
+.leaf-back span { display: block; margin-top: 3cqw; font-size: max(9px, 3.8cqw); color: #6e6e73; letter-spacing: 0.08em; }
+.leaf-back .stamp,
+.stamp { display: inline-block; margin-top: 4cqw; padding: 1.2cqw 3cqw; border: 1px solid #8a8a8f; border-radius: 2px; font-family: var(--mono); font-size: max(9px, 3.4cqw); color: #6e6e73; letter-spacing: 0.04em; }
+.loading { margin-top: auto; display: grid; gap: 2.5cqw; font-family: var(--mono); font-size: max(9px, 3.6cqw); color: #6e6e73; letter-spacing: 0.04em; }
+.bar { height: 2px; background: rgba(0, 0, 0, 0.1); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--accent); transform-origin: left center; transform: scaleX(0); }
+
+.footer { padding: 16px 0 24px; color: var(--text-2); font-size: 12px; letter-spacing: 0.04em; }
+.footer p { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <span class="brand">
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <rect x="1" y="1" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M5.8 7.6 8.2 10l-2.4 2.4M10.6 12.8h3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Vibe Coding
+      <span class="path">~/course-web</span>
+    </span>
+    <div class="theme-switch" role="group" aria-label="配色">
+      <button type="button" data-theme-choice="auto">自動</button>
+      <button type="button" data-theme-choice="light">淺色</button>
+      <button type="button" data-theme-choice="dark">深色</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="shelf-head">
+      <h1>書櫃</h1>
+      <p id="shelf-summary"></p>
+    </div>
+    <div class="bookcase">
+      <ul class="books" id="books" aria-label="課程"></ul>
+      <div class="board" aria-hidden="true"></div>
+    </div>
+    <section class="inspector" id="inspector" aria-live="polite"></section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap"><p>進度只存在這個瀏覽器。</p></div>
+</footer>
+
+<!--
+  新增一本書：在 SITES 加一筆。書的厚度依單元數自動計算，高度用 height（相對書櫃高度）調整。
+  href 寫到 index.html，GitHub Pages 和本機直接開檔都能用。
+-->
+<script>
+const SITES = [
+  {
+    id: 'karpathy',
+    color: '#8a6a1f',
+    icon: 'steps',
+    href: 'course-web/karpathy-output-formats-course/index.html',
+    spineTitle: '卡帕西的4種AI輸出格式',
+    titlePhrases: ['卡帕西的', '4 種 AI', '輸出格式'],
+    desc: '改編自《數位時代》報導：規範文字、一張圖、互動網頁、解說影片，讓 AI 把複雜概念講清楚。附原文連結與提示詞產生器。',
+    modules: 4,
+    lessons: 9,
+    readyLessons: 9,
+    updated: '2026-10',
+    height: 0.9,
+    progressKey: 'karpathy-formats.v1',
+  },
+  {
+    id: 'prompt',
+    color: '#1e4fb3',
+    icon: 'loop',
+    href: 'course-web/ai-chat-prompt-agent-course/index.html',
+    spineTitle: 'Prompt × Agent 實戰課',
+    titlePhrases: ['AI 對話', '× Prompt', '× Agent', '實戰課'],
+    desc: '從跟 AI 對話、寫 prompt，到操作 AI Agent、CLI 與 harness。',
+    modules: 12,
+    lessons: 50,
+    readyLessons: 50,
+    updated: '2026-10',
+    height: 1,
+    progressKey: 'ai-chat-prompt-agent-course.v1',
+  },
+  {
+    id: 'secure',
+    color: '#1d6338',
+    icon: 'layers',
+    href: 'course-web/claude-code-secure-dev-course/index.html',
+    spineTitle: 'Claude Code 安全開發',
+    titlePhrases: ['Claude Code', '× 安全開發', '實戰課'],
+    desc: '用 Claude Code CLI 與 Cowork 開發軟體：工作流、權限與隔離、資安防護、效能與成本。',
+    modules: 9,
+    lessons: 29,
+    readyLessons: 29,
+    updated: '2026-10',
+    height: 0.92,
+    progressKey: 'claude-secure-dev-course.v1',
+  },
+  {
+    id: 'terminal',
+    color: '#6b2a7a',
+    icon: 'terminal',
+    href: 'course-web/terminal-commands-course/index.html',
+    spineTitle: '終端機指令從零開始',
+    titlePhrases: ['終端機指令', '從零看懂', '到會寫'],
+    desc: '指令的文法、路徑與管線、PATH 與權限、PowerShell／zsh／bash／cmd，以及 git、npm 與三大 AI CLI。',
+    modules: 9,
+    lessons: 37,
+    readyLessons: 37,
+    updated: '2026-10',
+    height: 0.96,
+    progressKey: 'terminal-course.v1',
+  },
+];
+
+const THEME_KEY = 'vibe-coding-home.theme.v1';
+const SPINE_BASE_WIDTH = 40;
+const SPINE_WIDTH_PER_LESSON = 0.7;
+const COVER_MAX_WIDTH = 300;
+const COVER_RATIO = 4 / 3;
+const STAGE_PERSPECTIVE = 2000;
+const SPINE_TITLE_MIN_PX = 11;
+const SPINE_LABEL_PADDING = 20;
+const EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)';
+const EASE_IN_OUT = 'cubic-bezier(0.45, 0, 0.2, 1)';
+
+const ICONS = {
+  steps: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h4v-4h4v-4h4V8h4V4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M3 20h18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+  terminal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 9.5 9.5 12l-3 2.5M11.5 15h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  loop: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="4.5" r="2.2" fill="currentColor"/><circle cx="18.5" cy="15.8" r="2.2" fill="currentColor"/><circle cx="5.5" cy="15.8" r="2.2" fill="currentColor"/></svg>',
+  layers: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="4" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.6"/><rect x="6" y="6" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.8"/><path d="M10.5 10 8.6 12l1.9 2M13.5 10l1.9 2-1.9 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+
+/**
+ * 讀課程自己存在 localStorage 的進度。同網域（GitHub Pages 的同一個 repo）才讀得到。
+ * @param {string} key 課程的 STORAGE_KEY
+ * @returns {number} 已完成的單元數；讀不到時回傳 0
+ */
+function readDoneCount(key) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.done !== 'object' || parsed.done === null) return 0;
+    return Object.values(parsed.done).filter(Boolean).length;
+  } catch (err) {
+    console.warn(`無法讀取課程進度「${key}」：`, err);
+    return 0;
+  }
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function phrasesHtml(phrases) {
+  return phrases.map((p) => `<span class="phrase">${escapeHtml(p)}</span>`).join(' ');
+}
+
+function siteStats(site) {
+  return {
+    done: Math.min(readDoneCount(site.progressKey), site.lessons),
+    isComplete: site.readyLessons >= site.lessons,
+  };
+}
+
+function findSite(element) {
+  const book = element && element.closest('.book');
+  return book ? SITES.find((s) => s.id === book.dataset.id) : null;
+}
+
+/* ---------- 書櫃 ---------- */
+function spineHtml(site) {
+  const { done, isComplete } = siteStats(site);
+  const foot = isComplete ? `${site.lessons} 課` : `${site.readyLessons}/${site.lessons}`;
+  return `
+    <span class="spine">
+      <span class="band"></span>
+      <span class="spine-icon">${ICONS[site.icon]}</span>
+      <span class="spine-label"><span class="spine-title">${escapeHtml(site.spineTitle)}</span></span>
+      <span class="spine-foot">${foot}</span>
+      <span class="band"></span>
+      <span class="spine-progress" aria-hidden="true"><span style="--ratio:${done / site.lessons}"></span></span>
+    </span>`;
+}
+
+function renderBook(site) {
+  const { done } = siteStats(site);
+  const width = Math.round(SPINE_BASE_WIDTH + site.lessons * SPINE_WIDTH_PER_LESSON);
+  const fullTitle = site.titlePhrases.join(' ');
+  return `
+    <li>
+      <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}"
+         style="--accent:${site.color};--w:${width}px;--h:${site.height}"
+         aria-label="${escapeHtml(fullTitle)}，${site.lessons} 個單元，已讀 ${done} 個">
+        <span class="book-contact" aria-hidden="true"></span>
+        ${spineHtml(site)}
+      </a>
+    </li>`;
+}
+
+/* 金屬書擋：拉絲漸層＋左上高光 */
+const BOOKEND = `
+  <li aria-hidden="true" class="bookend">
+    <svg viewBox="0 0 46 170" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="metal" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stop-color="#9c9ca4"/><stop offset="0.35" stop-color="#f2f2f5"/><stop offset="0.7" stop-color="#c4c4cb"/><stop offset="1" stop-color="#8e8e96"/>
+        </linearGradient>
+      </defs>
+      <path d="M2 170V8a7 7 0 0 1 7-7h4v159h33v10Z" fill="url(#metal)"/>
+      <path d="M3.5 168V8.5a5.5 5.5 0 0 1 5.5-5.5" fill="none" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1"/>
+    </svg>
+  </li>`;
+
+/* 書名放不下標籤時等比縮小字級，避免被截斷 */
+function fitSpineTitles() {
+  document.querySelectorAll('#books .spine-title').forEach((title) => {
+    title.style.fontSize = '';
+    const available = title.parentElement.clientHeight - SPINE_LABEL_PADDING;
+    if (title.scrollHeight <= available) return;
+    const current = parseFloat(getComputedStyle(title).fontSize);
+    title.style.fontSize = `${Math.max(SPINE_TITLE_MIN_PX, Math.floor(current * (available / title.scrollHeight) * 10) / 10)}px`;
+  });
+}
+
+function renderShelf() {
+  document.getElementById('books').innerHTML = SITES.map(renderBook).join('') + BOOKEND;
+  fitSpineTitles();
+  const totalLessons = SITES.reduce((sum, s) => sum + s.lessons, 0);
+  const totalDone = SITES.reduce((sum, s) => sum + siteStats(s).done, 0);
+  document.getElementById('shelf-summary').textContent = `${SITES.length} 本 · ${totalLessons} 單元 · 已讀 ${totalDone}`;
+  inspectedId = undefined;
+  showInspector(null);
+}
+
+/* ---------- 說明欄：游標停在書背或用 Tab 聚焦時顯示 ---------- */
+let inspectedId;
+
+function inspectorHtml(site) {
+  if (!site) {
+    const hint = window.matchMedia('(hover: hover)').matches ? '游標停在書背上看介紹，點一下打開。' : '點一下書背打開。';
+    return `<p class="hint">${hint}</p>`;
+  }
+  const { done, isComplete } = siteStats(site);
+  const status = isComplete ? '已完成' : `製作中，${site.readyLessons} 個單元可讀`;
+  return `
+    <div>
+      <h2>${phrasesHtml(site.titlePhrases)}</h2>
+      <p>${escapeHtml(site.desc)}</p>
+    </div>
+    <dl>
+      <dt>路徑</dt><dd>${escapeHtml(site.href.replace(/index\.html$/, ''))}</dd>
+      <dt>內容</dt><dd>${site.modules} 模組 · ${site.lessons} 單元</dd>
+      <dt>狀態</dt><dd>${escapeHtml(status)}</dd>
+      <dt>已讀</dt><dd>${done} / ${site.lessons}</dd>
+      <dt>查證</dt><dd>${escapeHtml(site.updated)}</dd>
+    </dl>`;
+}
+
+function showInspector(site) {
+  const id = site ? site.id : null;
+  if (id === inspectedId) return;
+  inspectedId = id;
+  document.getElementById('inspector').innerHTML = inspectorHtml(site);
+}
+
+function setupInspector() {
+  const books = document.getElementById('books');
+  books.addEventListener('pointerover', (event) => {
+    const site = findSite(event.target);
+    if (site) showInspector(site);
+  });
+  books.addEventListener('focusin', (event) => showInspector(findSite(event.target)));
+  books.addEventListener('pointerleave', () => {
+    if (!books.contains(document.activeElement)) showInspector(null);
+  });
+  books.addEventListener('focusout', (event) => {
+    if (!books.contains(event.relatedTarget)) showInspector(null);
+  });
+
+  // 左右方向鍵在書之間移動
+  books.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const list = [...books.querySelectorAll('.book')];
+    const index = list.indexOf(document.activeElement);
+    if (index < 0) return;
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    list[(index + step + list.length) % list.length].focus();
+    event.preventDefault();
+  });
+}
+
+/* ---------- 開書：抽出 → 空中從書背轉到封面 → 翻開封面與扉頁 → 跳轉 ---------- */
+let isOpening = false;
+
+function book3dHtml(site, spineRect) {
+  const { done } = siteStats(site);
+  return `
+    <div class="b3 b3-back cloth"></div>
+    <div class="b3 b3-edge pages-x"></div>
+    <div class="b3 b3-top pages-y"></div>
+    <div class="b3 b3-bottom pages-y"></div>
+    <div class="b3 b3-page cloth">
+      <div class="page-panel paper gutter-left">
+        <h3>${phrasesHtml(site.titlePhrases)}</h3>
+        <p>${escapeHtml(site.desc)}</p>
+        <div class="loading"><span>正在打開…</span><div class="bar"><span></span></div></div>
+      </div>
+    </div>
+    <div class="b3-leaf">
+      <div class="b3 leaf-front paper gutter-left"><div><strong>${phrasesHtml(site.titlePhrases)}</strong><span>Vibe Coding</span></div><i class="shade"></i></div>
+      <div class="b3 leaf-back paper gutter-right"><div><span>${site.modules} 模組 · ${site.lessons} 單元</span><span class="stamp">已讀 ${done} / ${site.lessons}</span></div><i class="shade"></i></div>
+    </div>
+    <div class="b3-cover">
+      <div class="b3 cover-front cloth">
+        <div class="cover-head">${ICONS[site.icon]}<small>${site.lessons} 單元</small></div>
+        <div><h3>${phrasesHtml(site.titlePhrases)}</h3><small>VIBE CODING · ${escapeHtml(site.updated)}</small></div>
+        <i class="shade"></i>
+      </div>
+      <div class="b3 cover-inside cloth"><div class="endpaper gutter-right"></div><i class="shade"></i></div>
+    </div>
+    <div class="b3 b3-spine" style="--sw:${spineRect.width}px;--sh:${spineRect.height}px">${spineHtml(site)}<i class="shade"></i></div>`;
+}
+
+/**
+ * 算出 3D 書一開始的位置與縮放，讓透視投影後的書脊剛好疊在書櫃上那本書的位置。
+ * 書脊在書轉 90° 時位於 z = s·W/2，透視放大倍率 m = P / (P − z)，
+ * 需要 s·H·m = 書背高度，解出 s；中心點也要反推透視位移。
+ */
+function startPose(spineRect, W, H) {
+  const P = STAGE_PERSPECTIVE;
+  const h = spineRect.height;
+  const s = (h * P) / (H * P + (h * W) / 2);
+  const m = P / (P - (s * W) / 2);
+  const ox = window.innerWidth / 2;
+  const oy = window.innerHeight / 2;
+  const cx = ox + (spineRect.left + spineRect.width / 2 - ox) / m;
+  const cy = oy + (spineRect.top + spineRect.height / 2 - oy) / m;
+  return { s, x: cx - W / 2, y: cy - H / 2, depth: (spineRect.width * H) / h };
+}
+
+function pose(x, y, extra) {
+  return `translate(${x}px, ${y}px) ${extra}`;
+}
+
+/** 明暗遮罩的關鍵影格：黑色從 from 到 to 的濃度。用 background-color 而不是 opacity，原因見 .shade */
+function shadeFrames(from, to) {
+  return [{ backgroundColor: `rgba(0, 0, 0, ${from})` }, { backgroundColor: `rgba(0, 0, 0, ${to})` }];
+}
+
+async function openBook(book, site) {
+  isOpening = true;
+
+  // 1. 先把書從書櫃往前、往上抽出來
+  await book.animate(
+    [
+      { transform: 'translateY(-12px)' },
+      { transform: 'translateY(-22px) scale(1.03)', offset: 0.5 },
+      { transform: 'translateY(-36px) scale(1.06)' },
+    ],
+    { duration: 380, easing: EASE_OUT, fill: 'forwards' },
+  ).finished;
+
+  const spineRect = book.querySelector('.spine').getBoundingClientRect();
+  const W = Math.min(COVER_MAX_WIDTH, (window.innerWidth - 48) / 2);
+  const H = Math.min(W * COVER_RATIO, window.innerHeight - 120);
+  const start = startPose(spineRect, W, H);
+  const D = start.depth;
+  const endX = window.innerWidth / 2 - W / 2;
+  const endY = window.innerHeight / 2 - H / 2;
+
+  const stage = document.createElement('div');
+  stage.className = 'stage';
+  stage.setAttribute('aria-hidden', 'true');
+  stage.innerHTML = `
+    <div class="stage-backdrop"></div>
+    <div class="stage-shadow"></div>
+    <div class="book3d" style="--accent:${site.color};--W:${W}px;--H:${H}px;--D:${D}px;--spine-scale:${H / spineRect.height}">${book3dHtml(site, spineRect)}</div>
+    <span class="stage-skip">點一下直接打開</span>`;
+  document.body.append(stage);
+  stage.addEventListener('click', () => { window.location.href = book.href; });
+
+  const book3d = stage.querySelector('.book3d');
+  stage.querySelector('.b3-spine .spine-title').style.fontSize = book.querySelector('.spine-title').style.fontSize;
+  const q = (selector) => stage.querySelector(selector);
+  book3d.style.transform = pose(start.x, start.y, `scale3d(${start.s}, ${start.s}, ${start.s}) rotateY(90deg)`);
+  book.classList.add('is-pulled');
+  book.getAnimations().forEach((animation) => animation.cancel());
+
+  // 2. 在空中轉身：書背轉開、封面轉向你，途中帶一點傾斜，桌面出現影子
+  const flight = { duration: 1000, easing: EASE_IN_OUT, fill: 'forwards' };
+  const midX = (start.x + endX) / 2;
+  const midY = Math.min(start.y, endY) - 40;
+  const shadow = q('.stage-shadow');
+  Object.assign(shadow.style, { left: `${endX - W * 0.1}px`, top: `${endY + H - 14}px`, width: `${W * 1.2}px` });
+  await Promise.all([
+    q('.stage-backdrop').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, fill: 'forwards' }).finished,
+    book3d.animate([
+      { transform: pose(start.x, start.y, `scale3d(${start.s}, ${start.s}, ${start.s}) rotateY(90deg)`) },
+      { transform: pose(midX, midY, `scale3d(${(start.s + 1) / 2}, ${(start.s + 1) / 2}, ${(start.s + 1) / 2}) rotateY(48deg) rotateX(10deg) rotateZ(-4deg)`), offset: 0.5 },
+      { transform: pose(endX, endY, 'scale3d(1, 1, 1) rotateY(0deg)') },
+    ], flight).finished,
+    q('.b3-spine .shade').animate(shadeFrames(0, 0.6), flight).finished,
+    q('.cover-front .shade').animate(shadeFrames(0.6, 0), flight).finished,
+    shadow.animate([{ opacity: 0, transform: 'scaleX(0.3)' }, { opacity: 0.8, transform: 'scaleX(1)' }], flight).finished,
+  ]);
+
+  // 3. 翻開封面，再翻一張扉頁；整本書往右移半本，讓攤開的兩頁置中
+  const coverZ = `translateZ(${D / 2}px)`;
+  const leafZ = `translateZ(${D / 2 - 1.5}px)`;
+  const leafFlatZ = `translateZ(${D / 2 + 1.5}px)`;
+  const openCover = { duration: 900, easing: EASE_IN_OUT, fill: 'forwards' };
+  // 有延遲的動畫用 both：延遲期間就停在第一格，遮罩不會在開始那一刻從 0 跳到起始值
+  const openLeaf = { duration: 800, delay: 260, easing: EASE_IN_OUT, fill: 'both' };
+  await Promise.all([
+    book3d.animate([
+      { transform: pose(endX, endY, 'scale3d(1, 1, 1) rotateY(0deg)') },
+      { transform: pose(endX + W / 2, endY, 'scale3d(1, 1, 1) rotateY(0deg)') },
+    ], openCover).finished,
+    shadow.animate([
+      { opacity: 0.8, transform: 'translateX(0) scaleX(1)' },
+      { opacity: 0.8, transform: `translateX(${W / 2}px) scaleX(1.9)` },
+    ], openCover).finished,
+    q('.b3-cover').animate([{ transform: `${coverZ} rotateY(0deg)` }, { transform: `${coverZ} rotateY(-180deg)` }], openCover).finished,
+    q('.cover-front .shade').animate(shadeFrames(0, 0.5), openCover).finished,
+    q('.cover-inside .shade').animate(shadeFrames(0.5, 0), openCover).finished,
+    // 扉頁翻到 -180° 平放；高度同時墊到封面之上，翻完不會被封面蓋住
+    q('.b3-leaf').animate([{ transform: `${leafZ} rotateY(0deg)` }, { transform: `${leafFlatZ} rotateY(-180deg)` }], openLeaf).finished,
+    q('.leaf-front .shade').animate(shadeFrames(0, 0.35), openLeaf).finished,
+    q('.leaf-back .shade').animate(shadeFrames(0.35, 0), openLeaf).finished,
+  ]);
+
+  // 4. 讀取條跑完就跳轉
+  await q('.bar span').animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 450, easing: EASE_OUT, fill: 'forwards' }).finished;
+  window.location.href = book.href;
+}
+
+function resetOpening() {
+  document.querySelectorAll('.stage').forEach((stage) => stage.remove());
+  document.querySelectorAll('.book.is-pulled').forEach((book) => book.classList.remove('is-pulled'));
+  isOpening = false;
+}
+
+function setupOpening() {
+  document.getElementById('books').addEventListener('click', (event) => {
+    const book = event.target.closest('.book');
+    if (!book) return;
+    // 開新分頁、新視窗的修飾鍵點擊交給瀏覽器
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    const site = findSite(book);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!site || reduceMotion || typeof book.animate !== 'function') return;
+    event.preventDefault();
+    if (isOpening) return;
+    openBook(book, site).catch((err) => {
+      console.warn(`開書動畫失敗，直接前往「${book.href}」：`, err);
+      window.location.href = book.href;
+    });
+  });
+}
+
+/* ---------- 主題 ---------- */
+function applyTheme(choice) {
+  if (choice === 'light' || choice === 'dark') document.documentElement.dataset.theme = choice;
+  else delete document.documentElement.dataset.theme;
+  document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.themeChoice === choice));
+  });
+}
+
+function setupThemeSwitch() {
+  applyTheme(document.documentElement.dataset.theme || 'auto');
+  document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const choice = btn.dataset.themeChoice;
+      applyTheme(choice);
+      try {
+        if (choice === 'auto') window.localStorage.removeItem(THEME_KEY);
+        else window.localStorage.setItem(THEME_KEY, choice);
+      } catch (err) {
+        console.warn(`無法儲存主題偏好「${choice}」：`, err);
+      }
+    });
+  });
+}
+
+renderShelf();
+setupInspector();
+window.addEventListener('resize', fitSpineTitles);
+document.fonts.ready.then(fitSpineTitles);
+setupOpening();
+setupThemeSwitch();
+
+// 從課程按返回時（bfcache），收掉打開到一半的書並更新進度
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  resetOpening();
+  renderShelf();
+});
+</script>
+</body>
+</html>

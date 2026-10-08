@@ -395,5 +395,21 @@ Claude Code 專案層與 Codex 的 hook 指令不需要替換：Claude 交給 ba
 "@
 Write-TextFile (Join-Path $Dist 'README.md') $readme
 
+# ===== 同步到上一層 repo 的 .claude/skills/（雲端 session 用）=====
+# 只在正式 build（沒有 -OutDir）且上一層有 .claude 資料夾時執行；verify 用 -OutDir 重建比對時不動 repo
+$projectClaude = Join-Path (Split-Path -Parent $Root) '.claude'
+$listFile = Join-Path $Root 'project-skills.txt'
+if (-not $OutDir -and (Test-Path -LiteralPath $projectClaude) -and (Test-Path -LiteralPath $listFile)) {
+    $names = (Read-TextFile $listFile) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }
+    foreach ($n in $names) {
+        $from = Join-Path $Dist "claude-code/global/skills/$n"
+        if (-not (Test-Path -LiteralPath $from)) { throw "project-skills.txt 列了 $n，但 skills/ 裡沒有這個 skill" }
+        $to = Join-Path $projectClaude "skills/$n"
+        if (Test-Path -LiteralPath $to) { Remove-Item -LiteralPath $to -Recurse -Force }
+        Copy-Item -LiteralPath $from -Destination $to -Recurse
+    }
+    Write-Host "已同步到 .claude/skills/：$($names -join '、')"
+}
+
 $count = (Get-ChildItem $Dist -Recurse -File).Count
 Write-Host "build 完成：dist/ 共 $count 個檔案。下一步：執行 scripts/verify.ps1"
