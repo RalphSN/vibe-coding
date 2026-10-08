@@ -20,6 +20,7 @@
 | workflows、agents、hooks | `ai-dev-rules/workflows/`、`agents/`、`enforcement/` | 同上（hooks 不同步到 repo `.claude/`） | 同上 |
 | 有 `src/` 的課程 | `course-web/<課>/src/` | `course-web/<課>/index.html` | `sh ai-dev-rules/skills/course-web-neo-brutalism/scripts/build.sh <src> <index.html>` |
 | 沒有 `src/` 的課程 | `course-web/<課>/index.html` 本身 | — | — |
+| 文字書籍（小說全文） | 閱讀器 `books/reader/`；內文來源是維基文庫 | `books/<書>/text/*.js`、`toc.js` | `cd tools && npm install`，再 `node tools/fetch-wikisource-book.mjs --title 紅樓夢 --chapters 120 --out books/hongloumeng` |
 | 書櫃首頁 | `index.html`（3D）與 `index-2d.html`（2D），兩個要同步 | — | — |
 | impeccable skill | 第三方，上游 `RalphSN/impeccable` | `.claude/skills/impeccable/` | 從上游 `.claude/skills/impeccable/` 複製，保留 `LICENSE`、`NOTICE.md` |
 
