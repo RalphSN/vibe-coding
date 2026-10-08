@@ -6,6 +6,19 @@
 python -m http.server 8765 --bind 127.0.0.1
 ```
 
+## 0. 腳本檢查（Playwright，先跑這個）
+
+```bash
+node scripts/audit.mjs course-web/<slug>/index.html         # 選擇題、最長答案比例、缺段落、圖數、互動數、缺漏術語、360px 溢出、JS 錯誤
+node scripts/svg-text.mjs course-web/<slug>/index.html      # SVG 文字超出邊界或壓框
+node scripts/lesson-table.mjs course-web/<slug>/index.html  # 逐課總表：版型、圖數、元件、分鐘
+node scripts/longest-answer.mjs course-web/<slug>/index.html # 超過 35% 時，列出領先最多的題目優先改寫
+```
+
+- `audit.mjs`、`svg-text.mjs` 有問題時 exit code 為 1，可以接在 CI 或合併前檢查。
+- 專案沒裝 Playwright 時，腳本會改用全域安裝；路徑不同就設 `PW_ROOT`（全域 node_modules）與 `CHROMIUM_PATH`。
+- 腳本會中止 cdnjs 與 Google Fonts 請求，所以截圖是系統字型；字型與外觀另外在真的瀏覽器看。
+
 ## 1. 自動檢查（瀏覽器 console 執行）
 
 逐課切換，收集 console 錯誤、缺漏術語、水平溢出：
@@ -108,3 +121,7 @@ for (const lesson of LESSONS.filter((l) => l.content)) {
 - [ ] 測驗作答、重做、進度儲存正常
 - [ ] 複製按鈕用真實點擊（不是腳本 `click()`）測過；腳本點擊沒有使用者手勢，會走到備援訊息
 - [ ] `/` 搜尋、`←` `→` 換課、Tab 走過一個完整單元
+- [ ] 「回書櫃」按鈕在桌面與手機都看得到，連到書櫃首頁
+- [ ] 手機寬度（390px）時字級與深色模式在側欄裡，頂部列沒有擠壓
+- [ ] 每課至少一個互動元素；動畫只出現在真實機制，概念流程圖是靜態的
+- [ ] 書櫃首頁（3D 與 2D）都有這本書

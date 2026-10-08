@@ -21,7 +21,7 @@ description: 建立網頁動畫（CSS、GSAP、Lottie、Three.js），依需求�
 
 3. 看專案有沒有已安裝的動畫套件；有就優先用，沒有且需要新套件時先問。
 4. 實作，同時寫 reduced-motion 版本。
-5. 在瀏覽器確認：一般模式、開啟「減少動態效果」模式、手機寬度。
+5. 在瀏覽器確認：一般模式、開啟「減少動態效果」模式、手機寬度。3D 或多段編排的動畫要在 Chrome 與 Safari 各實際播放一次，可把 `playbackRate` 設 0.25 慢速看；暫停後截圖看不到播放中才出現的閃動。
 6. 回報：用了什麼工具、檔案位置、怎麼看到效果。
 
 ## CSS 範例
@@ -54,6 +54,8 @@ if (!reduce) {
 ## 規則
 
 - 只對 `transform` 和 `opacity` 做動畫；不動 `width`、`height`、`top`、`left`。
+- 例外：3D 場景（`preserve-3d`）裡疊在某一面上的明暗遮罩，改動 `background-color` 或對那一面做 `filter: brightness()`，不做 `opacity` 動畫。`opacity` 動畫會被拆成獨立合成圖層，和那一面同一平面，Safari 每格前後順序不固定而閃動；只補 `backface-visibility` 沒有用。
+- Web Animations 有 `delay` 時用 `fill: 'both'`，避免開始播放那一刻從 CSS 值跳到第一格。
 - 一般 UI 動畫 150–400ms；超過 600ms 要有理由。
 - Vue 元件卸載時清掉 GSAP / Three.js 實例（`onBeforeUnmount`），避免記憶體洩漏。
 - Three.js：限制 `devicePixelRatio` 最多 2；不在畫面上時暫停渲染。

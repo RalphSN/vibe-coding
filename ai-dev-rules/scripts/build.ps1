@@ -85,13 +85,31 @@ function New-GlobalEntry($Items, [string]$ToolName) {
     return ($lines -join "`n") + (Join-CoreBodies $Items) + "`n"
 }
 
+function Add-ExtraHeader([string]$Ext, [string]$Text) {
+    # 依檔案類型加上「由 build.ps1 產生」註解；有 shebang 或 doctype 時放在第二行，不影響執行
+    $c = switch ($Ext) {
+        '.md' { return $MdHeader + "`n`n" + $Text }
+        { $_ -in '.js', '.mjs', '.cjs', '.ts' } { "// $HeaderText"; break }
+        { $_ -in '.sh', '.py', '.ps1', '.yaml', '.yml', '.toml' } { $HashHeader; break }
+        { $_ -in '.html', '.htm', '.svg' } { $MdHeader; break }
+        '.css' { "/* $HeaderText */"; break }
+        default { $null }
+    }
+    if (-not $c) { return $Text }
+    if ($Text -match '^(#!|<!doctype|<!DOCTYPE)[^\n]*\n') {
+        $first = $Matches[0]
+        return $first + $c + "`n" + $Text.Substring($first.Length)
+    }
+    return $c + "`n" + $Text
+}
+
 function Copy-SkillExtras([string]$SourceDir, [string]$TargetDir) {
     foreach ($item in Get-ChildItem $SourceDir -Recurse -File) {
         if ($item.Name -eq 'SKILL.md' -and $item.DirectoryName -eq $SourceDir) { continue }
         $rel = Get-RelativePath $SourceDir $item.FullName
         $dest = Join-Path $TargetDir $rel
         $text = Read-TextFile $item.FullName
-        if ($item.Extension -eq '.md') { $text = $MdHeader + "`n`n" + $text }
+        $text = Add-ExtraHeader $item.Extension $text
         Write-TextFile $dest $text
     }
 }

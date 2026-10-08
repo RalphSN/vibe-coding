@@ -24,11 +24,11 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 3. 設計與實作：
    1. 寫 `design-system.md`，token 照 [design-tokens.md](references/design-tokens.md)，先跑對比度檢查。
    2. 做骨架：token、版面、側欄（含拖曳與字級）、路由、進度儲存、標題的詞組斷行。
-   3. 做元件與元件樣式表頁（`#/styleguide`），照 [components.md](references/components.md)。
-   4. 逐模組填內容；每 2–3 個模組自我檢查一次：console、缺漏術語、360px 溢出、選擇題長度、SVG 線段端點與文字（[layout-geometry.md](references/layout-geometry.md) 6.5 節）。圖畫完當下就檢查，不要留到最後。
+   3. 做元件與元件樣式表頁（`#/styleguide`），照 [components.md](references/components.md)。互動元件從共用元件庫搬，見 [build-and-widgets.md](references/build-and-widgets.md)。
+   4. 逐模組填內容，超過 5 個模組時用分段檔加 `scripts/build.sh` 組合（build-and-widgets.md 第 1 節）。每 2–3 個模組跑一次 `scripts/audit.mjs` 並自我檢查：console、缺漏術語、360px 溢出、選擇題長度、SVG 線段端點與文字（[layout-geometry.md](references/layout-geometry.md) 6.5 節）。圖畫完當下就檢查，不要留到最後。
 4. 驗證：照 [verification.md](references/verification.md) 全部走一次，再回報。
 
-品質目標：以 Awwwards、Webby Awards、FWA 得獎程度為目標。第 3 階段做完、第 4 階段之前，照 `domain-web-frontend` 的「品質目標：得獎等級」自我檢查迴圈反覆提升，直到四個維度都達標；十二條硬性規則是底線，不能為了創意分數犧牲。
+品質目標：以 Awwwards、Webby Awards、FWA 得獎程度為目標。第 3 階段做完、第 4 階段之前，照 `domain-web-frontend` 的「品質目標：得獎等級」自我檢查迴圈反覆提升，直到四個維度都達標；十五條硬性規則是底線，不能為了創意分數犧牲。
 
 任務超過一個對話時，寫 `HANDOFF.md`：一句話現況、接手 3 步驟、需求 checklist、資料格式、驗證方法、已知問題、下一步。
 
@@ -41,9 +41,9 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 - Hash 路由：`#/`、`#/m/N`、`#/l/ID`、`#/styleguide`、`#/references`。換課後焦點移到 `h1`（`tabindex="-1"`）。
 - 偏好與進度存 localStorage，key 加版本號（例如 `<course-slug>.v1`）；讀寫包 try/catch，失敗時退回記憶體並 `console.warn` 記錄原因。
 
-## 十二條硬性規則
+## 十五條硬性規則
 
-第 1–4、11、12 條是視覺與互動，第 5–8 條是內容，第 9、10 條沿用參考站的做法。每條的細節在 references。
+第 1–4、11、12 條是視覺與互動，第 5–8 條是內容，第 9、10 條沿用參考站的做法，第 13–15 條來自 2026-10 的使用者回饋。每條的細節在 references。
 
 1. 對比：內文對背景至少 7:1，次要文字與小字至少 4.5:1，非文字 UI 至少 3:1。淺色背景配深色字；彩色色塊上一律黑字。詳見 design-tokens.md 第 2 節。
 2. 側欄：桌面版右緣有可拖曳的把手（滑鼠、觸控、鍵盤都能調），頂部列有字級調整（至少 5 段）。兩者都記住使用者的選擇。詳見 components.md 第 1、2 節。
@@ -57,10 +57,19 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 10. 不用 emoji 當項目符號；區塊用文字貼紙標籤（「比喻」「限制」「常見錯誤」）。✓ ✗ 只用在對錯標示，且一定搭配文字。
 11. 換行以字詞完整為準：標題、按鈕、卡片等短文字不能把詞拆到兩行，斷在詞組邊界，任何一行不能只剩 1–2 個字或單獨的編號。標題在資料裡用 `|` 標出斷點；仍有孤行時，該標題動態縮小字級（下限 80%）。詳見 [line-breaking.md](references/line-breaking.md)。
 12. 對齊與幾何：「沒有溢出」不等於「有對齊」。頂部列高度量測後寫回 `--topbar-h`，側欄與把手同格 sticky，捲到頁尾不蓋過頁尾；圖示按鈕在任何寬度都是 44×44；沒有內容的欄位不留空；SVG 每段線的兩端都接在圖形上，文字不壓框、不壓線、不單字成行。在 10 種裝置寬度、頁面最上方與捲到最底各量一次。詳見 [layout-geometry.md](references/layout-geometry.md)。
+13. 動畫只給真實機制：有東西真的在移動或變化（電子流動、資料逐筆流過、拉桿改參數）才做動畫；概念步驟、層級、比較一律靜態圖，`pipeflow` 加 `static: true`。詳見 build-and-widgets.md 第 2.3 節。
+14. 每課至少一個互動元素，而且是讓讀者「做」一件事：分類、拉桿、切換對照、檢查器。用 `scripts/lesson-table.mjs` 確認沒有漏課。
+15. 回書櫃與手機版：頂部列有房屋圖示的「回書櫃」按鈕；手機版把字級、深色模式移到側欄。詳見 build-and-widgets.md 第 5 節。
+
+## 改編外部文章
+
+課程內容來自別人的文章時：不轉載全文，0-1 寫重點摘要與結構導讀，只引用短句並標出處，多處放原文連結；使用者給的原文存檔不進 repo。拿到的檔案和要求的文章不一致（例如網址編號不同）時，先回報再動手。參考實作：`karpathy-output-formats-course/`。
 
 ## 參考站
 
-優先參考 `claude-code-secure-dev-course/`（2026-10-02 版）：它照本 skill 實作，已修正下表的差異，並通過 layout-geometry.md 的全部檢查。引擎（路由、側欄、字級、術語 popup、測驗、詞組斷行）可以直接沿用，再換掉 `COURSES` 與各模組的資料區塊。
+分段建置與互動元件最完整的是 `terminal-commands-course/`（2026-10-07 版，37 課、8 種元件）；改編外部文章看 `karpathy-output-formats-course/`。
+
+版面與引擎優先參考 `claude-code-secure-dev-course/`（2026-10-02 版）：它照本 skill 實作，已修正下表的差異，並通過 layout-geometry.md 的全部檢查。引擎（路由、側欄、字級、術語 popup、測驗、詞組斷行）可以直接沿用，再換掉 `COURSES` 與各模組的資料區塊。
 
 `ai-chat-prompt-agent-course/`（2026-10 版）是這套風格的第一個實作，資料格式相同。下列地方它還不符合本 skill，複製時要改：
 
@@ -81,6 +90,8 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 
 照個人回報範本，另外寫出：
 - 單元數、每單元閱讀時間範圍、圖解總數、選擇題總數
+- `scripts/audit.mjs`、`scripts/svg-text.mjs` 的輸出摘要（JS 錯誤數、結構問題數、SVG 問題數）
+- 用了哪些互動元件、哪些是動畫、哪些是靜態（規則 13）
 - 對比度檢查結果（最低的一組是多少）
 - 選擇題：正確答案是最長選項的比例
 - 標為「未確認」的項目清單

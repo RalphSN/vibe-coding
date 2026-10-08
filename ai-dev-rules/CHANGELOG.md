@@ -6,6 +6,12 @@
 
 ### Added
 
+- `bookshelf-portal` skill 收進 ai-dev-rules，三個工具都會安裝：3D 書櫃為預設首頁（`index.html`）、2D 版為 `index-2d.html`；新增疊放書等尺寸、觸控裝置的「點書 → 羊皮紙介紹 → 前往閱讀」流程、`goTo()` 集中跳轉、`pageshow`／`visibilitychange` 回到書櫃初始狀態、載入字型 3 秒逾時、three.js 版本固定；附 `scripts/mobile-flow.mjs`（模擬 iPhone 測載入、介紹卡與外部跳轉重置）與 `assets/template-3d.html`。
+- `course-web-neo-brutalism` 第 13–15 條規則：動畫只給真實機制（概念流程用靜態圖、`pipeflow` 加 `static: true`）、每課至少一個互動元素、回書櫃按鈕與手機版設定移進側欄；新增 `references/build-and-widgets.md`（分段建置、共用元件庫、移植元件、6 個實際踩過的錯誤）與「改編外部文章」規則。
+- `course-web-neo-brutalism/scripts/`：`build.sh`（組合前逐模組 `node --check`）、`audit.mjs`、`svg-text.mjs`、`lesson-table.mjs`、`longest-answer.mjs`，有問題時 exit code 為 1。
+- core：溝通規範加「優先視覺化」與「新規範確立後回頭修正既有內容」；Git 加 `--no-ff` 合併規則；測試規範加「受限環境（雲端沙箱、離線）」。
+- `domain-web-frontend`「手機與跳轉」、`domain-education-content` 動畫原則與「改編外部文章」。
+- `scripts/build.ps1`：skill 附帶的 `.js`／`.mjs`／`.sh`／`.html`／`.css` 也加上「由 build.ps1 產生」註解（有 shebang 或 doctype 時放第二行），verify 才會通過。
 - `course-web-neo-brutalism` skill：新野獸派課程網站規範，整理自 ai-chat-prompt-agent-course，並加入內文 7:1 對比、可拖曳側欄與字級調整、hover 單一訊號、完整進退場轉場、術語 popup、有鑑別度且每個選項附解析的選擇題、視覺化數量、查證到當下日期等規則。
 - `course-web-neo-brutalism` 第 11 條規則：短文字換行以字詞完整為準（詞組斷點、不留孤行、避頭尾，仍有孤行時動態縮小字級），附實測過的詞組斷行寫法與檢查腳本。
 - `course-web-neo-brutalism` 第 12 條規則與 `references/layout-geometry.md`：頂部列高度量測後寫回、側欄與把手同格 sticky 不蓋過頁尾、按鈕不被壓縮、不留空欄、SVG 線段端點接在圖形上、SVG 文字不壓框不壓線不單字成行；附 10 種裝置寬度清單與 4 支檢查腳本。

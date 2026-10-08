@@ -3386,11 +3386,16 @@ async function start3d() {
     RectAreaLightUniformsLib.init();
     // 內頁用的明體要先載好再畫貼圖；Google Fonts 依字元分包，把會用到的字一起交給 load()
     const glyphs = [...new Set(JSON.stringify([STRINGS, SITES.map((s) => s.text), CLASSICS]) + '0123456789—·©/ MDCLXVI')].join('');
-    await Promise.all([
+    // 字型連不到（離線、被擋）時最多等 FONT_WAIT_MS，之後用系統字型繼續，載入畫面不會卡住
+    const FONT_WAIT_MS = 3000;
+    const fontsReady = Promise.all([
       document.fonts.ready,
-      loadIcons(),
       ...['400', '600', '700'].map((w) => document.fonts.load(`${w} 16px "Noto Serif TC"`, glyphs).catch(() => [])),
       ...['500', '700'].map((w) => document.fonts.load(`${w} 16px "Noto Sans TC"`, glyphs).catch(() => [])),
+    ]);
+    await Promise.all([
+      loadIcons(),
+      Promise.race([fontsReady, new Promise((resolve) => window.setTimeout(resolve, FONT_WAIT_MS))]),
     ]);
     linenBump = canvasTexture(linenBumpCanvas(), { srgb: false, repeat: true });
     pageEdgeX = canvasTexture(pageEdgeCanvas(true));
