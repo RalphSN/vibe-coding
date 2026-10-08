@@ -1,0 +1,638 @@
+
+<script>
+/* ==========================================================================
+   模組 5：三大 shell 方言＋cmd
+   ========================================================================== */
+const ROSETTA_TASKS = [
+  { label: '我在哪', pwsh: 'Get-Location        # 別名 pwd', bash: 'pwd', cmd: 'cd' },
+  { label: '列出檔案（含隱藏）', pwsh: 'Get-ChildItem -Force   # 別名 ls、dir', bash: 'ls -la', cmd: 'dir /a' },
+  { label: '切換資料夾', pwsh: 'Set-Location ..\\docs   # 別名 cd', bash: 'cd ../docs', cmd: 'cd ..\\docs' },
+  { label: '建立資料夾', pwsh: 'New-Item -ItemType Directory logs\n# 或直接 mkdir logs', bash: 'mkdir -p logs', cmd: 'mkdir logs' },
+  { label: '複製資料夾', pwsh: 'Copy-Item src backup -Recurse', bash: 'cp -r src backup', cmd: 'xcopy src backup\\ /E /I' },
+  { label: '刪除資料夾', pwsh: 'Remove-Item build -Recurse -Force', bash: 'rm -rf build', cmd: 'rmdir /s /q build', note: '三種寫法都**不會進資源回收筒**，也都**不會再問你**。' },
+  { label: '讀檔案', pwsh: 'Get-Content notes.txt   # 別名 cat、type', bash: 'cat notes.txt', cmd: 'type notes.txt' },
+  { label: '找含某字的行', pwsh: 'Select-String "TODO" *.js', bash: 'grep "TODO" *.js', cmd: 'findstr "TODO" *.js' },
+  { label: '讀環境變數', pwsh: '$env:USERPROFILE', zsh: 'echo $HOME', bash: 'echo $HOME', cmd: 'echo %USERPROFILE%' },
+  { label: '設環境變數（暫時）', pwsh: '$env:MODE = "dev"', bash: 'export MODE=dev', cmd: 'set MODE=dev' },
+  { label: '成功才執行下一步', pwsh: 'npm test && npm run build   # PowerShell 7', bash: 'npm test && npm run build', cmd: 'npm test && npm run build', note: 'Windows PowerShell 5.1 不支援 `&&`，要拆成兩行（3-4）。' },
+  { label: '丟掉輸出', pwsh: 'npm install > $null', bash: 'npm install > /dev/null', cmd: 'npm install > NUL' },
+  { label: '查指令在哪', pwsh: 'Get-Command git', bash: 'which git', cmd: 'where git' },
+  { label: '清除畫面', pwsh: 'Clear-Host   # 別名 cls、clear', bash: 'clear', cmd: 'cls' },
+  { label: '用迴圈處理每個檔案', pwsh: 'foreach ($f in Get-ChildItem *.txt) {\n  Write-Output $f.Name\n}', bash: 'for f in *.txt; do\n  echo "$f"\ndone', cmd: 'for %f in (*.txt) do echo %f', note: '迴圈初學只要**認得**就好：看到 `for … do … done` 是 bash／zsh，看到 `foreach (…) { }` 是 PowerShell。' },
+];
+
+defineTerms({
+  'Git Bash': { en: 'Git Bash', def: '安裝 Git for Windows 時附帶的 bash 環境，讓你在 Windows 上用 bash 指令。', example: '在資料夾按右鍵 →「Open Git Bash here」。' },
+  'oh-my-zsh': { en: 'oh-my-zsh', def: '社群做的 zsh 設定框架，提供主題與外掛，會修改 `~/.zshrc`。不是必裝。', example: '裝了之後提示字元常變成箭頭和 git 分支名。' },
+  'Get-Member': { en: 'Get-Member', def: 'PowerShell 查看物件有哪些屬性和方法的 cmdlet，別名 `gm`。', example: '`Get-ChildItem | Get-Member`。' },
+  '批次檔': { en: 'batch file（.bat／.cmd）', def: 'cmd 的腳本檔，裡面是一行行 cmd 指令。雙擊就會執行。', example: '`build.bat`、開頭常見 `@echo off`。' },
+});
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '知道 bash 在哪裡會遇到：Linux 伺服器、WSL、Git Bash、雲端環境',
+      '寫出並執行第一個 bash 腳本（含 shebang）',
+      '理解為什麼網路教學預設都是 bash 寫法',
+    ],
+    analogy: {
+      text: ['bash 像**英文**：不一定是你的母語，但出國、看說明書、跟世界各地的人合作時，最常用到的就是它。大部分伺服器、Docker 容器、GitHub Actions、雲端開發環境，預設都講 bash。'],
+      limit: ['英文有很多口音，bash 也有很多「親戚」：`sh`、`dash`、`zsh` 長得很像但不完全一樣。教學裡寫 `#!/bin/sh` 的腳本，不一定能用 bash 的所有功能。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="會遇到 bash 的地方：Linux 伺服器、Windows 的 WSL、Windows 的 Git Bash、Docker 容器與 CI、雲端開發環境，中間是 bash">
+        <rect x="200" y="110" width="160" height="80" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="160" text-anchor="middle" font-size="28" font-weight="900" class="on-color mono">bash</text>
+        <g font-size="18">
+          <rect x="10" y="10" width="170" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="95" y="46" text-anchor="middle">Linux 伺服器</text>
+          <rect x="380" y="10" width="170" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="465" y="46" text-anchor="middle">Windows 的 WSL</text>
+          <rect x="10" y="230" width="170" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="95" y="266" text-anchor="middle">Git Bash</text>
+          <rect x="380" y="230" width="170" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="465" y="266" text-anchor="middle">Docker 與 CI</text>
+          <rect x="195" y="10" width="170" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="46" text-anchor="middle">雲端開發環境</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3"><path d="M180 40 L210 110 M380 40 L350 110 M280 70 V110 M180 260 L210 190 M380 260 L350 190"/></g>
+      </svg>`,
+      caption: '你的筆電可能用 PowerShell 或 zsh，但一連到伺服器或容器，八成是 bash。',
+      blocks: [
+        { type: 'tabs', label: '在 Windows 用 bash', tabs: [
+          { label: 'WSL（完整 Linux）', blocks: [
+            { type: 'code', lang: 'powershell', title: 'PowerShell（系統管理員）', code: 'wsl --install\n# 重開機後，Windows Terminal 會多一個 Ubuntu 分頁' },
+            '[[WSL]] 是真正的 Linux，適合要跑 Linux 工具、Docker 或照著 Linux 教學做的時候。',
+          ] },
+          { label: 'Git Bash（輕量）', blocks: ['安裝 Git for Windows 時會一起裝 [[Git Bash]]。它能用大部分 bash 指令和 `ls`、`grep`，但底層還是 Windows，路徑寫成 `/c/Users/you`。'] },
+        ] },
+        { type: 'callout', variant: 'tip', title: 'macOS 上的 bash 很舊', body: ['macOS 內建的 bash 停在很舊的 3.2 版，因為之後的版本授權條款改了。所以 Apple 把預設換成 zsh。需要新版 bash 可以用 `brew install bash`。'] },
+        { type: 'widget', name: 'term', props: { shell: 'bash', title: '第一個 bash 腳本', steps: [
+          { cmd: 'cat hello.sh', out: '#!/bin/bash\n# 我的第一個腳本\nname="Amy"\necho "你好，$name！今天是 $(date +%m/%d)"', note: '第一行 `#!/bin/bash` 是 [[shebang]]：告訴系統用 bash 執行。`$(...)` 是「先執行裡面的指令，把結果放進來」。' },
+          { cmd: 'chmod +x hello.sh', out: '', note: '加上執行權限（4-3）。' },
+          { cmd: './hello.sh', out: '你好，Amy！今天是 10/07', note: '執行。腳本就是「把你會打的指令存成檔案」。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '腳本', en: 'script', def: '把一連串指令存成一個檔案，之後一次執行。bash 腳本副檔名常是 `.sh`。', example: '`./deploy.sh`。' },
+      { term: '指令替換', en: 'command substitution（$(...)）', def: '先執行 `$( )` 裡的指令，把它的輸出放進目前這一行。PowerShell 也用 `$( )`。', example: '`echo "今天 $(date)"`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一個腳本，兩種執行方式',
+        kind: '指令對照',
+        code: true,
+        badLabel: '交給 bash 執行',
+        goodLabel: '自己執行（靠 shebang）',
+        bad: '{{1:bash}} hello.sh\n# 不需要執行權限，也不看 shebang',
+        good: '{{2:chmod +x}} hello.sh\n{{3:./}}hello.sh',
+        badResult: '兩種都可以。`bash hello.sh` 適合偶爾跑一次；`./hello.sh` 適合常用的腳本。',
+        why: ['直接叫 bash 讀這個檔案', '讓檔案可以執行', '`./` 指定「目前資料夾的這個檔案」，系統讀第一行的 shebang 決定用誰執行'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="bash 腳本結構：第一行 shebang，接著註解，然後變數設定，最後是指令；變數等號兩邊不能有空白，使用時加錢字號">
+          <rect x="10" y="10" width="540" height="230" class="fill-term stroke-ink" stroke-width="4"/>
+          <g font-size="19">
+            <text x="26" y="50" class="t-prompt">#!/bin/bash</text><text x="300" y="50" class="t-dim">← 用誰執行</text>
+            <text x="26" y="94" class="t-dim"># 註解：給人看的</text>
+            <text x="26" y="138" class="t-cmd">name="Amy"</text><text x="300" y="138" class="t-dim">← 等號旁不能有空白</text>
+            <text x="26" y="182" class="t-cmd">echo "你好 $name"</text><text x="300" y="182" class="t-dim">← 用 $ 取值</text>
+            <text x="26" y="222" class="t-dim">exit 0</text><text x="300" y="222" class="t-dim">← 結束代碼（1-4）</text>
+          </g>
+        </svg>`, caption: '腳本裡的每一行，都是你在終端機可以直接打的指令。' },
+      ],
+      tryit: {
+        q: ['補完這個 bash 腳本：建立一個以今天日期命名的資料夾（例如 `2026-10-07`），並印出「已建立 2026-10-07」。'],
+        code: true,
+        draft: '#!/bin/bash\ntoday=$(date +%Y-%m-%d)\n____\n____',
+        answer: ['`mkdir -p "$today"`、`echo "已建立 $today"`。', '變數加引號是好習慣（1-2），即使值裡沒有空白。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 bash 裡寫 `name = "Amy"`。', why: '空白會把它切成三塊：執行叫 name 的程式，參數是 = 和 Amy（4-1 同樣的陷阱）。', right: '`name="Amy"`，等號兩邊不留空白。' },
+      { wrong: '在 Windows 用記事本寫好 .sh，放到 Linux 執行出現 `\\r: command not found`。', why: 'Windows 的換行是 CRLF，Linux 只認 LF，多出來的 `\\r` 被當成指令的一部分。', right: '用 VS Code 把右下角的 CRLF 改成 LF；或在 git 設定 `core.autocrlf`。' },
+      { wrong: '照教學在 PowerShell 裡執行 `./script.sh`。', why: 'PowerShell 不是 bash，它不會讀 shebang，會試著用 Windows 的檔案關聯打開它。', right: '在 WSL 或 Git Bash 裡執行 bash 腳本。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '腳本第一行 `#!/bin/bash` 的用途是？', options: [
+        { text: '註解，說明作者是誰', why: '它用 `#` 開頭，但 `#!` 在第一行有特殊意義。' },
+        { text: '告訴系統用哪個程式執行這個檔案', correct: true, why: '這就是 shebang：系統依它找到 `/bin/bash` 來執行腳本。' },
+        { text: '讓腳本自動取得管理員權限', why: '權限和 shebang 無關，需要的是 sudo（4-3）。' },
+        { text: '宣告這個檔案只能在 Linux 執行', why: '只要那台電腦有 `/bin/bash`，macOS 也能執行。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在 Windows 想照著一份 Ubuntu 伺服器的教學練習，最接近真實環境的選擇是？', options: [
+        { text: '在 PowerShell 裡照打', why: '簡單指令可以，但管線、引號、腳本的寫法會有差異。' },
+        { text: '安裝 WSL，在 Ubuntu 分頁裡做', correct: true, why: 'WSL 是真正的 Linux，行為和伺服器最接近。' },
+        { text: '用 cmd，它最接近 Linux', why: 'cmd 和 Linux 的 shell 差異最大。' },
+        { text: '把教學裡的 `/` 都改成 `\\`', why: '路徑分隔符號只是差異之一，指令和語法還有很多不同。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你每天上班都要打 `cd ~/work/api && git pull && npm install && npm run dev`。怎麼用這課學到的東西省下力氣？'], answer: [
+        '參考：寫成腳本 `start.sh`：第一行 `#!/bin/bash`，第二行放那串指令，`chmod +x start.sh`，之後只打 `./start.sh`。',
+        '更進一步：在 `~/.zshrc` 加 `alias work="~/work/api/start.sh"`（4-4）。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-3）`./hello.sh` 回 `permission denied`，最先試什麼？', options: [
+        { text: '`chmod +x hello.sh`', correct: true, why: '新建的腳本沒有執行權限。' },
+        { text: '`sudo ./hello.sh`', why: '問題不是身分，是檔案缺少 x 權限。' },
+        { text: '把檔名改成 hello.exe', why: '副檔名不會給它執行權限。' },
+        { text: '重新開機', why: '和開機無關。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 2-1）`./hello.sh` 的 `./` 是什麼意思？', options: [
+        { text: '目前資料夾', correct: true, why: '`.` 是目前資料夾，`./hello.sh` 就是「這裡的 hello.sh」。' },
+        { text: '根目錄', why: '根目錄是 `/`。' },
+        { text: '上一層', why: '上一層是 `..`。' },
+        { text: '家目錄', why: '家目錄是 `~`。' },
+      ] },
+    ],
+    keypoints: [
+      'bash 是伺服器、容器、CI 的通用語；Windows 上用 WSL 或 Git Bash。',
+      '腳本＝存成檔案的指令；第一行 shebang 指定直譯器，`chmod +x` 後用 `./` 執行。',
+      'bash 的變數：`x="值"`（等號旁無空白）、`$x` 取值、`$(指令)` 取輸出。',
+    ],
+    sources: ['bash-manual', 'wsl', 'apple-zsh'],
+  },
+
+  '5-2': {
+    goals: [
+      '知道 zsh 和 bash 九成相同，可以直接用 bash 教學',
+      '認得 zsh 最常讓初學者卡住的差異：`no matches found`',
+      '知道 `.zshrc`、外掛與主題是選配，不是必要',
+    ],
+    analogy: {
+      text: ['zsh 和 bash 像**台灣華語和大陸普通話**：九成以上聽得懂、寫法一樣，只有一些用詞和小規則不同。照 bash 教學在 zsh 裡打，大部分都能直接用。'],
+      limit: ['差異雖然少，卻剛好出現在初學者常用的地方，例如萬用字元：bash 找不到符合的檔案時會「放過你」，zsh 會直接報錯。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="bash 和 zsh 的重疊：兩個大圓大部分重疊，共同部分有 cd ls 管線 重新導向 變數 和和；zsh 獨有：萬用字元找不到就報錯、更強的 Tab 補全、提示字元百分比；bash 獨有：伺服器預設、腳本最常見">
+        <rect x="10" y="10" width="540" height="260" class="fill-surface stroke-ink" stroke-width="4"/>
+        <rect x="150" y="30" width="260" height="220" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="64" text-anchor="middle" font-size="20" font-weight="900" class="on-color">共同的 90%</text>
+        <g font-size="17" text-anchor="middle"><text x="280" y="102" class="on-color">cd、ls、grep、管線</text><text x="280" y="134" class="on-color">&gt;、&gt;&gt;、&amp;&amp;、||</text><text x="280" y="166" class="on-color">export、$變數、引號</text><text x="280" y="198" class="on-color">腳本、for 迴圈</text></g>
+        <text x="80" y="50" text-anchor="middle" font-size="18" font-weight="900">bash</text>
+        <g font-size="15" text-anchor="middle"><text x="80" y="110">伺服器預設</text><text x="80" y="140">腳本最常見</text><text x="80" y="170">提示字元 $</text></g>
+        <text x="480" y="50" text-anchor="middle" font-size="18" font-weight="900">zsh</text>
+        <g font-size="15" text-anchor="middle"><text x="480" y="110">萬用字元</text><text x="480" y="130">找不到就報錯</text><text x="480" y="170">Tab 補全更強</text><text x="480" y="200">提示字元 %</text></g>
+      </svg>`,
+      caption: '在 macOS 看到 bash 教學，直接照做通常沒問題；卡住時，先懷疑是不是萬用字元或方括號。',
+      blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: 'zsh 最常見的「卡住」', steps: [
+          { cmd: 'pip install requests[security]', out: 'zsh: no matches found: requests[security]', err: true, note: '在 zsh 裡 `[ ]` 是萬用字元（代表「其中一個字元」）。找不到符合的檔名，zsh 就報錯、**根本不執行 pip**。bash 會把它原樣交給 pip。' },
+          { cmd: 'pip install "requests[security]"', out: 'Successfully installed requests-2.32.3 ...', note: '加引號，讓 zsh 不要把它當萬用字元（1-2）。' },
+          { cmd: 'echo $0', out: '-zsh', note: '不確定自己在哪個 shell，就問一下（0-2）。' },
+        ] } },
+        { type: 'callout', variant: 'tip', title: 'zsh 好用的小功能', body: ['打 `cd` 後按 {kbd:Tab}，會列出可以選的資料夾，可以用方向鍵選。打 `git ` 後按 {kbd:Tab} 會列出子指令。輸入指令的開頭再按 {kbd:↑}，只會搜尋以它開頭的歷史（依設定而定）。'] },
+      ],
+    },
+    define: [
+      { term: 'glob', en: 'globbing', def: 'shell 把 `*`、`?`、`[ ]` 展開成符合的檔名清單的過程。zsh 找不到符合時預設報錯，bash 預設保留原文。', example: '`ls *.txt` 在執行 ls 之前，就被展開成 `ls a.txt b.txt`。' },
+      { term: 'Homebrew', en: 'Homebrew（brew）', def: 'macOS 最常用的套件管理器，用 `brew install` 安裝命令列工具（6-1）。', example: '`brew install git`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '帶方括號或問號的參數',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ zsh 會報錯',
+        goodLabel: '✓ 加引號',
+        bad: 'curl {{1:https://api.example.com/data?id=1}}\n# zsh: no matches found',
+        good: 'curl {{1:"https://api.example.com/data?id=1"}}',
+        badResult: '網址裡的 `?` 也是萬用字元。zsh 找不到叫這個名字的檔案，就不執行 curl。',
+        why: ['網址、含 `[ ] ? *` 的參數，一律加引號'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="萬用字元找不到符合時的差異：bash 把星號點 xyz 原樣交給程式；zsh 直接報錯 no matches found 不執行">
+          <text x="10" y="30" font-size="20" font-weight="900" class="mono">ls *.xyz（沒有任何 .xyz 檔）</text>
+          <g font-size="18">
+            <rect x="10" y="50" width="265" height="180" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+            <text x="142" y="84" text-anchor="middle" font-weight="900" class="on-color">bash</text>
+            <text x="30" y="124" class="on-color">原樣交給 ls：</text>
+            <text x="30" y="154" class="on-color mono" font-size="16">ls '*.xyz'</text>
+            <text x="30" y="196" class="on-color" font-size="16">ls 說：找不到檔案</text>
+            <rect x="285" y="50" width="265" height="180" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+            <text x="417" y="84" text-anchor="middle" font-weight="900" class="on-color">zsh</text>
+            <text x="305" y="124" class="on-color">shell 自己就停了：</text>
+            <text x="305" y="154" class="on-color mono" font-size="16">no matches found</text>
+            <text x="305" y="196" class="on-color" font-size="16">ls 根本沒執行</text>
+          </g>
+        </svg>`, caption: '兩種都會失敗，但**報錯的人不一樣**。看錯誤訊息開頭是 `zsh:` 還是程式名，就知道是誰擋下來的（1-4）。' },
+      ],
+      tryit: {
+        q: ['這行在 zsh 失敗了。改成能執行的版本：'],
+        code: true,
+        draft: 'npm install eslint@^9\n# zsh: no matches found: eslint@^9\n\n修正：____',
+        answer: ['`npm install "eslint@^9"`。`^` 在 zsh 的延伸萬用字元裡有特殊意義，加引號最保險。'],
+      },
+    },
+    mistakes: [
+      { wrong: '看到 `zsh: no matches found` 以為是 npm 或 pip 壞了。', why: '錯誤開頭是 `zsh:`，代表是 shell 自己擋下來，程式根本沒執行。', right: '把含 `[ ] ? * ^` 的參數加引號。' },
+      { wrong: '一裝 zsh 就裝一大堆主題和外掛，終端機開啟要好幾秒。', why: '外掛越多，每次啟動要執行的設定越多。', right: '先用預設的 zsh 一陣子，確定需要什麼功能再加；[[oh-my-zsh]] 不是必裝。' },
+      { wrong: '把 bash 的設定寫進 `~/.bash_profile`，在 macOS 上沒效果。', why: 'macOS 預設是 zsh，它不讀 bash 的設定檔。', right: '寫進 `~/.zshrc`（4-4）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下列哪個描述 zsh 和 bash 的關係最準確？', options: [
+        { text: '完全不同的語言，bash 教學不能用在 zsh', why: '兩者大部分語法相同，bash 教學多半可以直接用。' },
+        { text: '大部分相同，少數規則不同（例如萬用字元）', correct: true, why: '這就是為什麼 macOS 使用者可以照 Linux 教學做。' },
+        { text: 'zsh 只是 bash 換了名字', why: 'zsh 是獨立開發的 shell，有自己的功能和規則。' },
+        { text: 'zsh 是 PowerShell 的 macOS 版', why: 'PowerShell 是微軟的另一個 shell，和 zsh 無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 zsh 執行 `pip install pandas[excel]` 出現 `no matches found`。正確修法是？', options: [
+        { text: '改用 `sudo pip install pandas[excel]`', why: '問題不是權限；sudo 後面一樣會被 zsh 展開失敗。' },
+        { text: '`pip install "pandas[excel]"`', correct: true, why: '引號讓 zsh 不把 `[ ]` 當萬用字元。' },
+        { text: '重新安裝 pip', why: 'pip 根本沒有被執行，跟它無關。' },
+        { text: '改成 `pip install pandas excel`', why: '這會安裝兩個不同的套件，意思變了。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['AI 給你一段在 Linux 測試過的 bash 指令，你在 macOS 的 zsh 執行時失敗了。你會先檢查哪兩件事？'], answer: [
+        '參考：① 錯誤訊息開頭是不是 `zsh:`（shell 擋下的），常見是萬用字元或方括號，加引號解決。② 指令用到的工具在 macOS 是不是 BSD 版本，選項不同（例如 `sed -i`、`ls --help`），查 `man`。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-4）zsh 的設定檔是？', options: [
+        { text: '`~/.zshrc`', correct: true, why: '互動式 zsh 啟動時讀這個檔案。' },
+        { text: '`~/.bashrc`', why: '那是 bash 的。' },
+        { text: '`$PROFILE`', why: '那是 PowerShell 的。' },
+        { text: '`/etc/zsh.conf`', why: '一般使用者的設定放在家目錄的 `.zshrc`。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-3）`rm *.log` 在 zsh 裡、目前資料夾沒有任何 .log 檔時，會怎樣？', options: [
+        { text: 'zsh 報 `no matches found`，rm 不執行', correct: true, why: 'zsh 在展開萬用字元時就停下了。' },
+        { text: '刪除所有檔案', why: '`*.log` 只對應 .log 結尾的檔案。' },
+        { text: '刪除一個叫 *.log 的檔案', why: '那是 bash 把原文交給 rm 後的情況（而且通常也不存在）。' },
+        { text: '進入互動模式詢問', why: '要加 `-i` 才會詢問。' },
+      ] },
+    ],
+    keypoints: [
+      'zsh 是 macOS 預設，和 bash 九成相同，bash 教學多半能直接用。',
+      '最常見的差異：萬用字元找不到就報 `no matches found`；含 `[ ] ? * ^` 的參數加引號。',
+      '外掛、主題是選配；設定寫在 `~/.zshrc`。',
+    ],
+    sources: ['zsh-manual', 'apple-zsh', 'bash-manual'],
+  },
+
+  '5-3': {
+    goals: [
+      '讀懂 PowerShell 的「動詞-名詞」命名，猜出沒看過的指令在做什麼',
+      '理解管線傳的是物件，用 `Get-Member` 看物件有哪些欄位',
+      '分辨 Windows PowerShell 5.1 和 PowerShell 7，以及比較運算子為什麼是 `-gt`',
+    ],
+    analogy: {
+      text: ['bash 的管線像**傳紙條**：每個人只拿到一張寫滿字的紙，要自己找出需要的那一段。PowerShell 的管線像**傳表格**：每一列都有欄位名稱（Name、Size、Date），下一個人直接說「我要 Size 那一欄」。'],
+      limit: ['表格比紙條好處理，但**要先知道欄位叫什麼**。所以 PowerShell 有一個專門「看表頭」的指令 `Get-Member`。另外，表格只在 PowerShell 內部傳遞；交給外部程式（例如 git）時，還是會變回文字。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="動詞-名詞命名：Get 加 ChildItem 是取得子項目；Set 加 Location 是設定位置；Remove 加 Item 是移除項目；New 加 Item 是新建項目。動詞是一小組固定的字">
+        <g font-size="20">
+          <rect x="10" y="10" width="200" height="56" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/><text x="110" y="46" text-anchor="middle" font-weight="900" class="on-color">動詞（做什麼）</text>
+          <rect x="350" y="10" width="200" height="56" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/><text x="450" y="46" text-anchor="middle" font-weight="900" class="on-color">名詞（對什麼）</text>
+          <text x="280" y="46" text-anchor="middle" font-size="32" font-weight="900">-</text>
+        </g>
+        <g font-size="19" class="mono">
+          <text x="30" y="110" class="mono">Get</text><text x="200" y="110" class="mono">-ChildItem</text><text x="400" y="110">取得子項目</text>
+          <text x="30" y="150" class="mono">Set</text><text x="200" y="150" class="mono">-Location</text><text x="400" y="150">設定位置</text>
+          <text x="30" y="190" class="mono">New</text><text x="200" y="190" class="mono">-Item</text><text x="400" y="190">新建項目</text>
+          <text x="30" y="230" class="mono">Remove</text><text x="200" y="230" class="mono">-Item</text><text x="400" y="230">移除項目</text>
+          <text x="30" y="270" class="mono">Select</text><text x="200" y="270" class="mono">-String</text><text x="400" y="270">挑選字串</text>
+        </g>
+      </svg>`,
+      caption: '動詞只有一小組（Get、Set、New、Remove、Start、Stop…），看到名詞就能猜意思。大小寫不拘：`get-childitem` 也行。',
+      blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '看物件的欄位，再用欄位操作', steps: [
+          { cmd: 'Get-ChildItem | Get-Member -MemberType Property', out: '   TypeName: System.IO.FileInfo\n\nName           MemberType Definition\n----           ---------- ----------\nLength         Property   long Length {get;}\nName           Property   string Name {get;set;}\nLastWriteTime  Property   datetime LastWriteTime {get;set;}', note: '[[Get-Member]] 列出物件有哪些欄位（屬性）：檔案有 Length（大小）、Name、LastWriteTime…' },
+          { cmd: 'Get-ChildItem | Where-Object Length -gt 1MB', out: 'Mode    LastWriteTime   Length Name\n-a---   2026/10/7      5242880 video.mp4', note: '用欄位名稱過濾：大小 **大於（-gt）** 1MB 的檔案。PowerShell 直接看得懂 `1MB`、`1GB` 這種單位。' },
+          { cmd: 'Get-ChildItem | Sort-Object LastWriteTime | Select-Object -Last 3 Name', out: 'Name\n----\nnotes.txt\nreport.docx\nvideo.mp4', note: '依修改時間排序，取最後 3 個的名稱。整條管線每一站都在傳物件。' },
+        ] } },
+        { type: 'table', caption: '比較運算子（因為 > 已經是重新導向）', head: ['PowerShell', '意思', 'bash 的 [ ] 裡'], rows: [
+          ['`-eq`', '等於', '`-eq`（數字）／`=`（文字）'],
+          ['`-ne`', '不等於', '`-ne`'],
+          ['`-gt`、`-ge`', '大於、大於等於', '`-gt`、`-ge`'],
+          ['`-lt`、`-le`', '小於、小於等於', '`-lt`、`-le`'],
+          ['`-like`', '萬用字元比對', '`==` 搭配 `[[ ]]`'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'pwsh', en: 'PowerShell 7', def: '新版跨平台 PowerShell 的程式名稱。Windows 內建的舊版叫 `powershell.exe`（5.1）。兩者可以並存。', example: '在 Windows Terminal 選「PowerShell」分頁通常就是 pwsh（安裝後）。' },
+      { term: '屬性', en: 'property', def: '物件上的一個欄位，例如檔案的 Name、Length。用 `物件.屬性` 或在 cmdlet 參數裡用名稱取得。', example: '`(Get-Item notes.txt).Length`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '找出最近 7 天改過的檔案',
+        kind: '文字 vs 物件',
+        code: true,
+        badLabel: 'bash：交給 find 的選項',
+        goodLabel: 'PowerShell：比較欄位',
+        bad: 'find . -type f {{1:-mtime -7}}',
+        good: 'Get-ChildItem -Recurse -File |\n  Where-Object {{1:LastWriteTime -gt (Get-Date).AddDays(-7)}}',
+        badResult: 'bash 要記得 find 的特殊選項 `-mtime`；PowerShell 用通用的方法：拿欄位和日期比大小。',
+        why: ['同一個條件：修改時間在 7 天內'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="兩個 PowerShell 的比較：Windows PowerShell 5.1，程式名 powershell.exe，隨 Windows 內建，不再加新功能，不支援和和；PowerShell 7，程式名 pwsh，要另外安裝，持續更新，跨平台，支援和和">
+          <g font-size="18">
+            <rect x="10" y="10" width="265" height="240" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="142" y="44" text-anchor="middle" font-weight="900">Windows PowerShell</text>
+            <text x="142" y="72" text-anchor="middle" font-weight="900" class="mono">5.1</text>
+            <text x="30" y="112" class="mono" font-size="16">powershell.exe</text>
+            <text x="30" y="146">Windows 內建</text><text x="30" y="178">不再加新功能</text><text x="30" y="210">不支援 &amp;&amp;</text>
+            <rect x="285" y="10" width="265" height="240" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+            <text x="417" y="44" text-anchor="middle" font-weight="900" class="on-color">PowerShell</text>
+            <text x="417" y="72" text-anchor="middle" font-weight="900" class="on-color mono">7.x</text>
+            <text x="305" y="112" class="on-color mono" font-size="16">pwsh</text>
+            <text x="305" y="146" class="on-color">另外安裝</text><text x="305" y="178" class="on-color">持續更新、跨平台</text><text x="305" y="210" class="on-color">支援 &amp;&amp;、||</text>
+          </g>
+        </svg>`, caption: '安裝 PowerShell 7：`winget install Microsoft.PowerShell`。之後在 Windows Terminal 把它設成預設設定檔。' },
+      ],
+      tryit: {
+        q: ['不查資料，猜這些 cmdlet 在做什麼：'],
+        code: true,
+        draft: 'Get-Process     ____\nStop-Process    ____\nGet-Service     ____\nTest-Path       ____\nGet-History     ____',
+        answer: ['取得執行中的程式、停止程式、取得系統服務、測試路徑是否存在（回傳 True／False）、取得指令歷史。', '這就是動詞-名詞的好處：沒學過也猜得到。不確定時用 `Get-Help 名稱 -Examples`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 PowerShell 寫 `if ($size > 100)`。', why: '`>` 在 PowerShell 是重新導向，這行會建立一個叫 100 的檔案。', right: '比較用 `-gt`：`if ($size -gt 100)`。' },
+      { wrong: '以為 PowerShell 的 `curl` 就是真正的 curl。', why: '在 Windows PowerShell 5.1，`curl` 是 `Invoke-WebRequest` 的別名，選項完全不同。PowerShell 7 已移除這個別名。', right: '在 5.1 要用真正的 curl 就打 `curl.exe`（Windows 10 起內建）。' },
+      { wrong: '想從 `ls` 的輸出裡「切出第 5 欄」來排序，像 bash 那樣。', why: 'PowerShell 的輸出是物件，畫面上的表格只是顯示格式。', right: '用欄位名稱：`Sort-Object Length`；不知道欄位名就 `| Get-Member`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`Remove-Item` 最可能在做什麼？', options: [
+        { text: '從清單中移除重複的項目', why: '那是 `Select-Object -Unique` 或 `Sort-Object -Unique`。' },
+        { text: '刪除檔案或資料夾', correct: true, why: 'Remove（移除）＋Item（項目，例如檔案）＝刪除，它也是 `rm`、`del` 的實體。' },
+        { text: '把項目移到資源回收筒', why: 'Remove-Item 直接刪除，不經過資源回收筒。' },
+        { text: '取消安裝程式', why: '解除安裝程式用的是其他工具（例如 winget uninstall）。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 PowerShell 找出大於 100MB 的檔案，哪一行正確？', options: [
+        { text: '`Get-ChildItem | Where-Object { Length > 100MB }`', why: '`>` 是重新導向，會建立叫 100MB 的檔案。' },
+        { text: '`Get-ChildItem | Where-Object Length -gt 100MB`', correct: true, why: '用 `-gt` 比較 Length 欄位；PowerShell 認得 MB 單位。' },
+        { text: '`ls -l | sort -k5`', why: '這是 bash 的文字處理寫法，PowerShell 的 ls 不認得 `-l`。' },
+        { text: '`Get-ChildItem -Size 100MB`', why: 'Get-ChildItem 沒有 `-Size` 參數。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說「PowerShell 指令好長，不如 bash 簡潔」。用這課的概念，說出 PowerShell 設計的一個優點，和一個讓它不那麼長的方法。'], answer: [
+        '參考：優點是好猜、好讀（動詞-名詞），而且物件管線不用切文字欄位，比較不會切錯。',
+        '縮短方法：互動時用別名（`ls`、`cd`、`where`、`sort`、`select`）和參數的前綴（`-Rec` 代替 `-Recurse`）；寫腳本時再用完整名稱方便別人讀。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-1）PowerShell 讀取環境變數 `Path` 的寫法是？', options: [
+        { text: '`$env:Path`', correct: true, why: '`env:` 前綴讀環境變數。' },
+        { text: '`$PATH`', why: 'bash 寫法，PowerShell 裡是不同的一般變數。' },
+        { text: '`%PATH%`', why: 'cmd 寫法。' },
+        { text: '`Get-EnvironmentPath`', why: '沒有這個 cmdlet。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-2）PowerShell 的 `ls -Force` 顯示了什麼？', options: [
+        { text: '包含隱藏檔的清單', correct: true, why: '`-Force` 顯示隱藏項目，相當於 bash 的 `-a`。' },
+        { text: '強制刪除', why: 'ls 只列出，不刪除。' },
+        { text: '以管理員權限列出', why: '和權限無關。' },
+        { text: '子資料夾的內容', why: '那是 `-Recurse`。' },
+      ] },
+    ],
+    keypoints: [
+      'cmdlet 是「動詞-名詞」：Get、Set、New、Remove…看名詞就能猜意思。',
+      '管線傳物件：用 `Get-Member` 看欄位，用欄位名稱過濾、排序。',
+      '比較用 `-eq`、`-gt`；`>` 是重新導向。5.1 是內建舊版，7（pwsh）是新版。',
+    ],
+    sources: ['ps-overview', 'ps-objects', 'ps-diff', 'ps-76'],
+  },
+
+  '5-4': {
+    goals: [
+      '在舊教學、批次檔、錯誤訊息裡認出 cmd 的寫法',
+      '讀懂 cmd 最常見的 10 個指令和 `%變數%`、`/選項`',
+      '知道遇到 cmd 指令時，怎麼在 PowerShell 執行或改寫',
+    ],
+    analogy: {
+      text: ['cmd 像**家裡的老電話簿**：現在大家都用手機聯絡人（PowerShell），但老電話簿還在抽屜裡，有時候長輩（舊軟體、舊教學、公司的 `.bat` 檔）還是會叫你查它。你不用會寫，但要**看得懂**。'],
+      limit: ['老電話簿不會更新，cmd 也幾乎不再加新功能。新學的東西都學 PowerShell；cmd 的目標只是「認得、能執行、能翻譯」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="認出 cmd 的三個線索：提示字元只有路徑和大於，沒有 PS；選項用斜線開頭例如 slash s；變數用百分比包起來例如 百分比 USERPROFILE 百分比">
+        <g font-size="19">
+          <rect x="10" y="10" width="540" height="84" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="44" font-weight="900" class="on-color">① 提示字元</text><text x="200" y="44" class="on-color mono">C:\\Users\\you&gt;</text>
+          <text x="30" y="78" class="on-color" font-size="17">只有路徑＋&gt;，開頭沒有 PS</text>
+          <rect x="10" y="106" width="540" height="84" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="140" font-weight="900" class="on-color">② 選項用 /</text><text x="200" y="140" class="on-color mono">dir /s /b</text>
+          <text x="30" y="174" class="on-color" font-size="17">斜線開頭，不是減號</text>
+          <rect x="10" y="202" width="540" height="84" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="236" font-weight="900" class="on-color">③ 變數用 %%</text><text x="200" y="236" class="on-color mono">%USERPROFILE%</text>
+          <text x="30" y="270" class="on-color" font-size="17">前後都有百分比</text>
+        </g>
+      </svg>`,
+      caption: '三個線索出現任何一個，八成就是 cmd。檔名是 `.bat` 或 `.cmd` 的，一定是 cmd 腳本。',
+      blocks: [
+        { type: 'table', caption: 'cmd 常用指令（只求看懂）', head: ['cmd', '做什麼', 'PowerShell', 'zsh／bash'], rows: [
+          ['`dir`', '列出檔案', '`Get-ChildItem`／`dir`', '`ls`'],
+          ['`cd`', '切換／顯示位置', '`Set-Location`／`cd`', '`cd`、`pwd`'],
+          ['`md`／`mkdir`', '建立資料夾', '`mkdir`', '`mkdir`'],
+          ['`copy`、`xcopy`', '複製', '`Copy-Item`', '`cp`'],
+          ['`move`', '移動、改名', '`Move-Item`', '`mv`'],
+          ['`del`', '刪除檔案', '`Remove-Item`', '`rm`'],
+          ['`rd /s /q`', '刪除資料夾（不詢問）', '`Remove-Item -Recurse -Force`', '`rm -rf`'],
+          ['`type`', '讀檔', '`Get-Content`', '`cat`'],
+          ['`set X=1`', '設變數', '`$env:X = 1`', '`export X=1`'],
+          ['`cls`', '清除畫面', '`Clear-Host`／`cls`', '`clear`'],
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'cmd', title: '認得 cmd', steps: [
+          { cmd: 'echo %USERPROFILE%', out: 'C:\\Users\\you', note: '`%變數名%`：cmd 的變數寫法。' },
+          { cmd: 'dir /b *.txt', out: 'notes.txt\ntodo.txt', note: '`/b`：只列出名稱（bare）。cmd 的選項用 `/` 開頭；看說明用 `dir /?`。' },
+          { cmd: 'ls', out: "'ls' 不是內部或外部命令、可執行的程式或批次檔。", err: true, note: 'cmd 沒有 `ls`、`pwd`、`cat`。看到這個錯誤，代表你開的是 cmd 不是 PowerShell。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'cmd', en: 'Command Prompt（命令提示字元）', def: 'Windows 的舊式 shell（cmd.exe），從 DOS 時代延續下來。仍然內建，但新功能都在 PowerShell。', example: '開始選單搜尋「命令提示字元」。' },
+      { term: '/? 說明', en: 'cmd help switch', def: 'cmd 指令看說明的方式：指令後面加 `/?`。', example: '`copy /?`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '舊教學裡的一段 .bat，翻成 PowerShell',
+        kind: '方言翻譯',
+        code: true,
+        badLabel: 'cmd（.bat）',
+        goodLabel: 'PowerShell',
+        bad: '@echo off\nset {{1:OUT=%USERPROFILE%\\backup}}\nif not exist "%OUT%" mkdir "%OUT%"\n{{2:xcopy docs "%OUT%\\docs" /E /I /Y}}',
+        good: '$OUT = "{{1:$env:USERPROFILE\\backup}}"\nif (-not (Test-Path $OUT)) { mkdir $OUT }\n{{2:Copy-Item docs "$OUT\\docs" -Recurse -Force}}',
+        badResult: '意思完全一樣：建立 backup 資料夾（不存在才建），再把 docs 整個複製過去。',
+        why: ['`%USERPROFILE%` → `$env:USERPROFILE`；`set` → 一般變數', '`xcopy /E /I /Y` → `Copy-Item -Recurse -Force`'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="在 PowerShell 遇到 cmd 指令：dir cd copy 這類 PowerShell 有別名，直接可用但選項要改；dir 斜線 s 這種斜線選項不能用；真的需要 cmd 時用 cmd 斜線 c 加上指令">
+          <g font-size="18">
+            <rect x="10" y="10" width="540" height="64" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+            <text x="30" y="40" font-weight="900" class="on-color">名稱可用：dir、cd、copy、del、type、cls</text>
+            <text x="30" y="64" class="on-color" font-size="16">PowerShell 有同名別名</text>
+            <rect x="10" y="88" width="540" height="64" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+            <text x="30" y="118" font-weight="900" class="on-color">選項不能用：dir /s、del /q</text>
+            <text x="30" y="142" class="on-color" font-size="16">改成 -Recurse、-Force</text>
+            <rect x="10" y="166" width="540" height="64" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="30" y="196" font-weight="900" class="mono">cmd /c "dir /s /b *.txt"</text>
+            <text x="30" y="220" font-size="16">真的要照原樣跑，就交給 cmd 執行</text>
+          </g>
+        </svg>`, caption: '最常見的混亂：在 PowerShell 打 `dir /s`，名稱對了但選項是 cmd 的。' },
+      ],
+      tryit: {
+        q: ['把這行 cmd 翻成 PowerShell：'],
+        code: true,
+        draft: 'cmd：        del /s /q *.tmp\nPowerShell：____',
+        answer: ['`Get-ChildItem -Recurse -Filter *.tmp | Remove-Item -Force`', '`/s` 遞迴 → `-Recurse`；`/q` 不詢問 → `-Force`（並且 Remove-Item 預設就不問）。執行前先拿掉 `| Remove-Item ...` 預覽清單（2-3）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 cmd 打 `ls`、`cat`、`pwd`。', why: '這些是 Unix／PowerShell 的名稱，cmd 不認得。', right: '開 PowerShell；或在 cmd 用 `dir`、`type`、`cd`。' },
+      { wrong: '在 PowerShell 裡設 `set X=1`，以為設好了環境變數。', why: 'PowerShell 的 `set` 是 `Set-Variable` 的別名，行為不同，也不會設環境變數。', right: 'PowerShell 用 `$env:X = 1`。' },
+      { wrong: '雙擊一個來路不明的 `.bat` 檔看看會發生什麼。', why: '雙擊就會執行裡面所有指令，包括 `del /s /q`、`rd /s /q` 這種不詢問的刪除。', right: '先用記事本打開看內容，看得懂、確定安全再執行。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '哪一個最能確定是 cmd 的寫法？', options: [
+        { text: '`echo %PATH%`', correct: true, why: '`%變數%` 是 cmd 特有的寫法。' },
+        { text: '`echo $PATH`', why: '這是 bash／zsh 的寫法。' },
+        { text: '`echo $env:Path`', why: '這是 PowerShell 的寫法。' },
+        { text: '`ls -la`', why: '這是 bash／zsh 的寫法。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 PowerShell 打 `dir /s` 出現錯誤。為什麼？', options: [
+        { text: 'PowerShell 沒有 dir 指令', why: '有，`dir` 是 `Get-ChildItem` 的別名。' },
+        { text: '`/s` 是 cmd 的選項，Get-ChildItem 不認得', correct: true, why: '名稱借到了，選項沒有；PowerShell 要寫 `dir -Recurse`。' },
+        { text: '要用系統管理員身分', why: '和權限無關。' },
+        { text: '要先切換到 C:\\', why: '和位置無關。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['公司的部署說明是一個 `deploy.bat`。你想改成 PowerShell 腳本。翻譯時要特別注意哪三種差異？'], answer: [
+        '參考：① 變數：`%X%` → `$env:X` 或 `$X`。② 選項：`/s /q` → `-Recurse -Force` 等。③ 流程：`if exist`、`goto`、`%ERRORLEVEL%` → `Test-Path`、函式、`$LASTEXITCODE`。',
+        '翻完先在測試環境跑一次，並加上 `-WhatIf`（很多 cmdlet 支援的「只預覽不執行」選項）。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-2）cmd 裡查 `git` 在哪個資料夾，用哪個指令？', options: [
+        { text: '`where git`', correct: true, why: 'cmd 的 where 會列出 PATH 中符合的程式。' },
+        { text: '`which git`', why: '那是 bash／zsh。' },
+        { text: '`Get-Command git`', why: '那是 PowerShell。' },
+        { text: '`find git`', why: 'cmd 的 find 是找文字。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-4）cmd 的 `type notes.txt` 等於 zsh 的哪個指令？', options: [
+        { text: '`cat notes.txt`', correct: true, why: '兩者都是印出檔案內容。' },
+        { text: '`file notes.txt`', why: 'file 是判斷檔案類型。' },
+        { text: '`touch notes.txt`', why: 'touch 是建立空檔案。' },
+        { text: '`grep notes.txt`', why: 'grep 是搜尋。' },
+      ] },
+    ],
+    keypoints: [
+      '認出 cmd：提示字元沒有 `PS`、選項用 `/`、變數用 `%X%`、檔案是 `.bat`／`.cmd`。',
+      'cmd 只求看懂；新的東西都用 PowerShell 寫。',
+      'PowerShell 借了 cmd 的指令名稱，但選項要改寫；真的需要就用 `cmd /c`。',
+    ],
+    sources: ['win-cmd', 'ps-diff'],
+  },
+
+  '5-5': {
+    goals: [
+      '用對照器看同一件事在四種 shell 的寫法',
+      '從一段指令的特徵，判斷它是哪一種方言',
+      '把網路上找到的指令翻成你正在用的 shell',
+    ],
+    analogy: {
+      text: ['這一課是一本**四國語言的旅遊會話手冊**：同一句「洗手間在哪裡」，翻開就看到四種說法並排。不用全部背，需要時翻到那一頁、對著念就好。'],
+      limit: ['會話手冊只有常用句；真正複雜的對話（長腳本）逐句翻譯不一定行得通，有時換個做法更好。遇到長腳本，優先找原本就用你的 shell 寫的版本。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="判斷方言的線索：看到 PS 提示字元、動詞減名詞、錢字號 env 冒號、減號 eq 就是 PowerShell；看到 percent 提示字元或 zshrc 就是 zsh；看到錢字號提示字元、export、反斜線換行、do done 就是 bash 或 zsh；看到百分比變數、斜線選項、bat 就是 cmd">
+        <g font-size="17">
+          <rect x="10" y="10" width="265" height="150" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="42" font-weight="900" class="on-color">PowerShell</text>
+          <text x="30" y="74" class="on-color mono" font-size="15">Get-Xxx、-Recurse</text>
+          <text x="30" y="102" class="on-color mono" font-size="15">$env:X、-eq、-gt</text>
+          <text x="30" y="130" class="on-color mono" font-size="15">行尾 \` 換行、.ps1</text>
+          <rect x="285" y="10" width="265" height="150" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+          <text x="305" y="42" font-weight="900" class="on-color">bash／zsh</text>
+          <text x="305" y="74" class="on-color mono" font-size="15">export、$X、ls -la</text>
+          <text x="305" y="102" class="on-color mono" font-size="15">行尾 \\ 換行、do…done</text>
+          <text x="305" y="130" class="on-color mono" font-size="15">sudo、.sh、/dev/null</text>
+          <rect x="10" y="172" width="265" height="150" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="204" font-weight="900" class="on-color">zsh 特別的</text>
+          <text x="30" y="236" class="on-color mono" font-size="15">提示字元 %</text>
+          <text x="30" y="264" class="on-color mono" font-size="15">~/.zshrc、brew</text>
+          <text x="30" y="292" class="on-color" font-size="15">（其餘同 bash）</text>
+          <rect x="285" y="172" width="265" height="150" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="305" y="204" font-weight="900" class="on-color">cmd</text>
+          <text x="305" y="236" class="on-color mono" font-size="15">%X%、/s /q</text>
+          <text x="305" y="264" class="on-color mono" font-size="15">行尾 ^ 換行</text>
+          <text x="305" y="292" class="on-color mono" font-size="15">@echo off、.bat</text>
+        </g>
+      </svg>`,
+      caption: '最快的線索是**變數長相**：`$env:X`、`$X`、`%X%`，一眼分出三家。',
+      blocks: [
+        { type: 'widget', name: 'rosetta', props: { tasks: ROSETTA_TASKS } },
+        { type: 'callout', variant: 'tip', title: '長指令的換行符號也不同', body: ['一行太長要折到下一行時：bash／zsh 在行尾放 `\\`，PowerShell 放反引號 `` ` ``，cmd 放 `^`。從教學複製多行指令時，**行尾符號是判斷方言的好線索**，也是貼錯 shell 最容易出錯的地方。'] },
+      ],
+    },
+    define: [
+      { term: '方言', en: 'shell dialect', def: '不同 shell 對同一件事的不同寫法。指令的概念（程式、選項、管線）共通，細節（變數、選項符號、比較方式）不同。', example: '`$env:HOME`／`$HOME`／`%USERPROFILE%`。' },
+      { term: '續行符號', en: 'line continuation', def: '放在行尾，表示「指令還沒結束，下一行接著」。bash `\\`、PowerShell `` ` ``、cmd `^`。', example: '`docker run \\` 換行 `  -p 80:80 nginx`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '把 bash 教學翻成 PowerShell',
+        kind: '方言翻譯',
+        code: true,
+        badLabel: 'bash（教學原文）',
+        goodLabel: 'PowerShell（你的版本）',
+        bad: '{{1:export}} API_URL="https://api.example.com"\nmkdir {{2:-p}} logs\nnpm start {{3:> logs/out.txt 2>&1}}',
+        good: '{{1:$env:API_URL}} = "https://api.example.com"\nmkdir logs {{2:-Force}}\nnpm start {{3:*> logs\\out.txt}}',
+        badResult: '三行逐行對照：環境變數、建立資料夾（已存在不報錯）、把所有輸出存檔。',
+        why: ['export → $env:', '`-p`（已存在不報錯）→ `-Force`', '`> 檔 2>&1` → `*>`（PowerShell 的「全部輸出」）；`> 檔 2>&1` 在 PowerShell 也能用'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="翻譯流程：一、判斷原文是哪種方言；二、用拆解法找出程式、選項、參數、連接符號；三、程式和工具名稱通常不用改，例如 git npm；四、只翻 shell 本身的部分：變數、選項、重新導向">
+          <g font-size="18">
+            <rect x="10" y="10" width="540" height="50" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="26" y="42" class="on-color" font-weight="900">① 判斷原文的方言（看變數、行尾符號）</text>
+            <rect x="10" y="70" width="540" height="50" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="26" y="102" class="on-color" font-weight="900">② 拆解每一行（1-1）</text>
+            <rect x="10" y="130" width="540" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="162" font-weight="900">③ git、npm、python 這類工具：不用改</text>
+            <rect x="10" y="190" width="540" height="50" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/><text x="26" y="222" class="on-color" font-weight="900">④ 只翻 shell 的部分：變數、選項、導向</text>
+          </g>
+        </svg>`, caption: '好消息：跨平台工具（模組 6、7）在每種 shell 的寫法幾乎一樣，要翻的通常只有 shell 本身的語法。' },
+      ],
+      tryit: {
+        q: ['判斷每一行是哪種方言：'],
+        code: true,
+        draft: 'A. if exist build rd /s /q build          ____\nB. Remove-Item build -Recurse -Force      ____\nC. [ -d build ] && rm -rf build           ____\nD. $env:NODE_ENV = "production"           ____',
+        answer: ['A：cmd（`if exist`、`/s /q`）。B：PowerShell（動詞-名詞、`-Recurse`）。C：bash／zsh（`[ -d ]`、`&&`、`rm -rf`）。D：PowerShell（`$env:`）。', 'A、B、C 做的是同一件事：刪除 build 資料夾。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把多行的 bash 指令（行尾有 `\\`）直接貼進 PowerShell。', why: 'PowerShell 不認得 `\\` 是續行符號，每一行會被當成獨立的指令，結果亂掉。', right: '把行尾的 `\\` 換成反引號 `` ` ``，或乾脆合併成一行。' },
+      { wrong: '翻譯時連 `git commit -m` 也想改成 PowerShell 風格。', why: 'git、npm 是獨立的程式，它們的選項在任何 shell 都一樣。', right: '只翻 shell 自己的語法：變數、導向、串接、內建指令。' },
+      { wrong: '用 AI 翻譯後不看就執行。', why: 'AI 可能翻錯選項的意思，例如把 `rm -r`（遞迴）翻成不同行為的參數。', right: '用拆解器（1-1）看懂每一塊，對照這課的表格確認，再執行。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '看到一行指令結尾是反引號 `` ` ``，下一行繼續。這是哪種 shell？', options: [
+        { text: 'bash', why: 'bash 用 `\\` 續行。' },
+        { text: 'PowerShell', correct: true, why: '反引號是 PowerShell 的跳脫與續行字元。' },
+        { text: 'cmd', why: 'cmd 用 `^` 續行。' },
+        { text: 'zsh', why: 'zsh 和 bash 一樣用 `\\`。' },
+      ] },
+      { level: '應用', type: 'mc', q: '教學寫 `export PORT=3000 && npm start`，你在 PowerShell 7。怎麼改？', options: [
+        { text: '`$env:PORT = 3000; npm start`', correct: true, why: '設環境變數用 `$env:`；這裡用 `;` 或 `&&` 都可以（PowerShell 7）。' },
+        { text: '`set PORT=3000 && npm start`', why: '`set` 是 cmd 的寫法；在 PowerShell 是 Set-Variable，不會設環境變數。' },
+        { text: '照抄就好，PowerShell 7 也支援 export 指令', why: 'PowerShell 沒有 export 指令。' },
+        { text: '`npm start --PORT=3000`', why: '這是把參數傳給 npm，不是設環境變數，程式不一定讀得到。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你常在 Windows（PowerShell）和 Mac（zsh）之間切換。寫一個讓你少翻譯的策略。'], answer: [
+        '參考：① 兩邊都盡量用跨平台的工具（git、npm、python）和 npm scripts，把指令藏在 `npm run xxx` 後面。② 兩邊都裝 PowerShell 7 或兩邊都用 bash（WSL），讓 shell 一致。③ 常用的對照（像這課的表格）收藏起來。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-1）`set MODE=dev` 最可能出現在哪？', options: [
+        { text: 'cmd 或 .bat 檔', correct: true, why: 'cmd 用 set 設變數。' },
+        { text: 'zsh 的 .zshrc', why: 'zsh 用 `export MODE=dev`。' },
+        { text: 'PowerShell 的 $PROFILE', why: 'PowerShell 用 `$env:MODE = "dev"`。' },
+        { text: 'Python 程式碼', why: 'Python 有自己的語法。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 2-3）三種 shell 的「刪除資料夾」有什麼共同點？', options: [
+        { text: '都不經過資源回收筒', correct: true, why: '`rm -rf`、`Remove-Item -Recurse -Force`、`rd /s /q` 都直接刪除。' },
+        { text: '都會先詢問', why: '加了 `-f`、`-Force`、`/q` 就不會問。' },
+        { text: '都需要以系統管理員身分執行', why: '刪自己的檔案不需要。' },
+        { text: '都只能刪空資料夾', why: '加了遞迴選項就能刪整個資料夾。' },
+      ] },
+    ],
+    keypoints: [
+      '同一件事四種寫法：概念相同，差在變數、選項符號、導向與串接。',
+      '判斷方言看變數（`$env:X`／`$X`／`%X%`）和行尾續行符號（`` ` ``／`\\`／`^`）。',
+      '翻譯時只翻 shell 的部分；git、npm 等工具的寫法不用改。',
+    ],
+    sources: ['ps-diff', 'bash-manual', 'win-cmd'],
+  },
+});
+</script>

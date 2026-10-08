@@ -1,0 +1,503 @@
+
+<script>
+/* ==========================================================================
+   模組 1：核心邏輯：指令的文法
+   ========================================================================== */
+defineTerms({
+  'cmdlet': { en: 'cmdlet', def: 'PowerShell 內建的指令，名稱是「動詞-名詞」的形式。', example: '`Get-ChildItem`、`Set-Location`、`Remove-Item`。' },
+  '跳脫字元': { en: 'escape character', def: '放在特殊符號前面，讓它變回普通字元的符號。bash／zsh 是 `\\`，PowerShell 是反引號 `` ` ``，cmd 是 `^`。', example: '`echo \\$HOME` 會印出字面上的 `$HOME`。' },
+  '萬用字元': { en: 'wildcard', def: '代表「任意字元」的符號，讓一個參數一次對應很多檔案。`*` 代表任意長度，`?` 代表一個字元。', example: '`*.txt` 代表所有 .txt 檔。' },
+  'man page': { en: 'manual page', def: 'Unix 系統內建的指令說明手冊，用 `man 指令名` 開啟，按 `q` 離開。', example: '`man ls`。' },
+});
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '把任何一行指令拆成：程式、子指令、選項、參數',
+      '分辨短選項（`-l`）和長選項（`--long`），知道短選項可以合併',
+      '用拆解器拆一行你沒看過的指令，說出每個部分在做什麼',
+    ],
+    analogy: {
+      text: ['指令就像一句**請求**：「**請咖啡師**（程式）**做一杯拿鐵**（子指令），**大杯、少冰**（選項），**外帶給王小明**（參數）。」順序固定、用空白隔開，就是一行完整的指令。'],
+      limit: ['咖啡師聽得懂「少冰大杯」這種順序顛倒的說法，程式不一定：多數程式允許選項和參數交換位置，但**程式名一定在最前面**，子指令通常緊跟在程式後面。每個程式的規則以它的說明文件為準（1-3）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="指令解剖圖：git commit -m 修正登入 src/login.js。git 是程式，誰；commit 是子指令，做什麼；-m 修正登入 是選項和它的值，怎麼做；src/login.js 是參數，對誰做">
+        <g font-size="22" class="mono">
+          <rect x="10" y="20" width="80" height="56" style="fill:var(--k-prog)" class="stroke-ink" stroke-width="4"/><text x="50" y="56" text-anchor="middle" class="on-color mono" font-weight="700">git</text>
+          <rect x="100" y="20" width="110" height="56" style="fill:var(--k-sub)" class="stroke-ink" stroke-width="4"/><text x="155" y="56" text-anchor="middle" class="on-color mono" font-weight="700">commit</text>
+          <rect x="220" y="20" width="160" height="56" style="fill:var(--k-opt)" class="stroke-ink" stroke-width="4"/><text x="300" y="56" text-anchor="middle" class="on-color mono" font-weight="700">-m "修正"</text>
+          <rect x="390" y="20" width="160" height="56" style="fill:var(--k-arg)" class="stroke-ink" stroke-width="4"/><text x="470" y="56" text-anchor="middle" class="on-color mono" font-weight="700">login.js</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3"><path d="M50 76 V120 M155 76 V120 M300 76 V120 M470 76 V120"/></g>
+        <g font-size="22" font-weight="900" text-anchor="middle">
+          <text x="50" y="150">程式</text><text x="155" y="150">子指令</text><text x="300" y="150">選項</text><text x="470" y="150">參數</text>
+        </g>
+        <g font-size="20" text-anchor="middle">
+          <text x="50" y="186">誰</text><text x="155" y="186">做什麼</text><text x="300" y="186">怎麼做</text><text x="470" y="186">對誰做</text>
+        </g>
+        <rect x="10" y="220" width="540" height="96" class="fill-surface stroke-ink" stroke-width="4" stroke-dasharray="10 6"/>
+        <text x="30" y="256" font-size="20">不是每行都有四種：</text>
+        <text x="30" y="292" font-size="20" class="mono">ls</text><text x="80" y="292" font-size="20">只有程式；</text>
+        <text x="200" y="292" font-size="20" class="mono">ls -la docs</text><text x="350" y="292" font-size="20">沒有子指令</text>
+      </svg>`,
+      caption: '全站固定用這組顏色：粉紅＝程式、藍＝子指令、橘＝選項、綠＝參數、黃＝連接符號、紫＝變數。',
+      blocks: [
+        '[[shell]] 收到一行字，第一件事是**用空白把它切開**。切出來的第一塊是程式名，shell 會去找這個程式（4-2）；其餘每一塊都原封不動交給這個程式，由程式自己決定怎麼解讀。PowerShell 的內建指令叫 [[cmdlet]]，規則相同。',
+        { type: 'widget', name: 'anatomy', props: { presets: [
+          { cmd: 'git commit -m "修正登入"', notes: { '-m': '選項：message 的縮寫，後面接這次存檔的說明', '"修正登入"': '參數：-m 的值；有引號是為了把整句話包成一塊' } },
+          { cmd: 'ls -la ~/Downloads', notes: { '-la': '短選項合併：-l 詳細格式、-a 包含隱藏檔', '~/Downloads': '參數：要列出的資料夾，~ 代表家目錄' } },
+          { cmd: 'npm install --save-dev prettier', notes: { 'install': '子指令：安裝套件', '--save-dev': '長選項：記錄成「開發時才需要」的套件', 'prettier': '參數：要安裝的套件名稱' } },
+          { cmd: 'Get-ChildItem -Path C:\\Users -Recurse', notes: { 'Get-ChildItem': '程式（cmdlet）：列出資料夾內容，PowerShell 版的 ls', '-Path': 'PowerShell 參數名稱：後面接路徑', 'C:\\Users': '參數：-Path 的值', '-Recurse': 'PowerShell 參數：連子資料夾一起列出（不需要值的開關）' } },
+          { cmd: 'claude -p "整理這個資料夾" --model sonnet', notes: { '-p': '短選項：print，執行一次就結束，不進入對話模式', '"整理這個資料夾"': '參數：交給 Claude 的提示', '--model': '長選項：指定模型', 'sonnet': '參數：--model 的值' } },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '程式', en: 'program / command name', def: '指令的第一個字：要叫哪個程式來做事。shell 會到 PATH 裡的資料夾找同名的檔案（4-2）。', example: '`git`、`npm`、`ls`、`Get-ChildItem`。' },
+      { term: '子指令', en: 'subcommand', def: '功能很多的程式，用第二個字決定「這次做哪一種工作」。', example: '`git commit`、`npm install`、`winget search` 裡的第二個字。' },
+      { term: '選項', en: 'option / flag', def: '改變做法的開關，通常 `-` 或 `--` 開頭。有的選項後面要接一個值。', example: '`-l`、`--help`、`-m "訊息"`、PowerShell 的 `-Recurse`。' },
+      { term: '參數', en: 'argument', def: '這次要處理的對象：檔案、資料夾、網址、文字。', example: '`cp a.txt b.txt` 裡的兩個檔名。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一個意思，長短兩種寫法',
+        kind: '指令對照',
+        code: true,
+        badLabel: '短選項：好打',
+        goodLabel: '長選項：好讀',
+        bad: 'git log {{1:-n 3}} {{2:-p}}',
+        good: 'git log {{1:--max-count=3}} {{2:--patch}}',
+        badResult: '兩行做的事完全一樣：顯示最近 3 次 commit 和它們改了什麼。',
+        why: ['`-n 3` 和 `--max-count=3`：最多 3 筆', '`-p` 和 `--patch`：顯示內容差異'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 280" role="img" aria-label="選項的三種長相：短選項一個減號一個字母，可以合併成 -la；長選項兩個減號完整單字；PowerShell 用一個減號加完整單字">
+          <g font-size="20">
+            <rect x="10" y="10" width="540" height="76" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="30" y="42" font-weight="900">短選項</text><text x="140" y="42" class="mono">-l  -a  →  -la</text>
+            <text x="30" y="72">一個減號、一個字母；可以合併</text>
+            <rect x="10" y="98" width="540" height="76" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="30" y="130" font-weight="900">長選項</text><text x="140" y="130" class="mono">--all  --help</text>
+            <text x="30" y="160">兩個減號、完整單字；不能合併</text>
+            <rect x="10" y="186" width="540" height="76" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+            <text x="30" y="218" font-weight="900" class="on-color">PowerShell</text><text x="170" y="218" class="on-color mono">-Recurse  -Force</text>
+            <text x="30" y="248" class="on-color">一個減號、完整單字；大小寫不拘</text>
+          </g>
+        </svg>`, caption: '看到 `-la` 先想「可能是 `-l` 加 `-a`」；看到 `-Recurse` 就知道是 PowerShell。' },
+      ],
+      tryit: {
+        q: ['拆解這一行，把每一塊填進四個位置：'],
+        code: true,
+        draft: 'docker run -d --name web nginx\n\n程式：____\n子指令：____\n選項（含值）：____\n參數：____',
+        answer: ['程式 `docker`；子指令 `run`；選項 `-d`（背景執行）與 `--name web`（容器取名為 web）；參數 `nginx`（要執行的映像檔）。', '注意 `web` 是 `--name` 的值，不是獨立的參數。分辨方式：看它前面是不是一個需要值的選項（查 `docker run --help`）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 `-la` 當成一個叫做「la」的選項，到處找不到說明。', why: '短選項可以合併，`-la` 其實是 `-l` 和 `-a` 兩個開關。', right: '看到一個減號接好幾個字母，先拆成單一字母分別查。' },
+      { wrong: '以為所有程式的選項都一樣，`-r` 一定是「遞迴」。', why: '選項的意思由每個程式自己決定：`cp -r` 是遞迴複製，`sort -r` 是反向排序。', right: '對不熟的程式，用 `程式 --help` 確認每個選項的意思（1-3）。' },
+      { wrong: '少打了程式名稱，只輸入 `commit -m "修正"`。', why: 'shell 會把第一個字 `commit` 當成程式名去找，找不到就報「command not found」。', right: '一行指令永遠從程式名開始：`git commit -m "修正"`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`npm run build` 裡，`run` 是哪一種零件？', options: [
+        { text: '參數，代表要處理的對象', why: '`build` 才比較像對象（要跑的腳本名稱）；`run` 決定 npm 這次做哪種工作。' },
+        { text: '子指令', correct: true, why: '`npm` 是程式，`run` 告訴它「執行一個腳本」，`build` 是要跑的腳本名稱。' },
+        { text: '選項，因為它改變了 npm 的行為', why: '選項通常以 `-` 開頭；`run` 沒有減號，而且它決定的是「做什麼」，不是「怎麼做」。' },
+        { text: '程式，npm 只是它的前綴', why: 'shell 只把第一個字當程式名；`run` 是交給 npm 處理的第二個字。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`tar -xzf backup.tar.gz` 裡的 `-xzf` 最可能是什麼？', options: [
+        { text: '三個短選項 `-x`、`-z`、`-f` 合併在一起', correct: true, why: '一個減號接多個字母，通常是短選項合併：解壓縮（x）、gzip 格式（z）、指定檔案（f）。' },
+        { text: '一個名叫 xzf 的長選項', why: '長選項要兩個減號（`--xzf`）。單一減號接多字母，在 Unix 工具裡通常是合併的短選項。' },
+        { text: '檔案名稱，因為它緊接在程式後面', why: '以 `-` 開頭的通常是選項；檔名是後面的 `backup.tar.gz`。' },
+        { text: 'tar 的子指令，代表「解壓縮」', why: 'tar 的動作也是用選項（`-x`）表示，不是像 git 那樣的子指令。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['不查資料，猜猜看 `winget install --id Git.Git -e` 每一塊的角色，再用上面的拆解器驗證。'], answer: [
+        '程式 `winget`、子指令 `install`、長選項 `--id` 和它的值 `Git.Git`、短選項 `-e`（exact，名稱完全相符）。',
+        '你不需要先知道 `-e` 的意思，就能知道「它是一個開關」。這就是拆解法的用處：先看懂結構，再查細節。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-3）教學寫著 `PS> git status`。你要輸入什麼？', options: [
+        { text: '`PS> git status`', why: '`PS>` 是提示字元，不是指令。' },
+        { text: '`git status`', correct: true, why: '提示字元後面的部分才是指令。' },
+        { text: '`status`', why: '少了程式名 `git`，shell 不知道要叫誰。' },
+        { text: '`PS git status`', why: '`PS` 一樣是提示字元的一部分。' },
+      ] },
+    ],
+    keypoints: [
+      '指令＝程式＋（子指令）＋選項＋參數，用空白分開。',
+      '短選項 `-l` 可以合併成 `-la`；長選項 `--all` 不能合併；PowerShell 是 `-Recurse`。',
+      '選項的意思由每個程式自己決定，不熟就查 `--help`。',
+    ],
+    sources: ['posix-utility', 'bash-manual', 'ps-overview'],
+  },
+
+  '1-2': {
+    goals: [
+      '理解空白是「分隔符號」，路徑有空白時要加引號',
+      '分辨單引號和雙引號：哪一種會把變數換成值',
+      '認得三種[[跳脫字元]]：`\\`、`` ` ``、`^`',
+    ],
+    analogy: {
+      text: ['shell 切指令像切蛋糕：**空白就是刀子**。`cd My Documents` 會被切成三塊：`cd`、`My`、`Documents`。**[[引號]]是保鮮盒**：放進盒子裡的東西，刀子切不到，整盒算一塊。'],
+      limit: ['保鮮盒有兩種：**單引號**是密封盒，裡面的東西完全不動；**雙引號**是有窗的盒子，shell 還是會看進去，把 `$變數` 換成它的值。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="空白切割示意：cd My Documents 被切成三塊，第二塊和第三塊被當成兩個參數，出錯；cd 引號 My Documents 引號被切成兩塊，正確">
+        <text x="10" y="32" font-size="20" font-weight="900">✗ 沒加引號</text>
+        <g font-size="20">
+          <rect x="10" y="48" width="70" height="50" style="fill:var(--k-prog)" class="stroke-ink" stroke-width="4"/><text x="45" y="81" text-anchor="middle" class="on-color mono">cd</text>
+          <rect x="100" y="48" width="70" height="50" style="fill:var(--k-arg)" class="stroke-ink" stroke-width="4"/><text x="135" y="81" text-anchor="middle" class="on-color mono">My</text>
+          <rect x="190" y="48" width="150" height="50" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/><text x="265" y="81" text-anchor="middle" class="on-color mono">Documents</text>
+          <text x="360" y="72">多了一塊</text><text x="360" y="96">→ 出錯</text>
+        </g>
+        <text x="10" y="160" font-size="20" font-weight="900">✓ 加了引號</text>
+        <g font-size="20">
+          <rect x="10" y="176" width="70" height="50" style="fill:var(--k-prog)" class="stroke-ink" stroke-width="4"/><text x="45" y="209" text-anchor="middle" class="on-color mono">cd</text>
+          <rect x="100" y="176" width="240" height="50" style="fill:var(--k-arg)" class="stroke-ink" stroke-width="4"/><text x="220" y="209" text-anchor="middle" class="on-color mono">"My Documents"</text>
+          <text x="360" y="200">一整塊</text><text x="360" y="224">→ 正確</text>
+        </g>
+        <text x="10" y="276" font-size="18">刀子（空白）切不進引號裡</text>
+      </svg>`,
+      caption: '路徑或文字裡有空白、中文標點或特殊符號時，用引號包起來最保險。',
+      blocks: [
+        { type: 'table', caption: '單引號和雙引號（bash／zsh／PowerShell 規則相同）', head: ['寫法', '印出來', '說明'], rows: [
+          ['`echo "你好 $USER"`', '`你好 amy`', '雙引號：`$USER` 被換成值'],
+          ["`echo '你好 $USER'`", '`你好 $USER`', '單引號：一個字都不動'],
+          ['`echo 你好 $USER`', '`你好 amy`', '沒引號：一樣會換，但空白會被拿來切'],
+        ] },
+        { type: 'callout', variant: 'tip', title: 'PowerShell 的變數寫法', body: ['上表的 `$USER` 在 PowerShell 要寫成 `$env:USERNAME`；引號規則一樣：雙引號會換值，單引號不會。cmd 只認雙引號，而且單引號沒有特別意義。'] },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '引號的差別', steps: [
+          { cmd: 'echo "家目錄是 $HOME"', out: '家目錄是 /Users/amy', note: '雙引號：`$HOME` 被換成實際的路徑。' },
+          { cmd: "echo '家目錄是 $HOME'", out: '家目錄是 $HOME', note: '單引號：原封不動，連 `$` 都照印。' },
+          { cmd: 'echo 價格是 \\$100', out: '價格是 $100', note: '`\\` 是跳脫字元：讓後面的 `$` 變回普通符號，不當成變數。' },
+          { cmd: 'mkdir "期末 報告"', out: '', note: '建立一個名稱中有空白的資料夾，必須加引號；不加會建出兩個資料夾「期末」和「報告」。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '引號', en: 'quotes', def: '把含空白或特殊符號的文字包成「一塊」參數。雙引號裡的變數會被換成值，單引號裡完全不動。', example: '`"My Documents"`、`\'$HOME\'`。' },
+      { term: '跳脫', en: 'escaping', def: '在特殊符號前加跳脫字元，讓它失去特殊意義、當成普通字元。', example: 'bash `\\$`、PowerShell `` `$ ``、cmd `^&`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '刪除名稱有空白的檔案',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 少了引號',
+        goodLabel: '✓ 整個名稱加引號',
+        bad: 'rm {{1:my notes.txt}}',
+        good: 'rm {{1:"my notes.txt"}}',
+        badResult: '被切成兩個參數：shell 會試著刪除叫 `my` 和叫 `notes.txt` 的兩個檔案。如果剛好真的有 `notes.txt`，它就被刪掉了。',
+        why: ['引號讓 `my notes.txt` 成為一個參數，只刪你要刪的那個'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="三種跳脫字元比較：bash 和 zsh 用反斜線，PowerShell 用反引號，cmd 用插入符號。注意反斜線在 Windows 是路徑分隔符號">
+          <g font-size="20">
+            <rect x="10" y="10" width="170" height="160" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+            <text x="95" y="44" text-anchor="middle" font-weight="900" class="on-color">bash／zsh</text>
+            <text x="95" y="104" text-anchor="middle" font-size="48" font-weight="900" class="on-color mono">\\</text>
+            <text x="95" y="152" text-anchor="middle" class="on-color">反斜線</text>
+            <rect x="195" y="10" width="170" height="160" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+            <text x="280" y="44" text-anchor="middle" font-weight="900" class="on-color">PowerShell</text>
+            <text x="280" y="104" text-anchor="middle" font-size="48" font-weight="900" class="on-color mono">\`</text>
+            <text x="280" y="152" text-anchor="middle" class="on-color">反引號</text>
+            <rect x="380" y="10" width="170" height="160" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+            <text x="465" y="44" text-anchor="middle" font-weight="900" class="on-color">cmd</text>
+            <text x="465" y="104" text-anchor="middle" font-size="48" font-weight="900" class="on-color mono">^</text>
+            <text x="465" y="152" text-anchor="middle" class="on-color">插入符號</text>
+            <text x="10" y="210">Windows 的路徑也用 \\，所以 PowerShell</text>
+            <text x="10" y="238">不能拿 \\ 當跳脫字元</text>
+          </g>
+        </svg>`, caption: '三種 shell 三種跳脫字元。初學階段能用引號就用引號，比記跳脫字元簡單。' },
+      ],
+      tryit: {
+        q: ['在 PowerShell 裡，要讓 `echo` 印出「我的家目錄在 C:\\Users\\amy」（自動填入使用者名稱），補完這行：'],
+        code: true,
+        draft: 'echo ____我的家目錄在 $env:USERPROFILE____',
+        answer: ['`echo "我的家目錄在 $env:USERPROFILE"`。要用**雙引號**，變數才會被換成值；用單引號會印出字面上的 `$env:USERPROFILE`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '路徑有空白，例如 `C:\\Program Files`，直接打 `cd C:\\Program Files`。', why: '空白把它切成兩塊；PowerShell 會說找不到 `C:\\Program`，或把 `Files` 當成多餘的參數而報錯。', right: '加引號：`cd "C:\\Program Files"`；或打 `cd C:\\Prog` 按 Tab，shell 會自動加引號。' },
+      { wrong: '想印出 `$100`，用了雙引號 `echo "售價 $100"`。', why: '雙引號裡的 `$` 會被當成變數開頭，`$1` 被換成空字串，印出「售價 00」。', right: '用單引號 `\'售價 $100\'`，或跳脫：`"售價 \\$100"`（PowerShell 是 `` `$ ``）。' },
+      { wrong: '從網頁或 Word 複製指令，引號變成彎的「" "」。', why: '彎引號（“ ”、‘ ’）不是 shell 認得的引號，會被當成普通字元，出現奇怪的錯誤。', right: '從程式碼區塊複製；發現彎引號就改成直引號 `"` 或 `\'`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在 zsh 執行 `echo \'$HOME\'`，會印出什麼？', options: [
+        { text: '你的家目錄路徑，例如 `/Users/amy`', why: '這是雙引號的行為；單引號裡的 `$` 不會被替換。' },
+        { text: '`$HOME` 這五個字', correct: true, why: '單引號是密封盒，裡面的內容原封不動。' },
+        { text: '空白一行，因為 HOME 變數不存在', why: 'HOME 一定存在；而且單引號根本不會去查變數。' },
+        { text: '錯誤訊息，因為單引號不能包變數', why: '可以包，只是不會替換；這是故意的設計，不是錯誤。' },
+      ] },
+      { level: '應用', type: 'mc', q: '要把 `report final.docx` 複製到 `backup` 資料夾，哪一行正確？', options: [
+        { text: '`cp report final.docx backup`', why: '少了引號，會被當成三個參數：`report`、`final.docx`、`backup`，cp 會試著把前兩個複製進 backup。' },
+        { text: '`cp "report final.docx" backup`', correct: true, why: '引號把檔名包成一塊，cp 收到兩個參數：來源和目的地。' },
+        { text: "`cp 'report' 'final.docx' backup`", why: '每塊各自加引號，還是三個參數，問題沒解決。' },
+        { text: '`cp report\\ final.docx\\ backup`', why: '`\\ ` 跳脫了兩個空白，變成一個很長的檔名 `report final.docx backup`，少了目的地。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼很多工程師建立檔案時，習慣用 `my-notes.txt` 或 `my_notes.txt`，而不是 `my notes.txt`？'], answer: [
+        '參考：因為空白在 shell 裡是分隔符號。檔名沒有空白，就永遠不需要加引號，也不會被切錯。',
+        '同理也避免在檔名裡用 `&`、`$`、`(`、`)` 這類對 shell 有特殊意義的符號。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-1）`git push origin main` 裡，`origin` 和 `main` 是什麼？', options: [
+        { text: '兩個參數：推到哪個遠端、哪個分支', correct: true, why: '`git` 是程式、`push` 是子指令，後面兩個是要處理的對象。' },
+        { text: '兩個選項，因為它們改變了 push 的行為', why: '選項通常以 `-` 開頭；這兩個沒有。' },
+        { text: '兩個子指令，git 允許串很多個', why: 'git 一次只有一個子指令；第二個字之後都是交給它的參數或選項。' },
+        { text: '程式名稱的一部分', why: '程式名只有第一個字 `git`。' },
+      ] },
+    ],
+    keypoints: [
+      '空白是刀子：有空白的路徑或文字要用引號包起來。',
+      '雙引號會把 `$變數` 換成值，單引號完全不動。',
+      '跳脫字元：bash／zsh `\\`、PowerShell `` ` ``、cmd `^`。',
+    ],
+    sources: ['bash-quoting', 'ps-quoting', 'win-cmd'],
+  },
+
+  '1-3': {
+    goals: [
+      '在四種 shell 裡叫出任何指令的說明',
+      '看懂 usage 語法裡的 `[ ]`、`< >`、`...`、`|`',
+      '知道遇到看不懂的指令時，依序去哪裡查',
+    ],
+    analogy: {
+      text: ['每個程式都附了一本**說明書**，`--help` 是背面的簡易版，`man` 是完整版（[[man page]]）。usage 那一行就像**表格的填寫範例**：方括號是「選填」，尖括號是「這裡填你的資料」。'],
+      limit: ['說明書是寫給已經懂一點的人看的，很精簡，初學者常常看不懂例子。這時可以搭配 `tldr` 這類「只給常用範例」的工具，或請 AI 解釋（但要用說明書核對）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 340" role="img" aria-label="usage 語法解讀：cp 方括號 選項 方括號 尖括號 來源 尖括號 點點點 尖括號 目的地 尖括號。方括號代表可以省略，尖括號代表換成你的值，三個點代表可以有很多個">
+        <rect x="10" y="10" width="540" height="64" class="fill-term stroke-ink" stroke-width="4"/>
+        <text x="26" y="52" font-size="22" class="t-out">usage: cp [-r] &lt;來源&gt;... &lt;目的地&gt;</text>
+        <g font-size="20">
+          <rect x="10" y="100" width="260" height="104" style="fill:var(--k-opt)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="136" font-weight="900" class="on-color mono">[ ]</text><text x="90" y="136" font-weight="900" class="on-color">可以省略</text>
+          <text x="30" y="172" class="on-color">[-r] 要遞迴就加，</text><text x="30" y="196" class="on-color">不要就不寫</text>
+          <rect x="290" y="100" width="260" height="104" style="fill:var(--k-arg)" class="stroke-ink" stroke-width="4"/>
+          <text x="310" y="136" font-weight="900" class="on-color mono">&lt; &gt;</text><text x="370" y="136" font-weight="900" class="on-color">換成你的值</text>
+          <text x="310" y="172" class="on-color">不要真的打出</text><text x="310" y="196" class="on-color">尖括號</text>
+          <rect x="10" y="220" width="260" height="104" style="fill:var(--k-sub)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="256" font-weight="900" class="on-color mono">...</text><text x="90" y="256" font-weight="900" class="on-color">可以很多個</text>
+          <text x="30" y="292" class="on-color">一次複製好幾個檔案</text>
+          <rect x="290" y="220" width="260" height="104" style="fill:var(--k-op)" class="stroke-ink" stroke-width="4"/>
+          <text x="310" y="256" font-weight="900" class="on-color mono">a|b</text><text x="370" y="256" font-weight="900" class="on-color">二選一</text>
+          <text x="310" y="292" class="on-color">寫 a 或寫 b</text>
+        </g>
+      </svg>`,
+      caption: '四種記號讀懂九成的 usage。`{a,b}` 和大寫的 `FILE` 也常見，意思分別是「二選一」和「換成你的值」。',
+      blocks: [
+        { type: 'table', caption: '在各 shell 叫出說明', head: ['', '快速說明', '完整說明', '只看範例'], rows: [
+          ['zsh／bash', '`ls --help`（macOS 內建的 ls 不支援）', '`man ls`（按 `q` 離開）', '`tldr ls`（需另外安裝）'],
+          ['PowerShell', '`Get-Help Get-ChildItem`', '`Get-Help Get-ChildItem -Full`', '`Get-Help Get-ChildItem -Examples`'],
+          ['cmd', '`dir /?`', '—', '—'],
+          ['大部分 CLI 工具', '`git --help`、`npm help`、`claude --help`', '`git help commit`', '官方文件網站'],
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '讀 git 的說明', steps: [
+          { cmd: 'git switch -h', out: 'usage: git switch [<options>] [<branch>]\n   or: git switch [<options>] (-c|-C) <new-branch> [<start-point>]\n\n    -c, --create <branch>   create and switch to a new branch', note: '`-h` 是很多工具的簡短說明。第一行 usage 告訴你：選項可省略、分支名可省略。' },
+          { cmd: 'git switch -c feature-login', out: "Switched to a new branch 'feature-login'", note: '照著第二種寫法：`(-c|-C)` 二選一，後面接 `<new-branch>`，換成你取的名字。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'usage', en: 'usage line', def: '說明文件開頭那一行，用固定記號表示指令的寫法：哪些要填、哪些可省略、可以重複幾次。', example: '`usage: cp [-r] <來源>... <目的地>`。' },
+      { term: 'tldr', en: 'too long; didn\'t read', def: '社群維護的指令範例集，只列出最常見的用法，比 man 好讀。需要另外安裝，也有網頁版。', example: '`tldr tar` 列出 5–8 個常見 tar 用法。' },
+    ],
+    examples: {
+      compare: [{
+        title: '照 usage 寫指令',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 把記號也打進去',
+        goodLabel: '✓ 換成真正的值',
+        bad: 'cp {{1:[-r]}} {{2:<photos>}} {{2:<backup>}}',
+        good: 'cp {{1:-r}} {{2:photos}} {{2:backup}}',
+        badResult: '`[ ]` 和 `< >` 是說明用的記號，打進去 shell 會把 `<` `>` 當成重新導向（3-3），結果完全不是你要的。',
+        why: ['方括號拿掉：要這個選項就寫，不要就省略', '尖括號拿掉：換成真正的資料夾名稱'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 270" role="img" aria-label="遇到不懂的指令的查詢順序：一、指令 --help；二、tldr 看範例；三、man 或 Get-Help -Full；四、官方文件；五、問 AI，並用前面的來源核對">
+          <g font-size="20">
+            <rect x="10" y="10" width="540" height="42" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="26" y="38" class="on-color" font-weight="900">① 指令 --help（10 秒）</text>
+            <rect x="10" y="62" width="540" height="42" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="26" y="90" class="on-color" font-weight="900">② tldr：只看常用範例</text>
+            <rect x="10" y="114" width="540" height="42" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="142" font-weight="900">③ man／Get-Help -Full：完整說明</text>
+            <rect x="10" y="166" width="540" height="42" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="194" font-weight="900">④ 官方文件網站</text>
+            <rect x="10" y="218" width="540" height="42" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/><text x="26" y="246" class="on-color" font-weight="900">⑤ 問 AI → 回到 ①–④ 核對</text>
+          </g>
+        </svg>`, caption: 'AI 很會解釋，但偶爾會編出不存在的選項。它說的選項，花 10 秒用 `--help` 確認一下。' },
+      ],
+      tryit: {
+        q: ['看這行 usage，寫出一個正確的指令：把 `a.txt` 和 `b.txt` 移到 `old` 資料夾，移動前如果會覆蓋就先問你。'],
+        code: true,
+        draft: 'usage: mv [-i] [-f] <來源>... <目的地>\n  -i  覆蓋前先詢問\n  -f  直接覆蓋不詢問\n\n你的指令：____',
+        answer: ['`mv -i a.txt b.txt old`', '`[-i]` 選用並寫成 `-i`；`<來源>...` 代表可以放兩個檔案；`<目的地>` 換成 `old`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 macOS 打 `ls --help`，看到錯誤就以為 ls 壞了。', why: 'macOS 內建的 ls 是 BSD 版本，不支援 `--help`；Linux 的 GNU 版本才有。', right: '改用 `man ls`；或用 `tldr ls` 看範例。' },
+      { wrong: '打開 `man` 之後不知道怎麼離開，只好關掉視窗。', why: 'man 用一個叫 less 的閱讀器顯示，它有自己的按鍵。', right: '按 `q` 離開；空白鍵往下翻頁；`/關鍵字` 搜尋。' },
+      { wrong: 'AI 說某個指令有 `--auto-fix` 選項，直接照打。', why: 'AI 可能把不同工具的選項混在一起，或編出聽起來合理但不存在的選項。', right: '先跑 `程式 --help` 搜尋那個選項；找不到就不要用。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'usage 裡的 `[--verbose]` 代表什麼？', options: [
+        { text: '這個選項可以省略', correct: true, why: '方括號表示選填：需要就加上 `--verbose`，不需要就不寫。' },
+        { text: '一定要寫，而且要包含方括號', why: '方括號只是說明的記號，不是要你打進去的字。' },
+        { text: '這是一個陣列，要放好幾個值', why: '「好幾個」用的是 `...`；方括號在 usage 裡是選填的意思。' },
+        { text: '只有系統管理員才能用', why: 'usage 不標示權限；方括號只代表可以省略。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在 PowerShell 想看 `Copy-Item` 的使用範例，最直接的指令是？', options: [
+        { text: '`man Copy-Item`', why: 'PowerShell 其實有 `man` 這個別名，但它會顯示整份說明，不是只看範例。' },
+        { text: '`Get-Help Copy-Item -Examples`', correct: true, why: '`-Examples` 只列出範例，最適合初學者先看。' },
+        { text: '`Copy-Item /?`', why: '`/?` 是 cmd 的說明寫法，cmdlet 不認得。' },
+        { text: '`help --examples Copy-Item`', why: '`--examples` 是 Unix 風格的長選項；PowerShell 參數用一個減號。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事傳來 `rsync -avz --delete src/ server:/var/www/`，說「這樣部署就好」。你要怎麼在不執行它的情況下，搞懂它會做什麼？'], answer: [
+        '參考：先拆解（1-1）：程式 `rsync`、選項 `-avz`（三個合併）和 `--delete`、兩個參數（來源與目的地）。再用 `man rsync` 或 `tldr rsync` 查 `-a`、`-v`、`-z`、`--delete`。',
+        '你會發現 `--delete` 會刪掉目的地多出來的檔案，這正是需要確認的危險選項（8-1）。查完再決定要不要執行。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-3）打開 `man ls` 之後，要怎麼離開？', options: [
+        { text: '按 Ctrl+C', why: '在 man 裡 Ctrl+C 通常不會離開閱讀器；離開的按鍵是 `q`。' },
+        { text: '按 `q`', correct: true, why: 'man 用 less 顯示說明，`q` 是 quit。' },
+        { text: '輸入 `exit` 再按 Enter', why: '`exit` 是結束 shell；在 man 裡它只會被當成搜尋或無效按鍵。' },
+        { text: '只能關掉整個終端機視窗', why: '不用這麼激烈，按 `q` 就好。' },
+      ] },
+    ],
+    keypoints: [
+      '每個指令都有說明：`--help`、`man`、`Get-Help`、`/?`。',
+      'usage 記號：`[ ]` 選填、`< >` 換成你的值、`...` 可以多個、`|` 二選一。',
+      'AI 提到的選項，先用說明文件確認存在再用。',
+    ],
+    sources: ['posix-utility', 'ps-help', 'tldr', 'win-cmd'],
+  },
+
+  '1-4': {
+    goals: [
+      '理解每個指令結束時都會留下一個結束代碼：0 是成功',
+      '在 bash／zsh、PowerShell、cmd 裡查看上一個指令的結果',
+      '看懂四種最常見的錯誤訊息，並知道下一步怎麼做',
+    ],
+    analogy: {
+      text: ['每個指令結束時都會交一張**成績單**，上面只有一個數字：**0 代表「沒問題」**，這個數字叫[[結束代碼]]，其他數字代表「出了某種問題」。畫面上的文字是寫給人看的，這個數字是寫給 shell 和腳本看的。'],
+      limit: ['跟學校相反：0 分是最好的。而且非 0 的數字代表什麼，由每個程式自己決定；`1` 通常是「一般錯誤」，但沒有統一標準，要看說明文件。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="結束代碼流程：指令執行完，留下一個數字。0 走到綠色的成功；1 到 255 走到紅色的失敗。後面的 && 和 if 會讀這個數字決定下一步">
+        <rect x="170" y="10" width="220" height="56" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">指令執行完</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M280 66 V96 M120 96 H440 M120 96 V126 M440 96 V126"/></g>
+        <rect x="10" y="126" width="220" height="80" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="120" y="164" text-anchor="middle" font-size="36" font-weight="900" class="on-color mono">0</text>
+        <text x="120" y="194" text-anchor="middle" font-size="20" class="on-color">成功</text>
+        <rect x="330" y="126" width="220" height="80" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="440" y="164" text-anchor="middle" font-size="36" font-weight="900" class="on-color mono">1–255</text>
+        <text x="440" y="194" text-anchor="middle" font-size="20" class="on-color">失敗（原因看程式）</text>
+        <rect x="10" y="230" width="540" height="56" class="fill-surface stroke-ink" stroke-width="4" stroke-dasharray="10 6"/>
+        <text x="280" y="265" text-anchor="middle" font-size="20">&amp;&amp;、||、if 都是看這個數字決定下一步（3-4）</text>
+      </svg>`,
+      caption: '畫面上有字不代表失敗，沒有字也不代表成功；以結束代碼為準。',
+      blocks: [
+        { type: 'table', caption: '查看上一個指令的結束代碼', head: ['shell', '指令', '印出'], rows: [
+          ['zsh／bash', '`echo $?`', '`0` 或其他數字'],
+          ['PowerShell', '`$?`（上一個成功與否）、`$LASTEXITCODE`（外部程式的數字）', '`True`／`False`、數字'],
+          ['cmd', '`echo %ERRORLEVEL%`', '`0` 或其他數字'],
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '成績單', steps: [
+          { cmd: 'ls Documents', out: 'notes.txt  report.docx', note: '列出成功，畫面印出檔案。' },
+          { cmd: 'echo $?', out: '0', note: '`$?` 存著上一個指令的結束代碼：0 代表成功。' },
+          { cmd: 'ls 不存在的資料夾', out: 'ls: 不存在的資料夾: No such file or directory', err: true, note: '紅字是錯誤訊息，寫給人看的。' },
+          { cmd: 'echo $?', out: '1', note: '非 0：失敗。腳本和 `&&` 就是靠這個數字知道「上一步出錯了」。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '結束代碼', en: 'exit code / exit status', def: '程式結束時交給 shell 的整數，0 表示成功，非 0 表示失敗。', example: '`echo $?` 印出上一個指令的結束代碼。' },
+      { term: '錯誤訊息', en: 'error message', def: '程式寫到「錯誤輸出」的文字，說明哪裡出了問題，通常最後一行最關鍵。', example: '`No such file or directory`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '看錯誤訊息的方法',
+        kind: '讀錯誤',
+        code: true,
+        badLabel: '✗ 看到紅字就慌',
+        goodLabel: '✓ 找三個關鍵',
+        bad: 'npm ERR! code ENOENT\nnpm ERR! syscall open\nnpm ERR! path C:\\Users\\you\\Desktop\\package.json\nnpm ERR! errno -4058\nnpm ERR! enoent Could not read package.json',
+        good: '{{1:誰報的錯}}：npm\n{{2:錯在哪}}：C:\\Users\\you\\Desktop\\package.json\n{{3:什麼錯}}：Could not read package.json（找不到這個檔案）\n→ 你不在專案資料夾裡，先 cd 到有 package.json 的地方',
+        badResult: '五行紅字其實只說了一件事：在桌面找不到 package.json。',
+        why: ['行首通常是報錯的程式名', '錯誤訊息常會印出路徑，對照你以為的位置', '最後一行或關鍵字（ENOENT、Permission denied）說明原因'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 330" role="img" aria-label="四種最常見的錯誤：找不到指令，查拼字或 PATH；找不到檔案，查路徑和目前位置；權限不足，查是否需要管理員；語法錯誤，查引號和方言">
+          <g font-size="19">
+            <rect x="10" y="10" width="265" height="150" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+            <text x="26" y="42" font-weight="900" class="on-color">找不到指令</text>
+            <text x="26" y="72" class="on-color mono" font-size="15">command not found</text>
+            <text x="26" y="96" class="on-color mono" font-size="15">is not recognized</text>
+            <text x="26" y="136" class="on-color">→ 拼錯？沒安裝？PATH？</text>
+            <rect x="285" y="10" width="265" height="150" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+            <text x="301" y="42" font-weight="900" class="on-color">找不到檔案</text>
+            <text x="301" y="72" class="on-color mono" font-size="15">No such file</text>
+            <text x="301" y="96" class="on-color mono" font-size="15">Cannot find path</text>
+            <text x="301" y="136" class="on-color">→ pwd 確認位置</text>
+            <rect x="10" y="170" width="265" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+            <text x="26" y="202" font-weight="900" class="on-color">權限不足</text>
+            <text x="26" y="232" class="on-color mono" font-size="15">Permission denied</text>
+            <text x="26" y="256" class="on-color mono" font-size="15">Access is denied</text>
+            <text x="26" y="296" class="on-color">→ 需要管理員？（4-3）</text>
+            <rect x="285" y="170" width="265" height="150" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+            <text x="301" y="202" font-weight="900" class="on-color">語法錯誤</text>
+            <text x="301" y="232" class="on-color mono" font-size="15">syntax error</text>
+            <text x="301" y="256" class="on-color mono" font-size="15">unexpected token</text>
+            <text x="301" y="296" class="on-color">→ 引號？方言不對？</text>
+          </g>
+        </svg>`, caption: '九成的錯誤落在這四格。先判斷是哪一格，再往對應的模組找答案。' },
+      ],
+      tryit: {
+        q: ['讀這段 PowerShell 錯誤，回答：哪一格？下一步做什麼？'],
+        code: true,
+        draft: "python : The term 'python' is not recognized as a name of a cmdlet,\nfunction, script file, or executable program.\n\n屬於哪一格：____\n下一步：____",
+        answer: ['「找不到指令」那一格。PowerShell 在 PATH 裡找不到叫 `python` 的程式。', '下一步：確認有沒有安裝 Python；Windows 上可以試 `py`（Python 啟動器）；或安裝後重開終端機讓 PATH 生效（4-2、6-4）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '指令印了一堆黃色的 WARN，就以為失敗了。', why: '警告（warning）是提醒，不是錯誤；很多工具會印警告但仍然成功完成。', right: '看最後的結果和結束代碼；`npm install` 印出 `added 120 packages` 就是成功。' },
+      { wrong: '錯誤訊息很長，只看第一行就去搜尋。', why: '第一行常常只是「出錯了」，真正的原因在後面或最後一行。', right: '找出「誰報錯、錯在哪個檔案、什麼錯」三個關鍵，再搜尋關鍵那一句。' },
+      { wrong: '指令沒有印任何東西，就以為它什麼都沒做。', why: 'Unix 的習慣是「成功就安靜」：`cp`、`mv`、`mkdir` 成功時通常不印字。', right: '用 `echo $?` 確認是 0，或用 `ls` 看檔案是不是真的出現了。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在 zsh 執行 `echo $?` 印出 `0`，代表什麼？', options: [
+        { text: '上一個指令沒有輸出任何東西', why: '結束代碼和有沒有輸出無關；有輸出的成功指令一樣是 0。' },
+        { text: '上一個指令成功結束', correct: true, why: '結束代碼 0 是約定好的「成功」。' },
+        { text: '上一個指令被 Ctrl+C 中斷了', why: '被中斷通常會得到非 0 的代碼（常見是 130），不是 0。' },
+        { text: '沒有任何指令被執行過', why: '剛開的 shell 通常也是 0，但這不是 0 的定義；0 的意思是「上一個成功」。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`cd projects/web` 回了 `no such file or directory`。最先做什麼？', options: [
+        { text: '用 `pwd` 和 `ls` 看自己在哪、有哪些資料夾', correct: true, why: '找不到檔案的錯誤，最常見原因是「不在你以為的位置」或名稱拼錯。' },
+        { text: '用管理員權限重新開終端機', why: '那是解決「權限不足」的方法；這個錯誤是找不到，跟權限無關。' },
+        { text: '重新安裝 shell', why: 'shell 運作正常，它只是照實回報找不到這個路徑。' },
+        { text: '把 `/` 改成 `\\` 再試', why: '在 zsh 裡要用 `/`；PowerShell 兩種都接受。換斜線解決不了「不存在」。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼自動化腳本（例如 CI）不看畫面上的文字，而是看結束代碼來判斷成功或失敗？'], answer: [
+        '參考：畫面文字是給人讀的，格式不固定、語言可能不同、還會夾著警告；結束代碼是一個固定的數字，程式可以可靠地判斷。',
+        '這也是為什麼你寫的 `npm test` 只要回傳非 0，CI 就會顯示紅色的失敗。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-2）`mkdir 期末 報告` 會發生什麼事？', options: [
+        { text: '建立一個叫「期末 報告」的資料夾', why: '沒有引號，空白會把它切成兩個參數。' },
+        { text: '建立兩個資料夾：「期末」和「報告」', correct: true, why: '空白是分隔符號，mkdir 收到兩個參數，就建兩個資料夾。' },
+        { text: '出現錯誤，因為資料夾名稱不能有中文', why: '中文名稱可以；問題出在空白。' },
+        { text: '建立「期末報告」，空白會被自動移除', why: 'shell 不會自動移除空白，它把空白當成切割點。' },
+      ] },
+    ],
+    keypoints: [
+      '結束代碼 0 是成功，非 0 是失敗；用 `$?`、`$LASTEXITCODE`、`%ERRORLEVEL%` 查看。',
+      '讀錯誤訊息找三件事：誰報錯、錯在哪、什麼錯。',
+      '四大錯誤：找不到指令、找不到檔案、權限不足、語法錯誤。',
+    ],
+    sources: ['bash-exit', 'ps-automatic', 'win-cmd'],
+  },
+});
+</script>

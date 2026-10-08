@@ -1,0 +1,218 @@
+
+<script>
+/* ==========================================================================
+   模組 3：動手用
+   ========================================================================== */
+defineLessons({
+  '3-1': {
+    goals: [
+      '照原文的三步驟開始：先第 1 級、再追問、最後核對',
+      '用「同一個問題問兩次」親眼比較差別',
+      '養成核對習慣：格式越豐富，越要對照文字版',
+    ],
+    analogy: {
+      text: ['學新格式像**學開新車**：先在停車場繞一圈（第 1 級，不用換工具），熟了再上路追問細節，最後每次停車前都看一下後照鏡（核對）。車越高級，儀表板越炫，越要確認你看到的是真的。'],
+      limit: ['開車的危險看得見，AI 的錯誤看不見：它出現在你最信任的地方，例如一張漂亮的圖或一個會動的網頁。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="新手三步驟：第一步，先從第 1 級開始，把請解釋 X 改成點名 ASD-STE100，同一個問題問兩次比較；第二步，看懂大方向後再追問細節；第三步，格式愈豐富愈要多核對一次">
+        <g font-size="17">
+          <rect x="10" y="10" width="540" height="72" class="f1 stroke-ink" stroke-width="4"/>
+          <text x="30" y="40" class="on-color" font-weight="900">① 先從第 1 步開始</text>
+          <text x="30" y="68" class="on-color" font-size="15">不用換工具：點名 ASD-STE100 或貼五條規則，同一問題問兩次</text>
+          <rect x="10" y="96" width="540" height="72" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="30" y="126" font-weight="900">② 看懂大方向後，再追問細節</text>
+          <text x="30" y="154" font-size="15">簡潔版會省略細節，先抓重點再請 AI 補上</text>
+          <rect x="10" y="182" width="540" height="72" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="212" class="on-color" font-weight="900">③ 格式愈豐富，愈要多核對一次</text>
+          <text x="30" y="240" class="on-color" font-size="15">重要的數字和結論，對照文字版確認</text>
+        </g>
+      </svg>`,
+      caption: '原文最後一段的三個建議，就是新手的完整路線。',
+      blocks: [
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
+          { cmd: '問法 A：請解釋 KV cache', out: ['5 段文字', '一長串優化技術名詞'], note: '平常的問法。（示意：原文說一般提問版長得多）' },
+          { cmd: '問法 B：請用 ASD-STE100 的原則，以中文解釋 KV cache', out: ['短句', '編號步驟', '一句一件事'], note: '同一個問題再問一次，差別馬上看得出來。' },
+          { cmd: '追問：剛剛省略了哪些優化技術？請補上', out: ['補上細節'], note: '大方向懂了，再請 AI 補上省略的部分，比一開始就啃長文省力。' },
+          { cmd: '核對：重要數字對照文字版或原始資料', out: ['✓ 確認無誤'], note: '格式越豐富，錯誤越不容易發現。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'A/B 對照', en: 'A/B comparison', def: '同一個問題，用兩種問法各問一次，並排比較結果。這是判斷提示詞有沒有效最簡單的方法。' },
+      { term: '核對', en: 'verification', def: '拿 AI 的結論對照另一個來源：文字版、原始資料、你已知答案的例子。' },
+    ],
+    examples: {
+      compare: [{
+        title: '追問的方式',
+        kind: '提示詞對照',
+        badLabel: '✗ 重新問一次長版',
+        goodLabel: '✓ 在簡潔版上追問',
+        bad: '請詳細解釋 KV cache，越完整越好',
+        good: '你剛剛的解釋我看懂了。{{1:請補上你省略的優化技術}}，{{2:一樣遵守那五條規則}}，每項用兩三句說明。',
+        badResult: '又回到落落長的版本，前面抓到的大方向被淹沒。',
+        why: ['明確指出要補什麼', '維持同樣好讀的寫法'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'check', label: '一定要核對' }, { id: 'ok', label: '可以先相信' }], items: [
+          { text: '圖上的箭頭方向（誰傳資料給誰）', answer: 'check', why: '方向錯了，整個理解都錯。' },
+          { text: '互動網頁算出來的金額', answer: 'check', why: '公式可能寫錯，用已知答案試算。' },
+          { text: '影片裡出現的年份和數字', answer: 'check', why: '影片最難逐幀檢查。' },
+          { text: '文字版裡一句「這是一種快取機制」的描述', answer: 'ok', why: '概念性的描述可以先接受，之後在別的資料裡會再遇到。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="核對難度：規範文字最容易核對，一張圖中等，互動網頁中等，解說影片最難；格式越豐富越要多核對">
+          <g font-size="16">
+            <text x="10" y="28" font-weight="900">越往右，錯誤越不容易被發現</text>
+            <rect x="10" y="50" width="125" height="40" class="f1 stroke-ink" stroke-width="3"/><text x="72" y="76" text-anchor="middle" class="on-color" font-weight="900">1 文字</text>
+            <rect x="145" y="50" width="125" height="80" class="f2 stroke-ink" stroke-width="3"/><text x="207" y="76" text-anchor="middle" class="on-color" font-weight="900">2 一張圖</text>
+            <rect x="280" y="50" width="125" height="120" class="f3 stroke-ink" stroke-width="3"/><text x="342" y="76" text-anchor="middle" class="on-color" font-weight="900">3 網頁</text>
+            <rect x="415" y="50" width="135" height="160" class="f4 stroke-ink" stroke-width="3"/><text x="482" y="76" text-anchor="middle" class="on-color" font-weight="900">4 影片</text>
+          </g>
+        </svg>`, caption: '長條越高，越需要花心思核對。' },
+      ],
+      tryit: {
+        q: ['挑一個你最近想搞懂的概念，實際做一次 A/B 對照，記下差別。'],
+        draft: '概念：____\n問法 A 的回答有幾段？____\n問法 B 的回答有幾段？哪個比較好懂？____\n我要追問的細節：____',
+        answer: ['沒有標準答案。重點是親眼看到差別：多數人會發現 B 版短很多，但也會少一些細節，這正是第 2 步要追問的地方。'],
+      },
+    },
+    mistakes: [
+      { wrong: '一開始就做互動網頁或影片。', why: '最費工、最難核對；還沒確定問題問得對，就花了最多時間。', right: '先從第 1 級開始，看懂大方向再決定要不要往上。' },
+      { wrong: '簡潔版看完就結束，以為什麼都懂了。', why: '原文實測，簡潔版省略了多種優化技術。', right: '在簡潔版的基礎上追問省略的部分。' },
+      { wrong: '圖或網頁看起來很專業，就不核對。', why: '原文：圖表、網頁和影片裡的錯誤，比寫在文字裡更不容易發現。', right: '重要的數字和結論，對照文字版確認。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '原文建議新手從哪裡開始？', options: [
+        { text: '第 1 級：點名 ASD-STE100', correct: true, why: '不用換工具，差別馬上看得出來。' },
+        { text: '直接做互動網頁，最有成就感', why: '原文建議先從第 1 級開始。' },
+        { text: '先安裝 Manim', why: '那是第 4 級才需要的準備。' },
+        { text: '先學會 Mermaid 語法，之後畫圖比較方便', why: '不需要先學語法，AI 會寫，貼到編輯器就能看。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你用互動網頁看懂了房貸計算，接下來最該做的是？', options: [
+        { text: '用已知答案的數字試算核對', correct: true, why: '格式越豐富越要核對，公式可能寫錯。' },
+        { text: '直接分享給朋友', why: '還沒核對就分享，錯誤會跟著傳出去。' },
+        { text: '要求 AI 做成影片', why: '先確認內容正確，再考慮更費工的格式。' },
+        { text: '刪掉網頁，改回去讀一般的文字說明', why: '它還有用，只是要先核對。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['用自己的話，把原文的三個建議濃縮成一句你會貼在螢幕旁的提醒。'], answer: [
+        '參考：「先短，再深，最後對一下。」或「從第 1 級開始，懂了再追問，漂亮的更要核對。」',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-4）解說影片為什麼最難核對？', options: [
+        { text: '錯誤藏在某一幀裡，我們很少逐幀檢查', correct: true, why: '所以影片留給值得反覆看的主題，並對照文字版。' },
+        { text: '影片一定比較不準確，因為是 AI 自動產生的', why: '不一定不準，而是錯了很難發現。' },
+        { text: '影片沒有文字', why: '影片可能有字幕和旁白，問題是不易逐一確認。' },
+        { text: '影片都是英文', why: '和語言無關。' },
+      ] },
+    ],
+    keypoints: [
+      '新手路線：先第 1 級 A/B 對照 → 再追問細節 → 最後核對。',
+      '簡潔版會省略，懂了大方向再請 AI 補。',
+      '格式越豐富，錯誤越難發現：重要數字對照文字版。',
+    ],
+    sources: ['bnext'],
+  },
+
+  '3-2': {
+    layout: 'reference',
+    minutes: 10,
+    sources: ['bnext', 'x-post', 'ste-home', 'mermaid', 'manim'],
+    blocks: [
+      '這一頁是可以直接帶走的工具。輸入你想搞懂的主題，挑一級，複製提示詞貼到 ChatGPT、Claude 或 Gemini。下面還有 10 題總複習。',
+      { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="使用流程：輸入主題，選一級格式，複製提示詞，貼到 AI，最後核對">
+        <g font-size="16" font-weight="900">
+          <rect x="10" y="60" width="96" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="58" y="100" text-anchor="middle">輸入主題</text>
+          <rect x="121" y="60" width="96" height="70" class="f1 stroke-ink" stroke-width="3"/><text x="169" y="100" text-anchor="middle" class="on-color">選一級</text>
+          <rect x="232" y="60" width="96" height="70" class="f2 stroke-ink" stroke-width="3"/><text x="280" y="100" text-anchor="middle" class="on-color">複製</text>
+          <rect x="343" y="60" width="96" height="70" class="f3 stroke-ink" stroke-width="3"/><text x="391" y="100" text-anchor="middle" class="on-color">貼給 AI</text>
+          <rect x="454" y="60" width="96" height="70" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/><text x="502" y="100" text-anchor="middle" class="on-color">核對</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3"><path d="M106 95 H121 M217 95 H232 M328 95 H343 M439 95 H454"/></g>
+        <text x="280" y="170" text-anchor="middle" font-size="15">提示詞範本全部來自原文</text>
+      </svg>`, caption: '五步驟，最後一步不要省。' },
+      { type: 'heading', id: 'gen', text: '提示詞產生器' },
+      { type: 'widget', name: 'promptgen', props: { topic: 'KV cache' } },
+      { type: 'heading', id: 'cheat', text: '4 級速查' },
+      { type: 'table', caption: '什麼時候用哪一級', head: ['級', '格式', '一句話', '在哪裡做'], rows: [
+        ['1', '規範文字', '點名 ASD-STE100 或五條規則，讓回答變短變清楚', '任何聊天介面'],
+        ['2', '一張圖', '元件＋關係＋方向，標籤 ≤ 10 字', '聊天介面；程式碼貼 mermaid.live'],
+        ['3', '互動網頁', '可點開的說明＋可調參數＋單一檔案', '聊天介面；存成 .html 打開'],
+        ['4', '解說影片', '3b1b 風格＋配音，要執行與渲染', 'Claude Code、Codex 等 AI agent'],
+      ] },
+      { type: 'svg', svg: `<svg viewBox="0 0 560 150" role="img" aria-label="新手三步：先短，再深，最後核對">
+        <g font-size="18" font-weight="900">
+          <rect x="10" y="30" width="160" height="80" class="f1 stroke-ink" stroke-width="3"/><text x="90" y="66" text-anchor="middle" class="on-color">① 先短</text><text x="90" y="94" text-anchor="middle" class="on-color" font-size="14">第 1 級問兩次</text>
+          <rect x="200" y="30" width="160" height="80" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="66" text-anchor="middle">② 再深</text><text x="280" y="94" text-anchor="middle" font-size="14">追問省略的細節</text>
+          <rect x="390" y="30" width="160" height="80" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/><text x="470" y="66" text-anchor="middle" class="on-color">③ 核對</text><text x="470" y="94" text-anchor="middle" class="on-color" font-size="14">對照文字版</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3"><path d="M170 70 H200 M360 70 H390"/></g>
+      </svg>`, caption: '不管用哪一級，都照這三步走。' },
+      { type: 'heading', id: 'quiz', text: '總複習測驗' },
+      { type: 'quiz', key: '3-2:final', items: [
+        { level: '原文', type: 'mc', q: '卡帕西的核心主張是？', options: [
+          { text: '想讓複雜概念好懂，直接改變 AI 的輸出格式', correct: true, why: '這是原文開頭說的「簡單解法」。' },
+          { text: '提示詞要寫得越長越好', why: '原文沒有這樣說。' },
+          { text: '一定要用最新的模型', why: '重點是格式，不是模型。' },
+          { text: '不要讓 AI 解釋新概念', why: '正好相反。' },
+        ] },
+        { level: '1-1', type: 'mc', q: '為什麼文字比較難懂複雜概念？', options: [
+          { text: '文字是線性的，讀者要自己在腦中拼出架構', correct: true, why: '圖、網頁、影片直接呈現全貌。' },
+          { text: '文字一定有錯字', why: '和錯字無關。' },
+          { text: '文字不能表達流程', why: '可以，但讀者要自己拼。' },
+          { text: '文字比較慢產生', why: '產生速度不是重點。' },
+        ] },
+        { level: '1-2', type: 'mc', q: '「But even better」在原文裡的作用是？', options: [
+          { text: '卡帕西用它帶出下一級更好懂、更有互動性的格式', correct: true, why: '介紹完前三級都會補上這句。' },
+          { text: '表示前一級沒有用', why: '是更好，不是沒用。' },
+          { text: '是一個提示詞範本', why: '它是貼文裡的轉折句。' },
+          { text: '是 ASD-STE100 的規則', why: '和規範無關。' },
+        ] },
+        { level: '2-1', type: 'mc', q: '用中文點名 ASD-STE100，代表什麼？', options: [
+          { text: '借用它的清晰寫作原則，輸出不代表符合規範', correct: true, why: '它是英文規範，原文特別提醒。' },
+          { text: '輸出會自動符合國際標準', why: '只是借用原則。' },
+          { text: 'AI 會改用英文回答', why: '你指定中文，它就用中文。' },
+          { text: '只有航太業可以這樣用', why: '任何人都可以借用。' },
+        ] },
+        { level: '2-1', type: 'mc', q: '原文五條規則中，每句建議不超過幾個字？', options: [
+          { text: '30 個字', correct: true, why: '「句子要短，每句盡量不超過30個字」。' },
+          { text: '10 個字', why: '10 字是畫圖時「每個標籤」的上限。' },
+          { text: '20 個字', why: '20 是 ASD-STE100 流程類英文句子的單字上限。' },
+          { text: '沒有限制', why: '有，是規則 1。' },
+        ] },
+        { level: '2-2', type: 'mc', q: '畫圖指令裡為什麼要寫「不要用長篇文字」？', options: [
+          { text: '避免 AI 只是把文字搬進方框', correct: true, why: '要的是結構，不是切段的文章。' },
+          { text: '因為圖片不能有字', why: '可以有字，只是要短。' },
+          { text: '為了省錢', why: '和費用無關。' },
+          { text: '因為 Mermaid 不支援中文', why: '和語言無關。' },
+        ] },
+        { level: '2-3', type: 'mc', q: 'AI 給你一段 HTML，聊天介面沒有預覽。怎麼看？', options: [
+          { text: '存成 .html 檔，用瀏覽器打開', correct: true, why: '原文的做法。' },
+          { text: '貼到 Mermaid 編輯器', why: '那是看 Mermaid 圖的方法。' },
+          { text: '存成 .txt 用記事本打開', why: '只會看到程式碼。' },
+          { text: '一定要架網站', why: '單一 HTML 檔不需要架站。' },
+        ] },
+        { level: '2-4', type: 'mc', q: '做解說影片為什麼要在 AI agent 工具裡進行？', options: [
+          { text: '要實際執行程式並渲染成影片檔', correct: true, why: '一般聊天介面不一定做得到。' },
+          { text: 'agent 工具的模型比較聰明', why: '差別在能不能執行程式。' },
+          { text: '因為影片太大，聊天介面放不下', why: '重點是執行與渲染。' },
+          { text: '因為只有 agent 能配音', why: '配音靠 ElevenLabs 或替代方案。' },
+        ] },
+        { level: '3-1', type: 'mc', q: '看懂簡潔版之後，原文建議的下一步是？', options: [
+          { text: '再請 AI 補上省略的細節', correct: true, why: '先抓重點再追問，比一開始就啃長文省力。' },
+          { text: '直接做影片', why: '先把內容弄清楚。' },
+          { text: '換一個 AI 重問', why: '原文建議的是追問。' },
+          { text: '停止，已經夠了', why: '簡潔版會省略細節。' },
+        ] },
+        { level: '3-1', type: 'mc', q: '哪一個最需要對照文字版核對？', options: [
+          { text: '解說影片裡出現的關鍵數字', correct: true, why: '格式越豐富，錯誤越不容易發現。' },
+          { text: '文字版裡的一句概念描述', why: '文字最容易核對。' },
+          { text: '提示詞範本本身的每一個字', why: '範本來自原文，不需要核對數字。' },
+          { text: '你自己輸入的主題', why: '那是你寫的。' },
+        ] },
+      ] },
+      { type: 'callout', variant: 'tip', title: '原文', body: ['[《數位時代》：如何讓AI變身「科普大師」？大神卡帕西推4種輸出技巧，提示詞範例一次看](https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100)'] },
+    ],
+  },
+});
+</script>

@@ -6,7 +6,7 @@
 
 **Windows**：在這個資料夾開 PowerShell（5.1 或 7 都可以），照下面的指令執行。
 
-**macOS**：先裝 PowerShell 7（`brew install powershell`，或從 [PowerShell 官方 GitHub](https://github.com/PowerShell/PowerShell/releases) 下載 `.pkg`），hook 也要靠它執行。之後把下面指令開頭的 `powershell -ExecutionPolicy Bypass -File` 換成 `pwsh`，例如 `pwsh scripts/build.ps1`。
+**macOS**：先裝 PowerShell 7（`brew install powershell`，或從 [PowerShell 官方 GitHub](https://github.com/PowerShell/PowerShell/releases) 下載 `.pkg`），hook 也要靠它執行。之後把下面指令開頭的 `powershell -ExecutionPolicy Bypass -File` 換成 `pwsh`，例如 `pwsh scripts/build.ps1`。安裝也可以用 `sh scripts/install.sh`（加 `-Apply` 才寫入），它會先檢查有沒有 `pwsh`，沒有就告訴你怎麼裝。
 
 1. 產生並檢查：
    ```powershell

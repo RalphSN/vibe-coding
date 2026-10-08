@@ -4,12 +4,14 @@
 set -e
 D=${1:?請給分段資料夾}
 OUT=${2:?請給輸出路徑}
-TMP=$(mktemp)
+# node --check 只認 .js 副檔名，暫存檔放在臨時資料夾裡並取名 chk.js（macOS、Linux、Git Bash 都可用）
+TMPD=$(mktemp -d)
+TMP="$TMPD/chk.js"
 for f in "$D"/m*.html; do
   sed -e '1,/<script>/d' -e '/<\/script>/,$d' "$f" > "$TMP"
-  node --check "$TMP" || { echo "語法錯誤：$f"; rm -f "$TMP"; exit 1; }
+  node --check "$TMP" || { echo "語法錯誤：$f"; rm -rf "$TMPD"; exit 1; }
 done
-rm -f "$TMP"
+rm -rf "$TMPD"
 cat "$D/a-head1.html" "$D/b-widgets.css" "$D/a-head2.html" "$D/c-data.html" "$D/d-sources.html" \
   $(ls "$D"/m*.html | sort) "$D/e-engine1.js" "$D/f-widgets.js" "$D/e-engine2.js" > "$OUT"
 wc -c "$OUT"

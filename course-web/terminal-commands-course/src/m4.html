@@ -1,0 +1,509 @@
+
+<script>
+/* ==========================================================================
+   模組 4：環境：變數、PATH、權限
+   ========================================================================== */
+defineTerms({
+  'UAC': { en: 'User Account Control', def: 'Windows 在程式要取得系統管理員權限時跳出的確認視窗。', example: '「你要允許此 App 變更你的裝置嗎？」' },
+  '執行原則': { en: 'execution policy', def: 'PowerShell 決定能不能執行 `.ps1` 腳本的安全設定。Windows 用戶端預設是 Restricted（不能執行腳本）。', example: '`Get-ExecutionPolicy` 查看目前設定。' },
+  'API 金鑰': { en: 'API key', def: '程式呼叫雲端服務時用來證明身分的一串密碼。外洩等於別人可以用你的帳號花錢。', example: '常放在環境變數 `OPENAI_API_KEY`、`ANTHROPIC_API_KEY`。' },
+  'shebang': { en: 'shebang（#!）', def: '腳本第一行的 `#!`，告訴系統要用哪個程式執行這個檔案。', example: '`#!/bin/bash`、`#!/usr/bin/env python3`。' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '理解環境變數是「shell 和程式共用的便利貼」',
+      '在三種 shell 讀取和設定環境變數',
+      '分辨「只在這個視窗有效」和「永久生效」的設定',
+    ],
+    analogy: {
+      text: ['環境變數像**貼在冰箱上的便利貼**：「家裡地址：…」「Wi-Fi 密碼：…」。家裡每個人（每個程式）都看得到，需要時就去查。`HOME` 寫著家目錄在哪、`PATH` 寫著去哪找程式、`LANG` 寫著用什麼語言。'],
+      limit: ['冰箱只有一台，但**每個終端機視窗都有自己的一份便利貼副本**：你在這個視窗改了，其他已經開著的視窗看不到；關掉視窗，改的內容就消失了。要永久保存，得寫進設定檔（4-4）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 310" role="img" aria-label="環境變數繼承：shell 有一組環境變數，啟動 node 或 python 等子程式時，複製一份給它們；子程式改了不會影響 shell">
+        <rect x="150" y="10" width="260" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="42" text-anchor="middle" font-size="22" font-weight="900" class="on-color">shell 的便利貼</text>
+        <g font-size="17" class="mono"><text x="170" y="74" class="on-color mono">HOME=/Users/amy</text><text x="170" y="98" class="on-color mono">PATH=/usr/bin:...</text><text x="170" y="122" class="on-color mono">API_KEY=sk-...</text></g>
+        <g class="stroke-ink" stroke-width="4"><path d="M220 130 V170 H110 V200 M340 130 V170 H450 V200"/></g>
+        <text x="280" y="160" text-anchor="middle" font-size="16">啟動時複製一份</text>
+        <rect x="10" y="200" width="200" height="90" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="110" y="236" text-anchor="middle" font-size="20" font-weight="900" class="mono">node app.js</text>
+        <text x="110" y="268" text-anchor="middle" font-size="16">讀得到 API_KEY</text>
+        <rect x="350" y="200" width="200" height="90" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="450" y="236" text-anchor="middle" font-size="20" font-weight="900" class="mono">python x.py</text>
+        <text x="450" y="268" text-anchor="middle" font-size="16">改了也傳不回去</text>
+      </svg>`,
+      caption: '資料只往下傳：shell 給子程式一份副本，子程式怎麼改都不會影響 shell。',
+      blocks: [
+        { type: 'table', caption: '讀取與設定（只在目前視窗有效）', head: ['', '讀取', '設定'], rows: [
+          ['PowerShell', '`$env:USERPROFILE`', '`$env:API_KEY = "sk-123"`'],
+          ['zsh／bash', '`echo $HOME`', '`export API_KEY="sk-123"`'],
+          ['cmd', '`echo %USERPROFILE%`', '`set API_KEY=sk-123`'],
+        ] },
+        { type: 'table', caption: '常見的環境變數', head: ['Windows', 'macOS／Linux', '內容'], rows: [
+          ['`USERPROFILE`', '`HOME`', '家目錄'],
+          ['`USERNAME`', '`USER`', '使用者名稱'],
+          ['`Path`', '`PATH`', '去哪些資料夾找程式（4-2）'],
+          ['`TEMP`', '`TMPDIR`', '暫存資料夾'],
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '設定只活在這個視窗', steps: [
+          { cmd: '$env:GREETING = "哈囉"', out: '', note: '設定一個環境變數。等號兩邊可以有空白（PowerShell）；zsh／bash 的 `export` **等號兩邊不能有空白**。' },
+          { cmd: 'echo $env:GREETING', out: '哈囉', note: '讀回來。' },
+          { cmd: 'Get-ChildItem env:', out: 'Name           Value\n----           -----\nGREETING       哈囉\nHOMEDRIVE      C:\nPath           C:\\Windows\\system32;...\nUSERNAME       you', note: '`env:` 是一個特別的「磁碟」，列出全部環境變數。zsh／bash 用 `env` 或 `printenv`。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '環境變數', en: 'environment variable', def: '存在 shell 裡、會傳給它啟動的每個程式的「名稱＝值」。程式用它讀取設定，例如家目錄、語言、[[API 金鑰]]。', example: '`HOME=/Users/amy`。' },
+      { term: 'export', en: 'export', def: 'zsh／bash 中把變數設成環境變數，讓之後啟動的程式也看得到。只寫 `X=1` 的話，只有 shell 自己看得到。', example: '`export NODE_ENV=production`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '把 API 金鑰交給程式',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 寫在指令裡',
+        goodLabel: '✓ 用環境變數',
+        bad: 'python app.py {{1:--key sk-abc123secret}}',
+        good: '# 只在這個視窗設定\nexport {{2:OPENAI_API_KEY}}="sk-abc123secret"\npython app.py',
+        badResult: '金鑰會留在指令歷史（↑ 叫得出來）、可能出現在截圖或錄影裡，也可能被同台電腦的其他程式看到。',
+        why: ['密碼類的東西不要直接寫在指令參數裡', '程式自己去讀約定好的環境變數名稱；正式專案常放在 `.env` 檔，但 `.env` 絕對不能 commit（8-1）'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="暫時與永久：在指令列 export 或 env 冒號 設定只在這個視窗有效，關掉就消失；寫進點 zshrc 或 PowerShell 設定檔，或用 Windows 環境變數設定畫面，才會永久">
+          <g font-size="19">
+            <rect x="10" y="10" width="265" height="230" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+            <text x="142" y="46" text-anchor="middle" font-weight="900" class="on-color">暫時</text>
+            <text x="30" y="90" class="on-color mono" font-size="16">export X=1</text>
+            <text x="30" y="120" class="on-color mono" font-size="16">$env:X = 1</text>
+            <text x="30" y="170" class="on-color">只在這個視窗</text>
+            <text x="30" y="200" class="on-color">關掉就消失</text>
+            <rect x="285" y="10" width="265" height="230" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+            <text x="417" y="46" text-anchor="middle" font-weight="900" class="on-color">永久</text>
+            <text x="305" y="90" class="on-color mono" font-size="16">~/.zshrc</text>
+            <text x="305" y="120" class="on-color mono" font-size="16">$PROFILE</text>
+            <text x="305" y="150" class="on-color" font-size="16">Windows 設定畫面</text>
+            <text x="305" y="200" class="on-color">新開的視窗都有</text>
+          </g>
+        </svg>`, caption: '改了永久設定之後，**已經開著的視窗不會自動更新**，要重開終端機或重新載入設定檔。' },
+      ],
+      tryit: {
+        q: ['在 zsh 設定一個環境變數 `PORT` 為 `8080`，再印出來確認。兩行。'],
+        code: true,
+        draft: '____\n____',
+        answer: ['`export PORT=8080`、`echo $PORT`。', '注意 `PORT=8080` 中間不能有空白：`PORT = 8080` 會被當成「執行叫 PORT 的程式，參數是 = 和 8080」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 zsh 打 `export NAME = amy`。', why: '空白是分隔符號（1-2），shell 看到的是三塊，會報錯。', right: '等號兩邊不留空白：`export NAME=amy`；有空白的值加引號：`export NAME="amy chen"`。' },
+      { wrong: '在 PowerShell 打 `echo $HOME`、`export X=1`。', why: '這是 zsh／bash 的寫法；PowerShell 讀環境變數要加 `env:` 前綴，也沒有 export。', right: '`$env:USERPROFILE`、`$env:X = 1`。（PowerShell 有一個 `$HOME` 自動變數，但它不是環境變數。）' },
+      { wrong: '設好環境變數後開新的終端機分頁，發現讀不到。', why: '用指令設定的只活在那個視窗。', right: '需要每次都有，就寫進設定檔（4-4）或 Windows 的環境變數設定。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在 PowerShell 讀取 `USERNAME` 環境變數，正確寫法是？', options: [
+        { text: '`$USERNAME`', why: '沒有 `env:` 前綴，PowerShell 會找同名的一般變數，通常是空的。' },
+        { text: '`$env:USERNAME`', correct: true, why: 'PowerShell 用 `env:` 前綴讀取環境變數。' },
+        { text: '`%USERNAME%`', why: '這是 cmd 的寫法。' },
+        { text: '`printenv USERNAME`', why: '`printenv` 是 macOS／Linux 的程式，PowerShell 預設沒有。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在終端機 A 執行 `export DEBUG=1`，然後在**另一個已經開著的**終端機 B 執行程式。程式讀得到 DEBUG 嗎？', options: [
+        { text: '讀得到，環境變數是全系統共用的', why: '每個 shell 有自己的一份；export 只影響這個 shell 和它之後啟動的程式。' },
+        { text: '讀不到，因為 B 是另一個 shell', correct: true, why: 'A 的設定不會傳到 B；要在 B 也設定，或寫進設定檔再重開。' },
+        { text: '讀得到，但要等幾秒鐘同步', why: '沒有同步機制。' },
+        { text: '讀不到，因為 export 只能用在腳本裡', why: '在互動式 shell 也能用，只是範圍限於這個 shell。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['AI 工具的安裝說明常寫「把 API 金鑰設成環境變數 `XXX_API_KEY`」。為什麼不直接讓你在設定檔寫明碼，或每次打在指令後面？'], answer: [
+        '參考：環境變數讓**程式碼和密碼分開**：程式碼可以公開或 commit，密碼留在你的電腦上。打在指令後面會留在歷史紀錄裡；寫死在程式碼裡容易不小心上傳到 GitHub。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-3）`echo $PATH > path.txt` 做了什麼？', options: [
+        { text: '把 PATH 的內容寫進 path.txt（覆寫）', correct: true, why: 'echo 印出 PATH 的值，`>` 把它存進檔案。' },
+        { text: '把 path.txt 這個檔案加進 PATH 變數', why: '這需要修改 PATH，不是用 `>`。' },
+        { text: '附加到 path.txt 最後', why: '附加是 `>>`。' },
+        { text: '把 PATH 傳給叫 path.txt 的程式', why: '傳給程式用的是 `|`。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）`export NODE_ENV=production` 裡，`export` 是？', options: [
+        { text: '程式（shell 的內建指令）', correct: true, why: '第一個字永遠是要執行的指令。' },
+        { text: '選項', why: '選項通常是減號開頭。' },
+        { text: '參數', why: '參數是 `NODE_ENV=production`。' },
+        { text: '變數名稱', why: '變數名稱是 NODE_ENV。' },
+      ] },
+    ],
+    keypoints: [
+      '環境變數是 shell 傳給每個程式的「名稱＝值」，用來放設定和金鑰。',
+      '讀：`$env:X`／`$X`／`%X%`；設：`$env:X = 1`／`export X=1`／`set X=1`。',
+      '指令設定的只在這個視窗有效；永久要寫進設定檔。',
+    ],
+    sources: ['ps-env', 'bash-manual', 'win-cmd'],
+  },
+
+  '4-2': {
+    goals: [
+      '理解 PATH 是一串資料夾清單，shell 依序在裡面找程式',
+      '用 `which`、`where.exe`、`Get-Command` 查出某個指令實際是哪個檔案',
+      '修好「裝了卻說找不到指令」的問題',
+    ],
+    analogy: {
+      text: ['PATH 像**你打電話找人時的通訊錄順序**：先找家人群組，再找同事群組，再找朋友群組。找到第一個叫「小明」的就打過去，**不會繼續往下找**。'],
+      limit: ['通訊錄找不到人你會想別的辦法，shell 不會：只要每個資料夾都沒有，就直接說「找不到指令」，即使那個程式就在你電腦的另一個角落。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="PATH 搜尋流程：輸入 git，shell 依序檢查第一個資料夾 usr local bin，沒有；第二個 usr bin，找到 git，執行它，後面的資料夾不再檢查">
+        <rect x="10" y="10" width="160" height="56" style="fill:var(--k-prog)" class="stroke-ink" stroke-width="4"/>
+        <text x="90" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">git</text>
+        <g font-size="18" class="mono">
+          <rect x="220" y="10" width="330" height="56" class="fill-surface stroke-ink" stroke-width="3"/><text x="236" y="45" class="mono">1. /opt/homebrew/bin</text><text x="520" y="45" text-anchor="end">✗</text>
+          <rect x="220" y="80" width="330" height="56" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/><text x="236" y="115" class="on-color mono">2. /usr/bin</text><text x="520" y="115" text-anchor="end" class="on-color">✓ 找到</text>
+          <rect x="220" y="150" width="330" height="56" class="fill-surface stroke-ink" stroke-width="3" stroke-dasharray="8 6"/><text x="236" y="185" class="mono">3. /bin</text><text x="520" y="185" text-anchor="end">不再找</text>
+        </g>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M170 38 H220"/></g>
+        <rect x="10" y="230" width="540" height="56" class="fill-surface stroke-ink" stroke-width="4" stroke-dasharray="10 6"/>
+        <text x="280" y="265" text-anchor="middle" font-size="18">PATH 用 : 分隔（Windows 用 ;）</text>
+      </svg>`,
+      caption: '順序很重要：兩個資料夾都有 `python` 時，排前面的贏。',
+      blocks: [
+        { type: 'widget', name: 'pathfinder', props: { shell: 'pwsh', dirs: [
+          { path: 'C:\\Windows\\system32', has: ['where', 'ping', 'notepad', 'curl'] },
+          { path: 'C:\\Program Files\\Git\\cmd', has: ['git'] },
+          { path: 'C:\\Program Files\\nodejs', has: ['node', 'npm', 'npx'] },
+          { path: 'C:\\Users\\you\\AppData\\Local\\Microsoft\\WindowsApps', has: ['winget', 'python', 'wt'] },
+          { path: 'C:\\Users\\you\\.local\\bin', has: ['claude'] },
+        ], presets: ['git', 'npm', 'claude', 'python', 'pyhton'] } },
+        { type: 'callout', variant: 'tip', title: 'WindowsApps 裡的 python 是什麼', body: ['Windows 在 WindowsApps 放了一個 `python` 的「捷徑」，沒安裝 Python 時執行它會打開 Microsoft Store。所以「打 python 跳出商店」不是壞掉，而是還沒裝（6-4）。'] },
+      ],
+    },
+    define: [
+      { term: 'PATH', en: 'PATH environment variable', def: '一個環境變數，內容是好幾個資料夾路徑，用 `:`（Windows 用 `;`）分隔。輸入指令時，shell 依序在這些資料夾找同名的程式。', example: '`echo $PATH`、`$env:Path -split ";"`。' },
+      { term: 'which', en: 'which／where.exe／Get-Command', def: '查詢「這個指令名稱實際對應到哪個檔案」。zsh／bash 用 `which`，PowerShell 用 `Get-Command`，cmd 用 `where`。', example: '`which python3` → `/usr/bin/python3`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '剛裝好工具卻找不到',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 一直重裝',
+        goodLabel: '✓ 先查 PATH',
+        bad: 'PS> node -v\nnode : The term \'node\' is not recognized...\n# 再安裝一次、再安裝一次……',
+        good: '# 1. 關掉終端機重開（PATH 是開視窗時讀的）\n# 2. 查它在不在 PATH\nPS> {{1:Get-Command node}}\nPS> {{2:$env:Path -split ";"}}',
+        badResult: '安裝程式改了 PATH，但已經開著的終端機還拿著舊的 PATH。',
+        why: ['有就印出完整路徑，沒有就報錯', '把 PATH 拆成一行一個資料夾，看安裝位置在不在裡面'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="找不到指令的三個原因：拼錯字；沒安裝；裝了但不在 PATH 或終端機沒重開。對應的檢查方法">
+          <g font-size="19">
+            <rect x="10" y="10" width="540" height="68" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="30" y="40" font-weight="900">① 拼錯字</text><text x="30" y="66" font-size="17">pyhton、gti → 按 ↑ 檢查，或用 Tab 補全</text>
+            <rect x="10" y="90" width="540" height="68" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="30" y="120" font-weight="900">② 沒安裝</text><text x="30" y="146" font-size="17">用套件管理器安裝（6-1）</text>
+            <rect x="10" y="170" width="540" height="68" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+            <text x="30" y="200" font-weight="900" class="on-color">③ 裝了但找不到</text><text x="30" y="226" font-size="17" class="on-color">重開終端機 → 還不行就把安裝資料夾加進 PATH</text>
+          </g>
+        </svg>`, caption: '九成的「找不到指令」是第 ①、③ 種。第 ③ 種最常見的解法就是**重開終端機**。' },
+      ],
+      tryit: {
+        q: ['你在 macOS 裝了兩個版本的 Python。寫一個指令查出現在打 `python3` 會用到哪一個。'],
+        code: true,
+        draft: '____',
+        answer: ['`which python3`（zsh 也可以用 `where python3` 列出所有符合的位置）。', 'PowerShell：`Get-Command python`；cmd：`where python`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '照網路教學把 PATH 設成 `export PATH=/my/tool/bin`。', why: '這會**把整個 PATH 換掉**，原本的 `/usr/bin` 等都不見了，連 `ls` 都找不到。', right: '在原本的 PATH 前面加：`export PATH="/my/tool/bin:$PATH"`。' },
+      { wrong: '安裝完工具，在同一個終端機視窗一直說找不到。', why: 'PATH 是開視窗時讀的；安裝程式改的是之後新開的視窗。', right: '關掉終端機重開，再試一次。' },
+      { wrong: '為了方便，把 `.`（目前資料夾）加到 PATH 最前面。', why: '任何資料夾裡放一個叫 `ls` 的惡意腳本，你一 `cd` 進去打 `ls` 就會執行它。', right: '不要把 `.` 放進 PATH；要執行目前資料夾的腳本，明確寫 `./script.sh`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'PATH 裡有兩個資料夾都放了 `node`，打 `node` 會執行哪一個？', options: [
+        { text: '版本比較新的那個', why: 'shell 不比較版本，只看順序。' },
+        { text: 'PATH 裡排在前面的那個', correct: true, why: '找到第一個就停止。' },
+        { text: '兩個都執行', why: '只會執行一個。' },
+        { text: 'shell 會跳出選單讓你選', why: 'shell 不會問你，直接用第一個。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你想把 `~/tools/bin` 加進 PATH（zsh，暫時），哪一行正確？', options: [
+        { text: '`export PATH=~/tools/bin`', why: '會把整個 PATH 換掉，其他指令都找不到了。' },
+        { text: '`export PATH="$HOME/tools/bin:$PATH"`', correct: true, why: '新資料夾放前面，接著原本的 PATH。' },
+        { text: '`export PATH = "$PATH:$HOME/tools/bin"`', why: '等號兩邊有空白，zsh 會報錯。' },
+        { text: '`PATH += ~/tools/bin`', why: '這不是 zsh 的語法。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說「我裝了 Claude Code，可是打 `claude` 說 command not found」。列出你會依序請他做的三件事。'], answer: [
+        '參考：① 確認拼字。② 關掉終端機重開。③ 還是不行，查安裝位置在不在 PATH：`which claude`／`Get-Command claude`、`echo $PATH`；不在就照安裝說明把那個資料夾加進 PATH（寫進設定檔，4-4）。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-4）`command not found` 屬於哪一類錯誤？', options: [
+        { text: '找不到指令', correct: true, why: 'shell 在 PATH 裡找不到這個名稱的程式。' },
+        { text: '找不到檔案', why: '那是 `No such file or directory`，指的是參數裡的檔案。' },
+        { text: '權限不足', why: '那是 `Permission denied`。' },
+        { text: '語法錯誤', why: '語法錯誤是 shell 看不懂整行的結構。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-1）PATH 裡的資料夾通常用哪種路徑寫？', options: [
+        { text: '絕對路徑', correct: true, why: '不管你在哪個資料夾，PATH 都要指向同樣的地方。' },
+        { text: '相對路徑', why: '相對路徑會隨著目前位置改變，放在 PATH 裡會很混亂也危險。' },
+        { text: '只能寫資料夾名稱', why: '要寫完整位置。' },
+        { text: '網址', why: 'PATH 是本機資料夾。' },
+      ] },
+    ],
+    keypoints: [
+      'PATH 是資料夾清單；shell 依序找，找到第一個就執行。',
+      '查指令在哪：`which`、`Get-Command`、`where`。',
+      '找不到指令：查拼字 → 重開終端機 → 檢查 PATH；加 PATH 時保留原本的值。',
+    ],
+    sources: ['bash-manual', 'ps-env', 'win-cmd'],
+  },
+
+  '4-3': {
+    goals: [
+      '看懂 `rwx` 權限，用 `chmod +x` 讓腳本可以執行',
+      '知道 `sudo` 和 Windows「系統管理員」在做什麼，以及什麼時候不該用',
+      '處理 PowerShell「這個系統上已停用指令碼執行」的錯誤',
+    ],
+    analogy: {
+      text: ['權限像**大樓的門禁卡**：一般卡只能進自己的辦公室，管理員卡哪裡都能開。`sudo` 和 Windows 的「以系統管理員身分執行」，就是**暫時借用管理員卡**做一件事。'],
+      limit: ['借卡的人做錯事，後果也是全大樓承擔：用管理員權限執行的指令，可以改系統檔、刪掉任何東西。所以「權限不足就加 sudo」是最危險的習慣之一。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="rwx 權限解讀：減號 rwx r 減號 x r 減號 減號，分成擁有者、群組、其他人三組，r 讀、w 寫、x 執行">
+        <rect x="10" y="10" width="540" height="64" class="fill-term stroke-ink" stroke-width="4"/>
+        <text x="280" y="52" text-anchor="middle" font-size="30" class="t-out" letter-spacing="4">- rwx r-x r--</text>
+        <g font-size="18">
+          <rect x="10" y="100" width="120" height="80" class="fill-surface stroke-ink" stroke-width="3"/><text x="70" y="134" text-anchor="middle" font-weight="900">類型</text><text x="70" y="162" text-anchor="middle" font-size="15">- 檔案、d 資料夾</text>
+          <rect x="145" y="100" width="130" height="80" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="210" y="134" text-anchor="middle" font-weight="900" class="on-color">擁有者</text><text x="210" y="162" text-anchor="middle" class="on-color mono">rwx</text>
+          <rect x="285" y="100" width="130" height="80" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="350" y="134" text-anchor="middle" font-weight="900" class="on-color">群組</text><text x="350" y="162" text-anchor="middle" class="on-color mono">r-x</text>
+          <rect x="425" y="100" width="125" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="487" y="134" text-anchor="middle" font-weight="900" class="on-color">其他人</text><text x="487" y="162" text-anchor="middle" class="on-color mono">r--</text>
+        </g>
+        <g font-size="19"><text x="10" y="226" class="mono">r</text><text x="40" y="226">讀　</text><text x="120" y="226" class="mono">w</text><text x="150" y="226">寫　</text><text x="230" y="226" class="mono">x</text><text x="260" y="226">執行　</text><text x="350" y="226" class="mono">-</text><text x="380" y="226">沒有這個權限</text></g>
+        <text x="10" y="276" font-size="18">這個檔案：你可以讀寫執行；別人只能讀</text>
+      </svg>`,
+      caption: '這是 macOS／Linux 的權限。Windows 用另一套權限（ACL），初學階段只要知道「一般／系統管理員」兩種身分。',
+      blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '讓腳本可以執行', cwd: '~/projects', steps: [
+          { cmd: './deploy.sh', out: 'zsh: permission denied: ./deploy.sh', err: true, cwd: '~/projects', note: '下載或新建的腳本，預設沒有執行權限（沒有 x）。' },
+          { cmd: 'chmod +x deploy.sh', out: '', cwd: '~/projects', note: '`chmod +x`：加上執行權限。**這裡不需要 sudo**，因為檔案是你自己的。' },
+          { cmd: './deploy.sh', out: '部署中…完成', cwd: '~/projects', note: '開頭的 `./` 是「目前資料夾的這個檔案」，因為目前資料夾不在 PATH 裡（4-2）。' },
+        ] } },
+        { type: 'tabs', label: 'Windows 的管理員權限', tabs: [
+          { label: '系統管理員終端機', blocks: [
+            '在開始按鈕上按右鍵 →「終端機（系統管理員）」，會跳出 [[UAC]] 確認。提示字元的位置常變成 `C:\\Windows\\system32`，標題列會寫「系統管理員」。',
+            '只在需要時開（例如安裝系統層級的軟體），做完就關掉，平常用一般身分的終端機。',
+          ] },
+          { label: 'Windows 的 sudo', blocks: [
+            'Windows 11 24H2 起內建 `sudo`，要先到「設定 → 系統 → 進階」開啟。開啟後可以在一般終端機打 `sudo 指令`，跳出 UAC 確認後以管理員身分執行那一個指令。',
+          ] },
+          { label: 'PowerShell 執行原則', blocks: [
+            { type: 'code', lang: 'powershell', title: 'PowerShell', code: '# 錯誤：因為這個系統上已停用指令碼執行，所以無法載入 setup.ps1\nGet-ExecutionPolicy                 # 通常是 Restricted\nSet-ExecutionPolicy -Scope CurrentUser RemoteSigned' },
+            '`RemoteSigned`：自己電腦上的腳本可以執行，從網路下載的要有簽章。`-Scope CurrentUser` 只改你自己的帳號，**不需要系統管理員**。這是 [[執行原則]]，不是防毒，但能擋掉誤點下載的腳本。',
+          ] },
+        ] },
+      ],
+    },
+    define: [
+      { term: 'sudo', en: 'superuser do', def: '以系統管理員（root）身分執行後面的整個指令，會要求輸入你的密碼。macOS／Linux 內建，Windows 11 24H2 起可開啟。', example: '`sudo apt install git`。' },
+      { term: 'chmod', en: 'change mode', def: '修改檔案的權限。`+x` 加上執行權限，`-w` 拿掉寫入權限。', example: '`chmod +x run.sh`。' },
+      { term: '系統管理員', en: 'administrator／root', def: '可以修改整台電腦設定、任何檔案的帳號身分。一般工作不應該用這個身分。', example: 'Windows 的「以系統管理員身分執行」、macOS 的 sudo。' },
+    ],
+    examples: {
+      compare: [{
+        title: '遇到 Permission denied',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 反射性加 sudo',
+        goodLabel: '✓ 先想為什麼',
+        bad: '$ npm install -g some-tool\nEACCES: permission denied\n$ {{1:sudo}} npm install -g some-tool',
+        good: '# 1. 這件事真的需要改系統嗎？\n# 2. 能不能裝在自己的帳號下？\n$ npm install -g some-tool --prefix ~/.npm-global\n# 或改用版本管理工具（nvm、fnm）安裝 Node',
+        badResult: '用 sudo 裝 npm 套件，套件的安裝腳本也會以 root 身分執行，而且之後檔案擁有者變成 root，又引發更多權限問題。',
+        why: ['sudo 讓整個指令（包含它下載的程式碼）都拿到管理員權限'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="什麼時候需要管理員：安裝系統軟體、改系統設定需要；改自己家目錄裡的檔案、裝在自己帳號下的工具、執行自己的專案不需要">
+          <g font-size="18">
+            <rect x="10" y="10" width="265" height="220" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+            <text x="142" y="44" text-anchor="middle" font-weight="900" class="on-color">需要管理員</text>
+            <text x="30" y="90" class="on-color">安裝系統層級軟體</text>
+            <text x="30" y="126" class="on-color">改系統設定</text>
+            <text x="30" y="162" class="on-color">改其他使用者的檔案</text>
+            <rect x="285" y="10" width="265" height="220" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+            <text x="417" y="44" text-anchor="middle" font-weight="900" class="on-color">不需要</text>
+            <text x="305" y="90" class="on-color">家目錄裡的檔案</text>
+            <text x="305" y="126" class="on-color">自己的專案</text>
+            <text x="305" y="162" class="on-color">npm install（專案內）</text>
+            <text x="305" y="198" class="on-color">git、chmod 自己的檔</text>
+          </g>
+        </svg>`, caption: '在自己的專案裡遇到權限錯誤，答案幾乎從來不是 sudo，而是檔案擁有者或位置不對。' },
+      ],
+      tryit: {
+        q: ['你在 Windows 執行 `.\\setup.ps1`，出現「已停用指令碼執行」。寫出查看與修正的兩行指令（只改自己的帳號）。'],
+        code: true,
+        draft: '____\n____',
+        answer: ['`Get-ExecutionPolicy`、`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。', '執行前先打開 setup.ps1 看一下內容，確定它來自你信任的地方。'],
+      },
+    },
+    mistakes: [
+      { wrong: '每次遇到 Permission denied 就加 `sudo`。', why: 'sudo 讓整個指令擁有改動系統的權力；而且在家目錄用 sudo 建的檔案會變成 root 的，之後你自己反而改不動。', right: '先判斷是不是真的要改系統；自己的檔案用 `chmod`／`chown` 修正擁有者或權限。' },
+      { wrong: '為了省事，一直用系統管理員身分開 PowerShell 工作。', why: '任何你執行的腳本、AI 工具建議的指令，都會以管理員身分執行，出錯的後果放大。', right: '平常用一般身分；只有安裝系統軟體時另外開一個系統管理員視窗。' },
+      { wrong: '執行原則擋住腳本，就設成 `Set-ExecutionPolicy Unrestricted`。', why: 'Unrestricted 讓所有腳本都能執行，包含網路下載、沒簽章的；而且不加 Scope 會改整台電腦，需要管理員。', right: '用 `-Scope CurrentUser RemoteSigned`，範圍最小、夠用。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`-rwxr-xr--` 中，「其他人」有哪些權限？', options: [
+        { text: '讀、寫、執行', why: '那是第一組（擁有者）的 rwx。' },
+        { text: '讀、執行', why: '那是第二組（群組）的 r-x。' },
+        { text: '只能讀', correct: true, why: '最後一組 `r--`：只有 r。' },
+        { text: '沒有任何權限', why: '最後一組是 `r--`，有讀取權限。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`./build.sh` 回報 `permission denied`，檔案是你自己建的。最合適的做法是？', options: [
+        { text: '`sudo ./build.sh`', why: '問題是檔案沒有執行權限，不是你的身分不夠；而且用 root 跑建置腳本風險很高。' },
+        { text: '`chmod +x build.sh` 再執行', correct: true, why: '加上執行權限即可，不需要管理員。' },
+        { text: '`rm build.sh` 重新下載', why: '重新下載的檔案一樣沒有執行權限。' },
+        { text: '把 build.sh 移到 /usr/bin', why: '這需要 sudo，而且沒有解決執行權限的問題。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['網路教學寫 `curl https://某網站/install.sh | sudo bash`。用這課的觀念說明，這一行為什麼特別需要小心？'], answer: [
+        '參考：它把網路上下載的內容（你沒看過）直接交給 bash 執行，而且是用 sudo，也就是**以系統管理員身分執行一段你沒讀過的程式**。網站被入侵或網址打錯，後果就是整台電腦。',
+        '至少要：確認是官方網址、先下載下來看內容、能不用 sudo 就不用（8-1）。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-4）`chmod +x run.sh && ./run.sh` 的 `&&` 代表？', options: [
+        { text: 'chmod 成功才執行 run.sh', correct: true, why: '`&&` 依結束代碼決定是否繼續。' },
+        { text: '兩個同時執行', why: '同時執行並傳資料是管線。' },
+        { text: 'chmod 失敗才執行', why: '那是 `||`。' },
+        { text: '把 chmod 的輸出存進 run.sh', why: '寫進檔案用 `>`。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-4）`Permission denied` 是哪一類錯誤？', options: [
+        { text: '權限不足', correct: true, why: '你目前的身分或檔案的權限不允許這個動作。' },
+        { text: '找不到指令', why: '那是 command not found。' },
+        { text: '找不到檔案', why: '那是 No such file。' },
+        { text: '語法錯誤', why: 'shell 看懂了指令，只是被擋下。' },
+      ] },
+    ],
+    keypoints: [
+      '`rwx` 三組：擁有者、群組、其他人；`chmod +x` 讓腳本可以執行。',
+      '`sudo`、系統管理員終端機是借用管理員卡：只在真的要改系統時用。',
+      'PowerShell 腳本被擋：`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。',
+    ],
+    sources: ['coreutils', 'win-sudo', 'ps-exec-policy'],
+  },
+
+  '4-4': {
+    goals: [
+      '知道 shell 啟動時會自動執行的設定檔在哪裡',
+      '在設定檔裡加別名、加 PATH、設環境變數',
+      '改完設定檔後重新載入，並學會改壞時怎麼救回來',
+    ],
+    analogy: {
+      text: ['設定檔像**每天早上的開機清單**：「打開電腦 → 開燈 → 泡咖啡」。shell 每次啟動時，都會照著設定檔裡的指令一行一行先做一遍，所以寫在這裡的設定**每個新視窗都有**。'],
+      limit: ['清單寫錯一步，每天早上都會卡住：設定檔有錯，每次開終端機都會跳錯誤。改之前先備份。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="設定檔位置：zsh 是家目錄的點 zshrc；bash 是點 bashrc；PowerShell 是 PROFILE 變數指向的檔案；開新視窗時自動執行">
+        <g font-size="19">
+          <rect x="10" y="10" width="170" height="150" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="46" text-anchor="middle" font-weight="900" class="on-color">zsh</text>
+          <text x="95" y="100" text-anchor="middle" class="on-color mono" font-weight="700">~/.zshrc</text>
+          <rect x="195" y="10" width="170" height="150" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="46" text-anchor="middle" font-weight="900" class="on-color">bash</text>
+          <text x="280" y="100" text-anchor="middle" class="on-color mono" font-weight="700">~/.bashrc</text>
+          <rect x="380" y="10" width="170" height="150" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="46" text-anchor="middle" font-weight="900" class="on-color">PowerShell</text>
+          <text x="465" y="100" text-anchor="middle" class="on-color mono" font-weight="700">$PROFILE</text>
+          <text x="465" y="132" text-anchor="middle" class="on-color" font-size="15">echo $PROFILE 看路徑</text>
+        </g>
+        <rect x="10" y="190" width="540" height="76" class="fill-surface stroke-ink" stroke-width="4" stroke-dasharray="10 6"/>
+        <text x="280" y="222" text-anchor="middle" font-size="19">開新視窗 → 自動執行設定檔 → 出現提示字元</text>
+        <text x="280" y="252" text-anchor="middle" font-size="17">已開的視窗要手動重新載入</text>
+      </svg>`,
+      caption: '點開頭的檔案是隱藏檔，用 `ls -a` 才看得到。PowerShell 的設定檔第一次可能不存在，要自己建立。',
+      blocks: [
+        { type: 'tabs', label: '加一個別名和一個 PATH', tabs: [
+          { label: 'PowerShell', blocks: [{ type: 'code', lang: 'powershell', title: '$PROFILE', code: '# 第一次：建立設定檔並用記事本打開\nif (!(Test-Path $PROFILE)) { New-Item $PROFILE -Force }\nnotepad $PROFILE\n\n# 在檔案裡加上：\nSet-Alias g git\n$env:Path = "$HOME\\tools;" + $env:Path\n\n# 存檔後重新載入\n. $PROFILE' }] },
+          { label: 'zsh', blocks: [{ type: 'code', lang: 'zsh', title: '~/.zshrc', code: '# 用 VS Code 打開（或 nano ~/.zshrc）\ncode ~/.zshrc\n\n# 在檔案最後加上：\nalias g="git"\nexport PATH="$HOME/tools:$PATH"\n\n# 存檔後重新載入\nsource ~/.zshrc' }] },
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '別名生效', steps: [
+          { cmd: 'echo \'alias gs="git status"\' >> ~/.zshrc', out: '', note: '用 `>>` **附加**到設定檔最後（千萬不要用 `>`，會把整個設定檔清空，3-3）。' },
+          { cmd: 'source ~/.zshrc', out: '', note: '`source`：在目前的 shell 重新執行設定檔，不用重開視窗。' },
+          { cmd: 'gs', out: 'On branch main\nnothing to commit, working tree clean', note: '`gs` 現在等於 `git status`。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '設定檔', en: 'shell startup file／profile', def: 'shell 每次啟動時自動執行的腳本，用來放別名、PATH、環境變數、提示字元樣式。', example: '`~/.zshrc`、`~/.bashrc`、`$PROFILE`。' },
+      { term: 'source', en: 'source（.）', def: '在目前的 shell 裡執行一個腳本，讓裡面的設定立刻生效。PowerShell 用 `. 路徑`（點＋空白）。', example: '`source ~/.zshrc`、`. $PROFILE`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '把 PATH 寫進設定檔',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 用 > 寫入',
+        goodLabel: '✓ 用 >> 附加，先備份',
+        bad: 'echo \'export PATH="$HOME/bin:$PATH"\' {{1:>}} ~/.zshrc',
+        good: '{{2:cp ~/.zshrc ~/.zshrc.bak}}\necho \'export PATH="$HOME/bin:$PATH"\' {{1:>>}} ~/.zshrc',
+        badResult: '`>` 把整個 .zshrc 清空，只剩這一行；你（或安裝程式）之前加的設定全部消失。',
+        why: ['附加到最後，不動原本的內容', '先備份，改壞了可以 `cp ~/.zshrc.bak ~/.zshrc` 救回來'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="設定檔改壞的救援流程：開終端機出現錯誤，先看錯誤訊息指向第幾行，用編輯器修正或還原備份，再重新載入">
+          <g font-size="18">
+            <rect x="10" y="10" width="125" height="100" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/><text x="72" y="54" text-anchor="middle" class="on-color" font-weight="900">開視窗</text><text x="72" y="82" text-anchor="middle" class="on-color">跳錯誤</text>
+            <rect x="148" y="10" width="125" height="100" class="fill-surface stroke-ink" stroke-width="4"/><text x="210" y="54" text-anchor="middle" font-weight="900">看第幾行</text><text x="210" y="82" text-anchor="middle" font-size="15">錯誤訊息會寫</text>
+            <rect x="286" y="10" width="125" height="100" class="fill-surface stroke-ink" stroke-width="4"/><text x="348" y="54" text-anchor="middle" font-weight="900">修正</text><text x="348" y="82" text-anchor="middle" font-size="15">或還原備份</text>
+            <rect x="424" y="10" width="126" height="100" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/><text x="487" y="54" text-anchor="middle" class="on-color" font-weight="900">重新載入</text><text x="487" y="82" text-anchor="middle" class="on-color" font-size="15">source</text>
+          </g>
+          <g class="stroke-ink" stroke-width="4"><path d="M135 60 H148 M273 60 H286 M411 60 H424"/></g>
+          <text x="10" y="160" font-size="18">shell 壞到打不開時：用 VS Code 或記事本</text>
+          <text x="10" y="190" font-size="18">直接打開設定檔修改，或改開另一種 shell。</text>
+        </svg>`, caption: '設定檔再怎麼壞，也只是一個文字檔，用編輯器打開就能修。' },
+      ],
+      tryit: {
+        q: ['寫出 PowerShell 版：在設定檔加一個別名 `ll` 代表 `Get-ChildItem -Force`。提示：Set-Alias 只能對應指令名稱，不能帶參數，要用函式。'],
+        code: true,
+        draft: '# 寫進 $PROFILE 的內容：\n____',
+        answer: ['`function ll { Get-ChildItem -Force @args }`', '存檔後 `. $PROFILE` 重新載入。zsh 版本則是 `alias ll="ls -la"`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '改了 `~/.zshrc`，在同一個視窗發現沒效果，以為寫錯了。', why: '設定檔只在 shell 啟動時執行；已經開著的視窗不會自動重讀。', right: '`source ~/.zshrc`（PowerShell：`. $PROFILE`），或開新視窗。' },
+      { wrong: '在 macOS 把設定寫進 `~/.bashrc`，結果沒有作用。', why: 'macOS 預設是 zsh，zsh 讀的是 `~/.zshrc`。', right: '先確認自己用的 shell（0-2），寫進對應的設定檔。' },
+      { wrong: '在設定檔裡寫 API 金鑰，然後把整個 dotfiles 上傳到 GitHub 分享。', why: '設定檔裡的金鑰跟著被公開了。', right: '金鑰放在不會上傳的獨立檔案或系統的金鑰管理工具裡；分享設定檔前先搜尋 `KEY`、`TOKEN`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'macOS 預設 shell 的設定檔是？', options: [
+        { text: '`~/.bashrc`', why: '那是 bash 的；macOS 預設是 zsh。' },
+        { text: '`~/.zshrc`', correct: true, why: 'zsh 互動式啟動時會讀 `~/.zshrc`。' },
+        { text: '`$PROFILE`', why: '那是 PowerShell 的。' },
+        { text: '`/etc/hosts`', why: '那是系統的主機名稱對照表，跟 shell 設定無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在 `$PROFILE` 加了新的別名，想在目前的 PowerShell 視窗立刻生效。該打？', options: [
+        { text: '`source $PROFILE`', why: '`source` 是 zsh／bash 的指令，PowerShell 用點。' },
+        { text: '`. $PROFILE`', correct: true, why: '點＋空白＋路徑：在目前的 shell 裡執行設定檔。' },
+        { text: '`$PROFILE`', why: '這只會印出設定檔的路徑。' },
+        { text: '`Restart-Computer`', why: '不需要重開機，開新視窗或重新載入就好。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['很多工具的安裝程式會「自動修改你的 .zshrc」。為什麼了解設定檔對你很重要？'], answer: [
+        '參考：安裝程式加的 PATH、初始化指令都寫在這裡。你知道它在哪、怎麼看，就能：解決「重開終端機才有效」的困惑、移除不用的工具留下的設定、在出錯時找到是哪一行造成的。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-3）要把一行設定**加到** `~/.zshrc` 最後，應該用？', options: [
+        { text: '`>>`', correct: true, why: '附加，不動原本的內容。' },
+        { text: '`>`', why: '會覆寫整個檔案。' },
+        { text: '`|`', why: '管線是接到程式，不是檔案。' },
+        { text: '`2>`', why: '那是改接錯誤訊息。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 2-2）`ls -a` 的 `-a` 讓你看到什麼？', options: [
+        { text: '點開頭的隱藏檔', correct: true, why: '所以要 `ls -a` 才看得到 `.zshrc`。' },
+        { text: '檔案的權限', why: '那是 `-l`。' },
+        { text: '依字母排序', why: 'ls 預設就依名稱排序。' },
+        { text: '子資料夾的內容', why: '那是 `-R`（遞迴）。' },
+      ] },
+    ],
+    keypoints: [
+      '設定檔：zsh `~/.zshrc`、bash `~/.bashrc`、PowerShell `$PROFILE`，開新視窗時自動執行。',
+      '改完用 `source ~/.zshrc` 或 `. $PROFILE` 重新載入。',
+      '寫入設定檔用 `>>`，改之前先備份。',
+    ],
+    sources: ['ps-profiles', 'zsh-manual', 'bash-manual'],
+  },
+});
+</script>
