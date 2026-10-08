@@ -430,6 +430,54 @@ body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
   .bar .status { min-width: 10em; }
 }
 
+/* ---------- 英文書（reader.js 在 <html> 設 data-book-lang="en"） ---------- */
+/* 比例字型、自動斷字、首行縮排 1.5em；章首、分隔線之後與接續引文的段落不縮排（英文書的排版慣例） */
+:root[data-book-lang="en"] { --book-serif: "EB Garamond", "Iowan Old Style", Georgia, var(--serif); }
+[data-book-lang="en"] .flow { font-family: var(--book-serif); font-kerning: normal; hyphens: auto; -webkit-hyphens: auto; }
+[data-book-lang="en"] .flow p { text-indent: 1.5em; }
+[data-book-lang="en"] .flow .chapter-head + p,
+[data-book-lang="en"] .flow .break + p,
+[data-book-lang="en"] .flow p.cont,
+[data-book-lang="en"] .flow :is(.poem, .quote, .break, .list-title, .chapter-end, .front p) { text-indent: 0; }
+[data-book-lang="en"] .chapter-head .no { font-family: var(--font); font-size: 0.62em; letter-spacing: 0.32em; text-transform: uppercase; }
+[data-book-lang="en"] .chapter-head .couplet { font-size: 2.2em; line-height: 1.1; letter-spacing: 0.04em; font-weight: 500; }
+[data-book-lang="en"] .chapter-end { font-family: var(--font); font-size: 0.62em; letter-spacing: 0.32em; text-transform: uppercase; }
+[data-book-lang="en"] .running-head,
+[data-book-lang="en"] .folio { font-family: var(--book-serif); letter-spacing: 0.06em; }
+[data-book-lang="en"] .nav-title strong,
+[data-book-lang="en"] .drawer-head h2 { font-family: var(--book-serif); letter-spacing: 0.02em; }
+[data-book-lang="en"] .toc .excerpt { font-family: var(--book-serif); font-style: italic; color: var(--text-2); }
+
+/* 分場：一整行置中的星號，高度剛好一行，不打亂行高對齊 */
+.flow .break { margin: 0; text-indent: 0; text-align: center; color: var(--ink-2); }
+/* 信件：和詩一樣不縮排、上下留半行；署名靠右 */
+.flow .quote { margin: calc(var(--reader-lh, 1.95) * 0.5em) 0; text-indent: 0; font-style: italic; }
+.flow .quote.sign { margin: 0; text-align: right; }
+.flow .quote.sign + p:not(.quote) { margin-top: calc(var(--reader-lh, 1.95) * 0.5em); }
+.flow .poem .cite { display: block; text-align: right; font-style: italic; color: var(--ink-2); }
+/* 作息表與條列：可以跨頁（整塊不跨頁會留下半頁空白），但每一列、每一項不切開 */
+.flow .table { width: 100%; margin: calc(var(--reader-lh, 1.95) * 0.5em) 0; border-collapse: collapse; font-size: 0.88em; }
+.flow .table tr,
+.flow .list li { break-inside: avoid; }
+.flow .table td { padding: 0 0.6em 0 0; vertical-align: top; text-align: left; } /* 表格不左右對齊：窄欄會撐出大空隙 */
+.flow .table td:nth-child(2) { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.flow .table td:last-child { padding-right: 0; }
+.flow .list { margin: calc(var(--reader-lh, 1.95) * 0.5em) 0; }
+.flow .list-title { margin: 0; break-after: avoid; text-indent: 0; font-variant: small-caps; letter-spacing: 0.04em; }
+.flow .list ul { margin: 0; padding: 0; list-style: none; text-align: left; }
+.flow .list li::before { content: "– "; color: var(--ink-2); }
+
+/* 英文書卷首：橫排書名、獻詞與題詞頁 */
+[data-book-lang="en"] .front-title .big { writing-mode: horizontal-tb; font-size: 2.3em; font-weight: 500; letter-spacing: 0.02em; line-height: 1.15; }
+[data-book-lang="en"] .front-title .by { letter-spacing: 0.08em; }
+.front-epigraph { justify-content: center; align-items: center; gap: 3em; }
+.front-epigraph .dedication { margin: 0; text-indent: 0; white-space: pre-line; font-style: italic; }
+.front-epigraph .poem { margin: 0; font-size: 0.92em; }
+/* 英文書封面：題簽改成橫排、置中 */
+[data-book-lang="en"] .title-slip { right: auto; left: 50%; top: 20%; transform: translateX(-50%); padding: 12px 18px; }
+[data-book-lang="en"] .title-slip span { writing-mode: horizontal-tb; font-family: var(--book-serif); font-size: clamp(18px, calc(var(--page-w) * 0.06), 30px); font-weight: 600; letter-spacing: 0.03em; white-space: nowrap; }
+[data-book-lang="en"] .cover-meta b { font-family: var(--book-serif); letter-spacing: 0.06em; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
