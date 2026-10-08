@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>紅樓夢</title>
+<meta name="description" content="翻頁閱讀《紅樓夢》一百二十回全文，繁體中文，維基文庫匯校本。">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&display=swap">
+<script>
+  /* 在第一次繪製前套用主題，避免深色模式閃白（和書櫃首頁共用同一個 key） */
+  try {
+    const savedTheme = window.localStorage.getItem('vibe-coding-home.theme.v1');
+    if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+  } catch (err) {
+    console.warn('無法讀取主題偏好，改用系統設定：', err);
+  }
+</script>
+<link rel="stylesheet" href="../reader/reader.css">
+</head>
+<body style="--accent:#6e2a2a">
+
+<header class="nav">
+  <button class="icon-btn" id="menu-btn" type="button" aria-label="目錄與設定" aria-controls="drawer" aria-expanded="false">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </button>
+  <a class="icon-btn" href="../../index.html" aria-label="回書櫃">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 9.2 10 3.5l7 5.7M5 8v8.5h10V8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+  <h1 class="nav-title"><strong>紅樓夢</strong><span id="nav-chapter"></span></h1>
+  <div class="nav-tools">
+    <div class="segmented font-size" role="group" aria-label="字級">
+      <button type="button" data-font-step="-1" aria-label="字級縮小">小</button>
+      <button type="button" data-font-step="1" aria-label="字級放大">大</button>
+    </div>
+    <div class="segmented" role="group" aria-label="配色">
+      <button type="button" data-theme-choice="auto">自動</button>
+      <button type="button" data-theme-choice="light">淺色</button>
+      <button type="button" data-theme-choice="dark">深色</button>
+    </div>
+  </div>
+</header>
+
+<main class="stage" id="stage" aria-label="書頁">
+  <div class="book" id="book" aria-hidden="true">
+    <div class="page left" id="page-left"></div>
+    <div class="page right" id="page-right"></div>
+    <div class="leaf" id="leaf" hidden>
+      <div class="page front"></div>
+      <div class="page back"></div>
+    </div>
+    <div class="cover" id="cover" hidden>
+      <div class="cover-front cloth">
+        <div class="title-slip"><span>紅樓夢</span></div>
+        <div class="cover-meta"><b>曹雪芹</b><span>一百二十回</span></div>
+        <i class="shade"></i>
+      </div>
+      <div class="cover-inside cloth"><div class="page"></div><i class="shade"></i></div>
+    </div>
+    <div class="page measure" id="measure" style="visibility:hidden;left:0"><div class="page-inner"><div class="window"><div class="flow"></div></div></div></div>
+  </div>
+  <span class="stage-hint" id="stage-hint" hidden>點一下直接翻開</span>
+</main>
+
+<nav class="bar" aria-label="翻頁">
+  <button class="icon-btn" id="first-btn" type="button" aria-label="回到最前頁" title="回到最前頁">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4.5v11M14.5 4.5 9 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="icon-btn" id="prev-btn" type="button" aria-label="上一頁">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <input type="range" id="page-range" min="1" max="1" value="1" aria-label="本回頁碼">
+  <span class="status" id="status"></span>
+  <button class="icon-btn" id="next-btn" type="button" aria-label="下一頁">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="icon-btn" id="resume-btn" type="button" aria-label="回到閱讀進度" title="回到閱讀進度">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.5h8v13l-4-3-4 3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="目錄與設定" aria-hidden="true">
+  <div class="drawer-head">
+    <div><h2>紅樓夢</h2><p>曹雪芹 著 · 高鶚 續</p></div>
+    <button class="icon-btn" id="drawer-close" type="button" aria-label="關閉目錄">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="drawer-settings">
+    <label>字級
+      <span class="segmented font-size" role="group" aria-label="字級">
+        <button type="button" data-font-step="-1" aria-label="字級縮小">小</button>
+        <button type="button" data-font-step="1" aria-label="字級放大">大</button>
+      </span>
+    </label>
+    <label>配色
+      <span class="segmented" role="group" aria-label="配色">
+        <button type="button" data-theme-choice="auto">自動</button>
+        <button type="button" data-theme-choice="light">淺色</button>
+        <button type="button" data-theme-choice="dark">深色</button>
+      </span>
+    </label>
+  </div>
+  <div class="progress-line"><span id="progress-text"></span><div class="meter"><span id="progress-meter"></span></div></div>
+  <ol class="toc" id="toc" aria-label="回目"></ol>
+</aside>
+
+<p class="sr-only" id="live" aria-live="polite"></p>
+<article class="sr-only" id="sr-text"></article>
+
+<script>
+  window.BOOK = {
+    id: 'hongloumeng',
+    title: '紅樓夢',
+    seal: '石頭記',
+    authorLines: ['曹雪芹 著', '高鶚 續'],
+    edition: '一百二十回匯校本，不含脂批：前八十回以庚辰本為底本，後四十回以程甲本為底本。內文經 OpenCC 轉為繁體。',
+    source: { url: 'https://zh.wikisource.org/wiki/%E7%B4%85%E6%A8%93%E5%A4%A2', label: '維基文庫《紅樓夢》' },
+    license: '原文屬公有領域；維基文庫的編者註釋依 CC BY-SA 4.0 授權。',
+    chapterCount: 120,
+    textPath: 'text/',
+    progressKey: 'hongloumeng.v1',
+    stateKey: 'hongloumeng-reader.v1',
+  };
+</script>
+<script src="../reader/reader.js"></script>
+<script src="toc.js"></script>
+</body>
+</html>
