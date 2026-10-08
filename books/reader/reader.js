@@ -76,7 +76,8 @@
     const [no, ...couplet] = c.title.split('　').filter(Boolean);
     const body = c.blocks.map((b) => {
       if (b.t === 'poem') return `<p class="poem">${inlineHtml(b.x)}</p>`;
-      if (b.t === 'comment') return `<p class="comment">${inlineHtml(b.x)}</p>`;
+      // 批語裡的詩（多行）和正文的詩一樣排：不縮排、上下留間距
+      if (b.t === 'comment') return `<p class="comment${b.x.includes('\n') ? ' poem' : ''}">${inlineHtml(b.x)}</p>`;
       return `<p>${inlineHtml(b.x)}</p>`;
     }).join('');
     const notes = c.notes.length
