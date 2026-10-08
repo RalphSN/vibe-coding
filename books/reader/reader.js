@@ -17,8 +17,13 @@
   const SWIPE_MIN = 40;
   const FONT_WAIT_MS = 3000;
   const RESIZE_DEBOUNCE_MS = 150;
-  const LINE_HEIGHT = 1.95; // 和 reader.css 的 .flow 用同一個值，由這裡寫進 --reader-lh
-  const LETTER_SPACING_EM = 0.04; // 同上，寫進 --reader-ls
+  // 書的語言：中文書（預設）與英文書的排版不同；BOOK.unit 是目錄與進度用的單位（回、章）
+  const IS_EN = BOOK.lang === 'en';
+  const FLOW_LANG = IS_EN ? 'en' : 'zh-Hant';
+  const UNIT = BOOK.unit || '回';
+  // 行高與字距由這裡寫進 --reader-lh、--reader-ls。英文用比例字型，行高較緊、不加字距
+  const LINE_HEIGHT = IS_EN ? 1.6 : 1.95;
+  const LETTER_SPACING_EM = IS_EN ? 0 : 0.04;
   const GRID_SLACK_PX = 1; // 剛好等於整數倍時，小數誤差可能讓最後一個字或最後一行被擠掉，留 1px
   const MAX_QUEUED_FLIPS = 5; // 連點時最多累積幾頁，避免一口氣翻太遠
   const FRONT = 0; // 第 0 回是卷首（書名頁＋說明頁）
@@ -42,6 +47,7 @@
   const pending = new Map(); // n → resolve
   const counts = new Map(); // n → 目前版面下的頁數
   let toc = null;
+  let frontExtras = {}; // 獻詞、題詞（英文書由 toc.js 提供）
   let tocReady;
   const tocPromise = new Promise((resolve) => { tocReady = resolve; });
   let layout = null;
@@ -55,9 +61,19 @@
 
   /* ---------- 資料 ---------- */
   window.BookData = {
-    toc(list) { toc = list; tocReady(list); },
+    toc(list, extras) {
+      toc = list;
+      if (extras) {
+        frontExtras = extras;
+        chapters.set(FRONT, { title: '卷首', label: '卷首', short: '', html: frontHtml() });
+      }
+      tocReady(list);
+    },
     chapter(c) {
-      chapters.set(c.n, { title: c.title, html: chapterHtml(c) });
+      // label：頂部列與目錄用的完整名稱；short：頁眉用的短名稱
+      const label = IS_EN ? `Chapter ${c.title}` : c.title;
+      const short = IS_EN ? label : c.title.split('　')[0];
+      chapters.set(c.n, { title: c.title, label, short, html: chapterHtml(c) });
       const resolve = pending.get(c.n);
       if (resolve) { pending.delete(c.n); resolve(); }
     },
@@ -67,43 +83,78 @@
     return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   }
 
-  /** 註腳標記在資料裡是 \u0003N\u0004，轉成上標 */
+  /** 資料裡的行內標記：註腳 \u0003N\u0004 轉上標，斜體 \u0005…\u0006 轉 <i> */
   function inlineHtml(text) {
-    return escapeHtml(text).replace(/\u0003(\d+)\u0004/g, '<sup>$1</sup>');
+    return escapeHtml(text)
+      .replace(/\u0003(\d+)\u0004/g, '<sup>$1</sup>')
+      .replace(/\u0005/g, '<i>')
+      .replace(/\u0006/g, '</i>');
+  }
+
+  /** 一個區塊轉 HTML。詩、引文、信件都不縮排，用上下間距和正文區隔 */
+  function blockHtml(b) {
+    if (b.t === 'poem') {
+      const cite = b.cite ? `<span class="cite">${inlineHtml(b.cite)}</span>` : '';
+      return `<p class="poem">${inlineHtml(b.x)}${cite}</p>`;
+    }
+    // 批語裡的詩（多行）和正文的詩一樣排：不縮排、上下留間距
+    if (b.t === 'comment') return `<p class="comment${b.x.includes('\n') ? ' poem' : ''}">${inlineHtml(b.x)}</p>`;
+    if (b.t === 'quote') return `<p class="quote${b.sign ? ' sign' : ''}">${inlineHtml(b.x)}</p>`;
+    if (b.t === 'break') return '<p class="break" role="separator">*\u2003*\u2003*</p>';
+    if (b.t === 'table') {
+      const rows = b.rows.map((row) => `<tr>${row.map((cell) => `<td>${inlineHtml(cell)}</td>`).join('')}</tr>`).join('');
+      return `<table class="table"><tbody>${rows}</tbody></table>`;
+    }
+    if (b.t === 'list') {
+      const title = b.title ? `<p class="list-title">${inlineHtml(b.title)}</p>` : '';
+      return `<div class="list">${title}<ul>${b.items.map((item) => `<li>${inlineHtml(item)}</li>`).join('')}</ul></div>`;
+    }
+    return `<p${b.cont ? ' class="cont"' : ''}>${inlineHtml(b.x)}</p>`;
   }
 
   function chapterHtml(c) {
-    const [no, ...couplet] = c.title.split('　').filter(Boolean);
-    const body = c.blocks.map((b) => {
-      if (b.t === 'poem') return `<p class="poem">${inlineHtml(b.x)}</p>`;
-      // 批語裡的詩（多行）和正文的詩一樣排：不縮排、上下留間距
-      if (b.t === 'comment') return `<p class="comment${b.x.includes('\n') ? ' poem' : ''}">${inlineHtml(b.x)}</p>`;
-      return `<p>${inlineHtml(b.x)}</p>`;
-    }).join('');
+    const body = c.blocks.map(blockHtml).join('');
     const notes = c.notes.length
       ? `<section class="notes"><h3>註釋</h3><ol>${c.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ol></section>`
       : '';
-    const end = c.n === BOOK.chapterCount ? '全書完' : `${no}終`;
+    const isLast = c.n === BOOK.chapterCount;
+    if (IS_EN) {
+      const end = isLast ? '<p class="chapter-end">The End</p>' : '';
+      return `<header class="chapter-head"><span class="no">Chapter</span><span class="couplet">${escapeHtml(c.title)}</span></header>${body}${end}`;
+    }
+    const [no, ...couplet] = c.title.split('　').filter(Boolean);
+    const end = isLast ? '全書完' : `${no}終`;
     return `<header class="chapter-head"><span class="no">${escapeHtml(no)}</span><span class="couplet">${couplet.map(escapeHtml).join('<br>')}</span></header>${body}<p class="chapter-end">${end}</p>${notes}`;
+  }
+
+  /** 英文書卷首的第三頁：獻詞與題詞 */
+  function epigraphHtml() {
+    const { dedication, epigraph } = frontExtras;
+    if (!dedication && !epigraph) return '';
+    return `
+      <section class="front front-epigraph">
+        ${dedication ? `<p class="dedication">${inlineHtml(dedication)}</p>` : ''}
+        ${epigraph ? blockHtml(epigraph) : ''}
+      </section>`;
   }
 
   function frontHtml() {
     return `
       <section class="front front-title">
         <span class="big">${escapeHtml(BOOK.title)}</span>
-        <span class="seal">${escapeHtml(BOOK.seal)}</span>
+        ${BOOK.seal ? `<span class="seal">${escapeHtml(BOOK.seal)}</span>` : ''}
         <span class="by">${BOOK.authorLines.map(escapeHtml).join('<br>')}</span>
       </section>
-      <section class="front front-info">
+      <section class="front front-info" lang="zh-Hant">
         <h3>版本</h3>
         <p>${escapeHtml(BOOK.edition)}</p>
         <h3>出處</h3>
         <p><a href="${escapeHtml(BOOK.source.url)}" target="_blank" rel="noopener">${escapeHtml(BOOK.source.label)}</a>。${escapeHtml(BOOK.license)}</p>
         <h3>翻頁</h3>
-        <p>點書頁左右兩側、左右滑動，或按 <kbd>←</kbd> <kbd>→</kbd>。左上角的選單有全書 ${BOOK.chapterCount} 回目錄。</p>
-      </section>`;
+        <p>點書頁左右兩側、左右滑動，或按 <kbd>←</kbd> <kbd>→</kbd>。左上角的選單有全書 ${BOOK.chapterCount} ${UNIT}目錄。</p>
+      </section>${epigraphHtml()}`;
   }
-  chapters.set(FRONT, { title: '卷首', html: frontHtml() });
+  chapters.set(FRONT, { title: '卷首', label: '卷首', short: '', html: frontHtml() });
 
   function loadChapter(n) {
     if (chapters.has(n)) return Promise.resolve();
@@ -141,9 +192,12 @@
     const size = FONT_SIZES[fontIndex];
     const basePadX = Math.round(Math.min(56, Math.max(20, pageW * 0.09)));
     const basePadY = Math.round(Math.min(60, Math.max(34, pageH * 0.075)));
-    // 欄寬取「字寬＋字距」的整數倍：每行剛好排滿整數個字，左右對齊時字距不會被撐開
+    // 中文：欄寬取「字寬＋字距」的整數倍，每行剛好排滿整數個字，左右對齊時字距不會被撐開。
+    // 英文是比例字型，每個字寬度不同，對齊整數倍沒有意義，靠斷字（hyphens）讓行尾平整
     const charAdvance = size * (1 + LETTER_SPACING_EM);
-    const colW = Math.floor((pageW - basePadX * 2) / charAdvance) * charAdvance + GRID_SLACK_PX;
+    const colW = IS_EN
+      ? pageW - basePadX * 2
+      : Math.floor((pageW - basePadX * 2) / charAdvance) * charAdvance + GRID_SLACK_PX;
     // 文字區高度取行高的整數倍：最後一行剛好貼齊底部，多出的空間平均分到上下
     const lineH = size * LINE_HEIGHT;
     const textH = Math.floor((pageH - basePadY * 2) / lineH) * lineH + GRID_SLACK_PX;
@@ -197,7 +251,7 @@
     const key = `${n}`;
     if (!chapter) { el.innerHTML = '<div class="loading-note">載入中…</div>'; delete el.dataset.key; return; }
     if (el.dataset.key !== key) {
-      el.innerHTML = `<div class="page-inner"><div class="running-head"><span></span><span></span></div><div class="window"><div class="flow">${chapter.html}</div></div><div class="folio"></div></div>`;
+      el.innerHTML = `<div class="page-inner"><div class="running-head"><span></span><span></span></div><div class="window"><div class="flow" lang="${FLOW_LANG}">${chapter.html}</div></div><div class="folio"></div></div>`;
       el.dataset.key = key;
     }
     const flow = el.querySelector('.flow');
@@ -207,7 +261,7 @@
     const head = el.querySelectorAll('.running-head span');
     const showHead = n !== FRONT && i > 0 && !isBlank;
     head[0].textContent = showHead ? BOOK.title : '';
-    head[1].textContent = showHead ? chapter.title.split('　')[0] : '';
+    head[1].textContent = showHead ? chapter.short : '';
     el.querySelector('.folio').textContent = n === FRONT || isBlank ? '' : String(i + 1);
     let blank = el.querySelector('.blank-end');
     if (isBlank && !blank) {
@@ -409,7 +463,8 @@
   function chapterLabel(n) {
     if (n === FRONT) return '卷首';
     const chapter = chapters.get(n);
-    return chapter ? chapter.title : `第 ${n} 回`;
+    if (chapter) return chapter.label;
+    return IS_EN ? `Chapter ${n}` : `第 ${n} ${UNIT}`;
   }
 
   function overallPercent() {
@@ -430,7 +485,7 @@
     range.setAttribute('aria-valuetext', `${label}，第 ${cur.page + 1} 頁，共 ${count} 頁`);
     const percent = overallPercent();
     statusEl.innerHTML = `<b>${cur.page + 1}${shown > cur.page + 1 ? `–${shown}` : ''}</b> / ${count}<span class="pct"> 頁 · ${percent.toFixed(percent < 10 ? 1 : 0)}%</span>`;
-    $('#progress-text').textContent = `已讀 ${readDone().size} / ${BOOK.chapterCount} 回 · 全書 ${percent.toFixed(1)}%`;
+    $('#progress-text').textContent = `已讀 ${readDone().size} / ${BOOK.chapterCount} ${UNIT} · 全書 ${percent.toFixed(1)}%`;
     $('#progress-meter').style.transform = `scaleX(${percent / 100})`;
     $('#prev-btn').disabled = cur.ch === FRONT && cur.page === 0;
     $('#first-btn').disabled = cur.ch === FRONT && cur.page === 0;
@@ -503,8 +558,11 @@
     const list = $('#toc');
     const items = [{ n: FRONT, title: '卷首　書名頁與說明' }, ...toc];
     list.innerHTML = items.map((c) => {
-      const [no, ...rest] = c.title.split('　').filter(Boolean);
-      return `<li><a href="#ch-${c.n}" data-ch="${c.n}"><span class="no">${escapeHtml(no)}</span><span>${rest.map(escapeHtml).join('<br>')}</span><i class="read" aria-hidden="true"></i></a></li>`;
+      // 英文書各章沒有標題，目錄改列章號與開頭幾個字
+      const isEnChapter = IS_EN && c.n !== FRONT;
+      const [no, ...rest] = isEnChapter ? [`Chapter ${c.title}`, c.excerpt || ''] : c.title.split('　').filter(Boolean);
+      const lang = isEnChapter ? ' lang="en" class="excerpt"' : '';
+      return `<li><a href="#ch-${c.n}" data-ch="${c.n}"><span class="no">${escapeHtml(no)}</span><span${lang}>${rest.map(escapeHtml).join('<br>')}</span><i class="read" aria-hidden="true"></i></a></li>`;
     }).join('');
     list.addEventListener('click', (event) => {
       const link = event.target.closest('a[data-ch]');
@@ -673,6 +731,10 @@
   }
 
   async function start() {
+    // 排版依書的語言：CSS 用 data-book-lang 切換字型與段落樣式，lang 讓瀏覽器正確斷字
+    document.documentElement.dataset.bookLang = IS_EN ? 'en' : 'zh';
+    measure.querySelector('.flow').lang = FLOW_LANG;
+    srText.lang = FLOW_LANG;
     const saved = loadState();
     setupSettings();
     setupInput();

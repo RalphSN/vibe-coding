@@ -748,13 +748,40 @@ const SITES = [
         desc: 'Cao Xueqin and Gao E. The full 120 chapters in Traditional Chinese, with page-turning and saved reading position.',
       },
     },
-    kind: 'book', // 文字書籍：單位是「回」，介紹卡不顯示模組與製作狀態
+    kind: 'book', // 文字書籍：介紹卡不顯示模組與製作狀態
+    unit: '回', // 中文介面的單位；英文介面一律 chapters
     modules: 1,
     lessons: 120,
     readyLessons: 120,
     updated: '2026-10',
     height: 0.98,
     progressKey: 'hongloumeng.v1',
+  },
+  {
+    id: 'the-great-gatsby',
+    color: '#1d2c4c', // 夜藍書布
+    icon: 'book',
+    href: 'books/the-great-gatsby/index.html?from=shelf',
+    text: {
+      zh: {
+        spineTitle: '大亨小傳',
+        titlePhrases: ['大亨小傳'],
+        desc: '費茲傑羅著，1925 年英文原文，九章全文。翻頁閱讀，自動記住讀到哪一頁。',
+      },
+      en: {
+        spineTitle: 'The Great Gatsby',
+        titlePhrases: ['The Great', 'Gatsby'],
+        desc: 'F. Scott Fitzgerald, 1925. The full English text in nine chapters, with page-turning and saved reading position.',
+      },
+    },
+    kind: 'book',
+    unit: '章',
+    modules: 1,
+    lessons: 9,
+    readyLessons: 9,
+    updated: '2026-10',
+    height: 0.88,
+    progressKey: 'the-great-gatsby.v1',
   },
   {
     // 外部連結（YouTube 頻道）：沒有單元與進度，厚度直接指定
@@ -826,8 +853,9 @@ const STRINGS = {
     imprint: '端點星 藏書',
     channelLabel: (title) => `${title}，YouTube 頻道（外部連結）`, channelContent: 'YouTube 影音頻道', externalLink: '外部連結',
     channelStamp: '影音典藏', lessonUnit: '單元', runningHead: '端點星 · 書目', chapter: '卷首',
-    bookUnit: '回', bookContent: (l) => `${l} 回全文`, bookColophon: (l) => `全書 ${l} 回`,
-    bookLabelText: (title, l, done) => `${title}，${l} 回，已讀 ${done} 回`,
+    // 文字書籍的單位由每本書的 unit 決定（回、章）
+    bookUnit: (u) => u, bookContent: (l, u) => `${l} ${u}全文`, bookColophon: (l, u) => `全書 ${l} ${u}`,
+    bookLabelText: (title, l, done, u) => `${title}，${l} ${u}，已讀 ${done} ${u}`,
   },
   en: {
     brand: 'Terminus', motto: 'On the very fringe of the Galactic spiral', loading: 'Leafing through the shelves',
@@ -923,7 +951,7 @@ function renderBook(site) {
     <li>
       <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}" draggable="false"
          style="--accent:${site.color};--w:${spineWidth(site)}px;--h:${site.height}"
-         aria-label="${escapeHtml(site.external ? t('channelLabel', text.titlePhrases.join(' ')) : t(site.kind === 'book' ? 'bookLabelText' : 'bookLabel', text.titlePhrases.join(' '), site.lessons, done))}">
+         aria-label="${escapeHtml(site.external ? t('channelLabel', text.titlePhrases.join(' ')) : t(site.kind === 'book' ? 'bookLabelText' : 'bookLabel', text.titlePhrases.join(' '), site.lessons, done, site.unit))}">
         <span class="book-fallback" aria-hidden="true">${escapeHtml(text.spineTitle)}</span>
       </a>
     </li>`;
@@ -1140,9 +1168,9 @@ function cardHtml(site) {
     <div class="card-progress" aria-hidden="true"><span style="--ratio:${done / site.lessons};--accent:${site.color}"></span></div>
     <dl>
       <dt>${t('path')}</dt><dd>${escapeHtml(site.href.replace(/\?.*$/, '').replace(/index\.html$/, ''))}</dd>
-      <dt>${t('content')}</dt><dd>${escapeHtml(isBook ? t('bookContent', site.lessons) : t('contentValue', site.modules, site.lessons))}</dd>
+      <dt>${t('content')}</dt><dd>${escapeHtml(isBook ? t('bookContent', site.lessons, site.unit) : t('contentValue', site.modules, site.lessons))}</dd>
       ${isBook ? '' : `<dt>${t('status')}</dt><dd>${escapeHtml(status)}</dd>`}
-      <dt>${t('read')}</dt><dd>${done} / ${site.lessons}${isBook ? ` ${escapeHtml(t('bookUnit'))}` : ''}</dd>
+      <dt>${t('read')}</dt><dd>${done} / ${site.lessons}${isBook ? ` ${escapeHtml(t('bookUnit', site.unit))}` : ''}</dd>
       <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>
     ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))}</button>` : ''}
@@ -1631,7 +1659,7 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
   // 底部數字
   // 完成與製作中統一格式：可讀單元／總單元
   const foot = site.foot || (site.external ? 'YouTube'
-    : site.kind === 'book' ? `${site.lessons} ${t('bookUnit')}` : `${site.readyLessons}/${site.lessons}`);
+    : site.kind === 'book' ? `${site.lessons} ${t('bookUnit', site.unit)}` : `${site.readyLessons}/${site.lessons}`);
   ctx.font = `400 11px ${MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1894,7 +1922,7 @@ function paintLeafBack(canvas, site) {
   ctx.fillStyle = INK_2;
   ctx.font = `400 ${10.5 * u}px ${SERIF}`;
   const colophon = site.external ? t('channelContent')
-    : site.kind === 'book' ? t('bookColophon', site.lessons) : t('colophon', site.modules, site.lessons);
+    : site.kind === 'book' ? t('bookColophon', site.lessons, site.unit) : t('colophon', site.modules, site.lessons);
   ctx.fillText(colophon, cx, H * 0.62 + 24 * u);
   ctx.font = `400 ${9 * u}px ${SERIF}`;
   ctx.fillText(`© ${site.updated.slice(0, 4)} ${t('brand')}`, cx, H * 0.62 + 42 * u);
@@ -2079,7 +2107,7 @@ function paintCover(canvas, site, mode) {
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'right';
   ctx.font = `500 ${12 * u}px ${MONO}`;
-  ctx.fillText(site.external ? 'YouTube' : `${site.lessons} ${t(site.kind === 'book' ? 'bookUnit' : 'lessonUnit')}`, W - inset - 18 * u, inset + 38 * u);
+  ctx.fillText(site.external ? 'YouTube' : `${site.lessons} ${site.kind === 'book' ? t('bookUnit', site.unit) : t('lessonUnit')}`, W - inset - 18 * u, inset + 38 * u);
 
   // 書名：按詞組換行，靠左下
   const titleSize = 30 * u;
