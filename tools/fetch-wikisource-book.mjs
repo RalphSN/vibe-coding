@@ -4,10 +4,81 @@
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-// 維基文庫的後四十回混有簡體字；用 OpenCC s2t 依詞組轉繁體（安裝：cd tools && npm install）
+// 維基文庫的原文混有簡體字；用 OpenCC 依詞組轉成台灣用字（安裝：cd tools && npm install）
 import * as OpenCC from 'opencc-js';
 
-const toTraditional = OpenCC.Converter({ from: 'cn', to: 't' });
+const openccToTw = OpenCC.Converter({ from: 'cn', to: 'tw' });
+
+/*
+  原文本身大多已是繁體，OpenCC 會把一些合法的繁體字當成簡體再轉一次而轉錯
+  （自云→自雲、只減了→只減瞭、大家什麼→大傢什麼、一出頭→一齣頭、周大爺→週大爺）。
+  這些字預設保留原文，只有上下文符合下面的規則時才採用 OpenCC 的結果。規則逐處對照原文確認過。
+*/
+const KEEP_UNLESS = {
+  云: () => false, // 「說」的意思；原文少數寫成「云」的「雲」由 YUN_AS_CLOUD 處理
+  了: () => false,
+  娘: () => false,
+  周: () => false,
+  家: (prev, next) => next === '伙' && prev !== '大', // 傢伙；「大家伙兒」是大家夥兒
+  只: (prev, next) => '一二兩三四五六七八九十百幾這那船'.includes(prev) || next === '身', // 量詞：兩隻手、船隻、隻身
+  出: (prev, next, before, after) => /^《/.test(after) || /第[一二三四五六七八九十]+$/.test(before)
+    || (/[這那了唱有]一$/.test(before) && /^([。？戲]|熱鬧|吉慶|上，)/.test(after)), // 戲曲的「齣」
+  欲: (prev, next, before, after) => /(情|利|色|人|淫|寡)$/.test(before) && !/^(向|亡)/.test(after), // 情慾、利慾、淫慾
+};
+const KEEP_CONTEXT = 4;
+
+const YUN_AS_CLOUD = ['流云百蝠', '連云直上', '九霄云外', '倚云栽', '聚云根', '穿云', '向云霞', '被云催', '朝云之流',
+  '倪云林', '絳云軒', '云妹妹', '素云', '云南', '層云下', '野鶴閒云', '好云香護'];
+
+/** 逐字比對原文與 OpenCC 結果，KEEP_UNLESS 裡的字照規則決定要不要轉 */
+function convertKeepingValidChars(text) {
+  const src = [...text];
+  const out = [...openccToTw(text)];
+  // OpenCC 是逐字對應，長度不變；萬一不一樣就無法逐字比對，直接用 OpenCC 的結果
+  if (src.length !== out.length) return out.join('');
+  for (let i = 0; i < src.length; i += 1) {
+    const rule = KEEP_UNLESS[src[i]];
+    if (!rule || src[i] === out[i]) continue;
+    const before = src.slice(Math.max(0, i - KEEP_CONTEXT), i).join('');
+    const after = src.slice(i + 1, i + 1 + KEEP_CONTEXT).join('');
+    if (!rule(src[i - 1] || '', src[i + 1] || '', before, after)) out[i] = src[i];
+  }
+  return out.join('');
+}
+
+/** 轉成台灣用字；維基文庫編者用 -{字}- 標記為「不要轉換」的字照原樣保留 */
+function toTraditional(raw) {
+  return raw.split(/-\{([^{}]*)\}-/).map((part, i) => {
+    if (i % 2 === 1) return part;
+    const converted = convertKeepingValidChars(part).replace(/頭發(?![暈昏脹沉燒熱])/g, '頭髮');
+    return YUN_AS_CLOUD.reduce((acc, phrase) => acc.replaceAll(phrase, phrase.replace('云', '雲')), converted);
+  }).join('');
+}
+
+/**
+ * 引號統一成台灣用的「」『』。原文前幾回用「」、後面多用“”，也有方向寫反的（”絳雲軒”）。
+ * 一段裡的“”成對時，照開、關交替重新配對；不成對（對話跨段）時照原本的方向。
+ * 外層用「」、包在引號裡的用『』，原文已有的「」『』也算進層次。
+ */
+function normalizeQuotes(text) {
+  const chars = [...text];
+  const curly = chars.filter((ch) => ch === '“' || ch === '”').length;
+  const pairByOrder = curly % 2 === 0;
+  let curlyOpen = false;
+  let depth = 0;
+  return chars.map((ch) => {
+    if (ch === '「' || ch === '『') { depth += 1; return ch; }
+    if (ch === '」' || ch === '』') { depth = Math.max(0, depth - 1); return ch; }
+    const isCurly = ch === '“' || ch === '”';
+    const isSingle = ch === '‘' || ch === '’';
+    if (!isCurly && !isSingle) return ch;
+    let opens;
+    if (isCurly && pairByOrder) { curlyOpen = !curlyOpen; opens = curlyOpen; } else opens = ch === '“' || ch === '‘';
+    if (opens) { depth += 1; return depth > 1 ? '『' : '「'; }
+    depth = Math.max(0, depth - 1);
+    return depth > 0 ? '』' : '」';
+  }).join('');
+}
 
 const API = 'https://zh.wikisource.org/w/api.php';
 const BATCH_SIZE = 10; // MediaWiki 一次查詢最多 50 頁，內容太大會被截，保守一點
@@ -174,7 +245,8 @@ function cleanChapter(raw, label, unknown) {
   for (const b of blocks) {
     if (/[{}<>\[\]|]/.test(b.x.replace(/\u0003\d+\u0004/g, ''))) unknown.add(`殘留標記@${label}: ${b.x.slice(0, 30)}`);
   }
-  return { title, blocks, notes: notes.map((n) => stripInline(expandTemplates(n, unknown)).replace(/<li>/g, '；').replace(/<[^>]+>/g, '').trim()) };
+  for (const b of blocks) b.x = normalizeQuotes(b.x);
+  return { title, blocks, notes: notes.map((n) => normalizeQuotes(stripInline(expandTemplates(n, unknown)).replace(/<li>/g, '；').replace(/<[^>]+>/g, '').trim())) };
 }
 
 async function main() {
