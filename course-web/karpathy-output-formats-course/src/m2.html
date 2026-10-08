@@ -1,0 +1,465 @@
+
+<script>
+/* ==========================================================================
+   模組 2：4 種輸出格式
+   ========================================================================== */
+defineTerms({
+  'Mermaid': { en: 'Mermaid', def: '用簡單文字描述流程圖、時序圖的語法。把程式碼貼到 Mermaid 線上編輯器就能看到圖。', example: '`A --> B` 會畫出 A 指向 B 的箭頭。' },
+  'HTML': { en: 'HyperText Markup Language', def: '網頁的語言。存成 .html 檔，用瀏覽器打開就能看到網頁，不需要架網站。' },
+  'Manim': { en: 'Manim', def: '3Blue1Brown 創作者開發的開源動畫工具，用 Python 程式描述畫面，再渲染成影片。' },
+  '渲染': { en: 'render', def: '把程式描述的畫面，實際算成一張張影像、輸出成影片檔的過程，通常要花一些時間。' },
+  'API key': { en: 'API key', def: '程式呼叫雲端服務時證明身分的一串密碼，外流等於別人可以用你的額度。' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出 ASD-STE100 是什麼、為什麼適合拿來要求 AI',
+      '用英文點名規範，或用中文借用它的原則',
+      '用 5 條中文規則檢查一段 AI 回答好不好讀',
+    ],
+    analogy: {
+      text: ['ASD-STE100 像**飛機維修手冊的寫作守則**：維修技師可能來自世界各地、英文不是母語，手冊一句話被誤解就可能出事。所以規定**句子要短、一個詞只有一個意思、一句只講一件事**。請 AI 照這套規範寫，就是請它把你當成那位技師。'],
+      limit: ['這是英文規範。用中文下指令只是**借用它的原則**，輸出並不代表符合規範（原文特別提醒）。而且簡潔的代價是省略細節，看懂大方向後要再追問（3-1）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="ASD-STE100 的重點：875 個核准詞，每個詞原則上一個意思；流程類句子最多 20 個英文單字，描述類最多 25 個；出發點是照顧英文非母語讀者，最初應航空公司客戶要求制定，這些客戶 80% 不以英文為母語">
+        <rect x="10" y="10" width="540" height="56" class="f1 stroke-ink" stroke-width="4"/>
+        <text x="280" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">ASD-STE100 簡化技術英文</text>
+        <g font-size="17">
+          <rect x="10" y="80" width="175" height="140" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="97" y="122" text-anchor="middle" font-size="34" font-weight="900">875</text>
+          <text x="97" y="156" text-anchor="middle">個核准詞</text>
+          <text x="97" y="186" text-anchor="middle" font-size="14">一詞原則上一義</text>
+          <rect x="192" y="80" width="175" height="140" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="279" y="122" text-anchor="middle" font-size="34" font-weight="900">20／25</text>
+          <text x="279" y="156" text-anchor="middle">英文單字上限</text>
+          <text x="279" y="186" text-anchor="middle" font-size="14">流程類／描述類句子</text>
+          <rect x="374" y="80" width="176" height="140" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="462" y="122" text-anchor="middle" font-size="34" font-weight="900">80%</text>
+          <text x="462" y="156" text-anchor="middle">客戶非英文母語</text>
+          <text x="462" y="186" text-anchor="middle" font-size="14">規範的出發點</text>
+        </g>
+        <rect x="10" y="236" width="540" height="82" class="fill-surface stroke-ink" stroke-width="3" stroke-dasharray="10 6"/>
+        <text x="30" y="270" font-size="17">制定者：歐洲航太、安全與國防工業協會（ASD）</text>
+        <text x="30" y="300" font-size="17">用途：飛機維修手冊。卡帕西：LLM 對它掌握得很好</text>
+      </svg>`,
+      caption: '三個數字記住這套規範：875 個詞、20／25 個字、80% 的讀者。',
+      blocks: [
+        { type: 'tabs', label: '三種問法', tabs: [
+          { label: '英文：點名規範', blocks: [{ type: 'code', lang: 'text', title: '提示詞', code: 'Explain [主題] in ASD-STE100 Simplified Technical English.' }, '太嚴時放寬：「80% of the way to ASD-STE100」。'] },
+          { label: '中文：借用原則', blocks: [{ type: 'code', lang: 'text', title: '提示詞', code: '請用ASD-STE100的原則，以中文解釋[主題]。' }] },
+          { label: '中文：五條規則（最像一般文章）', blocks: [{ type: 'code', lang: 'text', title: '提示詞', code: '請用中文解釋[主題]。寫作時遵守以下規則：\n1. 句子要短，每句盡量不超過30個字。\n2. 一句只講一件事。\n3. 同一個概念從頭到尾用同一個詞，不要換說法。\n4. 用主動語態，每句的主詞要清楚。\n5. 不要堆疊名詞，一個名詞片語最多三個詞。' }] },
+        ] },
+        '下面用原文的兩段實測文字來檢查。切換範例，看看哪一版的句子比較短、一句只講一件事；也可以貼上你自己拿到的 AI 回答。',
+        { type: 'widget', name: 'rulecheck', props: {} },
+      ],
+    },
+    define: [
+      { term: 'ASD-STE100', en: 'Simplified Technical English', def: '歐洲航太、安全與國防工業協會（ASD）為飛機維修手冊制定的英文寫作規範：約 875 個核准詞，每個詞原則上一個意思，流程類句子最多 20 個英文單字、描述類最多 25 個。', example: '`Explain X in ASD-STE100 Simplified Technical English.`' },
+      { term: '主動語態', en: 'active voice', def: '主詞做動作的句子，例如「模型計算 K」；被動語態是「K 被模型計算」。主動語態的主詞比較清楚。' },
+      { term: '名詞堆疊', en: 'noun stacking', def: '一長串名詞黏在一起，例如「快取記憶體管理最佳化機制」，讀者很難看出誰修飾誰。五條規則限制最多三個詞。' },
+    ],
+    examples: {
+      compare: [{
+        title: '原文實測：解釋「沒有 KV cache 會怎樣」',
+        kind: '回答對照',
+        badLabel: '一般提問',
+        goodLabel: '點名 ASD-STE100',
+        bad: '如果沒有任何快取，模型得把前面1,000個token的K和V全部重新算一遍。生成第1,002個時又要再算1,001個……計算量會隨長度不斷堆高，非常浪費。',
+        good: '沒有KV cache時，模型每產生一個新token，就要重新計算前面所有token的K和V。{{1:前面token的K和V不會改變。}}{{2:所以這些計算都是重複的工作。}}',
+        badResult: '原文說一般提問版全文長得多，還塞進一長串優化技術名詞。',
+        why: ['一句只講一件事：先講「不會改變」', '再講結論，因果關係清楚'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="五條中文規則圖示：1 句子短，30 字以內；2 一句一件事；3 同一概念同一個詞；4 主動語態主詞清楚；5 名詞片語最多三個詞">
+          <g font-size="17">
+            <rect x="10" y="10" width="540" height="42" class="f1 stroke-ink" stroke-width="3"/><text x="26" y="38" class="on-color" font-weight="900">1 句子短：每句盡量 ≤ 30 字</text>
+            <rect x="10" y="60" width="540" height="42" class="f1 stroke-ink" stroke-width="3"/><text x="26" y="88" class="on-color" font-weight="900">2 一句只講一件事</text>
+            <rect x="10" y="110" width="540" height="42" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="138" font-weight="900">3 同一個概念，從頭到尾同一個詞</text>
+            <rect x="10" y="160" width="540" height="42" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="188" font-weight="900">4 主動語態，主詞清楚</text>
+            <rect x="10" y="210" width="540" height="42" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="238" font-weight="900">5 名詞片語最多三個詞</text>
+          </g>
+        </svg>`, caption: '黃色兩條，上面的檢查器能自動抓；白色三條要靠你讀。' },
+      ],
+      tryit: {
+        q: ['把這段改寫成符合五條規則的版本：'],
+        draft: '原文：透過在推論階段導入鍵值快取記憶體管理最佳化機制，系統得以在避免重複運算的情況下，大幅降低生成延遲並提升整體吞吐量。\n\n改寫：____',
+        answer: ['參考：模型會把算過的 K 和 V 存起來。下一次直接拿來用。這樣就不用重算。所以模型回答得更快。', '改了什麼：拆成 4 句（規則 1、2）；拿掉「鍵值快取記憶體管理最佳化機制」這種名詞堆疊（規則 5）；每句都有清楚的主詞（規則 4）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為用中文下指令，AI 的輸出就「符合 ASD-STE100」。', why: '它是英文規範，原文提醒：中文只是借用原則。', right: '把它當成「讓回答變簡潔的開關」，不要當成認證。' },
+      { wrong: '輸出太像條列清單，就放棄這個方法。', why: '點名規範時，AI 常把流程改成編號步驟。', right: '改用五條中文規則，原文實測最接近一般文章；或英文用「80% of the way」。' },
+      { wrong: '看完簡潔版就以為學完了。', why: '原文的實測中，簡潔版省略了一般版提到的多種優化技術。', right: '先用簡潔版抓大方向，再追問省略的細節（3-1）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'ASD-STE100 最初是為了什麼制定的？', options: [
+        { text: '飛機維修手冊，照顧英文非母語的讀者', correct: true, why: '應航空公司客戶要求制定，這些客戶 80% 不以英文為母語。' },
+        { text: '讓 AI 的回答變短、讓聊天機器人更好用', why: '那是卡帕西的新用法；規範本身早在 AI 之前就存在。' },
+        { text: '學術論文的寫作格式', why: '它是航太維修文件的規範。' },
+        { text: '中文技術文件的標準', why: '它是英文規範。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你點名 ASD-STE100 後，AI 回答變成一長串編號清單，你想要比較像文章。最好的下一步是？', options: [
+        { text: '改用原文的五條中文規則', correct: true, why: '原文實測，五條規則寫出來最接近一般文章。' },
+        { text: '要求「不要用清單」，其他不變', why: '只說不要，AI 不知道該用什麼取代。' },
+        { text: '放棄，回到一般提問', why: '一般提問又會變回落落長。' },
+        { text: '改成第 4 級做影片', why: '問題只是文字風格，不需要換到最費工的格式。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['五條規則除了拿來要求 AI，也可以用在哪裡？舉一個你自己的例子。'], answer: [
+        '參考：寫給主管的 email、操作說明、報告摘要、給長輩的使用教學。只要讀者可能很忙、不熟這個領域，或不是用母語閱讀，這五條都能讓文字更好懂。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）卡帕西的第 1 級是什麼？', options: [
+        { text: '照 ASD-STE100 規範寫文字', correct: true, why: '第 1 級還是文字，但照規範寫。' },
+        { text: '畫一張圖', why: '那是第 2 級。' },
+        { text: '做互動網頁', why: '那是第 3 級。' },
+        { text: '做一支 3Blue1Brown 風格的解說影片', why: '那是第 4 級。' },
+      ] },
+    ],
+    keypoints: [
+      'ASD-STE100：航太維修手冊的英文規範，875 個詞、句子 20／25 字上限。',
+      '英文直接點名；中文借用原則，或用五條規則（最像一般文章）。',
+      '簡潔會省略細節：先抓大方向，再追問。',
+    ],
+    sources: ['bnext', 'ste-home', 'ste-issue9', 'ste-about'],
+  },
+
+  '2-2': {
+    goals: [
+      '寫出一個「不會只是把文字搬進方框」的畫圖指令',
+      '知道 AI 可能給你圖片，也可能給 Mermaid 程式碼，以及怎麼看',
+      '分辨一張好的解說圖和一張文字搬家的圖',
+    ],
+    analogy: {
+      text: ['請 AI 畫圖，像**請人幫你畫路線圖**：只說「畫一下怎麼去」，他可能把文字指引一行一行抄進方框；你說「標出捷運站、轉乘點、走路的方向」，才會得到一張真正能看的地圖。'],
+      limit: ['畫路線的人看過那條路，AI 沒有。圖上的元件和箭頭是它推論出來的，箭頭方向畫錯，比文字講錯更不容易被發現。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="好圖和壞圖的比較：左邊壞圖是三個方框，每個框裡塞一整段文字，沒有箭頭；右邊好圖是三個元件，標籤短，箭頭標出流程方向和關係">
+        <text x="140" y="28" text-anchor="middle" font-size="18" font-weight="900">✗ 文字搬進方框</text>
+        <g font-size="13">
+          <rect x="10" y="44" width="260" height="70" class="fill-surface stroke-ink" stroke-width="2"/><text x="20" y="66">模型產生新 token 時需要前面所有</text><text x="20" y="86">token 的 K 和 V，如果沒有快取的話…</text>
+          <rect x="10" y="124" width="260" height="70" class="fill-surface stroke-ink" stroke-width="2"/><text x="20" y="146">KV cache 會把算過的結果存在記憶</text><text x="20" y="166">體中，以便下一次可以直接…</text>
+          <rect x="10" y="204" width="260" height="70" class="fill-surface stroke-ink" stroke-width="2"/><text x="20" y="226">因此可以大幅減少運算量並提升…</text>
+        </g>
+        <text x="420" y="28" text-anchor="middle" font-size="18" font-weight="900">✓ 元件＋關係＋方向</text>
+        <g font-size="16" font-weight="900" text-anchor="middle">
+          <rect x="300" y="60" width="110" height="50" class="f2 stroke-ink" stroke-width="3"/><text x="355" y="91" class="on-color">新 token</text>
+          <rect x="440" y="60" width="110" height="50" class="f2 stroke-ink" stroke-width="3"/><text x="495" y="91" class="on-color">算 K、V</text>
+          <rect x="370" y="200" width="110" height="50" class="f3 stroke-ink" stroke-width="3"/><text x="425" y="231" class="on-color">KV cache</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M410 85 H440 M495 110 L450 200 M400 200 L362 110"/></g>
+        <g font-size="13"><text x="480" y="160">存起來</text><text x="306" y="160">直接取用</text></g>
+      </svg>`,
+      caption: '原文：把圖上要有什麼講清楚，輸出才不會只是把文字搬進方框裡。',
+      blocks: [
+        { type: 'code', lang: 'text', title: '原文的提示詞', code: '請用一張圖解釋[主題]，不要用長篇文字。圖上要標出關鍵元件、元件之間的關係和流程方向，每個標籤不超過10個字。' },
+        { type: 'table', caption: '拆解這句提示詞：格式、內容、限制三種都要有', head: ['片段', '種類', '作用'], rows: [
+          ['請用一張圖解釋[主題]', '格式', '指定輸出成一張圖'],
+          ['不要用長篇文字', '限制', '擋住「文字搬進方框」'],
+          ['標出關鍵元件', '內容', '圖上要有哪些方框'],
+          ['元件之間的關係', '內容', '方框之間的連線'],
+          ['流程方向', '內容', '箭頭往哪裡指'],
+          ['每個標籤不超過10個字', '限制', '逼 AI 提煉重點'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'Mermaid', en: 'Mermaid', def: '用文字描述圖表的語法。AI 常用它回答「畫一張圖」。程式碼貼到 mermaid.live 就能看到成圖。', example: '`flowchart LR` 開頭，`A --> B` 畫箭頭。' },
+      { term: '解說圖', en: 'explanatory diagram', def: '用元件、連線和方向呈現概念結構的圖，不是把文字放進方框。' },
+    ],
+    examples: {
+      compare: [{
+        title: 'AI 回給你的 Mermaid 程式碼',
+        kind: '程式碼 → 成圖',
+        code: true,
+        badLabel: 'AI 給的程式碼',
+        goodLabel: '貼到 mermaid.live 之後',
+        bad: 'flowchart LR\n  A[新 token] --> B[算 K、V]\n  B --> C[(KV cache)]\n  C -->|直接取用| A',
+        good: '[新 token] ──▶ [算 K、V]\n     ▲              │\n     └── 直接取用 ── [(KV cache)]',
+        badResult: '看起來像程式碼，其實就是文字版的圖：方括號是方框、箭頭是連線、`|文字|` 是箭頭上的標籤。',
+        why: ['貼到 Mermaid 線上編輯器，左邊程式碼、右邊立刻出現圖'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'good', label: '好的解說圖' }, { id: 'bad', label: '文字搬進方框' }], items: [
+          { text: '每個方框裡都是一整句話，方框之間沒有箭頭', answer: 'bad', why: '只是把段落切開，結構還是要你自己拼。' },
+          { text: '6 個短標籤的方框，箭頭上寫著「傳送」「回傳」', answer: 'good', why: '元件、關係、方向都有。' },
+          { text: '一張圖有 25 個方框，標籤平均 20 個字', answer: 'bad', why: '太多、太長，等於另一篇文章。' },
+          { text: '用顏色區分「使用者端」和「伺服器端」，箭頭標出順序 1、2、3', answer: 'good', why: '層級和流程都一眼看得出來。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="拿到結果的兩種情況：如果是圖片，直接看並核對；如果是 Mermaid 程式碼，貼到 mermaid.live 線上編輯器看成圖">
+          <g font-size="17">
+            <rect x="10" y="10" width="200" height="60" class="f2 stroke-ink" stroke-width="3"/><text x="110" y="47" text-anchor="middle" class="on-color" font-weight="900">AI 的回答</text>
+            <rect x="290" y="10" width="260" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="420" y="47" text-anchor="middle">圖片 → 直接看、核對</text>
+            <rect x="290" y="110" width="260" height="96" class="fill-surface stroke-ink" stroke-width="3"/><text x="420" y="146" text-anchor="middle">Mermaid 程式碼</text><text x="420" y="178" text-anchor="middle" class="mono" font-size="15">→ 貼到 mermaid.live</text>
+          </g>
+          <g class="stroke-ink" stroke-width="3" fill="none"><path d="M210 40 H290 M110 70 V158 H290"/></g>
+        </svg>`, caption: '原文：拿到的可能是圖片，也可能是 Mermaid 這類畫圖程式碼。' },
+      ],
+      tryit: {
+        q: ['用原文的公式，為「颱風假怎麼決定」寫一句畫圖指令，並列出你希望圖上出現的元件。'],
+        draft: '指令：____\n希望出現的元件：____',
+        answer: ['參考：「請用一張圖解釋颱風假怎麼決定，不要用長篇文字。圖上要標出氣象署、縣市政府、判斷標準和公布時間這幾個關鍵元件、彼此的關係和流程方向，每個標籤不超過10個字。」', '把你想要的元件直接寫進指令，比讓 AI 自己猜準得多。'],
+      },
+    },
+    mistakes: [
+      { wrong: '只說「畫一張圖」。', why: 'AI 很容易把原本的文字切段塞進方框。', right: '照原文公式：不要長篇文字＋元件＋關係＋方向＋標籤字數上限。' },
+      { wrong: '拿到一堆看不懂的程式碼，以為 AI 失敗了。', why: '那多半是 Mermaid 語法，本身就是「文字版的圖」。', right: '貼到 [Mermaid 線上編輯器](https://mermaid.live/) 看成圖。' },
+      { wrong: '圖看起來很專業，就直接拿去簡報。', why: '箭頭方向、元件名稱都可能是推論出來的，錯了也很難發現。', right: '對照文字版或原始資料，逐條確認箭頭（3-1）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '原文的畫圖指令，要求圖上標出哪三樣東西？', options: [
+        { text: '關鍵元件、元件之間的關係、流程方向', correct: true, why: '再加上「每個標籤不超過 10 個字」的限制。' },
+        { text: '標題、作者、日期', why: '那是文件資訊，不是解說圖的內容。' },
+        { text: '顏色、字型、尺寸', why: '原文沒有要求外觀，而是要求結構。' },
+        { text: '定義、生活化的例子、常見錯誤與修正方式', why: '那是教學文章的結構。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'AI 回你一段以 `flowchart TD` 開頭的程式碼。你該怎麼做？', options: [
+        { text: '貼到 Mermaid 線上編輯器看成圖', correct: true, why: '那是 Mermaid 語法，貼上去就能看到圖。' },
+        { text: '存成 .html 用瀏覽器打開', why: '那是第 3 級 HTML 的看法；Mermaid 程式碼要用 Mermaid 編輯器。' },
+        { text: '重新問一次，要求它直接給一張圖片檔', why: '可以，但貼到編輯器更快。' },
+        { text: '放棄，因為看不懂程式碼', why: '不需要看懂，貼上去就有圖。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼「每個標籤不超過 10 個字」這個限制很重要？'], answer: [
+        '參考：字數上限逼 AI 把每個元件提煉成關鍵詞；沒有上限，它很容易把整句話塞進方框，圖就變回一篇被切開的文章。限制越清楚，結構越乾淨。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-1）五條中文規則中，「一個名詞片語最多三個詞」是在避免什麼？', options: [
+        { text: '名詞堆疊', correct: true, why: '例如「快取記憶體管理最佳化機制」。' },
+        { text: '句子太短', why: '規則是希望句子短。' },
+        { text: '用到英文', why: '和語言無關。' },
+        { text: '主動語態', why: '主動語態是規則 4 鼓勵的。' },
+      ] },
+    ],
+    keypoints: [
+      '畫圖指令＝不要長篇文字＋元件＋關係＋方向＋標籤 ≤ 10 字。',
+      '可能拿到圖片或 Mermaid 程式碼；程式碼貼到 mermaid.live。',
+      '好圖畫的是結構，不是把文字搬進方框；箭頭要核對。',
+    ],
+    sources: ['bnext', 'mermaid'],
+  },
+
+  '2-3': {
+    goals: [
+      '寫出要求 AI 做單頁互動解說網頁的指令',
+      '知道沒有預覽時怎麼打開 AI 給的 HTML',
+      '親手操作一個「調參數、即時看結果」的互動元件，理解它為什麼好懂',
+    ],
+    analogy: {
+      text: ['互動網頁像**科學館的展示機台**：看板上的說明你可能讀過就忘，但親手轉動旋鈕、看到結果跟著變，原理一下子就記住了。'],
+      limit: ['機台是專家設計並驗證過的，AI 做的網頁不一定：計算公式可能寫錯，畫面卻看起來很正確。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="互動網頁的三個部分：可以點開的段落說明、可以調整的參數、即時變化的結果；三者都放在同一個 HTML 檔案裡，用瀏覽器打開">
+        <rect x="10" y="10" width="540" height="280" class="fill-surface stroke-ink" stroke-width="4"/>
+        <rect x="10" y="10" width="540" height="40" class="f3 stroke-ink" stroke-width="4"/>
+        <text x="30" y="37" font-size="17" font-weight="900" class="on-color mono">kv-cache.html（單一檔案）</text>
+        <g font-size="16">
+          <rect x="30" y="70" width="240" height="40" class="fill-surface stroke-ink" stroke-width="2"/><text x="44" y="96">▸ 什麼是 token？</text>
+          <rect x="30" y="118" width="240" height="40" class="fill-surface stroke-ink" stroke-width="2"/><text x="44" y="144">▸ K 和 V 是什麼？</text>
+          <text x="30" y="190" font-weight="900">① 可以點開的段落說明</text>
+          <rect x="300" y="70" width="230" height="40" class="fill-surface stroke-ink" stroke-width="2"/>
+          <rect x="314" y="86" width="200" height="8" class="fill-ink"/><circle cx="400" cy="90" r="10" class="f3 stroke-ink" stroke-width="2"/>
+          <text x="300" y="138" font-weight="900">② 可以調的參數</text>
+          <rect x="300" y="160" width="230" height="70" class="fill-surface stroke-ink" stroke-width="2"/>
+          <rect x="314" y="176" width="180" height="16" style="fill:var(--danger)"/><rect x="314" y="200" width="40" height="16" style="fill:var(--success)"/>
+          <text x="300" y="256" font-weight="900">③ 即時變化的結果</text>
+        </g>
+      </svg>`,
+      caption: '原文提示詞的三個要求，正好是一個好互動網頁的三個部分。',
+      blocks: [
+        { type: 'code', lang: 'text', title: '原文的提示詞', code: '請用HTML做一個單頁互動網頁解釋[主題]。要有可以點開的段落說明，以及一個可以調整參數、即時看到結果變化的互動元件。所有程式碼放在同一個檔案裡。' },
+        '下面就是照這個指令做出來的樣子：用原文的 KV cache 當主題，**拉動拉桿**，看看有沒有快取時，K 和 V 要算幾次。紅格是重複計算，綠格是新算的。',
+        { type: 'widget', name: 'kvcache', props: {} },
+        { type: 'reveal', summary: '▸ 點開：什麼是 token？', body: ['模型處理文字的基本單位，大約是一個詞或一個字的一部分。模型一次產生一個 token。'] },
+        { type: 'reveal', summary: '▸ 點開：K 和 V 是什麼？', body: ['模型替每個 token 算出的兩組資料，產生下一個 token 時要用到前面所有 token 的 K 和 V。前面 token 的 K 和 V 不會改變，所以可以存起來重複使用，這就是 KV cache。'] },
+      ],
+    },
+    define: [
+      { term: '單頁互動網頁', en: 'single-file interactive page', def: '所有程式碼（HTML、CSS、JavaScript）都放在同一個 .html 檔裡的網頁，雙擊就能用瀏覽器打開，不用架站。' },
+      { term: '互動元件', en: 'interactive widget', def: '可以拉、點、輸入的介面，例如拉桿、按鈕，操作後結果立刻改變。', example: '上面的 token 數量拉桿。' },
+    ],
+    examples: {
+      compare: [{
+        title: '聊天介面沒有預覽時',
+        kind: '操作對照',
+        badLabel: '✗ 看程式碼',
+        goodLabel: '✓ 存檔再打開',
+        bad: '盯著 300 行 HTML 程式碼，\n試著想像網頁長什麼樣子',
+        good: '1. 複製 AI 給的整段程式碼\n2. 貼進記事本，存成 {{1:kv-cache.html}}\n3. 雙擊這個檔案，{{2:用瀏覽器打開}}',
+        badResult: '程式碼是給瀏覽器讀的，不是給人讀的。',
+        why: ['副檔名一定要是 .html', '原文：存成 .html 檔，用瀏覽器打開即可'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="主題適不適合互動網頁的判斷：有可以調的數字或選項的主題適合，例如利率、運算量、人口；只有定義、沒有變數的主題用圖或文字就好">
+          <g font-size="17">
+            <rect x="10" y="10" width="265" height="210" class="f3 stroke-ink" stroke-width="4"/>
+            <text x="142" y="44" text-anchor="middle" class="on-color" font-weight="900">適合互動網頁</text>
+            <text x="30" y="88" class="on-color">有可以調的數字</text><text x="30" y="122" class="on-color">利率、年數、數量</text><text x="30" y="156" class="on-color">「如果…會怎樣」</text>
+            <rect x="285" y="10" width="265" height="210" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="417" y="44" text-anchor="middle" font-weight="900">圖或文字就好</text>
+            <text x="305" y="88">只有定義</text><text x="305" y="122">歷史事件的經過</text><text x="305" y="156">沒有變數可調</text>
+          </g>
+        </svg>`, caption: '關鍵在「參數」：有東西可以調，互動才有意義。' },
+      ],
+      tryit: {
+        q: ['為「房貸月付金」寫一句互動網頁的指令，並說出你想要的參數。'],
+        draft: '指令：____\n參數：____',
+        answer: ['參考：「請用HTML做一個單頁互動網頁解釋房貸月付金怎麼算。要有可以點開的段落說明，以及一個可以調整貸款金額、利率、年限，即時看到月付金和總利息變化的互動元件。所有程式碼放在同一個檔案裡。」', '把參數名稱寫進指令，AI 就知道要做哪幾個拉桿。'],
+      },
+    },
+    mistakes: [
+      { wrong: '忘了寫「所有程式碼放在同一個檔案裡」。', why: 'AI 可能分成好幾個檔案，你要自己組合才打得開。', right: '照原文加上這句，存一個檔就能用。' },
+      { wrong: '網頁能動，就相信上面的數字。', why: '計算公式可能寫錯，畫面看起來仍然正常。', right: '用一兩個你知道答案的值試算，對照文字版（3-1）。' },
+      { wrong: '把檔案存成 .txt。', why: '瀏覽器會把它當純文字顯示。', right: '副檔名改成 .html；Windows 要先在檔案總管開啟「副檔名」顯示。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '原文的互動網頁指令要求哪兩種內容？', options: [
+        { text: '可點開的說明＋可調參數的互動元件', correct: true, why: '再加上「所有程式碼放在同一個檔案」。' },
+        { text: '一張圖和一段影片', why: '那是第 2 級和第 4 級。' },
+        { text: '登入功能和資料庫', why: '解說網頁不需要這些。' },
+        { text: '多個頁面、導覽列和一個可以搜尋的首頁', why: '原文要的是「單頁」。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在上面的 KV cache 示範裡，把 token 數從 8 拉到 16，沒有快取的計算次數會？', options: [
+        { text: '從 36 次變成 136 次，大約 3.8 倍', correct: true, why: '1+2+…+n，n 加倍，總數大約變 4 倍。這就是「計算量隨長度不斷堆高」。' },
+        { text: '從 8 次變成 16 次，剛好 2 倍', why: '那是有快取的情況。' },
+        { text: '不變', why: '每多一個 token，就要重算前面所有的。' },
+        { text: '從 36 次變成 72 次，剛好變成 2 倍', why: '不是線性成長，是越來越快地堆高。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['操作完上面的拉桿，再讀一次原文的「一般提問版」那段文字。哪一個讓你更快理解「非常浪費」？為什麼？'], answer: [
+        '參考：多半是拉桿。文字告訴你「會堆高」，拉桿讓你**看到**紅格像三角形一樣長大、而綠格只是一條線。這就是卡帕西把互動網頁放在第 3 級的原因。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）AI 回給你 Mermaid 程式碼時，要貼到哪裡看成圖？', options: [
+        { text: 'Mermaid 線上編輯器', correct: true, why: '貼上就會出現圖。' },
+        { text: '存成 .html 檔，再用瀏覽器打開來看看', why: '那是看 HTML 的方法。' },
+        { text: 'Word', why: 'Word 不會把 Mermaid 畫成圖。' },
+        { text: '直接讀程式碼就好', why: '可以，但看圖快得多。' },
+      ] },
+    ],
+    keypoints: [
+      '互動網頁指令＝單頁 HTML＋可點開的說明＋可調參數的互動元件＋單一檔案。',
+      '沒有預覽：存成 .html，用瀏覽器打開。',
+      '有參數可調的主題最適合；用已知答案試算核對。',
+    ],
+    sources: ['bnext'],
+  },
+
+  '2-4': {
+    goals: [
+      '說出做解說影片前要準備什麼環境、為什麼',
+      '照卡帕西的指令範例，在 AI agent 裡要一支影片',
+      '知道配音的 API key 怎麼處理，以及什麼主題值得做影片',
+    ],
+    analogy: {
+      text: ['請 AI 做解說影片，像**請人幫你拍片**：只寫好腳本（程式碼）還不夠，還要有攝影棚和剪接機（能執行程式的電腦）把畫面真的拍出來（渲染）。一般聊天介面只有編劇，沒有攝影棚。'],
+      limit: ['真的拍片要好幾天，AI 可能幾分鐘到幾十分鐘就好；但影片裡的錯誤最難發現：你很少會暫停每一幀去核對。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="影片製作流程：你的指令，交給 AI agent，例如 Claude Code 或 Codex；AI 寫 Manim 程式，實際執行並渲染成影片檔，加上 ElevenLabs 或免費替代方案配音，得到一支解說影片">
+        <g font-size="16">
+          <rect x="10" y="10" width="160" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="90" y="40" text-anchor="middle" font-weight="900">你的指令</text><text x="90" y="64" text-anchor="middle" font-size="13">主題＋3b1b 風格</text>
+          <rect x="200" y="10" width="160" height="70" class="f4 stroke-ink" stroke-width="3"/><text x="280" y="40" text-anchor="middle" class="on-color" font-weight="900">AI agent</text><text x="280" y="64" text-anchor="middle" class="on-color" font-size="13">Claude Code、Codex</text>
+          <rect x="390" y="10" width="160" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="470" y="40" text-anchor="middle" font-weight="900">寫 Manim 程式</text><text x="470" y="64" text-anchor="middle" font-size="13">Python</text>
+          <rect x="390" y="120" width="160" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="470" y="150" text-anchor="middle" font-weight="900">執行＋渲染</text><text x="470" y="174" text-anchor="middle" font-size="13">在你的電腦上</text>
+          <rect x="200" y="120" width="160" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="150" text-anchor="middle" font-weight="900">配音</text><text x="280" y="174" text-anchor="middle" font-size="13">ElevenLabs／免費替代</text>
+          <rect x="10" y="120" width="160" height="70" class="f4 stroke-ink" stroke-width="3"/><text x="90" y="160" text-anchor="middle" class="on-color" font-weight="900">解說影片</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M170 45 H200 M360 45 H390 M470 80 V120 M390 155 H360 M200 155 H170"/></g>
+        <rect x="10" y="214" width="540" height="74" class="fill-surface stroke-ink" stroke-width="3" stroke-dasharray="10 6"/>
+        <text x="30" y="246" font-size="16">一般聊天介面只能寫程式，沒有地方執行與渲染，</text>
+        <text x="30" y="274" font-size="16">所以不一定拿得到影片檔。</text>
+      </svg>`,
+      caption: '影片和前三級最大的差別：AI 要真的在電腦上執行程式。',
+      blocks: [
+        { type: 'code', lang: 'text', title: '卡帕西的指令範例', code: '製作一支主題為[主題]、3b1b（3Blue1Brown）風格的解說影片。用我的ElevenLabs API key配音。' },
+        { type: 'widget', name: 'pipeflow', props: { static: true, stages: [
+          { cmd: '寫分鏡', out: ['1 一個 token 出現', '2 前面的 K、V 重算（紅）', '3 改成存起來（綠）'], note: 'AI 先規劃每一幕要演什麼。（示意）' },
+          { cmd: '寫 Manim 程式', out: ['scene.py'], note: '用 Python 描述畫面：方塊出現、移動、變色。' },
+          { cmd: '執行與渲染', out: ['渲染第 1 幕…', '渲染第 2 幕…', 'kv_cache.mp4'], note: 'AI agent 在你的電腦上執行程式，把畫面算成影片檔，要花一些時間。' },
+          { cmd: '配音與合成', out: ['旁白音軌', 'kv_cache_final.mp4'], note: '用 ElevenLabs 的 API key 產生旁白；沒有的話，請 AI 找能用自己電腦運算的免費替代方案。' },
+        ] } },
+        { type: 'callout', variant: 'danger', title: 'API key 的處理', body: ['「用我的 ElevenLabs API key」不代表要把金鑰貼進對話。比較安全的做法是先設成環境變數（例如 `ELEVENLABS_API_KEY`），再告訴 AI 去讀那個變數。金鑰外流，別人就能用你的額度。'] },
+      ],
+    },
+    define: [
+      { term: '3Blue1Brown', en: '3Blue1Brown（3b1b）', def: '以動畫講解數學聞名的 YouTube 頻道，動畫用創作者自己開發的開源工具 Manim 製作。「3b1b 風格」指深色背景、流暢的圖形變化。' },
+      { term: 'Manim', en: 'Manim', def: '用 Python 程式描述動畫畫面、再渲染成影片的開源工具。', example: '原文連結的是 3Blue1Brown 的 GitHub 版本。' },
+      { term: 'ElevenLabs', en: 'ElevenLabs', def: 'AI 語音生成服務，可以把文字變成自然的旁白；透過 API 使用需要 API key。' },
+    ],
+    examples: {
+      compare: [{
+        title: '在哪裡下指令',
+        kind: '環境對照',
+        badLabel: '✗ 一般聊天介面',
+        goodLabel: '✓ AI agent 工具',
+        bad: '（在聊天網頁）\n製作一支主題為 KV cache、3b1b 風格的解說影片\n→ 拿到一段 Python 程式碼，沒有影片',
+        good: '（在終端機啟動 Claude Code 或 Codex）\n製作一支主題為 KV cache、3b1b 風格的解說影片\n→ AI {{1:安裝 Manim、執行程式、渲染}}\n→ 資料夾裡出現 {{2:.mp4 影片檔}}',
+        badResult: '聊天介面沒有可以執行程式的電腦。',
+        why: ['agent 會在你的電腦上實際執行', '成品是一個真正的影片檔'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'worth', label: '值得做影片' }, { id: 'not', label: '用前三級就好' }], items: [
+          { text: '你要反覆複習、還想分享給全班的「傅立葉轉換」', answer: 'worth', why: '值得反覆看，數學直覺最適合動畫。' },
+          { text: '明天開會前要搞懂的一個名詞', answer: 'not', why: '時間緊，第 1 級最快。' },
+          { text: '公司新人訓練要用的「訂單處理流程」', answer: 'worth', why: '會被很多人反覆看。' },
+          { text: '只想確認一個數字算得對不對', answer: 'not', why: '影片最難核對數字。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="影片的代價：要準備能執行程式的環境、要花時間渲染、錯誤最難發現；所以留給值得反覆看的主題">
+          <g font-size="17">
+            <rect x="10" y="10" width="170" height="130" class="fill-surface stroke-ink" stroke-width="3"/><text x="95" y="62" text-anchor="middle" font-weight="900">要準備環境</text><text x="95" y="96" text-anchor="middle" font-size="14">AI agent 工具</text>
+            <rect x="195" y="10" width="170" height="130" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="62" text-anchor="middle" font-weight="900">要花時間渲染</text><text x="280" y="96" text-anchor="middle" font-size="14">分鐘到更久</text>
+            <rect x="380" y="10" width="170" height="130" class="fill-surface stroke-ink" stroke-width="3"/><text x="465" y="62" text-anchor="middle" font-weight="900">錯誤最難發現</text><text x="465" y="96" text-anchor="middle" font-size="14">很少逐幀檢查</text>
+            <rect x="10" y="156" width="540" height="44" class="f4 stroke-ink" stroke-width="3"/><text x="280" y="184" text-anchor="middle" class="on-color" font-weight="900">留給值得反覆看的主題</text>
+          </g>
+        </svg>`, caption: '原文：影片還得準備能執行程式的環境、花時間渲染，留給值得反覆看的主題再做。' },
+      ],
+      tryit: {
+        q: ['你沒有 ElevenLabs 的帳號。依原文，怎麼改卡帕西的指令？'],
+        draft: '改寫：____',
+        answer: ['參考：「製作一支主題為[主題]、3b1b（3Blue1Brown）風格的解說影片。我沒有 ElevenLabs，請找找看有沒有能用我自己電腦運算資源的免費配音替代方案。」', '這正是原文轉述卡帕西的建議。也可以先做沒有配音的版本。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在聊天網頁要求做影片，拿到程式碼後覺得 AI 不會做。', why: '影片要實際執行程式並渲染，聊天介面通常做不到。', right: '在 Claude Code、Codex 這類 AI agent 工具裡下指令。' },
+      { wrong: '把 API key 直接貼進對話。', why: '金鑰會留在對話紀錄裡，可能外流。', right: '設成環境變數，告訴 AI 變數名稱就好。' },
+      { wrong: '影片做完直接分享，沒有核對。', why: '影片裡的錯誤最難發現。', right: '對照文字版確認重要的數字和結論（3-1）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '為什麼做解說影片要用 Claude Code、Codex 這類工具？', options: [
+        { text: 'AI 要實際執行程式，再把畫面渲染成影片檔', correct: true, why: '這需要能在電腦上執行程式的 AI agent。' },
+        { text: '因為只有這兩個工具會寫 Python 程式碼', why: '一般聊天介面也會寫程式，差在能不能執行。' },
+        { text: '因為影片需要付費帳號', why: '原文講的是執行環境，不是付費。' },
+        { text: '因為 Manim 只能在手機上用', why: 'Manim 是在電腦上執行的工具。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你想做影片但沒有 ElevenLabs API key。依原文，卡帕西建議？', options: [
+        { text: '請 AI 找能用自己電腦運算資源的免費替代方案', correct: true, why: '原文轉述的正是這個建議。' },
+        { text: '一定要先付費註冊 ElevenLabs 帳號才能配音', why: '原文提供了替代方案。' },
+        { text: '放棄做影片', why: '可以用替代方案。' },
+        { text: '向別人借 API key', why: '金鑰不應該共用。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['卡帕西對這一步的評語是「這真的開始行得通了！」。為什麼他說「開始」？這對你代表什麼？'], answer: [
+        '參考：「開始」表示這件事最近才變得可行，而且還不完美：要準備環境、要渲染、結果要核對。對你來說，它值得試，但不是每個問題的預設選項；先熟練前三級，真的值得的主題再做影片。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-3）互動網頁指令裡的「所有程式碼放在同一個檔案裡」有什麼用？', options: [
+        { text: '存一個 .html 檔就能直接打開', correct: true, why: '不用自己組合多個檔案。' },
+        { text: '讓網頁跑得比較快', why: '重點是方便打開，不是速度。' },
+        { text: '讓 AI 比較便宜', why: '和費用無關。' },
+        { text: '可以上傳到 App Store', why: '和 App Store 無關。' },
+      ] },
+    ],
+    keypoints: [
+      '影片要在 AI agent 工具（Claude Code、Codex）裡做：要執行程式並渲染。',
+      '指令範例：主題＋3b1b 風格＋ElevenLabs 配音；沒有 key 就請 AI 找免費替代。',
+      '最費工、最難核對：留給值得反覆看的主題；金鑰用環境變數。',
+    ],
+    sources: ['bnext', '3b1b', 'manim', 'claude-code', 'codex', 'elevenlabs'],
+  },
+});
+</script>

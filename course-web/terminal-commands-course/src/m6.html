@@ -1,0 +1,646 @@
+
+<script>
+/* ==========================================================================
+   模組 6：跨平台必備工具
+   ========================================================================== */
+defineTerms({
+  'repo': { en: 'repository', def: '用 git 管理的專案資料夾，包含檔案和完整的修改歷史（藏在 `.git` 隱藏資料夾裡）。', example: '`git clone` 下來的資料夾就是一個 repo。' },
+  'commit': { en: 'commit', def: 'git 的一個存檔點：記錄「這個時間點，這些檔案長這樣」，附上一句說明。', example: '`git commit -m "新增登入頁"`。' },
+  'package.json': { en: 'package.json', def: 'Node.js 專案的設定檔，記錄專案名稱、需要哪些套件、有哪些 `npm run` 腳本。', example: '`"scripts": { "dev": "vite" }`。' },
+  'node_modules': { en: 'node_modules', def: '`npm install` 下載的套件存放的資料夾，常常很大，不放進 git。', example: '刪掉後再 `npm install` 就會重新下載。' },
+  '虛擬環境': { en: 'virtual environment（venv）', def: 'Python 專案專用的獨立套件空間，避免不同專案的套件版本互相打架。', example: '`python -m venv .venv`。' },
+  'SSH 金鑰': { en: 'SSH key', def: '一對檔案：私鑰留在你電腦、公鑰交給伺服器或 GitHub，用來證明身分、取代密碼。私鑰絕對不能給別人。', example: '`ssh-keygen -t ed25519`。' },
+});
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '用 winget（Windows）和 brew（macOS）搜尋、安裝、更新軟體',
+      '看懂 Linux 教學裡的 `sudo apt install`',
+      '知道「下載安裝腳本並直接執行」這類安裝指令什麼時候可以用',
+    ],
+    analogy: {
+      text: ['套件管理器是**終端機裡的 App Store**：不用上網找下載頁、點下一步，一行指令就能安裝、一行就能全部更新。'],
+      limit: ['App Store 有審核，套件管理器的審核程度不一：winget 和 Homebrew 的軟體多半連到官方來源，但仍有社群提交的套件。安裝前看清楚套件的 ID 和發行者。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="三個系統的套件管理器：Windows 用 winget，macOS 用 brew，Ubuntu 用 apt；四個動作都一樣：搜尋 search、安裝 install、更新 upgrade、移除 uninstall 或 remove">
+        <g font-size="19">
+          <rect x="10" y="10" width="170" height="80" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/><text x="95" y="44" text-anchor="middle" class="on-color" font-weight="900">Windows</text><text x="95" y="74" text-anchor="middle" class="on-color mono">winget</text>
+          <rect x="195" y="10" width="170" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/><text x="280" y="44" text-anchor="middle" class="on-color" font-weight="900">macOS</text><text x="280" y="74" text-anchor="middle" class="on-color mono">brew</text>
+          <rect x="380" y="10" width="170" height="80" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/><text x="465" y="44" text-anchor="middle" class="on-color" font-weight="900">Ubuntu</text><text x="465" y="74" text-anchor="middle" class="on-color mono">apt</text>
+        </g>
+        <g font-size="18">
+          <rect x="10" y="110" width="540" height="160" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="30" y="144" font-weight="900">四個動作，三家都有：</text>
+          <text x="30" y="180" class="mono">search</text><text x="160" y="180">找套件</text>
+          <text x="300" y="180" class="mono">install</text><text x="420" y="180">安裝</text>
+          <text x="30" y="220" class="mono">upgrade</text><text x="160" y="220">更新</text>
+          <text x="300" y="220" class="mono">uninstall</text><text x="420" y="220">移除</text>
+          <text x="30" y="256" font-size="16">（apt 的移除是 remove；apt 安裝要加 sudo）</text>
+        </g>
+      </svg>`,
+      caption: '子指令幾乎一樣，這就是 1-1 的拆解法派上用場的地方：程式換了，子指令照舊。',
+      blocks: [
+        { type: 'tabs', label: '安裝 git', tabs: [
+          { label: 'Windows（winget）', blocks: [{ type: 'code', lang: 'powershell', title: 'PowerShell', code: 'winget search git            # 找到 ID：Git.Git\nwinget install --id Git.Git -e\nwinget upgrade --all         # 全部更新' }] },
+          { label: 'macOS（Homebrew）', blocks: [
+            { type: 'code', lang: 'zsh', title: 'zsh', code: '# 第一次：安裝 Homebrew 本身（官方網站 brew.sh 的指令）\n/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"\n\nbrew install git\nbrew upgrade' },
+          ] },
+          { label: 'Ubuntu／WSL（apt）', blocks: [{ type: 'code', lang: 'bash', title: 'bash', code: 'sudo apt update          # 先更新「有哪些套件」的清單\nsudo apt install git\nsudo apt upgrade' }] },
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '用 winget 找並安裝', steps: [
+          { cmd: 'winget search vscode', out: 'Name                ID                        Version  Source\n-------------------------------------------------------------\nVisual Studio Code  Microsoft.VisualStudioCode 1.105.0  winget', note: '`search` 列出名稱、**ID**、版本、來源。安裝時用 ID 最精準。' },
+          { cmd: 'winget install --id Microsoft.VisualStudioCode -e', out: '找到 Visual Studio Code [Microsoft.VisualStudioCode]\n正在下載…\n已成功安裝', note: '`--id` 指定 ID、`-e` 完全相符，避免裝到名字相近的別的套件。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '套件管理器', en: 'package manager', def: '用指令搜尋、安裝、更新、移除軟體的工具。也指 npm、pip 這種「程式語言的套件」管理器。', example: 'winget、brew、apt、npm、pip。' },
+      { term: 'winget', en: 'Windows Package Manager', def: 'Windows 10／11 內建的套件管理器（隨 App Installer 提供）。', example: '`winget install --id Git.Git -e`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '用名稱 vs 用 ID 安裝',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 模糊的名稱',
+        goodLabel: '✓ 精確的 ID',
+        bad: 'winget install {{1:python}}\n# 找到好幾個符合的套件，請用 --id 指定',
+        good: 'winget search python\nwinget install --id {{2:Python.Python.3.13}} -e',
+        badResult: '名稱太模糊，可能有好幾個版本或不同發行者的套件。',
+        why: ['先 search 看清楚', '用 ID 安裝，確定是你要的那一個（版本號以 search 結果為準）'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="下載即執行的安裝方式：curl 網址 管線 bash，或 irm 網址 管線 iex。可以用的條件：網址是官方文件上寫的、你確實要裝那個軟體、不用 sudo；要避免：來路不明的網址、論壇貼文、AI 憑空給的網址">
+          <rect x="10" y="10" width="540" height="56" class="fill-term stroke-ink" stroke-width="4"/>
+          <text x="22" y="46" font-size="17" class="t-cmd">curl -fsSL 網址 | bash　/　irm 網址 | iex</text>
+          <g font-size="18">
+            <rect x="10" y="80" width="265" height="170" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+            <text x="142" y="112" text-anchor="middle" font-weight="900" class="on-color">可以用</text>
+            <text x="26" y="148" class="on-color" font-size="16">網址是官方文件上的</text>
+            <text x="26" y="180" class="on-color" font-size="16">你確定要裝這個軟體</text>
+            <text x="26" y="212" class="on-color" font-size="16">不需要 sudo</text>
+            <rect x="285" y="80" width="265" height="170" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+            <text x="417" y="112" text-anchor="middle" font-weight="900" class="on-color">不要用</text>
+            <text x="301" y="148" class="on-color" font-size="16">網址來自論壇、留言</text>
+            <text x="301" y="180" class="on-color" font-size="16">AI 給的、沒查證的網址</text>
+            <text x="301" y="212" class="on-color" font-size="16">網域拼字怪怪的</text>
+          </g>
+        </svg>`, caption: 'Homebrew、Claude Code、Codex 等官方安裝方式都是這種寫法。它方便，但等於「執行一段你沒看過的程式」，所以只對官方網址用（8-1）。' },
+      ],
+      tryit: {
+        q: ['寫出 macOS 上：搜尋 node、安裝 node、之後全部更新的三行指令。'],
+        code: true,
+        draft: '____\n____\n____',
+        answer: ['`brew search node`、`brew install node`、`brew upgrade`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 Ubuntu 直接 `apt install git`，出現權限錯誤。', why: 'apt 安裝的是系統層級軟體，需要管理員。', right: '`sudo apt install git`；而且第一次先 `sudo apt update`。' },
+      { wrong: '用 `sudo brew install`。', why: 'Homebrew 設計成不用 sudo，用了反而會把檔案權限弄亂。', right: '`brew install` 不加 sudo；遇到權限錯誤照 `brew doctor` 的建議修。' },
+      { wrong: '裝好軟體後，在同一個終端機打指令說找不到。', why: '安裝程式更新了 PATH，但目前的視窗還拿著舊的（4-2）。', right: '重開終端機。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'macOS 最常用的命令列套件管理器是？', options: [
+        { text: 'winget', why: 'winget 是 Windows 的。' },
+        { text: 'Homebrew（brew）', correct: true, why: 'macOS 沒有內建套件管理器，Homebrew 是最普遍的選擇。' },
+        { text: 'apt', why: 'apt 是 Debian／Ubuntu 的。' },
+        { text: 'App Store 的指令版 appstore', why: '沒有這個工具。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 Windows 想一次更新所有用 winget 裝的軟體，指令是？', options: [
+        { text: '`winget update`', why: '`update` 是 `upgrade` 的別名，但不加 `--all` 只會列出可更新的清單。' },
+        { text: '`winget upgrade --all`', correct: true, why: '`--all` 更新全部可更新的套件。' },
+        { text: '`winget install --all`', why: 'install 是安裝新軟體。' },
+        { text: '`sudo winget upgrade`', why: 'winget 不需要 sudo，需要時會跳 UAC。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在論壇看到「裝這個超好用：`curl -fsSL https://get-tool.xyz/i.sh | sudo bash`」。你會怎麼處理？'], answer: [
+        '參考：先不要執行。① 這個網址是工具的官方網站嗎？到它的 GitHub 或官方文件確認安裝方式。② 先只下載腳本 `curl -fsSL 網址 -o i.sh`，用編輯器看內容。③ 有 `sudo` 代表要用管理員身分執行，風險更高；能用 winget／brew 裝就用它們。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-5）`winget install --id Git.Git -e` 在 zsh 和 PowerShell 的寫法差多少？', options: [
+        { text: '完全一樣（winget 只在 Windows，但寫法和 shell 無關）', correct: true, why: '工具的選項在任何 shell 都一樣；要翻譯的只有 shell 自己的語法。' },
+        { text: 'zsh 要寫成 `winget install -id`', why: '工具選項不會因為 shell 改變。' },
+        { text: 'PowerShell 要寫成 `Install-Winget`', why: 'winget 是獨立程式，不是 cmdlet。' },
+        { text: '要加引號才能在 PowerShell 執行', why: 'ID 裡沒有空白或特殊字元，不需要引號。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-4）`sudo apt update && sudo apt install git` 的 `&&` 作用是？', options: [
+        { text: 'update 成功才安裝', correct: true, why: '清單更新失敗時不繼續安裝。' },
+        { text: '兩個同時執行', why: '那是背景執行，不是 &&。' },
+        { text: '把 update 的輸出交給 install', why: '那是管線。' },
+        { text: 'update 失敗才安裝', why: '那是 ||。' },
+      ] },
+    ],
+    keypoints: [
+      '套件管理器：Windows `winget`、macOS `brew`、Ubuntu `apt`；子指令 search／install／upgrade／uninstall。',
+      '安裝時用精確的 ID，裝完重開終端機。',
+      '「下載即執行」的安裝指令只用在官方網址上。',
+    ],
+    sources: ['winget', 'brew'],
+  },
+
+  '6-2': {
+    goals: [
+      '理解 git 的三個區域：工作資料夾、暫存區、存檔點',
+      '用 `clone`、`status`、`add`、`commit`、`push`、`pull` 完成日常流程',
+      '用 `git status` 隨時確認狀態，不怕弄壞',
+    ],
+    analogy: {
+      text: ['git 像**遊戲的存檔系統**：`git add` 是**選要存哪些東西**，`git commit` 是**按下存檔**並寫一句說明，`git push` 是**上傳到雲端存檔**，`git pull` 是**把雲端的進度拉回來**。'],
+      limit: ['遊戲存檔通常只有一條時間線；git 可以分出好幾條「分支」同時進行，最後再合併。初學先用一條線（main）就好。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="git 的流程：工作資料夾，git add 到暫存區，git commit 到本機存檔點，git push 到遠端 GitHub；git pull 從遠端拉回到工作資料夾">
+        <g font-size="18">
+          <rect x="10" y="40" width="120" height="100" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/><text x="70" y="82" text-anchor="middle" class="on-color" font-weight="900">工作</text><text x="70" y="108" text-anchor="middle" class="on-color" font-weight="900">資料夾</text>
+          <rect x="150" y="40" width="120" height="100" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/><text x="210" y="82" text-anchor="middle" class="on-color" font-weight="900">暫存區</text><text x="210" y="108" text-anchor="middle" class="on-color" font-size="15">準備存的</text>
+          <rect x="290" y="40" width="120" height="100" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/><text x="350" y="82" text-anchor="middle" class="on-color" font-weight="900">本機</text><text x="350" y="108" text-anchor="middle" class="on-color" font-weight="900">存檔點</text>
+          <rect x="430" y="40" width="120" height="100" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/><text x="490" y="82" text-anchor="middle" class="on-color" font-weight="900">遠端</text><text x="490" y="108" text-anchor="middle" class="on-color" font-size="15">GitHub</text>
+        </g>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M130 90 H150 M270 90 H290 M410 90 H430"/><path d="M490 140 V200 H70 V140"/></g>
+        <g font-size="15" class="mono" text-anchor="middle"><text x="140" y="30">add</text><text x="280" y="30">commit</text><text x="420" y="30">push</text></g>
+        <text x="280" y="224" text-anchor="middle" font-size="17" class="mono">git pull（拉回最新）</text>
+        <text x="280" y="270" text-anchor="middle" font-size="17">隨時打 git status 看檔案在哪一格</text>
+      </svg>`,
+      caption: '暫存區讓你可以「只存其中幾個檔案」：改了 5 個檔，只 add 其中 2 個，commit 就只包含那 2 個。',
+      blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '一次完整的日常流程', cwd: 'C:\\Users\\you\\projects', steps: [
+          { cmd: 'git clone https://github.com/you/demo.git', out: "Cloning into 'demo'...\nReceiving objects: 100% (42/42), done.", cwd: 'C:\\Users\\you\\projects', note: '`clone`：把遠端的 [[repo]] 整個下載到新資料夾 demo。' },
+          { cmd: 'cd demo; git status', out: 'On branch main\nnothing to commit, working tree clean', cwd: 'C:\\Users\\you\\projects', note: '`status`：目前在 main 分支，沒有任何改動。**這是你最該常打的 git 指令。**' },
+          { cmd: 'git status', out: 'Changes not staged for commit:\n  modified:   README.md\nUntracked files:\n  notes.txt', cwd: 'C:\\Users\\you\\projects\\demo', note: '（你用編輯器改了 README、新增了 notes.txt）status 告訴你：一個被修改、一個是新檔案，都還沒加到暫存區。' },
+          { cmd: 'git add README.md notes.txt', out: '', cwd: 'C:\\Users\\you\\projects\\demo', note: '`add`：把兩個檔案放進暫存區。全部加入可以用 `git add .`（先 status 確認沒有不該加的檔案）。' },
+          { cmd: 'git commit -m "更新說明並新增筆記"', out: '[main 3f2a1c9] 更新說明並新增筆記\n 2 files changed, 12 insertions(+)', cwd: 'C:\\Users\\you\\projects\\demo', note: '`commit`：建立[[commit|存檔點]]，`-m` 後面是說明。' },
+          { cmd: 'git push', out: 'To https://github.com/you/demo.git\n   a1b2c3d..3f2a1c9  main -> main', cwd: 'C:\\Users\\you\\projects\\demo', note: '`push`：把本機的存檔點上傳到 GitHub。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'git', en: 'git', def: '版本控制工具：記錄檔案的每一次修改，可以回到任何存檔點、和別人合作。', example: '`git status`、`git log --oneline`。' },
+      { term: '暫存區', en: 'staging area／index', def: '`git add` 把改動放進的「準備區」，下一次 commit 只會包含暫存區裡的東西。', example: '`git add app.js` 只暫存這一個檔案。' },
+      { term: 'push／pull', en: 'push／pull', def: '`push` 把本機的 commit 上傳到遠端；`pull` 把遠端的新 commit 下載並合併到本機。', example: '開始工作前 `git pull`，完成後 `git push`。' },
+    ],
+    examples: {
+      compare: [{
+        title: 'commit 前的習慣',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 一口氣全部加',
+        goodLabel: '✓ 先看再加',
+        bad: 'git add {{1:.}}\ngit commit -m "{{2:update}}"',
+        good: '{{3:git status}}\n{{3:git diff}}\ngit add src/login.js\ngit commit -m "{{2:修正登入時密碼錯誤沒有提示}}"',
+        badResult: '`.` 會把 `.env`（密碼）、暫存檔、大檔案一起加進去；說明「update」半年後誰也看不懂。',
+        why: ['加入目前資料夾的所有改動', '說明要讓未來的你看得懂改了什麼', '`status` 看有哪些檔案、`diff` 看改了哪幾行'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="git status 的四種狀態顏色：untracked 新檔案未追蹤，modified 已修改未暫存，staged 已暫存準備 commit，clean 乾淨沒有改動">
+          <g font-size="18">
+            <rect x="10" y="10" width="265" height="110" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="30" y="44" font-weight="900" class="mono">Untracked</text><text x="30" y="76">新檔案，git 還不認識</text><text x="30" y="104" font-size="15" class="mono">→ git add</text>
+            <rect x="285" y="10" width="265" height="110" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+            <text x="305" y="44" font-weight="900" class="on-color mono">modified</text><text x="305" y="76" class="on-color">改過，還沒暫存</text><text x="305" y="104" font-size="15" class="on-color mono">→ git add</text>
+            <rect x="10" y="135" width="265" height="110" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+            <text x="30" y="169" font-weight="900" class="on-color mono">to be committed</text><text x="30" y="201" class="on-color">已暫存</text><text x="30" y="229" font-size="15" class="on-color mono">→ git commit</text>
+            <rect x="285" y="135" width="265" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+            <text x="305" y="169" font-weight="900" class="on-color mono">working tree clean</text><text x="305" y="201" class="on-color">都存好了</text><text x="305" y="229" font-size="15" class="on-color mono">→ git push</text>
+          </g>
+        </svg>`, caption: '`git status` 的輸出還會提示你下一步可以打什麼指令，仔細讀它。' },
+      ],
+      tryit: {
+        q: ['你改了 `index.html` 和 `style.css`，但只想先存 `style.css`。寫出指令（含確認）。'],
+        code: true,
+        draft: '____\n____\n____\n____',
+        answer: ['`git status`、`git add style.css`、`git commit -m "調整首頁配色"`、`git status`（確認 index.html 還在 modified）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`git add .` 把 `.env`、`node_modules` 一起 commit 上傳。', why: '`.` 代表所有改動，包含不該上傳的密碼和大型資料夾。', right: '專案裡放 `.gitignore` 列出不追蹤的檔案；add 前先 `git status`。密碼一旦 push 上去，要立刻換掉（8-1）。' },
+      { wrong: '好幾天沒 `git pull` 就開始改，push 時被拒絕。', why: '遠端有你本機沒有的新 commit，git 不讓你直接覆蓋。', right: '開工前先 `git pull`；被拒絕時先 `git pull`，處理完衝突再 push。不要用 `--force`。' },
+      { wrong: '在家目錄打 `git init`。', why: '整個家目錄變成一個 repo，之後每個資料夾的 status 都會很奇怪。', right: '只在專案資料夾裡 `git init`；誤建了就刪除家目錄的 `.git` 資料夾。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`git commit` 會包含哪些改動？', options: [
+        { text: '工作資料夾裡所有改過的檔案', why: '只有被 `git add` 放進暫存區的才會被 commit。' },
+        { text: '暫存區裡的改動', correct: true, why: 'commit 是把暫存區的內容存成一個存檔點。' },
+        { text: '遠端 GitHub 上的檔案', why: 'commit 只在本機；上傳是 push。' },
+        { text: '上一次 commit 之後打開過的檔案', why: '打開不等於改動，也要 add 才會進去。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`git push` 被拒絕，訊息說遠端有你沒有的 commit。最合適的下一步是？', options: [
+        { text: '`git push --force`', why: '會把別人的 commit 蓋掉，是團隊合作最危險的指令之一。' },
+        { text: '`git pull`，處理完再 `git push`', correct: true, why: '先把遠端的改動合併到本機，再上傳。' },
+        { text: '刪掉資料夾重新 clone', why: '你本機還沒推上去的 commit 會跟著消失。' },
+        { text: '`git commit` 再試一次', why: '多一個 commit 不會解決「本機落後遠端」的問題。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['AI 工具改了你專案裡 8 個檔案。用 git 的觀念，說明你怎麼安全地檢查並決定要不要保留。'], answer: [
+        '參考：① `git status` 看改了哪些檔案。② `git diff` 逐行看改了什麼。③ 要保留就 `add` ＋ `commit`；不要某個檔案的改動就 `git restore 檔名` 還原。',
+        '所以在讓 AI 動手前，先把目前的狀態 commit 起來，就多了一個隨時能回去的存檔點。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-4）git 的指令在 PowerShell 和 zsh 寫法一樣嗎？', options: [
+        { text: '一樣，git 是跨平台的獨立程式', correct: true, why: '只有 shell 的語法（變數、導向）需要翻譯。' },
+        { text: 'PowerShell 要寫 `Invoke-Git`', why: '沒有這個 cmdlet。' },
+        { text: 'zsh 要加 sudo', why: 'git 不需要 sudo。' },
+        { text: 'cmd 才能用 git', why: '各 shell 都能用。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-2）`git log --oneline | head -n 5` 會顯示什麼？', options: [
+        { text: '最近 5 個 commit，一個一行', correct: true, why: 'log 由新到舊，head 取前 5 行。' },
+        { text: '最早的 5 個 commit', why: 'git log 預設由新到舊。' },
+        { text: '5 個檔案的內容', why: 'log 顯示的是 commit 歷史。' },
+        { text: '錯誤，git 不能接管線', why: 'git 的輸出是文字，可以接管線。' },
+      ] },
+    ],
+    keypoints: [
+      'git 流程：`add`（選）→ `commit`（存）→ `push`（上傳）；`pull` 拉回最新。',
+      '`git status` 隨時看狀態；`git diff` 看改了哪幾行。',
+      '用 `.gitignore` 排除密碼與大型資料夾；不要隨便 `--force`。',
+    ],
+    sources: ['git-docs', 'git-book'],
+  },
+
+  '6-3': {
+    goals: [
+      '用 `node -v`、`npm -v` 確認環境',
+      '看懂 `npm install`、`npm run dev`、`npx` 三種最常見的指令',
+      '理解 `package.json`、`node_modules`、`package-lock.json` 各自的角色',
+    ],
+    analogy: {
+      text: ['Node.js 專案像**一份食譜**：[[package.json]] 是**食材清單和步驟名稱**，`npm install` 是**照清單去買菜**（放進 `node_modules` 冰箱），`npm run dev` 是**照著名叫 dev 的步驟開始煮**。'],
+      limit: ['食譜上的「麵粉」買哪個牌子都差不多，套件的版本差一點就可能不相容。所以還有 `package-lock.json` 記錄「上次買的確切是哪一包」，讓每個人裝到一模一樣的版本。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="npm 的三個檔案：package.json 記錄需要什麼和腳本，npm install 讀它，下載到 node_modules，並寫下 package-lock.json 記錄確切版本；npm run dev 執行 package.json 裡 scripts 的 dev">
+        <g font-size="18">
+          <rect x="10" y="10" width="220" height="130" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="120" y="44" text-anchor="middle" font-weight="900" class="on-color mono">package.json</text>
+          <text x="30" y="80" class="on-color mono" font-size="15">"dependencies": {…}</text>
+          <text x="30" y="110" class="on-color mono" font-size="15">"scripts": {…}</text>
+          <rect x="330" y="10" width="220" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="440" y="48" text-anchor="middle" font-weight="900" class="on-color mono">node_modules/</text>
+          <rect x="330" y="80" width="220" height="60" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="440" y="118" text-anchor="middle" font-weight="900" class="on-color mono" font-size="16">package-lock.json</text>
+          <rect x="10" y="200" width="540" height="80" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="234" font-weight="900" class="on-color mono">npm run dev</text>
+          <text x="30" y="264" class="on-color">→ 執行 scripts 裡叫 dev 的那一行</text>
+        </g>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M230 75 H330"/><path d="M120 140 V200"/></g>
+        <text x="280" y="66" text-anchor="middle" font-size="15" class="mono">npm install</text>
+      </svg>`,
+      caption: '`node_modules` 可以隨時刪掉重裝，所以不放進 git；`package.json` 和 `package-lock.json` 要 commit。',
+      blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '接手一個 Node.js 專案', cwd: '~/projects/shop', steps: [
+          { cmd: 'node -v && npm -v', out: 'v22.20.0\n10.9.3', cwd: '~/projects/shop', note: '確認有裝 Node.js（npm 會一起裝）。版本號依你的電腦而定。' },
+          { cmd: 'npm install', out: 'added 214 packages, and audited 215 packages in 8s\nfound 0 vulnerabilities', cwd: '~/projects/shop', note: '照 package.json 下載所有套件到 [[node_modules]]。剛 clone 下來的專案一定要先做這步。' },
+          { cmd: 'npm run dev', out: '> shop@1.0.0 dev\n> vite\n\n  VITE v7.1.0  ready in 320 ms\n  ➜  Local:   http://localhost:5173/', cwd: '~/projects/shop', note: '執行 scripts 裡的 dev。這種「開發伺服器」會一直跑，要停止就按 {kbd:Ctrl+C}（0-3）。' },
+          { cmd: 'npx prettier --write src', out: 'src/app.js 42ms\nsrc/cart.js 18ms', cwd: '~/projects/shop', note: '`npx`：執行套件提供的指令，不用全域安裝。這裡用 prettier 整理程式碼格式。' },
+        ] } },
+        { type: 'table', caption: '常見 npm 指令', head: ['指令', '做什麼'], rows: [
+          ['`npm install`（`npm i`）', '照 package.json 安裝全部套件'],
+          ['`npm install 套件名`', '加一個新套件到專案（會寫進 package.json）'],
+          ['`npm install -D 套件名`', '加一個「只有開發時需要」的套件'],
+          ['`npm run 名稱`', '執行 scripts 裡的腳本；`npm test`、`npm start` 可以省略 run'],
+          ['`npm ci`', '完全照 package-lock.json 安裝（CI 和重裝時用）'],
+          ['`npx 指令`', '執行套件的指令；本機沒有就暫時下載'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'npm', en: 'Node Package Manager', def: 'Node.js 的套件管理器，負責安裝套件和執行 package.json 裡的腳本。', example: '`npm install`、`npm run build`。' },
+      { term: 'npx', en: 'npx', def: '執行某個 npm 套件提供的指令；本機沒有安裝時會暫時下載來執行。', example: '`npx create-vite@latest my-app`。' },
+      { term: 'scripts', en: 'npm scripts', def: 'package.json 裡給一串指令取的名字，用 `npm run 名字` 執行。讓團隊不用記長指令。', example: '`"build": "vite build"`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '照 README 啟動專案',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 跳過安裝',
+        goodLabel: '✓ 先裝再跑',
+        bad: 'git clone https://github.com/x/shop.git\ncd shop\n{{1:npm run dev}}\n# sh: vite: command not found',
+        good: 'git clone https://github.com/x/shop.git\ncd shop\n{{2:npm install}}\n{{1:npm run dev}}',
+        badResult: '`vite` 是專案的套件，還沒 install 就不在 node_modules 裡，所以找不到。',
+        why: ['要執行的腳本', '先照清單把套件裝好'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="npm install 和 npx 的差別：npm install 把套件放進專案的 node_modules 並記錄在 package.json，之後專案一直會用；npx 是拿來執行一次指令，例如建立新專案或一次性工具">
+          <g font-size="18">
+            <rect x="10" y="10" width="265" height="220" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+            <text x="142" y="44" text-anchor="middle" font-weight="900" class="on-color mono">npm install X</text>
+            <text x="30" y="90" class="on-color">放進專案</text><text x="30" y="124" class="on-color">寫進 package.json</text><text x="30" y="158" class="on-color">專案程式碼會用到</text>
+            <text x="30" y="204" class="on-color mono" font-size="15">例：react、express</text>
+            <rect x="285" y="10" width="265" height="220" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+            <text x="417" y="44" text-anchor="middle" font-weight="900" class="on-color mono">npx X</text>
+            <text x="305" y="90" class="on-color">執行一個指令</text><text x="305" y="124" class="on-color">不必先安裝</text><text x="305" y="158" class="on-color">建立專案、一次性工具</text>
+            <text x="305" y="204" class="on-color mono" font-size="15">例：create-vite</text>
+          </g>
+        </svg>`, caption: '`npx` 會下載並執行網路上的套件，和「下載即執行」一樣要看清楚套件名稱有沒有拼錯（8-1）。' },
+      ],
+      tryit: {
+        q: ['看這段 package.json，寫出「執行測試」和「建置正式版」的指令。'],
+        code: true,
+        draft: '"scripts": {\n  "dev": "vite",\n  "build": "vite build",\n  "test": "vitest run"\n}\n\n執行測試：____\n建置正式版：____',
+        answer: ['`npm test`（或 `npm run test`）；`npm run build`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 `node_modules` commit 進 git。', why: '它可能有幾萬個檔案、幾百 MB，而且可以隨時從 package.json 重建。', right: '`.gitignore` 加上 `node_modules/`。' },
+      { wrong: '遇到奇怪的錯誤就 `npm install -g` 一堆東西。', why: '全域安裝的套件不會記錄在專案裡，別人 clone 下來還是缺；不同專案版本也會打架。', right: '專案要用的套件裝在專案裡（不加 -g）；一次性的指令用 npx。' },
+      { wrong: '`npm install expres`（打錯字）就按 Enter。', why: '有人會故意註冊和熱門套件名稱很像的惡意套件。', right: '安裝前確認拼字；不熟的套件先到 npmjs.com 看下載數和發行者。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '剛 clone 一個 Node.js 專案，第一個要執行的 npm 指令通常是？', options: [
+        { text: '`npm run dev`', why: '套件還沒安裝，dev 用到的工具會找不到。' },
+        { text: '`npm install`', correct: true, why: '先依 package.json 安裝套件。' },
+        { text: '`npm init`', why: '那是建立新的 package.json，專案已經有了。' },
+        { text: '`npx node_modules`', why: '沒有這種用法。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`npm run dev` 啟動後一直佔著終端機。你想停止它，應該？', options: [
+        { text: '按 Ctrl+C', correct: true, why: '開發伺服器會持續執行，用 Ctrl+C 中斷（0-3）。' },
+        { text: '打 `npm stop`', why: '終端機正被伺服器佔用，打字不會被當成新指令。' },
+        { text: '刪除 node_modules', why: '不會停止已經在跑的程式，還得重裝。' },
+        { text: '關機', why: 'Ctrl+C 就夠了。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 npm scripts（`npm run build`）能讓 Windows 和 Mac 的同事少吵架？連結模組 5 的觀念。'], answer: [
+        '參考：長指令藏在 package.json 裡，大家都只要打 `npm run build`，不用各自用 PowerShell 或 zsh 翻譯。npm 會用各系統的預設 shell 去執行 script，寫 script 時選跨平台的工具，就能兩邊共用。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-3）PowerShell 執行 `npm install` 跟 zsh 有什麼差別？', options: [
+        { text: '沒有差別，npm 是跨平台程式', correct: true, why: '工具本身的指令在各 shell 相同。' },
+        { text: 'PowerShell 要打 `Install-Npm`', why: '沒有這個 cmdlet。' },
+        { text: 'PowerShell 不能執行 npm', why: '可以，但若出現執行原則錯誤，見 4-3。' },
+        { text: 'zsh 要加引號', why: '沒有特殊字元時不用。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-3）想安靜地安裝、只留錯誤訊息到檔案（zsh），哪一行對？', options: [
+        { text: '`npm install > /dev/null 2> err.txt`', correct: true, why: 'stdout 丟掉，stderr 存檔。' },
+        { text: '`npm install 2> /dev/null > err.txt`', why: '這樣反而把錯誤丟掉、正常訊息存檔。' },
+        { text: '`npm install | err.txt`', why: '`|` 後面要接程式。' },
+        { text: '`npm install >> /dev/null`', why: '錯誤仍在畫面上，也沒有存檔。' },
+      ] },
+    ],
+    keypoints: [
+      '`package.json` 是清單、`node_modules` 是下載的套件、`package-lock.json` 鎖版本。',
+      '接手專案：`npm install` → `npm run dev`；停止用 Ctrl+C。',
+      '專案套件用 `npm install`，一次性指令用 `npx`；裝之前確認拼字。',
+    ],
+    sources: ['npm-cli', 'npx'],
+  },
+
+  '6-4': {
+    goals: [
+      '分清楚 `python`、`python3`、`py` 在不同系統的意思',
+      '用 `pip` 安裝套件，並理解為什麼要用虛擬環境',
+      '在 PowerShell、zsh、cmd 正確啟用虛擬環境',
+    ],
+    analogy: {
+      text: ['[[虛擬環境]]像**每個專案自己的工具箱**：A 專案需要 1 號扳手，B 專案需要 2 號扳手，如果共用一個工具箱就會打架。每個專案開一個工具箱（`.venv`），各放各的版本。'],
+      limit: ['工具箱要**先打開才能用**：每次開新的終端機都要重新「啟用」虛擬環境，否則 pip 會把套件裝到系統的共用工具箱裡。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="系統 Python 和虛擬環境：系統 Python 共用；專案 A 的 venv 有 requests 2.31，專案 B 的 venv 有 requests 2.32，各自獨立；啟用後 python 和 pip 指向那個 venv">
+        <rect x="10" y="10" width="540" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="44" text-anchor="middle" font-size="20" font-weight="900">系統的 Python（大家共用）</text>
+        <text x="280" y="68" text-anchor="middle" font-size="16">不要在這裡亂裝套件</text>
+        <g font-size="18">
+          <rect x="10" y="120" width="255" height="150" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="137" y="154" text-anchor="middle" font-weight="900" class="on-color">專案 A/.venv</text>
+          <text x="30" y="196" class="on-color mono" font-size="16">requests 2.31</text><text x="30" y="226" class="on-color mono" font-size="16">pandas 2.2</text>
+          <rect x="295" y="120" width="255" height="150" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="422" y="154" text-anchor="middle" font-weight="900" class="on-color">專案 B/.venv</text>
+          <text x="315" y="196" class="on-color mono" font-size="16">requests 2.32</text><text x="315" y="226" class="on-color mono" font-size="16">flask 3.1</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3" stroke-dasharray="8 6"><path d="M137 80 V120 M422 80 V120"/></g>
+      </svg>`,
+      caption: '每個專案一個 `.venv`，版本互不干擾；`.venv` 和 node_modules 一樣不放進 git。',
+      blocks: [
+        { type: 'table', caption: '叫出 Python 的名字', head: ['系統', '常見指令', '說明'], rows: [
+          ['Windows', '`py` 或 `python`', '`py` 是 Python 啟動器，`py -3.13` 指定版本；`python` 沒安裝時會打開 Microsoft Store（4-2）'],
+          ['macOS', '`python3`', '`python` 通常不存在；用 `python3`、`pip3`'],
+          ['Linux', '`python3`', '同 macOS'],
+          ['虛擬環境啟用後', '`python`', '任何系統都會指向 venv 裡的 Python'],
+        ] },
+        { type: 'tabs', label: '建立並啟用虛擬環境', tabs: [
+          { label: 'PowerShell', blocks: [{ type: 'code', lang: 'powershell', title: 'PowerShell', code: 'py -m venv .venv\n.venv\\Scripts\\Activate.ps1\n# 提示字元前面出現 (.venv)\npython -m pip install requests\ndeactivate' }, '如果出現「已停用指令碼執行」，見 4-3 的執行原則設定。'] },
+          { label: 'zsh／bash', blocks: [{ type: 'code', lang: 'zsh', title: 'zsh', code: 'python3 -m venv .venv\nsource .venv/bin/activate\n# 提示字元前面出現 (.venv)\npython -m pip install requests\ndeactivate' }] },
+          { label: 'cmd', blocks: [{ type: 'code', lang: 'cmd', title: 'cmd', code: 'py -m venv .venv\n.venv\\Scripts\\activate.bat\npython -m pip install requests\ndeactivate' }] },
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '有沒有啟用，差很多', cwd: '~/projects/scraper', steps: [
+          { cmd: 'which python3', out: '/usr/bin/python3', cwd: '~/projects/scraper', note: '還沒啟用：python3 是系統的。' },
+          { cmd: 'source .venv/bin/activate', out: '', cwd: '~/projects/scraper', note: '啟用虛擬環境。它其實就是把 `.venv/bin` 放到 PATH 最前面（4-2）。' },
+          { cmd: 'which python', out: '/Users/amy/projects/scraper/.venv/bin/python', cwd: '~/projects/scraper', note: '啟用後：`python` 指向專案自己的 Python，pip 也是。提示字元前面會多一個 `(.venv)`。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'pip', en: 'pip', def: 'Python 的套件管理器。建議寫成 `python -m pip`，確保裝到「目前這個 Python」。', example: '`python -m pip install requests`。' },
+      { term: 'requirements.txt', en: 'requirements file', def: 'Python 專案列出所需套件的文字檔，相當於 Node 的 package.json 依賴清單。', example: '`python -m pip install -r requirements.txt`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '在新專案裡安裝套件',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 直接裝到系統',
+        goodLabel: '✓ 先建虛擬環境',
+        bad: '{{1:pip install}} pandas\n# macOS／Linux 可能出現 externally-managed-environment 錯誤',
+        good: 'python3 -m venv .venv\nsource .venv/bin/activate\n{{2:python -m pip install}} pandas',
+        badResult: '新版 macOS（Homebrew 的 Python）和 Linux 會**主動擋住**你把套件裝進系統 Python，就是為了避免把系統弄亂。',
+        why: ['不確定 pip 對應哪個 Python', '在已啟用的虛擬環境裡，明確用目前的 Python 執行 pip'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="提示字元判斷：出現括號 venv 代表虛擬環境已啟用，pip 會裝到專案；沒有就代表系統 Python">
+          <g font-size="18">
+            <rect x="10" y="10" width="540" height="56" class="fill-term stroke-ink" stroke-width="4"/>
+            <text x="22" y="46" class="t-prompt">(.venv) you@mac scraper %</text>
+            <text x="380" y="46" class="t-dim">已啟用 ✓</text>
+            <rect x="10" y="84" width="540" height="56" class="fill-term stroke-ink" stroke-width="4"/>
+            <text x="22" y="120" class="t-prompt">you@mac scraper %</text>
+            <text x="380" y="120" class="t-dim">沒啟用</text>
+            <text x="10" y="180">開新視窗、重開機後都要重新 activate。</text>
+            <text x="10" y="210">VS Code 選好直譯器後會自動幫你啟用。</text>
+          </g>
+        </svg>`, caption: '提示字元前面的 `(.venv)` 就是工具箱已打開的標誌。' },
+      ],
+      tryit: {
+        q: ['你在 Windows 接手一個有 `requirements.txt` 的 Python 專案。寫出 PowerShell 裡從建立環境到安裝完所有套件的三行指令。'],
+        code: true,
+        draft: '____\n____\n____',
+        answer: ['`py -m venv .venv`、`.venv\\Scripts\\Activate.ps1`、`python -m pip install -r requirements.txt`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 macOS 打 `python` 說找不到，以為沒裝 Python。', why: 'macOS 上的指令名稱通常是 `python3`。', right: '用 `python3 --version` 確認；建了虛擬環境後，裡面就有 `python`。' },
+      { wrong: '在 PowerShell 照 zsh 寫 `source .venv/bin/activate`。', why: 'Windows 的虛擬環境結構不同（`Scripts` 而不是 `bin`），PowerShell 也沒有 source。', right: '`.venv\\Scripts\\Activate.ps1`。' },
+      { wrong: '開了新終端機，忘記啟用就 `pip install`。', why: '套件被裝到系統 Python，專案裡用不到，還弄亂系統。', right: '看提示字元有沒有 `(.venv)`；沒有就先啟用。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在 Windows 上，`py` 是什麼？', options: [
+        { text: 'Python 啟動器，用來找出並執行已安裝的 Python', correct: true, why: '`py` 可以用 `-3.13` 等參數指定版本。' },
+        { text: '`python` 的拼字錯誤', why: '`py` 是官方提供的獨立程式。' },
+        { text: 'pip 的縮寫', why: 'pip 是套件管理器，和 py 不同。' },
+        { text: 'PowerShell 的 cmdlet', why: 'py 是 Python 安裝時附帶的程式。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 zsh 啟用專案裡的 `.venv`，正確寫法是？', options: [
+        { text: '`.venv\\Scripts\\Activate.ps1`', why: '這是 Windows PowerShell 的寫法。' },
+        { text: '`source .venv/bin/activate`', correct: true, why: 'macOS／Linux 的虛擬環境用 bin，用 source 在目前的 shell 執行。' },
+        { text: '`python activate .venv`', why: 'python 沒有這個子指令。' },
+        { text: '`cd .venv`', why: '進入資料夾不會啟用環境。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['比較 Node.js 的 `node_modules` 和 Python 的 `.venv`。它們解決的是同一個問題嗎？有什麼差別？'], answer: [
+        '參考：都是「每個專案自己的套件，互不干擾」。差別：npm 預設就裝在專案的 node_modules，不用啟用；Python 要自己建 venv，而且每次要啟用（或用 VS Code、uv 等工具代勞）。兩者都不放進 git，用清單檔（package.json／requirements.txt）重建。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-2）啟用虛擬環境後 `which python` 指向 .venv，原理是？', options: [
+        { text: 'activate 把 .venv 的 bin 放到 PATH 最前面', correct: true, why: 'PATH 依序找，第一個就是 venv 的 python。' },
+        { text: '它刪除了系統的 Python', why: '系統的 Python 還在，只是排到後面。' },
+        { text: '它修改了 .zshrc', why: 'activate 只影響目前的 shell。' },
+        { text: '它建立了一個叫 python 的別名到 /usr/bin/python3', why: '方向相反，指向的是 venv 裡的。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 5-3）PowerShell 執行 `.ps1` 被擋下，相關的設定叫？', options: [
+        { text: '執行原則（ExecutionPolicy）', correct: true, why: '`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。' },
+        { text: 'PATH', why: 'PATH 決定去哪找程式，不決定能不能執行腳本。' },
+        { text: 'UAC', why: 'UAC 是管理員權限確認。' },
+        { text: 'chmod', why: 'chmod 是 macOS／Linux 的權限工具。' },
+      ] },
+    ],
+    keypoints: [
+      'Windows 用 `py`／`python`，macOS／Linux 用 `python3`。',
+      '每個專案一個虛擬環境：`python -m venv .venv`，啟用方式依 shell 不同。',
+      '用 `python -m pip install`，並確認提示字元有 `(.venv)`。',
+    ],
+    sources: ['py-venv', 'py-windows', 'pip'],
+  },
+
+  '6-5': {
+    goals: [
+      '用 `curl` 下載檔案、查看網址的回應、呼叫簡單的 API',
+      '用 `ssh` 登入遠端電腦，認得 `user@host` 的寫法',
+      '知道 SSH 金鑰的私鑰為什麼絕對不能外流',
+    ],
+    analogy: {
+      text: ['`curl` 像**用終端機打電話給網站**：你說「給我這個網址的內容」，它把回答印出來或存成檔案。`ssh` 像**遠端開門進到另一台電腦**：門一開，你打的每個指令都在那台電腦上執行。'],
+      limit: ['電話打錯號碼頂多尷尬，ssh 進錯電腦可能會在正式伺服器上執行測試用的指令。進去後先看提示字元裡的主機名稱。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="curl 和 ssh 示意：你的電腦用 curl 對網站發送請求，拿回內容；用 ssh 登入伺服器後，指令在伺服器上執行，提示字元變成伺服器的名稱">
+        <rect x="10" y="90" width="150" height="100" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+        <text x="85" y="134" text-anchor="middle" font-size="20" font-weight="900" class="on-color">你的電腦</text>
+        <text x="85" y="164" text-anchor="middle" font-size="15" class="on-color mono">you@mac %</text>
+        <rect x="400" y="10" width="150" height="100" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="475" y="54" text-anchor="middle" font-size="20" font-weight="900" class="on-color">網站／API</text>
+        <text x="475" y="84" text-anchor="middle" font-size="15" class="on-color mono">https://…</text>
+        <rect x="400" y="170" width="150" height="100" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="475" y="214" text-anchor="middle" font-size="20" font-weight="900" class="on-color">伺服器</text>
+        <text x="475" y="244" text-anchor="middle" font-size="15" class="on-color mono">amy@web01:~$</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M160 120 L400 60"/><path d="M160 160 L400 220"/></g>
+        <text x="270" y="74" text-anchor="middle" font-size="18" font-weight="900" class="mono">curl</text>
+        <text x="270" y="102" text-anchor="middle" font-size="15">拿回內容</text>
+        <text x="270" y="216" text-anchor="middle" font-size="18" font-weight="900" class="mono">ssh</text>
+        <text x="270" y="244" text-anchor="middle" font-size="15">在那邊下指令</text>
+      </svg>`,
+      caption: 'curl 是「拿東西回來」，ssh 是「人過去那邊」。',
+      blocks: [
+        { type: 'table', caption: 'curl 常用選項', head: ['寫法', '做什麼'], rows: [
+          ['`curl https://example.com`', '把網址內容印在畫面上'],
+          ['`curl -o page.html 網址`', '存成指定的檔名（`-O` 用網址裡的檔名）'],
+          ['`curl -L 網址`', '跟著轉址走（很多下載網址會轉址）'],
+          ['`curl -I 網址`', '只看回應的標頭（狀態碼、類型）'],
+          ['`curl -fsSL 網址`', '安裝腳本常見：失敗不印網頁（f）、安靜（s）但顯示錯誤（S）、跟著轉址（L）'],
+          ['`curl -H "Authorization: Bearer …" 網址`', '帶上標頭呼叫 API'],
+        ] },
+        { type: 'callout', variant: 'tip', title: 'Windows 上的 curl', body: ['Windows 10 起內建真正的 `curl.exe`。在 **Windows PowerShell 5.1** 裡打 `curl` 會變成 `Invoke-WebRequest`（別名），選項不同；請打 `curl.exe`。PowerShell 7 沒有這個別名，`curl` 就是 curl。'] },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '和網路說話', steps: [
+          { cmd: 'curl -I https://example.com', out: 'HTTP/2 200\ncontent-type: text/html\ncontent-length: 1256', note: '`-I` 只看標頭。`200` 代表成功；`404` 是找不到；`301`／`302` 是轉址。' },
+          { cmd: 'curl -s https://api.github.com/repos/git/git | grep stargazers_count', out: '  "stargazers_count": 55123,', note: '呼叫 API，回傳 JSON；用管線接 grep 只看想要的那一行（3-2）。數字是示意。' },
+          { cmd: 'ssh amy@web01.example.com', out: 'Welcome to Ubuntu 24.04 LTS\namy@web01:~$', note: '`ssh 使用者@主機`。登入後提示字元變成伺服器的，**之後的指令都在伺服器上執行**。打 `exit` 回到自己的電腦。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'curl', en: 'client URL', def: '用網址傳送或接收資料的命令列工具，下載檔案、測試網站、呼叫 API 都靠它。', example: '`curl -L -o app.zip 網址`。' },
+      { term: 'ssh', en: 'Secure Shell', def: '加密連線到另一台電腦並在那裡執行指令。Windows 10 起內建 OpenSSH 用戶端。', example: '`ssh amy@192.168.1.20`。' },
+      { term: 'HTTP 狀態碼', en: 'HTTP status code', def: '網站回應的三位數代碼：2xx 成功、3xx 轉址、4xx 你的請求有問題、5xx 伺服器出錯。', example: '`200 OK`、`404 Not Found`、`500 Internal Server Error`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '下載檔案',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 少了選項',
+        goodLabel: '✓ 存檔並跟隨轉址',
+        bad: 'curl https://github.com/x/tool/releases/latest/download/tool.zip\n# 畫面印出一堆亂碼，或只拿到一個轉址頁',
+        good: 'curl {{1:-L}} {{2:-o tool.zip}} https://github.com/x/tool/releases/latest/download/tool.zip',
+        badResult: '沒有 `-o`，二進位內容直接印在終端機；沒有 `-L`，停在轉址的那一步。',
+        why: ['跟著轉址走到真正的檔案', '存成 tool.zip'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="SSH 金鑰：ssh-keygen 產生一對，私鑰 id_ed25519 留在自己電腦的 .ssh 資料夾，絕不外流；公鑰 id_ed25519.pub 可以貼到 GitHub 或伺服器">
+          <rect x="10" y="10" width="540" height="56" class="fill-term stroke-ink" stroke-width="4"/>
+          <text x="22" y="46" font-size="18" class="t-cmd">ssh-keygen -t ed25519 -C "amy@example.com"</text>
+          <g font-size="18">
+            <rect x="10" y="86" width="265" height="164" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+            <text x="142" y="120" text-anchor="middle" font-weight="900" class="on-color">私鑰</text>
+            <text x="30" y="156" class="on-color mono" font-size="15">~/.ssh/id_ed25519</text>
+            <text x="30" y="194" class="on-color">留在自己電腦</text>
+            <text x="30" y="226" class="on-color" font-weight="900">絕不給任何人</text>
+            <rect x="285" y="86" width="265" height="164" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+            <text x="417" y="120" text-anchor="middle" font-weight="900" class="on-color">公鑰</text>
+            <text x="305" y="156" class="on-color mono" font-size="15">id_ed25519.pub</text>
+            <text x="305" y="194" class="on-color">貼到 GitHub、</text>
+            <text x="305" y="226" class="on-color">伺服器</text>
+          </g>
+        </svg>`, caption: '[[SSH 金鑰]]像一副鎖和鑰匙：公鑰是鎖，可以裝在很多門上；私鑰是鑰匙，只有你拿著。' },
+      ],
+      tryit: {
+        q: ['寫兩個指令：① 檢查 `https://example.com/api/health` 回應的狀態碼。② 以使用者 `deploy` 登入主機 `10.0.0.5`。'],
+        code: true,
+        draft: '① ____\n② ____',
+        answer: ['① `curl -I https://example.com/api/health`（看第一行的狀態碼）。② `ssh deploy@10.0.0.5`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 Windows PowerShell 5.1 照 Linux 教學打 `curl -o file.zip 網址`，出現參數錯誤。', why: '5.1 的 `curl` 是 `Invoke-WebRequest` 的別名，不認得 `-o`。', right: '打 `curl.exe -o file.zip 網址`，或改用 PowerShell 7。' },
+      { wrong: '把 `~/.ssh/id_ed25519`（沒有 .pub 的那個）貼到網站或傳給同事。', why: '那是私鑰，拿到的人可以冒充你登入所有放了你公鑰的地方。', right: '只分享 `.pub` 檔。私鑰外流了，就從 GitHub 和伺服器移除對應的公鑰，重新產生一對。' },
+      { wrong: 'ssh 進伺服器後，以為還在自己電腦，執行了清理指令。', why: 'ssh 後的指令都在遠端執行。', right: '每次下重要指令前看提示字元的主機名稱；用完就 `exit`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`ssh amy@web01` 裡，`amy` 和 `web01` 分別是？', options: [
+        { text: '遠端主機上的使用者名稱、主機名稱', correct: true, why: '`使用者@主機`：用 amy 這個帳號登入 web01。' },
+        { text: '你自己電腦的名稱、遠端的使用者名稱', why: '順序反了，而且 @ 前面是遠端的帳號。' },
+        { text: 'Email 帳號和網域', why: '長得像 Email，但這裡是 ssh 的帳號與主機。' },
+        { text: '密碼和主機', why: '密碼不會寫在指令裡。' },
+      ] },
+      { level: '應用', type: 'mc', q: '想確認網站是否正常回應，又不想印出整個網頁，用哪一個？', options: [
+        { text: '`curl -I 網址`', correct: true, why: '只取回應標頭，第一行就有狀態碼。' },
+        { text: '`curl -o page.html 網址`', why: '會下載整個網頁存檔。' },
+        { text: '`ssh 網址`', why: 'ssh 是登入遠端電腦，不是查網站。' },
+        { text: '`curl -L 網址`', why: '會跟隨轉址並印出整個網頁內容。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['AI 建議你執行 `curl -s https://some-api.com/data -H "Authorization: Bearer sk-abc123"`。這行有什麼值得注意的地方？怎麼改比較好？'], answer: [
+        '參考：金鑰直接寫在指令裡，會留在指令歷史，也可能出現在截圖或 AI 對話紀錄中。改成先設環境變數（4-1）再引用：`curl -s https://some-api.com/data -H "Authorization: Bearer $API_KEY"`（PowerShell 用 `$env:API_KEY`）。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-2）在 zsh 執行 `curl https://x.com/a?id=1` 出現 `no matches found`。怎麼修？', options: [
+        { text: '把網址加上引號', correct: true, why: '`?` 是萬用字元，加引號讓 zsh 不展開。' },
+        { text: '改用 sudo', why: '和權限無關。' },
+        { text: '把 https 改成 http', why: '問題在 `?`，不在協定。' },
+        { text: '重新安裝 curl', why: 'curl 根本沒被執行。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 3-2）`curl -s 網址 | grep title` 的 `|` 在做什麼？', options: [
+        { text: '把 curl 的輸出交給 grep 過濾', correct: true, why: '管線把網頁內容接給 grep。' },
+        { text: '把結果寫進叫 grep 的檔案', why: '那是 `>`。' },
+        { text: 'curl 成功才執行 grep', why: '那是 `&&`。' },
+        { text: '兩個指令擇一執行', why: '在 shell 裡 `|` 是管線。' },
+      ] },
+    ],
+    keypoints: [
+      '`curl`：`-o` 存檔、`-L` 跟轉址、`-I` 看狀態碼；Windows PowerShell 5.1 要打 `curl.exe`。',
+      '`ssh 使用者@主機` 登入遠端，提示字元會變；`exit` 回來。',
+      'SSH 金鑰：公鑰可以分享，私鑰絕不外流；金鑰類資料不要寫在指令裡。',
+    ],
+    sources: ['curl', 'win-ssh', 'ps-diff'],
+  },
+});
+</script>

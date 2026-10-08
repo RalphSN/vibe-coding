@@ -1,0 +1,236 @@
+
+<script>
+/* ==========================================================================
+   模組 1：為什麼換格式有效
+   ========================================================================== */
+defineTerms({
+  '輸出格式': { en: 'output format', def: 'AI 回答的呈現形式：一段文字、一張圖、一個網頁或一支影片。內容可以一樣，格式決定讀者要花多少力氣理解。' },
+  '工作記憶': { en: 'working memory', def: '腦袋暫時記住、同時處理資訊的空間，容量很小。讀長文時，要一邊讀一邊把前面的內容記在這裡拼成全貌。' },
+});
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '說出為什麼「文字是線性的」會讓複雜概念難懂',
+      '判斷一個主題適合文字，還是適合圖、網頁或影片',
+      '理解卡帕西說的：人的角色正往「監督與理解」移動',
+    ],
+    analogy: {
+      text: ['讀一段長長的文字，像**用手電筒在黑暗的房間裡找路**：一次只照亮一小塊，你得自己記住剛剛看過哪裡，才拼得出整個房間的樣子。一張圖則像**直接開燈**：整個房間一次看完。'],
+      limit: ['開燈不一定比較好。房間很小（概念很簡單）時，手電筒就夠了；而且燈也可能照錯地方：圖上的錯誤比文字裡的更難發現（3-1）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="文字與圖的比較：左邊是文字，資訊排成一條線，讀者要一段一段讀，在腦中拼出 A 連到 B 再連到 C 的結構；右邊是圖，A、B、C 和箭頭同時出現，一眼看到全貌">
+        <text x="140" y="30" text-anchor="middle" font-size="20" font-weight="900">文字：一條線</text>
+        <g font-size="16">
+          <rect x="10" y="48" width="260" height="34" class="fill-surface stroke-ink" stroke-width="2"/><text x="22" y="71">第 1 句：A 會產生資料…</text>
+          <rect x="10" y="90" width="260" height="34" class="fill-surface stroke-ink" stroke-width="2"/><text x="22" y="113">第 2 句：B 接收 A 的…</text>
+          <rect x="10" y="132" width="260" height="34" class="fill-surface stroke-ink" stroke-width="2"/><text x="22" y="155">第 3 句：C 再把結果…</text>
+          <rect x="10" y="174" width="260" height="34" class="fill-surface stroke-ink" stroke-width="2"/><text x="22" y="197">第 4 句：另外，A 也…</text>
+        </g>
+        <rect x="10" y="228" width="260" height="90" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/>
+        <text x="140" y="262" text-anchor="middle" font-size="17" font-weight="900" class="on-color">讀者自己在腦中拼圖</text>
+        <text x="140" y="292" text-anchor="middle" font-size="15" class="on-color">A → B → C？還是 A → C？</text>
+        <text x="420" y="30" text-anchor="middle" font-size="20" font-weight="900">圖：一次看全貌</text>
+        <rect x="300" y="48" width="250" height="270" class="fill-surface stroke-ink" stroke-width="3"/>
+        <g font-size="22" font-weight="900" text-anchor="middle">
+          <rect x="325" y="80" width="64" height="50" class="f2 stroke-ink" stroke-width="3"/><text x="357" y="113" class="on-color">A</text>
+          <rect x="460" y="80" width="64" height="50" class="f2 stroke-ink" stroke-width="3"/><text x="492" y="113" class="on-color">B</text>
+          <rect x="392" y="220" width="64" height="50" class="f2 stroke-ink" stroke-width="3"/><text x="424" y="253" class="on-color">C</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M389 105 H460 M492 130 L440 220 M357 130 L408 220"/></g>
+        <g class="fill-ink"><path d="M452 99 L462 105 L452 111Z"/><path d="M446 210 L438 222 L436 207Z"/><path d="M398 212 L410 222 L410 207Z"/></g>
+      </svg>`,
+      caption: '同樣的資訊。左邊要靠讀者的工作記憶慢慢拼，右邊直接把結構畫出來。',
+      blocks: [
+        '原文的關鍵句：**文字是線性的，讀者必須一邊閱讀，一邊在腦中拼出完整架構。** 主題裡只要有流程、層級或元件之間的關係，這個拼圖的工作就落在讀者身上。',
+        '換輸出格式，等於把拼圖的工作交回給 AI：讓它把結構直接畫出來、做成可以操作的網頁，或拍成一步一步播放的影片。',
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'text', label: '文字就夠' }, { id: 'visual', label: '換成圖或互動更好' }], items: [
+          { text: '「Python 的 `print` 是什麼意思？」', answer: 'text', why: '單一、簡單的概念，一兩句就講完。' },
+          { text: '「網頁從輸入網址到顯示出來，中間經過哪些步驟？」', answer: 'visual', why: '有流程方向、多個元件，畫成流程圖一眼看完。' },
+          { text: '「公司的組織架構是怎麼分的？」', answer: 'visual', why: '有層級關係，樹狀圖比文字清楚。' },
+          { text: '「這個英文單字怎麼翻譯？」', answer: 'text', why: '沒有結構可言。' },
+          { text: '「利率變動對房貸月付金的影響」', answer: 'visual', why: '有可以調整的參數，互動網頁拉一拉就懂（2-3）。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '輸出格式', en: 'output format', def: 'AI 回答的呈現形式。卡帕西的主張是：與其改措辭，不如直接指定格式。', example: '「用一張圖解釋」「用 HTML 輸出」。' },
+      { term: '監督與理解', en: 'oversight and understanding', def: '卡帕西認為，AI 能自主完成越來越多執行工作後，人的主要角色會變成監督 AI 做的事，並理解它。', example: '你不必自己畫圖、寫網頁，但要看得懂、判斷得出對錯。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一個問題，兩種問法',
+        kind: '提示詞對照',
+        badLabel: '只問內容',
+        goodLabel: '連格式一起指定',
+        bad: '請解釋 DNS 是怎麼運作的',
+        good: '請{{1:用一張圖}}解釋 DNS 是怎麼運作的，{{2:標出瀏覽器、DNS 伺服器、網站伺服器}}和{{3:查詢的流程方向}}，每個標籤不超過 10 個字。',
+        badResult: '多半得到五六段文字，你要自己在腦中畫出誰問誰、問了幾次。',
+        why: ['指定格式：不要長篇文字', '列出圖上一定要有的元件', '要求畫出方向，結構才清楚'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="成本翻轉圖：過去，客製化的互動網頁或影片要花幾天製作，只用一次不划算；現在 AI 幾分鐘就能做出來，只用一次也值得">
+          <g font-size="18">
+            <rect x="10" y="10" width="265" height="230" class="fill-surface stroke-ink" stroke-width="4"/>
+            <text x="142" y="44" text-anchor="middle" font-weight="900">過去</text>
+            <text x="30" y="90">做一個解說網頁：幾天</text>
+            <text x="30" y="126">只用一次？</text>
+            <text x="30" y="162" font-weight="900">不值得</text>
+            <rect x="285" y="10" width="265" height="230" class="f3 stroke-ink" stroke-width="4"/>
+            <text x="417" y="44" text-anchor="middle" font-weight="900" class="on-color">現在</text>
+            <text x="305" y="90" class="on-color">請 AI 做：幾分鐘</text>
+            <text x="305" y="126" class="on-color">只用一次？</text>
+            <text x="305" y="162" font-weight="900" class="on-color">也值得</text>
+          </g>
+        </svg>`, caption: '原文：當 AI 生成內容和程式碼的成本持續降低，只用一次的互動網頁或解說影片，也開始值得交給 AI 製作。' },
+      ],
+      tryit: {
+        q: ['把你最近問過 AI、但看完還是一頭霧水的一個問題寫下來，判斷它有沒有「流程、層級或元件關係」。'],
+        draft: '我的問題：____\n有流程嗎？____\n有層級嗎？____\n有元件之間的關係嗎？____',
+        answer: ['只要有一個「有」，就值得試試 2-2 的「一張圖」或 2-3 的互動網頁。三個都沒有，先用 2-1 的規範文字讓回答變短就好。'],
+      },
+    },
+    mistakes: [
+      { wrong: '回答看不懂，就一直要求 AI「再解釋清楚一點」。', why: '格式沒變，AI 通常只是換句話說，或寫得更長。', right: '直接指定格式：「用一張圖」「用 HTML 互動網頁」。' },
+      { wrong: '所有問題都要求做成圖或網頁。', why: '簡單的問題文字就夠，而且越豐富的格式越難核對。', right: '先問「這個主題有沒有結構」，有才換格式。' },
+      { wrong: '以為 AI 做得出來，自己就不用懂。', why: '原文說人的角色是「監督與理解」：判斷 AI 做得對不對，還是你的工作。', right: '拿到圖、網頁、影片後，挑重點對照文字版確認（3-1）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '原文說，為什麼改變輸出格式能讓複雜概念更好懂？', options: [
+        { text: '文字是線性的，結構要讀者自己拼', correct: true, why: '圖表、網頁、影片能直接呈現全貌，省下自行整理的力氣。' },
+        { text: '因為 AI 用圖表回答時，內容會比較正確', why: '格式不保證正確；原文反而提醒，格式越豐富越要核對。' },
+        { text: '因為文字回答一定比較長', why: '長短不是重點，重點是讀者要自己拼出結構。' },
+        { text: '因為現在的人都不喜歡讀字', why: '原文沒有這樣說；它講的是理解的成本。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你想了解「信用卡刷卡後，錢經過哪些單位才到店家手上」。最合適的要求是？', options: [
+        { text: '「請詳細說明，越完整越好」', why: '越完整通常越長，結構還是要你自己拼。' },
+        { text: '「請用一張圖說明，標出每個單位和錢的流向」', correct: true, why: '有多個單位和流程方向，最適合畫成圖。' },
+        { text: '「請用 ASD-STE100 的原則寫，越短越好」', why: '能讓文字變短，但流程結構仍要你自己想像。' },
+        { text: '「請用條列式回答」', why: '條列還是一條線，看不出誰流到誰。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['卡帕西說人的角色會往「監督與理解」移動。用你自己的工作或課業，舉一個例子說明這是什麼意思。'], answer: [
+        '參考：例如寫報告時，AI 可以幫你畫圖、做互動網頁、整理資料，但你要判斷圖上的數字對不對、結論合不合理，並且自己真正理解內容，才能回答別人的問題。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1 原文）卡帕西提出的是哪一類方法？', options: [
+        { text: '改變 AI 的輸出格式', correct: true, why: '原文：他的簡單解法是直接改變 AI 的輸出格式。' },
+        { text: '換一個更大的模型', why: '原文沒有提到換模型。' },
+        { text: '把提示詞寫得更客氣、更有禮貌', why: '重點是格式，不是語氣。' },
+        { text: '只用英文提問', why: '原文也示範了中文用法。' },
+      ] },
+    ],
+    keypoints: [
+      '文字是線性的，讀者要自己拼出結構；圖、網頁、影片直接呈現全貌。',
+      '主題有流程、層級或元件關係時，就值得換格式。',
+      'AI 讓「只用一次的客製化解說」變得划算；人負責監督與理解。',
+    ],
+    sources: ['bnext', 'x-post'],
+  },
+
+  '1-2': {
+    goals: [
+      '依序說出卡帕西的 4 級輸出格式',
+      '理解「But even better」：每往上一級，更好懂、也更費工',
+      '依主題和時間，挑出合適的那一級',
+    ],
+    analogy: {
+      text: ['4 種格式像**解釋路線的 4 種方式**：寫一段清楚的文字指引 → 畫一張地圖 → 給你一個可以縮放、點擊的導航 App → 拍一支從頭走到尾的導覽影片。一級比一級好懂。'],
+      limit: ['導覽影片最好懂，但拍一支最費工，路一改又要重拍。實際上不一定要爬到最上面：簡單的路，一段文字就夠。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 320" role="img" aria-label="四級階梯：第 1 級規範文字最低，第 2 級一張圖，第 3 級互動網頁，第 4 級解說影片最高；每級之間標著 But even better；左下到右上箭頭寫著更好懂，但也更費工">
+        <g font-size="17" font-weight="900">
+          <rect x="10" y="230" width="125" height="80" class="f1 stroke-ink" stroke-width="3"/><text x="72" y="266" text-anchor="middle" class="on-color">1 規範文字</text><text x="72" y="292" text-anchor="middle" class="on-color" font-size="13">ASD-STE100</text>
+          <rect x="145" y="170" width="125" height="140" class="f2 stroke-ink" stroke-width="3"/><text x="207" y="206" text-anchor="middle" class="on-color">2 一張圖</text><text x="207" y="232" text-anchor="middle" class="on-color" font-size="13">圖表、Mermaid</text>
+          <rect x="280" y="110" width="125" height="200" class="f3 stroke-ink" stroke-width="3"/><text x="342" y="146" text-anchor="middle" class="on-color">3 互動網頁</text><text x="342" y="172" text-anchor="middle" class="on-color" font-size="13">HTML</text>
+          <rect x="415" y="50" width="135" height="260" class="f4 stroke-ink" stroke-width="3"/><text x="482" y="86" text-anchor="middle" class="on-color">4 解說影片</text><text x="482" y="112" text-anchor="middle" class="on-color" font-size="13">Manim</text>
+        </g>
+        <g font-size="12" font-weight="700" text-anchor="middle"><text x="140" y="160">But even better</text><text x="275" y="100">But even better</text><text x="410" y="40">But even better</text></g>
+        <text x="10" y="30" font-size="16" font-weight="900">越往上：越好懂、越費工</text>
+      </svg>`,
+      caption: '卡帕西介紹完前三級，每次都補一句「But even better」，帶出下一級。',
+      blocks: [
+        { type: 'table', caption: '4 級比較', head: ['', '1 規範文字', '2 一張圖', '3 互動網頁', '4 解說影片'], rows: [
+          ['要準備什麼', '不用', '不用', '瀏覽器就能開', '能執行程式的 AI agent 環境'],
+          ['花的時間', '最少', '少', '中', '最多（要渲染）'],
+          ['適合', '任何問題的第一步', '有結構的主題', '有可調參數的主題', '值得反覆看的主題'],
+          ['核對難度', '最容易', '中', '中', '最難'],
+          ['本書單元', '2-1', '2-2', '2-3', '2-4'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'But even better', en: 'But even better', def: '卡帕西在貼文裡的轉折句，意思是「不過還有更好的」。他用它把 4 種格式串成一道逐級上升的階梯。' },
+      { term: 'AI agent', en: 'AI agent', def: '能自己執行程式、讀寫檔案、看結果再決定下一步的 AI 工具。做解說影片需要它，因為要實際執行程式並渲染畫面。', example: 'Claude Code、Codex。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一個主題，往上爬一級',
+        kind: '提示詞對照',
+        badLabel: '第 1 級',
+        goodLabel: '第 3 級',
+        bad: '請用ASD-STE100的原則，以中文解釋{{1:複利}}。',
+        good: '請用HTML做一個單頁互動網頁解釋{{1:複利}}。要有可以點開的段落說明，以及一個{{2:可以調整參數、即時看到結果變化}}的互動元件。所有程式碼放在同一個檔案裡。',
+        badResult: '得到一段短而清楚的文字，但「本金、利率、年數怎麼影響結果」還是要自己想像。',
+        why: ['主題一樣', '複利有參數可以調：拉一拉利率，看結果怎麼變，比讀十句話都快'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="選擇流程：先問有沒有結構，沒有就用第 1 級；有結構再問有沒有可以調的參數，沒有用第 2 級圖，有就用第 3 級網頁；最後問值不值得反覆看並且有執行環境，是的話用第 4 級影片">
+          <g font-size="16">
+            <rect x="10" y="10" width="220" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="120" y="41" text-anchor="middle" font-weight="900">有流程或結構嗎？</text>
+            <rect x="330" y="10" width="220" height="50" class="f1 stroke-ink" stroke-width="3"/><text x="440" y="41" text-anchor="middle" class="on-color" font-weight="900">沒有 → 1 規範文字</text>
+            <rect x="10" y="100" width="220" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="120" y="131" text-anchor="middle" font-weight="900">有可以調的參數嗎？</text>
+            <rect x="330" y="100" width="220" height="50" class="f2 stroke-ink" stroke-width="3"/><text x="440" y="131" text-anchor="middle" class="on-color" font-weight="900">沒有 → 2 一張圖</text>
+            <rect x="10" y="190" width="220" height="60" class="f3 stroke-ink" stroke-width="3"/><text x="120" y="216" text-anchor="middle" class="on-color" font-weight="900">有 → 3 互動網頁</text><text x="120" y="240" text-anchor="middle" class="on-color" font-size="13">值得反覆看再升 4 級</text>
+            <rect x="330" y="190" width="220" height="60" class="f4 stroke-ink" stroke-width="3"/><text x="440" y="216" text-anchor="middle" class="on-color" font-weight="900">4 解說影片</text><text x="440" y="240" text-anchor="middle" class="on-color" font-size="13">要有執行環境</text>
+          </g>
+          <g class="stroke-ink" stroke-width="3"><path d="M230 35 H330 M120 60 V100 M230 125 H330 M120 150 V190 M230 220 H330"/></g>
+        </svg>`, caption: '不一定要爬到最高。依主題和你願意花的時間停在合適的那一級。' },
+      ],
+      tryit: {
+        q: ['為下面三個主題各選一級，寫一句理由。'],
+        draft: 'A. 「什麼是 API？」：____\nB. 「房貸利率升 1%，月付金差多少？」：____\nC. 「傅立葉轉換的直覺」（你想反覆複習）：____',
+        answer: ['A：第 1 或 2 級，概念單純，短文字或一張圖就夠。B：第 3 級，有參數可以調。C：第 4 級，數學直覺最適合動畫，而且值得反覆看；也可以先用第 3 級。'],
+      },
+    },
+    mistakes: [
+      { wrong: '每個問題都直接跳到第 4 級做影片。', why: '影片要準備執行環境、花時間渲染，錯誤也最難發現。', right: '從第 1 級開始；真的值得反覆看的主題才做影片。' },
+      { wrong: '以為「But even better」代表前面幾級都沒用。', why: '那是卡帕西介紹的順序，不是淘汰。第 1 級最快、最容易核對。', right: '把 4 級當成工具箱，依情況選用。' },
+      { wrong: '用一般的聊天介面要求「做一支影片」，結果只拿到程式碼。', why: '影片要實際執行程式並渲染，一般聊天介面不一定做得到。', right: '在 Claude Code、Codex 這類 AI agent 工具裡做（2-4）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '卡帕西的 4 級格式，由低到高的順序是？', options: [
+        { text: '規範文字 → 一張圖 → 互動網頁 → 解說影片', correct: true, why: '每一級都比前一級更容易理解、也更有互動性。' },
+        { text: '一張圖 → 規範文字 → 解說影片 → 互動網頁', why: '順序錯了：第 1 級是規範文字，最高是影片。' },
+        { text: '互動網頁 → 一張圖 → 規範文字 → 解說影片', why: '互動網頁是第 3 級。' },
+        { text: '規範文字 → 互動網頁 → 一張圖 → 解說影片', why: '一張圖是第 2 級，在網頁之前。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你只有 5 分鐘，想快速看懂一個新名詞。最先試哪一級？', options: [
+        { text: '第 4 級解說影片', why: '要準備環境和渲染，5 分鐘不夠。' },
+        { text: '第 1 級：點名 ASD-STE100', correct: true, why: '不用換工具，同一個問題改一下問法，立刻看得到差別。原文也建議新手從這裡開始。' },
+        { text: '第 3 級：做一個互動網頁來看', why: '做得到，但一個名詞通常不需要可調參數。' },
+        { text: '不用指定格式，讓 AI 自由發揮', why: '那就是會得到落落長回答的原因。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼越往上的格式越好懂，卻也越要「多核對一次」？'], answer: [
+        '參考：越豐富的格式越像成品，看起來越可信，你越不容易停下來檢查；錯誤藏在圖的箭頭、網頁的計算或影片的某一幀裡，比寫在文字裡更難發現。所以原文建議重要的數字和結論對照文字版確認。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）什麼樣的主題最值得換成圖或互動格式？', options: [
+        { text: '有流程、層級或元件關係的主題', correct: true, why: '這些結構用文字表達，讀者要自己在腦中拼起來。' },
+        { text: '越短越簡單、一句話就能講完的主題', why: '簡單的主題文字就夠。' },
+        { text: '只有一個名詞的定義', why: '一個定義通常沒有結構可畫。' },
+        { text: '任何主題都一樣', why: '原文強調的是有結構的主題。' },
+      ] },
+    ],
+    keypoints: [
+      '4 級：規範文字 → 一張圖 → 互動網頁 → 解說影片。',
+      '每往上一級：更好懂、更有互動，也更費工、更難核對。',
+      '從第 1 級開始；依主題和時間決定要不要往上爬。',
+    ],
+    sources: ['bnext', 'x-post'],
+  },
+});
+</script>

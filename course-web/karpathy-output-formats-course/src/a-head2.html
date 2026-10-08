@@ -1,0 +1,125 @@
+/* 來源 */
+.sources { margin-top: var(--sp-7); padding: var(--sp-4); border: var(--bw-sm) dashed var(--ink); font-size: var(--fs-small); }
+.sources ol { margin: var(--sp-2) 0 0; }
+
+/* 元件樣式表 */
+.sg-row { display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center; }
+.sg-block { margin-bottom: var(--sp-7); }
+.sg-block > h2 { font-size: var(--fs-h3); margin-bottom: var(--sp-4); }
+.force-hover { transform: translate(-2px, -2px); }
+.force-hover::before { transform: translate(calc(var(--off) + 2px), calc(var(--off) + 2px)) !important; }
+.force-active { transform: translate(var(--off), var(--off)); }
+.force-active::before { transform: translate(0, 0) !important; }
+.force-focus { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+/* ==========================================================================
+   99. 減少動態效果：關掉位移、縮放、高度動畫，保留 120ms 內的淡入淡出與顏色
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .nb-press, .nb-press::before, .sidebar, .collapse, .collapse > .collapse-inner > *,
+  details.reveal::details-content, details.reveal > .reveal-body, .dropdown, .term-pop,
+  .search-results, .progress > span, .nav-module-btn .caret,
+  details.reveal > summary::before {
+    transition-property: opacity, background-color, color, visibility !important;
+    transition-duration: var(--dur-micro) !important;
+    transform: none !important;
+  }
+  .nb-press:hover:not(:disabled), .nb-press:active:not(:disabled), .nb-press:focus-visible:not(:disabled) { transform: none; }
+  .nb-press::before { transform: translate(var(--off), var(--off)) !important; }
+  .sidebar:not(.open) { visibility: hidden; opacity: 0; }
+  .sidebar.open { opacity: 1; }
+  .nav-module-btn[aria-expanded="true"] .caret { transform: rotate(90deg) !important; }
+  details.reveal[open] > summary::before { transform: rotate(90deg) !important; }
+  .progress > span { transform: scaleX(var(--p, 0)) !important; }
+  .label.tilt { transform: rotate(-2deg) !important; }
+}
+@media (prefers-reduced-motion: reduce) and (min-width: 1280px) {
+  .sidebar:not(.open) { visibility: visible; opacity: 1; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要內容</a>
+
+<header class="topbar">
+  <button class="btn icon nb-press menu-btn" type="button" aria-controls="sidebar" aria-expanded="false" aria-label="開啟課程目錄">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M2 5h18M2 11h18M2 17h18" stroke="currentColor" stroke-width="3"/></svg>
+  </button>
+  <a class="btn icon nb-press shelf-btn" href="../../index.html" aria-label="回到書櫃首頁" title="回到書櫃首頁">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 10 11 3l8 7M5 9v10h12V9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+  </a>
+  <a class="brand" href="#/" aria-label="回到課程首頁">
+    <span class="brand-short">4 種格式</span>
+    <span class="brand-long">卡帕西<span class="x">×</span>4 種 AI 輸出格式</span>
+  </a>
+  <span class="spacer"></span>
+  <div id="search-slot"></div>
+  <div class="top-progress" aria-hidden="true">
+    <span class="progress" style="width:96px"><span id="top-progress-fill"></span></span>
+    <span id="top-progress-text">0 / 0</span>
+  </div>
+  <div class="fontctl fontctl-top" role="group" aria-label="字級">
+    <button class="btn small nb-press" type="button" data-font="down" aria-label="縮小字級">A−</button>
+    <span class="pct" data-font-pct>100%</span>
+    <button class="btn small nb-press" type="button" data-font="up" aria-label="放大字級">A+</button>
+    <button class="btn small nb-press" type="button" data-font="reset" aria-label="重設字級">重設</button>
+  </div>
+  <div class="settings">
+    <button class="btn icon nb-press" type="button" id="settings-btn" aria-expanded="false" aria-controls="settings-menu" aria-label="顯示設定">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><text x="1" y="17" font-size="15" font-weight="900" fill="currentColor" font-family="sans-serif">Aa</text></svg>
+    </button>
+    <div class="dropdown" id="settings-menu" data-open="false" role="group" aria-label="顯示設定">
+      <span class="label" style="--chip:var(--info)">字級</span>
+      <div class="fontctl" role="group" aria-label="字級">
+        <button class="btn small nb-press" type="button" data-font="down" aria-label="縮小字級">A−</button>
+        <span class="pct" data-font-pct>100%</span>
+        <button class="btn small nb-press" type="button" data-font="up" aria-label="放大字級">A+</button>
+      </div>
+      <p style="margin:var(--sp-3) 0 0"><button class="btn small nb-press" type="button" data-font="reset">重設字級</button></p>
+    </div>
+  </div>
+  <button class="btn icon nb-press theme-btn" type="button" id="theme-btn" aria-label="切換深淺色">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="3"/><path d="M11 3a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
+  </button>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar" aria-label="課程目錄">
+    <div class="sidebar-head">
+      <span class="label">課程目錄</span>
+      <button class="btn icon small nb-press sidebar-close" type="button" aria-label="關閉課程目錄">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" stroke-width="3"/></svg>
+      </button>
+    </div>
+    <div class="sidebar-prefs" role="group" aria-label="顯示設定">
+      <span class="label">顯示設定</span>
+      <div class="fontctl" role="group" aria-label="字級">
+        <button class="btn small nb-press" type="button" data-font="down" aria-label="縮小字級">A−</button>
+        <span class="pct" data-font-pct>100%</span>
+        <button class="btn small nb-press" type="button" data-font="up" aria-label="放大字級">A+</button>
+        <button class="btn small nb-press" type="button" data-font="reset" aria-label="重設字級">重設</button>
+      </div>
+      <button class="btn small nb-press theme-side-btn" type="button">切換深淺色</button>
+    </div>
+    <nav class="nav" id="nav" aria-label="模組與單元"></nav>
+  </aside>
+  <div class="sidebar-resizer" role="separator" tabindex="0"
+       aria-orientation="vertical" aria-controls="sidebar" aria-label="調整目錄寬度"
+       aria-valuemin="224" aria-valuemax="480" aria-valuenow="288"></div>
+  <div class="scrim" id="scrim" data-open="false"></div>
+  <main id="main" tabindex="-1"></main>
+  <aside class="toc" id="toc" aria-label="本課段落"></aside>
+</div>
+
+<footer class="site-footer">
+  <div class="inner" id="footer"></div>
+</footer>
+
+<div class="visually-hidden" aria-live="polite" id="live"></div>
+

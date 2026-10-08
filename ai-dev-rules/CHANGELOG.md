@@ -21,6 +21,12 @@
 - `domain-web-frontend`、`web-animation` 與 `domain-media-image-video-animation` 動畫規則：3D 場景裡的明暗遮罩不做 `opacity` 動畫，改動 `background-color` 或 `filter: brightness()`（Safari 翻頁閃動的實例）；有 `delay` 的 Web Animations 用 `fill: 'both'`；動畫要在播放中檢查，暫停截圖看不到合成圖層的閃動。
 - core 測試規範的 UI 改動：網頁至少在 Chrome 與 Safari 各看一次。
 
+- `scripts/install.sh`：macOS／Linux 的安裝入口，檢查 `pwsh` 後把參數交給 `install.ps1`。
+
+### Fixed
+
+- `course-web-neo-brutalism/scripts/build.sh`：`node --check` 不接受沒有 `.js` 副檔名的暫存檔，改成在臨時資料夾裡建 `chk.js`。
+
 ### Changed
 
 - `course-web-neo-brutalism` 參考站改為優先參考 `claude-code-secure-dev-course/`；驗證寬度從 3 種改為 10 種，並要求在頁面最上方與捲到最底各量一次。

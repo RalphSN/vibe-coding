@@ -1,0 +1,374 @@
+
+<script>
+/* ==========================================================================
+   模組 0：終端機是什麼
+   ========================================================================== */
+defineTerms({
+  '指令': { en: 'command', def: '你在終端機輸入、按 Enter 後交給電腦執行的一行文字。', example: '`ls`、`git status`、`Get-ChildItem` 都是指令。' },
+  '作業系統': { en: 'operating system, OS', def: '管理電腦硬體、檔案與程式的基礎軟體，例如 Windows、macOS、Linux。', example: '刪除檔案、啟動程式，最後都是請作業系統去做。' },
+  'GUI': { en: 'graphical user interface', def: '圖形介面：用滑鼠點選視窗、按鈕、圖示來操作電腦。', example: '檔案總管、Finder 都是 GUI。' },
+  'CLI': { en: 'command-line interface', def: '命令列介面：用打字輸入指令來操作程式。', example: '`git`、`npm`、`claude` 都是 CLI 程式。' },
+  'Windows Terminal': { en: 'Windows Terminal', def: 'Windows 11 的預設終端機 App，可以在分頁裡開 PowerShell、cmd、WSL 等不同 shell。', example: '開始選單搜尋「終端機」或 Terminal。' },
+  'WSL': { en: 'Windows Subsystem for Linux', def: '在 Windows 裡執行 Linux 的功能，裝好後可以在 Windows 上用 bash。', example: '`wsl --install` 安裝；之後在 Windows Terminal 開 Ubuntu 分頁。' },
+  '工作目錄': { en: 'working directory', def: '終端機「目前所在」的資料夾。指令裡沒寫完整路徑的檔名，都從這裡開始找。', example: '提示字元裡的 `C:\\Users\\you` 或 `~` 就是目前的工作目錄。' },
+  'Tab 補全': { en: 'tab completion', def: '打出開頭幾個字再按 Tab，shell 會幫你補完檔名或指令名稱。', example: '打 `cd Doc` 按 Tab，自動變成 `cd Documents`。' },
+});
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '分清楚終端機、shell、作業系統三層各負責什麼',
+      '說出 Windows 與 macOS 預設用的 shell',
+      '理解「打一行字」和「用滑鼠點」最後做的是同一件事',
+    ],
+    analogy: {
+      text: ['想像你在餐廳點餐：**終端機**是菜單和點菜單，讓你寫下要什麼；**shell** 是服務生，看懂你寫的字、轉成廚房聽得懂的單子；**作業系統**是廚房，真正把菜做出來。'],
+      limit: ['真實的服務生會猜你的意思，shell 不會：字寫錯一個，它就說「看不懂」（找不到指令）。而且同一間餐廳可以換服務生：同一個終端機視窗裡，你可以換用 PowerShell、zsh 或 bash，它們聽得懂的「方言」不一樣。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 420" role="img" aria-label="三層架構圖：最上面是你，打字輸入；第二層是終端機視窗，負責顯示文字與接收鍵盤；第三層是 shell，負責看懂指令；最下層是作業系統，負責真正執行。箭頭往下是指令，往上是結果">
+        <rect x="150" y="10" width="260" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="46" text-anchor="middle" font-size="24" font-weight="900">你（打字）</text>
+        <rect x="20" y="110" width="520" height="70" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+        <text x="40" y="142" font-size="24" font-weight="900" class="on-color">終端機</text>
+        <text x="40" y="168" font-size="20" class="on-color">視窗：接收鍵盤、顯示文字</text>
+        <rect x="20" y="210" width="520" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="40" y="242" font-size="24" font-weight="900" class="on-color">shell</text>
+        <text x="40" y="268" font-size="20" class="on-color">翻譯官：看懂指令、找到程式</text>
+        <rect x="20" y="310" width="520" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="40" y="342" font-size="24" font-weight="900" class="on-color">作業系統</text>
+        <text x="40" y="368" font-size="20" class="on-color">真正執行：讀寫檔案、啟動程式</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M280 66 V110 M280 180 V210 M280 280 V310"/></g>
+        <text x="300" y="96" font-size="18">指令往下、結果往上</text>
+      </svg>`,
+      caption: '三層各做一件事。換終端機 App 不會改變指令的寫法；換 shell 才會。',
+      blocks: [
+        '[[終端機]]只是一個會顯示文字的視窗。真正讀懂你打的字的，是裡面執行的 [[shell]]。shell 把指令拆開、找到要執行的程式，再請[[作業系統]]去做。',
+        { type: 'table', caption: '你會遇到的組合（截至 2026-10）', head: ['', 'Windows', 'macOS'], rows: [
+          ['終端機 App', '[[Windows Terminal]]（Windows 11 預設）', '終端機（Terminal.app）、iTerm2'],
+          ['預設 shell', '**PowerShell**；另有舊的 cmd', '**zsh**（2019 年起）'],
+          ['也能用', 'bash（透過 [[WSL]] 或 Git Bash）', 'bash（系統內建，但不是預設）'],
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '第一次對話', steps: [
+          { cmd: 'whoami', out: 'laptop\\you', note: '`whoami`：問電腦「我是誰」。印出「電腦名稱\\使用者名稱」。' },
+          { cmd: 'Get-Date', out: '2026年10月7日 星期三 上午 09:30:12', note: '`Get-Date`：PowerShell 的指令，印出現在的日期時間。' },
+          { cmd: 'echo 哈囉', out: '哈囉', note: '`echo`：把後面的文字原樣印出來。幾乎每種 shell 都有。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '終端機', en: 'terminal', def: '顯示文字、接收鍵盤輸入的視窗程式。它本身不懂指令，只負責把字交給 shell、把結果顯示出來。', example: 'Windows Terminal、macOS 的終端機 App。' },
+      { term: 'shell', en: 'shell', def: '讀懂指令的程式：把你打的一行字拆開、找到對應的程式、交給作業系統執行，再把結果傳回終端機。', example: 'PowerShell、zsh、bash、cmd 都是 shell。' },
+      { term: '命令列', en: 'command line', def: '用打字下指令的操作方式；也指你正在輸入的那一行。', example: '「在命令列輸入 `git status`」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一件事：看下載資料夾裡有什麼',
+        kind: '滑鼠 vs 指令',
+        code: true,
+        badLabel: '用滑鼠（GUI）',
+        goodLabel: '用指令（CLI）',
+        bad: '1. 打開檔案總管\n2. 點左邊的「下載」\n3. 用眼睛看清單',
+        good: '{{1:ls}} {{2:~/Downloads}}',
+        badResult: '兩種方法結果一樣。滑鼠適合第一次探索；指令適合重複做、交給別人照做、或讓 AI 幫你做。',
+        why: ['一個字的程式名稱，說明要做什麼：列出', '告訴它要列出哪個資料夾'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 300" role="img" aria-label="比較圖：左邊是 GUI，步驟是點、點、看，適合探索；右邊是 CLI，一行文字，適合重複、分享、自動化。兩邊最後都交給作業系統">
+          <rect x="10" y="10" width="255" height="200" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="137" y="48" text-anchor="middle" font-size="24" font-weight="900">GUI</text>
+          <text x="30" y="92" font-size="20">點 → 點 → 看</text>
+          <text x="30" y="130" font-size="20">適合：第一次探索</text>
+          <text x="30" y="168" font-size="20">難：重複一百次</text>
+          <rect x="295" y="10" width="255" height="200" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="422" y="48" text-anchor="middle" font-size="24" font-weight="900" class="on-color">CLI</text>
+          <text x="315" y="92" font-size="20" class="on-color">一行文字</text>
+          <text x="315" y="130" font-size="20" class="on-color">適合：重複、分享</text>
+          <text x="315" y="168" font-size="20" class="on-color">適合：交給 AI 做</text>
+          <rect x="130" y="240" width="300" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="273" text-anchor="middle" font-size="22" font-weight="900" class="on-color">作業系統執行</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M137 210 V225 H200 V240 M422 210 V225 H360 V240"/></g>
+        </svg>`, caption: '兩條路通到同一個廚房。學指令不是要取代滑鼠，而是多一條可以複製、可以自動化的路。' },
+      ],
+      tryit: {
+        q: ['把下面三樣東西，分別填到「終端機／shell／作業系統」哪一層：'],
+        draft: 'A. zsh：____\nB. Windows Terminal：____\nC. macOS：____',
+        answer: ['A 是 shell（翻譯官）；B 是終端機（視窗）；C 是作業系統（廚房）。', '判斷方法：會「看懂指令」的是 shell；只負責顯示的是終端機；真正管檔案和程式的是作業系統。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為「終端機」和「PowerShell」是同一個東西。', why: 'Windows Terminal 是視窗，PowerShell 是裡面跑的 shell。同一個視窗可以開 PowerShell 分頁，也可以開 cmd 或 Ubuntu 分頁。', right: '看分頁標題或提示字元判斷現在用的是哪個 shell（0-2 會教）。' },
+      { wrong: '在網路上抄了一段指令，不管是哪種 shell 的就直接貼上。', why: '同一件事在 PowerShell 和 zsh 的寫法常常不同，貼錯方言會出現看不懂的錯誤。', right: '先確認範例是給哪個 shell 的（模組 5 有判斷技巧），再用對應的寫法。' },
+      { wrong: '覺得黑色視窗很危險，什麼都不敢打。', why: '大部分指令只是「查看」，不會改變任何東西，例如 `whoami`、`ls`、`Get-Date`。', right: '先從只會讀資料的指令練起；會刪除、覆寫的指令，模組 2、8 會教你怎麼認出來。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '哪一層負責「看懂你打的指令、找到要執行的程式」？', options: [
+        { text: 'shell', correct: true, why: 'shell 是翻譯官：拆開指令、找到程式、交給作業系統。' },
+        { text: '終端機視窗', why: '終端機只負責顯示文字和接收鍵盤，它不懂指令的意思。這是最常見的混淆。' },
+        { text: '螢幕與鍵盤', why: '那是硬體，只負責輸入輸出；解讀文字是軟體（shell）的工作。' },
+        { text: '作業系統的檔案總管', why: '檔案總管是 GUI 程式，跟命令列是兩條不同的路。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在 macOS 打開終端機 App，什麼都沒改。預設用的是哪個 shell？', options: [
+        { text: 'bash，因為 macOS 是 Unix 系統', why: 'macOS 在 2019 年（Catalina）以前預設是 bash，之後改成 zsh。很多舊教學還停在 bash。' },
+        { text: 'zsh', correct: true, why: 'Apple 自 macOS Catalina 起把新帳號的預設 shell 改成 zsh。' },
+        { text: 'PowerShell，因為它可以跨平台', why: 'PowerShell 7 可以安裝在 macOS，但不是預設，需要自己裝。' },
+        { text: 'cmd，它是最基本的 shell', why: 'cmd 是 Windows 才有的舊式 shell，macOS 上沒有。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說：「我把 Windows Terminal 換成另一個終端機 App 了，所以之前的 PowerShell 指令都要重學。」你會怎麼回應？'], answer: [
+        '參考：不用重學。指令的寫法由 **shell** 決定，不是由終端機 App 決定。只要新 App 裡開的還是 PowerShell，指令完全一樣。',
+        '需要重學的情況是**換了 shell**，例如從 PowerShell 換到 bash。',
+      ] },
+    ],
+    keypoints: [
+      '終端機是視窗，shell 是翻譯官，作業系統是真正做事的廚房。',
+      'Windows 預設 shell 是 PowerShell，macOS 是 zsh。',
+      '指令的寫法跟著 shell 走，不跟著終端機 App 走。',
+    ],
+    sources: ['wt', 'apple-zsh', 'ps-overview'],
+  },
+
+  '0-2': {
+    goals: [
+      '在 Windows 和 macOS 打開終端機',
+      '從提示字元的長相，認出現在是 PowerShell、zsh、bash 還是 cmd',
+      '用一個指令確認 shell 的版本',
+    ],
+    analogy: {
+      text: ['提示字元像店家門口的招牌：`PS C:\\>` 掛的是 PowerShell 的招牌，`%` 是 zsh，`$` 是 bash，`C:\\>` 是 cmd。看招牌就知道裡面講哪種方言。'],
+      limit: ['招牌可以被改：很多人會自訂提示字元，加上顏色、git 分支、時間。看不出來的時候，就直接用指令問（下面的「確認 shell」）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 400" role="img" aria-label="四種提示字元的比較：PowerShell 是 PS 加路徑加大於；zsh 是使用者@電腦 波浪號 百分比；bash 是使用者@電腦 冒號 波浪號 錢字號；cmd 是磁碟路徑加大於，沒有 PS">
+        <g font-size="22">
+          <rect x="10" y="10" width="540" height="80" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="44" font-weight="900" class="on-color">PowerShell</text>
+          <text x="30" y="76" class="on-color mono">PS C:\\Users\\you&gt;</text>
+          <rect x="10" y="105" width="540" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="139" font-weight="900" class="on-color">zsh（macOS）</text>
+          <text x="30" y="171" class="on-color mono">you@mac ~ %</text>
+          <rect x="10" y="200" width="540" height="80" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="234" font-weight="900" class="on-color">bash（Linux／WSL）</text>
+          <text x="30" y="266" class="on-color mono">you@linux:~$</text>
+          <rect x="10" y="295" width="540" height="80" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="329" font-weight="900" class="on-color">cmd（舊式）</text>
+          <text x="30" y="361" class="on-color mono">C:\\Users\\you&gt;</text>
+        </g>
+      </svg>`,
+      caption: '最快的分辨法：開頭有 `PS` 是 PowerShell；結尾 `%` 是 zsh、`$` 是 bash；只有路徑加 `>` 是 cmd。',
+      blocks: [
+        { type: 'tabs', label: '怎麼打開', tabs: [
+          { label: 'Windows', blocks: [
+            { type: 'list', ordered: true, items: ['按 {kbd:Win} 鍵，輸入「終端機」或 `Terminal`，按 {kbd:Enter}。', '或在桌面按右鍵 → 「在終端機中開啟」，會直接開在那個資料夾。', '預設分頁是 PowerShell。上方的 ⌄ 可以改開 cmd 或 Ubuntu（裝了 WSL 才有）。'] },
+          ] },
+          { label: 'macOS', blocks: [
+            { type: 'list', ordered: true, items: ['按 {kbd:Cmd+Space} 打開 Spotlight，輸入「終端機」或 `Terminal`，按 {kbd:Enter}。', '或在 Finder 的資料夾上按右鍵 → 服務 → 「新增位於檔案夾位置的終端機視窗」。', '預設 shell 是 zsh。'] },
+          ] },
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '確認 PowerShell 版本', steps: [
+          { cmd: '$PSVersionTable.PSVersion', out: 'Major  Minor  Patch\n-----  -----  -----\n7      6      0', note: '版本 7 以上是新版 PowerShell（`pwsh`）。如果是 **5.1**，那是 Windows 內建的舊版 Windows PowerShell，兩者有些差異（模組 5 會講）。' },
+        ] } },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '確認 macOS 的 shell', steps: [
+          { cmd: 'echo $SHELL', out: '/bin/zsh', note: '`$SHELL` 是一個變數，存著你的預設 shell。看到 `/bin/zsh` 就是 zsh。' },
+          { cmd: 'echo $0', out: '-zsh', note: '`$0` 是「現在正在跑的 shell」。和上一個不一樣時，以這個為準。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '提示字元', en: 'prompt', def: 'shell 準備好接收指令時，印在行首的那串文字。它告訴你：可以打字了，以及你現在在哪個資料夾。', example: '`PS C:\\Users\\you>`、`you@mac ~ %`。' },
+      { term: 'PowerShell', en: 'PowerShell', def: '微軟的 shell。Windows 內建舊版 Windows PowerShell 5.1（`powershell.exe`）；新版 PowerShell 7（`pwsh`）可跨平台，2026-03 發布 7.6 LTS。', example: '指令多是「動詞-名詞」，例如 `Get-ChildItem`。' },
+      { term: 'zsh', en: 'Z shell', def: 'macOS 自 Catalina（2019）起的預設 shell，寫法和 bash 大多相同。', example: '提示字元結尾是 `%`。' },
+      { term: 'bash', en: 'Bourne Again SHell', def: 'Linux 與伺服器最常見的 shell，也是大部分網路教學預設的寫法。', example: '提示字元結尾是 `$`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '開終端機的位置',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 開在哪就算哪',
+        goodLabel: '✓ 直接開在專案資料夾',
+        bad: '# 開在家目錄，再一層一層找\nPS C:\\Users\\you> {{1:cd Desktop}}\nPS C:\\Users\\you\\Desktop> cd 作業\nPS C:\\Users\\you\\Desktop\\作業> cd 期末報告',
+        good: '# 在檔案總管的資料夾上按右鍵 →「在終端機中開啟」\n{{2:PS C:\\Users\\you\\Desktop\\作業\\期末報告>}}',
+        badResult: '可以到，但每次都要打三次 `cd`，還可能打錯資料夾名稱。',
+        why: ['一層一層 cd 容易打錯字', '右鍵開啟，提示字元直接就在正確的資料夾'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="判斷流程：看提示字元開頭有沒有 PS，有就是 PowerShell；沒有的話看結尾，百分比是 zsh，錢字號是 bash，大於是 cmd">
+          <rect x="170" y="10" width="220" height="56" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">開頭有 PS？</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M170 38 H90 V100 M390 38 H470 V100"/></g>
+          <text x="96" y="80" font-size="18">有</text><text x="440" y="80" font-size="18">沒有</text>
+          <rect x="10" y="100" width="160" height="56" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+          <text x="90" y="136" text-anchor="middle" font-size="20" font-weight="900" class="on-color">PowerShell</text>
+          <rect x="370" y="100" width="180" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="460" y="136" text-anchor="middle" font-size="20" font-weight="900">看最後一個字</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M460 156 V176 M290 176 H520 M290 176 V190 M405 176 V190 M520 176 V190"/></g>
+          <rect x="240" y="190" width="100" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/><text x="290" y="222" text-anchor="middle" font-size="18" font-weight="900" class="on-color">% zsh</text>
+          <rect x="355" y="190" width="100" height="50" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/><text x="405" y="222" text-anchor="middle" font-size="18" font-weight="900" class="on-color">$ bash</text>
+          <rect x="470" y="190" width="80" height="50" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/><text x="510" y="222" text-anchor="middle" font-size="18" font-weight="900" class="on-color">&gt; cmd</text>
+        </svg>`, caption: '十秒判斷法。自訂過的提示字元例外，那就用上面的版本指令確認。' },
+      ],
+      tryit: {
+        q: ['看下面四個提示字元，各是哪個 shell？'],
+        draft: 'A. PS D:\\code>  ____\nB. amy@MacBook-Air proj %  ____\nC. D:\\code>  ____\nD. amy@ubuntu:~/proj$  ____',
+        answer: ['A：PowerShell（開頭 PS）。B：zsh（結尾 %）。C：cmd（只有路徑加 >）。D：bash（結尾 $）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 Windows 開了「命令提示字元」（cmd），照著 PowerShell 的教學打 `Get-ChildItem`。', why: 'cmd 和 PowerShell 是不同的 shell，cmd 不認得 PowerShell 的指令，會說「不是內部或外部命令」。', right: '開 Windows Terminal 的預設分頁（PowerShell），或確認提示字元開頭有 `PS`。' },
+      { wrong: '以為看到 `$` 結尾一定是 bash，看到 `%` 一定是 zsh，從不懷疑。', why: '提示字元可以自訂，很多人裝了主題後就完全看不出來。', right: '不確定時用指令問：PowerShell 用 `$PSVersionTable`，zsh／bash 用 `echo $0`。' },
+      { wrong: '把 Windows PowerShell 5.1 和 PowerShell 7 當成同一個。', why: '5.1 是 Windows 內建、不再更新；7 是新版，支援 `&&` 等新語法。有些教學的寫法在 5.1 會失敗。', right: '用 `$PSVersionTable.PSVersion` 看版本；需要新功能就安裝 PowerShell 7（`winget install Microsoft.PowerShell`）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '提示字元 `you@mac ~ %` 代表哪個 shell？', options: [
+        { text: 'bash', why: 'bash 的預設提示字元結尾是 `$`。很多人以為 macOS 都是 bash，那是 2019 年以前的事。' },
+        { text: 'zsh', correct: true, why: '結尾的 `%` 是 zsh 的預設提示字元，也是 macOS 的預設 shell。' },
+        { text: 'PowerShell', why: 'PowerShell 的提示字元開頭是 `PS`，這裡沒有。' },
+        { text: 'cmd', why: 'cmd 的提示字元是「路徑＋>」，而且只在 Windows 上。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在 Windows 跑 `$PSVersionTable.PSVersion`，看到 Major 是 5、Minor 是 1。這代表什麼？', options: [
+        { text: '你用的是 Windows 內建的舊版 Windows PowerShell', correct: true, why: '5.1 是 Windows 內建版本，不再加新功能。想用新語法可以另外安裝 PowerShell 7。' },
+        { text: '你的 Windows 版本太舊，需要升級系統', why: 'Windows 11 也內建 5.1。版本號是 PowerShell 的，不是 Windows 的。' },
+        { text: 'PowerShell 壞掉了，需要重新安裝', why: '沒有壞，5.1 是正常的內建版本，和 PowerShell 7 可以並存。' },
+        { text: '你其實開的是 cmd，不是 PowerShell', why: 'cmd 不認得 `$PSVersionTable`，會直接報錯；能印出版本表就代表是 PowerShell。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['朋友傳給你一張教學截圖，提示字元是 `user@server:~$`。你用的是 Windows 筆電，可以直接照著打嗎？'], answer: [
+        '參考：不一定。`$` 結尾代表是 bash（多半是 Linux 伺服器）。簡單的指令（`cd`、`ls`、`git`）在 PowerShell 也能用；但用到管線、引號、變數的指令，寫法可能不同。',
+        '兩個做法：在 Windows 裝 WSL 用真正的 bash；或用模組 5 的對照表把它翻成 PowerShell。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1）同一個 Windows Terminal 視窗，可以開哪些 shell？', options: [
+        { text: '只能開 PowerShell，因為它是 Windows 的預設', why: 'Windows Terminal 可以用分頁開不同的 shell，不限 PowerShell。' },
+        { text: 'PowerShell、cmd，裝了 WSL 還能開 bash', correct: true, why: '終端機只是視窗，裡面跑什麼 shell 可以選。' },
+        { text: '只能開 cmd，PowerShell 要另外的 App', why: 'PowerShell 就是 Windows Terminal 的預設分頁。' },
+        { text: '任何 shell 都可以，包括 macOS 的 Terminal.app', why: 'Terminal.app 是另一個終端機 App，不是 shell，也不能在 Windows 執行。' },
+      ] },
+    ],
+    keypoints: [
+      'Windows：Win 鍵搜尋「終端機」；macOS：Cmd+Space 搜尋 Terminal。',
+      '提示字元的開頭和結尾，告訴你現在用的是哪個 shell。',
+      '不確定時用指令問：`$PSVersionTable` 或 `echo $0`。',
+    ],
+    sources: ['wt', 'apple-zsh', 'ps-76', 'ps-lifecycle'],
+  },
+
+  '0-3': {
+    goals: [
+      '分清楚提示字元和指令，複製教學時不會把提示字元也貼上',
+      '用 Tab 補全、↑ 叫回上一個指令，少打很多字',
+      '用 Ctrl+C 中斷卡住的指令，並知道各系統複製貼上的按鍵',
+    ],
+    analogy: {
+      text: ['提示字元像表格上已經印好的「姓名：____」。你只要填底線上的內容，不用再把「姓名：」三個字寫一次。教學裡常把印好的部分一起寫出來，讓你知道是在哪裡填的。'],
+      limit: ['表格上的字不會變，提示字元會：它會隨著你所在的資料夾改變，所以它同時是「你在哪裡」的地址牌（模組 2）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="提示字元解剖圖：一行 PS C:\\Users\\you\\proj&gt; git status。前半段 PS 是 shell 名稱、中間是目前資料夾、大於是等你輸入；後半段 git status 才是你要打的指令">
+        <rect x="10" y="20" width="540" height="64" class="fill-term stroke-ink" stroke-width="4"/>
+        <text x="26" y="62" font-size="21" font-family="monospace" class="t-prompt">PS C:\\Users\\you\\proj&gt;</text>
+        <text x="342" y="62" font-size="21" font-family="monospace" class="t-cmd">git status</text>
+        <g class="stroke-ink" stroke-width="3" fill="none">
+          <path d="M40 84 V120"/><path d="M190 84 V120"/><path d="M322 84 V160"/><path d="M420 84 V200"/>
+        </g>
+        <rect x="10" y="120" width="110" height="40" style="fill:var(--info)" class="stroke-ink" stroke-width="3"/><text x="65" y="147" text-anchor="middle" font-size="17" class="on-color">shell 名稱</text>
+        <rect x="128" y="120" width="140" height="40" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="198" y="147" text-anchor="middle" font-size="17" class="on-color">目前的資料夾</text>
+        <rect x="262" y="160" width="120" height="40" style="fill:var(--neutral)" class="stroke-ink" stroke-width="3"/><text x="322" y="187" text-anchor="middle" font-size="17" class="on-color">等你輸入</text>
+        <rect x="380" y="200" width="170" height="54" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/><text x="465" y="234" text-anchor="middle" font-size="19" font-weight="900" class="on-color">你打的指令</text>
+      </svg>`,
+      caption: '只有粉紅色那段是你要打的。前面綠色的整段都是 shell 自己印的。',
+      blocks: [
+        '教學文件常寫成 `$ npm install` 或 `PS> npm install`。開頭的 `$`、`%`、`PS>` 代表「在提示字元後面打」，**不要一起複製**。比較好的教學會只寫 `npm install`。',
+        { type: 'table', caption: '五個救命按鍵', head: ['按鍵', '做什麼', '什麼時候用'], rows: [
+          ['{kbd:Tab}', '補完檔名、資料夾名、指令名', '打了開頭幾個字，懶得打完或怕打錯'],
+          ['{kbd:↑} {kbd:↓}', '叫出前一個／下一個打過的指令', '剛剛打錯一個字，叫回來改'],
+          ['{kbd:Ctrl+C}', '**中斷**正在執行的指令', '卡住、跑太久、跑錯了'],
+          ['{kbd:Ctrl+L} 或 `clear`／`cls`', '清除畫面', '畫面太亂（歷史不會消失）'],
+          ['`exit`', '結束這個 shell', '用完了；或從 ssh、子 shell 離開'],
+        ] },
+        { type: 'callout', variant: 'danger', title: 'Ctrl+C 在終端機不是複製', body: [
+          '在終端機裡 {kbd:Ctrl+C} 的意思是「停止」。Windows Terminal 會在**有選取文字時**改成複製；macOS 的複製一律是 {kbd:Cmd+C}。舊的 cmd 視窗複製要用 {kbd:Ctrl+Shift+C} 或滑鼠右鍵。',
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '中斷一個停不下來的指令', steps: [
+          { cmd: 'ping google.com', out: '64 bytes from 142.250.66.78: icmp_seq=0 ttl=117 time=8.1 ms\n64 bytes from 142.250.66.78: icmp_seq=1 ttl=117 time=7.9 ms\n64 bytes from 142.250.66.78: icmp_seq=2 ttl=117 time=8.3 ms', note: 'macOS／Linux 的 `ping` 會一直送下去，不會自己停。' },
+          { cmd: '^C', out: '--- google.com ping statistics ---\n3 packets transmitted, 3 packets received, 0.0% packet loss', note: '按 {kbd:Ctrl+C}，畫面上會顯示 `^C`，指令停止，提示字元回來了。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: '中斷', en: 'interrupt（Ctrl+C）', def: '要求正在執行的指令立刻停止。大多數程式收到後會結束，提示字元回到畫面上。', example: '跑錯了 `npm install`，按 Ctrl+C 停下來。' },
+      { term: '指令歷史', en: 'command history', def: 'shell 記住你打過的指令，按 ↑ 可以叫回來。', example: '`history`（zsh／bash）或 `Get-History`（PowerShell）列出全部。' },
+    ],
+    examples: {
+      compare: [{
+        title: '照著教學複製',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 連提示字元一起貼',
+        goodLabel: '✓ 只貼指令本身',
+        bad: '{{1:$ }}npm install\n{{2:added 120 packages in 4s}}',
+        good: 'npm install',
+        badResult: '多了 `$` 會被當成指令的一部分，出現「找不到 $ 指令」；連輸出一起貼，下一行又是一個錯誤。',
+        why: ['`$` 是教學標示的提示字元，不是指令', '輸出是結果，不是要你打的東西'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="Tab 補全示意：打 cd Doc 按 Tab，變成 cd Documents；如果有兩個符合的，按兩次 Tab 會列出 Documents 和 Downloads 讓你選">
+          <g font-size="20">
+            <rect x="10" y="10" width="540" height="56" class="fill-term stroke-ink" stroke-width="4"/>
+            <text x="26" y="46" class="t-prompt">%</text><text x="52" y="46" class="t-cmd">cd Doc</text>
+            <rect x="196" y="20" width="80" height="36" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="236" y="45" text-anchor="middle" font-size="18" font-weight="900" class="on-color">Tab</text>
+            <text x="300" y="46" class="t-cmd">cd Documents/</text>
+            <rect x="10" y="90" width="540" height="130" class="fill-term stroke-ink" stroke-width="4"/>
+            <text x="26" y="126" class="t-prompt">%</text><text x="52" y="126" class="t-cmd">cd D</text>
+            <rect x="160" y="100" width="120" height="36" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="220" y="125" text-anchor="middle" font-size="18" font-weight="900" class="on-color">Tab Tab</text>
+            <text x="26" y="168" class="t-out">Desktop/  Documents/  Downloads/</text>
+            <text x="26" y="204" class="t-dim">有好幾個符合時，列出來讓你選</text>
+          </g>
+        </svg>`, caption: 'Tab 補全不只省字，更重要的是**不會拼錯**：補不出來，就代表那個名字不存在。PowerShell 是連按 Tab 輪流切換候選。' },
+      ],
+      tryit: {
+        q: ['下面這段教學，你實際要打的是哪些字？把要打的寫下來。'],
+        code: true,
+        draft: 'PS C:\\Users\\you> cd projects\nPS C:\\Users\\you\\projects> git clone https://github.com/x/demo.git\nCloning into \'demo\'...\n\n你要打的：\n1. ____\n2. ____',
+        answer: ['1. `cd projects`　2. `git clone https://github.com/x/demo.git`', '`PS ...>` 是提示字元；`Cloning into ...` 是輸出。兩者都不用打。'],
+      },
+    },
+    mistakes: [
+      { wrong: '指令跑很久沒反應，直接關掉整個終端機視窗。', why: '關掉視窗有時會留下做到一半的檔案或背景程式，而且你看不到最後的錯誤訊息。', right: '先按 {kbd:Ctrl+C} 中斷，看輸出最後幾行發生了什麼。' },
+      { wrong: '一個字一個字打很長的資料夾名稱，結果拼錯了。', why: '手打長名稱，尤其有空白或大小寫時，很容易出錯。', right: '打開頭幾個字就按 {kbd:Tab}；補不出來代表名稱不對或不在這個資料夾。' },
+      { wrong: '打錯一個字，就把整行重新打一次。', why: '浪費時間，也可能在重打時又打錯別的地方。', right: '按 {kbd:↑} 叫回上一行，用 {kbd:←} {kbd:→} 移到錯的地方修改，再按 {kbd:Enter}。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在終端機裡，指令卡住不動了。要讓它停下來，最標準的按鍵是？', options: [
+        { text: 'Ctrl+C', correct: true, why: 'Ctrl+C 送出「中斷」，幾乎所有 shell 和程式都認得。' },
+        { text: 'Esc', why: 'Esc 在很多 GUI 程式是「取消」，但在終端機通常不會停止正在執行的指令。' },
+        { text: 'Ctrl+Z', why: '在 zsh／bash 它是「暫停並丟到背景」，程式還活著；在 Windows 則是輸入結束記號。都不是停止。' },
+        { text: 'Ctrl+L', why: 'Ctrl+L 只是清除畫面，正在跑的指令不受影響。' },
+      ] },
+      { level: '應用', type: 'mc', q: '教學寫著 `% brew install git`。你在 macOS 終端機該輸入什麼？', options: [
+        { text: '`% brew install git`，照抄最保險', why: '`%` 是 zsh 的提示字元，不是指令。一起貼上會出現 `command not found: %` 之類的錯誤。' },
+        { text: '`brew install git`', correct: true, why: '開頭的 `%` 只是表示「在提示字元後面打」，實際指令從 `brew` 開始。' },
+        { text: '`install git`，brew 是提示字元的一部分', why: '`brew` 是程式名稱（Homebrew），少了它 shell 不知道要叫哪個程式。' },
+        { text: '`%brew install git`，把空白拿掉', why: '問題不是空白，而是 `%` 本來就不該打。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你想把終端機裡一段錯誤訊息複製給 AI 問問題。在 Windows Terminal 和 macOS 終端機各要怎麼複製？'], answer: [
+        '參考：Windows Terminal：用滑鼠選取文字，按 {kbd:Ctrl+C}（有選取時是複製）或按右鍵。macOS：選取後按 {kbd:Cmd+C}。',
+        '提醒：貼給 AI 前看一眼，裡面有沒有密碼、token 或個人資料（模組 4、8）。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-2）提示字元開頭是 `PS`，代表你在用哪個 shell？', options: [
+        { text: 'PowerShell', correct: true, why: '`PS` 就是 PowerShell 的縮寫，後面接目前的資料夾。' },
+        { text: 'cmd', why: 'cmd 的提示字元只有路徑和 `>`，沒有 `PS`。' },
+        { text: 'zsh', why: 'zsh 的提示字元結尾是 `%`。' },
+        { text: '任何一種，PS 只是代表 prompt string', why: '雖然「提示字元」在 Unix 也有 PS1 這個變數名，但畫面開頭的 `PS` 是 PowerShell 的標記。' },
+      ] },
+    ],
+    keypoints: [
+      '提示字元和輸出都不用打；教學開頭的 `$`、`%`、`PS>` 不要複製。',
+      'Tab 補全、↑ 叫回歷史，能少打字也少打錯。',
+      'Ctrl+C 在終端機是「停止」，不是複製。',
+    ],
+    sources: ['wt', 'bash-manual', 'zsh-manual'],
+  },
+});
+</script>

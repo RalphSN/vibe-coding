@@ -1,0 +1,80 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: '卡帕西的 4 種 AI 輸出格式',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-07',
+  version: 'v1',
+  article: 'https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100',
+};
+
+const COURSES = [
+  { id: 0, title: '原文', short: '原文', desc: '原文導讀與重點摘要，附《數位時代》原文連結。', lessons: [
+    ['0-1', '原文導讀：|卡帕西的 4 種輸出技巧'],
+  ]},
+  { id: 1, title: '為什麼|換格式有效', short: '為什麼', desc: '文字是線性的；4 種格式像一道逐級上升的階梯。', lessons: [
+    ['1-1', '文字是線性的，|腦袋要自己拼圖'],
+    ['1-2', '四級階梯：|But even better'],
+  ]},
+  { id: 2, title: '4 種|輸出格式', short: '4 種格式', desc: '航太手冊規範、一張圖、互動網頁、解說影片，各自怎麼下指令、適合什麼。', lessons: [
+    ['2-1', '方法 1：|ASD-STE100 規範文字'],
+    ['2-2', '方法 2：|請 AI 畫一張圖'],
+    ['2-3', '方法 3：|HTML 互動解說網頁'],
+    ['2-4', '方法 4：|Manim 解說影片'],
+  ]},
+  { id: 3, title: '動手用', short: '動手', desc: '新手從哪裡開始、怎麼核對，以及可以直接帶走的提示詞產生器。', lessons: [
+    ['3-1', '新手路線|與核對習慣'],
+    ['3-2', '提示詞產生器|與總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

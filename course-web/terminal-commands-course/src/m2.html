@@ -1,0 +1,503 @@
+
+<script>
+/* ==========================================================================
+   模組 2：檔案系統與路徑
+   ========================================================================== */
+const FS_UNIX = {
+  Users: { amy: {
+    Desktop: {},
+    Documents: { 'notes.txt': null, 'report.docx': null, school: { 'hw1.pdf': null } },
+    Downloads: { 'photo.jpg': null, 'setup.dmg': null },
+    projects: { web: { 'index.html': null, src: { 'app.js': null } } },
+  } },
+};
+const FS_WIN = {
+  Users: { you: {
+    Desktop: {},
+    Documents: { 'notes.txt': null, 'report.docx': null, school: { 'hw1.pdf': null } },
+    Downloads: { 'photo.jpg': null, 'setup.exe': null },
+    projects: { web: { 'index.html': null, src: { 'app.js': null } } },
+  } },
+};
+
+defineTerms({
+  '根目錄': { en: 'root directory', def: '整棵資料夾樹的最上層。macOS／Linux 是 `/`；Windows 每個磁碟各有一個，例如 `C:\\`。', example: '`cd /` 回到最上層。' },
+  '隱藏檔': { en: 'hidden file', def: '名稱以 `.` 開頭的檔案或資料夾（macOS／Linux），預設 `ls` 不會列出，要加 `-a`。常用來放設定。', example: '`.gitignore`、`.zshrc`、`.env`。' },
+  '遞迴': { en: 'recursive', def: '處理一個資料夾時，連它裡面的子資料夾、子資料夾的子資料夾也一起處理。選項常寫成 `-r`、`-R` 或 `-Recurse`。', example: '`cp -r photos backup` 複製整個資料夾。' },
+  '正規表示式': { en: 'regular expression, regex', def: '描述「文字樣式」的小語言，`grep`、`Select-String` 都用它找符合的行。', example: '`^Error` 代表「以 Error 開頭的行」。' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '把電腦的檔案想成一棵樹，說出某個檔案的完整路徑',
+      '分辨絕對路徑和相對路徑，認得 `~`、`.`、`..`',
+      '知道 Windows 用 `\\`、macOS 用 `/`，以及 PowerShell 兩種都接受',
+    ],
+    analogy: {
+      text: ['路徑就像地址。**絕對路徑**是完整地址：「台灣台北市大安區某路 1 號」，在哪裡唸都指同一個地方。**相對路徑**是「從這裡往左走兩間」：要先知道「這裡」是哪裡才有意義。'],
+      limit: ['真實地址不會跟著你走，相對路徑會：同一行 `cd src`，在不同資料夾執行會到不同地方。這就是為什麼看懂提示字元裡的「目前資料夾」這麼重要。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 360" role="img" aria-label="資料夾樹：最上面是根目錄，下面是 Users，再下面是 amy 也就是家目錄波浪號，家目錄下有 Documents、Downloads、projects，projects 下有 web，web 下有 src 和 index.html。目前位置是 web">
+        <g font-size="20" class="mono">
+          <rect x="230" y="10" width="100" height="44" style="fill:var(--neutral)" class="stroke-ink" stroke-width="3"/><text x="280" y="40" text-anchor="middle" class="on-color mono" font-weight="700">/</text>
+          <rect x="220" y="76" width="120" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="106" text-anchor="middle" class="mono">Users</text>
+          <rect x="200" y="142" width="160" height="44" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="280" y="172" text-anchor="middle" class="on-color mono" font-weight="700">amy  (~)</text>
+          <rect x="10" y="214" width="150" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="85" y="244" text-anchor="middle" class="mono">Documents</text>
+          <rect x="205" y="214" width="150" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="244" text-anchor="middle" class="mono">Downloads</text>
+          <rect x="400" y="214" width="150" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="475" y="244" text-anchor="middle" class="mono">projects</text>
+          <rect x="400" y="290" width="150" height="56" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/><text x="475" y="315" text-anchor="middle" class="on-color mono" font-weight="700">web</text><text x="475" y="338" text-anchor="middle" class="on-color" font-size="16">你在這裡 (.)</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M280 54 V76 M280 120 V142 M280 186 V200 M85 200 H475 M85 200 V214 M280 200 V214 M475 200 V214 M475 258 V290"/></g>
+        <text x="10" y="300" font-size="18">web 的「..」是 projects</text>
+        <text x="10" y="330" font-size="18">絕對路徑：/Users/amy/projects/web</text>
+      </svg>`,
+      caption: '每個資料夾都可以用兩種方式指出：從根目錄開始的完整路徑，或從「你在這裡」出發的相對路徑。',
+      blocks: [
+        { type: 'table', caption: '四個特殊符號', head: ['符號', '意思', '例子（目前在 web）'], rows: [
+          ['`~`', '[[家目錄]]', '`~/Downloads` ＝ `/Users/amy/Downloads`'],
+          ['`.`', '目前所在的資料夾', '`./src` ＝ `src`'],
+          ['`..`', '上一層資料夾', '`..` ＝ `projects`；`../..` ＝ `amy`'],
+          ['`/` 開頭（Windows 是 `C:\\`）', '從[[根目錄]]開始', '`/Users/amy` 不管你在哪都一樣'],
+        ] },
+        { type: 'widget', name: 'fstree', props: { style: 'unix', tree: FS_UNIX, home: ['Users', 'amy'], start: ['Users', 'amy', 'projects', 'web'], actions: ['pwd', 'cd ..', 'cd ../..', 'cd ~/Downloads', 'cd /Users/amy/projects/web', 'cd src'] } },
+      ],
+    },
+    define: [
+      { term: '路徑', en: 'path', def: '指出一個檔案或資料夾位置的文字，用斜線把每一層資料夾名稱串起來。', example: '`/Users/amy/notes.txt`、`C:\\Users\\you\\notes.txt`。' },
+      { term: '絕對路徑', en: 'absolute path', def: '從根目錄開始寫的完整路徑，在任何位置執行都指向同一個地方。', example: '`/Users/amy/Documents`、`C:\\Users\\you\\Documents`。' },
+      { term: '相對路徑', en: 'relative path', def: '從目前所在資料夾出發的路徑，結果取決於你現在在哪。', example: '`src/app.js`、`../Downloads`。' },
+      { term: '家目錄', en: 'home directory', def: '每個使用者自己的資料夾，用 `~` 表示。macOS 是 `/Users/名字`，Windows 是 `C:\\Users\\名字`。', example: '`cd ~` 回家。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一個檔案，兩種系統的絕對路徑',
+        kind: '路徑對照',
+        code: true,
+        badLabel: 'Windows',
+        goodLabel: 'macOS／Linux',
+        bad: '{{1:C:}}{{2:\\}}Users{{2:\\}}you{{2:\\}}Documents{{2:\\}}notes.txt',
+        good: '{{1:/}}Users{{2:/}}amy{{2:/}}Documents{{2:/}}notes.txt',
+        badResult: '結構一樣，只有兩個差別：起點（磁碟代號 vs 根目錄）和分隔符號（反斜線 vs 斜線）。',
+        why: ['Windows 從磁碟代號開始；macOS 從單一的根目錄 `/` 開始', 'Windows 用 `\\`；macOS 用 `/`。PowerShell 兩種都接受'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="相對路徑走法：從 web 出發，點點斜線 Downloads 先往上一層到 projects，再往下找 Downloads，但 projects 底下沒有 Downloads 所以失敗；要寫 點點斜線點點斜線 Downloads 先上兩層到 amy">
+          <g font-size="20">
+            <rect x="10" y="10" width="540" height="100" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+            <text x="30" y="44" font-weight="900" class="on-color mono">✗ cd ../Downloads</text>
+            <text x="30" y="78" class="on-color">web → 上一層 projects → 找 Downloads</text>
+            <text x="30" y="100" class="on-color" font-size="17">projects 裡沒有 Downloads，失敗</text>
+            <rect x="10" y="130" width="540" height="100" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+            <text x="30" y="164" font-weight="900" class="on-color mono">✓ cd ../../Downloads</text>
+            <text x="30" y="198" class="on-color">web → projects → amy → Downloads</text>
+            <text x="30" y="220" class="on-color" font-size="17">或直接寫 cd ~/Downloads，最不會錯</text>
+          </g>
+        </svg>`, caption: '每個 `..` 往上一層。離家目錄近的地方，用 `~` 開頭通常比數 `..` 簡單。' },
+      ],
+      tryit: {
+        q: ['目前在 `/Users/amy/projects/web`。寫出到 `Documents/school` 的相對路徑和絕對路徑。'],
+        code: true,
+        draft: '相對路徑：____\n絕對路徑：____\n用 ~ 的寫法：____',
+        answer: ['相對：`../../Documents/school`（上兩層到 amy，再往下）。', '絕對：`/Users/amy/Documents/school`。用 ~：`~/Documents/school`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 zsh 裡照 Windows 習慣打 `cd projects\\web`。', why: 'zsh 的路徑分隔符號是 `/`；`\\` 在 zsh 是跳脫字元，`\\w` 會變成普通的 `w`，結果找 `projectsweb`。', right: 'macOS／Linux 一律用 `/`。PowerShell 兩種都可以，跨平台時用 `/` 最保險。' },
+      { wrong: '把相對路徑寫進文件給別人照做：「執行 `cd src`」。', why: '對方可能不在同一個資料夾，`cd src` 會失敗或跑到別的 src。', right: '給別人的說明寫清楚起點：「在專案根目錄執行 `cd src`」，或用絕對路徑。' },
+      { wrong: '以為 `~` 在任何程式裡都代表家目錄。', why: '`~` 是 shell 幫你展開的；放在引號裡（`"~/Downloads"`）或寫進某些設定檔時，不一定會被展開。', right: '在引號裡改用 `$HOME`（zsh／bash）或 `$env:USERPROFILE`（PowerShell）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`..` 代表什麼？', options: [
+        { text: '目前所在的資料夾', why: '那是單一個點 `.`。兩個點是往上一層。' },
+        { text: '上一層資料夾', correct: true, why: '`..` 永遠指向目前資料夾的上一層。' },
+        { text: '家目錄', why: '家目錄是 `~`。' },
+        { text: '最上層的根目錄', why: '根目錄是 `/` 或 `C:\\`；`..` 只往上一層。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在 `C:\\Users\\you\\projects\\web`，想用相對路徑到 `C:\\Users\\you\\Desktop`，該打？', options: [
+        { text: '`cd ..\\Desktop`', why: '上一層是 projects，projects 裡沒有 Desktop。' },
+        { text: '`cd ..\\..\\Desktop`', correct: true, why: '兩個 `..` 回到 you，再往下到 Desktop。' },
+        { text: '`cd \\Desktop`', why: '`\\` 開頭代表從目前磁碟的根目錄開始，會去找 `C:\\Desktop`。' },
+        { text: '`cd Desktop`', why: '相對路徑從目前位置往下找，web 裡沒有 Desktop。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼專案的設定檔（例如 `package.json` 裡的 scripts）大多用相對路徑，而不是 `C:\\Users\\you\\...` 這種絕對路徑？'], answer: [
+        '參考：因為專案會被不同的人 clone 到不同的位置、不同的作業系統。相對路徑以專案自己為起點，換到誰的電腦都成立；絕對路徑只在你的電腦上有效。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）資料夾名稱 `My Projects` 有空白，在 PowerShell 要怎麼切換進去？', options: [
+        { text: '`cd "My Projects"`', correct: true, why: '引號把名稱包成一個參數。' },
+        { text: '`cd My Projects`', why: '空白會把它切成兩塊。' },
+        { text: '`cd My_Projects`', why: '底線和空白是不同的字元，這是另一個名字。' },
+        { text: '`cd [My Projects]`', why: '方括號是說明文件的記號，不是引號。' },
+      ] },
+    ],
+    keypoints: [
+      '絕對路徑從根目錄（`/` 或 `C:\\`）開始；相對路徑從目前資料夾開始。',
+      '`~` 家目錄、`.` 這裡、`..` 上一層。',
+      'macOS／Linux 用 `/`；Windows 用 `\\`，PowerShell 也接受 `/`。',
+    ],
+    sources: ['bash-manual', 'ps-overview', 'coreutils'],
+  },
+
+  '2-2': {
+    goals: [
+      '用 `pwd`、`cd`、`ls` 確認位置、移動、查看內容',
+      '在 PowerShell 和 zsh 用同一組名稱操作（認得 PowerShell 的別名）',
+      '用 `ls -la` 看到隱藏檔和檔案細節',
+    ],
+    analogy: {
+      text: ['在陌生大樓裡找房間，你會一直重複三件事：**看門牌**（我在哪：`pwd`）、**看樓層指示**（這裡有什麼：`ls`）、**走過去**（換地方：`cd`）。終端機的移動就是這三招輪流用。'],
+      limit: ['大樓裡你看得到四周，終端機裡你看不到：**不打 `ls`，你根本不知道這裡有什麼**。所以初學時養成習慣：每次 `cd` 之後就 `ls` 一下。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="三個指令的循環：pwd 我在哪，ls 這裡有什麼，cd 換地方，三者循環">
+        <g font-size="22">
+          <rect x="10" y="20" width="160" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="90" y="64" text-anchor="middle" font-weight="900" class="on-color mono">pwd</text><text x="90" y="104" text-anchor="middle" class="on-color">我在哪？</text>
+          <rect x="200" y="20" width="160" height="110" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="64" text-anchor="middle" font-weight="900" class="on-color mono">ls</text><text x="280" y="104" text-anchor="middle" class="on-color">有什麼？</text>
+          <rect x="390" y="20" width="160" height="110" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="470" y="64" text-anchor="middle" font-weight="900" class="on-color mono">cd</text><text x="470" y="104" text-anchor="middle" class="on-color">走過去</text>
+        </g>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M170 75 H200 M360 75 H390 M470 130 V180 H90 V130"/></g>
+        <g class="fill-ink"><path d="M192 67 L202 75 L192 83Z"/><path d="M382 67 L392 75 L382 83Z"/><path d="M82 140 L90 128 L98 140Z"/></g>
+        <text x="280" y="210" text-anchor="middle" font-size="18">迷路時：先 pwd，再 ls</text>
+      </svg>`,
+      caption: '三招循環。PowerShell 也認得 `pwd`、`ls`、`cd`，它們是 PowerShell 指令的別名。',
+      blocks: [
+        { type: 'widget', name: 'fstree', props: { style: 'win', tree: FS_WIN, home: ['Users', 'you'], start: ['Users', 'you'], actions: ['pwd', 'ls', 'cd Documents', 'ls', 'cd school', 'cd ..\\..\\projects\\web', 'dir src', 'cd ~'] } },
+        { type: 'table', caption: '三招在各 shell 的名稱', head: ['做什麼', 'PowerShell 正式名', 'PowerShell 也接受', 'zsh／bash', 'cmd'], rows: [
+          ['我在哪', '`Get-Location`', '`pwd`', '`pwd`', '`cd`（不加參數）'],
+          ['有什麼', '`Get-ChildItem`', '`ls`、`dir`、`gci`', '`ls`', '`dir`'],
+          ['走過去', '`Set-Location`', '`cd`', '`cd`', '`cd`'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'pwd', en: 'print working directory', def: '印出目前所在資料夾的絕對路徑。', example: '`pwd` → `/Users/amy/projects/web`。' },
+      { term: 'cd', en: 'change directory', def: '切換目前所在的資料夾。不加參數時，zsh／bash 會回到家目錄。', example: '`cd ..`、`cd ~/Downloads`、`cd -`（回到上一個位置，zsh／bash）。' },
+      { term: 'ls', en: 'list', def: '列出資料夾的內容。`-l` 詳細資訊、`-a` 包含隱藏檔、`-h` 檔案大小用 KB／MB 顯示。', example: '`ls -lah`。' },
+      { term: '別名', en: 'alias', def: '指令的另一個名字。PowerShell 內建很多和 Unix 相同的別名，讓你用熟悉的名稱打 PowerShell 指令。', example: 'PowerShell 的 `ls` 實際執行 `Get-ChildItem`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '看到隱藏檔',
+        kind: '指令對照',
+        code: true,
+        badLabel: 'zsh：ls -la',
+        goodLabel: 'PowerShell：-Force',
+        bad: '% ls {{1:-la}}\ndrwxr-xr-x  5 amy  staff  160 10月 7 09:30 .\n-rw-r--r--  1 amy  staff   23 10月 7 09:12 {{2:.gitignore}}\n-rw-r--r--  1 amy  staff  412 10月 7 09:30 index.html',
+        good: 'PS> Get-ChildItem {{1:-Force}}\nMode          LastWriteTime   Length Name\n----          -------------   ------ ----\n-a-h--   2026/10/7 09:12        23 {{2:.gitignore}}\n-a----   2026/10/7 09:30       412 index.html',
+        badResult: '`.gitignore` 這種點開頭的檔案平常看不到。',
+        why: ['zsh 用 `-a`，PowerShell 用 `-Force` 顯示隱藏項目', '點開頭的檔案通常是設定，例如 `.gitignore`、`.env`'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 270" role="img" aria-label="ls -l 一行的解讀：開頭的 d 或減號表示資料夾或檔案，接著是權限，然後是擁有者、大小、修改時間、名稱">
+          <rect x="10" y="10" width="540" height="56" class="fill-term stroke-ink" stroke-width="4"/>
+          <text x="22" y="46" font-size="17" class="t-out">-rw-r--r--  1 amy staff 412 10/7 09:30 index.html</text>
+          <g font-size="18">
+            <rect x="10" y="90" width="120" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="70" y="120" text-anchor="middle" class="on-color" font-weight="900">類型＋權限</text><text x="70" y="146" text-anchor="middle" class="on-color" font-size="15">d 是資料夾（4-3）</text>
+            <rect x="140" y="90" width="120" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="200" y="120" text-anchor="middle" font-weight="900">擁有者</text><text x="200" y="146" text-anchor="middle" font-size="15">amy</text>
+            <rect x="270" y="90" width="80" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="310" y="120" text-anchor="middle" font-weight="900">大小</text><text x="310" y="146" text-anchor="middle" font-size="15">bytes</text>
+            <rect x="360" y="90" width="90" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="405" y="120" text-anchor="middle" font-weight="900">修改</text><text x="405" y="146" text-anchor="middle" font-size="15">時間</text>
+            <rect x="460" y="90" width="90" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="505" y="130" text-anchor="middle" class="on-color" font-weight="900">名稱</text>
+          </g>
+          <text x="10" y="200" font-size="18">加 -h 會把 412 顯示成 412B、2.1M 這種好讀的單位。</text>
+          <text x="10" y="236" font-size="18">PowerShell 的 Mode 欄：d 資料夾、a 封存、h 隱藏。</text>
+        </svg>`, caption: '看不懂的欄位先跳過，初學最常用的是：類型（d 開頭是資料夾）、大小、名稱。' },
+      ],
+      tryit: {
+        q: ['在上面的資料夾樹模擬器裡，從 `C:\\Users\\you` 出發，**只用三個指令**找到 `app.js` 在哪個資料夾，並確認它在那裡。寫下你的三個指令。'],
+        code: true,
+        draft: '1. ____\n2. ____\n3. ____',
+        answer: ['一種解法：`cd projects\\web`、`ls`（看到 src）、`ls src`（看到 app.js）。', '也可以 `cd projects\\web\\src` 再 `ls`。重點是：不確定時先 `ls` 看，不要猜。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 PowerShell 打 `ls -la`，出現錯誤。', why: 'PowerShell 的 `ls` 是 `Get-ChildItem` 的別名，它不認得 Unix 的 `-la` 選項。', right: '在 PowerShell 用 `ls -Force`（含隱藏檔）；`-la` 只在 zsh／bash 用。' },
+      { wrong: '`cd` 之後直接執行專案指令，結果在錯的資料夾跑了 `npm install`。', why: '`cd` 打錯一個字可能失敗，你卻沒注意，還留在原地。', right: '`cd` 之後看一眼提示字元或打 `pwd`，確認位置再執行。' },
+      { wrong: '在 cmd 打 `pwd` 找目前位置。', why: 'cmd 沒有 `pwd` 指令。', right: 'cmd 用不加參數的 `cd`，或直接看提示字元。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在 PowerShell 打 `ls`，實際執行的是哪個指令？', options: [
+        { text: 'Unix 系統的 ls 程式', why: 'Windows 預設沒有 Unix 的 ls；PowerShell 用別名讓你能打 ls。' },
+        { text: '`Get-ChildItem`', correct: true, why: '`ls`、`dir`、`gci` 都是 `Get-ChildItem` 的別名。' },
+        { text: 'cmd 的 `dir`', why: '`dir` 在 PowerShell 一樣是 `Get-ChildItem` 的別名，不會去叫 cmd。' },
+        { text: '`List-Item`', why: 'PowerShell 沒有叫 `List-Item` 的 cmdlet；列出內容的是 `Get-ChildItem`。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 zsh 想看下載資料夾裡**所有**檔案（含隱藏檔）和它們的大小，最合適的是？', options: [
+        { text: '`ls ~/Downloads`', why: '不加 `-a` 看不到隱藏檔，不加 `-l` 看不到大小。' },
+        { text: '`ls -lah ~/Downloads`', correct: true, why: '`-l` 詳細、`-a` 全部、`-h` 大小好讀。' },
+        { text: '`ls -Force ~/Downloads`', why: '`-Force` 是 PowerShell 的寫法；zsh 的 ls 不認得。' },
+        { text: '`cd -a ~/Downloads`', why: '`cd` 是移動，不是列出；而且 `-a` 不是 cd 的選項。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你打開終端機，提示字元是 `PS C:\\Windows\\System32>`（用系統管理員開時常見）。你想到自己的專案資料夾工作，第一步打什麼？為什麼不要在這裡工作？'], answer: [
+        '參考：先 `cd ~` 或 `cd ~\\projects\\...` 離開。`System32` 是 Windows 的系統資料夾，在這裡建立或刪除檔案可能影響系統。',
+        '習慣：開始工作前看一眼提示字元，確認自己在專案資料夾裡。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-4）`cd docs` 回了錯誤，你懷疑是不在正確位置。先做什麼？', options: [
+        { text: '`pwd` 看自己在哪，再 `ls` 看有什麼', correct: true, why: '找不到檔案類的錯誤，第一步就是確認位置與內容。' },
+        { text: '用系統管理員重開終端機', why: '那是處理權限錯誤的方法。' },
+        { text: '把 docs 改成大寫 DOCS 再試一次', why: '猜大小寫不如 `ls` 直接看真正的名稱。' },
+        { text: '重新開機', why: '路徑問題跟開機無關。' },
+      ] },
+    ],
+    keypoints: [
+      '三招循環：`pwd` 我在哪、`ls` 有什麼、`cd` 走過去。',
+      'PowerShell 的 `ls`、`cd`、`pwd` 是別名，選項要用 PowerShell 的寫法（`-Force`）。',
+      '`ls -la`：zsh／bash 看隱藏檔和細節；點開頭的檔案多半是設定。',
+    ],
+    sources: ['coreutils', 'ps-overview', 'win-cmd'],
+  },
+
+  '2-3': {
+    goals: [
+      '用指令建立資料夾、複製、移動、改名、刪除',
+      '知道 `rm` 刪除的東西**不會進資源回收筒**',
+      '用萬用字元 `*` 一次處理一批檔案，並先用 `ls` 預覽',
+    ],
+    analogy: {
+      text: ['檔案操作就是搬家的四個動作：**打紙箱**（`mkdir`）、**影印一份**（`cp`）、**搬過去或換標籤**（`mv`）、**丟掉**（`rm`）。'],
+      limit: ['真的搬家，丟掉的東西還能從垃圾桶撿回來。`rm` 是直接送進碎紙機：**沒有資源回收筒、沒有「確定嗎？」**（除非你加 `-i`）。這是終端機和滑鼠最大的差別之一。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="四個動作：mkdir 建立資料夾；cp 複製，原檔還在；mv 移動或改名，原檔消失；rm 刪除，直接消失不進回收筒，用紅色標示">
+        <g font-size="20">
+          <rect x="10" y="10" width="265" height="145" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="46" font-weight="900" class="on-color mono">mkdir 新資料夾</text>
+          <text x="30" y="86" class="on-color">建立</text>
+          <text x="30" y="122" class="on-color" font-size="17">PS：mkdir、New-Item</text>
+          <rect x="285" y="10" width="265" height="145" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="305" y="46" font-weight="900" class="on-color mono">cp 來源 目的</text>
+          <text x="305" y="86" class="on-color">複製：原檔還在</text>
+          <text x="305" y="122" class="on-color" font-size="17">資料夾要加 -r</text>
+          <rect x="10" y="170" width="265" height="145" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="206" font-weight="900" class="on-color mono">mv 來源 目的</text>
+          <text x="30" y="246" class="on-color">移動＝改名</text>
+          <text x="30" y="282" class="on-color" font-size="17">原位置的檔案消失</text>
+          <rect x="285" y="170" width="265" height="145" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+          <text x="305" y="206" font-weight="900" class="on-color mono">rm 檔案</text>
+          <text x="305" y="246" class="on-color" font-weight="900">直接消失</text>
+          <text x="305" y="282" class="on-color" font-size="17">不進資源回收筒</text>
+        </g>
+      </svg>`,
+      caption: '`mv` 同時是「移動」和「改名」：把 `a.txt` 移到同一個資料夾的 `b.txt`，就是改名。',
+      blocks: [
+        { type: 'tabs', label: '四個動作的寫法', tabs: [
+          { label: 'PowerShell', blocks: [{ type: 'code', lang: 'powershell', title: 'PowerShell', code: 'mkdir backup                       # 建立資料夾\nNew-Item notes.txt                 # 建立空檔案\nCopy-Item report.docx backup\\      # 複製（別名 cp）\nCopy-Item photos backup -Recurse   # 複製整個資料夾\nMove-Item draft.txt final.txt      # 改名（別名 mv）\nRemove-Item old.txt                # 刪除（別名 rm）' }] },
+          { label: 'zsh／bash', blocks: [{ type: 'code', lang: 'bash', title: 'zsh', code: 'mkdir backup              # 建立資料夾\nmkdir -p a/b/c            # 一次建立多層\ntouch notes.txt           # 建立空檔案\ncp report.docx backup/    # 複製\ncp -r photos backup/      # 複製整個資料夾\nmv draft.txt final.txt    # 改名\nrm -i old.txt             # 刪除前先問' }] },
+          { label: 'cmd', blocks: [{ type: 'code', lang: 'cmd', title: 'cmd', code: 'mkdir backup\ncopy report.docx backup\\\nxcopy photos backup\\photos\\ /E\nmove draft.txt final.txt\ndel old.txt' }] },
+        ] },
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '先預覽，再刪除', cwd: '~/Downloads', steps: [
+          { cmd: 'ls *.dmg', out: 'setup-1.2.dmg  setup-1.3.dmg  zoom.dmg', cwd: '~/Downloads', note: '`*` 是[[萬用字元]]：`*.dmg` 代表「所有 .dmg 結尾的檔案」。**刪除前先用 `ls` 看會選到哪些。**' },
+          { cmd: 'rm -i *.dmg', out: 'remove setup-1.2.dmg? y\nremove setup-1.3.dmg? y\nremove zoom.dmg? n', cwd: '~/Downloads', note: '`-i` 讓 rm 每個檔案都先問你。zoom.dmg 回答 n，所以保留。' },
+          { cmd: 'ls *.dmg', out: 'zoom.dmg', cwd: '~/Downloads', note: '確認結果：只剩你想留的那一個。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'mkdir', en: 'make directory', def: '建立資料夾。zsh／bash 加 `-p` 可以一次建立多層，已存在也不報錯。', example: '`mkdir -p src/components`。' },
+      { term: 'cp', en: 'copy', def: '複製檔案；複製資料夾要加 `-r`（PowerShell 是 `-Recurse`）。目的地已有同名檔案時會直接覆蓋。', example: '`cp a.txt b.txt`。' },
+      { term: 'mv', en: 'move', def: '移動或改名。目的地已有同名檔案時會直接覆蓋。', example: '`mv old.txt new.txt`。' },
+      { term: 'rm', en: 'remove', def: '刪除檔案，**不經過資源回收筒**。`-r` 刪除整個資料夾，`-f` 不詢問、忽略錯誤。', example: '`rm -i *.log`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '刪除一批檔案',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 直接刪',
+        goodLabel: '✓ 先看再刪',
+        bad: 'rm {{1:* .log}}',
+        good: 'ls {{2:*.log}}\nrm -i {{2:*.log}}',
+        badResult: '`*` 和 `.log` 中間多一個空白：`*` 變成「目前資料夾的所有檔案」，全部被刪除，`.log` 另外再當一個參數。',
+        why: ['先 `ls` 同樣的萬用字元，看清楚會選到什麼；`-i` 再多一道確認'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="萬用字元比對：資料夾裡有 a.txt、b.txt、photo.jpg、notes.md。星號點 txt 選中 a.txt 和 b.txt；問號點 txt 選中單一字元的 a.txt 和 b.txt；星號選中全部四個">
+          <g font-size="19">
+            <text x="10" y="30" font-weight="900">資料夾裡有：a.txt  b.txt  photo.jpg  notes.md</text>
+            <rect x="10" y="50" width="160" height="56" style="fill:var(--k-arg)" class="stroke-ink" stroke-width="3"/><text x="90" y="85" text-anchor="middle" class="on-color mono" font-weight="700">*.txt</text>
+            <text x="190" y="85">→ a.txt、b.txt</text>
+            <rect x="10" y="118" width="160" height="56" style="fill:var(--k-arg)" class="stroke-ink" stroke-width="3"/><text x="90" y="153" text-anchor="middle" class="on-color mono" font-weight="700">photo.*</text>
+            <text x="190" y="153">→ photo.jpg</text>
+            <rect x="10" y="186" width="160" height="56" style="fill:var(--danger)" class="stroke-ink" stroke-width="3"/><text x="90" y="221" text-anchor="middle" class="on-color mono" font-weight="700">*</text>
+            <text x="190" y="221">→ 全部四個（小心！）</text>
+          </g>
+        </svg>`, caption: '`*` 代表任意長度的任意字元。單獨一個 `*` 就是「全部」，和 `rm` 放在一起時特別危險。' },
+      ],
+      tryit: {
+        q: ['用 zsh 完成：建立 `archive` 資料夾，把所有 `.pdf` 移進去，最後確認。寫下三行指令。'],
+        code: true,
+        draft: '1. ____\n2. ____\n3. ____',
+        answer: ['`mkdir archive`、`mv *.pdf archive/`、`ls archive`。', '保險起見可以在第 2 步之前先 `ls *.pdf` 預覽。PowerShell 版：`mkdir archive`、`Move-Item *.pdf archive`、`ls archive`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `rm` 刪錯檔案，打開資源回收筒想救回來。', why: '`rm`、`Remove-Item`、`del` 都直接刪除，不經過資源回收筒。', right: '刪除前先 `ls` 預覽；重要的專案放在 git 裡（6-2），刪錯還能從版本紀錄救回。' },
+      { wrong: '`cp report.docx backup`，但 backup 資料夾不存在。', why: 'cp 會把它當成新檔名，複製出一個叫 `backup` 的檔案，而不是放進資料夾。', right: '先 `mkdir backup`；目的地寫成 `backup/`，結尾的斜線讓錯誤更容易被發現。' },
+      { wrong: '`mv a.txt b.txt` 沒注意 b.txt 已經存在。', why: 'mv 和 cp 預設直接覆蓋同名檔案，舊的 b.txt 就消失了。', right: '不確定時加 `-i`（zsh／bash），覆蓋前會先問。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下列哪個敘述正確？', options: [
+        { text: '`rm` 刪除的檔案會先放進資源回收筒', why: '這是滑鼠刪除的行為；終端機的 rm 直接刪除。' },
+        { text: '`mv` 可以用來把檔案改名', correct: true, why: '移動到同一個資料夾、換一個名稱，就是改名。' },
+        { text: '`cp` 不加選項就能複製整個資料夾', why: '資料夾要加 `-r`（PowerShell 是 `-Recurse`），不然會報錯或略過。' },
+        { text: '`mkdir` 遇到已存在的資料夾會自動合併', why: '預設會報錯「已存在」；zsh／bash 加 `-p` 才會靜靜略過。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你想刪除目前資料夾中所有 `.tmp` 檔，最安全的流程是？', options: [
+        { text: '直接 `rm -rf *`，最乾淨', why: '這會刪掉目前資料夾的**所有東西**，包含子資料夾，而且不問。' },
+        { text: '`ls *.tmp` 確認清單，再 `rm *.tmp`', correct: true, why: '先預覽同一個萬用字元會選到什麼，確認無誤再刪。' },
+        { text: '`rm .tmp`', why: '這只會刪除名稱剛好是 `.tmp` 的那個檔案，不會刪 `a.tmp`。' },
+        { text: '`rm * .tmp`', why: '多一個空白，`*` 會選中所有檔案。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 AI 工具在要執行 `rm -rf` 之類的指令前，會停下來問你？從這課學到的特性解釋。'], answer: [
+        '參考：因為 `rm` 不經過資源回收筒、`-r` 會連子資料夾一起刪、`-f` 不詢問也不報錯。三者加在一起，一個路徑寫錯就可能無法復原。',
+        '所以權限設定通常把它列為「要先詢問」或直接禁止（7-1、8-1）。',
+      ] },
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）`cp -r photos backup` 裡的 `-r` 是什麼零件？', options: [
+        { text: '選項', correct: true, why: '減號開頭的開關，這裡代表遞迴（連子資料夾一起）。' },
+        { text: '參數', why: '參數是 `photos` 和 `backup` 這兩個要處理的對象。' },
+        { text: '子指令', why: 'cp 沒有子指令；`-r` 是改變做法的選項。' },
+        { text: '程式', why: '程式是 `cp`。' },
+      ] },
+    ],
+    keypoints: [
+      '`mkdir` 建立、`cp` 複製、`mv` 移動＋改名、`rm` 刪除。',
+      '`rm` 不進資源回收筒；`cp`、`mv` 會直接覆蓋同名檔案。',
+      '用萬用字元批次處理前，先用 `ls` 預覽同一個樣式。',
+    ],
+    sources: ['coreutils', 'rm', 'ps-overview', 'win-cmd'],
+  },
+
+  '2-4': {
+    goals: [
+      '用 `cat`、`head`、`tail` 讀檔案內容',
+      '用 `grep`（PowerShell 是 `Select-String`）找出含某個字的行',
+      '用 `find`（PowerShell 是 `Get-ChildItem -Recurse`）依檔名找檔案',
+    ],
+    analogy: {
+      text: ['讀檔和搜尋像在圖書館：`cat` 是**整本翻開**，`head`／`tail` 是**只看第一頁或最後一頁**，`grep` 是**用螢光筆找有某個詞的句子**，`find` 是**去書架上找書名**。'],
+      limit: ['圖書館員會理解「類似的詞」，`grep` 不會：它只找完全相符的字（大小寫也算不同，除非加 `-i`）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="三種工具的分工：讀內容用 cat head tail，在內容裡找字用 grep，依名稱找檔案用 find。對應的 PowerShell 是 Get-Content、Select-String、Get-ChildItem -Recurse">
+        <g font-size="19">
+          <rect x="10" y="10" width="170" height="200" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="46" text-anchor="middle" font-weight="900" class="on-color">讀內容</text>
+          <text x="95" y="90" text-anchor="middle" class="on-color mono">cat</text><text x="95" y="120" text-anchor="middle" class="on-color mono">head</text><text x="95" y="150" text-anchor="middle" class="on-color mono">tail</text>
+          <text x="95" y="190" text-anchor="middle" class="on-color mono" font-size="14">Get-Content</text>
+          <rect x="195" y="10" width="170" height="200" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="46" text-anchor="middle" font-weight="900" class="on-color">內容裡找字</text>
+          <text x="280" y="120" text-anchor="middle" class="on-color mono" font-size="28" font-weight="700">grep</text>
+          <text x="280" y="190" text-anchor="middle" class="on-color mono" font-size="14">Select-String</text>
+          <rect x="380" y="10" width="170" height="200" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="46" text-anchor="middle" font-weight="900" class="on-color">依名稱找檔</text>
+          <text x="465" y="120" text-anchor="middle" class="on-color mono" font-size="28" font-weight="700">find</text>
+          <text x="465" y="190" text-anchor="middle" class="on-color mono" font-size="14">gci -Recurse</text>
+          <text x="10" y="250">找「哪個檔案裡寫了 TODO」→ grep</text>
+          <text x="10" y="282">找「哪裡有叫 config.json 的檔案」→ find</text>
+        </g>
+      </svg>`,
+      caption: '每格最下面一行是 PowerShell 的對應寫法。',
+      blocks: [
+        { type: 'widget', name: 'term', props: { shell: 'zsh', title: '讀檔與搜尋', cwd: '~/projects/web', steps: [
+          { cmd: 'head -n 3 src/app.js', out: "import { start } from './server.js';\n// TODO: 加上登入檢查\nstart(3000);", cwd: '~/projects/web', note: '`head -n 3`：只看前 3 行。看大檔案時比 `cat` 安全，不會一下噴出幾萬行。' },
+          { cmd: 'grep -rn "TODO" src', out: 'src/app.js:2:// TODO: 加上登入檢查\nsrc/db.js:14:// TODO: 處理連線逾時', cwd: '~/projects/web', note: '`grep` 找含 TODO 的行。`-r` 搜尋整個資料夾，`-n` 顯示行號。輸出格式是「檔名:行號:內容」。' },
+          { cmd: 'find . -name "*.json"', out: './package.json\n./config/settings.json', cwd: '~/projects/web', note: '`find` 從 `.`（這裡）開始，往下找所有名稱符合 `*.json` 的檔案。注意 `-name` 是 find 的選項，一個減號但是完整單字。' },
+        ] } },
+        { type: 'widget', name: 'term', props: { shell: 'pwsh', title: '同樣的事，PowerShell 版', cwd: 'C:\\Users\\you\\projects\\web', steps: [
+          { cmd: 'Get-Content src\\app.js -TotalCount 3', out: "import { start } from './server.js';\n// TODO: 加上登入檢查\nstart(3000);", note: '`Get-Content`（別名 `cat`、`gc`）讀檔；`-TotalCount 3` 等於 head。看最後幾行用 `-Tail 3`。' },
+          { cmd: 'Select-String -Path src\\*.js -Pattern "TODO"', out: 'src\\app.js:2:// TODO: 加上登入檢查\nsrc\\db.js:14:// TODO: 處理連線逾時', note: '`Select-String`（別名 `sls`）是 PowerShell 的 grep。預設不分大小寫。' },
+          { cmd: 'Get-ChildItem -Recurse -Filter *.json', out: '    Directory: C:\\Users\\you\\projects\\web\n\nMode   LastWriteTime   Length Name\n-a---  2026/10/7 09:30    612 package.json', note: '`-Recurse` 往下所有子資料夾，`-Filter` 依名稱過濾，等於 find。' },
+        ] } },
+      ],
+    },
+    define: [
+      { term: 'cat', en: 'concatenate', def: '把檔案內容整個印出來；原意是「串接」多個檔案。PowerShell 的 `cat` 是 `Get-Content` 的別名，cmd 是 `type`。', example: '`cat notes.txt`。' },
+      { term: 'grep', en: 'global regular expression print', def: '在文字中找出符合樣式的行。`-i` 不分大小寫、`-r` 搜尋資料夾、`-n` 顯示行號。', example: '`grep -i error app.log`。' },
+      { term: 'find', en: 'find', def: '依名稱、類型、時間等條件，在資料夾樹裡找檔案（macOS／Linux）。Windows 上的 cmd 也有一個 `find`，但它是找文字，用途完全不同。', example: '`find . -name "*.md"`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '看一個很大的記錄檔',
+        kind: '指令對照',
+        code: true,
+        badLabel: '✗ 整個印出來',
+        goodLabel: '✓ 只看需要的部分',
+        bad: 'cat {{1:server.log}}\n（畫面捲了 20 萬行，看不到開頭也找不到錯誤）',
+        good: 'tail {{2:-n 50}} server.log\ngrep {{3:-i "error"}} server.log',
+        badResult: '終端機被洗版，重要的錯誤夾在中間根本看不到。',
+        why: ['同一個檔案', '只看最後 50 行：最近發生的事', '只挑出含 error 的行，不分大小寫'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="grep 過濾示意：左邊是五行記錄，右邊只留下含 ERROR 的兩行">
+          <g font-size="16" class="mono">
+            <rect x="10" y="10" width="230" height="230" class="fill-term stroke-ink" stroke-width="4"/>
+            <text x="22" y="46" class="t-out">INFO 啟動</text>
+            <text x="22" y="86" class="t-err">ERROR 連線失敗</text>
+            <text x="22" y="126" class="t-out">INFO 重試</text>
+            <text x="22" y="166" class="t-err">ERROR 逾時</text>
+            <text x="22" y="206" class="t-out">INFO 結束</text>
+            <rect x="320" y="60" width="230" height="130" class="fill-term stroke-ink" stroke-width="4"/>
+            <text x="332" y="110" class="t-err">ERROR 連線失敗</text>
+            <text x="332" y="150" class="t-err">ERROR 逾時</text>
+          </g>
+          <g class="stroke-ink" stroke-width="4"><path d="M240 140 H320"/></g>
+          <text x="280" y="108" text-anchor="middle" font-size="16" font-weight="900" class="mono">grep</text>
+          <text x="280" y="128" text-anchor="middle" font-size="16" font-weight="900" class="mono">ERROR</text>
+        </svg>`, caption: 'grep 像篩子：整行進去，只有含關鍵字的行出來。下一個模組會把它和其他指令串成管線。' },
+      ],
+      tryit: {
+        q: ['用 zsh 寫指令：在 `notes` 資料夾（含子資料夾）裡，找出所有提到「期末考」的行，並顯示行號。'],
+        code: true,
+        draft: '____',
+        answer: ['`grep -rn "期末考" notes`', 'PowerShell 版：`Get-ChildItem notes -Recurse -File | Select-String "期末考"`（用到下一個模組的管線 `|`）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `cat` 打開圖片、壓縮檔或 .exe。', why: '這些是二進位檔，印出來是亂碼，還可能把終端機的顯示弄亂。', right: '`cat` 只用在文字檔；不小心弄亂了可以打 `reset`（zsh／bash）或重開分頁。' },
+      { wrong: '在 Windows 的 cmd 裡用 `find` 找檔名。', why: 'cmd 的 `find` 是在檔案內容裡找文字，跟 Unix 的 find 不是同一個東西。', right: 'Windows 找檔名用 PowerShell 的 `Get-ChildItem -Recurse -Filter`，或 cmd 的 `dir /s`。' },
+      { wrong: '`grep error app.log` 找不到，就以為沒有錯誤。', why: 'grep 預設分大小寫，記錄檔裡可能寫的是 `ERROR` 或 `Error`。', right: '加 `-i` 不分大小寫：`grep -i error app.log`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '想知道「哪些檔案的內容提到 password」，該用哪一類工具？', options: [
+        { text: '`find`，依名稱找檔案', why: 'find 看的是檔名，不是內容。檔名裡沒有 password 的檔案會被漏掉。' },
+        { text: '`grep -r`（PowerShell 是 `Select-String`）', correct: true, why: '搜尋**內容**用 grep；`-r` 讓它檢查整個資料夾。' },
+        { text: '`cat` 每個檔案再用眼睛看', why: '可行但很慢，檔案一多就不可能做到。' },
+        { text: '`ls -la`，看檔案大小判斷', why: 'ls 只列出檔名和屬性，看不到內容。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'PowerShell 裡，只看 `app.log` 最後 20 行，哪一行正確？', options: [
+        { text: '`tail -n 20 app.log`', why: 'Windows 預設沒有 tail 程式；這是 zsh／bash 的寫法。' },
+        { text: '`Get-Content app.log -Tail 20`', correct: true, why: '`-Tail` 是 Get-Content 看最後幾行的參數。' },
+        { text: '`Get-Content app.log -Last 20`', why: '`-Last` 是 `Select-Object` 的參數，Get-Content 用的是 `-Tail`。' },
+        { text: '`type app.log /tail 20`', why: 'cmd 的 type 沒有這個選項。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的專案很大，你想找出「哪裡定義了 `function login`」。用這課學到的工具，寫出你的搜尋策略。'], answer: [
+        '參考：用內容搜尋：`grep -rn "function login" src`（PowerShell：`Get-ChildItem src -Recurse -File | Select-String "function login"`）。',
+        '如果結果太多，縮小範圍：只搜某種副檔名（`grep -rn --include="*.js" ...`），或先用 find 找出可能的檔案。',
+      ] },
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-2）要搜尋含空白的句子「not found」，哪一行正確？', options: [
+        { text: '`grep not found app.log`', why: '沒有引號：grep 只搜尋 `not`，`found` 被當成另一個檔名。' },
+        { text: '`grep "not found" app.log`', correct: true, why: '引號讓 `not found` 成為一個參數。' },
+        { text: '`grep not_found app.log`', why: '底線不等於空白，會搜尋另一個字串。' },
+        { text: '`grep (not found) app.log`', why: '括號在 shell 有特殊意義，不是引號。' },
+      ] },
+    ],
+    keypoints: [
+      '讀內容：`cat`、`head`、`tail`；PowerShell 是 `Get-Content`（`-TotalCount`、`-Tail`）。',
+      '內容裡找字：`grep -rni`；PowerShell 是 `Select-String`。',
+      '依名稱找檔：`find . -name`；PowerShell 是 `Get-ChildItem -Recurse -Filter`。',
+    ],
+    sources: ['coreutils', 'ps-overview', 'win-cmd'],
+  },
+});
+</script>

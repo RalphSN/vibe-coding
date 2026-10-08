@@ -1,0 +1,80 @@
+
+<script>
+/* ==========================================================================
+   模組 0：原文導讀（重點摘要＋短引用；全文請見原文連結）
+   ========================================================================== */
+defineTerms({
+  '卡帕西': { en: 'Andrej Karpathy', def: 'OpenAI 創始成員、前特斯拉 AI 總監，「vibe coding」一詞的提出者。', example: '本書的 4 種輸出格式來自他 2026-10-02 的 X 貼文。' },
+  'LLM': { en: 'large language model', def: '大型語言模型：ChatGPT、Claude、Gemini 背後的模型，依前文預測下一個字來產生文字。' },
+  'token': { en: 'token', def: '模型處理文字的基本單位，大約是一個詞或一個字的一部分。' },
+  'KV cache': { en: 'key-value cache', def: '語言模型生成文字時，暫存每個 token 的中間運算結果（K 和 V），避免重複計算的機制。', example: '原文用它來比較兩種提問的差別（2-1、2-3）。' },
+});
+
+defineLessons({
+  '0-1': {
+    layout: 'reference',
+    minutes: 6,
+    sources: ['bnext', 'x-post', 'ste-home', 'mermaid', 'manim', 'bnext-lotr'],
+    blocks: [
+      { type: 'callout', variant: 'tip', title: '先讀原文', body: [
+        '這本書改編自《數位時代》2026-10-02 的報導（李先泰）。這一課是**導讀與重點摘要**，完整內容請讀原文：',
+        '[→ 前往《數位時代》原文：如何讓AI變身「科普大師」？大神卡帕西推4種輸出技巧，提示詞範例一次看](https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100)',
+        '原文著作權屬原作者與數位時代。本書的摘要、圖解、互動與練習為改寫與延伸；引用的短句與提示詞範本都標示出處。',
+      ] },
+      { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="原文結構地圖：導言與為什麼換格式有效，接著 4 種格式：1 ASD-STE100、2 一張圖、3 HTML 互動網頁、4 Manim 影片，最後是新手怎麼開始；每段標出本書對應單元">
+        <g font-size="17">
+          <rect x="10" y="10" width="540" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="39" font-weight="900">導言・為什麼換格式更有效（1-1、1-2）</text>
+          <rect x="10" y="66" width="128" height="94" class="f1 stroke-ink" stroke-width="3"/><text x="74" y="100" text-anchor="middle" class="on-color" font-weight="900">1 規範</text><text x="74" y="128" text-anchor="middle" class="on-color" font-size="14">ASD-STE100</text><text x="74" y="150" text-anchor="middle" class="on-color" font-size="14">2-1</text>
+          <rect x="147" y="66" width="128" height="94" class="f2 stroke-ink" stroke-width="3"/><text x="211" y="100" text-anchor="middle" class="on-color" font-weight="900">2 一張圖</text><text x="211" y="128" text-anchor="middle" class="on-color" font-size="14">圖表</text><text x="211" y="150" text-anchor="middle" class="on-color" font-size="14">2-2</text>
+          <rect x="284" y="66" width="128" height="94" class="f3 stroke-ink" stroke-width="3"/><text x="348" y="100" text-anchor="middle" class="on-color" font-weight="900">3 網頁</text><text x="348" y="128" text-anchor="middle" class="on-color" font-size="14">HTML</text><text x="348" y="150" text-anchor="middle" class="on-color" font-size="14">2-3</text>
+          <rect x="421" y="66" width="129" height="94" class="f4 stroke-ink" stroke-width="3"/><text x="485" y="100" text-anchor="middle" class="on-color" font-weight="900">4 影片</text><text x="485" y="128" text-anchor="middle" class="on-color" font-size="14">Manim</text><text x="485" y="150" text-anchor="middle" class="on-color" font-size="14">2-4</text>
+          <rect x="10" y="174" width="540" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="203" font-weight="900">新手先從 ASD-STE100 開始（3-1）</text>
+        </g>
+      </svg>`, caption: '原文的結構，以及每一段在本書哪一課拆解。' },
+
+      { type: 'heading', id: 'what', text: '一句話：這篇在講什麼' },
+      { type: 'callout', variant: 'keypoints', title: '重點', body: [
+        '[[卡帕西]]在 2026-10-02 的 [X 貼文](https://x.com/karpathy/status/2105819303471976479)裡主張：想讓 AI 把複雜概念講清楚，與其改措辭，不如**直接改變輸出格式**。',
+        '他給了 4 種格式，像一道階梯；每介紹完一種，就用一句「But even better」帶出下一種更好懂的。',
+      ] },
+
+      { type: 'heading', id: 'why', text: '為什麼換格式有效（原文第一段）' },
+      { type: 'list', items: [
+        '**文字是線性的**：讀者要一邊讀、一邊在腦中拼出架構。主題有流程、層級、元件關係時特別吃力。',
+        '圖、互動網頁、影片能**直接呈現全貌**，把拼圖的工作交給 AI。',
+        '卡帕西認為人的角色會往「監督與理解」移動；AI 製作成本變低後，**只用一次的客製化解說**也值得做。',
+      ] },
+
+      { type: 'heading', id: 'four', text: '4 種格式摘要（原文主體）' },
+      { type: 'table', caption: '原文 4 種方法重點整理', head: ['級', '格式', '原文重點', '本書'], rows: [
+        ['1', 'ASD-STE100 規範文字', '航太維修手冊的英文寫作規範（約 875 個核准詞、句子有字數上限）；英文直接點名、中文借用原則，或用原文改寫的五條中文規則', '2-1'],
+        ['2', '一張圖', '指令要寫清楚圖上的元件、關係、流程方向與標籤字數；可能拿到圖片或 [Mermaid](https://mermaid.live/) 程式碼', '2-2'],
+        ['3', 'HTML 互動網頁', '要求可點開的說明、可調參數的互動元件、單一檔案；存成 .html 用瀏覽器打開', '2-3'],
+        ['4', 'Manim 解說影片', '3Blue1Brown 風格；要在 Claude Code、Codex 這類能執行程式的工具裡做，配音可用 ElevenLabs 或免費替代', '2-4'],
+      ] },
+      { type: 'widget', name: 'ladder', props: {} },
+      '原文用 [[KV cache]] 做了一次實測：同一個問題，一般提問的回答長、名詞多；點名 ASD-STE100 後，回答「一句只講一件事」。兩段實測文字的對照收錄在 **2-1**。',
+
+      { type: 'heading', id: 'start', text: '原文給新手的建議' },
+      { type: 'svg', svg: `<svg viewBox="0 0 560 150" role="img" aria-label="新手三步：先短，再深，最後核對">
+        <g font-size="18" font-weight="900">
+          <rect x="10" y="30" width="160" height="80" class="f1 stroke-ink" stroke-width="3"/><text x="90" y="66" text-anchor="middle" class="on-color">① 先短</text><text x="90" y="94" text-anchor="middle" class="on-color" font-size="14">第 1 級問兩次</text>
+          <rect x="200" y="30" width="160" height="80" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="66" text-anchor="middle">② 再深</text><text x="280" y="94" text-anchor="middle" font-size="14">追問省略的細節</text>
+          <rect x="390" y="30" width="160" height="80" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/><text x="470" y="66" text-anchor="middle" class="on-color">③ 核對</text><text x="470" y="94" text-anchor="middle" class="on-color" font-size="14">對照文字版</text>
+        </g>
+        <g class="stroke-ink" stroke-width="3"><path d="M170 70 H200 M360 70 H390"/></g>
+      </svg>`, caption: '原文最後一段，濃縮成三步。' },
+      { type: 'list', ordered: true, items: [
+        '**先從第 1 級開始**：不用換工具，把「請解釋 X」改成點名規範，同一題問兩次比較。',
+        '**看懂大方向再追問**：簡潔版會省略細節，再請 AI 補上。',
+        '**格式越豐富，越要核對**：圖、網頁、影片的錯誤比文字更難發現。',
+      ] },
+      { type: 'callout', variant: 'tip', title: '原文與延伸閱讀', body: [
+        '[《數位時代》原文全文](https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100)',
+        '原文的延伸閱讀：[Karpathy如何讓Claude用5,500行程式碼刻出《魔戒》世界？](https://www.bnext.com.tw/article/91711/karpathy-claude-opus-lord-of-the-rings)',
+        '原文引用的資料：[卡帕西X貼文](https://x.com/karpathy/status/2105819303471976479)、[ASD-STE100 Issue 9](https://www.asd-ste100.org/assets/files/ASD-STE100_ISSUE9.pdf)、[ASD-STE100官方說明](https://www.asd-ste100.org/about.html)、[3Blue1Brown Manim GitHub](https://github.com/3b1b/manim)',
+      ] },
+    ],
+  },
+});
+</script>
