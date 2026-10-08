@@ -276,6 +276,21 @@ if (-not $SkipHookTests) {
     Write-Host "hook 測試：用 $(Get-PowerShellExe) 跑了 $i 個案例"
 }
 
+# ---------- 同步到 repo 的 .claude/skills/ ----------
+$projectClaude = Join-Path (Split-Path -Parent $Root) '.claude'
+$listFile = Join-Path $Root 'project-skills.txt'
+if ((Test-Path -LiteralPath $projectClaude) -and (Test-Path -LiteralPath $listFile)) {
+    $names = (Read-TextFile $listFile) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }
+    foreach ($n in $names) {
+        $from = Join-Path $Dist "claude-code/global/skills/$n"
+        $to = Join-Path $projectClaude "skills/$n"
+        if (-not (Test-Path -LiteralPath $to)) { Fail $to '沒有同步，請重跑 scripts/build.ps1'; continue }
+        $a = @(Get-ChildItem $from -Recurse -File | ForEach-Object { (Get-RelativePath $from $_.FullName) + '|' + (Get-FileHash $_.FullName).Hash } | Sort-Object)
+        $b = @(Get-ChildItem $to -Recurse -File | ForEach-Object { (Get-RelativePath $to $_.FullName) + '|' + (Get-FileHash $_.FullName).Hash } | Sort-Object)
+        if (($a -join "`n") -ne ($b -join "`n")) { Fail $to '和 dist 不一致：有人直接改了副本，請改 ai-dev-rules/skills/ 後重跑 build' }
+    }
+}
+
 # ---------- 結果 ----------
 Write-Host ''
 Write-Host ("Claude 全域：CLAUDE.md + rules 共 {0} 行" -f $claudeTotal)
