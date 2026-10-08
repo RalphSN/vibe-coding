@@ -15,6 +15,7 @@ Vibe-Coding/
 │  └─ <課程>/
 │     ├─ index.html        成品（GitHub Pages 讀這個）
 │     └─ src/              原始分段檔（有的課才有）→ 改這裡再重建
+├─ AGENTS.md               給 AI agent 的工作說明（CLAUDE.md、GEMINI.md 都指向它）
 ├─ ai-dev-rules/           三個 AI 工具共用的規範與 skills（來源 → build → dist → install）
 ├─ .claude/
 │  ├─ skills/impeccable/   前端設計 skill（第三方，Apache-2.0）

@@ -69,6 +69,10 @@ pwsh scripts/new-project.ps1 -Starter vue3-vite-ts -Target ~/code/my-app
 3. `scripts/verify.ps1` 檢查，失敗會列出檔名與原因。
 4. `scripts/install.ps1` 預覽，再加 `-Apply` 寫入。
 
+- 刪除 skill：刪掉 `skills/<名稱>/` 再 build。install 會把家目錄裡我們裝過、但來源已刪除的檔案一併刪掉（只刪有「由 build.ps1 產生」標記的檔案，先備份），你自己放的 skill 不受影響。
+- 雲端 session 要用的 skill：名稱加進 `project-skills.txt`，build 會同步到上一層 repo 的 `.claude/skills/`。
+- 完整的 AI agent 工作說明在上一層 repo 的 `AGENTS.md`。
+
 寫規則的原則：一條規則一句話、可以被檢查。「回答要好」不行，「先給結論，再給理由」可以。
 
 程式碼註解預設繁體中文。想改成英文：改 `core/02-code-quality.md` 的「註解」一節，再 build。

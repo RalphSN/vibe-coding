@@ -79,6 +79,7 @@ if ($Tool -ne 'all') { $Tools = @($Tool) }
 $OurHookScripts = 'block-dangerous.ps1', 'format-on-edit.ps1'
 
 $Actions = New-Object System.Collections.Generic.List[object]
+$BuildMarker = '由 scripts/build.ps1 產生'
 
 function Add-Action([string]$Kind, [string]$Source, [string]$Dest, [string]$Label) {
     $Actions.Add([pscustomobject]@{ Kind = $Kind; Source = $Source; Dest = $Dest; Label = $Label; Status = ''; NewText = $null })
@@ -89,6 +90,19 @@ function Add-CopyTree([string]$SourceDir, [string]$DestDir, [string]$Label) {
     foreach ($f in Get-ChildItem -LiteralPath $SourceDir -Recurse -File) {
         $rel = Get-RelativePath $SourceDir $f.FullName
         Add-Action 'copy' $f.FullName (Join-Path $DestDir $rel) $Label
+    }
+}
+
+function Add-StaleRemovals([string]$SourceDir, [string]$DestDir, [string]$Label) {
+    # 來源已經刪掉、但家目錄還留著的舊檔：只處理開頭有 build.ps1 產生標記的檔案（我們裝的），使用者自己放的不碰
+    if (-not (Test-Path -LiteralPath $DestDir)) { return }
+    foreach ($f in Get-ChildItem -LiteralPath $DestDir -Recurse -File) {
+        $rel = Get-RelativePath $DestDir $f.FullName
+        if (Test-Path -LiteralPath (Join-Path $SourceDir $rel)) { continue }
+        $head = ''
+        try { $head = Read-TextFile $f.FullName } catch { continue }
+        if ($head.Length -gt 1500) { $head = $head.Substring(0, 1500) }
+        if ($head -like "*$BuildMarker*") { Add-Action 'remove' '' $f.FullName $Label }
     }
 }
 
@@ -211,12 +225,14 @@ if ($Scope -eq 'global') {
                 $src = Join-Path $Dist 'claude-code/global'; $dst = Join-Path $HomeDir '.claude'
                 Add-Action 'copy' (Join-Path $src 'CLAUDE.md') (Join-Path $dst 'CLAUDE.md') 'claude'
                 foreach ($sub in 'rules', 'skills', 'agents', 'hooks') { Add-CopyTree (Join-Path $src $sub) (Join-Path $dst $sub) 'claude' }
+                foreach ($sub in 'rules', 'skills', 'agents') { Add-StaleRemovals (Join-Path $src $sub) (Join-Path $dst $sub) 'claude' }
                 Add-Action 'merge-claude' (Join-Path $src 'settings.json') (Join-Path $dst 'settings.json') 'claude'
             }
             'codex' {
                 $src = Join-Path $Dist 'codex/global'; $dst = Join-Path $HomeDir '.codex'
                 Add-Action 'copy' (Join-Path $src 'AGENTS.md') (Join-Path $dst 'AGENTS.md') 'codex'
                 foreach ($sub in 'skills', 'rules', 'agents', 'hooks') { Add-CopyTree (Join-Path $src $sub) (Join-Path $dst $sub) 'codex' }
+                foreach ($sub in 'skills', 'agents') { Add-StaleRemovals (Join-Path $src $sub) (Join-Path $dst $sub) 'codex' }
                 Add-Action 'merge-hooks' (Join-Path $src 'hooks.json') (Join-Path $dst 'hooks.json') 'codex'
                 if ($IncludeCodexPermissions) { Add-Action 'codex-toml' (Join-Path $src 'config.snippet.toml') (Join-Path $dst 'config.toml') 'codex' }
             }
@@ -224,6 +240,7 @@ if ($Scope -eq 'global') {
                 $src = Join-Path $Dist 'antigravity/global'; $dst = Join-Path $HomeDir '.gemini'
                 Add-Action 'copy' (Join-Path $src 'GEMINI.md') (Join-Path $dst 'GEMINI.md') 'antigravity'
                 foreach ($sub in 'config/skills', 'config/hooks') { Add-CopyTree (Join-Path $src $sub) (Join-Path $dst $sub) 'antigravity' }
+                Add-StaleRemovals (Join-Path $src 'config/skills') (Join-Path $dst 'config/skills') 'antigravity'
                 Add-Action 'merge-ag-hooks' (Join-Path $src 'config/hooks.json') (Join-Path $dst 'config/hooks.json') 'antigravity'
                 Add-Action 'merge-permissions' (Join-Path $src 'antigravity-cli/settings.json') (Join-Path $dst 'antigravity-cli/settings.json') 'antigravity'
             }
@@ -262,6 +279,7 @@ if ($Scope -eq 'global') {
 # ---------- 計算每個動作的結果 ----------
 
 foreach ($a in $Actions) {
+    if ($a.Kind -eq 'remove') { $a.Status = '刪除（先備份；來源已移除）'; continue }
     if (-not (Test-Path -LiteralPath $a.Source)) { throw "dist 裡找不到 $($a.Source)，先重跑 build.ps1。" }
     switch ($a.Kind) {
         'copy' { $a.NewText = Read-TextFile $a.Source }
@@ -331,6 +349,16 @@ foreach ($a in $changed) {
         $backup = Join-Path (Join-Path $BackupRoot "$Scope-$($a.Label)") $rel
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
         Copy-Item -LiteralPath $a.Dest -Destination $backup -Force
+    }
+    if ($a.Kind -eq 'remove') {
+        Remove-Item -LiteralPath $a.Dest -Force
+        # 往上清掉變空的資料夾（停在工具的根資料夾之前）
+        $dir = Split-Path -Parent $a.Dest
+        while ($dir -and $dir.Length -gt $baseDir.Length + 10 -and (Test-Path -LiteralPath $dir) -and -not (Get-ChildItem -LiteralPath $dir -Force)) {
+            Remove-Item -LiteralPath $dir -Force
+            $dir = Split-Path -Parent $dir
+        }
+        continue
     }
     Write-TextFile $a.Dest $a.NewText
 }
