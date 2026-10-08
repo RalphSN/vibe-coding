@@ -748,6 +748,7 @@ const SITES = [
         desc: 'Cao Xueqin and Gao E. The full 120 chapters in Traditional Chinese, with page-turning and saved reading position.',
       },
     },
+    kind: 'book', // 文字書籍：單位是「回」，介紹卡不顯示模組與製作狀態
     modules: 1,
     lessons: 120,
     readyLessons: 120,
@@ -825,6 +826,8 @@ const STRINGS = {
     imprint: '端點星 藏書',
     channelLabel: (title) => `${title}，YouTube 頻道（外部連結）`, channelContent: 'YouTube 影音頻道', externalLink: '外部連結',
     channelStamp: '影音典藏', lessonUnit: '單元', runningHead: '端點星 · 書目', chapter: '卷首',
+    bookUnit: '回', bookContent: (l) => `${l} 回全文`, bookColophon: (l) => `全書 ${l} 回`,
+    bookLabelText: (title, l, done) => `${title}，${l} 回，已讀 ${done} 回`,
   },
   en: {
     brand: 'Terminus', motto: 'On the very fringe of the Galactic spiral', loading: 'Leafing through the shelves',
@@ -842,6 +845,8 @@ const STRINGS = {
     imprint: 'From the library of Terminus',
     channelLabel: (title) => `${title}, YouTube channel (external link)`, channelContent: 'YouTube video channel', externalLink: 'External link',
     channelStamp: 'Video archive', lessonUnit: 'lessons', runningHead: 'Terminus · Catalogue', chapter: 'Prologue',
+    bookUnit: 'ch.', bookContent: (l) => `Full text, ${l} chapters`, bookColophon: (l) => `${l} chapters`,
+    bookLabelText: (title, l, done) => `${title}, ${l} chapters, ${done} read`,
   },
 };
 
@@ -918,7 +923,7 @@ function renderBook(site) {
     <li>
       <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}" draggable="false"
          style="--accent:${site.color};--w:${spineWidth(site)}px;--h:${site.height}"
-         aria-label="${escapeHtml(site.external ? t('channelLabel', text.titlePhrases.join(' ')) : t('bookLabel', text.titlePhrases.join(' '), site.lessons, done))}">
+         aria-label="${escapeHtml(site.external ? t('channelLabel', text.titlePhrases.join(' ')) : t(site.kind === 'book' ? 'bookLabelText' : 'bookLabel', text.titlePhrases.join(' '), site.lessons, done))}">
         <span class="book-fallback" aria-hidden="true">${escapeHtml(text.spineTitle)}</span>
       </a>
     </li>`;
@@ -1065,8 +1070,10 @@ function distributeBooks() {
 
 function renderShelfDom() {
   distributeBooks();
-  const totalLessons = SITES.reduce((sum, s) => sum + (s.external ? 0 : s.lessons), 0);
-  const totalDone = SITES.reduce((sum, s) => sum + siteStats(s).done, 0);
+  // 單元數與已讀只算課程；書的「回」單位不同，不混進來
+  const courses = SITES.filter((s) => !s.external && s.kind !== 'book');
+  const totalLessons = courses.reduce((sum, s) => sum + s.lessons, 0);
+  const totalDone = courses.reduce((sum, s) => sum + siteStats(s).done, 0);
   document.getElementById('shelf-summary').textContent = t('summary', SITES.length, totalLessons, totalDone);
   document.getElementById('shelf-hint').textContent = window.matchMedia('(hover: hover)').matches ? t('hintHover') : t('hintTouch');
   hideCard();
@@ -1125,16 +1132,17 @@ function cardHtml(site) {
     </div>`;
   }
   const status = isComplete ? t('complete') : t('inProgress', site.readyLessons);
+  const isBook = site.kind === 'book';
   return `
     <div class="scroll-body" style="clip-path:${tornEdges()}">
     <h2>${phrasesHtml(text.titlePhrases)}</h2>
     <p>${escapeHtml(text.desc)}</p>
     <div class="card-progress" aria-hidden="true"><span style="--ratio:${done / site.lessons};--accent:${site.color}"></span></div>
     <dl>
-      <dt>${t('path')}</dt><dd>${escapeHtml(site.href.replace(/index\.html$/, ''))}</dd>
-      <dt>${t('content')}</dt><dd>${escapeHtml(t('contentValue', site.modules, site.lessons))}</dd>
-      <dt>${t('status')}</dt><dd>${escapeHtml(status)}</dd>
-      <dt>${t('read')}</dt><dd>${done} / ${site.lessons}</dd>
+      <dt>${t('path')}</dt><dd>${escapeHtml(site.href.replace(/\?.*$/, '').replace(/index\.html$/, ''))}</dd>
+      <dt>${t('content')}</dt><dd>${escapeHtml(isBook ? t('bookContent', site.lessons) : t('contentValue', site.modules, site.lessons))}</dd>
+      ${isBook ? '' : `<dt>${t('status')}</dt><dd>${escapeHtml(status)}</dd>`}
+      <dt>${t('read')}</dt><dd>${done} / ${site.lessons}${isBook ? ` ${escapeHtml(t('bookUnit'))}` : ''}</dd>
       <dt>${t('verified')}</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>
     ${isTouchUI() ? `<button type="button" class="card-enter" data-enter="${escapeHtml(site.id)}">${escapeHtml(t('enter'))}</button>` : ''}
@@ -1622,7 +1630,8 @@ function paintSpine(ctx, site, w, h, k, titleSize, mode) {
 
   // 底部數字
   // 完成與製作中統一格式：可讀單元／總單元
-  const foot = site.foot || (site.external ? 'YouTube' : `${site.readyLessons}/${site.lessons}`);
+  const foot = site.foot || (site.external ? 'YouTube'
+    : site.kind === 'book' ? `${site.lessons} ${t('bookUnit')}` : `${site.readyLessons}/${site.lessons}`);
   ctx.font = `400 11px ${MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1884,7 +1893,9 @@ function paintLeafBack(canvas, site) {
   drawOrnament(ctx, cx, H * 0.62, 70 * u, u, 'rgba(42, 33, 24, 0.4)');
   ctx.fillStyle = INK_2;
   ctx.font = `400 ${10.5 * u}px ${SERIF}`;
-  ctx.fillText(site.external ? t('channelContent') : t('colophon', site.modules, site.lessons), cx, H * 0.62 + 24 * u);
+  const colophon = site.external ? t('channelContent')
+    : site.kind === 'book' ? t('bookColophon', site.lessons) : t('colophon', site.modules, site.lessons);
+  ctx.fillText(colophon, cx, H * 0.62 + 24 * u);
   ctx.font = `400 ${9 * u}px ${SERIF}`;
   ctx.fillText(`© ${site.updated.slice(0, 4)} ${t('brand')}`, cx, H * 0.62 + 42 * u);
 
@@ -2068,7 +2079,7 @@ function paintCover(canvas, site, mode) {
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'right';
   ctx.font = `500 ${12 * u}px ${MONO}`;
-  ctx.fillText(site.external ? 'YouTube' : `${site.lessons} ${t('lessonUnit')}`, W - inset - 18 * u, inset + 38 * u);
+  ctx.fillText(site.external ? 'YouTube' : `${site.lessons} ${t(site.kind === 'book' ? 'bookUnit' : 'lessonUnit')}`, W - inset - 18 * u, inset + 38 * u);
 
   // 書名：按詞組換行，靠左下
   const titleSize = 30 * u;

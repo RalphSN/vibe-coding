@@ -656,6 +656,7 @@ const SITES = [
     modules: 1,
     lessons: 120,
     readyLessons: 120,
+    kind: 'book', // 文字書籍：單位是「回」，說明欄不顯示模組與製作狀態
     updated: '2026-10',
     height: 0.98,
     progressKey: 'hongloumeng.v1',
@@ -720,9 +721,12 @@ function findSite(element) {
 }
 
 /* ---------- 書櫃 ---------- */
+/** 書背與說明欄用的單位：課程是「課」，文字書籍是「回」 */
+const unitOf = (site) => (site.kind === 'book' ? '回' : '課');
+
 function spineHtml(site) {
   const { done, isComplete } = siteStats(site);
-  const foot = isComplete ? `${site.lessons} 課` : `${site.readyLessons}/${site.lessons}`;
+  const foot = isComplete ? `${site.lessons} ${unitOf(site)}` : `${site.readyLessons}/${site.lessons}`;
   return `
     <span class="spine">
       <span class="band"></span>
@@ -742,7 +746,7 @@ function renderBook(site) {
     <li>
       <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}"
          style="--accent:${site.color};--w:${width}px;--h:${site.height}"
-         aria-label="${escapeHtml(fullTitle)}，${site.lessons} 個單元，已讀 ${done} 個">
+         aria-label="${escapeHtml(fullTitle)}，${site.lessons} ${site.kind === 'book' ? '回' : '個單元'}，已讀 ${done} ${site.kind === 'book' ? '回' : '個'}">
         <span class="book-contact" aria-hidden="true"></span>
         ${spineHtml(site)}
       </a>
@@ -777,8 +781,10 @@ function fitSpineTitles() {
 function renderShelf() {
   document.getElementById('books').innerHTML = SITES.map(renderBook).join('') + BOOKEND;
   fitSpineTitles();
-  const totalLessons = SITES.reduce((sum, s) => sum + s.lessons, 0);
-  const totalDone = SITES.reduce((sum, s) => sum + siteStats(s).done, 0);
+  // 單元數與已讀只算課程；書的「回」單位不同，不混進來
+  const courses = SITES.filter((s) => s.kind !== 'book');
+  const totalLessons = courses.reduce((sum, s) => sum + s.lessons, 0);
+  const totalDone = courses.reduce((sum, s) => sum + siteStats(s).done, 0);
   document.getElementById('shelf-summary').textContent = `${SITES.length} 本 · ${totalLessons} 單元 · 已讀 ${totalDone}`;
   inspectedId = undefined;
   showInspector(null);
@@ -794,16 +800,17 @@ function inspectorHtml(site) {
   }
   const { done, isComplete } = siteStats(site);
   const status = isComplete ? '已完成' : `製作中，${site.readyLessons} 個單元可讀`;
+  const isBook = site.kind === 'book';
   return `
     <div>
       <h2>${phrasesHtml(site.titlePhrases)}</h2>
       <p>${escapeHtml(site.desc)}</p>
     </div>
     <dl>
-      <dt>路徑</dt><dd>${escapeHtml(site.href.replace(/index\.html$/, ''))}</dd>
-      <dt>內容</dt><dd>${site.modules} 模組 · ${site.lessons} 單元</dd>
-      <dt>狀態</dt><dd>${escapeHtml(status)}</dd>
-      <dt>已讀</dt><dd>${done} / ${site.lessons}</dd>
+      <dt>路徑</dt><dd>${escapeHtml(site.href.replace(/\?.*$/, '').replace(/index\.html$/, ''))}</dd>
+      <dt>內容</dt><dd>${isBook ? `${site.lessons} 回全文` : `${site.modules} 模組 · ${site.lessons} 單元`}</dd>
+      ${isBook ? '' : `<dt>狀態</dt><dd>${escapeHtml(status)}</dd>`}
+      <dt>已讀</dt><dd>${done} / ${site.lessons}${isBook ? ' 回' : ''}</dd>
       <dt>查證</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>`;
 }
@@ -860,11 +867,11 @@ function book3dHtml(site, spineRect) {
     </div>
     <div class="b3-leaf">
       <div class="b3 leaf-front paper gutter-left"><div><strong>${phrasesHtml(site.titlePhrases)}</strong><span>Vibe Coding</span></div><i class="shade"></i></div>
-      <div class="b3 leaf-back paper gutter-right"><div><span>${site.modules} 模組 · ${site.lessons} 單元</span><span class="stamp">已讀 ${done} / ${site.lessons}</span></div><i class="shade"></i></div>
+      <div class="b3 leaf-back paper gutter-right"><div><span>${site.kind === 'book' ? `全書 ${site.lessons} 回` : `${site.modules} 模組 · ${site.lessons} 單元`}</span><span class="stamp">已讀 ${done} / ${site.lessons}</span></div><i class="shade"></i></div>
     </div>
     <div class="b3-cover">
       <div class="b3 cover-front cloth">
-        <div class="cover-head">${ICONS[site.icon]}<small>${site.lessons} 單元</small></div>
+        <div class="cover-head">${ICONS[site.icon]}<small>${site.lessons} ${site.kind === 'book' ? '回' : '單元'}</small></div>
         <div><h3>${phrasesHtml(site.titlePhrases)}</h3><small>VIBE CODING · ${escapeHtml(site.updated)}</small></div>
         <i class="shade"></i>
       </div>
