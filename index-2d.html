@@ -655,10 +655,28 @@ const SITES = [
     modules: 1,
     lessons: 120,
     readyLessons: 120,
-    kind: 'book', // 文字書籍：單位是「回」，說明欄不顯示模組與製作狀態
+    kind: 'book', // 文字書籍：說明欄不顯示模組與製作狀態
+    unit: '回',
     updated: '2026-10',
     height: 0.98,
     progressKey: 'hongloumeng.v1',
+  },
+  {
+    id: 'the-great-gatsby',
+    color: '#1d2c4c',
+    icon: 'book',
+    href: 'books/the-great-gatsby/index.html?from=shelf',
+    spineTitle: '大亨小傳',
+    titlePhrases: ['大亨小傳'],
+    desc: '費茲傑羅著，1925 年英文原文，九章全文。翻頁閱讀，自動記住讀到哪一頁。',
+    modules: 1,
+    lessons: 9,
+    readyLessons: 9,
+    kind: 'book',
+    unit: '章',
+    updated: '2026-10',
+    height: 0.88,
+    progressKey: 'the-great-gatsby.v1',
   },
 ];
 
@@ -721,7 +739,7 @@ function findSite(element) {
 
 /* ---------- 書櫃 ---------- */
 /** 書背與說明欄用的單位：課程是「課」，文字書籍是「回」 */
-const unitOf = (site) => (site.kind === 'book' ? '回' : '課');
+const unitOf = (site) => (site.kind === 'book' ? site.unit : '課');
 
 function spineHtml(site) {
   const { done, isComplete } = siteStats(site);
@@ -745,7 +763,7 @@ function renderBook(site) {
     <li>
       <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}"
          style="--accent:${site.color};--w:${width}px;--h:${site.height}"
-         aria-label="${escapeHtml(fullTitle)}，${site.lessons} ${site.kind === 'book' ? '回' : '個單元'}，已讀 ${done} ${site.kind === 'book' ? '回' : '個'}">
+         aria-label="${escapeHtml(fullTitle)}，${site.lessons} ${site.kind === 'book' ? site.unit : '個單元'}，已讀 ${done} ${site.kind === 'book' ? site.unit : '個'}">
         <span class="book-contact" aria-hidden="true"></span>
         ${spineHtml(site)}
       </a>
@@ -807,9 +825,9 @@ function inspectorHtml(site) {
     </div>
     <dl>
       <dt>路徑</dt><dd>${escapeHtml(site.href.replace(/\?.*$/, '').replace(/index\.html$/, ''))}</dd>
-      <dt>內容</dt><dd>${isBook ? `${site.lessons} 回全文` : `${site.modules} 模組 · ${site.lessons} 單元`}</dd>
+      <dt>內容</dt><dd>${isBook ? `${site.lessons} ${site.unit}全文` : `${site.modules} 模組 · ${site.lessons} 單元`}</dd>
       ${isBook ? '' : `<dt>狀態</dt><dd>${escapeHtml(status)}</dd>`}
-      <dt>已讀</dt><dd>${done} / ${site.lessons}${isBook ? ' 回' : ''}</dd>
+      <dt>已讀</dt><dd>${done} / ${site.lessons}${isBook ? ` ${site.unit}` : ''}</dd>
       <dt>查證</dt><dd>${escapeHtml(site.updated)}</dd>
     </dl>`;
 }
@@ -866,11 +884,11 @@ function book3dHtml(site, spineRect) {
     </div>
     <div class="b3-leaf">
       <div class="b3 leaf-front paper gutter-left"><div><strong>${phrasesHtml(site.titlePhrases)}</strong><span>Vibe Coding</span></div></div>
-      <div class="b3 leaf-back paper gutter-right"><div><span>${site.kind === 'book' ? `全書 ${site.lessons} 回` : `${site.modules} 模組 · ${site.lessons} 單元`}</span><span class="stamp">已讀 ${done} / ${site.lessons}</span></div></div>
+      <div class="b3 leaf-back paper gutter-right"><div><span>${site.kind === 'book' ? `全書 ${site.lessons} ${site.unit}` : `${site.modules} 模組 · ${site.lessons} 單元`}</span><span class="stamp">已讀 ${done} / ${site.lessons}</span></div></div>
     </div>
     <div class="b3-cover">
       <div class="b3 cover-front cloth">
-        <div class="cover-head">${ICONS[site.icon]}<small>${site.lessons} ${site.kind === 'book' ? '回' : '單元'}</small></div>
+        <div class="cover-head">${ICONS[site.icon]}<small>${site.lessons} ${site.kind === 'book' ? site.unit : '單元'}</small></div>
         <div><h3>${phrasesHtml(site.titlePhrases)}</h3><small>VIBE CODING · ${escapeHtml(site.updated)}</small></div>
         
       </div>
