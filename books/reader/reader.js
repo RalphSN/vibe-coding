@@ -17,6 +17,10 @@
   const SWIPE_MIN = 40;
   const FONT_WAIT_MS = 3000;
   const RESIZE_DEBOUNCE_MS = 150;
+  const LINE_HEIGHT = 1.95; // 和 reader.css 的 .flow 用同一個值，由這裡寫進 --reader-lh
+  const LETTER_SPACING_EM = 0.04; // 同上，寫進 --reader-ls
+  const GRID_SLACK_PX = 1; // 剛好等於整數倍時，小數誤差可能讓最後一個字或最後一行被擠掉，留 1px
+  const MAX_QUEUED_FLIPS = 5; // 連點時最多累積幾頁，避免一口氣翻太遠
   const FRONT = 0; // 第 0 回是卷首（書名頁＋說明頁）
 
   const $ = (sel) => document.querySelector(sel);
@@ -132,11 +136,19 @@
     }
     pageW = Math.floor(pageW);
     pageH = Math.floor(pageH);
-    const padX = Math.round(Math.min(56, Math.max(20, pageW * 0.09)));
-    const padY = Math.round(Math.min(60, Math.max(34, pageH * 0.075)));
-    const colW = pageW - padX * 2;
+    const size = FONT_SIZES[fontIndex];
+    const basePadX = Math.round(Math.min(56, Math.max(20, pageW * 0.09)));
+    const basePadY = Math.round(Math.min(60, Math.max(34, pageH * 0.075)));
+    // 欄寬取「字寬＋字距」的整數倍：每行剛好排滿整數個字，左右對齊時字距不會被撐開
+    const charAdvance = size * (1 + LETTER_SPACING_EM);
+    const colW = Math.floor((pageW - basePadX * 2) / charAdvance) * charAdvance + GRID_SLACK_PX;
+    // 文字區高度取行高的整數倍：最後一行剛好貼齊底部，多出的空間平均分到上下
+    const lineH = size * LINE_HEIGHT;
+    const textH = Math.floor((pageH - basePadY * 2) / lineH) * lineH + GRID_SLACK_PX;
+    const padX = (pageW - colW) / 2;
+    const padY = (pageH - textH) / 2;
     const gap = padX * 2;
-    return { isSpread, pageW, pageH, padX, padY, colW, gap, step: colW + gap, size: FONT_SIZES[fontIndex] };
+    return { isSpread, pageW, pageH, padX, padY, colW, gap, step: colW + gap, size };
   }
 
   function applyLayout() {
@@ -150,6 +162,8 @@
     s.setProperty('--col-w', `${layout.colW}px`);
     s.setProperty('--col-gap', `${layout.gap}px`);
     s.setProperty('--reader-size', `${layout.size}px`);
+    s.setProperty('--reader-lh', String(LINE_HEIGHT));
+    s.setProperty('--reader-ls', `${LETTER_SPACING_EM}em`);
     bookEl.classList.toggle('single', !layout.isSpread);
     counts.clear();
     document.querySelectorAll('.page[data-key]').forEach((el) => { delete el.dataset.key; });
@@ -168,6 +182,10 @@
   }
 
   const span = () => (layout.isSpread ? 2 : 1);
+
+  /** 比例換回頁碼。ratio 是 page / count 存下來的，直接 floor 會因浮點誤差少一頁（30/44*44 = 29.999…），加一點容差 */
+  const RATIO_EPSILON = 1e-6;
+  const pageAtRatio = (ratio, count) => Math.min(count - 1, Math.floor(ratio * count + RATIO_EPSILON));
   const alignPage = (page) => page - (page % span());
 
   /** 把頁面元素設定成「第 n 回的第 i 頁」。同一回只換平移量，不重排整回文字 */
@@ -255,27 +273,46 @@
       frontShade && frontShade.animate(forward ? shadeFrames(0, 0.32) : shadeFrames(0.32, 0), opts).finished,
       backShade && backShade.animate(forward ? shadeFrames(0.32, 0) : shadeFrames(0, 0.32), opts).finished,
     ]);
+  }
+
+  const nextFrame = () => new Promise((resolve) => { window.requestAnimationFrame(() => resolve()); });
+
+  /**
+   * 翻完先讓翻頁停在原位蓋著，底下的頁面換好內容、畫完兩個畫格才收起。
+   * 每回內文是一條很寬的文字流，換頁是平移它；Safari 只先畫看得到的部分，
+   * 直接收起翻頁會露出還沒畫好的新位置，那一頁的字會閃一下。
+   */
+  async function hideLeafAfterPaint() {
+    await nextFrame();
+    await nextFrame();
     leaf.hidden = true;
     leaf.getAnimations({ subtree: true }).forEach((a) => a.cancel());
   }
 
   async function flip(dir) {
-    if (busy) { queued = dir; return; }
+    // 翻頁動畫中又按了，記下次數依序翻完；反方向的會互相抵銷
+    if (busy) { queued = Math.max(-MAX_QUEUED_FLIPS, Math.min(MAX_QUEUED_FLIPS, queued + dir)); return; }
     busy = true;
     try {
       const target = dir > 0 ? nextPos(cur) : await prevPos(cur);
-      if (!target) return;
+      if (!target) { queued = 0; return; }
       await ensure(target.ch);
       const animate = !reduceMotion.matches;
       if (animate) await playFlip(dir, target);
       cur = target;
       render();
+      if (animate) await hideLeafAfterPaint();
       prefetch();
     } catch (err) {
+      leaf.hidden = true;
       console.error(`翻頁失敗（第 ${cur.ch} 回第 ${cur.page + 1} 頁，方向 ${dir}）：`, err);
     } finally {
       busy = false;
-      if (queued) { const next = queued; queued = 0; flip(next); }
+      if (queued) {
+        const next = Math.sign(queued);
+        queued -= next;
+        flip(next);
+      }
     }
   }
 
@@ -402,12 +439,12 @@
   /** 目前這一頁（雙頁時是這一攤）是否就是讀到最遠的地方 */
   function isAtFurthest() {
     if (cur.ch !== furthest.ch) return false;
-    return alignPage(Math.floor(furthest.ratio * pageCount(cur.ch))) === cur.page;
+    return alignPage(pageAtRatio(furthest.ratio, pageCount(cur.ch))) === cur.page;
   }
 
   async function goToFurthest() {
     await ensure(furthest.ch);
-    goTo(furthest.ch, alignPage(Math.floor(furthest.ratio * pageCount(furthest.ch))));
+    goTo(furthest.ch, alignPage(pageAtRatio(furthest.ratio, pageCount(furthest.ch))));
   }
 
   function readDone() {
@@ -484,14 +521,16 @@
   const menuBtn = $('#menu-btn');
   const blockedWhileOpen = ['.nav', '#stage', '.bar'];
 
-  function openDrawer() {
+  /** viaKeyboard：用鍵盤開啟時焦點放到目前那一回；滑鼠或觸控開啟時放在側欄本身，不顯示 focus 框 */
+  function openDrawer(viaKeyboard) {
     document.body.classList.add('drawer-open');
     drawer.removeAttribute('aria-hidden');
     menuBtn.setAttribute('aria-expanded', 'true');
     blockedWhileOpen.forEach((sel) => { document.querySelector(sel).inert = true; });
     const current = drawer.querySelector('a[aria-current="true"]');
     if (current) current.scrollIntoView({ block: 'center' });
-    (current || $('#drawer-close')).focus({ preventScroll: true });
+    const focusTarget = viaKeyboard ? (current || $('#drawer-close')) : drawer;
+    focusTarget.focus({ preventScroll: true });
   }
 
   function closeDrawer() {
@@ -543,7 +582,7 @@
   function relayout() {
     const ratio = cur.page / pageCount(cur.ch);
     applyLayout();
-    cur.page = Math.floor(ratio * pageCount(cur.ch));
+    cur.page = pageAtRatio(ratio, pageCount(cur.ch));
     render();
     updateFontButtons();
   }
@@ -560,7 +599,8 @@
       cur.page = alignPage(Number(range.value) - 1);
       render();
     });
-    menuBtn.addEventListener('click', openDrawer);
+    // 鍵盤（Enter、空白鍵）觸發的 click，event.detail 是 0
+    menuBtn.addEventListener('click', (event) => openDrawer(event.detail === 0));
     $('#drawer-close').addEventListener('click', closeDrawer);
     $('#scrim').addEventListener('click', closeDrawer);
 
@@ -621,7 +661,7 @@
     buildToc();
     try {
       await ensure(saved.ch);
-      cur = { ch: saved.ch, page: Math.floor(saved.ratio * pageCount(saved.ch)) };
+      cur = { ch: saved.ch, page: pageAtRatio(saved.ratio, pageCount(saved.ch)) };
     } catch (err) {
       console.warn(`還原到第 ${saved.ch} 回失敗，從卷首開始：`, err);
       cur = { ch: FRONT, page: 0 };
