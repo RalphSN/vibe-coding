@@ -6,6 +6,8 @@
 <title>端點星</title>
 <meta name="description" content="端點星：個人課程書櫃，Prompt 與 Agent、Claude Code 安全開發、PAPAYA 電腦教室。">
 <meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/png" href="assets/logo/Terminus-dark-small.png" media="(prefers-color-scheme: light)">
+<link rel="icon" type="image/png" href="assets/logo/Terminus-light-small.png" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&family=LXGW+WenKai+TC:wght@700&display=swap">
@@ -141,7 +143,14 @@ body {
   letter-spacing: 0;
   white-space: nowrap;
 }
-.brand svg { width: 22px; height: 22px; flex: none; }
+.brand .logo { width: 24px; height: auto; flex: none; }
+.brand .logo-on-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .brand .logo-on-light { display: none; }
+  :root:not([data-theme="light"]) .brand .logo-on-dark { display: block; }
+}
+:root[data-theme="dark"] .brand .logo-on-light { display: none; }
+:root[data-theme="dark"] .brand .logo-on-dark { display: block; }
 @media (max-width: 479px) {
   .brand .path { display: none; }
 }
@@ -563,12 +572,9 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 <header class="nav">
   <div class="wrap">
     <span class="brand">
-      <!-- 標誌：攤開的書，書頁上方一顆四芒星 -->
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 7.2 13 4.6 15.6 3.6 13 2.6 12 0 11 2.6 8.4 3.6 11 4.6Z" fill="currentColor" transform="translate(0 1.4) scale(1 0.9)"/>
-        <path d="M12 21.5c-2.6-1.6-5.6-2.2-9-2V8.6c3.4-.2 6.4.5 9 2.2 2.6-1.7 5.6-2.4 9-2.2v10.9c-3.4-.2-6.4.4-9 2Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
-        <path d="M12 10.8v10.7" fill="none" stroke="currentColor" stroke-width="1.1"/>
-      </svg>
+      <!-- 標誌：淺色模式用深色圖、深色模式用淺色圖，由 CSS 依主題切換 -->
+      <img class="logo logo-on-light" src="assets/logo/Terminus-dark-small.png" alt="" width="24" height="22">
+      <img class="logo logo-on-dark" src="assets/logo/Terminus-light-small.png" alt="" width="24" height="22">
       <span class="brand-name" data-i18n="brand">端點星</span>
       <span class="motto" data-i18n="motto">位於銀河旋臂的最邊緣</span>
     </span>
