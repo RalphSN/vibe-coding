@@ -56,6 +56,16 @@ build 會把**全部**規範、skills、子代理同步到 repo 的 `.claude/`�
 - 規範只寫 AI 會做錯的事；AI 本來就做得對的不要寫，檔案太長規則會被忽略。
 - `verify.ps1` 會檢查長度上限（Codex `AGENTS.md` 32 KB、Antigravity `GEMINI.md` 24 KB），超過就要精簡。
 
+### 名詞：「知識卷軸」與「著作」
+
+使用者用這兩個詞指定產出，不要互相混用：
+
+| 使用者說 | 產出 | 用的 skill | 入口 |
+|---|---|---|---|
+| 「X 的知識卷軸」 | Notion 課程（`學習與知識` 底下） | `knowledge-scroll` | Notion「學習與知識」首頁；**不上書櫃** |
+| 「X 的著作」 | 本地網站 `course-web/<課>/index.html` | `course-web-neo-brutalism` | 書櫃 `index.html` 與 `index-2d.html` 都要加（`bookshelf-portal`） |
+| 兩個詞都沒說，只說「做課程」「做教材」 | 先問要哪一種，不要自己選 | — | — |
+
 ### 學習類內容的配套（必做）
 
 和學習、精進自己有關的內容，都要放上書櫃並做好配套。目前包含三種：
@@ -72,10 +82,11 @@ build 會把**全部**規範、skills、子代理同步到 repo 的 `.claude/`�
 - 手機版（< 768px）：頂部列只留選單、回書櫃與標題；字級、深色模式等不常用設定收進側欄或選單。
 - 互動與動畫原則見 `domain-education-content` 與 `domain-web-frontend`。
 - 和學習無關的開發或內容，這一節不適用；之後有需要再定規則。
+- Notion 的知識卷軸不在 repo 裡，不上書櫃，入口只放在 Notion「學習與知識」首頁。
 
 ### 新增課程或加書到書櫃
 
-- 課程：用 `course-web-neo-brutalism` skill；超過 5 個模組用 `src/` 分段加 `build.sh`。
+- 課程（使用者說「著作」）：用 `course-web-neo-brutalism` skill，完成後一定要加進書櫃；超過 5 個模組用 `src/` 分段加 `build.sh`。
 - 書櫃：用 `bookshelf-portal` skill；`index.html` 與 `index-2d.html` 的 `SITES` 都要加。
 - 驗證：`node ai-dev-rules/skills/course-web-neo-brutalism/scripts/audit.mjs course-web/<課>/index.html`。
 
