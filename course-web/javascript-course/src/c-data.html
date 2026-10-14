@@ -1,0 +1,120 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'JavaScript：看懂執行期到底發生什麼',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-14',
+  version: 'v1',
+};
+
+const COURSES = [
+  { id: 0, title: 'JavaScript|在哪裡跑', short: '起點', desc: '語言、引擎與執行環境的分工；在瀏覽器與 Node.js 執行第一支程式；讀懂錯誤訊息。', lessons: [
+    ['0-1', '語言、引擎|與執行環境'],
+    ['0-2', '執行你的|第一支程式'],
+    ['0-3', '讀懂錯誤訊息|與 console'],
+  ]},
+  { id: 1, title: '值|與型別', short: '型別', desc: '七種原始值與物件、typeof 的怪癖、64 位元浮點數、字串、null 與 undefined。', lessons: [
+    ['1-1', '七種原始值|與物件'],
+    ['1-2', 'number 的真面目：|64 位元浮點數'],
+    ['1-3', '字串|與樣板字串'],
+    ['1-4', 'null、undefined|與「沒有值」'],
+  ]},
+  { id: 2, title: '變數|與作用域', short: '作用域', desc: 'let、const、var 的差別；提升與暫時性死區；區塊、函式作用域與遮蔽。', lessons: [
+    ['2-1', 'let、const|與 var'],
+    ['2-2', '提升|與暫時性死區'],
+    ['2-3', '區塊、函式|與遮蔽'],
+  ]},
+  { id: 3, title: '比較|與轉型', short: '轉型', desc: '== 與 === 的規則、truthy 與 falsy、?? 與 ?.、加號與數字轉換。', lessons: [
+    ['3-1', '== 與 ==='],
+    ['3-2', 'truthy、falsy、|?? 與 ?.'],
+    ['3-3', '加號、數字轉換|與表單輸入'],
+  ]},
+  { id: 4, title: '物件|與陣列', short: '參考', desc: '原始值是值、物件是參考；淺複製與解構；陣列方法與會不會改到原陣列；Map、Set 與分組。', lessons: [
+    ['4-1', '原始值是值，|物件是參考'],
+    ['4-2', '淺複製、深複製|與解構'],
+    ['4-3', 'map、filter|與 reduce'],
+    ['4-4', '會不會改到|原陣列'],
+    ['4-5', 'Map、Set|與分組'],
+  ]},
+  { id: 5, title: '函式|與物件模型', short: '函式', desc: '函式是值、閉包、this 的四條規則、原型鏈與 class。', lessons: [
+    ['5-1', '函式是值、|箭頭函式與參數'],
+    ['5-2', '閉包：|會記住環境的函式'],
+    ['5-3', 'this：|看是誰在呼叫'],
+    ['5-4', '原型鏈|與 class'],
+  ]},
+  { id: 6, title: '非同步', short: '非同步', desc: '事件迴圈、Promise、async／await 的序列與平行、fetch 的錯誤與取消。', lessons: [
+    ['6-1', '事件迴圈：|一條執行緒與排隊'],
+    ['6-2', 'Promise：|未來才會有的值'],
+    ['6-3', 'async／await：|序列與平行'],
+    ['6-4', 'fetch、錯誤|與取消'],
+  ]},
+  { id: 7, title: '程式組織|與品質', short: '品質', desc: 'ES 模組、錯誤處理與 cause、node:test 測試、斷點除錯。', lessons: [
+    ['7-1', 'ES 模組：|import 與 export'],
+    ['7-2', '錯誤處理：|throw、catch 與 cause'],
+    ['7-3', '用 node:test|寫測試'],
+    ['7-4', '除錯：|斷點與開發者工具'],
+  ]},
+  { id: 8, title: '在瀏覽器裡', short: '瀏覽器', desc: 'DOM、事件冒泡與委派、表單與 XSS、localStorage 與 JSON 驗證。', lessons: [
+    ['8-1', 'DOM：|網頁是一棵物件樹'],
+    ['8-2', '事件、冒泡|與事件委派'],
+    ['8-3', '表單、|innerHTML 與 XSS'],
+    ['8-4', 'localStorage、|JSON 與驗證'],
+  ]},
+  { id: 9, title: '實戰|與參考', short: '實戰', desc: '期末實作練球間歇計時器、ES2024 到 ES2027 新功能地圖、速查表、總複習測驗。', lessons: [
+    ['9-1', '期末實作：|練球間歇計時器'],
+    ['9-2', '新功能地圖：|ES2024 到 ES2027'],
+    ['9-3', '速查表'],
+    ['9-4', '總複習測驗'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>
