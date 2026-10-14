@@ -1,6 +1,6 @@
 ---
 name: bookshelf-portal
-description: 建立或更新「擬真書櫃」風格的個人入口網站（預設 three.js 3D 書櫃，另有 2D 版）：每個子網站是一本書，厚度依內容量計算，書背燙金直排書名與閱讀進度線，滑鼠停留顯示說明欄，點選後書抽出、在空中轉成 3D 封面、翻開封面與扉頁再跳轉。Apple 用色與字體、單一 index.html、可直接放 GitHub Pages。使用者要做入口頁、首頁、網站目錄、課程書櫃、「像 Vibe-Coding 首頁那樣的入口」，或要把新網站加進書櫃時使用。
+description: 建立或更新「擬真書櫃」風格的個人入口網站（預設 three.js 3D 書櫃，另有 2D 版）：每個子網站是一本書，厚度依內容量計算，書背燙金直排書名與閱讀進度線，滑鼠停留顯示說明欄，點選後書抽出、在空中轉成 3D 封面、翻開封面與扉頁再跳轉。Apple 用色與字體、單一 index.html、可直接放 GitHub Pages。使用者要做入口頁、首頁、網站目錄、課程書櫃、「像 Vibe-Coding 首頁那樣的入口」，或要把新網站加進書櫃時使用；完成一部「著作」（本地課程網站）後也一定要用。Notion 的「知識卷軸」不上書櫃。
 ---
 
 <!-- 由 scripts/build.ps1 產生，請改 ai-dev-rules 的來源（core/、skills/、workflows/、agents/、enforcement/），不要改這裡 -->

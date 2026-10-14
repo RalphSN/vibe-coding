@@ -49,6 +49,11 @@
 
 ## 輸出格式
 
+依使用者用的詞決定，不要自己選：
+- 「知識卷軸」→ Notion 課程（用 `knowledge-scroll`），入口在 Notion「學習與知識」首頁。
+- 「著作」→ 本地課程網站（用 `course-web-neo-brutalism`），完成後加進書櫃（用 `bookshelf-portal`）。
+- 兩個詞都沒說：先問要 Notion 還是本地網站。
+
 Notion 版：
 - 一課一頁；頁面標題「第 N 課：主題」。
 - 用 callout 放「學完你能做到」與閱讀時間。
