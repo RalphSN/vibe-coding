@@ -1,6 +1,6 @@
 ---
 name: course-web-neo-brutalism
-description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：單一 HTML、資料驅動的模組與單元、高對比色塊與硬陰影、可拖曳寬度的側欄與字級調整、術語 hover 解釋、有鑑別度且每個選項都附解析的選擇題、大量 SVG 圖解，內容查證到當下日期。使用者要做線上課程網站、教學網站、互動講義站、「像 ai-chat-prompt-agent-course 那樣的課程」、或新野獸派風格的教材網頁時使用。
+description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：單一 HTML、資料驅動的模組與單元、高對比色塊與硬陰影、可拖曳寬度的側欄與字級調整、術語 hover 解釋、有鑑別度且每個選項都附解析的選擇題、大量 SVG 圖解，內容查證到當下日期。使用者說「X 的著作」，或要做線上課程網站、教學網站、互動講義站、「像 ai-chat-prompt-agent-course 那樣的課程」、或新野獸派風格的教材網頁時使用。
 ---
 
 # 新野獸派課程網站
@@ -27,6 +27,9 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
    3. 做元件與元件樣式表頁（`#/styleguide`），照 [components.md](references/components.md)。互動元件從共用元件庫搬，見 [build-and-widgets.md](references/build-and-widgets.md)。
    4. 逐模組填內容，超過 5 個模組時用分段檔加 `scripts/build.sh` 組合（build-and-widgets.md 第 1 節）。每 2–3 個模組跑一次 `scripts/audit.mjs` 並自我檢查：console、缺漏術語、360px 溢出、選擇題長度、SVG 線段端點與文字（[layout-geometry.md](references/layout-geometry.md) 6.5 節）。圖畫完當下就檢查，不要留到最後。
 4. 驗證：照 [verification.md](references/verification.md) 全部走一次，再回報。
+5. 加入書櫃：用 `bookshelf-portal` skill 把網站加進書櫃（3D 與 2D 兩個入口都要加），這一步沒做不算完成。
+
+「著作」指這個 skill 產生的本地網站；「知識卷軸」是 Notion 課程，不用這個 skill，也不上書櫃。
 
 品質目標：以 Awwwards、Webby Awards、FWA 得獎程度為目標。第 3 階段做完、第 4 階段之前，照 `domain-web-frontend` 的「品質目標：得獎等級」自我檢查迴圈反覆提升，直到四個維度都達標；十五條硬性規則是底線，不能為了創意分數犧牲。
 

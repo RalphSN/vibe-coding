@@ -6,6 +6,8 @@
 
 ### Added
 
+- 名詞定義：「知識卷軸」＝ Notion 課程（`knowledge-scroll`，不上書櫃）；「著作」＝本地課程網站（`course-web-neo-brutalism`，完成後用 `bookshelf-portal` 加進書櫃）；兩者都沒說時先問。寫進 `domain-education-content`、`course-web-neo-brutalism`（流程加第 5 步「加入書櫃」）、`bookshelf-portal`、`course-lesson` 與 repo 的 `AGENTS.md`。
+
 - `bookshelf-portal` skill 收進 ai-dev-rules，三個工具都會安裝：3D 書櫃為預設首頁（`index.html`）、2D 版為 `index-2d.html`；新增疊放書等尺寸、觸控裝置的「點書 → 羊皮紙介紹 → 前往閱讀」流程、`goTo()` 集中跳轉、`pageshow`／`visibilitychange` 回到書櫃初始狀態、載入字型 3 秒逾時、three.js 版本固定；附 `scripts/mobile-flow.mjs`（模擬 iPhone 測載入、介紹卡與外部跳轉重置）與 `assets/template-3d.html`。
 - `course-web-neo-brutalism` 第 13–15 條規則：動畫只給真實機制（概念流程用靜態圖、`pipeflow` 加 `static: true`）、每課至少一個互動元素、回書櫃按鈕與手機版設定移進側欄；新增 `references/build-and-widgets.md`（分段建置、共用元件庫、移植元件、6 個實際踩過的錯誤）與「改編外部文章」規則。
 - `course-web-neo-brutalism/scripts/`：`build.sh`（組合前逐模組 `node --check`）、`audit.mjs`、`svg-text.mjs`、`lesson-table.mjs`、`longest-answer.mjs`，有問題時 exit code 為 1。
