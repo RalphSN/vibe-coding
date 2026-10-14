@@ -52,7 +52,7 @@ if (!reduce) {
 ## 規則
 
 - 只對 `transform` 和 `opacity` 做動畫；不動 `width`、`height`、`top`、`left`。
-- 例外：3D 場景（`preserve-3d`）裡疊在某一面上的明暗遮罩，改動 `background-color` 或對那一面做 `filter: brightness()`，不做 `opacity` 動畫。`opacity` 動畫會被拆成獨立合成圖層，和那一面同一平面，Safari 每格前後順序不固定而閃動；只補 `backface-visibility` 沒有用。
+- 3D 翻面（`backface-visibility: hidden` 的面）上不疊明暗遮罩子元素。Safari 只藏住朝後的那一面本身，上面的遮罩照樣畫出來，翻到背面時閃黑一下；改用 `background-color`、`opacity` 或對遮罩切換 `visibility` 都不穩定。
 - Web Animations 有 `delay` 時用 `fill: 'both'`，避免開始播放那一刻從 CSS 值跳到第一格。
 - 一般 UI 動畫 150–400ms；超過 600ms 要有理由。
 - Vue 元件卸載時清掉 GSAP / Three.js 實例（`onBeforeUnmount`），避免記憶體洩漏。

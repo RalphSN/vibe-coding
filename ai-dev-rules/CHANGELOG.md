@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `domain-web-frontend`、`web-animation`、`domain-media-image-video-animation`、`bookshelf-portal`：3D 翻面上不再疊明暗遮罩。Safari 只藏住朝後的那一面，上面的遮罩照樣畫出來，翻到背面時閃黑一下；改 `background-color` 或切換 `visibility` 都沒有穩定解決（紅樓夢閱讀器的實例）。2D 書櫃範本拿掉開書動畫的遮罩，`shoot.mjs` 的動畫序號跟著更新。
+- `domain-web-frontend` 設計品質：長文閱讀裡的詩詞、引文不加左縮排，改用較大的上下間距和正文區隔。
+
 ### Added
 
 - 名詞定義：「知識卷軸」＝ Notion 課程（`knowledge-scroll`，不上書櫃）；「著作」＝本地課程網站（`course-web-neo-brutalism`，完成後用 `bookshelf-portal` 加進書櫃）；兩者都沒說時先問。寫進 `domain-education-content`、`course-web-neo-brutalism`（流程加第 5 步「加入書櫃」）、`bookshelf-portal`、`course-lesson` 與 repo 的 `AGENTS.md`。

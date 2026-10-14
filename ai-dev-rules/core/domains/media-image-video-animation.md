@@ -40,7 +40,7 @@ description: 媒體製作規範：圖片生成 prompt 結構、影片分鏡表�
 | 用程式產生影片檔（MP4） | Remotion |
 
 - 網頁動畫一律處理 `prefers-reduced-motion`。
-- 只對 `transform` 和 `opacity` 做動畫。例外：3D 場景裡疊在某一面上的明暗遮罩改動 `background-color`，見 `domain-web-frontend` 的「動畫」。
+- 只對 `transform` 和 `opacity` 做動畫。3D 翻面上不疊明暗遮罩，見 `domain-web-frontend` 的「動畫」。
 
 ## SVG
 

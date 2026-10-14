@@ -17,6 +17,15 @@
   const SWIPE_MIN = 40;
   const FONT_WAIT_MS = 3000;
   const RESIZE_DEBOUNCE_MS = 150;
+  // 書的語言：中文書（預設）與英文書的排版不同；BOOK.unit 是目錄與進度用的單位（回、章）
+  const IS_EN = BOOK.lang === 'en';
+  const FLOW_LANG = IS_EN ? 'en' : 'zh-Hant';
+  const UNIT = BOOK.unit || '回';
+  // 行高與字距由這裡寫進 --reader-lh、--reader-ls。英文用比例字型，行高較緊、不加字距
+  const LINE_HEIGHT = IS_EN ? 1.6 : 1.95;
+  const LETTER_SPACING_EM = IS_EN ? 0 : 0.04;
+  const GRID_SLACK_PX = 1; // 剛好等於整數倍時，小數誤差可能讓最後一個字或最後一行被擠掉，留 1px
+  const MAX_QUEUED_FLIPS = 5; // 連點時最多累積幾頁，避免一口氣翻太遠
   const FRONT = 0; // 第 0 回是卷首（書名頁＋說明頁）
 
   const $ = (sel) => document.querySelector(sel);
@@ -38,21 +47,33 @@
   const pending = new Map(); // n → resolve
   const counts = new Map(); // n → 目前版面下的頁數
   let toc = null;
+  let frontExtras = {}; // 獻詞、題詞（英文書由 toc.js 提供）
   let tocReady;
   const tocPromise = new Promise((resolve) => { tocReady = resolve; });
   let layout = null;
   let cur = { ch: FRONT, page: 0 };
   let busy = false;
   let queued = 0;
+  let needsRepaginate = false;
   let fontIndex = DEFAULT_FONT_INDEX;
   // 讀到最遠的位置：跳去卷首或翻目錄之後，用「回到閱讀進度」回來
   let furthest = { ch: FRONT, ratio: 0 };
 
   /* ---------- 資料 ---------- */
   window.BookData = {
-    toc(list) { toc = list; tocReady(list); },
+    toc(list, extras) {
+      toc = list;
+      if (extras) {
+        frontExtras = extras;
+        chapters.set(FRONT, { title: '卷首', label: '卷首', short: '', html: frontHtml() });
+      }
+      tocReady(list);
+    },
     chapter(c) {
-      chapters.set(c.n, { title: c.title, html: chapterHtml(c) });
+      // label：頂部列與目錄用的完整名稱；short：頁眉用的短名稱
+      const label = IS_EN ? `Chapter ${c.title}` : c.title;
+      const short = IS_EN ? label : c.title.split('　')[0];
+      chapters.set(c.n, { title: c.title, label, short, html: chapterHtml(c) });
       const resolve = pending.get(c.n);
       if (resolve) { pending.delete(c.n); resolve(); }
     },
@@ -62,42 +83,78 @@
     return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   }
 
-  /** 註腳標記在資料裡是 \u0003N\u0004，轉成上標 */
+  /** 資料裡的行內標記：註腳 \u0003N\u0004 轉上標，斜體 \u0005…\u0006 轉 <i> */
   function inlineHtml(text) {
-    return escapeHtml(text).replace(/\u0003(\d+)\u0004/g, '<sup>$1</sup>');
+    return escapeHtml(text)
+      .replace(/\u0003(\d+)\u0004/g, '<sup>$1</sup>')
+      .replace(/\u0005/g, '<i>')
+      .replace(/\u0006/g, '</i>');
+  }
+
+  /** 一個區塊轉 HTML。詩、引文、信件都不縮排，用上下間距和正文區隔 */
+  function blockHtml(b) {
+    if (b.t === 'poem') {
+      const cite = b.cite ? `<span class="cite">${inlineHtml(b.cite)}</span>` : '';
+      return `<p class="poem">${inlineHtml(b.x)}${cite}</p>`;
+    }
+    // 批語裡的詩（多行）和正文的詩一樣排：不縮排、上下留間距
+    if (b.t === 'comment') return `<p class="comment${b.x.includes('\n') ? ' poem' : ''}">${inlineHtml(b.x)}</p>`;
+    if (b.t === 'quote') return `<p class="quote${b.sign ? ' sign' : ''}">${inlineHtml(b.x)}</p>`;
+    if (b.t === 'break') return '<p class="break" role="separator">*\u2003*\u2003*</p>';
+    if (b.t === 'table') {
+      const rows = b.rows.map((row) => `<tr>${row.map((cell) => `<td>${inlineHtml(cell)}</td>`).join('')}</tr>`).join('');
+      return `<table class="table"><tbody>${rows}</tbody></table>`;
+    }
+    if (b.t === 'list') {
+      const title = b.title ? `<p class="list-title">${inlineHtml(b.title)}</p>` : '';
+      return `<div class="list">${title}<ul>${b.items.map((item) => `<li>${inlineHtml(item)}</li>`).join('')}</ul></div>`;
+    }
+    return `<p${b.cont ? ' class="cont"' : ''}>${inlineHtml(b.x)}</p>`;
   }
 
   function chapterHtml(c) {
-    const [no, ...couplet] = c.title.split('　').filter(Boolean);
-    const body = c.blocks.map((b) => {
-      if (b.t === 'poem') return `<p class="poem">${inlineHtml(b.x)}</p>`;
-      if (b.t === 'comment') return `<p class="comment">${inlineHtml(b.x)}</p>`;
-      return `<p>${inlineHtml(b.x)}</p>`;
-    }).join('');
+    const body = c.blocks.map(blockHtml).join('');
     const notes = c.notes.length
       ? `<section class="notes"><h3>註釋</h3><ol>${c.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ol></section>`
       : '';
-    const end = c.n === BOOK.chapterCount ? '全書完' : `${no}終`;
+    const isLast = c.n === BOOK.chapterCount;
+    if (IS_EN) {
+      const end = isLast ? '<p class="chapter-end">The End</p>' : '';
+      return `<header class="chapter-head"><span class="no">Chapter</span><span class="couplet">${escapeHtml(c.title)}</span></header>${body}${end}`;
+    }
+    const [no, ...couplet] = c.title.split('　').filter(Boolean);
+    const end = isLast ? '全書完' : `${no}終`;
     return `<header class="chapter-head"><span class="no">${escapeHtml(no)}</span><span class="couplet">${couplet.map(escapeHtml).join('<br>')}</span></header>${body}<p class="chapter-end">${end}</p>${notes}`;
+  }
+
+  /** 英文書卷首的第三頁：獻詞與題詞 */
+  function epigraphHtml() {
+    const { dedication, epigraph } = frontExtras;
+    if (!dedication && !epigraph) return '';
+    return `
+      <section class="front front-epigraph">
+        ${dedication ? `<p class="dedication">${inlineHtml(dedication)}</p>` : ''}
+        ${epigraph ? blockHtml(epigraph) : ''}
+      </section>`;
   }
 
   function frontHtml() {
     return `
       <section class="front front-title">
         <span class="big">${escapeHtml(BOOK.title)}</span>
-        <span class="seal">${escapeHtml(BOOK.seal)}</span>
+        ${BOOK.seal ? `<span class="seal">${escapeHtml(BOOK.seal)}</span>` : ''}
         <span class="by">${BOOK.authorLines.map(escapeHtml).join('<br>')}</span>
       </section>
-      <section class="front front-info">
+      <section class="front front-info" lang="zh-Hant">
         <h3>版本</h3>
         <p>${escapeHtml(BOOK.edition)}</p>
         <h3>出處</h3>
         <p><a href="${escapeHtml(BOOK.source.url)}" target="_blank" rel="noopener">${escapeHtml(BOOK.source.label)}</a>。${escapeHtml(BOOK.license)}</p>
         <h3>翻頁</h3>
-        <p>點書頁左右兩側、左右滑動，或按 <kbd>←</kbd> <kbd>→</kbd>。左上角的選單有全書 ${BOOK.chapterCount} 回目錄。</p>
-      </section>`;
+        <p>點書頁左右兩側、左右滑動，或按 <kbd>←</kbd> <kbd>→</kbd>。左上角的選單有全書 ${BOOK.chapterCount} ${UNIT}目錄。</p>
+      </section>${epigraphHtml()}`;
   }
-  chapters.set(FRONT, { title: '卷首', html: frontHtml() });
+  chapters.set(FRONT, { title: '卷首', label: '卷首', short: '', html: frontHtml() });
 
   function loadChapter(n) {
     if (chapters.has(n)) return Promise.resolve();
@@ -132,11 +189,22 @@
     }
     pageW = Math.floor(pageW);
     pageH = Math.floor(pageH);
-    const padX = Math.round(Math.min(56, Math.max(20, pageW * 0.09)));
-    const padY = Math.round(Math.min(60, Math.max(34, pageH * 0.075)));
-    const colW = pageW - padX * 2;
+    const size = FONT_SIZES[fontIndex];
+    const basePadX = Math.round(Math.min(56, Math.max(20, pageW * 0.09)));
+    const basePadY = Math.round(Math.min(60, Math.max(34, pageH * 0.075)));
+    // 中文：欄寬取「字寬＋字距」的整數倍，每行剛好排滿整數個字，左右對齊時字距不會被撐開。
+    // 英文是比例字型，每個字寬度不同，對齊整數倍沒有意義，靠斷字（hyphens）讓行尾平整
+    const charAdvance = size * (1 + LETTER_SPACING_EM);
+    const colW = IS_EN
+      ? pageW - basePadX * 2
+      : Math.floor((pageW - basePadX * 2) / charAdvance) * charAdvance + GRID_SLACK_PX;
+    // 文字區高度取行高的整數倍：最後一行剛好貼齊底部，多出的空間平均分到上下
+    const lineH = size * LINE_HEIGHT;
+    const textH = Math.floor((pageH - basePadY * 2) / lineH) * lineH + GRID_SLACK_PX;
+    const padX = (pageW - colW) / 2;
+    const padY = (pageH - textH) / 2;
     const gap = padX * 2;
-    return { isSpread, pageW, pageH, padX, padY, colW, gap, step: colW + gap, size: FONT_SIZES[fontIndex] };
+    return { isSpread, pageW, pageH, padX, padY, colW, gap, step: colW + gap, size };
   }
 
   function applyLayout() {
@@ -150,6 +218,8 @@
     s.setProperty('--col-w', `${layout.colW}px`);
     s.setProperty('--col-gap', `${layout.gap}px`);
     s.setProperty('--reader-size', `${layout.size}px`);
+    s.setProperty('--reader-lh', String(LINE_HEIGHT));
+    s.setProperty('--reader-ls', `${LETTER_SPACING_EM}em`);
     bookEl.classList.toggle('single', !layout.isSpread);
     counts.clear();
     document.querySelectorAll('.page[data-key]').forEach((el) => { delete el.dataset.key; });
@@ -168,6 +238,10 @@
   }
 
   const span = () => (layout.isSpread ? 2 : 1);
+
+  /** 比例換回頁碼。ratio 是 page / count 存下來的，直接 floor 會因浮點誤差少一頁（30/44*44 = 29.999…），加一點容差 */
+  const RATIO_EPSILON = 1e-6;
+  const pageAtRatio = (ratio, count) => Math.min(count - 1, Math.floor(ratio * count + RATIO_EPSILON));
   const alignPage = (page) => page - (page % span());
 
   /** 把頁面元素設定成「第 n 回的第 i 頁」。同一回只換平移量，不重排整回文字 */
@@ -177,7 +251,7 @@
     const key = `${n}`;
     if (!chapter) { el.innerHTML = '<div class="loading-note">載入中…</div>'; delete el.dataset.key; return; }
     if (el.dataset.key !== key) {
-      el.innerHTML = `<div class="page-inner"><div class="running-head"><span></span><span></span></div><div class="window"><div class="flow">${chapter.html}</div></div><div class="folio"></div></div><i class="shade"></i>`;
+      el.innerHTML = `<div class="page-inner"><div class="running-head"><span></span><span></span></div><div class="window"><div class="flow" lang="${FLOW_LANG}">${chapter.html}</div></div><div class="folio"></div></div>`;
       el.dataset.key = key;
     }
     const flow = el.querySelector('.flow');
@@ -187,7 +261,7 @@
     const head = el.querySelectorAll('.running-head span');
     const showHead = n !== FRONT && i > 0 && !isBlank;
     head[0].textContent = showHead ? BOOK.title : '';
-    head[1].textContent = showHead ? chapter.title.split('　')[0] : '';
+    head[1].textContent = showHead ? chapter.short : '';
     el.querySelector('.folio').textContent = n === FRONT || isBlank ? '' : String(i + 1);
     let blank = el.querySelector('.blank-end');
     if (isBlank && !blank) {
@@ -199,7 +273,7 @@
   }
 
   function setBlankPaper(el) {
-    el.innerHTML = '<i class="shade"></i>';
+    el.innerHTML = '';
     delete el.dataset.key;
   }
 
@@ -223,8 +297,9 @@
   }
 
   function prefetch() {
+    // 載入後先量一次頁數：新出現的字會提早下載字型子集，不會等到翻過去才重新分頁
     [cur.ch + 1, cur.ch - 1].forEach((n) => {
-      ensure(n).catch((err) => console.warn('預先載入失敗：', err));
+      ensure(n).then(() => pageCount(n)).catch((err) => console.warn(`預先載入第 ${n} 回失敗：`, err));
     });
   }
 
@@ -242,40 +317,69 @@
 
   /* ---------- 翻頁動畫：和書櫃首頁的扉頁同一套（rotateY 繞書脊，明暗只動 background-color） ---------- */
   const EASE = 'cubic-bezier(0.45, 0, 0.2, 1)';
-  const shadeFrames = (from, to) => [{ backgroundColor: `rgba(0, 0, 0, ${from})` }, { backgroundColor: `rgba(0, 0, 0, ${to})` }];
+  const nextFrame = () => new Promise((resolve) => { window.requestAnimationFrame(() => resolve()); });
+  /*
+    翻頁與封面翻動時不做明暗變化。原本疊一層黑色遮罩表現明暗，
+    但 Safari 的 backface-visibility 只藏住朝後的那一面，上面的遮罩照樣畫出來，
+    翻頁躺在左頁時會閃黑一下（拿掉遮罩後實測不閃）。
+  */
+  const leafPose = (deg) => `translateZ(1px) rotateY(${deg}deg)`;
 
-  async function animateLeaf(fromDeg, toDeg) {
+  /** 翻頁「靜止時」的角度直接寫在 style 上，不靠動畫的 fill 撐住，動畫還沒套上或剛結束的那一格也是正確角度 */
+  function setLeafPose(deg) {
+    leaf.style.transform = leafPose(deg);
+  }
+
+  /**
+   * 翻頁先以起始角度畫好、蓋住底下那頁，才換底下的內容（swapBeneath）再開始轉。
+   * 翻頁剛顯示的那一格可能還沒畫好，先換底下會露出下一頁。
+   */
+  async function animateLeaf(fromDeg, toDeg, swapBeneath) {
+    setLeafPose(fromDeg);
     leaf.hidden = false;
-    const opts = { duration: FLIP_MS, easing: EASE, fill: 'forwards' };
-    const forward = toDeg < fromDeg;
-    const frontShade = leafFront.querySelector('.shade');
-    const backShade = leafBack.querySelector('.shade');
-    await Promise.all([
-      leaf.animate([{ transform: `translateZ(1px) rotateY(${fromDeg}deg)` }, { transform: `translateZ(1px) rotateY(${toDeg}deg)` }], opts).finished,
-      frontShade && frontShade.animate(forward ? shadeFrames(0, 0.32) : shadeFrames(0.32, 0), opts).finished,
-      backShade && backShade.animate(forward ? shadeFrames(0.32, 0) : shadeFrames(0, 0.32), opts).finished,
-    ]);
+    await nextFrame();
+    await nextFrame();
+    if (swapBeneath) swapBeneath();
+    const opts = { duration: FLIP_MS, easing: EASE };
+    const turn = leaf.animate([{ transform: leafPose(fromDeg) }, { transform: leafPose(toDeg) }], opts);
+    // 動畫一開始就把 style 換成終點：動畫播放時蓋過 style，播完那一格直接停在終點
+    setLeafPose(toDeg);
+    await turn.finished;
+  }
+
+  /** 翻完先讓翻頁停著蓋住底下，等底下的頁面畫好兩個畫格才收起（見 animateLeaf） */
+  async function hideLeafAfterPaint() {
+    await nextFrame();
+    await nextFrame();
     leaf.hidden = true;
     leaf.getAnimations({ subtree: true }).forEach((a) => a.cancel());
   }
 
   async function flip(dir) {
-    if (busy) { queued = dir; return; }
+    // 翻頁動畫中又按了，記下次數依序翻完；反方向的會互相抵銷
+    if (busy) { queued = Math.max(-MAX_QUEUED_FLIPS, Math.min(MAX_QUEUED_FLIPS, queued + dir)); return; }
     busy = true;
     try {
       const target = dir > 0 ? nextPos(cur) : await prevPos(cur);
-      if (!target) return;
+      if (!target) { queued = 0; return; }
       await ensure(target.ch);
       const animate = !reduceMotion.matches;
       if (animate) await playFlip(dir, target);
       cur = target;
       render();
+      if (animate) await hideLeafAfterPaint();
       prefetch();
     } catch (err) {
+      leaf.hidden = true;
       console.error(`翻頁失敗（第 ${cur.ch} 回第 ${cur.page + 1} 頁，方向 ${dir}）：`, err);
     } finally {
       busy = false;
-      if (queued) { const next = queued; queued = 0; flip(next); }
+      if (needsRepaginate) repaginate();
+      if (queued) {
+        const next = Math.sign(queued);
+        queued -= next;
+        flip(next);
+      }
     }
   }
 
@@ -283,18 +387,15 @@
     if (layout.isSpread && dir > 0) {
       setFace(leafFront, cur.ch, cur.page + 1);
       setFace(leafBack, target.ch, target.page);
-      setFace(pageR, target.ch, target.page + 1);
-      await animateLeaf(0, -180);
+      await animateLeaf(0, -180, () => setFace(pageR, target.ch, target.page + 1));
     } else if (layout.isSpread) {
       setFace(leafBack, cur.ch, cur.page);
       setFace(leafFront, target.ch, target.page + 1);
-      setFace(pageL, target.ch, target.page);
-      await animateLeaf(-180, 0);
+      await animateLeaf(-180, 0, () => setFace(pageL, target.ch, target.page));
     } else if (dir > 0) {
       setFace(leafFront, cur.ch, cur.page);
       setBlankPaper(leafBack);
-      setFace(pageR, target.ch, target.page);
-      await animateLeaf(0, -180);
+      await animateLeaf(0, -180, () => setFace(pageR, target.ch, target.page));
     } else {
       setFace(leafFront, target.ch, target.page);
       setBlankPaper(leafBack);
@@ -350,8 +451,6 @@
       await Promise.all([
         bookEl.animate([{ transform: closed }, { transform: open }], opts).finished,
         cover.animate([{ transform: 'translateZ(3px) rotateY(0deg)' }, { transform: 'translateZ(3px) rotateY(-180deg)' }], opts).finished,
-        cover.querySelector('.cover-front .shade').animate(shadeFrames(0, 0.5), opts).finished,
-        cover.querySelector('.cover-inside .shade').animate(shadeFrames(0.4, 0), opts).finished,
       ]);
     } catch (err) {
       // 被使用者略過時動畫會被 cancel，這是預期的；其他錯誤要記錄
@@ -364,7 +463,8 @@
   function chapterLabel(n) {
     if (n === FRONT) return '卷首';
     const chapter = chapters.get(n);
-    return chapter ? chapter.title : `第 ${n} 回`;
+    if (chapter) return chapter.label;
+    return IS_EN ? `Chapter ${n}` : `第 ${n} ${UNIT}`;
   }
 
   function overallPercent() {
@@ -385,7 +485,7 @@
     range.setAttribute('aria-valuetext', `${label}，第 ${cur.page + 1} 頁，共 ${count} 頁`);
     const percent = overallPercent();
     statusEl.innerHTML = `<b>${cur.page + 1}${shown > cur.page + 1 ? `–${shown}` : ''}</b> / ${count}<span class="pct"> 頁 · ${percent.toFixed(percent < 10 ? 1 : 0)}%</span>`;
-    $('#progress-text').textContent = `已讀 ${readDone().size} / ${BOOK.chapterCount} 回 · 全書 ${percent.toFixed(1)}%`;
+    $('#progress-text').textContent = `已讀 ${readDone().size} / ${BOOK.chapterCount} ${UNIT} · 全書 ${percent.toFixed(1)}%`;
     $('#progress-meter').style.transform = `scaleX(${percent / 100})`;
     $('#prev-btn').disabled = cur.ch === FRONT && cur.page === 0;
     $('#first-btn').disabled = cur.ch === FRONT && cur.page === 0;
@@ -402,12 +502,12 @@
   /** 目前這一頁（雙頁時是這一攤）是否就是讀到最遠的地方 */
   function isAtFurthest() {
     if (cur.ch !== furthest.ch) return false;
-    return alignPage(Math.floor(furthest.ratio * pageCount(cur.ch))) === cur.page;
+    return alignPage(pageAtRatio(furthest.ratio, pageCount(cur.ch))) === cur.page;
   }
 
   async function goToFurthest() {
     await ensure(furthest.ch);
-    goTo(furthest.ch, alignPage(Math.floor(furthest.ratio * pageCount(furthest.ch))));
+    goTo(furthest.ch, alignPage(pageAtRatio(furthest.ratio, pageCount(furthest.ch))));
   }
 
   function readDone() {
@@ -458,8 +558,11 @@
     const list = $('#toc');
     const items = [{ n: FRONT, title: '卷首　書名頁與說明' }, ...toc];
     list.innerHTML = items.map((c) => {
-      const [no, ...rest] = c.title.split('　').filter(Boolean);
-      return `<li><a href="#ch-${c.n}" data-ch="${c.n}"><span class="no">${escapeHtml(no)}</span><span>${rest.map(escapeHtml).join('<br>')}</span><i class="read" aria-hidden="true"></i></a></li>`;
+      // 英文書各章沒有標題，目錄改列章號與開頭幾個字
+      const isEnChapter = IS_EN && c.n !== FRONT;
+      const [no, ...rest] = isEnChapter ? [`Chapter ${c.title}`, c.excerpt || ''] : c.title.split('　').filter(Boolean);
+      const lang = isEnChapter ? ' lang="en" class="excerpt"' : '';
+      return `<li><a href="#ch-${c.n}" data-ch="${c.n}"><span class="no">${escapeHtml(no)}</span><span${lang}>${rest.map(escapeHtml).join('<br>')}</span><i class="read" aria-hidden="true"></i></a></li>`;
     }).join('');
     list.addEventListener('click', (event) => {
       const link = event.target.closest('a[data-ch]');
@@ -484,14 +587,16 @@
   const menuBtn = $('#menu-btn');
   const blockedWhileOpen = ['.nav', '#stage', '.bar'];
 
-  function openDrawer() {
+  /** viaKeyboard：用鍵盤開啟時焦點放到目前那一回；滑鼠或觸控開啟時放在側欄本身，不顯示 focus 框 */
+  function openDrawer(viaKeyboard) {
     document.body.classList.add('drawer-open');
     drawer.removeAttribute('aria-hidden');
     menuBtn.setAttribute('aria-expanded', 'true');
     blockedWhileOpen.forEach((sel) => { document.querySelector(sel).inert = true; });
     const current = drawer.querySelector('a[aria-current="true"]');
     if (current) current.scrollIntoView({ block: 'center' });
-    (current || $('#drawer-close')).focus({ preventScroll: true });
+    const focusTarget = viaKeyboard ? (current || $('#drawer-close')) : drawer;
+    focusTarget.focus({ preventScroll: true });
   }
 
   function closeDrawer() {
@@ -543,9 +648,22 @@
   function relayout() {
     const ratio = cur.page / pageCount(cur.ch);
     applyLayout();
-    cur.page = Math.floor(ratio * pageCount(cur.ch));
+    cur.page = pageAtRatio(ratio, pageCount(cur.ch));
     render();
     updateFontButtons();
+  }
+
+  /**
+   * 字型子集下載完，字寬可能變，頁數要重算。版面尺寸沒變，所以不重建頁面 DOM（重建會閃一下）；
+   * 翻頁中就等翻完再做。
+   */
+  function repaginate() {
+    if (busy) { needsRepaginate = true; return; }
+    needsRepaginate = false;
+    const ratio = cur.page / pageCount(cur.ch);
+    counts.clear();
+    cur.page = pageAtRatio(ratio, pageCount(cur.ch));
+    render();
   }
 
   /* ---------- 操作 ---------- */
@@ -560,7 +678,8 @@
       cur.page = alignPage(Number(range.value) - 1);
       render();
     });
-    menuBtn.addEventListener('click', openDrawer);
+    // 鍵盤（Enter、空白鍵）觸發的 click，event.detail 是 0
+    menuBtn.addEventListener('click', (event) => openDrawer(event.detail === 0));
     $('#drawer-close').addEventListener('click', closeDrawer);
     $('#scrim').addEventListener('click', closeDrawer);
 
@@ -612,6 +731,10 @@
   }
 
   async function start() {
+    // 排版依書的語言：CSS 用 data-book-lang 切換字型與段落樣式，lang 讓瀏覽器正確斷字
+    document.documentElement.dataset.bookLang = IS_EN ? 'en' : 'zh';
+    measure.querySelector('.flow').lang = FLOW_LANG;
+    srText.lang = FLOW_LANG;
     const saved = loadState();
     setupSettings();
     setupInput();
@@ -621,7 +744,7 @@
     buildToc();
     try {
       await ensure(saved.ch);
-      cur = { ch: saved.ch, page: Math.floor(saved.ratio * pageCount(saved.ch)) };
+      cur = { ch: saved.ch, page: pageAtRatio(saved.ratio, pageCount(saved.ch)) };
     } catch (err) {
       console.warn(`還原到第 ${saved.ch} 回失敗，從卷首開始：`, err);
       cur = { ch: FRONT, page: 0 };
@@ -629,7 +752,7 @@
     render();
     prefetch();
     // 字型的子集是看到新字才下載，下載完字寬可能變，重新分頁一次
-    if (document.fonts) document.fonts.addEventListener('loadingdone', () => relayout());
+    if (document.fonts) document.fonts.addEventListener('loadingdone', repaginate);
     await playOpening();
   }
 

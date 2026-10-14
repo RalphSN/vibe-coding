@@ -17,10 +17,7 @@
 
 緩動：抽出與讀取條用 `cubic-bezier(0.16, 1, 0.3, 1)`；轉身與翻頁用 `cubic-bezier(0.45, 0, 0.2, 1)`。
 
-每個面都有 `<i class="shade">` 黑色遮罩，跟著角度改黑色濃度，讓轉動時有明暗。遮罩本身 `opacity` 固定為 1，動畫只改 `background-color`（用 `shadeFrames(from, to)` 產生 `rgba(0, 0, 0, x)` 的關鍵影格）：
-- 轉身：書脊 0 → 0.6，封面 0.6 → 0。
-- 翻封面：封面正面 0 → 0.5，封面內側 0.5 → 0。
-- 翻扉頁：正面 0 → 0.35，背面 0.35 → 0。
+各面轉動時不做明暗變化，不疊黑色遮罩。Safari 的 `backface-visibility: hidden` 只藏住朝後的那一面本身，疊在上面的遮罩照樣畫出來，轉到背面時會閃黑一下（見第 5 節）。
 
 ## 2. 3D 書的結構
 
@@ -65,5 +62,5 @@
 | 右頁四周沒有書板邊、左右不對稱 | 右頁只有紙沒有底板 | 右頁＝布底＋內縮紙；封面內側＝布底＋內縮蝴蝶頁 |
 | 封面標題詞組被拆開 | `.phrase` 沒有 inline-block | 封面、扉頁、右頁的 `.phrase` 都要 `display: inline-block` |
 | 書名字級在 3D 書脊不同 | 3D 書脊是重新產生的標記 | 建立舞台後複製書櫃書名的 `style.fontSize` |
-| Safari 翻頁時左頁閃動，Chrome 正常 | 遮罩做 `opacity` 動畫，被拆成獨立合成圖層，和所在頁面同一平面，Safari 每格前後順序不定。補 `backface-visibility` 沒用 | 遮罩只動 `background-color`；不要在 preserve-3d 的頁面上疊會做 opacity／transform 動畫的子元素 |
+| Safari 翻頁時左頁閃黑一下，Chrome 正常；放慢動畫閃的長度不變 | 面上疊了黑色遮罩。Safari 藏住朝後的那一面，卻照樣畫出它上面的遮罩；面停在背面朝外的那一刻就露出來。改 `background-color`、切換 `visibility`、補 `backface-visibility` 都沒有穩定解決 | 拿掉遮罩，轉動時不做明暗 |
 | 扉頁開始翻的瞬間遮罩跳一下 | 延遲 260ms 又只有 `fill: 'forwards'`，延遲期間用 CSS 值，開始時跳到第一格 | 有 `delay` 的動畫用 `fill: 'both'` |
