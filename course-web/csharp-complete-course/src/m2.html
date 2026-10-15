@@ -1,0 +1,498 @@
+<script>
+/* ==========================================================================
+   模組 2：方法與陣列
+   ========================================================================== */
+defineTerms({
+  '方法': { en: 'method', def: '有名字的一段程式，可以接收參數、回傳結果。C# 的函式都叫方法；寫在頂層陳述式裡的叫區域函式。', example: '`int Add(int a, int b) => a + b;`' },
+  '參數': { en: 'parameter', def: '方法宣告時列出的「空格」，呼叫時由引數填入。', example: '`void Greet(string name)` 的 name。' },
+  '引數': { en: 'argument', def: '呼叫方法時實際傳進去的值。', example: '`Greet("阿明")` 的 "阿明"。' },
+  '回傳值': { en: 'return value', def: '方法用 `return` 交回給呼叫端的結果；`void` 表示沒有回傳值。', example: '`return a + b;`' },
+  '運算式主體': { en: 'expression-bodied member', def: '用 `=>` 接一個運算式來寫只有一行的方法。', example: '`int Square(int x) => x * x;`' },
+  '具名引數': { en: 'named argument', def: '呼叫時寫出參數名稱，可以不照順序、也讓程式更好讀。', example: '`Box(width: 3, height: 5)`' },
+  '傳值': { en: 'pass by value', def: 'C# 預設的傳參數方式：把值複製一份給方法，方法裡改參數不影響呼叫端的變數。', example: '`void F(int x) { x = 9; }` 不改外面的變數。' },
+  'ref': { en: 'ref parameter', def: '傳變數本身（參考）進去，方法裡的修改會反映到呼叫端；呼叫時也要寫 ref。', example: '`Swap(ref a, ref b);`' },
+  'out': { en: 'out parameter', def: '讓方法「多回傳一個值」的參數；方法一定要指定它，呼叫前不用先給值。', example: '`int.TryParse(s, out int n)`' },
+  'in': { en: 'in parameter', def: '以參考傳入但方法不能修改，用來避免複製很大的 struct。', example: '`double Length(in Vector3 v)`' },
+  '陣列': { en: 'array', def: '固定長度、同一型別的一排元素，索引從 0 開始。', example: '`int[] scores = [90, 85, 77];`' },
+  '集合運算式': { en: 'collection expression', def: 'C# 12 起用 `[…]` 建立陣列、List、Span 等集合的統一寫法，`..` 可以展開另一個集合。', example: '`int[] all = [..a, ..b, 99];`' },
+  '索引': { en: 'index', def: '元素的位置編號，從 0 開始；`^1` 表示倒數第一個。', example: '`arr[0]`、`arr[^1]`' },
+  '範圍': { en: 'range', def: '`a..b` 表示從 a 到 b（不含 b）的一段。', example: '`arr[1..3]` 取第 1、2 個。' },
+  'Span': { en: 'Span<T>', def: '指向一段連續記憶體的「視窗」，可以讀寫但不複製資料。只能放在堆疊上（ref struct），不能存成類別欄位。', example: '`Span<int> part = arr.AsSpan(1, 2);`' },
+  'ReadOnlySpan': { en: 'ReadOnlySpan<T>', def: '唯讀版本的 Span，常用來切字串而不產生新字串。', example: '`ReadOnlySpan<char> s = "hello".AsSpan(0, 2);`' },
+  '配置': { en: 'allocation', def: '在受管理堆積（heap）上要一塊記憶體；配置越多，垃圾回收（GC）越忙。', example: '`Substring` 會配置新字串，`AsSpan` 不會。' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '宣告有參數、有回傳值的方法並呼叫它',
+      '用運算式主體寫一行方法',
+      '用預設值與具名引數讓呼叫更好讀',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-5）switch 運算式最後的 `_ =>` 代表什麼？', options: [
+        { text: '前面都沒有符合時的預設分支', correct: true, why: '`_` 是捨棄模式，什麼都符合。' },
+        { text: '一個名叫底線的變數', why: '在模式裡 `_` 是捨棄，不是變數。' },
+        { text: '表示這個分支會拋例外', why: '要拋例外得寫 `_ => throw …`。' },
+        { text: '只符合 null', why: '要比對 null 寫 `null =>`。' },
+      ] },
+    ],
+    analogy: {
+      text: ['方法像飲料店的點單按鈕：按「珍奶、半糖、少冰」（引數），店員照固定流程做（方法本體），交給你一杯飲料（回傳值）。你不用知道茶怎麼煮，只要知道按鈕要填什麼。'],
+      limit: ['飲料店做錯可以重做；方法拿到錯誤的引數可能直接拋例外。而且方法也可以什麼都不交回來（void），像「幫我把垃圾拿去倒」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="方法的構造：回傳型別 int、方法名稱 Add、參數列 int a, int b、方法本體 return a + b；呼叫 Add(2, 3) 把引數 2 和 3 填入參數，得到回傳值 5">
+        <rect x="10" y="20" width="540" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="58" text-anchor="middle" font-size="21" class="mono">int Add(int a, int b) =&gt; a + b;</text>
+        <g class="stroke-ink" stroke-width="3"><path d="M85 80 V110"/><path d="M145 80 V110"/><path d="M245 80 V110"/><path d="M420 80 V110"/></g>
+        <rect x="45" y="110" width="80" height="44" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="85" y="138" text-anchor="middle" font-size="15" class="on-color">回傳型別</text>
+        <rect x="130" y="110" width="70" height="44" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="165" y="138" text-anchor="middle" font-size="15" class="on-color">名稱</text>
+        <rect x="205" y="110" width="80" height="44" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="245" y="138" text-anchor="middle" font-size="15" class="on-color">參數</text>
+        <rect x="370" y="110" width="100" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="420" y="138" text-anchor="middle" font-size="15" class="on-color">本體</text>
+        <rect x="120" y="190" width="320" height="56" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="225" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">Add(2, 3) → 5</text>
+      </svg>`,
+      caption: '宣告時的 a、b 是參數；呼叫時填進去的 2、3 是引數；`=>` 後面的運算式結果就是回傳值。',
+      blocks: [
+        '[[方法]]把一段程式包成一個名字。宣告時列出[[參數]]與[[回傳值]]的型別；只有一行時可以用[[運算式主體]] `=>`。在頂層陳述式的檔案裡，方法可以直接寫在程式碼下面。',
+        { type: 'code', lang: 'csharp', title: 'price.cs', code: 'Console.WriteLine(Total(100m, 3));\nConsole.WriteLine(Total(100m, 3, discount: 0.1m));\n\ndecimal Total(decimal price, int qty, decimal discount = 0m)\n{\n    decimal sum = price * qty;\n    return sum * (1 - discount);\n}' },
+      ],
+    },
+    define: [
+      { term: '方法', en: 'method', def: '有名稱、參數列、回傳型別與本體的程式單位。', example: '`void Log(string msg) => Console.WriteLine(msg);`' },
+      { term: '運算式主體', en: 'expression body', def: '`=> 運算式`，等於 `{ return 運算式; }`。', example: '`bool IsEven(int n) => n % 2 == 0;`' },
+      { term: '具名引數', en: 'named argument', def: '呼叫時寫 `參數名: 值`，常和選擇性參數（有預設值）搭配。', example: '`Total(100m, 3, discount: 0.1m)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '算面積',
+        kind: '難讀 vs 好讀',
+        code: true,
+        badLabel: '一堆看不出意思的數字',
+        goodLabel: '具名引數',
+        bad: 'var room = CreateRoom(4, 3, true, false);',
+        good: 'var room = CreateRoom(width: 4, depth: 3,\n    {{1:hasWindow: true}}, {{1:isFurnished: false}});',
+        badResult: '讀的人要跳去看定義才知道 true、false 指什麼。',
+        goodResult: '呼叫處自己說明了每個值的意思。',
+        why: ['bool 參數超過一個時，呼叫處用具名引數'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'Console.WriteLine(Square(4));\nGreet("阿明");\nGreet();\n\nint Square(int x) => x * x;\nvoid Greet(string name = "朋友") => Console.WriteLine($"嗨，{name}");',
+          predict: { q: '`Greet();` 沒有傳引數，會發生什麼？', options: ['編譯錯誤', '印出「嗨，朋友」', '印出「嗨，」'], answer: 1 },
+          output: '16\n嗨，阿明\n嗨，朋友',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="呼叫流程：主程式執行到 Square(4) 時跳進方法，x 得到 4，計算 x 乘 x 等於 16 後 return 回到主程式，16 被印出">
+          <rect x="10" y="30" width="230" height="160" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="125" y="65" text-anchor="middle" font-size="19" font-weight="900" class="on-color">主程式</text>
+          <text x="30" y="110" font-size="16" class="on-color mono">WriteLine(</text>
+          <text x="30" y="135" font-size="16" class="on-color mono">  Square(4))</text>
+          <text x="30" y="172" font-size="16" class="on-color">印出 16</text>
+          <rect x="320" y="30" width="230" height="160" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="435" y="65" text-anchor="middle" font-size="19" font-weight="900" class="on-color">Square</text>
+          <text x="340" y="110" font-size="16" class="on-color mono">x = 4</text>
+          <text x="340" y="135" font-size="16" class="on-color mono">return 16</text>
+          <path d="M240 100 H320" class="stroke-ink" stroke-width="4"/>
+          <path d="M320 150 H240" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+          <text x="280" y="90" text-anchor="middle" font-size="14">帶 4 進去</text>
+          <text x="280" y="175" text-anchor="middle" font-size="14">帶 16 回來</text>
+        </svg>`, caption: '呼叫方法時程式跳進去執行，遇到 return 就帶著結果回到呼叫的位置。' },
+      ],
+      tryit: {
+        q: ['寫一個方法 `IsAdult`：收一個年齡，18 歲以上回傳 true。用運算式主體寫成一行。'],
+        draft: '____ IsAdult(int age) => ____;',
+        answer: ['`bool IsAdult(int age) => age >= 18;`', '比較運算本身就是 bool，不用寫 `age >= 18 ? true : false`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '宣告了回傳 int 的方法，但某個 if 分支沒有 return。', why: '編譯器要求每條路徑都回傳值（CS0161）。', right: '確保每個分支都有 return，或在最後補一個。' },
+      { wrong: '`int r = Log("hi");`，而 Log 是 void。', why: 'void 方法沒有值可以指定（CS0029／CS0815）。', right: '只呼叫 `Log("hi");`，或改成回傳需要的值。' },
+      { wrong: '選擇性參數放在必要參數前面：`void F(int a = 1, int b)`。', why: '有預設值的參數必須放在最後（CS1737）。', right: '`void F(int b, int a = 1)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`string Hello(string n) => $"Hi {n}";` 的回傳型別是？', options: [
+        { text: '`string`', correct: true, why: '方法名稱前面的型別就是回傳型別。' },
+        { text: '`void`，因為用了 =>', why: '`=>` 只是寫法，回傳型別看名稱前面。' },
+        { text: '看呼叫時傳什麼', why: 'C# 的回傳型別在宣告時就固定。' },
+        { text: '`object`', why: '寫的是 string，就是 string。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`double Area(double w, double h = 1) => w * h;`，`Area(h: 2, w: 3)` 的結果是？', options: [
+        { text: '`6`', correct: true, why: '具名引數可以不照順序，w = 3、h = 2。' },
+        { text: '`3`，h 用預設值 1', why: '有寫 h: 2，就不會用預設值。' },
+        { text: '`2`', why: '這是把順序搞反後再忽略一個參數的結果。' },
+        { text: '編譯錯誤：順序不對', why: '全部用具名引數時，順序可以任意。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個 80 行的方法同時做「讀檔、計算統計、印報表」。你會怎麼拆？拆完的好處是什麼？'], answer: [
+        '拆成三個方法：`ReadScores(path)`、`Summarize(scores)`、`PrintReport(summary)`，主程式依序呼叫。',
+        '好處：每個方法名稱就說明了它做什麼；計算的部分不碰檔案，可以單獨測試（模組 9）；之後改成從網路讀資料，只要換掉第一個。',
+      ] },
+    ],
+    keypoints: [
+      '方法 = 回傳型別 + 名稱 + 參數列 + 本體；只有一行用 `=>`。',
+      '每條路徑都要 return；void 方法不回傳值。',
+      '參數有預設值就變成選擇性；呼叫時用具名引數讓意思更清楚。',
+    ],
+    sources: ['cs-methods'],
+  },
+
+  '2-2': {
+    goals: [
+      '說出 C# 預設是「傳值」',
+      '分辨 ref、out、in 的用途',
+      '知道什麼時候該用 out，什麼時候該回傳 tuple',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-1）`void F(int a = 1, int b)` 為什麼不能編譯？', options: [
+        { text: '有預設值的參數必須放在最後面', correct: true, why: 'CS1737：選擇性參數後面不能接必要參數。' },
+        { text: 'void 方法不能有參數', why: 'void 只是不回傳值，參數照樣可以有。' },
+        { text: '參數名稱太短', why: '名稱長短不影響編譯。' },
+        { text: 'int 參數不能有預設值', why: '任何編譯期常數都可以當預設值。' },
+      ] },
+    ],
+    analogy: {
+      text: ['傳值像把作業「影印」一份給同學改，他怎麼塗改你的原稿都不變。ref 像把「原稿」直接借給他，他改了你拿回來就是改過的。out 像給他一張空白紙，說「把答案寫在這裡還我」。'],
+      limit: ['影印的比喻只適用於 int、double 這類實值型別。傳參考型別（例如陣列）時，複製的是「地址」，同學照地址去改，原本那份陣列真的會變，這是 3-5 的主題。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="三種傳法：傳值時方法拿到複本，修改不影響外面；ref 時方法和呼叫端共用同一個變數，修改會影響外面；out 時方法負責寫入一個值給呼叫端">
+        <rect x="10" y="20" width="170" height="260" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="56" text-anchor="middle" font-size="20" font-weight="900" class="on-color">傳值（預設）</text>
+        <rect x="35" y="80" width="120" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="95" y="112" text-anchor="middle" font-size="17" class="mono">外 x=1</text>
+        <rect x="35" y="180" width="120" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="95" y="212" text-anchor="middle" font-size="17" class="mono">內 x=9</text>
+        <path d="M95 130 V180" class="stroke-ink" stroke-width="3" stroke-dasharray="6 5"/>
+        <text x="95" y="262" text-anchor="middle" font-size="15" class="on-color">外面還是 1</text>
+        <rect x="195" y="20" width="170" height="260" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="56" text-anchor="middle" font-size="20" font-weight="900" class="on-color">ref</text>
+        <rect x="220" y="120" width="120" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="157" text-anchor="middle" font-size="17" class="mono">x=9</text>
+        <text x="280" y="105" text-anchor="middle" font-size="15" class="on-color">內外同一個</text>
+        <text x="280" y="262" text-anchor="middle" font-size="15" class="on-color">外面變成 9</text>
+        <rect x="380" y="20" width="170" height="260" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="56" text-anchor="middle" font-size="20" font-weight="900" class="on-color">out</text>
+        <rect x="405" y="80" width="120" height="50" class="fill-surface stroke-ink" stroke-width="3" stroke-dasharray="6 5"/><text x="465" y="112" text-anchor="middle" font-size="17" class="mono">空的</text>
+        <rect x="405" y="180" width="120" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="465" y="212" text-anchor="middle" font-size="17" class="mono">寫入 42</text>
+        <path d="M465 180 V130" class="stroke-ink" stroke-width="3"/>
+        <text x="465" y="262" text-anchor="middle" font-size="15" class="on-color">方法一定要寫</text>
+      </svg>`,
+      caption: '預設複製一份；`ref` 共用同一個變數；`out` 是方法保證會填進去的回傳欄位。',
+      blocks: [
+        'C# 預設[[傳值]]。[[ref]] 讓方法能修改呼叫端的變數；[[out]] 用來多回傳一個值（最常見的是 TryParse）；[[in]] 以參考傳入但唯讀，用在很大的 struct。',
+        { type: 'table', caption: '四種傳法對照', head: ['寫法', '呼叫前要有值', '方法能改', '方法一定要寫入', '典型用途'], rows: [
+          ['（無）', '要', '只改到複本', '否', '一般情況'],
+          ['`ref`', '要', '會改到外面', '否', 'Swap、遞增計數器'],
+          ['`out`', '不用', '會改到外面', '**是**', 'TryParse、多個結果'],
+          ['`in`', '要', '不能改', '否', '大型 struct 避免複製'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '傳值', en: 'pass by value', def: '預設行為：參數是引數的複本。', example: '`void Add1(int n) { n++; }` 不影響呼叫端。' },
+      { term: 'ref', en: 'ref', def: '以參考傳遞，宣告與呼叫兩邊都要寫 ref；引數必須是已指定值的變數。', example: '`void Add1(ref int n) => n++;`' },
+      { term: 'out', en: 'out', def: '以參考傳遞的輸出參數；方法結束前必須指定。呼叫時可以 `out var x` 順便宣告。', example: '`bool TryGet(string key, out int value)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '回傳兩個結果',
+        kind: '舊寫法 vs 新寫法',
+        code: true,
+        badLabel: '用 out',
+        goodLabel: '回傳 tuple',
+        bad: 'void MinMax(int[] a, out int min, out int max)\n{\n    min = a.Min(); max = a.Max();\n}\nMinMax(scores, out var lo, out var hi);',
+        good: '{{1:(int Min, int Max)}} MinMax(int[] a) => (a.Min(), a.Max());\nvar (lo, hi) = MinMax(scores);',
+        badResult: '能用，但呼叫端要準備兩個 out 變數。',
+        goodResult: '一次回傳兩個值，呼叫端用解構接住。',
+        why: ['out 留給「成功與否 + 結果」的 TryXxx 模式；單純多個結果用 tuple'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'int a = 1;\nint b = 1;\nAddOne(a);\nAddOneRef(ref b);\nConsole.WriteLine($"a={a}, b={b}");\n\nvoid AddOne(int n) => n++;\nvoid AddOneRef(ref int n) => n++;',
+          predict: { q: '會印出什麼？', options: ['a=2, b=2', 'a=1, b=2', 'a=1, b=1'], answer: 1 },
+          output: 'a=1, b=2',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'none', label: '不用修飾詞' }, { id: 'ref', label: 'ref' }, { id: 'out', label: 'out' }],
+          items: [
+            { text: '交換兩個 int 變數的值', answer: 'ref', why: '需要讀原本的值，也要改到外面。' },
+            { text: '嘗試從字典取值，順便告訴我有沒有找到', answer: 'out', why: '回傳 bool 表示成功，值從 out 拿；Dictionary.TryGetValue 就是這樣。' },
+            { text: '計算兩數平均', answer: 'none', why: '只需要讀值、回傳結果。' },
+            { text: '把字串解析成日期，可能失敗', answer: 'out', why: 'DateTime.TryParse 的 TryXxx 模式。' },
+            { text: '印出一個名字', answer: 'none', why: '不需要修改任何東西。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 160" role="img" aria-label="Swap 方法：呼叫 Swap(ref a, ref b) 之前 a 是 1、b 是 2；之後 a 是 2、b 是 1">
+          <rect x="10" y="40" width="190" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="105" y="88" text-anchor="middle" font-size="20" class="mono">a=1  b=2</text>
+          <rect x="235" y="40" width="90" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="88" text-anchor="middle" font-size="17" font-weight="900" class="on-color">Swap</text>
+          <rect x="360" y="40" width="190" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="455" y="88" text-anchor="middle" font-size="20" class="on-color mono">a=2  b=1</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M200 80 H235"/><path d="M325 80 H360"/></g>
+          <text x="280" y="150" text-anchor="middle" font-size="15" class="mono">(a, b) = (b, a);  // 不用方法也能交換</text>
+        </svg>`, caption: '需要改到外面的變數才用 ref；交換兩個值其實用 tuple 一行就好。' },
+      ],
+      tryit: {
+        q: ['補完這個 TryXxx 方法：成功時回傳 true 並把結果放進 out。'],
+        draft: 'bool TryHalf(int n, ____ int half)\n{\n    if (n % 2 != 0) { half = 0; return false; }\n    half = ____;\n    return true;\n}',
+        answer: ['`out int half`、`half = n / 2;`', '失敗的分支也要給 half 一個值（這裡是 0），因為 out 參數在每條路徑都必須被指定。'],
+      },
+    },
+    mistakes: [
+      { wrong: '宣告了 `ref` 參數，呼叫時寫 `AddOne(x)`。', why: '呼叫端也必須寫 ref，讓讀程式的人知道變數可能被改（CS1620）。', right: '`AddOne(ref x)`。' },
+      { wrong: 'out 參數只在成功分支指定。', why: '每條離開方法的路徑都要指定 out（CS0177）。', right: '失敗分支也給預設值。' },
+      { wrong: '為了效能把所有參數都加 ref。', why: 'int、double 這種小型別複製比參考還便宜，而且 ref 讓程式難以推理。', right: '一般情況傳值；只有大型 struct 才考慮 in。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '哪一種參數在呼叫前「不需要」先給值？', options: [
+        { text: '`ref`', why: 'ref 會讀取原本的值，所以必須先指定。' },
+        { text: '`out`', correct: true, why: 'out 由方法負責寫入，呼叫前不用給值。' },
+        { text: '`in`', why: 'in 是唯讀參考，方法會讀它，必須有值。' },
+        { text: '一般參數', why: '傳值要複製一個值，當然要先有值。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`int[] arr = [1, 2]; Reset(arr); Console.WriteLine(arr[0]);`，其中 `void Reset(int[] a) { a[0] = 0; }`。印出？', options: [
+        { text: '`1`，因為 C# 預設傳值', why: '傳值傳的是「陣列的參考」的複本，兩者指向同一個陣列。' },
+        { text: '`0`', correct: true, why: '陣列是參考型別，方法透過複製來的參考修改了同一個陣列。' },
+        { text: '編譯錯誤：要寫 ref', why: '修改陣列內容不需要 ref；只有要讓 arr 指向「另一個陣列」才需要。' },
+        { text: '拋出例外', why: '索引 0 存在，不會拋例外。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['承上題，如果 Reset 寫成 `void Reset(int[] a) { a = [0, 0]; }`，arr[0] 會是多少？為什麼和上一題不一樣？'], answer: [
+        '還是 1。這次方法把「參數 a」改指向一個新陣列，只改到複本；外面的 arr 仍指向原本的陣列。',
+        '上一題是「沿著參考去改那個陣列的內容」，這題是「換掉參考本身」。要換掉外面的參考才需要 ref。模組 3 會用實值型別與參考型別完整解釋。',
+      ] },
+    ],
+    keypoints: [
+      'C# 預設傳值：方法拿到的是複本。',
+      'ref 讓方法改到外面的變數，out 讓方法多回傳一個值，in 是唯讀參考。',
+      '單純要回傳多個結果，用 tuple 比 out 清楚。',
+    ],
+    sources: ['cs-params', 'cs-methods'],
+  },
+
+  '2-3': {
+    goals: [
+      '建立陣列並用索引讀寫元素',
+      '用集合運算式 `[…]` 與展開 `..` 組合集合',
+      '用 `^` 與 `..` 取最後一個元素與一段範圍',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-2）要寫一個「嘗試取得設定值」的方法，最符合 .NET 慣例的簽章是？', options: [
+        { text: '`bool TryGetSetting(string key, out string value)`', correct: true, why: 'TryXxx 模式：回傳是否成功，值從 out 拿。' },
+        { text: '`string GetSetting(ref string key)`', why: 'key 只需要讀，不該用 ref。' },
+        { text: '`void TryGetSetting(string key)`', why: '沒有任何方式把結果交回呼叫端。' },
+        { text: '`bool TryGetSetting(out string key, string value)`', why: '輸入與輸出顛倒了。' },
+      ] },
+    ],
+    analogy: {
+      text: ['陣列像火車：車廂數量在出發前就決定了，每節車廂有編號（從 0 號開始），每節只能載同一種貨。要加車廂只能換一列更長的火車。'],
+      limit: ['火車通常從 1 號車廂開始；陣列從 0 開始，所以 5 節車廂的最後一節是 4 號。需要能隨時增減長度時，用 `List<T>`（模組 5）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="陣列 scores 有五個元素 90、85、77、60、98；正向索引是 0 到 4，反向索引 ^1 是最後一個 98；範圍 1..3 取出索引 1 和 2 的 85、77">
+        <g class="stroke-ink" stroke-width="4">
+          <rect x="30" y="60" width="100" height="70" class="fill-surface"/><rect x="130" y="60" width="100" height="70" style="fill:var(--m3)"/><rect x="230" y="60" width="100" height="70" style="fill:var(--m3)"/><rect x="330" y="60" width="100" height="70" class="fill-surface"/><rect x="430" y="60" width="100" height="70" style="fill:var(--m4)"/>
+        </g>
+        <text x="80" y="105" text-anchor="middle" font-size="22" font-weight="900" class="mono">90</text>
+        <text x="180" y="105" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">85</text>
+        <text x="280" y="105" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">77</text>
+        <text x="380" y="105" text-anchor="middle" font-size="22" font-weight="900" class="mono">60</text>
+        <text x="480" y="105" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">98</text>
+        <text x="80" y="45" text-anchor="middle" font-size="17" class="mono">[0]</text><text x="180" y="45" text-anchor="middle" font-size="17" class="mono">[1]</text><text x="280" y="45" text-anchor="middle" font-size="17" class="mono">[2]</text><text x="380" y="45" text-anchor="middle" font-size="17" class="mono">[3]</text><text x="480" y="45" text-anchor="middle" font-size="17" class="mono">[4]</text>
+        <text x="480" y="160" text-anchor="middle" font-size="17" class="mono">[^1]</text>
+        <path d="M130 175 H330" class="stroke-ink" stroke-width="4"/>
+        <path d="M130 165 V185 M330 165 V185" class="stroke-ink" stroke-width="4"/>
+        <text x="230" y="212" text-anchor="middle" font-size="17" class="mono">[1..3] → 85, 77</text>
+      </svg>`,
+      caption: '索引從 0 開始；`^1` 是倒數第一個；範圍 `1..3` 包含 1、不包含 3。',
+      blocks: [
+        '[[陣列]]長度固定，用[[索引]]讀寫。C# 12 起用[[集合運算式]] `[…]` 建立，`..` 可以展開另一個集合；`^` 從尾巴數，[[範圍]] `a..b` 取一段（會產生新陣列）。',
+        { type: 'code', lang: 'csharp', title: 'arrays.cs', code: 'int[] scores = [90, 85, 77, 60, 98];\nConsole.WriteLine(scores.Length);   // 5\nConsole.WriteLine(scores[^1]);      // 98\n\nint[] extra = [100, 95];\nint[] all = [..scores, ..extra];    // 7 個元素\nint[] middle = scores[1..3];        // [85, 77]' },
+      ],
+    },
+    define: [
+      { term: '陣列', en: 'array', def: '`T[]`：固定長度、連續存放的同型別元素；是參考型別。', example: '`string[] names = ["A", "B"];`' },
+      { term: '集合運算式', en: 'collection expression', def: '`[元素, ..展開]`，目標型別可以是陣列、List、Span 等。C# 15（.NET 11）預計再加上傳入建構引數的寫法。', example: '`List<int> list = [1, 2, 3];`' },
+      { term: '範圍', en: 'range', def: '`起..終`，含起不含終；`..` 省略表示到頭或到尾。', example: '`arr[..2]` 前兩個、`arr[2..]` 從第 3 個到最後。' },
+    ],
+    examples: {
+      compare: [{
+        title: '取最後一個元素',
+        kind: '舊寫法 vs 新寫法',
+        code: true,
+        badLabel: '自己算長度',
+        goodLabel: '反向索引',
+        bad: 'var last = scores[{{1:scores.Length - 1}}];',
+        good: 'var last = scores[{{1:^1}}];',
+        badResult: '能用，但寫成 `scores.Length` 就會超出範圍。',
+        goodResult: '意圖清楚：倒數第一個。',
+        why: ['`^0` 不是最後一個，而是「最後一個的下一格」，會超出範圍'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'int[] a = [1, 2, 3];\nint[] b = a;\nb[0] = 99;\nConsole.WriteLine(a[0]);\n\nint[] c = [..a];\nc[1] = 0;\nConsole.WriteLine(a[1]);\nConsole.WriteLine(a[3]);',
+          predict: { q: '第一個 WriteLine 印出什麼？', options: ['1', '99', '編譯錯誤'], answer: 1 },
+          output: '99\n2\n!Unhandled exception. System.IndexOutOfRangeException: Index was outside the bounds of the array.',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="b = a 只複製參考，a 和 b 指向同一個陣列；c = [..a] 建立新陣列，c 指向獨立的複本">
+          <rect x="20" y="20" width="80" height="50" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/><text x="60" y="52" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">a</text>
+          <rect x="20" y="85" width="80" height="50" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/><text x="60" y="117" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">b</text>
+          <rect x="20" y="155" width="80" height="50" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/><text x="60" y="187" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">c</text>
+          <rect x="300" y="45" width="240" height="60" class="fill-surface stroke-ink" stroke-width="4"/><text x="420" y="82" text-anchor="middle" font-size="19" class="mono">[99, 2, 3]</text>
+          <rect x="300" y="150" width="240" height="60" class="fill-surface stroke-ink" stroke-width="4"/><text x="420" y="187" text-anchor="middle" font-size="19" class="mono">[99, 0, 3] 複本</text>
+          <g class="stroke-ink" stroke-width="4" fill="none"><path d="M100 45 H200 V70 H300"/><path d="M100 110 H200 V80 H300"/><path d="M100 180 H300"/></g>
+        </svg>`, caption: '陣列是參考型別：`b = a` 不會複製陣列，兩個變數指向同一個；要複製用 `[..a]`。' },
+      ],
+      tryit: {
+        q: ['用集合運算式和範圍，把陣列的「第一個」和「最後兩個」組成新陣列：'],
+        draft: 'int[] n = [10, 20, 30, 40, 50];\nint[] picked = [n[____], ..n[____]];\n// 期望：[10, 40, 50]',
+        answer: ['`[n[0], ..n[^2..]]`。', '`^2..` 表示從倒數第二個到結尾；前面的 `..` 把那段陣列展開成個別元素。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`for (int i = 0; i <= arr.Length; i++)`', why: '最後一圈 i 等於 Length，超出範圍拋 IndexOutOfRangeException。', right: '`i < arr.Length`，或直接用 foreach。' },
+      { wrong: '`int[] copy = original;` 以為得到一份複本。', why: '只複製了參考，兩個變數指向同一個陣列。', right: '`int[] copy = [..original];` 或 `original.ToArray()`。' },
+      { wrong: '想在陣列尾巴 Add 一個元素。', why: '陣列長度固定，沒有 Add 方法。', right: '需要增減時用 `List<T>`；或用 `[..arr, newItem]` 建新陣列。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`int[] a = [5, 6, 7, 8];` 中 `a[1..3]` 是？', options: [
+        { text: '`[6, 7]`', correct: true, why: '含索引 1、不含索引 3。' },
+        { text: '`[6, 7, 8]`', why: '範圍不包含結尾的索引 3。' },
+        { text: '`[5, 6, 7]`', why: '索引從 0 開始，1 是第二個元素 6。' },
+        { text: '`[7, 8]`', why: '那是 `a[2..]` 或 `a[^2..]`。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`int[] a = [1, 2, 3]; Console.WriteLine(a[^0]);` 會怎樣？', options: [
+        { text: '印出 3，因為 ^0 代表最後一個元素', why: '最後一個是 `^1`；`^0` 指向結尾之後。' },
+        { text: '拋出 IndexOutOfRangeException', correct: true, why: '`^0` 等於 a.Length，超出範圍。' },
+        { text: '印出 1，^0 繞回到陣列開頭', why: '`^0` 不會繞回開頭。' },
+        { text: '編譯錯誤', why: '語法合法，要執行時才發現超出範圍。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要把三個來源的清單合併，並在最前面加一個標題列。用集合運算式怎麼寫？跟用迴圈一個個 Add 比起來好在哪？'], answer: [
+        '`string[] rows = ["標題", ..fromDb, ..fromFile, ..fromApi];`',
+        '一行就表達了「結果長什麼樣子」，而且編譯器可以事先算好總長度，只配置一次記憶體；迴圈 Add 要多寫程式，List 也可能多次擴容。',
+      ] },
+    ],
+    keypoints: [
+      '陣列長度固定、索引從 0 開始，`^1` 是最後一個。',
+      '`[…]` 建立集合，`..` 展開另一個集合，`a..b` 取一段（不含 b）。',
+      '陣列是參考型別：`b = a` 不會複製，要複製用 `[..a]`。',
+    ],
+    sources: ['cs-arrays', 'cs-collection-expr', 'cs-ranges'],
+  },
+
+  '2-4': {
+    goals: [
+      '說出 Span 是「不複製的視窗」',
+      '用 ReadOnlySpan 切字串而不產生新字串',
+      '知道 Span 的限制：不能存成類別欄位、不能跨 await',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-3）`int[] part = arr[1..3];` 之後修改 `part[0]`，arr 會變嗎？', options: [
+        { text: '不會，範圍運算在陣列上會複製出新陣列', correct: true, why: '陣列的 `[a..b]` 會配置新陣列。' },
+        { text: '會，part 和 arr 共用記憶體', why: '那是 Span 的行為，陣列範圍會複製。' },
+        { text: '編譯錯誤：範圍結果不能修改', why: '新陣列可以自由修改。' },
+        { text: '拋出例外', why: '修改新陣列是合法操作。' },
+      ] },
+    ],
+    analogy: {
+      text: ['Span 像拿一張有長方形挖洞的卡片蓋在報紙上：洞裡看到的就是那一段文字，不用剪下來影印。移動卡片就看到另一段，報紙本身沒有被複製。'],
+      limit: ['卡片看完就要收起來，不能夾進書裡帶走：Span 只能活在方法執行期間（堆疊上），不能存成類別的欄位，也不能在 await 前後持續使用。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="同一個字串 2026-10-16：Substring(5, 2) 會配置新字串 10；AsSpan(5, 2) 只是指向原字串第 5 到 6 個字元的視窗，不配置新記憶體">
+        <rect x="20" y="20" width="520" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="60" text-anchor="middle" font-size="24" font-weight="900" class="mono">"2026-10-16"</text>
+        <rect x="276" y="28" width="38" height="44" class="stroke-ink" stroke-width="4" fill="none" stroke-dasharray="6 4"/>
+        <rect x="20" y="150" width="240" height="80" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="140" y="185" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Substring(5, 2)</text>
+        <text x="140" y="213" text-anchor="middle" font-size="16" class="on-color">新字串 "10"（配置）</text>
+        <rect x="300" y="150" width="240" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="420" y="185" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">AsSpan(5, 2)</text>
+        <text x="420" y="213" text-anchor="middle" font-size="16" class="on-color">指向原字串（不配置）</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M295 80 V115 H140 V150"/><path d="M295 115 H420 V150"/></g>
+      </svg>`,
+      caption: '兩者看到的內容一樣；差別在 Substring 複製出新字串，Span 只記住「從哪裡開始、多長」。',
+      blocks: [
+        '[[Span]] 和 [[ReadOnlySpan]] 是指向一段連續記憶體的視窗，不產生[[配置]]。.NET 函式庫很多方法都有接受 Span 的版本，例如 `int.Parse(ReadOnlySpan<char>)`。C# 14 讓陣列、Span、ReadOnlySpan 之間有更多隱含轉換，傳參數更順手。',
+        { type: 'callout', variant: 'tip', title: '什麼時候需要 Span', body: ['初學時不用到處改成 Span。它的價值在「大量、重複」的處理：解析大檔案、高流量 API。一般商業邏輯先寫清楚，量測到效能問題再換。'] },
+      ],
+    },
+    define: [
+      { term: 'Span', en: 'Span<T>', def: '可讀寫的連續記憶體視窗，是 ref struct，只能放在堆疊上。', example: '`Span<int> s = arr; s[0] = 9;` 會改到 arr。' },
+      { term: 'ReadOnlySpan', en: 'ReadOnlySpan<T>', def: '唯讀的 Span；string 可以隱含轉成 `ReadOnlySpan<char>`。', example: '`ReadOnlySpan<char> year = date.AsSpan(0, 4);`' },
+      { term: '配置', en: 'allocation', def: '在受管理堆積上要記憶體，之後由垃圾回收器（GC）清理。', example: '在迴圈裡 Substring 一百萬次 = 一百萬次配置。' },
+    ],
+    examples: {
+      compare: [{
+        title: '從日期字串取出月份數字',
+        kind: '會配置 vs 不配置',
+        code: true,
+        badLabel: 'Substring',
+        goodLabel: 'AsSpan',
+        bad: 'string date = "2026-10-16";\nint month = int.Parse(date.{{1:Substring(5, 2)}});',
+        good: 'string date = "2026-10-16";\nint month = int.Parse(date.{{1:AsSpan(5, 2)}});',
+        badResult: '多配置一個暫時的字串 "10"，用完就成為垃圾。',
+        goodResult: '直接在原字串上解析，沒有額外配置。',
+        why: ['結果都是 10；差別只在記憶體配置，處理量大時才明顯'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'int[] data = [1, 2, 3, 4, 5];\nSpan<int> mid = data.AsSpan(1, 3);\nmid[0] = 20;\nConsole.WriteLine(data[1]);\nConsole.WriteLine(mid.Length);\n\nint[] copy = data[1..4];\ncopy[0] = 0;\nConsole.WriteLine(data[1]);',
+          predict: { q: '第一個 WriteLine（`data[1]`）印出什麼？', options: ['2', '20', '0'], answer: 1 },
+          output: '20\n3\n20',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ok', label: '可以用 Span' }, { id: 'no', label: '不行' }],
+          items: [
+            { text: '方法裡的區域變數', answer: 'ok', why: '區域變數在堆疊上，正是 Span 的使用範圍。' },
+            { text: '類別（class）的欄位', answer: 'no', why: '類別在堆積上，Span 是 ref struct，不能放進去（CS8345）。' },
+            { text: '方法參數', answer: 'ok', why: '很常見，例如 `int Sum(ReadOnlySpan<int> nums)`。' },
+            { text: '在 await 之後繼續使用 await 之前建立的 Span', answer: 'no', why: 'async 方法會把區域變數搬到堆積上，Span 不能跨 await。' },
+            { text: 'lambda 捕捉的外部變數', answer: 'no', why: '被捕捉的變數會放進堆積上的閉包物件。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="Span 只活在堆疊：方法開始時建立 Span，方法結束時跟著消失；類別物件在堆積上，可以活得比方法久，所以不能裝 Span">
+          <rect x="20" y="20" width="240" height="140" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="56" text-anchor="middle" font-size="19" font-weight="900" class="on-color">堆疊（方法期間）</text>
+          <rect x="60" y="80" width="160" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="140" y="112" text-anchor="middle" font-size="17" class="mono">Span ✓</text>
+          <rect x="300" y="20" width="240" height="140" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="56" text-anchor="middle" font-size="19" font-weight="900" class="on-color">堆積（可以活很久）</text>
+          <rect x="340" y="80" width="160" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="420" y="112" text-anchor="middle" font-size="17" class="mono">Span ✗ 放不進</text>
+          <path d="M260 90 H300" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: 'Span 可能指向堆疊上的記憶體，所以它自己也必須留在堆疊上，才不會指向已經消失的資料。' },
+      ],
+      tryit: {
+        q: ['改寫成不配置新字串的版本：'],
+        draft: 'string line = "Alice,30";\nint comma = line.IndexOf(\',\');\nint age = int.Parse(line.Substring(comma + 1));\n// 改成：int age = int.Parse(line.____(comma + 1));',
+        answer: ['`line.AsSpan(comma + 1)`。', 'int.Parse 有接受 `ReadOnlySpan<char>` 的多載，所以直接傳 Span 就好。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 class 裡宣告 `Span<byte> buffer;` 欄位。', why: 'Span 是 ref struct，不能當類別欄位（CS8345）。', right: '欄位用 `byte[]` 或 `Memory<byte>`，要處理時再 `.AsSpan()`。' },
+      { wrong: '以為 `arr[1..3]` 和 `arr.AsSpan(1, 2)` 一樣不複製。', why: '陣列的範圍運算會配置新陣列。', right: '要不複製就用 `arr.AsSpan()[1..3]` 或 `AsSpan(1, 2)`。' },
+      { wrong: '一開始就把所有字串處理改成 Span。', why: '程式變難讀，但大部分程式碼不在效能熱點上。', right: '先寫清楚，用 BenchmarkDotNet 或分析工具量測後，只優化熱點。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`Span<T>` 和陣列範圍 `arr[a..b]` 最大的差別是？', options: [
+        { text: 'Span 不複製資料，範圍會產生新陣列', correct: true, why: 'Span 只是指向原本記憶體的視窗。' },
+        { text: 'Span 只能放 int', why: 'Span 是泛型，可以放任何型別。' },
+        { text: '範圍語法不能用在 Span 上', why: 'Span 也支援 `[a..b]`，而且結果還是 Span，不會複製。' },
+        { text: 'Span 一定比陣列慢', why: '它的目的就是減少複製與配置，通常更快。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`ReadOnlySpan<char> s = "hello"; s[0] = \'H\';` 會怎樣？', options: [
+        { text: '字串變成 "Hello"', why: 'ReadOnlySpan 是唯讀的，而且 string 本身不可變。' },
+        { text: '編譯錯誤：唯讀，不能指定', correct: true, why: 'ReadOnlySpan 的索引子只能讀（CS8331）。' },
+        { text: '執行時拋出例外', why: '在編譯時就被擋下了。' },
+        { text: '產生一個新字串', why: 'Span 從來不會自動產生新字串。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要解析一個 2 GB 的記錄檔，每行用逗號分成 5 欄再轉數字。用 Split + Parse 和用 Span 的寫法，在記憶體上會差在哪裡？'], answer: [
+        'Split 每行會配置一個陣列加 5 個新字串；幾千萬行就是上億次配置，GC 會頻繁執行，處理變慢。',
+        '用 `ReadOnlySpan<char>` 找逗號位置、直接 `int.Parse(span)`，每行幾乎不配置。這正是 Span 值得用的「大量、重複」情境。.NET 也提供 `MemoryExtensions.Split` 這類以 Span 為基礎的方法。',
+      ] },
+    ],
+    keypoints: [
+      'Span 是不複製的記憶體視窗；ReadOnlySpan 是唯讀版。',
+      'Span 只能活在堆疊：不能當類別欄位、不能跨 await。',
+      '先寫清楚，量測到熱點再用 Span 優化。',
+    ],
+    sources: ['span', 'cs-whatsnew-14'],
+  },
+});
+</script>
