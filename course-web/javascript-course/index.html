@@ -5261,6 +5261,1037 @@ defineLessons({
 </script>
 <script>
 /* ==========================================================================
+   模組 8：在瀏覽器裡
+   ========================================================================== */
+defineTerms({
+  'DOM': { en: 'Document Object Model', def: '瀏覽器把 HTML 讀進來後建立的物件樹；JavaScript 改它，畫面就跟著變。', example: '`document.querySelector(\'h1\')` 拿到標題那個節點。' },
+  '節點': { en: 'node', def: 'DOM 樹上的每一個點：元素、文字、註解都是節點。', example: '`<li>` 是元素節點，裡面的字是文字節點。' },
+  '事件冒泡': { en: 'event bubbling', def: '事件先在被點的元素觸發，再一層一層往外傳到父元素、一直到 document。', example: '點 button，外層 ul 的 click 監聽也會收到。' },
+  '事件委派': { en: 'event delegation', def: '只在外層放一個監聽，靠冒泡收到裡面所有元素的事件，再用 target 判斷是誰。', example: '清單的刪除按鈕全部由 ul 處理。' },
+  'XSS': { en: 'cross-site scripting', def: '攻擊者把程式碼塞進網頁讓別人的瀏覽器執行，可以偷 cookie、冒用身分。', example: '把留言用 innerHTML 插入頁面。' },
+  'localStorage': { en: 'localStorage', def: '瀏覽器替每個網站保存的字串鍵值；關掉瀏覽器還在，但只能存字串、約 5 MB。', example: '`localStorage.setItem(\'theme\', \'dark\')`' },
+  'JSON': { en: 'JavaScript Object Notation', def: '用文字表示資料的格式；`JSON.stringify` 把值變文字，`JSON.parse` 把文字變回值。', example: '`JSON.stringify({ a: 1 })` 是 `\'{"a":1}\'`。' },
+});
+
+const SCORE_DOM = '<h1 id="title">雷霆 vs 閃電</h1><p id="score">0 : 0</p><ul id="log"></ul>';
+
+defineLessons({
+  '8-1': {
+    goals: [
+      '說出 HTML 與 DOM 樹的對應',
+      '用 querySelector 找到元素並改內容',
+      '用 createElement 與 append 新增元素',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-1）`const el = document.querySelector(\'h1\'); el.textContent = \'X\';` 畫面上的 h1 會變嗎？', options: [
+        { text: '會，el 是指向那個節點的參考', correct: true, why: '改的是同一個物件，畫面跟著更新。' },
+        { text: '不會，el 只是一份複製品', why: 'querySelector 回傳的是參考，不是複製品。' },
+        { text: '要再呼叫 render() 才會變', why: '直接改 DOM 就會反映到畫面。' },
+        { text: '拋出 TypeError，因為 el 是 const', why: 'const 不保護物件內容。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-2）`document` 在 Node.js 裡存在嗎？', options: [
+        { text: '不存在，它是瀏覽器提供的', correct: true, why: 'DOM 是瀏覽器這個執行環境的 API，不是語言本身。' },
+        { text: '存在，所有環境都有', why: 'Node.js 沒有網頁，所以沒有 document。' },
+        { text: '只有在 .mjs 檔裡存在', why: '和副檔名無關。' },
+        { text: '要先 npm install document', why: '它不是 npm 套件。' },
+      ] },
+    ],
+    analogy: {
+      text: ['HTML 原始碼像建築藍圖，[[DOM]] 像照藍圖蓋好的房子。房子蓋好之後，你搬家具、換燈泡改的是房子，不是藍圖；重新整理頁面就是「照藍圖重蓋一次」，你做的改動都不見了。'],
+      limit: ['真的房子改起來很慢；DOM 改起來很快，但每次改動都可能讓瀏覽器重新排版，一次改很多個元素時最好先組好再一次放進去。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="HTML 與 DOM 樹對照：左邊是 HTML 原始碼，右邊是樹狀結構，body 底下有 h1、p、ul 三個子節點">
+        <rect x="10" y="10" width="250" height="240" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="44" font-size="17" font-weight="900">HTML（藍圖）</text>
+        <text x="30" y="90" font-size="14" class="mono">&lt;body&gt;</text>
+        <text x="46" y="120" font-size="14" class="mono">&lt;h1 id="title"&gt;</text>
+        <text x="46" y="150" font-size="14" class="mono">&lt;p id="score"&gt;</text>
+        <text x="46" y="180" font-size="14" class="mono">&lt;ul id="log"&gt;</text>
+        <text x="30" y="210" font-size="14" class="mono">&lt;/body&gt;</text>
+        <rect x="300" y="10" width="250" height="240" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+        <text x="320" y="44" font-size="17" font-weight="900" class="on-color">DOM（物件樹）</text>
+        <rect x="385" y="70" width="80" height="34" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="425" y="93" text-anchor="middle" font-size="14" class="mono">body</text>
+        <rect x="315" y="170" width="64" height="34" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="347" y="193" text-anchor="middle" font-size="14" class="mono">h1</text>
+        <rect x="393" y="170" width="64" height="34" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="425" y="193" text-anchor="middle" font-size="14" class="mono">p</text>
+        <rect x="471" y="170" width="64" height="34" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="503" y="193" text-anchor="middle" font-size="14" class="mono">ul</text>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M425 104 V140 H347 V170 M425 140 V170 M425 140 H503 V170"/></g>
+      </svg>`,
+      caption: '每個標籤變成樹上的一個[[節點]]；縮排的層級就是父子關係。',
+      blocks: [
+        '操作 DOM 幾乎都是三個動作：**找**（`querySelector` 用 CSS 選擇器找第一個、`querySelectorAll` 找全部）、**改**（`textContent` 改文字、`classList` 改樣式、`dataset` 讀寫 `data-*` 屬性）、**加**（`createElement` 建新元素，`append` 放進去）。',
+      ],
+    },
+    define: [
+      { term: 'querySelector', en: 'querySelector', def: '用 CSS 選擇器找第一個符合的元素，找不到是 null。', example: "`document.querySelector('#score')`" },
+      { term: 'textContent', en: 'textContent', def: '讀寫元素裡的純文字；寫入時不會被當成 HTML。', example: "`el.textContent = '1 : 0'`" },
+      { term: 'classList', en: 'classList', def: '加、移除、切換 class：`add`、`remove`、`toggle`。', example: "`btn.classList.toggle('is-active')`" },
+    ],
+    examples: {
+      compare: [{
+        title: '新增 50 筆紀錄',
+        kind: '一筆一筆放 vs 一次放',
+        code: true,
+        badLabel: '每次都放進頁面',
+        goodLabel: '先組好，一次放',
+        bad: "for (const item of items) {\n  const li = document.createElement('li');\n  li.textContent = item;\n  {{1:list.append(li)}};\n}",
+        good: "const lis = items.map((item) => {\n  const li = document.createElement('li');\n  li.textContent = item;\n  return li;\n});\n{{1:list.append(...lis)}};",
+        badResult: '能用，但每次放進頁面都可能讓瀏覽器重新計算版面。',
+        goodResult: '先在記憶體裡建好，一次放進去，只改動頁面一次。',
+        why: ['大量新增時先組好再一次放進頁面'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          title: '沙盒裡的小頁面（下方程式可以直接改 DOM）',
+          dom: SCORE_DOM,
+          code: "const score = document.querySelector('#score');\nscore.textContent = '1 : 0';\nconst li = document.createElement('li');\nli.textContent = '雷霆 發球得分';\ndocument.querySelector('#log').append(li);\nconsole.log(score.textContent, document.querySelectorAll('li').length);\nconsole.log(document.querySelector('#nope'));",
+          predict: { q: '找不到 `#nope` 時印出什麼？', options: ['undefined', 'null', '拋出 TypeError'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="DOM 的三個動作：找用 querySelector，改用 textContent 和 classList，加用 createElement 和 append">
+          <rect x="10" y="10" width="170" height="180" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">找</text>
+          <text x="95" y="110" text-anchor="middle" font-size="14" class="mono on-color">querySelector</text>
+          <text x="95" y="140" text-anchor="middle" font-size="14" class="mono on-color">querySelectorAll</text>
+          <rect x="195" y="10" width="170" height="180" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">改</text>
+          <text x="280" y="110" text-anchor="middle" font-size="14" class="mono on-color">textContent</text>
+          <text x="280" y="140" text-anchor="middle" font-size="14" class="mono on-color">classList</text>
+          <rect x="380" y="10" width="170" height="180" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">加</text>
+          <text x="465" y="110" text-anchor="middle" font-size="14" class="mono on-color">createElement</text>
+          <text x="465" y="140" text-anchor="middle" font-size="14" class="mono on-color">append</text>
+        </svg>`, caption: '大部分 DOM 程式都是這三個動作的組合。' },
+      ],
+      tryit: {
+        q: ['讓計分板「比分改變時閃一下」：替 `#score` 加上 `flash` 這個 class，已經有就拿掉。'],
+        draft: "document.querySelector('#score').____;",
+        answer: ["`classList.toggle('flash')`。", '用 class 切換樣式，把樣式本身寫在 CSS 裡；不要在 JavaScript 裡直接改一堆 `style.xxx`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 `<head>` 的一般 script 裡直接 querySelector 頁面元素，得到 null。', why: '那時候 body 還沒被讀進來，元素不存在。', right: '用 `<script type="module">`（自動延後）或 `defer`，或把 script 放在 body 最後。' },
+      { wrong: '`document.querySelectorAll(\'li\').map(...)`。', why: 'querySelectorAll 回傳 NodeList，有 forEach 但沒有 map。', right: '`[...document.querySelectorAll(\'li\')].map(...)`。' },
+      { wrong: '找不到元素時直接讀屬性。', why: '找不到是 null，讀屬性拋出 TypeError。', right: '先檢查，或用 `?.`；選擇器打錯是最常見的原因。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`querySelector(\'.player\')` 有三個符合時，回傳？', options: [
+        { text: '第一個符合的元素', correct: true, why: '要全部用 querySelectorAll。' },
+        { text: '三個元素組成的陣列', why: '那是 querySelectorAll（而且是 NodeList）。' },
+        { text: '最後一個符合的元素', why: '它從文件開頭找，回傳第一個。' },
+        { text: 'null，因為不只一個', why: '有符合就回傳第一個。' },
+      ] },
+      { level: '應用', type: 'mc', q: '要把清單裡每個 li 的文字收集成陣列，哪個寫法可以？', options: [
+        { text: "`[...document.querySelectorAll('li')].map((li) => li.textContent)`", correct: true, why: '先展開成真正的陣列，才有 map。' },
+        { text: "`document.querySelectorAll('li').map((li) => li.textContent)`", why: 'NodeList 沒有 map。' },
+        { text: "`document.querySelector('li').map((li) => li.textContent)`", why: 'querySelector 只回傳一個元素。' },
+        { text: "`document.getElementsByTagName('li').textContent`", why: '集合本身沒有 textContent。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你用 Vue 寫專案，同事在元件裡寫了 `document.querySelector(\'#total\').textContent = sum`。為什麼這在 Vue 裡不是好做法？'], answer: [
+        'Vue 依資料重畫 DOM。你直接改的 DOM，下次 Vue 重畫時會被蓋掉；而且畫面與資料不一致，很難追蹤。',
+        '改成把 sum 放在響應式資料裡，模板寫 `{{ sum }}`。真的需要拿到元素（例如聚焦輸入框）時用 template ref，不用 querySelector。',
+      ] },
+    ],
+    keypoints: [
+      'DOM 是瀏覽器照 HTML 建好的物件樹；改它畫面就變，重新整理就回到 HTML 的樣子。',
+      '找：querySelector／All；改：textContent、classList；加：createElement、append。',
+      'querySelector 找不到是 null；NodeList 要展開成陣列才有 map。',
+    ],
+    sources: ['mdn-dom'],
+  },
+
+  '8-2': {
+    goals: [
+      '說出事件冒泡的方向與順序',
+      '分辨 target 與 currentTarget',
+      '用事件委派處理動態新增的元素',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-3）`btn.addEventListener(\'click\', app.save)`，點擊時 save 裡的 this 是？', options: [
+        { text: 'btn 元素，不是 app', correct: true, why: '瀏覽器呼叫事件處理函式時，this 設成掛監聽的元素。' },
+        { text: 'app，因為 save 是寫在 app 裡的方法', why: '交出去的只是函式，呼叫時沒有「app 點」。' },
+        { text: 'window', why: '瀏覽器會把 this 設成元素。' },
+        { text: '事件物件', why: '事件物件是第一個參數，不是 this。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 8-1）`querySelectorAll` 回傳的 NodeList 有 map 嗎？', options: [
+        { text: '沒有，要先展開成陣列', correct: true, why: '它只有 forEach。' },
+        { text: '有，NodeList 就是陣列的一種', why: 'NodeList 不是陣列。' },
+        { text: '有，但只能用一次', why: '它根本沒有 map。' },
+        { text: '看瀏覽器', why: '所有瀏覽器都沒有。' },
+      ] },
+    ],
+    analogy: {
+      text: ['在大樓裡喊「失火了」：你所在的房間先聽到，接著整層樓、整棟大樓的廣播系統都會收到。[[事件冒泡]]也是這樣：事件從被點的元素開始，一層一層往外傳。所以大樓的管理室（外層元素）只要裝一台接收器，就知道哪一間房間出事了。'],
+      limit: ['真的聲音越傳越小；事件每一層收到的都是同一個事件物件，而且任何一層都可以呼叫 `stopPropagation()` 讓它不再往外傳。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="冒泡路徑：點擊 button 時，事件依序在 button、li、ul、div、document 觸發，從內往外">
+        <rect x="10" y="10" width="540" height="230" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="40" font-size="15" class="mono">div#outer</text>
+        <rect x="40" y="55" width="480" height="170" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+        <text x="60" y="84" font-size="15" class="mono on-color">ul#list</text>
+        <rect x="70" y="100" width="420" height="110" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="90" y="128" font-size="15" class="mono">li</text>
+        <rect x="100" y="140" width="200" height="56" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="200" y="174" text-anchor="middle" font-size="15" class="mono on-color">button ← 點這裡</text>
+        <text x="320" y="174" font-size="15">① button → ② li</text>
+        <text x="320" y="128" font-size="15">→ ③ ul → ④ div</text>
+      </svg>`,
+      caption: '事件從被點的元素往外傳；每一層的 click 監聽都會被叫到。',
+      blocks: [
+        { type: 'widget', name: 'bubble', props: { levels: ['div#outer', 'ul#list', 'li', 'button#btn'] } },
+        '事件物件有兩個常搞混的屬性：`event.target` 是**真正被點的**那個元素；`event.currentTarget` 是**目前正在處理**的那個（也就是掛監聽的元素）。[[事件委派]]就是靠 target 判斷點的是誰。',
+      ],
+    },
+    define: [
+      { term: 'event.target', en: 'target', def: '事件真正發生的元素。', example: '點 button，ul 的監聽裡 target 是 button。' },
+      { term: 'event.currentTarget', en: 'currentTarget', def: '目前執行的監聽掛在哪個元素上。', example: 'ul 的監聽裡 currentTarget 是 ul。' },
+      { term: 'closest', en: 'Element.closest', def: '從自己開始往外找第一個符合選擇器的元素。', example: "`e.target.closest('button[data-id]')`" },
+    ],
+    examples: {
+      compare: [{
+        title: '清單的刪除按鈕',
+        kind: '每個都掛 vs 委派',
+        code: true,
+        badLabel: '每個按鈕各掛一個',
+        goodLabel: '外層掛一個',
+        bad: "document.querySelectorAll('.del').forEach((btn) => {\n  btn.addEventListener('click', () => remove(btn.dataset.id));\n});\n// 之後新增的項目沒有監聽",
+        good: "list.addEventListener('click', (e) => {\n  const btn = {{1:e.target.closest('.del')}};\n  if (!btn) return;\n  remove(btn.dataset.id);\n});",
+        badResult: '1000 個項目就有 1000 個監聽；後來新增的項目還要記得再掛。',
+        goodResult: '一個監聽處理全部，包括之後才新增的。',
+        why: ['動態清單用事件委派'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          dom: '<ul id="list"><li>阿明 <button class="del" data-id="1">刪除</button></li></ul>',
+          code: "const list = document.querySelector('#list');\nlist.addEventListener('click', (e) => {\n  const btn = e.target.closest('.del');\n  if (!btn) return;\n  console.log('刪除', btn.dataset.id, e.currentTarget.id);\n});\nlist.insertAdjacentHTML('beforeend', '<li>小華 <button class=\"del\" data-id=\"2\">刪除</button></li>');\ndocument.querySelector('[data-id=\"2\"]').click();",
+          predict: { q: '點了「後來才加的」第二個按鈕，會印出？', options: ['什麼都不印', '刪除 2 list', '刪除 2 undefined'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="委派前後對照：委派前每個按鈕各有一個監聽，新項目沒有；委派後只有 ul 有一個監聽，所有按鈕包括新的都由它處理">
+          <rect x="10" y="10" width="265" height="180" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">每個按鈕各掛</text>
+          <text x="142" y="100" text-anchor="middle" font-size="15" class="on-color">N 個監聽</text>
+          <text x="142" y="140" text-anchor="middle" font-size="15" class="on-color">新項目：沒有監聽</text>
+          <rect x="285" y="10" width="265" height="180" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">外層委派</text>
+          <text x="417" y="100" text-anchor="middle" font-size="15" class="on-color">1 個監聽</text>
+          <text x="417" y="140" text-anchor="middle" font-size="15" class="on-color">新項目：自動處理</text>
+        </svg>`, caption: '委派靠的就是冒泡：所有按鈕的點擊最後都會傳到 ul。' },
+      ],
+      tryit: {
+        q: ['點按鈕裡的 `<span>` 圖示時，`e.target` 是 span 而不是 button，所以 `e.target.dataset.id` 是 undefined。補完修正：'],
+        draft: "list.addEventListener('click', (e) => {\n  const btn = ____;\n  if (!btn) return;\n  remove(btn.dataset.id);\n});",
+        answer: ["`e.target.closest('button[data-id]')`。", 'closest 從被點的元素開始往外找，點到按鈕裡的任何東西都能找到按鈕本身；點在按鈕外面就是 null，直接 return。'],
+      },
+    },
+    mistakes: [
+      { wrong: '委派時直接用 `e.target.dataset.id`。', why: '點到按鈕裡面的圖示或文字時，target 是那個子元素。', right: '用 `e.target.closest(選擇器)` 找到真正的按鈕。' },
+      { wrong: '為了「不要觸發外層」到處 stopPropagation。', why: '會讓外層的委派、分析工具、關閉選單的邏輯都收不到事件。', right: '在外層用 target 判斷要不要處理，盡量不阻止冒泡。' },
+      { wrong: '把表單送出寫在按鈕的 click 上。', why: '按 Enter 送出不會經過按鈕的 click 處理，邏輯會漏掉。', right: '監聽 form 的 submit 事件（8-3）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '冒泡的方向是？', options: [
+        { text: '從被點的元素往外層傳', correct: true, why: '先觸發最內層，再一層層往外。' },
+        { text: '從 document 往內傳', why: '那是捕獲階段，預設的監聽不在那個階段。' },
+        { text: '只在被點的元素觸發', why: '外層的監聽也會收到。' },
+        { text: '隨機順序', why: '順序是固定的。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'ul 上的 click 監聽，使用者點了 li 裡的 button，`e.currentTarget` 是？', options: [
+        { text: 'ul', correct: true, why: 'currentTarget 是掛監聽的元素。' },
+        { text: 'button', why: '那是 target。' },
+        { text: 'li', why: 'li 只是中間經過的一層。' },
+        { text: 'document', why: '監聽掛在 ul 上。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你做了一個下拉選單：點按鈕打開，點頁面其他地方要關閉。說出你會怎麼用冒泡做到「點外面關閉」。'], answer: [
+        '在 document 上監聽 click；事件處理裡判斷 `menu.contains(e.target)` 或 `e.target.closest(\'.menu\')`，點在選單裡就不處理，點在外面就關閉。',
+        '不要在選單上 stopPropagation 來「保護」它：用 target 判斷就好，其他依賴冒泡的功能才不會壞掉。',
+      ] },
+    ],
+    keypoints: [
+      '事件從被點的元素一層層往外冒泡；target 是被點的，currentTarget 是掛監聽的。',
+      '事件委派：外層掛一個監聽，用 `e.target.closest()` 判斷點的是誰，連之後新增的元素也能處理。',
+      '盡量不要 stopPropagation；用 target 判斷要不要處理。',
+    ],
+    sources: ['mdn-events'],
+  },
+
+  '8-3': {
+    goals: [
+      '用 submit 事件與 preventDefault 處理表單',
+      '說出把使用者輸入放進 innerHTML 的風險',
+      '用 textContent 或建立元素安全地顯示資料',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 8-2）表單送出的邏輯該掛在哪？', options: [
+        { text: 'form 的 submit 事件', correct: true, why: '點按鈕和按 Enter 都會觸發 submit。' },
+        { text: '送出按鈕的 click', why: '按 Enter 送出時邏輯可能被漏掉。' },
+        { text: '每個 input 的 change', why: 'change 是欄位改變，不是送出。' },
+        { text: 'window 的 load', why: 'load 是頁面載入完成。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 3-3）`input.value` 永遠是什麼型別？', options: [
+        { text: '字串', correct: true, why: '就算 type="number" 也是字串，要自己轉。' },
+        { text: '看 input 的 type', why: 'value 一律是字串；數字型的另有 valueAsNumber。' },
+        { text: '數字', why: '要自己 Number() 轉換。' },
+        { text: '物件', why: '它是原始值字串。' },
+      ] },
+    ],
+    analogy: {
+      text: ['留言板讓訪客貼紙條。安全的做法是「把紙條內容抄成文字貼上去」；危險的做法是「把訪客交來的東西原封不動貼上去」：如果那不是紙條，而是一個會自己動的機關（程式碼），每個來看留言板的人都會觸發它。'],
+      limit: ['真的機關一眼就看得出來；[[XSS]] 的程式碼可以藏在看起來正常的文字裡，例如一個帶有 onerror 屬性的圖片標籤。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="XSS 攻擊流程：攻擊者在留言送出含程式碼的文字；網站存起來；其他使用者打開頁面時，網站用 innerHTML 插入，程式碼在受害者的瀏覽器裡執行，偷走登入狀態">
+        <rect x="10" y="10" width="125" height="230" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="72" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">① 攻擊者</text>
+        <text x="72" y="110" text-anchor="middle" font-size="14" class="on-color">留言裡</text>
+        <text x="72" y="134" text-anchor="middle" font-size="14" class="on-color">藏程式碼</text>
+        <rect x="145" y="10" width="125" height="230" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="207" y="50" text-anchor="middle" font-size="16" font-weight="900">② 網站</text>
+        <text x="207" y="110" text-anchor="middle" font-size="14">原樣存起來</text>
+        <rect x="280" y="10" width="125" height="230" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="342" y="50" text-anchor="middle" font-size="16" font-weight="900">③ 顯示</text>
+        <text x="342" y="110" text-anchor="middle" font-size="14" class="mono">innerHTML =</text>
+        <text x="342" y="134" text-anchor="middle" font-size="14">留言</text>
+        <rect x="415" y="10" width="135" height="230" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="482" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">④ 受害者</text>
+        <text x="482" y="110" text-anchor="middle" font-size="14" class="on-color">瀏覽器執行</text>
+        <text x="482" y="134" text-anchor="middle" font-size="14" class="on-color">程式碼</text>
+      </svg>`,
+      caption: '問題出在第 ③ 步：把資料當成 HTML 插進頁面。',
+      blocks: [
+        '`innerHTML` 會把字串**當成 HTML 解析**，裡面的標籤與事件屬性都會生效；`textContent` 把字串**當成純文字**，`<` 就顯示成 `<`。顯示使用者或外部來源的資料時，一律用 textContent 或建立元素。真的需要插入 HTML（例如 Markdown 轉出來的內容）時，先用 DOMPurify 之類的函式庫清洗。',
+      ],
+    },
+    define: [
+      { term: 'preventDefault', en: 'Event.preventDefault', def: '取消瀏覽器的預設動作，例如表單送出後換頁。', example: "`form.addEventListener('submit', (e) => { e.preventDefault(); … })`" },
+      { term: 'FormData', en: 'FormData', def: '一次讀出表單所有欄位（依 name 屬性）。', example: "`Object.fromEntries(new FormData(form))`" },
+      { term: 'XSS', en: 'cross-site scripting', def: '把程式碼注入頁面讓別人的瀏覽器執行。', example: '用 innerHTML 顯示留言。' },
+    ],
+    examples: {
+      compare: [{
+        title: '顯示留言',
+        kind: '當成 HTML vs 當成文字',
+        code: true,
+        badLabel: 'innerHTML',
+        goodLabel: 'textContent',
+        bad: "li.{{1:innerHTML}} = comment;",
+        good: "li.{{1:textContent}} = comment;",
+        badResult: '留言裡的 `<img onerror="…">` 會被當成真的圖片，onerror 裡的程式碼立刻執行。',
+        goodResult: '留言原封不動顯示成文字，什麼都不會執行。',
+        why: ['外部資料一律用 textContent'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          title: '同一段輸入，兩種寫法',
+          dom: '<ul><li id="unsafe"></li><li id="safe"></li></ul>',
+          wait: 300,
+          code: "window.hacked = false;\nconst comment = '好球！<img src=x onerror=\"window.hacked = true\">';\ndocument.querySelector('#safe').textContent = comment;\nconsole.log('textContent 之後：', window.hacked);\ndocument.querySelector('#unsafe').innerHTML = comment;\nsetTimeout(() => console.log('innerHTML 之後：', window.hacked), 100);",
+          predict: { q: 'innerHTML 之後 `window.hacked` 變成？', options: ['false，只是一張壞掉的圖', 'true，onerror 被執行了', '拋出錯誤，瀏覽器擋下來'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="安全與不安全寫法對照：innerHTML、outerHTML、insertAdjacentHTML、v-html 會解析 HTML，不安全；textContent、append 字串、框架的一般插值只當文字，安全">
+          <rect x="10" y="10" width="265" height="200" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">解析成 HTML（危險）</text>
+          <text x="142" y="96" text-anchor="middle" font-size="15" class="mono on-color">innerHTML</text>
+          <text x="142" y="126" text-anchor="middle" font-size="15" class="mono on-color">insertAdjacentHTML</text>
+          <text x="142" y="156" text-anchor="middle" font-size="15" class="mono on-color">v-html</text>
+          <rect x="285" y="10" width="265" height="200" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">只當文字（安全）</text>
+          <text x="417" y="96" text-anchor="middle" font-size="15" class="mono on-color">textContent</text>
+          <text x="417" y="126" text-anchor="middle" font-size="15" class="mono on-color">append('字串')</text>
+          <text x="417" y="156" text-anchor="middle" font-size="15" class="mono on-color">{{ }} 一般插值</text>
+        </svg>`, caption: '左邊的工具只用在「內容完全由你自己寫死」或「已經清洗過」的字串。' },
+        { type: 'widget', name: 'runner', props: {
+          title: '表單：攔下送出，讀出欄位',
+          dom: '<form id="f"><input name="player" value="阿明"><input name="points" type="number" value="18"><button>送出</button></form>',
+          code: "const form = document.querySelector('#f');\nform.addEventListener('submit', (e) => {\n  e.preventDefault();\n  const data = Object.fromEntries(new FormData(form));\n  console.log(data, typeof data.points);\n});\n// 這個沙盒不允許真的送出表單，所以直接觸發 submit 事件，效果等同按下送出\nform.dispatchEvent(new Event('submit', { cancelable: true }));",
+          predict: { q: '`typeof data.points` 是？', options: ["'number'", "'string'", "'undefined'"], answer: 1 },
+        } },
+      ],
+      tryit: {
+        q: ['用「建立元素」的方式安全地顯示一則留言：名字粗體、後面接留言內容。'],
+        draft: "const li = document.createElement('li');\nconst name = document.createElement('strong');\nname.textContent = c.name;\nli.append(name, '：', ____);\nlist.append(li);",
+        answer: ['`c.text`。', 'append 收到字串時會建立文字節點，和 textContent 一樣不會被當成 HTML；這樣就能組出有結構的內容，又不會有 XSS。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為「只有 script 標籤危險」，過濾掉它就安全了。', why: 'innerHTML 插入的 script 標籤本來就不會執行；真正常見的是 onerror、onclick 這類事件屬性。', right: '不要用 innerHTML 插入外部資料；需要時用 DOMPurify 清洗。' },
+      { wrong: '表單送出沒有 preventDefault，頁面重新整理，console 的東西都不見。', why: '表單的預設動作是送出並換頁。', right: '在 submit 監聽的第一行 `e.preventDefault()`。' },
+      { wrong: '只在前端驗證欄位就相信資料。', why: '使用者可以繞過前端直接送請求。', right: '前端驗證是為了體驗；伺服器端一定要再驗證一次。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`el.textContent = \'<b>hi</b>\'` 畫面上顯示？', options: [
+        { text: '`<b>hi</b>` 這串文字', correct: true, why: 'textContent 不解析 HTML。' },
+        { text: '粗體顯示的 hi 兩個字', why: '那是 innerHTML 的效果。' },
+        { text: 'hi', why: '標籤會原樣顯示出來。' },
+        { text: '什麼都不顯示', why: '文字會正常顯示。' },
+      ] },
+      { level: '應用', type: 'mc', q: '下列哪一個用來顯示「從 API 拿到的使用者暱稱」是安全的？', options: [
+        { text: '`el.textContent = user.nickname`', correct: true, why: '當成純文字，什麼都不會執行。' },
+        { text: '`el.innerHTML = user.nickname`', why: '暱稱裡如果有 HTML，會被解析執行。' },
+        { text: '用樣板字串把暱稱包進 `<b>` 再指定給 innerHTML', why: '樣板字串不會跳脫 HTML，一樣危險。' },
+        { text: "`el.outerHTML = user.nickname`", why: '一樣會被當成 HTML 解析。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['Vue 有 `v-html`，React 有 `dangerouslySetInnerHTML`。用這一課的觀念說明：什麼情況下用它們會有 XSS？要怎麼安全地用？'], answer: [
+        '兩者都等於 innerHTML。內容只要有一部分來自使用者或外部（留言、暱稱、從 API 拿到的文章），就可能被塞進帶事件屬性的標籤。',
+        '安全的用法：預設用一般的插值（Vue 的 `{{ }}`、React 的 `{}`，框架會自動跳脫）；真的需要 HTML 時，先用 DOMPurify 清洗再交給 v-html。',
+      ] },
+    ],
+    keypoints: [
+      '表單監聽 submit、第一行 preventDefault；FormData 讀欄位，值一律是字串。',
+      'innerHTML 會解析 HTML，用在外部資料就是 XSS；textContent 與 append 字串是安全的。',
+      '需要插入 HTML 時先用 DOMPurify 清洗；前端驗證之外，伺服器還要再驗證。',
+    ],
+    sources: ['owasp-xss'],
+  },
+
+  '8-4': {
+    goals: [
+      '用 localStorage 搭配 JSON 存讀物件',
+      '讀取時處理「沒有資料」「格式壞掉」「資料不合法」',
+      '用版本號 key 讓資料結構可以升級',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 7-2）`JSON.parse` 遇到壞掉的字串會？', options: [
+        { text: '拋出 SyntaxError', correct: true, why: '要用 try／catch 接住。' },
+        { text: '回傳 null', why: 'parse 失敗不會回傳 null。' },
+        { text: '回傳空物件 `{}` 當作預設值', why: '不會自動給預設值。' },
+        { text: '回傳原本的字串', why: '它會拋錯。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-4）`JSON.stringify({ a: undefined })` 是？', options: [
+        { text: "`'{}'`", correct: true, why: 'undefined 的屬性在 JSON 裡會消失。' },
+        { text: `\`'{"a":undefined}'\``, why: 'JSON 沒有 undefined。' },
+        { text: `\`'{"a":null}'\``, why: '物件屬性的 undefined 直接被省略，不會變成 null。' },
+        { text: '拋出 TypeError', why: '不會拋錯，只是省略。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[localStorage]] 像飯店房間的保險箱：退房前放進去的東西，下次入住還在。但它只收「信封」（字串），所以物件要先寫成一封信（JSON.stringify），拿出來再拆信讀（JSON.parse）。'],
+      limit: ['保險箱只有你能開；localStorage 裡的資料使用者可以在開發者工具裡隨意修改，也可能被別的版本的程式寫成舊格式，所以讀出來的東西不能直接相信。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="存讀流程：存的時候物件經過 JSON.stringify 變成字串存進 localStorage；讀的時候字串經過 JSON.parse 變回物件，再經過驗證，失敗就用預設值">
+        <rect x="10" y="10" width="120" height="100" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="70" y="66" text-anchor="middle" font-size="16" font-weight="900">物件</text>
+        <rect x="160" y="10" width="140" height="100" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+        <text x="230" y="66" text-anchor="middle" font-size="14" class="mono on-color">stringify</text>
+        <rect x="330" y="10" width="220" height="100" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="440" y="66" text-anchor="middle" font-size="15">localStorage（字串）</text>
+        <rect x="10" y="140" width="160" height="100" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+        <text x="90" y="196" text-anchor="middle" font-size="14" class="mono on-color">parse（可能壞）</text>
+        <rect x="200" y="140" width="160" height="100" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="196" text-anchor="middle" font-size="15" class="on-color">驗證（可能不合法）</text>
+        <rect x="390" y="140" width="160" height="100" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="470" y="186" text-anchor="middle" font-size="15" class="on-color">可以用的資料</text>
+        <text x="470" y="212" text-anchor="middle" font-size="13" class="on-color">失敗 → 預設值</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M130 60 H160 M300 60 H330 M170 190 H200 M360 190 H390"/></g>
+      </svg>`,
+      caption: '存很簡單；讀才是重點：三種失敗（沒有、壞掉、不合法）都要有退路。',
+      blocks: [
+        { type: 'code', lang: 'javascript', title: 'settings.js（9-1 期末實作會用到）', code: "const KEY = 'interval-timer.settings.v1';\nconst DEFAULTS = { work: 30, rest: 15, sets: 8 };\n\nfunction parseSettings(raw) {\n  if (raw === null) return DEFAULTS;\n  let data;\n  try {\n    data = JSON.parse(raw);\n  } catch (e) {\n    console.error('設定格式壞了，改用預設值', e.message);\n    return DEFAULTS;\n  }\n  const isValid = (n, min, max) => Number.isInteger(n) && n >= min && n <= max;\n  if (!isValid(data?.work, 5, 600) || !isValid(data?.rest, 1, 600) || !isValid(data?.sets, 1, 50)) return DEFAULTS;\n  return { work: data.work, rest: data.rest, sets: data.sets };\n}\n\nexport const loadSettings = () => parseSettings(localStorage.getItem(KEY));\nexport const saveSettings = (s) => localStorage.setItem(KEY, JSON.stringify(s));" },
+      ],
+    },
+    define: [
+      { term: 'localStorage', en: 'localStorage', def: '`setItem(key, 字串)`、`getItem(key)`（沒有是 null）、`removeItem(key)`。', example: '每個網站（來源）各自一份。' },
+      { term: 'JSON.stringify／parse', en: 'JSON', def: '物件 ↔ 字串；Date 變字串、undefined 消失、NaN 變 null。', example: '`JSON.stringify({ n: NaN })` 是 `\'{"n":null}\'`。' },
+      { term: '版本號 key', en: 'versioned key', def: '在 key 名稱加上 `.v1`；資料結構改變時換成 `.v2`，舊資料不會被誤讀。', example: "`'interval-timer.settings.v1'`" },
+    ],
+    examples: {
+      compare: [{
+        title: '讀取設定',
+        kind: '直接相信 vs 驗證',
+        code: true,
+        badLabel: '直接用',
+        goodLabel: '每種失敗都有退路',
+        bad: "const settings = {{1:JSON.parse(localStorage.getItem(KEY))}};\nstartTimer(settings.work);",
+        good: "const settings = {{1:loadSettings()}};\nstartTimer(settings.work);",
+        badResult: '第一次使用時 getItem 是 null，parse(null) 得到 null，讀 work 拋錯；資料壞了也會讓整頁掛掉。',
+        goodResult: '沒有、壞掉、不合法都回到預設值，頁面一定能開。',
+        why: ['外部來的資料（包含 localStorage）都要驗證'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "const DEFAULTS = { work: 30, rest: 15, sets: 8 };\nfunction parseSettings(raw) {\n  if (raw === null) return DEFAULTS;\n  let data;\n  try { data = JSON.parse(raw); } catch { return DEFAULTS; }\n  const isValid = (n, min, max) => Number.isInteger(n) && n >= min && n <= max;\n  if (!isValid(data?.work, 5, 600) || !isValid(data?.rest, 1, 600) || !isValid(data?.sets, 1, 50)) return DEFAULTS;\n  return { work: data.work, rest: data.rest, sets: data.sets };\n}\nconsole.log(parseSettings('{\"work\":40,\"rest\":20,\"sets\":5}'));\nconsole.log(parseSettings('{\"work\":\"40\"}'));\nconsole.log(parseSettings('{bad'));\nconsole.log(JSON.stringify({ d: new Date(0), u: undefined, n: NaN }));",
+          predict: { q: "`parseSettings('{\"work\":\"40\"}')` 回傳？", options: ["{ work: '40' }", '預設值 { work: 30, rest: 15, sets: 8 }', '拋出 TypeError'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="驗證失敗的退路：沒有資料、JSON 壞掉、欄位不合法三種情況，都回到預設值，頁面照常開啟">
+          <rect x="10" y="10" width="170" height="120" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">沒有資料</text>
+          <text x="95" y="90" text-anchor="middle" font-size="14" class="mono on-color">getItem → null</text>
+          <rect x="195" y="10" width="170" height="120" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">格式壞掉</text>
+          <text x="280" y="90" text-anchor="middle" font-size="14" class="mono on-color">parse 拋錯</text>
+          <rect x="380" y="10" width="170" height="120" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">不合法</text>
+          <text x="465" y="90" text-anchor="middle" font-size="14" class="mono on-color">"40"、-5、999</text>
+          <rect x="10" y="150" width="540" height="50" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="182" text-anchor="middle" font-size="16" class="on-color">全部 → 預設值，頁面照常開啟</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M95 130 V150 M280 130 V150 M465 130 V150"/></g>
+        </svg>`, caption: '「讀不到」永遠不該讓頁面壞掉。' },
+      ],
+      tryit: {
+        q: ['設定的結構要從 `{ work, rest, sets }` 改成多了 `sound: true`。照「版本號 key」的做法，你會怎麼改？'],
+        draft: "const KEY = '____';\n// 舊的 v1 資料要怎麼處理？____",
+        answer: ["`'interval-timer.settings.v2'`。", '讀 v2；沒有的話試著讀 v1 並補上 `sound: true` 轉換成 v2 存回去，再 `removeItem` 舊的 key。這樣舊使用者的設定不會遺失，也不會被新程式誤讀。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`localStorage.setItem(\'s\', settings)` 直接存物件。', why: '會被轉成字串 "[object Object]"，資料全沒了。', right: '`setItem(key, JSON.stringify(settings))`。' },
+      { wrong: '把 token、密碼存在 localStorage。', why: '頁面上任何腳本（包括 XSS 注入的）都讀得到。', right: '登入狀態交給伺服器設定的 HttpOnly cookie。' },
+      { wrong: '讀取時沒有 try／catch。', why: '資料被手動改壞或被舊版程式寫成別的格式時，整頁掛掉。', right: '包成 load 函式：沒有、壞掉、不合法都回傳預設值。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`localStorage.getItem(\'沒有的key\')` 回傳？', options: [
+        { text: '`null`', correct: true, why: '沒有就是 null，不是 undefined。' },
+        { text: '`undefined`', why: 'getItem 找不到時回傳 null。' },
+        { text: "`''`", why: '不會回傳空字串。' },
+        { text: '拋出錯誤', why: '找不到不會拋錯。' },
+      ] },
+      { level: '應用', type: 'mc', q: '存進去的 `{ when: new Date() }`，parse 回來後 `when` 是？', options: [
+        { text: 'ISO 格式的字串，要自己 `new Date()` 轉回來', correct: true, why: 'JSON 沒有日期型別，stringify 時會變成字串。' },
+        { text: '原本的 Date 物件，可以直接呼叫 getTime()', why: 'JSON.parse 不會自動轉回 Date。' },
+        { text: '時間戳記數字', why: 'stringify 輸出的是 ISO 字串。' },
+        { text: 'undefined', why: '屬性還在，只是變成字串。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的網站把購物車存在 localStorage。改版後商品的 `price` 從「元」改成「分」（整數）。舊使用者打開網站可能發生什麼？怎麼避免？'], answer: [
+        '舊資料的 price 會被當成「分」，金額少了 100 倍；或驗證規則不同導致整個購物車被當成不合法而清空。',
+        '把 key 從 `cart.v1` 換成 `cart.v2`：讀不到 v2 時讀 v1、把 price 乘 100 轉成新格式存成 v2，再刪掉 v1。資料結構改變一律換版本號。',
+      ] },
+    ],
+    keypoints: [
+      'localStorage 只存字串：存用 JSON.stringify、讀用 JSON.parse；Date 會變字串、undefined 會消失。',
+      '讀取時處理沒有（null）、壞掉（try／catch）、不合法（驗證）三種情況，全部退回預設值。',
+      'key 加版本號；不要存 token 或密碼。',
+    ],
+    sources: ['mdn-storage'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
+   模組 9：實戰與參考
+   ========================================================================== */
+defineTerms({
+  '狀態機': { en: 'state machine', def: '把程式可能處在的狀態列出來（例如 idle、work、rest、done），並規定每個狀態遇到什麼事件會轉到哪裡。', example: 'work 倒數到 0 → rest。' },
+});
+
+const TIMER_CORE = `function createTimer({ work, rest, sets }, onChange, tickMs = 1000) {
+  let phase = 'idle', set = 0, left = 0, timerId = null;
+  const emit = () => onChange({ phase, set, left });
+  function enter(next) {
+    phase = next;
+    left = next === 'work' ? work : rest;
+    if (next === 'work') set++;
+    emit();
+  }
+  function tick() {
+    left--;
+    if (left > 0) return emit();
+    if (phase === 'work' && set === sets) { pause(); phase = 'done'; return emit(); }
+    enter(phase === 'work' ? 'rest' : 'work');
+  }
+  function start() {
+    if (timerId) return;
+    if (phase === 'idle' || phase === 'done') { set = 0; enter('work'); }
+    timerId = setInterval(tick, tickMs);
+  }
+  function pause() { clearInterval(timerId); timerId = null; }
+  function reset() { pause(); phase = 'idle'; set = 0; left = 0; emit(); }
+  return { start, pause, reset };
+}`;
+
+const TIMER_HTML = `<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>練球間歇計時器</title>
+</head>
+<body>
+  <main>
+    <h1>練球間歇計時器</h1>
+    <form id="settings">
+      <label>練習秒數 <input name="work" type="number" min="5" max="600"></label>
+      <label>休息秒數 <input name="rest" type="number" min="1" max="600"></label>
+      <label>組數 <input name="sets" type="number" min="1" max="50"></label>
+      <button>套用</button>
+    </form>
+    <p id="phase" aria-live="polite">準備</p>
+    <p id="left">0</p>
+    <div id="controls">
+      <button data-action="start">開始</button>
+      <button data-action="pause">暫停</button>
+      <button data-action="reset">重設</button>
+    </div>
+  </main>
+  <script type="module" src="./main.js"><\/script>
+</body>
+</html>`;
+
+const TIMER_MAIN = `import { loadSettings, saveSettings } from './settings.js';
+import { createTimer } from './timer.js';
+
+const PHASE_LABEL = { idle: '準備', work: '練習', rest: '休息', done: '完成' };
+const form = document.querySelector('#settings');
+const phaseEl = document.querySelector('#phase');
+const leftEl = document.querySelector('#left');
+
+let settings = loadSettings();
+let timer = makeTimer();
+
+function makeTimer() {
+  return createTimer(settings, ({ phase, set, left }) => {
+    phaseEl.textContent = phase === 'idle' || phase === 'done'
+      ? PHASE_LABEL[phase]
+      : \`第 \${set} / \${settings.sets} 組・\${PHASE_LABEL[phase]}\`;
+    leftEl.textContent = String(left);
+  });
+}
+
+function fillForm() {
+  for (const [key, value] of Object.entries(settings)) form.elements[key].value = value;
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const raw = Object.fromEntries(new FormData(form));
+  const next = { work: Number(raw.work), rest: Number(raw.rest), sets: Number(raw.sets) };
+  saveSettings(next);
+  settings = loadSettings(); // 不合法就會回到預設值
+  timer.reset();
+  timer = makeTimer();
+  fillForm();
+});
+
+document.querySelector('#controls').addEventListener('click', (e) => {
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action) timer[action]();
+});
+
+fillForm();`;
+
+defineLessons({
+  '9-1': {
+    goals: [
+      '把前面八個模組的觀念組成一個完整的小工具',
+      '用狀態機描述計時器會經過的每個狀態',
+      '照交付前檢查清單自己驗收',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 8-4）讀取 localStorage 的設定，該處理哪幾種失敗？', options: [
+        { text: '沒有資料、格式壞掉、欄位不合法', correct: true, why: '三種都退回預設值，頁面一定能開。' },
+        { text: '只要處理沒有資料', why: '資料也可能被改壞或是舊格式。' },
+        { text: '不用處理，localStorage 一定可靠', why: '使用者可以手動修改。' },
+        { text: '只要用 try／catch 包起來', why: 'parse 成功但欄位不合法時，try／catch 抓不到。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 6-1）`setInterval(tick, 1000)` 的 tick 是哪一種排隊？', options: [
+        { text: '任務', correct: true, why: '計時器的回呼放進任務佇列。' },
+        { text: '微任務', why: '微任務是 Promise 相關的回呼。' },
+        { text: '同步，不排隊', why: '計時器回呼一定要排隊等。' },
+        { text: '看瀏覽器', why: '規格明確定義是任務。' },
+      ] },
+    ],
+    analogy: {
+      text: ['排球隊的間歇訓練：教練吹哨「練 30 秒」，再吹哨「休息 15 秒」，重複 8 組。教練腦中只需要記三件事：現在是練還是休、第幾組、還剩幾秒。這三件事就是程式的**狀態**；吹哨就是**狀態轉換**。'],
+      limit: ['真的教練看情況可以臨時多練一組；程式只會照你寫的規則轉換，所以每一種轉換都要事先想清楚，包括「暫停後再開始」與「最後一組練完不用休息」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="狀態轉換圖：idle 按開始進入 work；work 倒數到 0，如果還有組數就進入 rest，最後一組就進入 done；rest 倒數到 0 回到 work；任何狀態按重設回到 idle">
+        <rect x="10" y="90" width="100" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="60" y="126" text-anchor="middle" font-size="17" font-weight="900" class="mono">idle</text>
+        <rect x="170" y="90" width="110" height="60" style="fill:var(--m9)" class="stroke-ink" stroke-width="4"/>
+        <text x="225" y="126" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">work</text>
+        <rect x="340" y="10" width="100" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="390" y="46" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">rest</text>
+        <rect x="340" y="170" width="100" height="60" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="390" y="206" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">done</text>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M110 120 H170 M280 105 L340 50 M340 30 H225 V90 M280 135 L340 195"/></g>
+        <text x="140" y="110" text-anchor="middle" font-size="12">開始</text>
+        <text x="460" y="60" font-size="13">還有組數</text>
+        <text x="460" y="210" font-size="13">最後一組</text>
+        <text x="230" y="22" text-anchor="middle" font-size="12">倒數到 0</text>
+      </svg>`,
+      caption: '先畫出[[狀態機]]再寫程式：每一個箭頭就是程式裡的一個 if。重設從任何狀態回到 idle（圖上省略）。',
+      blocks: [
+        '這個小工具分成三個檔案，每一塊只做一件事，彼此用 import 連起來（7-1）：',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="程式分塊圖：main.js 負責 DOM 與事件，匯入 timer.js 的狀態機與 settings.js 的存讀；timer.js 不碰 DOM，settings.js 只處理 localStorage">
+          <rect x="190" y="10" width="180" height="80" style="fill:var(--m9)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="44" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">main.js</text>
+          <text x="280" y="70" text-anchor="middle" font-size="13" class="on-color">DOM、事件委派（8 模組）</text>
+          <rect x="10" y="130" width="250" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="135" y="164" text-anchor="middle" font-size="17" font-weight="900" class="mono">timer.js</text>
+          <text x="135" y="190" text-anchor="middle" font-size="13">狀態機、閉包、計時器（5、6）</text>
+          <rect x="300" y="130" width="250" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="425" y="164" text-anchor="middle" font-size="17" font-weight="900" class="mono">settings.js</text>
+          <text x="425" y="190" text-anchor="middle" font-size="13">localStorage、驗證（8-4）</text>
+          <g class="stroke-ink" stroke-width="4" fill="none"><path d="M240 90 V110 H135 V130 M320 90 V110 H425 V130"/></g>
+        </svg>`, caption: 'timer.js 完全不碰 DOM，所以可以用 node:test 測試（7-3）。' },
+      ],
+    },
+    define: [
+      { term: '狀態機', en: 'state machine', def: '列出所有狀態與轉換規則。', example: 'idle → work → rest → work … → done。' },
+      { term: '關注點分離', en: 'separation of concerns', def: '畫面、邏輯、儲存各放一個模組，彼此只透過函式溝通。', example: 'timer.js 只透過 onChange 通知外面。' },
+      { term: '參考實作', en: 'reference implementation', def: '一份可以對照的完整解答；先自己做，卡住再看。', example: '本課下方的三個檔案。' },
+    ],
+    examples: {
+      compare: [{
+        title: '暫停後再按開始',
+        kind: '重複排計時器 vs 先檢查',
+        code: true,
+        badLabel: '直接 setInterval',
+        goodLabel: '已在跑就不再排',
+        bad: 'function start() {\n  timerId = setInterval(tick, 1000);\n}\n// 連按兩次：每秒扣 2',
+        good: 'function start() {\n  {{1:if (timerId) return;}}\n  timerId = setInterval(tick, 1000);\n}',
+        badResult: '連按兩次開始會排兩個計時器，倒數速度變兩倍，而且 pause 只清得掉最後一個。',
+        goodResult: '已經在跑就直接 return；狀態永遠只有一個計時器。',
+        why: ['每個會改狀態的函式，都要想「重複呼叫會怎樣」'],
+      }],
+      blocks: [
+        { type: 'code', lang: 'javascript', title: 'timer.js', code: 'export ' + TIMER_CORE },
+        { type: 'widget', name: 'runner', props: {
+          title: '快轉測試：一秒縮成 20 毫秒，練 2、休 1、共 2 組',
+          wait: 1000,
+          code: TIMER_CORE + "\n\nconst log = [];\nconst timer = createTimer({ work: 2, rest: 1, sets: 2 }, (s) => {\n  log.push(`${s.phase}${s.set}:${s.left}`);\n  if (s.phase === 'done') console.log(log.join(' '));\n}, 20);\ntimer.start();",
+          predict: { q: '最後一組練完之後，狀態是？', options: ['rest2（再休息一次）', 'done2（直接完成）', 'idle（回到準備）'], answer: 1 },
+        } },
+        { type: 'code', lang: 'html', title: 'index.html', code: TIMER_HTML },
+        { type: 'code', lang: 'javascript', title: 'main.js', code: TIMER_MAIN },
+        '`settings.js` 就是 8-4 的那一份。四個檔案放在同一個資料夾，用本機伺服器打開 index.html（7-1：file:// 不能載入模組）。',
+        { type: 'widget', name: 'checklist', props: { key: 'final-project', items: [
+          '連按兩次「開始」，倒數速度沒有變快',
+          '暫停後再開始，從暫停的秒數繼續',
+          '最後一組練完直接顯示「完成」，不會多休息一次',
+          '設定改成 40／20／5，重新整理後還在',
+          '在開發者工具把 localStorage 的設定改成亂碼，重新整理後頁面仍能開（回到預設值）',
+          '設定輸入 -5 或 abc 時不會壞掉',
+          '所有按鈕都能用 Tab 聚焦、按 Enter 觸發',
+          'timer.js 寫至少 2 個 node:test 測試並通過',
+        ] } },
+      ],
+      tryit: {
+        q: ['加一個功能：每次進入 rest 時播放提示音（`new Audio(\'beep.mp3\').play()`）。這段程式應該放在哪個檔案？為什麼？'],
+        draft: '// 放在 ____，寫在 ____ 裡',
+        answer: ['放在 main.js 的 onChange 回呼裡：`if (phase === \'rest\' && left === settings.rest) beep();`。', 'timer.js 只負責狀態，不碰瀏覽器的東西（DOM、音效），它才能在 Node.js 裡測試。和畫面、聲音有關的事都在 main.js 處理。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把倒數秒數只存在畫面上（`leftEl.textContent - 1`）。', why: '資料和畫面混在一起，畫面文字一改格式就壞；也沒辦法測試。', right: '狀態存在變數裡，畫面只負責顯示它。' },
+      { wrong: '用 setInterval 的次數當作精確的時間。', why: '分頁在背景時瀏覽器會降低計時器頻率，倒數會變慢。', right: '需要精確時記下開始時間，每次 tick 用 `Date.now()` 算剩下多少。' },
+      { wrong: '套用新設定時沒有先停掉舊的計時器。', why: '舊的 setInterval 還在跑，兩個計時器同時改畫面。', right: '先 `timer.reset()` 再建立新的。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '計時器在 work 倒數到 0、而且是最後一組時，會進入？', options: [
+        { text: 'done', correct: true, why: '最後一組練完不需要再休息。' },
+        { text: 'rest', why: '還有組數時才進 rest。' },
+        { text: 'idle', why: '要按重設才回到 idle。' },
+        { text: 'work', why: '組數已經用完。' },
+      ] },
+      { level: '應用', type: 'mc', q: '為什麼 timer.js 不直接寫 `document.querySelector(\'#left\').textContent = left`？', options: [
+        { text: '讓它不依賴 DOM，可以在 Node.js 裡測試，也能換別的畫面', correct: true, why: '透過 onChange 回呼把狀態交出去，顯示的事交給 main.js。' },
+        { text: '因為模組裡不能用 document', why: '瀏覽器的模組可以用 document。' },
+        { text: '因為 textContent 很慢', why: '速度不是原因。' },
+        { text: '因為 querySelector 會回傳 null', why: '元素存在時不會。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['期末延伸：使用者想要「暖身 60 秒，然後才開始間歇」。在狀態機上要加什麼？程式要改哪幾個地方？'], answer: [
+        '狀態機多一個 warmup 狀態：idle → warmup → work。設定多一個 warmup 秒數。',
+        '要改的地方：settings.js 的 DEFAULTS、驗證與版本號（v1 → v2，8-4）；timer.js 的 start（先進 warmup）與 tick（warmup 到 0 進 work）；main.js 的 PHASE_LABEL 與表單欄位。先改 timer.js 並寫測試（7-3），再改畫面。',
+      ] },
+    ],
+    keypoints: [
+      '先畫狀態機再寫程式：每個箭頭是一個 if，每個會改狀態的函式都要想「重複呼叫會怎樣」。',
+      '邏輯（timer.js）、儲存（settings.js）、畫面（main.js）分開；邏輯不碰 DOM 才能測試。',
+      '用交付前檢查清單自己驗收：重複操作、重新整理、壞資料、鍵盤操作。',
+    ],
+    sources: ['mdn-modules', 'mdn-storage'],
+  },
+
+  '9-2': {
+    layout: 'reference',
+    minutes: 10,
+    sources: ['tc39-finished', 'mdn-bcd', 'node-releases'],
+    blocks: [
+      `這一頁整理 ES2024 到 ES2027 的新功能，以及「現在能不能直接用」。支援版本來自 MDN browser-compat-data，查證日期 ${SITE.verifiedOn}；之後會過期，要用之前再查一次。`,
+      { type: 'heading', id: 'versions', text: '版本與時間' },
+      { type: 'table', head: ['版本', '狀態', '這門課用到的功能'], rows: [
+        ['ES2023', '已發布', '`toSorted`、`toReversed`、`toSpliced`、`with`（4-4）'],
+        ['ES2024', '已發布', '`Object.groupBy`（4-5）、`Promise.withResolvers`'],
+        ['ES2025', '已發布', 'Set 方法（4-5）、Iterator helpers、`Promise.try`'],
+        ['ES2026', '2026-06-30 通過', '`Array.fromAsync`、`Error.isError`、`Math.sumPrecise`、`Iterator.concat`、`RegExp.escape`、Uint8Array 與 Base64 互轉'],
+        ['ES2027', '預定', 'Temporal、`using` 宣告、`Map.prototype.getOrInsert`'],
+      ] },
+      { type: 'callout', variant: 'tip', title: '二手資料常見的錯', body: ['不少文章把 Temporal 和 `using` 寫成 ES2026 的功能。依 TC39 的 finished proposals 表格，它們預定在 ES2027。'] },
+      { type: 'heading', id: 'support', text: '支援表' },
+      { type: 'table', head: ['功能', '版本', 'Chrome', 'Firefox', 'Safari', 'Node.js'], rows: [
+        ['`toSorted`、`with`', 'ES2023', '110', '115', '16', '20'],
+        ['`Object.groupBy`', 'ES2024', '117', '未查證', '17.4', '本機 22 可用'],
+        ['`Promise.withResolvers`', 'ES2024', '119', '121', '17.4', '22'],
+        ['Set 方法', 'ES2025', '122', '127', '17', '22'],
+        ['Iterator helpers', 'ES2025', '122', '131', '18.4', '22'],
+        ['`Promise.try`', 'ES2025', '128', '134', '18.2', '23'],
+        ['`Array.fromAsync`', 'ES2026', '121', '115', '16.4', '22'],
+        ['`Error.isError`', 'ES2026', '134', '138', '18.4（部分）', '24.3'],
+        ['`Math.sumPrecise`', 'ES2026', '147', '137', '26.2', '尚未支援'],
+        ['`Iterator.concat`', 'ES2026', '146', '147', '26.4', '26'],
+        ['Temporal', 'ES2027 預定', '144', '139', '僅預覽版', '26'],
+        ['`using` 宣告', 'ES2027 預定', '未查證', '未查證', '未查證', '未查證'],
+      ] },
+      { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="判斷流程：先看目標環境；所有目標都支援就直接用；有部分不支援就查表或加 polyfill；連 Safari 正式版都沒有的，只當延伸閱讀">
+        <rect x="10" y="10" width="170" height="190" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="50" text-anchor="middle" font-size="17" font-weight="900" class="on-color">現在就能用</text>
+        <text x="95" y="100" text-anchor="middle" font-size="14" class="on-color">各大瀏覽器與</text>
+        <text x="95" y="124" text-anchor="middle" font-size="14" class="on-color">Node.js 22 都有</text>
+        <rect x="195" y="10" width="170" height="190" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="50" text-anchor="middle" font-size="17" font-weight="900" class="on-color">要查表</text>
+        <text x="280" y="100" text-anchor="middle" font-size="14" class="on-color">新版瀏覽器有</text>
+        <text x="280" y="124" text-anchor="middle" font-size="14" class="on-color">Node.js 22 沒有</text>
+        <rect x="380" y="10" width="170" height="190" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="50" text-anchor="middle" font-size="17" font-weight="900" class="on-color">還不能當主線</text>
+        <text x="465" y="100" text-anchor="middle" font-size="14" class="on-color">Safari 正式版</text>
+        <text x="465" y="124" text-anchor="middle" font-size="14" class="on-color">或規格還沒定</text>
+      </svg>`, caption: '「能不能用」看的是你的使用者用什麼環境，不是規格哪一年通過。' },
+      { type: 'heading', id: 'classify', text: '分類練習' },
+      '依上面的支援表，把每個功能分到三類（以「各大瀏覽器最新版加上 Node.js 22」為目標環境）：',
+      { type: 'widget', name: 'classify', props: {
+        buckets: [{ id: 'now', label: '現在就能用' }, { id: 'check', label: '要查表' }, { id: 'later', label: '還不能當主線' }],
+        items: [
+          { text: '`arr.toSorted()`', answer: 'now', why: 'ES2023，各大瀏覽器與 Node.js 20 起都有。' },
+          { text: '`new Set(a).union(b)`', answer: 'now', why: 'ES2025，但 Chrome 122、Safari 17、Node.js 22 都已支援。' },
+          { text: '`Promise.try(fn)`', answer: 'check', why: '瀏覽器都有，但 Node.js 23 才支援，22 不能跑。' },
+          { text: '`Error.isError(x)`', answer: 'check', why: 'Node.js 24.3 起；Safari 的行為也有差異（DOMException 回傳 false）。' },
+          { text: '`Temporal.Now.plainDateISO()`', answer: 'later', why: 'Safari 只有預覽版，規格預定 ES2027。' },
+          { text: '`using file = open()`', answer: 'later', why: '預定 ES2027，支援狀態未查證。' },
+        ],
+      } },
+    ],
+  },
+
+  '9-3': {
+    layout: 'reference',
+    minutes: 10,
+    sources: ['mdn-js', 'mdn-equality', 'mdn-this', 'mdn-eventloop'],
+    blocks: [
+      '一頁整理整門課最常查的東西。每一列都標了出處單元，忘記為什麼就回去看那一課。',
+      { type: 'heading', id: 'questions', text: '讀任何程式碼都先問三個問題' },
+      { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="三個問題：這個值是什麼型別，對應模組 1 到 4；這個函式是被誰呼叫，對應模組 5；這段程式現在在執行還是在排隊，對應模組 6">
+        <rect x="10" y="10" width="170" height="180" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">這個值是什麼？</text>
+        <text x="95" y="120" text-anchor="middle" font-size="14" class="on-color">型別、參考、轉型</text>
+        <text x="95" y="150" text-anchor="middle" font-size="14" class="on-color">模組 1–4</text>
+        <rect x="195" y="10" width="170" height="180" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">被誰呼叫？</text>
+        <text x="280" y="120" text-anchor="middle" font-size="14" class="on-color">this、閉包、原型</text>
+        <text x="280" y="150" text-anchor="middle" font-size="14" class="on-color">模組 5</text>
+        <rect x="380" y="10" width="170" height="180" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">執行還是排隊？</text>
+        <text x="465" y="120" text-anchor="middle" font-size="14" class="on-color">事件迴圈、Promise</text>
+        <text x="465" y="150" text-anchor="middle" font-size="14" class="on-color">模組 6</text>
+      </svg>`, caption: '大部分「看不懂為什麼」的 bug，都是這三個問題其中一個答錯了。' },
+      { type: 'heading', id: 'values', text: '值與轉型' },
+      { type: 'table', head: ['寫法', '結果', '出處'], rows: [
+        ['`typeof null`', "`'object'`（歷史錯誤）", '1-1'],
+        ['`0.1 + 0.2 === 0.3`', '`false`；金額用整數的分', '1-2'],
+        ['`a ?? b`', 'a 是 null／undefined 才用 b', '3-2'],
+        ['`a || b`', 'a 是 falsy（含 0、空字串）就用 b', '3-2'],
+        ['`==`', '會轉型；一律用 `===`', '3-3'],
+        ["`'17' + 1`", "`'171'`", '3-3'],
+        ['`b = a`（物件）', '共用同一個', '4-1'],
+        ['`{ ...a }`', '淺複製', '4-2'],
+        ['`structuredClone(a)`', '深複製', '4-2'],
+      ] },
+      { type: 'heading', id: 'arrays', text: '陣列方法' },
+      { type: 'table', head: ['要做什麼', '用', '會改原陣列？'], rows: [
+        ['每個都變形', '`map`', '不會'],
+        ['留下符合的', '`filter`', '不會'],
+        ['合成一個值', '`reduce(fn, 起始值)`', '不會'],
+        ['找第一個', '`find`（找不到是 undefined）', '不會'],
+        ['有沒有／是不是全部', '`some`／`every`', '不會'],
+        ['排序', '`toSorted((a, b) => a - b)`', '不會（`sort` 會）'],
+        ['反轉', '`toReversed()`', '不會（`reverse` 會）'],
+        ['換掉一格', '`with(i, 值)`', '不會（`arr[i] =` 會）'],
+        ['加到最後', '`[...arr, x]`', '不會（`push` 會）'],
+      ] },
+      { type: 'heading', id: 'this', text: 'this 判定順序（5-3）' },
+      { type: 'table', head: ['順序', '呼叫方式', 'this'], rows: [
+        ['0', '箭頭函式', '外層的 this'],
+        ['1', '`new F()`', '新建立的物件'],
+        ['2', '`f.call(x)`／`f.bind(x)`', 'x'],
+        ['3', '`obj.f()`', 'obj'],
+        ['4', '`f()`', 'undefined（嚴格模式）'],
+      ] },
+      { type: 'heading', id: 'async', text: '非同步' },
+      { type: 'table', head: ['情況', '做法', '出處'], rows: [
+        ['執行順序', '同步 → 清空微任務（then、await 之後）→ 一個任務（setTimeout、事件）', '6-1'],
+        ['全部都要成功', '`Promise.all`', '6-2'],
+        ['每一個的結果都要知道', '`Promise.allSettled`', '6-2'],
+        ['互不相干的請求', '先全部發出，再 `await Promise.all`', '6-3'],
+        ['要等每一輪', '`for…of` ＋ await（不要用 forEach）', '6-3'],
+        ['fetch 的 404／500', '不會 reject，檢查 `res.ok`', '6-4'],
+        ['逾時', '`signal: AbortSignal.timeout(ms)`', '6-4'],
+      ] },
+      { type: 'heading', id: 'browser', text: '瀏覽器' },
+      { type: 'table', head: ['情況', '做法', '出處'], rows: [
+        ['動態清單的按鈕', '外層委派 ＋ `e.target.closest()`', '8-2'],
+        ['顯示外部資料', '`textContent`，不要 `innerHTML`', '8-3'],
+        ['表單', 'submit 事件 ＋ `preventDefault`', '8-3'],
+        ['存設定', '`JSON.stringify` ＋ 版本號 key；讀取時驗證', '8-4'],
+      ] },
+    ],
+  },
+
+  '9-4': {
+    layout: 'reference',
+    minutes: 25,
+    sources: ['mdn-js'],
+    blocks: [
+      '20 題，混合模組 0 到 9。每題都標了出處單元，答錯就回去複習那一課。先自己想，再展開看解析。',
+      { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="各模組題數長條圖：模組 0 一題，模組 1 兩題，模組 2 兩題，模組 3 兩題，模組 4 三題，模組 5 三題，模組 6 三題，模組 7 一題，模組 8 兩題，模組 9 一題">
+        <text x="10" y="28" font-size="18" font-weight="900">各模組題數</text>
+        <g class="stroke-ink" stroke-width="3">
+          <rect x="20" y="190" width="40" height="40" style="fill:var(--m0)"/>
+          <rect x="74" y="150" width="40" height="80" style="fill:var(--m1)"/>
+          <rect x="128" y="150" width="40" height="80" style="fill:var(--m2)"/>
+          <rect x="182" y="150" width="40" height="80" style="fill:var(--m3)"/>
+          <rect x="236" y="110" width="40" height="120" style="fill:var(--m4)"/>
+          <rect x="290" y="110" width="40" height="120" style="fill:var(--m5)"/>
+          <rect x="344" y="110" width="40" height="120" style="fill:var(--m6)"/>
+          <rect x="398" y="190" width="40" height="40" style="fill:var(--m7)"/>
+          <rect x="452" y="150" width="40" height="80" style="fill:var(--m8)"/>
+          <rect x="506" y="190" width="40" height="40" style="fill:var(--m9)"/>
+        </g>
+        <g font-size="14" text-anchor="middle">
+          <text x="40" y="252">0</text><text x="94" y="252">1</text><text x="148" y="252">2</text><text x="202" y="252">3</text><text x="256" y="252">4</text>
+          <text x="310" y="252">5</text><text x="364" y="252">6</text><text x="418" y="252">7</text><text x="472" y="252">8</text><text x="526" y="252">9</text>
+        </g>
+      </svg>`, caption: '模組 4–6 是這門課的核心，題數最多。' },
+      { type: 'quiz', key: '9-4:final', items: [
+        { level: '0-2', type: 'mc', q: '`setTimeout` 是 JavaScript 語言本身的功能嗎？', options: [
+          { text: '不是，是執行環境提供的', correct: true, why: '語言規格裡沒有計時器；兩個環境剛好都提供。' },
+          { text: '是，寫在 ECMAScript 語言規格裡', why: '規格沒有計時器。' },
+          { text: '只有瀏覽器有', why: 'Node.js 也有。' },
+          { text: '只有 Node.js 有', why: '瀏覽器也有。' },
+        ] },
+        { level: '1-1', type: 'mc', q: '判斷一個值是不是陣列，該用？', options: [
+          { text: '`Array.isArray(x)`', correct: true, why: 'typeof 陣列是 object，分不出來。' },
+          { text: "`typeof x === 'array'`", why: 'typeof 沒有 array 這個結果。' },
+          { text: "`typeof x === 'object'`", why: '物件與 null 也是 object。' },
+          { text: '`x.length > 0`', why: '字串也有 length；空陣列 length 是 0。' },
+        ] },
+        { level: '1-2', type: 'mc', q: '購物車金額要怎麼存才不會出現 99.99000000000001？', options: [
+          { text: '用整數的「分」存', correct: true, why: '整數在安全範圍內是精確的。' },
+          { text: '用 toFixed(2) 存成字串', why: '計算時又要轉回數字，誤差還在。' },
+          { text: '用 Math.round 每一步都四捨五入', why: '能減少誤差，但規則複雜容易漏。' },
+          { text: '用 parseFloat', why: 'parseFloat 得到的還是浮點數。' },
+        ] },
+        { level: '2-1', type: 'mc', q: '`const list = []; list.push(1);` 會？', options: [
+          { text: '正常執行', correct: true, why: 'const 只禁止重新指定，不保護內容。' },
+          { text: '拋出 TypeError', why: 'push 是修改內容，不是重新指定。' },
+          { text: '靜默失敗', why: '真的會改到。' },
+          { text: '拋出 SyntaxError', why: '語法沒有問題。' },
+        ] },
+        { level: '2-2', type: 'mc', q: '在 `let x = 1;` 這行之前讀 x 會？', options: [
+          { text: '拋出 ReferenceError', correct: true, why: 'let 有提升，但宣告前不能存取。' },
+          { text: '得到 undefined，和 var 一樣', why: '那是 var 的行為。' },
+          { text: '得到 1', why: '還沒執行到指定。' },
+          { text: '得到 null', why: '沒有任何規則會給 null。' },
+        ] },
+        { level: '3-2', type: 'mc', q: '`const volume = settings.volume || 50`，使用者設定的音量是 0，結果是？', options: [
+          { text: '50', correct: true, why: '0 是 falsy，|| 改用 50；應該用 ??。' },
+          { text: '0', why: '那是 `??` 的結果。' },
+          { text: 'undefined', why: '|| 一定會回傳其中一邊。' },
+          { text: 'NaN', why: '沒有任何運算產生 NaN。' },
+        ] },
+        { level: '3-3', type: 'mc', q: '`[] == false` 是？', options: [
+          { text: 'true', correct: true, why: '這正是一律用 === 的原因。' },
+          { text: 'false，陣列是 truthy', why: '== 不看 truthy，而是一連串轉型。' },
+          { text: '拋出 TypeError', why: '== 不會拋錯。' },
+          { text: 'undefined', why: '比較一定得到布林值。' },
+        ] },
+        { level: '4-1', type: 'mc', q: '函式裡 `p.score += 10`，外面傳進來的物件會變嗎？', options: [
+          { text: '會，指向同一個物件', correct: true, why: '傳進函式的是參考。' },
+          { text: '不會，參數是傳進來時複製的一份', why: '物件傳的是參考。' },
+          { text: '只有 const 物件會', why: '和宣告方式無關。' },
+          { text: '要 return 才會', why: '改內容不需要 return。' },
+        ] },
+        { level: '4-3', type: 'mc', q: '`[{ p: 1 }, { p: 2 }].reduce((s, x) => s + x.p)`（沒給起始值）得到？', options: [
+          { text: "`'[object Object]2'`", correct: true, why: '第一個元素物件被當成起始值，物件 + 數字變字串相接。' },
+          { text: '`3`', why: '要給起始值 0 才是 3。' },
+          { text: '`NaN`', why: '物件轉字串後相接，不是數字運算。' },
+          { text: '拋出 TypeError', why: '不會拋錯，所以更難發現。' },
+        ] },
+        { level: '4-4', type: 'mc', q: '`const sorted = list.sort()` 之後？', options: [
+          { text: 'list 也被排序了', correct: true, why: 'sort 就地排序並回傳原陣列。' },
+          { text: 'sorted 是排好的新陣列，list 保持原樣', why: '那是 toSorted。' },
+          { text: 'list 被清空', why: 'sort 不會清空。' },
+          { text: 'sorted 是 undefined', why: 'sort 會回傳陣列。' },
+        ] },
+        { level: '5-1', type: 'mc', q: "`btn.addEventListener('click', save())` 錯在哪？", options: [
+          { text: '`save()` 立刻呼叫了', correct: true, why: '要交出函式本身 `save`。' },
+          { text: "'click' 要寫成 'onclick'", why: 'addEventListener 用不含 on 的名稱。' },
+          { text: 'save 必須是箭頭函式', why: '一般函式也可以。' },
+          { text: '沒有錯', why: '載入時會先存一次，點擊反而沒反應。' },
+        ] },
+        { level: '5-2', type: 'mc', q: '閉包記住的是？', options: [
+          { text: '變數本身', correct: true, why: '不是拍照存值。' },
+          { text: '建立當下的值', why: '最常見的誤解。' },
+          { text: '只有全域變數', why: '任何外層變數都會。' },
+          { text: '函式的原始碼', why: '多的是變數環境。' },
+        ] },
+        { level: '5-3', type: 'mc', q: '`const f = team.describe; f()` 裡的 this 是？', options: [
+          { text: 'undefined', correct: true, why: '呼叫時沒有點的左邊（嚴格模式）。' },
+          { text: 'team', why: '函式寫在 team 裡不代表 this 是 team。' },
+          { text: 'f', why: 'this 不會指向函式本身。' },
+          { text: 'window', why: '模組是嚴格模式，不是 window。' },
+        ] },
+        { level: '6-1', type: 'mc', q: '`setTimeout(A, 0); Promise.resolve().then(B); C();` 的執行順序？', options: [
+          { text: 'C B A', correct: true, why: '同步 → 微任務 → 任務。' },
+          { text: 'A B C', why: '寫的順序不等於執行順序。' },
+          { text: 'C A B', why: '微任務比任務先。' },
+          { text: 'B C A', why: '同步程式最先。' },
+        ] },
+        { level: '6-3', type: 'mc', q: '`items.forEach(async (x) => { await save(x); })` 之後立刻說「全部存好了」，對嗎？', options: [
+          { text: '不對，forEach 不會等', correct: true, why: '要等就用 for…of 或 Promise.all。' },
+          { text: '對，回呼裡的 await 會讓 forEach 一個一個等', why: 'await 只暫停回呼自己。' },
+          { text: '對，只是比較慢', why: 'forEach 根本不等。' },
+          { text: '會拋出 SyntaxError', why: '語法合法，只是行為不對。' },
+        ] },
+        { level: '6-4', type: 'mc', q: 'fetch 收到 500，下面哪個說法對？', options: [
+          { text: 'fetch 成功，`res.ok` 是 false', correct: true, why: '有回應就算成功，要自己檢查 ok。' },
+          { text: 'fetch 失敗，會進 catch', why: '只有網路錯誤、取消、逾時才會。' },
+          { text: 'fetch 會自動重試', why: 'fetch 不會自動重試。' },
+          { text: 'res.json() 一定會成功', why: '錯誤頁面可能不是 JSON。' },
+        ] },
+        { level: '7-2', type: 'mc', q: '`try { bad(); } catch {}`，bad 是會失敗的 async 函式，catch 接得到嗎？', options: [
+          { text: '接不到', correct: true, why: 'bad() 只回傳失敗的 Promise，不會同步拋錯。' },
+          { text: '接得到，錯誤會在 bad() 那一行拋出', why: '非同步錯誤不會在這一行拋出；要 `await bad()`。' },
+          { text: '看瀏覽器', why: '所有環境都一樣。' },
+          { text: '只有在 Node.js 接得到', why: '兩邊都接不到。' },
+        ] },
+        { level: '8-2', type: 'mc', q: '清單項目會動態新增，刪除按鈕的監聽該怎麼掛？', options: [
+          { text: '掛在外層（事件委派）', correct: true, why: '事件委派，新增的項目也能處理。' },
+          { text: '每個按鈕各掛一個', why: '之後新增的項目沒有監聽。' },
+          { text: '掛在 window 的 load', why: 'load 只觸發一次。' },
+          { text: '用 setInterval 定時檢查每個按鈕有沒有被點', why: '浪費效能而且不可靠。' },
+        ] },
+        { level: '8-3', type: 'mc', q: '顯示使用者留言，安全的寫法是？', options: [
+          { text: '`li.textContent = comment`', correct: true, why: '當成純文字，不會執行任何東西。' },
+          { text: '`li.innerHTML = comment`', why: '留言裡的事件屬性會被執行（XSS）。' },
+          { text: '先刪掉 script 標籤再 innerHTML', why: 'onerror 之類的屬性一樣危險。' },
+          { text: '用樣板字串組好再 innerHTML', why: '樣板字串不會跳脫 HTML。' },
+        ] },
+        { level: '9-1', type: 'reveal', q: ['計時器的「開始」按鈕被連按兩次，倒數變成每秒扣 2。說出原因與修法。'], answer: [
+          '每按一次就呼叫一次 setInterval，兩個計時器同時在扣秒數；pause 只清得掉最後一個。',
+          '修法：start 開頭寫 `if (timerId) return;`，已經在跑就不再排。每個會改狀態的函式都要想「重複呼叫會怎樣」。',
+        ] },
+      ] },
+      { type: 'callout', variant: 'keypoints', title: '做完之後', body: ['錯 3 題以內：可以開始用框架（Vue、React）做專案了，遇到怪問題先回到 9-3 的三個問題。', '錯超過 3 題：照每題標的單元回去複習，一週後再做一次這份測驗（間隔回想比連續重讀有效）。'] },
+    ],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
    App：狀態、路由、版面
    ========================================================================== */
 (() => {

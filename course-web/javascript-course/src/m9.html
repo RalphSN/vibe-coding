@@ -1,0 +1,521 @@
+<script>
+/* ==========================================================================
+   模組 9：實戰與參考
+   ========================================================================== */
+defineTerms({
+  '狀態機': { en: 'state machine', def: '把程式可能處在的狀態列出來（例如 idle、work、rest、done），並規定每個狀態遇到什麼事件會轉到哪裡。', example: 'work 倒數到 0 → rest。' },
+});
+
+const TIMER_CORE = `function createTimer({ work, rest, sets }, onChange, tickMs = 1000) {
+  let phase = 'idle', set = 0, left = 0, timerId = null;
+  const emit = () => onChange({ phase, set, left });
+  function enter(next) {
+    phase = next;
+    left = next === 'work' ? work : rest;
+    if (next === 'work') set++;
+    emit();
+  }
+  function tick() {
+    left--;
+    if (left > 0) return emit();
+    if (phase === 'work' && set === sets) { pause(); phase = 'done'; return emit(); }
+    enter(phase === 'work' ? 'rest' : 'work');
+  }
+  function start() {
+    if (timerId) return;
+    if (phase === 'idle' || phase === 'done') { set = 0; enter('work'); }
+    timerId = setInterval(tick, tickMs);
+  }
+  function pause() { clearInterval(timerId); timerId = null; }
+  function reset() { pause(); phase = 'idle'; set = 0; left = 0; emit(); }
+  return { start, pause, reset };
+}`;
+
+const TIMER_HTML = `<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>練球間歇計時器</title>
+</head>
+<body>
+  <main>
+    <h1>練球間歇計時器</h1>
+    <form id="settings">
+      <label>練習秒數 <input name="work" type="number" min="5" max="600"></label>
+      <label>休息秒數 <input name="rest" type="number" min="1" max="600"></label>
+      <label>組數 <input name="sets" type="number" min="1" max="50"></label>
+      <button>套用</button>
+    </form>
+    <p id="phase" aria-live="polite">準備</p>
+    <p id="left">0</p>
+    <div id="controls">
+      <button data-action="start">開始</button>
+      <button data-action="pause">暫停</button>
+      <button data-action="reset">重設</button>
+    </div>
+  </main>
+  <script type="module" src="./main.js"><\/script>
+</body>
+</html>`;
+
+const TIMER_MAIN = `import { loadSettings, saveSettings } from './settings.js';
+import { createTimer } from './timer.js';
+
+const PHASE_LABEL = { idle: '準備', work: '練習', rest: '休息', done: '完成' };
+const form = document.querySelector('#settings');
+const phaseEl = document.querySelector('#phase');
+const leftEl = document.querySelector('#left');
+
+let settings = loadSettings();
+let timer = makeTimer();
+
+function makeTimer() {
+  return createTimer(settings, ({ phase, set, left }) => {
+    phaseEl.textContent = phase === 'idle' || phase === 'done'
+      ? PHASE_LABEL[phase]
+      : \`第 \${set} / \${settings.sets} 組・\${PHASE_LABEL[phase]}\`;
+    leftEl.textContent = String(left);
+  });
+}
+
+function fillForm() {
+  for (const [key, value] of Object.entries(settings)) form.elements[key].value = value;
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const raw = Object.fromEntries(new FormData(form));
+  const next = { work: Number(raw.work), rest: Number(raw.rest), sets: Number(raw.sets) };
+  saveSettings(next);
+  settings = loadSettings(); // 不合法就會回到預設值
+  timer.reset();
+  timer = makeTimer();
+  fillForm();
+});
+
+document.querySelector('#controls').addEventListener('click', (e) => {
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action) timer[action]();
+});
+
+fillForm();`;
+
+defineLessons({
+  '9-1': {
+    goals: [
+      '把前面八個模組的觀念組成一個完整的小工具',
+      '用狀態機描述計時器會經過的每個狀態',
+      '照交付前檢查清單自己驗收',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 8-4）讀取 localStorage 的設定，該處理哪幾種失敗？', options: [
+        { text: '沒有資料、格式壞掉、欄位不合法', correct: true, why: '三種都退回預設值，頁面一定能開。' },
+        { text: '只要處理沒有資料', why: '資料也可能被改壞或是舊格式。' },
+        { text: '不用處理，localStorage 一定可靠', why: '使用者可以手動修改。' },
+        { text: '只要用 try／catch 包起來', why: 'parse 成功但欄位不合法時，try／catch 抓不到。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 6-1）`setInterval(tick, 1000)` 的 tick 是哪一種排隊？', options: [
+        { text: '任務', correct: true, why: '計時器的回呼放進任務佇列。' },
+        { text: '微任務', why: '微任務是 Promise 相關的回呼。' },
+        { text: '同步，不排隊', why: '計時器回呼一定要排隊等。' },
+        { text: '看瀏覽器', why: '規格明確定義是任務。' },
+      ] },
+    ],
+    analogy: {
+      text: ['排球隊的間歇訓練：教練吹哨「練 30 秒」，再吹哨「休息 15 秒」，重複 8 組。教練腦中只需要記三件事：現在是練還是休、第幾組、還剩幾秒。這三件事就是程式的**狀態**；吹哨就是**狀態轉換**。'],
+      limit: ['真的教練看情況可以臨時多練一組；程式只會照你寫的規則轉換，所以每一種轉換都要事先想清楚，包括「暫停後再開始」與「最後一組練完不用休息」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="狀態轉換圖：idle 按開始進入 work；work 倒數到 0，如果還有組數就進入 rest，最後一組就進入 done；rest 倒數到 0 回到 work；任何狀態按重設回到 idle">
+        <rect x="10" y="90" width="100" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="60" y="126" text-anchor="middle" font-size="17" font-weight="900" class="mono">idle</text>
+        <rect x="170" y="90" width="110" height="60" style="fill:var(--m9)" class="stroke-ink" stroke-width="4"/>
+        <text x="225" y="126" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">work</text>
+        <rect x="340" y="10" width="100" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="390" y="46" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">rest</text>
+        <rect x="340" y="170" width="100" height="60" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="390" y="206" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">done</text>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M110 120 H170 M280 105 L340 50 M340 30 H225 V90 M280 135 L340 195"/></g>
+        <text x="140" y="110" text-anchor="middle" font-size="12">開始</text>
+        <text x="460" y="60" font-size="13">還有組數</text>
+        <text x="460" y="210" font-size="13">最後一組</text>
+        <text x="230" y="22" text-anchor="middle" font-size="12">倒數到 0</text>
+      </svg>`,
+      caption: '先畫出[[狀態機]]再寫程式：每一個箭頭就是程式裡的一個 if。重設從任何狀態回到 idle（圖上省略）。',
+      blocks: [
+        '這個小工具分成三個檔案，每一塊只做一件事，彼此用 import 連起來（7-1）：',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="程式分塊圖：main.js 負責 DOM 與事件，匯入 timer.js 的狀態機與 settings.js 的存讀；timer.js 不碰 DOM，settings.js 只處理 localStorage">
+          <rect x="190" y="10" width="180" height="80" style="fill:var(--m9)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="44" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">main.js</text>
+          <text x="280" y="70" text-anchor="middle" font-size="13" class="on-color">DOM、事件委派（8 模組）</text>
+          <rect x="10" y="130" width="250" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="135" y="164" text-anchor="middle" font-size="17" font-weight="900" class="mono">timer.js</text>
+          <text x="135" y="190" text-anchor="middle" font-size="13">狀態機、閉包、計時器（5、6）</text>
+          <rect x="300" y="130" width="250" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="425" y="164" text-anchor="middle" font-size="17" font-weight="900" class="mono">settings.js</text>
+          <text x="425" y="190" text-anchor="middle" font-size="13">localStorage、驗證（8-4）</text>
+          <g class="stroke-ink" stroke-width="4" fill="none"><path d="M240 90 V110 H135 V130 M320 90 V110 H425 V130"/></g>
+        </svg>`, caption: 'timer.js 完全不碰 DOM，所以可以用 node:test 測試（7-3）。' },
+      ],
+    },
+    define: [
+      { term: '狀態機', en: 'state machine', def: '列出所有狀態與轉換規則。', example: 'idle → work → rest → work … → done。' },
+      { term: '關注點分離', en: 'separation of concerns', def: '畫面、邏輯、儲存各放一個模組，彼此只透過函式溝通。', example: 'timer.js 只透過 onChange 通知外面。' },
+      { term: '參考實作', en: 'reference implementation', def: '一份可以對照的完整解答；先自己做，卡住再看。', example: '本課下方的三個檔案。' },
+    ],
+    examples: {
+      compare: [{
+        title: '暫停後再按開始',
+        kind: '重複排計時器 vs 先檢查',
+        code: true,
+        badLabel: '直接 setInterval',
+        goodLabel: '已在跑就不再排',
+        bad: 'function start() {\n  timerId = setInterval(tick, 1000);\n}\n// 連按兩次：每秒扣 2',
+        good: 'function start() {\n  {{1:if (timerId) return;}}\n  timerId = setInterval(tick, 1000);\n}',
+        badResult: '連按兩次開始會排兩個計時器，倒數速度變兩倍，而且 pause 只清得掉最後一個。',
+        goodResult: '已經在跑就直接 return；狀態永遠只有一個計時器。',
+        why: ['每個會改狀態的函式，都要想「重複呼叫會怎樣」'],
+      }],
+      blocks: [
+        { type: 'code', lang: 'javascript', title: 'timer.js', code: 'export ' + TIMER_CORE },
+        { type: 'widget', name: 'runner', props: {
+          title: '快轉測試：一秒縮成 20 毫秒，練 2、休 1、共 2 組',
+          wait: 1000,
+          code: TIMER_CORE + "\n\nconst log = [];\nconst timer = createTimer({ work: 2, rest: 1, sets: 2 }, (s) => {\n  log.push(`${s.phase}${s.set}:${s.left}`);\n  if (s.phase === 'done') console.log(log.join(' '));\n}, 20);\ntimer.start();",
+          predict: { q: '最後一組練完之後，狀態是？', options: ['rest2（再休息一次）', 'done2（直接完成）', 'idle（回到準備）'], answer: 1 },
+        } },
+        { type: 'code', lang: 'html', title: 'index.html', code: TIMER_HTML },
+        { type: 'code', lang: 'javascript', title: 'main.js', code: TIMER_MAIN },
+        '`settings.js` 就是 8-4 的那一份。四個檔案放在同一個資料夾，用本機伺服器打開 index.html（7-1：file:// 不能載入模組）。',
+        { type: 'widget', name: 'checklist', props: { key: 'final-project', items: [
+          '連按兩次「開始」，倒數速度沒有變快',
+          '暫停後再開始，從暫停的秒數繼續',
+          '最後一組練完直接顯示「完成」，不會多休息一次',
+          '設定改成 40／20／5，重新整理後還在',
+          '在開發者工具把 localStorage 的設定改成亂碼，重新整理後頁面仍能開（回到預設值）',
+          '設定輸入 -5 或 abc 時不會壞掉',
+          '所有按鈕都能用 Tab 聚焦、按 Enter 觸發',
+          'timer.js 寫至少 2 個 node:test 測試並通過',
+        ] } },
+      ],
+      tryit: {
+        q: ['加一個功能：每次進入 rest 時播放提示音（`new Audio(\'beep.mp3\').play()`）。這段程式應該放在哪個檔案？為什麼？'],
+        draft: '// 放在 ____，寫在 ____ 裡',
+        answer: ['放在 main.js 的 onChange 回呼裡：`if (phase === \'rest\' && left === settings.rest) beep();`。', 'timer.js 只負責狀態，不碰瀏覽器的東西（DOM、音效），它才能在 Node.js 裡測試。和畫面、聲音有關的事都在 main.js 處理。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把倒數秒數只存在畫面上（`leftEl.textContent - 1`）。', why: '資料和畫面混在一起，畫面文字一改格式就壞；也沒辦法測試。', right: '狀態存在變數裡，畫面只負責顯示它。' },
+      { wrong: '用 setInterval 的次數當作精確的時間。', why: '分頁在背景時瀏覽器會降低計時器頻率，倒數會變慢。', right: '需要精確時記下開始時間，每次 tick 用 `Date.now()` 算剩下多少。' },
+      { wrong: '套用新設定時沒有先停掉舊的計時器。', why: '舊的 setInterval 還在跑，兩個計時器同時改畫面。', right: '先 `timer.reset()` 再建立新的。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '計時器在 work 倒數到 0、而且是最後一組時，會進入？', options: [
+        { text: 'done', correct: true, why: '最後一組練完不需要再休息。' },
+        { text: 'rest', why: '還有組數時才進 rest。' },
+        { text: 'idle', why: '要按重設才回到 idle。' },
+        { text: 'work', why: '組數已經用完。' },
+      ] },
+      { level: '應用', type: 'mc', q: '為什麼 timer.js 不直接寫 `document.querySelector(\'#left\').textContent = left`？', options: [
+        { text: '讓它不依賴 DOM，可以在 Node.js 裡測試，也能換別的畫面', correct: true, why: '透過 onChange 回呼把狀態交出去，顯示的事交給 main.js。' },
+        { text: '因為模組裡不能用 document', why: '瀏覽器的模組可以用 document。' },
+        { text: '因為 textContent 很慢', why: '速度不是原因。' },
+        { text: '因為 querySelector 會回傳 null', why: '元素存在時不會。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['期末延伸：使用者想要「暖身 60 秒，然後才開始間歇」。在狀態機上要加什麼？程式要改哪幾個地方？'], answer: [
+        '狀態機多一個 warmup 狀態：idle → warmup → work。設定多一個 warmup 秒數。',
+        '要改的地方：settings.js 的 DEFAULTS、驗證與版本號（v1 → v2，8-4）；timer.js 的 start（先進 warmup）與 tick（warmup 到 0 進 work）；main.js 的 PHASE_LABEL 與表單欄位。先改 timer.js 並寫測試（7-3），再改畫面。',
+      ] },
+    ],
+    keypoints: [
+      '先畫狀態機再寫程式：每個箭頭是一個 if，每個會改狀態的函式都要想「重複呼叫會怎樣」。',
+      '邏輯（timer.js）、儲存（settings.js）、畫面（main.js）分開；邏輯不碰 DOM 才能測試。',
+      '用交付前檢查清單自己驗收：重複操作、重新整理、壞資料、鍵盤操作。',
+    ],
+    sources: ['mdn-modules', 'mdn-storage'],
+  },
+
+  '9-2': {
+    layout: 'reference',
+    minutes: 10,
+    sources: ['tc39-finished', 'mdn-bcd', 'node-releases'],
+    blocks: [
+      `這一頁整理 ES2024 到 ES2027 的新功能，以及「現在能不能直接用」。支援版本來自 MDN browser-compat-data，查證日期 ${SITE.verifiedOn}；之後會過期，要用之前再查一次。`,
+      { type: 'heading', id: 'versions', text: '版本與時間' },
+      { type: 'table', head: ['版本', '狀態', '這門課用到的功能'], rows: [
+        ['ES2023', '已發布', '`toSorted`、`toReversed`、`toSpliced`、`with`（4-4）'],
+        ['ES2024', '已發布', '`Object.groupBy`（4-5）、`Promise.withResolvers`'],
+        ['ES2025', '已發布', 'Set 方法（4-5）、Iterator helpers、`Promise.try`'],
+        ['ES2026', '2026-06-30 通過', '`Array.fromAsync`、`Error.isError`、`Math.sumPrecise`、`Iterator.concat`、`RegExp.escape`、Uint8Array 與 Base64 互轉'],
+        ['ES2027', '預定', 'Temporal、`using` 宣告、`Map.prototype.getOrInsert`'],
+      ] },
+      { type: 'callout', variant: 'tip', title: '二手資料常見的錯', body: ['不少文章把 Temporal 和 `using` 寫成 ES2026 的功能。依 TC39 的 finished proposals 表格，它們預定在 ES2027。'] },
+      { type: 'heading', id: 'support', text: '支援表' },
+      { type: 'table', head: ['功能', '版本', 'Chrome', 'Firefox', 'Safari', 'Node.js'], rows: [
+        ['`toSorted`、`with`', 'ES2023', '110', '115', '16', '20'],
+        ['`Object.groupBy`', 'ES2024', '117', '未查證', '17.4', '本機 22 可用'],
+        ['`Promise.withResolvers`', 'ES2024', '119', '121', '17.4', '22'],
+        ['Set 方法', 'ES2025', '122', '127', '17', '22'],
+        ['Iterator helpers', 'ES2025', '122', '131', '18.4', '22'],
+        ['`Promise.try`', 'ES2025', '128', '134', '18.2', '23'],
+        ['`Array.fromAsync`', 'ES2026', '121', '115', '16.4', '22'],
+        ['`Error.isError`', 'ES2026', '134', '138', '18.4（部分）', '24.3'],
+        ['`Math.sumPrecise`', 'ES2026', '147', '137', '26.2', '尚未支援'],
+        ['`Iterator.concat`', 'ES2026', '146', '147', '26.4', '26'],
+        ['Temporal', 'ES2027 預定', '144', '139', '僅預覽版', '26'],
+        ['`using` 宣告', 'ES2027 預定', '未查證', '未查證', '未查證', '未查證'],
+      ] },
+      { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="判斷流程：先看目標環境；所有目標都支援就直接用；有部分不支援就查表或加 polyfill；連 Safari 正式版都沒有的，只當延伸閱讀">
+        <rect x="10" y="10" width="170" height="190" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="50" text-anchor="middle" font-size="17" font-weight="900" class="on-color">現在就能用</text>
+        <text x="95" y="100" text-anchor="middle" font-size="14" class="on-color">各大瀏覽器與</text>
+        <text x="95" y="124" text-anchor="middle" font-size="14" class="on-color">Node.js 22 都有</text>
+        <rect x="195" y="10" width="170" height="190" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="50" text-anchor="middle" font-size="17" font-weight="900" class="on-color">要查表</text>
+        <text x="280" y="100" text-anchor="middle" font-size="14" class="on-color">新版瀏覽器有</text>
+        <text x="280" y="124" text-anchor="middle" font-size="14" class="on-color">Node.js 22 沒有</text>
+        <rect x="380" y="10" width="170" height="190" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="50" text-anchor="middle" font-size="17" font-weight="900" class="on-color">還不能當主線</text>
+        <text x="465" y="100" text-anchor="middle" font-size="14" class="on-color">Safari 正式版</text>
+        <text x="465" y="124" text-anchor="middle" font-size="14" class="on-color">或規格還沒定</text>
+      </svg>`, caption: '「能不能用」看的是你的使用者用什麼環境，不是規格哪一年通過。' },
+      { type: 'heading', id: 'classify', text: '分類練習' },
+      '依上面的支援表，把每個功能分到三類（以「各大瀏覽器最新版加上 Node.js 22」為目標環境）：',
+      { type: 'widget', name: 'classify', props: {
+        buckets: [{ id: 'now', label: '現在就能用' }, { id: 'check', label: '要查表' }, { id: 'later', label: '還不能當主線' }],
+        items: [
+          { text: '`arr.toSorted()`', answer: 'now', why: 'ES2023，各大瀏覽器與 Node.js 20 起都有。' },
+          { text: '`new Set(a).union(b)`', answer: 'now', why: 'ES2025，但 Chrome 122、Safari 17、Node.js 22 都已支援。' },
+          { text: '`Promise.try(fn)`', answer: 'check', why: '瀏覽器都有，但 Node.js 23 才支援，22 不能跑。' },
+          { text: '`Error.isError(x)`', answer: 'check', why: 'Node.js 24.3 起；Safari 的行為也有差異（DOMException 回傳 false）。' },
+          { text: '`Temporal.Now.plainDateISO()`', answer: 'later', why: 'Safari 只有預覽版，規格預定 ES2027。' },
+          { text: '`using file = open()`', answer: 'later', why: '預定 ES2027，支援狀態未查證。' },
+        ],
+      } },
+    ],
+  },
+
+  '9-3': {
+    layout: 'reference',
+    minutes: 10,
+    sources: ['mdn-js', 'mdn-equality', 'mdn-this', 'mdn-eventloop'],
+    blocks: [
+      '一頁整理整門課最常查的東西。每一列都標了出處單元，忘記為什麼就回去看那一課。',
+      { type: 'heading', id: 'questions', text: '讀任何程式碼都先問三個問題' },
+      { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="三個問題：這個值是什麼型別，對應模組 1 到 4；這個函式是被誰呼叫，對應模組 5；這段程式現在在執行還是在排隊，對應模組 6">
+        <rect x="10" y="10" width="170" height="180" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">這個值是什麼？</text>
+        <text x="95" y="120" text-anchor="middle" font-size="14" class="on-color">型別、參考、轉型</text>
+        <text x="95" y="150" text-anchor="middle" font-size="14" class="on-color">模組 1–4</text>
+        <rect x="195" y="10" width="170" height="180" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">被誰呼叫？</text>
+        <text x="280" y="120" text-anchor="middle" font-size="14" class="on-color">this、閉包、原型</text>
+        <text x="280" y="150" text-anchor="middle" font-size="14" class="on-color">模組 5</text>
+        <rect x="380" y="10" width="170" height="180" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">執行還是排隊？</text>
+        <text x="465" y="120" text-anchor="middle" font-size="14" class="on-color">事件迴圈、Promise</text>
+        <text x="465" y="150" text-anchor="middle" font-size="14" class="on-color">模組 6</text>
+      </svg>`, caption: '大部分「看不懂為什麼」的 bug，都是這三個問題其中一個答錯了。' },
+      { type: 'heading', id: 'values', text: '值與轉型' },
+      { type: 'table', head: ['寫法', '結果', '出處'], rows: [
+        ['`typeof null`', "`'object'`（歷史錯誤）", '1-1'],
+        ['`0.1 + 0.2 === 0.3`', '`false`；金額用整數的分', '1-2'],
+        ['`a ?? b`', 'a 是 null／undefined 才用 b', '3-2'],
+        ['`a || b`', 'a 是 falsy（含 0、空字串）就用 b', '3-2'],
+        ['`==`', '會轉型；一律用 `===`', '3-3'],
+        ["`'17' + 1`", "`'171'`", '3-3'],
+        ['`b = a`（物件）', '共用同一個', '4-1'],
+        ['`{ ...a }`', '淺複製', '4-2'],
+        ['`structuredClone(a)`', '深複製', '4-2'],
+      ] },
+      { type: 'heading', id: 'arrays', text: '陣列方法' },
+      { type: 'table', head: ['要做什麼', '用', '會改原陣列？'], rows: [
+        ['每個都變形', '`map`', '不會'],
+        ['留下符合的', '`filter`', '不會'],
+        ['合成一個值', '`reduce(fn, 起始值)`', '不會'],
+        ['找第一個', '`find`（找不到是 undefined）', '不會'],
+        ['有沒有／是不是全部', '`some`／`every`', '不會'],
+        ['排序', '`toSorted((a, b) => a - b)`', '不會（`sort` 會）'],
+        ['反轉', '`toReversed()`', '不會（`reverse` 會）'],
+        ['換掉一格', '`with(i, 值)`', '不會（`arr[i] =` 會）'],
+        ['加到最後', '`[...arr, x]`', '不會（`push` 會）'],
+      ] },
+      { type: 'heading', id: 'this', text: 'this 判定順序（5-3）' },
+      { type: 'table', head: ['順序', '呼叫方式', 'this'], rows: [
+        ['0', '箭頭函式', '外層的 this'],
+        ['1', '`new F()`', '新建立的物件'],
+        ['2', '`f.call(x)`／`f.bind(x)`', 'x'],
+        ['3', '`obj.f()`', 'obj'],
+        ['4', '`f()`', 'undefined（嚴格模式）'],
+      ] },
+      { type: 'heading', id: 'async', text: '非同步' },
+      { type: 'table', head: ['情況', '做法', '出處'], rows: [
+        ['執行順序', '同步 → 清空微任務（then、await 之後）→ 一個任務（setTimeout、事件）', '6-1'],
+        ['全部都要成功', '`Promise.all`', '6-2'],
+        ['每一個的結果都要知道', '`Promise.allSettled`', '6-2'],
+        ['互不相干的請求', '先全部發出，再 `await Promise.all`', '6-3'],
+        ['要等每一輪', '`for…of` ＋ await（不要用 forEach）', '6-3'],
+        ['fetch 的 404／500', '不會 reject，檢查 `res.ok`', '6-4'],
+        ['逾時', '`signal: AbortSignal.timeout(ms)`', '6-4'],
+      ] },
+      { type: 'heading', id: 'browser', text: '瀏覽器' },
+      { type: 'table', head: ['情況', '做法', '出處'], rows: [
+        ['動態清單的按鈕', '外層委派 ＋ `e.target.closest()`', '8-2'],
+        ['顯示外部資料', '`textContent`，不要 `innerHTML`', '8-3'],
+        ['表單', 'submit 事件 ＋ `preventDefault`', '8-3'],
+        ['存設定', '`JSON.stringify` ＋ 版本號 key；讀取時驗證', '8-4'],
+      ] },
+    ],
+  },
+
+  '9-4': {
+    layout: 'reference',
+    minutes: 25,
+    sources: ['mdn-js'],
+    blocks: [
+      '20 題，混合模組 0 到 9。每題都標了出處單元，答錯就回去複習那一課。先自己想，再展開看解析。',
+      { type: 'svg', svg: `<svg viewBox="0 0 560 260" role="img" aria-label="各模組題數長條圖：模組 0 一題，模組 1 兩題，模組 2 兩題，模組 3 兩題，模組 4 三題，模組 5 三題，模組 6 三題，模組 7 一題，模組 8 兩題，模組 9 一題">
+        <text x="10" y="28" font-size="18" font-weight="900">各模組題數</text>
+        <g class="stroke-ink" stroke-width="3">
+          <rect x="20" y="190" width="40" height="40" style="fill:var(--m0)"/>
+          <rect x="74" y="150" width="40" height="80" style="fill:var(--m1)"/>
+          <rect x="128" y="150" width="40" height="80" style="fill:var(--m2)"/>
+          <rect x="182" y="150" width="40" height="80" style="fill:var(--m3)"/>
+          <rect x="236" y="110" width="40" height="120" style="fill:var(--m4)"/>
+          <rect x="290" y="110" width="40" height="120" style="fill:var(--m5)"/>
+          <rect x="344" y="110" width="40" height="120" style="fill:var(--m6)"/>
+          <rect x="398" y="190" width="40" height="40" style="fill:var(--m7)"/>
+          <rect x="452" y="150" width="40" height="80" style="fill:var(--m8)"/>
+          <rect x="506" y="190" width="40" height="40" style="fill:var(--m9)"/>
+        </g>
+        <g font-size="14" text-anchor="middle">
+          <text x="40" y="252">0</text><text x="94" y="252">1</text><text x="148" y="252">2</text><text x="202" y="252">3</text><text x="256" y="252">4</text>
+          <text x="310" y="252">5</text><text x="364" y="252">6</text><text x="418" y="252">7</text><text x="472" y="252">8</text><text x="526" y="252">9</text>
+        </g>
+      </svg>`, caption: '模組 4–6 是這門課的核心，題數最多。' },
+      { type: 'quiz', key: '9-4:final', items: [
+        { level: '0-2', type: 'mc', q: '`setTimeout` 是 JavaScript 語言本身的功能嗎？', options: [
+          { text: '不是，是執行環境提供的', correct: true, why: '語言規格裡沒有計時器；兩個環境剛好都提供。' },
+          { text: '是，寫在 ECMAScript 語言規格裡', why: '規格沒有計時器。' },
+          { text: '只有瀏覽器有', why: 'Node.js 也有。' },
+          { text: '只有 Node.js 有', why: '瀏覽器也有。' },
+        ] },
+        { level: '1-1', type: 'mc', q: '判斷一個值是不是陣列，該用？', options: [
+          { text: '`Array.isArray(x)`', correct: true, why: 'typeof 陣列是 object，分不出來。' },
+          { text: "`typeof x === 'array'`", why: 'typeof 沒有 array 這個結果。' },
+          { text: "`typeof x === 'object'`", why: '物件與 null 也是 object。' },
+          { text: '`x.length > 0`', why: '字串也有 length；空陣列 length 是 0。' },
+        ] },
+        { level: '1-2', type: 'mc', q: '購物車金額要怎麼存才不會出現 99.99000000000001？', options: [
+          { text: '用整數的「分」存', correct: true, why: '整數在安全範圍內是精確的。' },
+          { text: '用 toFixed(2) 存成字串', why: '計算時又要轉回數字，誤差還在。' },
+          { text: '用 Math.round 每一步都四捨五入', why: '能減少誤差，但規則複雜容易漏。' },
+          { text: '用 parseFloat', why: 'parseFloat 得到的還是浮點數。' },
+        ] },
+        { level: '2-1', type: 'mc', q: '`const list = []; list.push(1);` 會？', options: [
+          { text: '正常執行', correct: true, why: 'const 只禁止重新指定，不保護內容。' },
+          { text: '拋出 TypeError', why: 'push 是修改內容，不是重新指定。' },
+          { text: '靜默失敗', why: '真的會改到。' },
+          { text: '拋出 SyntaxError', why: '語法沒有問題。' },
+        ] },
+        { level: '2-2', type: 'mc', q: '在 `let x = 1;` 這行之前讀 x 會？', options: [
+          { text: '拋出 ReferenceError', correct: true, why: 'let 有提升，但宣告前不能存取。' },
+          { text: '得到 undefined，和 var 一樣', why: '那是 var 的行為。' },
+          { text: '得到 1', why: '還沒執行到指定。' },
+          { text: '得到 null', why: '沒有任何規則會給 null。' },
+        ] },
+        { level: '3-2', type: 'mc', q: '`const volume = settings.volume || 50`，使用者設定的音量是 0，結果是？', options: [
+          { text: '50', correct: true, why: '0 是 falsy，|| 改用 50；應該用 ??。' },
+          { text: '0', why: '那是 `??` 的結果。' },
+          { text: 'undefined', why: '|| 一定會回傳其中一邊。' },
+          { text: 'NaN', why: '沒有任何運算產生 NaN。' },
+        ] },
+        { level: '3-3', type: 'mc', q: '`[] == false` 是？', options: [
+          { text: 'true', correct: true, why: '這正是一律用 === 的原因。' },
+          { text: 'false，陣列是 truthy', why: '== 不看 truthy，而是一連串轉型。' },
+          { text: '拋出 TypeError', why: '== 不會拋錯。' },
+          { text: 'undefined', why: '比較一定得到布林值。' },
+        ] },
+        { level: '4-1', type: 'mc', q: '函式裡 `p.score += 10`，外面傳進來的物件會變嗎？', options: [
+          { text: '會，指向同一個物件', correct: true, why: '傳進函式的是參考。' },
+          { text: '不會，參數是傳進來時複製的一份', why: '物件傳的是參考。' },
+          { text: '只有 const 物件會', why: '和宣告方式無關。' },
+          { text: '要 return 才會', why: '改內容不需要 return。' },
+        ] },
+        { level: '4-3', type: 'mc', q: '`[{ p: 1 }, { p: 2 }].reduce((s, x) => s + x.p)`（沒給起始值）得到？', options: [
+          { text: "`'[object Object]2'`", correct: true, why: '第一個元素物件被當成起始值，物件 + 數字變字串相接。' },
+          { text: '`3`', why: '要給起始值 0 才是 3。' },
+          { text: '`NaN`', why: '物件轉字串後相接，不是數字運算。' },
+          { text: '拋出 TypeError', why: '不會拋錯，所以更難發現。' },
+        ] },
+        { level: '4-4', type: 'mc', q: '`const sorted = list.sort()` 之後？', options: [
+          { text: 'list 也被排序了', correct: true, why: 'sort 就地排序並回傳原陣列。' },
+          { text: 'sorted 是排好的新陣列，list 保持原樣', why: '那是 toSorted。' },
+          { text: 'list 被清空', why: 'sort 不會清空。' },
+          { text: 'sorted 是 undefined', why: 'sort 會回傳陣列。' },
+        ] },
+        { level: '5-1', type: 'mc', q: "`btn.addEventListener('click', save())` 錯在哪？", options: [
+          { text: '`save()` 立刻呼叫了', correct: true, why: '要交出函式本身 `save`。' },
+          { text: "'click' 要寫成 'onclick'", why: 'addEventListener 用不含 on 的名稱。' },
+          { text: 'save 必須是箭頭函式', why: '一般函式也可以。' },
+          { text: '沒有錯', why: '載入時會先存一次，點擊反而沒反應。' },
+        ] },
+        { level: '5-2', type: 'mc', q: '閉包記住的是？', options: [
+          { text: '變數本身', correct: true, why: '不是拍照存值。' },
+          { text: '建立當下的值', why: '最常見的誤解。' },
+          { text: '只有全域變數', why: '任何外層變數都會。' },
+          { text: '函式的原始碼', why: '多的是變數環境。' },
+        ] },
+        { level: '5-3', type: 'mc', q: '`const f = team.describe; f()` 裡的 this 是？', options: [
+          { text: 'undefined', correct: true, why: '呼叫時沒有點的左邊（嚴格模式）。' },
+          { text: 'team', why: '函式寫在 team 裡不代表 this 是 team。' },
+          { text: 'f', why: 'this 不會指向函式本身。' },
+          { text: 'window', why: '模組是嚴格模式，不是 window。' },
+        ] },
+        { level: '6-1', type: 'mc', q: '`setTimeout(A, 0); Promise.resolve().then(B); C();` 的執行順序？', options: [
+          { text: 'C B A', correct: true, why: '同步 → 微任務 → 任務。' },
+          { text: 'A B C', why: '寫的順序不等於執行順序。' },
+          { text: 'C A B', why: '微任務比任務先。' },
+          { text: 'B C A', why: '同步程式最先。' },
+        ] },
+        { level: '6-3', type: 'mc', q: '`items.forEach(async (x) => { await save(x); })` 之後立刻說「全部存好了」，對嗎？', options: [
+          { text: '不對，forEach 不會等', correct: true, why: '要等就用 for…of 或 Promise.all。' },
+          { text: '對，回呼裡的 await 會讓 forEach 一個一個等', why: 'await 只暫停回呼自己。' },
+          { text: '對，只是比較慢', why: 'forEach 根本不等。' },
+          { text: '會拋出 SyntaxError', why: '語法合法，只是行為不對。' },
+        ] },
+        { level: '6-4', type: 'mc', q: 'fetch 收到 500，下面哪個說法對？', options: [
+          { text: 'fetch 成功，`res.ok` 是 false', correct: true, why: '有回應就算成功，要自己檢查 ok。' },
+          { text: 'fetch 失敗，會進 catch', why: '只有網路錯誤、取消、逾時才會。' },
+          { text: 'fetch 會自動重試', why: 'fetch 不會自動重試。' },
+          { text: 'res.json() 一定會成功', why: '錯誤頁面可能不是 JSON。' },
+        ] },
+        { level: '7-2', type: 'mc', q: '`try { bad(); } catch {}`，bad 是會失敗的 async 函式，catch 接得到嗎？', options: [
+          { text: '接不到', correct: true, why: 'bad() 只回傳失敗的 Promise，不會同步拋錯。' },
+          { text: '接得到，錯誤會在 bad() 那一行拋出', why: '非同步錯誤不會在這一行拋出；要 `await bad()`。' },
+          { text: '看瀏覽器', why: '所有環境都一樣。' },
+          { text: '只有在 Node.js 接得到', why: '兩邊都接不到。' },
+        ] },
+        { level: '8-2', type: 'mc', q: '清單項目會動態新增，刪除按鈕的監聽該怎麼掛？', options: [
+          { text: '掛在外層（事件委派）', correct: true, why: '事件委派，新增的項目也能處理。' },
+          { text: '每個按鈕各掛一個', why: '之後新增的項目沒有監聽。' },
+          { text: '掛在 window 的 load', why: 'load 只觸發一次。' },
+          { text: '用 setInterval 定時檢查每個按鈕有沒有被點', why: '浪費效能而且不可靠。' },
+        ] },
+        { level: '8-3', type: 'mc', q: '顯示使用者留言，安全的寫法是？', options: [
+          { text: '`li.textContent = comment`', correct: true, why: '當成純文字，不會執行任何東西。' },
+          { text: '`li.innerHTML = comment`', why: '留言裡的事件屬性會被執行（XSS）。' },
+          { text: '先刪掉 script 標籤再 innerHTML', why: 'onerror 之類的屬性一樣危險。' },
+          { text: '用樣板字串組好再 innerHTML', why: '樣板字串不會跳脫 HTML。' },
+        ] },
+        { level: '9-1', type: 'reveal', q: ['計時器的「開始」按鈕被連按兩次，倒數變成每秒扣 2。說出原因與修法。'], answer: [
+          '每按一次就呼叫一次 setInterval，兩個計時器同時在扣秒數；pause 只清得掉最後一個。',
+          '修法：start 開頭寫 `if (timerId) return;`，已經在跑就不再排。每個會改狀態的函式都要想「重複呼叫會怎樣」。',
+        ] },
+      ] },
+      { type: 'callout', variant: 'keypoints', title: '做完之後', body: ['錯 3 題以內：可以開始用框架（Vue、React）做專案了，遇到怪問題先回到 9-3 的三個問題。', '錯超過 3 題：照每題標的單元回去複習，一週後再做一次這份測驗（間隔回想比連續重讀有效）。'] },
+    ],
+  },
+});
+</script>

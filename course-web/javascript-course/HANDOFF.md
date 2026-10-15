@@ -1,7 +1,7 @@
 # 交接文件：JavaScript 著作（互動課程網站）
 
 > 更新：2026-10-15
-> 一句話現況：**骨架、互動元件、模組 0–7（30 課）完成並在 Chrome 驗證，已上書櫃（顯示 30/38 製作中）；模組 8–9（8 課）待寫。**
+> 一句話現況：**38 課內容全部完成並在 Chrome 驗證，書櫃顯示 38/38；剩第 4 階段驗證（10 種寬度、深色模式、對齊、得獎等級迴圈）與 Safari 實測。**
 
 ## 0. 新 session 的開場 prompt（直接貼）
 
@@ -50,11 +50,11 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - [x] 書櫃入口（3D `index.html` 與 2D `index-2d.html`；`readyLessons` 每完成一批就更新）
 - [x] 模組 4（4-1～4-5，含 refviz、mutator）、模組 5（5-1～5-4，含 thisfinder、protochain）
 - [x] 模組 6（6-1～6-4，含 loopsim、racer）、模組 7（7-1～7-4）
-- [ ] 模組 8 內容
-- [ ] 模組 9：9-1 期末實作、9-2～9-4 reference 版型
+- [x] 模組 8（8-1～8-4）
+- [x] 模組 9：9-1 期末實作、9-2～9-4 reference 版型
 - [ ] 第 4 階段驗證（verification.md 全部）
 - [ ] 得獎等級自我檢查迴圈
-- [ ] 全部完成後把兩個書櫃的 `readyLessons` 改成 38
+- [x] 兩個書櫃的 `readyLessons` 改成 38
 
 ## 3. 資料格式（本課新增）
 
@@ -92,16 +92,22 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 
 ## 5. 已知問題
 
+- 2026-10-15 模組 8–9：0 個語法錯誤；8-x 與 9-1 每課 2 張 SVG（9-2～9-4 reference 頁各 1 張）；1280 與 360px 頁面無水平溢出；runner 輸出與 predict 一致。
+- 寫課文的陷阱：字串裡不能出現 `<script>`（build 檢查會切錯），也不能出現 `</script>`（會提早結束頁面的 script），要寫成 `<\/script>`。
+- runner 的沙盒沒有 allow-forms：`requestSubmit()` 會被擋，8-3 改用 `dispatchEvent(new Event('submit'))`。
+- 內建瀏覽器的面板隱藏時計時器會被節流，9-1 的快轉 demo 要等幾秒才印出；可見時正常。
+- 9-2 支援表在 360px 是表格內水平捲動，程式碼名稱會斷行，第 4 階段再看要不要改版面。
+
 - Safari 未實測（sandbox iframe 的 postMessage 在 Safari 的行為要在 Mac 確認）。
 - 10 種寬度、對齊量測、深色模式都還沒做，留到第 4 階段。
 
 ## 6. 下一步
 
-寫 `src/m8.html`（模組 8：在瀏覽器裡，用 bubble、classify 等），接著 m9（9-1 期末實作、9-2～9-4 reference 版型）。先在 Node.js 實測每段範例的輸出，再寫課文。做完更新兩個書櫃的 `readyLessons`、跑下面的檢查流程並回報。
+第 4 階段驗證：照 skill 的 verification.md 跑 10 種寬度、深色模式、對齊量測，再跑得獎等級自我檢查迴圈（至少 2 輪）；Safari 請使用者在 Mac 看。先在 Node.js 實測每段範例的輸出，再寫課文。做完更新兩個書櫃的 `readyLessons`、跑下面的檢查流程並回報。
 
 ### 每批的檢查流程（2026-10-15 實際使用）
 
 1. build 後用 `vm.Script` 檢查每個 `<script>`：0 個語法錯誤。
 2. 在內建瀏覽器打開課程，對新課逐一：數 SVG（≥ 2）、找 `.term-missing`（0）、檢查水平溢出、按每個 runner 的「執行」並把輸出和 `predict.answer` 對照。
-3. 全站算「正確答案是最長選項」的比例（≤ 35%；2026-10-15 模組 0–7 為 30/111＝27%，算法：只算 mc、正確選項嚴格最長才計）。
+3. 全站算「正確答案是最長選項」的比例（≤ 35%；2026-10-15 全站 39/150＝26%（含 9-4 的 20 題），算法：只算 mc、正確選項嚴格最長才計）。
 4. 360px 寬再跑一次溢出檢查。
