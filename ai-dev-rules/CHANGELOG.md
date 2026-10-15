@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- `bookshelf-portal` 3D 範本：載入動畫剛開瀏覽器時像破圖。第 2–4 頁有延遲卻沒有 `animation-fill-mode`，延遲期間沒墊高、陷進書頁塊；改成 `both`，並在瀏覽器畫出兩格前先停在第一格。
+- `bookshelf-portal` 3D 範本：載入動畫在 3D 書櫃準備時卡住約 1 秒。第一次 render 一次上傳上百張貼圖並同步編譯 shader；改成載入動畫還在時先分段上傳貼圖（每段 10ms）、`compileAsync` 背景編譯、畫好第一格才收掉載入動畫，`warmUp` 完成前不畫 3D。
+
 ### Changed
 
 - `domain-web-frontend`、`web-animation`、`domain-media-image-video-animation`、`bookshelf-portal`：3D 翻面上不再疊明暗遮罩。Safari 只藏住朝後的那一面，上面的遮罩照樣畫出來，翻到背面時閃黑一下；改 `background-color` 或切換 `visibility` 都沒有穩定解決（紅樓夢閱讀器的實例）。2D 書櫃範本拿掉開書動畫的遮罩，`shoot.mjs` 的動畫序號跟著更新。
