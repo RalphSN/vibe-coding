@@ -1,0 +1,103 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: "React 完整入門：從元件到 React 19.3",
+  updated: "2026 年 10 月",
+  verifiedOn: "2026-10-16",
+  version: "v1",
+};
+
+const COURSES = [
+  { id: 0, title: "認識|React", short: "起點", desc: "React 解決什麼問題、用 Vite 建立專案、JSX 的規則。", lessons: [
+    ["0-1", "React 是什麼：|畫面是狀態的函式"],
+    ["0-2", "建立專案|與第一個元件"],
+    ["0-3", "JSX|的規則"],
+  ]},
+  { id: 1, title: "元件|與 props", short: "元件", desc: "元件與 props、條件渲染與清單、事件處理、組合與 children。", lessons: [
+    ["1-1", "元件|與 props"],
+    ["1-2", "條件渲染、|清單與 key"],
+    ["1-3", "事件|處理"],
+    ["1-4", "組合|與 children"],
+  ]},
+  { id: 2, title: "state|與渲染", short: "state", desc: "useState 與重新渲染、state 是快照、不可變更新、狀態提升。", lessons: [
+    ["2-1", "useState：|會被記住的值"],
+    ["2-2", "state|是快照"],
+    ["2-3", "更新物件|與陣列"],
+    ["2-4", "狀態提升|與單一來源"],
+  ]},
+  { id: 3, title: "副作用|與 ref", short: "Effect", desc: "你可能不需要 Effect、useEffect 的同步與清理、useRef、useEffectEvent。", lessons: [
+    ["3-1", "你可能|不需要 Effect"],
+    ["3-2", "useEffect：|和外部系統同步"],
+    ["3-3", "useRef：|不會觸發渲染的值"],
+    ["3-4", "useEffectEvent：|Effect 裡的事件"],
+  ]},
+  { id: 4, title: "架構|與效能", short: "架構", desc: "Context、useReducer、自訂 Hook、效能與 React Compiler。", lessons: [
+    ["4-1", "Context：|跨層傳遞資料"],
+    ["4-2", "useReducer：|集中管理狀態邏輯"],
+    ["4-3", "自訂 Hook：|重用狀態邏輯"],
+    ["4-4", "效能|與 React Compiler"],
+  ]},
+  { id: 5, title: "資料|與表單", short: "資料", desc: "受控表單、Actions 與 useActionState、Suspense 與 use、Server Components。", lessons: [
+    ["5-1", "表單：|受控與非受控"],
+    ["5-2", "Actions|與 useActionState"],
+    ["5-3", "Suspense|與 use"],
+    ["5-4", "Server|Components"],
+  ]},
+  { id: 6, title: "實戰|工具", short: "實戰", desc: "React 與 TypeScript、測試、19.2／19.3 新功能、框架選擇。", lessons: [
+    ["6-1", "React|與 TypeScript"],
+    ["6-2", "用 Vitest|與 Testing Library 測試"],
+    ["6-3", "Activity、|ViewTransition 與新功能"],
+    ["6-4", "選擇框架：|Vite、Next.js、React Router"],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>
