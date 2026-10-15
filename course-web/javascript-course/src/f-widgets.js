@@ -428,8 +428,8 @@ Widgets.protochain = {
       items.forEach((li, i) => { li.className = hit === -1 || i < hit ? 'miss' : (i === hit ? 'found' : ''); });
       $('.pc-end', el).className = `pc-end${hit === -1 ? ' found-none' : ''}`;
       $('.pc-note', el).innerHTML = !key ? '' : (hit === -1
-        ? `每一層都沒有 \`${esc(key)}\`，走到 null 還是找不到：讀取結果是 \`undefined\`；如果拿來呼叫，會拋出 \`TypeError: ... is not a function\`。`
-        : `在「${esc(props.chain[hit].name)}」找到 \`${esc(key)}\`${hit === 0 ? '：它是物件自己的屬性。' : `，往上找了 ${hit} 層。`}`);
+        ? `每一層都沒有 <code>${esc(key)}</code>，走到 null 還是找不到：讀取結果是 <code>undefined</code>；如果拿來呼叫，會拋出 <code>TypeError: ... is not a function</code>。`
+        : `在「${esc(props.chain[hit].name)}」找到 <code>${esc(key)}</code>${hit === 0 ? '：它是物件自己的屬性。' : `，往上找了 ${hit} 層。`}`);
     }
     input.addEventListener('input', look);
     el.addEventListener('click', (e) => {

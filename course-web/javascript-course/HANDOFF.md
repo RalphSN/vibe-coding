@@ -1,7 +1,7 @@
 # 交接文件：JavaScript 著作（互動課程網站）
 
-> 更新：2026-10-14
-> 一句話現況：**骨架、互動元件、模組 0–3（13 課）完成並在 Chrome 驗證，已上書櫃（顯示 13/38 製作中）；模組 4–9（25 課）待寫。**
+> 更新：2026-10-15
+> 一句話現況：**骨架、互動元件、模組 0–5（22 課）完成並在 Chrome 驗證，已上書櫃（顯示 22/38 製作中）；模組 6–9（16 課）待寫。**
 
 ## 0. 新 session 的開場 prompt（直接貼）
 
@@ -48,7 +48,8 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - [x] 模組 1（1-1～1-4）
 - [x] 模組 2（2-1～2-3）、模組 3（3-1～3-3，含 coerce）
 - [x] 書櫃入口（3D `index.html` 與 2D `index-2d.html`；`readyLessons` 每完成一批就更新）
-- [ ] 模組 4～8 內容（每 2–3 個模組自我檢查一次）
+- [x] 模組 4（4-1～4-5，含 refviz、mutator）、模組 5（5-1～5-4，含 thisfinder、protochain）
+- [ ] 模組 6～8 內容（每 2–3 個模組自我檢查一次）
 - [ ] 模組 9：9-1 期末實作、9-2～9-4 reference 版型
 - [ ] 第 4 階段驗證（verification.md 全部）
 - [ ] 得獎等級自我檢查迴圈
@@ -84,7 +85,8 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - **audit.mjs 沒跑**：需要 Playwright，這台電腦沒有安裝（全域安裝要先問使用者）。改用內建瀏覽器手動檢查。
 - Chrome（內建瀏覽器，新分頁）：0 個 console 錯誤；0-1～0-3 每課 2 張 SVG、0 個缺漏術語、無水平溢出；樣式表頁 6 個元件都初始化。
 - 實際操作：runner（0-3 印出「開始」「92」再拋 TypeError，預測判定正確；0-1 印出 object／undefined／9）、mutator（sort 改原陣列、toSorted 不改）、floatbits（0.1 實際存 0.1000000000000000055511151）、thisfinder、bubble（含 stopPropagation，修過一次 bug）。
-- coerce 已在 3-1、3-3 實際操作。尚未實際操作：refviz、protochain、loopsim、racer（等用到的模組再測）。
+- coerce 已在 3-1、3-3 實際操作；refviz（4-1、4-2 逐步播到最後）、mutator（4-4）、thisfinder（5-3）、protochain（5-4，score／toString／fly）已在 2026-10-15 實際操作。尚未實際操作：loopsim、racer（模組 6 再測）。
+- 2026-10-15 模組 4–5：0 個語法錯誤；每課 2 張 SVG、0 個缺漏術語；1280 與 360px 無水平溢出；10 個 runner 的輸出都和 predict 答案一致。
 
 ## 5. 已知問題
 
@@ -93,11 +95,11 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 
 ## 6. 下一步
 
-寫 `src/m4.html`（模組 4：物件與陣列，5 課，用 refviz、mutator），接著 `src/m5.html`（模組 5：函式與物件模型，用 thisfinder、protochain）。做完更新兩個書櫃的 `readyLessons`、跑第 4 節的檢查並回報。
+寫 `src/m6.html`（模組 6：非同步，用 loopsim、racer），接著 m7、m8。先在 Node.js 實測每段範例的輸出，再寫課文。做完更新兩個書櫃的 `readyLessons`、跑下面的檢查流程並回報。
 
 ### 每批的檢查流程（2026-10-15 實際使用）
 
 1. build 後用 `vm.Script` 檢查每個 `<script>`：0 個語法錯誤。
 2. 在內建瀏覽器打開課程，對新課逐一：數 SVG（≥ 2）、找 `.term-missing`（0）、檢查水平溢出、按每個 runner 的「執行」並把輸出和 `predict.answer` 對照。
-3. 全站算「正確答案是最長選項」的比例（≤ 35%；2026-10-15 為 13/43）。
+3. 全站算「正確答案是最長選項」的比例（≤ 35%；2026-10-15 模組 0–5 為 20/79＝25%，算法：只算 mc、正確選項嚴格最長才計）。
 4. 360px 寬再跑一次溢出檢查。
