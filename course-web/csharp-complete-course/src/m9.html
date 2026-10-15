@@ -1,0 +1,523 @@
+<script>
+/* ==========================================================================
+   模組 9：實戰生態系
+   ========================================================================== */
+defineTerms({
+  '方案': { en: 'solution (.slnx)', def: '把多個專案組在一起的檔案。.NET 10 起 `dotnet new sln` 預設產生 XML 格式的 .slnx。', example: '`dotnet new sln -n Shop` → Shop.slnx' },
+  '專案參考': { en: 'project reference', def: '一個專案使用另一個專案的程式碼。', example: '`dotnet add Shop.Api reference Shop.Core`' },
+  'NuGet': { en: 'NuGet', def: '.NET 的套件管理系統，nuget.org 是公開的套件庫。', example: '`dotnet add package Serilog`' },
+  '目標框架': { en: 'target framework (TFM)', def: '專案要在哪個 .NET 版本上執行，寫在 .csproj。', example: '`<TargetFramework>net10.0</TargetFramework>`' },
+  '單元測試': { en: 'unit test', def: '自動檢查一小段程式（通常是一個方法）在特定輸入下是否得到預期結果。', example: '`Assert.Equal(4, Add(2, 2));`' },
+  'xUnit': { en: 'xUnit.net', def: '.NET 最常用的測試框架之一，2026-10 的主線是 v3。', example: '`[Fact] public void Adds() { … }`' },
+  'Fact': { en: '[Fact]', def: 'xUnit 的屬性：標示一個沒有參數的測試方法。', example: '`[Fact] public void EmptyCart_TotalIsZero()`' },
+  'Theory': { en: '[Theory]', def: 'xUnit 的屬性：同一個測試方法用多組資料執行，搭配 `[InlineData]`。', example: '`[Theory, InlineData(1, 2, 3)]`' },
+  'Arrange-Act-Assert': { en: 'AAA pattern', def: '測試的三段結構：準備資料、執行要測的動作、檢查結果。', example: '每段之間空一行。' },
+  'Minimal API': { en: 'Minimal API', def: 'ASP.NET Core 用少量程式碼定義 HTTP 端點的寫法：`app.MapGet(路徑, 處理函式)`。', example: '`app.MapGet("/hello", () => "Hi");`' },
+  '相依性注入': { en: 'dependency injection (DI)', def: '物件需要的服務由框架從外面傳進來，而不是自己 new。ASP.NET Core 內建 DI 容器。', example: '`builder.Services.AddScoped<IOrderService, OrderService>();`' },
+  '中介軟體': { en: 'middleware', def: '每個 HTTP 請求依序經過的處理管線，例如記錄、驗證身分、處理例外。', example: '`app.UseAuthentication();`' },
+  'EF Core': { en: 'Entity Framework Core', def: '.NET 的 ORM：用 C# 類別與 LINQ 操作資料庫，不用手寫大部分 SQL。2026-10 的正式版是 EF Core 10。', example: '`await db.Orders.Where(o => o.Total > 100).ToListAsync();`' },
+  'DbContext': { en: 'DbContext', def: 'EF Core 中代表「一次和資料庫的工作階段」的類別，裡面的 DbSet 對應資料表。', example: '`public DbSet<Order> Orders => Set<Order>();`' },
+  'migration': { en: 'migration', def: '把 C# 模型的變更轉成資料庫結構變更的腳本，可以套用與回復。', example: '`dotnet ef migrations add AddOrderDate`' },
+  'Native AOT': { en: 'Native AOT', def: '發布時事先把程式編譯成機器碼：啟動快、記憶體小、不需要安裝 .NET runtime，但部分反射功能不能用。', example: '`<PublishAot>true</PublishAot>`' },
+});
+
+defineLessons({
+  '9-1': {
+    goals: [
+      '用 dotnet CLI 建立方案與多個專案',
+      '加入專案參考與 NuGet 套件',
+      '讀懂 .csproj 的關鍵設定',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-2）什麼時候該把 `app.cs` 轉成專案？', options: [
+        { text: '需要多個檔案、測試或正式部署時', correct: true, why: '用 `dotnet project convert app.cs`。' },
+        { text: '程式超過 10 行時，單一檔案就放不下', why: '行數不是判斷依據。' },
+        { text: '要用 NuGet 套件時', why: '檔案型程式也能用 `#:package`。' },
+        { text: '永遠不需要', why: '多專案、測試專案都需要真正的專案。' },
+      ] },
+    ],
+    analogy: {
+      text: ['方案像一間餐廳，專案是各個工作站：廚房（核心邏輯）、外場（Web API）、品管（測試）。外場要用廚房做的菜（專案參考），廚房會跟外面的供應商進貨（NuGet 套件）。'],
+      limit: ['餐廳工作站可以互相傳菜；專案參考是單向的，而且不能繞圈（A 參考 B、B 又參考 A 會建置失敗）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="典型方案結構：Shop.slnx 包含三個專案；Shop.Api 與 Shop.Tests 都參考 Shop.Core；Shop.Core 從 NuGet 引用套件；相依方向只往核心">
+        <rect x="170" y="15" width="220" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="50" text-anchor="middle" font-size="19" font-weight="900" class="mono">Shop.slnx</text>
+        <rect x="10" y="120" width="170" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="162" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Shop.Api</text>
+        <rect x="380" y="120" width="170" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="162" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Shop.Tests</text>
+        <rect x="195" y="215" width="170" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="252" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Shop.Core</text>
+        <path d="M280 71 V95 H95 V120 M280 95 H465 V120" class="stroke-ink" stroke-width="3" fill="none" stroke-dasharray="6 5"/>
+        <path d="M95 190 V245 H195 M465 190 V245 H365" class="stroke-ink" stroke-width="4" fill="none"/>
+        <text x="280" y="115" text-anchor="middle" font-size="14">包含（虛線）</text>
+        <text x="280" y="205" text-anchor="middle" font-size="14">參考（實線，指向核心）</text>
+      </svg>`,
+      caption: 'Core 不知道 Api 和 Tests 的存在；相依方向只往核心，核心最容易測試。',
+      blocks: [
+        '[[方案]]組合多個專案；.NET 10 起 `dotnet new sln` 預設產生 .slnx（XML 格式，比舊的 .sln 好讀好合併）。專案之間用[[專案參考]]，外部套件用 [[NuGet]]。',
+        { type: 'code', lang: 'bash', title: '建立方案', code: 'dotnet new sln -n Shop\ndotnet new classlib -n Shop.Core\ndotnet new webapi -n Shop.Api\ndotnet sln add Shop.Core Shop.Api\ndotnet add Shop.Api reference Shop.Core\ndotnet add Shop.Core package Humanizer\ndotnet build' },
+        { type: 'code', lang: 'xml', title: 'Shop.Core.csproj', code: '<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n  <ItemGroup>\n    <PackageReference Include="Humanizer" Version="2.14.1" />\n  </ItemGroup>\n</Project>' },
+      ],
+    },
+    define: [
+      { term: '方案', en: 'solution', def: '.slnx（.NET 10 預設）或 .sln：列出包含哪些專案，給 IDE 與 `dotnet build` 使用。', example: '舊的 .sln 用 `dotnet sln migrate` 轉換。' },
+      { term: '目標框架', en: 'TFM', def: '`net10.0`、`net8.0` 等；決定能用哪些 API 與預設的 C# 版本。', example: 'net10.0 預設 C# 14。' },
+      { term: 'NuGet', en: 'NuGet', def: '套件以 PackageReference 寫進 .csproj，建置時自動還原。', example: '`dotnet list package --outdated` 檢查可更新的套件。' },
+    ],
+    examples: {
+      compare: [{
+        title: '專案切分',
+        kind: '全部塞一起 vs 分層',
+        badLabel: '一個大專案',
+        goodLabel: 'Core + Api + Tests',
+        bad: 'Shop/\n  Program.cs        （端點、商業邏輯、資料存取全混在一起）\n  OrderStuff.cs',
+        good: 'Shop.Core/   商業邏輯（不依賴 ASP.NET）\nShop.Api/    HTTP 端點，參考 Core\nShop.Tests/  測試 Core',
+        badResult: '測試商業邏輯時必須啟動整個網站。',
+        goodResult: 'Core 可以單獨測試，也能被其他程式（CLI、背景服務）重用。',
+        why: ['小專案先用一個就好；開始想寫測試或重用時再拆'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'new', label: 'dotnet new' }, { id: 'add', label: 'dotnet add' }, { id: 'other', label: '其他指令' }],
+          items: [
+            { text: '建立一個類別庫專案', answer: 'new', why: '`dotnet new classlib`。' },
+            { text: '加入 NuGet 套件', answer: 'add', why: '`dotnet add package 名稱`。' },
+            { text: '讓 Api 專案使用 Core 專案', answer: 'add', why: '`dotnet add Shop.Api reference Shop.Core`。' },
+            { text: '把專案加進方案', answer: 'other', why: '`dotnet sln add 專案`。' },
+            { text: '把舊的 .sln 轉成 .slnx', answer: 'other', why: '`dotnet sln migrate`。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="循環參考會失敗：Core 參考 Api、Api 又參考 Core，建置失敗；正確做法是 Core 定義介面，Api 實作並參考 Core">
+          <rect x="10" y="30" width="250" height="110" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="135" y="68" text-anchor="middle" font-size="17" font-weight="900" class="on-color">✗ Core ⇄ Api</text>
+          <text x="135" y="105" text-anchor="middle" font-size="15" class="on-color">循環參考，建置失敗</text>
+          <rect x="300" y="30" width="250" height="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="425" y="68" text-anchor="middle" font-size="17" font-weight="900" class="on-color">✓ Api → Core</text>
+          <text x="425" y="105" text-anchor="middle" font-size="15" class="on-color">Core 定義介面</text>
+          <path d="M260 85 H300" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: 'Core 需要「外層的能力」（寄信、存檔）時，在 Core 定義介面，由外層實作（3-4 的依賴反轉）。' },
+      ],
+      tryit: {
+        q: ['為一個名叫 Todo 的方案建立核心類別庫與測試專案，並讓測試專案參考核心：'],
+        draft: 'dotnet new sln -n Todo\ndotnet new classlib -n Todo.Core\ndotnet new ____ -n Todo.Tests\ndotnet sln add Todo.Core Todo.Tests\ndotnet add Todo.Tests ____ Todo.Core',
+        answer: ['`dotnet new xunit3 -n Todo.Tests`（要先 `dotnet new install xunit.v3.templates`；SDK 內建的 `xunit` 範本是 v2），以及 `reference`。', '下一課就用這個測試專案寫第一個測試。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在同一個 repo 同時保留 Shop.sln 和 Shop.slnx。', why: '兩個檔案內容會不同步，IDE 與 CI 可能讀到不同的專案清單。', right: '用 `dotnet sln migrate` 轉換後刪掉舊的 .sln。' },
+      { wrong: '套件版本寫 `*` 或不固定版本。', why: '每次還原可能拿到不同版本，今天能建置明天不行。', right: '固定版本；多專案時用 Directory.Packages.props 集中管理。' },
+      { wrong: '從網路上隨便複製套件名稱就 add。', why: '有仿冒名稱的惡意套件（typosquatting）。', right: '在 nuget.org 確認作者、下載數、最後更新日期，再加入。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '.NET 10 的 `dotnet new sln` 預設產生什麼檔案？', options: [
+        { text: '.slnx', correct: true, why: '.NET 10 起預設 XML 格式；要舊格式加 `--format sln`。' },
+        { text: '.sln', why: '那是 .NET 9 以前的預設。' },
+        { text: '.csproj', why: 'csproj 是專案檔，不是方案檔。' },
+        { text: 'solution.json', why: '沒有這種格式。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'Shop.Api 要使用 Shop.Core 裡的類別，該執行哪個指令？', options: [
+        { text: '`dotnet add Shop.Api reference Shop.Core`', correct: true, why: '讓 Api 參考 Core。' },
+        { text: '`dotnet add Shop.Core reference Shop.Api`', why: '方向反了：這讓 Core 依賴 Api。' },
+        { text: '`dotnet add Shop.Api package Shop.Core`', why: 'package 是 NuGet 套件，不是同方案的專案。' },
+        { text: '`dotnet sln add Shop.Core`', why: '這只是把專案加進方案，不會建立參考。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['新增一個 NuGet 套件前，依你的團隊規範要評估哪些事？'], answer: [
+        '為什麼需要（不用套件能不能做）、套件大小、維護狀態（最後發版日期、下載數、issue 回應），以及授權條款。',
+        '加入後跑 `dotnet list package --vulnerable` 檢查已知漏洞；有 high 以上要回報。這些評估應該寫在 PR 說明裡。',
+      ] },
+    ],
+    keypoints: [
+      '方案組合專案；.NET 10 起預設 .slnx。',
+      '相依方向往核心：Api、Tests 參考 Core，不能循環。',
+      'NuGet 套件固定版本，加入前確認來源與維護狀態。',
+    ],
+    sources: ['dotnet-cli', 'slnx', 'nuget'],
+  },
+
+  '9-2': {
+    goals: [
+      '用 xUnit 寫 Fact 與 Theory 測試',
+      '用 Arrange-Act-Assert 組織測試',
+      '用 dotnet test 執行並讀懂結果',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 9-1）為什麼要把商業邏輯放在獨立的 Core 專案？', options: [
+        { text: '不用啟動網站就能測試，也能被其他程式重用', correct: true, why: '這正是這課要做的事。' },
+        { text: 'Core 專案編譯比較快', why: '速度不是主要原因。' },
+        { text: '.NET 規定一定要分', why: '沒有這種規定。' },
+        { text: '這樣才能用 NuGet', why: '任何專案都能用 NuGet。' },
+      ] },
+    ],
+    analogy: {
+      text: ['單元測試像餐廳每天開店前試吃每一道醬料：固定的材料（輸入）、照食譜做（執行）、嚐嚐看味道對不對（檢查）。改了食譜之後再全部試一次，就知道有沒有把別道菜弄壞。'],
+      limit: ['試吃靠人的舌頭；測試是自動的，幾百個測試幾秒跑完。但測試只檢查你想到的情況，沒寫到的情況照樣可能有錯。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="Arrange Act Assert 三段：Arrange 準備購物車與商品；Act 呼叫 Total 方法；Assert 檢查結果等於 150">
+        <rect x="10" y="30" width="170" height="190" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="65" text-anchor="middle" font-size="19" font-weight="900" class="on-color">Arrange</text>
+        <text x="95" y="95" text-anchor="middle" font-size="15" class="on-color">準備</text>
+        <text x="25" y="140" font-size="14" class="on-color mono">var cart = new</text>
+        <text x="25" y="162" font-size="14" class="on-color mono">  Cart();</text>
+        <text x="25" y="184" font-size="14" class="on-color mono">cart.Add(…);</text>
+        <rect x="195" y="30" width="170" height="190" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="65" text-anchor="middle" font-size="19" font-weight="900" class="on-color">Act</text>
+        <text x="280" y="95" text-anchor="middle" font-size="15" class="on-color">執行</text>
+        <text x="210" y="150" font-size="14" class="on-color mono">var total =</text>
+        <text x="210" y="172" font-size="14" class="on-color mono">  cart.Total();</text>
+        <rect x="380" y="30" width="170" height="190" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="65" text-anchor="middle" font-size="19" font-weight="900" class="on-color">Assert</text>
+        <text x="465" y="95" text-anchor="middle" font-size="15" class="on-color">檢查</text>
+        <text x="395" y="150" font-size="14" class="on-color mono">Assert.Equal(</text>
+        <text x="395" y="172" font-size="14" class="on-color mono">  150m, total);</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M180 125 H195"/><path d="M365 125 H380"/></g>
+      </svg>`,
+      caption: '每個測試只驗證一件事；名稱寫出「情境」與「預期結果」。',
+      blocks: [
+        '[[xUnit]] 用 [[Fact]] 標示單一測試、[[Theory]] 加 `[InlineData]` 跑多組資料。測試照 [[Arrange-Act-Assert]] 分三段。`dotnet test` 執行全部測試並回報通過與失敗數。',
+        { type: 'code', lang: 'csharp', title: 'CartTests.cs', code: 'public class CartTests\n{\n    [Fact]\n    public void Total_IsZero_WhenCartIsEmpty()\n    {\n        var cart = new Cart();\n\n        var total = cart.Total();\n\n        Assert.Equal(0m, total);\n    }\n\n    [Theory]\n    [InlineData(100, 1, 100)]\n    [InlineData(50, 3, 150)]\n    public void Total_MultipliesPriceByQuantity(decimal price, int qty, decimal expected)\n    {\n        var cart = new Cart();\n        cart.Add(new Item("書", price), qty);\n\n        Assert.Equal(expected, cart.Total());\n    }\n}' },
+      ],
+    },
+    define: [
+      { term: 'Fact', en: '[Fact]', def: '無參數的測試方法；執行時拋出任何例外（包括 Assert 失敗）就算失敗。', example: '`[Fact] public void Parse_ReturnsNull_WhenEmpty()`' },
+      { term: 'Theory', en: '[Theory]', def: '參數化測試；每組 `[InlineData]` 各算一個測試案例。', example: '`[InlineData("", false)]`' },
+      { term: 'Assert', en: 'Assert', def: 'xUnit 的檢查方法：Equal、True、Null、Throws、Contains 等。', example: '`Assert.Throws<ArgumentException>(() => cart.Add(null!, 1));`' },
+    ],
+    examples: {
+      compare: [{
+        title: '測試名稱',
+        kind: '看不出意圖 vs 情境＋預期',
+        code: true,
+        badLabel: '模糊的名稱',
+        goodLabel: '寫出情境與結果',
+        bad: '[Fact]\npublic void Test1() { … }\n\n[Fact]\npublic void TotalTest() { … }',
+        good: '[Fact]\npublic void {{1:Total_IsZero_WhenCartIsEmpty}}() { … }\n\n[Fact]\npublic void {{1:Add_Throws_WhenQuantityIsNegative}}() { … }',
+        badResult: '測試失敗時只看到「Test1 失敗」，要打開程式碼才知道壞了什麼。',
+        goodResult: '光看失敗清單就知道哪個行為壞了。',
+        why: ['常見格式：方法_預期結果_情境'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'dotnet test 的輸出',
+          title: '先預測，再看測試結果',
+          code: '[Theory]\n[InlineData(2, 2, 4)]\n[InlineData(-1, 1, 0)]\n[InlineData(int.MaxValue, 1, 2147483648L)]\npublic void Add_ReturnsSum(int a, int b, long expected)\n    => Assert.Equal(expected, Calc.Add(a, b));\n\n// Calc.Add 的實作：\npublic static int Add(int a, int b) => a + b;',
+          predict: { q: '三組資料中，哪一組會失敗？', options: ['第 3 組（溢位）', '第 2 組（負數）', '全部通過'], answer: 0 },
+          output: '!失敗 Add_ReturnsSum(a: 2147483647, b: 1, expected: 2147483648)\n!  Assert.Equal() Failure: Values differ\n!  Expected: 2147483648\n!  Actual:   -2147483648\n測試摘要：總計 3，失敗 1，成功 2',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'arrange', label: 'Arrange' }, { id: 'act', label: 'Act' }, { id: 'assert', label: 'Assert' }],
+          items: [
+            { text: '`var account = new Account(balance: 100m);`', answer: 'arrange', why: '準備測試需要的物件與狀態。' },
+            { text: '`account.Withdraw(30m);`', answer: 'act', why: '執行要測試的行為。' },
+            { text: '`Assert.Equal(70m, account.Balance);`', answer: 'assert', why: '檢查結果。' },
+            { text: '`var fakeClock = new FakeClock(new DateTime(2026, 1, 1));`', answer: 'arrange', why: '準備替身物件。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="修 bug 的流程：先寫一個能重現 bug 的失敗測試，確認它是紅的；修改程式碼讓它變綠；之後這個測試防止 bug 再出現">
+          <rect x="10" y="40" width="160" height="80" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="90" y="75" text-anchor="middle" font-size="17" font-weight="900" class="on-color">1. 寫失敗測試</text>
+          <text x="90" y="103" text-anchor="middle" font-size="14" class="on-color">紅燈</text>
+          <rect x="200" y="40" width="160" height="80" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="75" text-anchor="middle" font-size="17" font-weight="900" class="on-color">2. 修程式</text>
+          <text x="280" y="103" text-anchor="middle" font-size="14" class="on-color">讓它通過</text>
+          <rect x="390" y="40" width="160" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="470" y="75" text-anchor="middle" font-size="17" font-weight="900" class="on-color">3. 綠燈</text>
+          <text x="470" y="103" text-anchor="middle" font-size="14" class="on-color">bug 不會再回來</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M170 80 H200"/><path d="M360 80 H390"/></g>
+          <text x="280" y="155" text-anchor="middle" font-size="15">先看到紅燈，才能確定測試真的抓得到這個 bug</text>
+        </svg>`, caption: '修 bug 先寫能重現它的測試；這是團隊規範裡的固定流程。' },
+      ],
+      tryit: {
+        q: ['寫一個測試：提款金額大於餘額時應該拋出 InvalidOperationException。'],
+        draft: '[Fact]\npublic void Withdraw_Throws_WhenAmountExceedsBalance()\n{\n    var account = new Account(balance: 100m);\n\n    Assert.____<InvalidOperationException>(() => account.____(500m));\n}',
+        answer: ['`Assert.Throws<InvalidOperationException>(() => account.Withdraw(500m));`', 'Throws 要的是「一段會拋例外的程式」（lambda），不是直接呼叫的結果；直接呼叫的話例外在 Assert 之前就拋出了。'],
+      },
+    },
+    mistakes: [
+      { wrong: '為了讓測試通過，修改測試的預期值。', why: '測試是規格，改它等於改需求。', right: '先確認測試本身對不對；測試錯了要先回報再改。' },
+      { wrong: '一個測試裡檢查十件事。', why: '第一個 Assert 失敗後面就不跑了，也看不出是哪個行為壞掉。', right: '一個測試一個行為；同類型多組資料用 Theory。' },
+      { wrong: '測試依賴現在時間或網路。', why: '今天過、明天不過，或沒網路就失敗（不穩定的測試）。', right: '時間用 .NET 8 起的 TimeProvider 注入，外部服務用介面替身。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '同一個測試邏輯要跑 5 組不同輸入，xUnit 用什麼？', options: [
+        { text: '`[Theory]` 加 5 個 `[InlineData]`', correct: true, why: '每組資料各是一個測試案例。' },
+        { text: '寫 5 個 `[Fact]` 方法，每個方法放一組輸入', why: '可行但重複，Theory 是為此設計的。' },
+        { text: '在一個 Fact 裡寫迴圈', why: '一組失敗就看不到其他組，而且報告不清楚。' },
+        { text: '`[Fact(Repeat = 5)]`', why: '沒有這個參數。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`Assert.Throws<ArgumentException>(account.Withdraw(-1));` 有什麼問題？', options: [
+        { text: '要傳 lambda：`() => account.Withdraw(-1)`', correct: true, why: '直接呼叫時例外在 Assert 之前就拋出，測試會因未處理的例外失敗。' },
+        { text: '沒有問題，例外會直接被 Assert.Throws 接住', why: 'Withdraw 會先被呼叫並拋出例外。' },
+        { text: '要改用 Assert.Equal', why: 'Equal 用來比較值，不是檢查例外。' },
+        { text: '型別參數要寫 Exception', why: '應該寫你預期的具體型別。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['9-1 把 OrderService 設計成依賴 INotifier 介面。在測試裡怎麼驗證「完成訂單時有寄出通知」，又不真的寄信？'], answer: [
+        '寫一個測試用的假實作：`class FakeNotifier : INotifier { public List<string> Sent = []; public void Send(string m) => Sent.Add(m); }`。',
+        'Arrange 建立 FakeNotifier 傳給 OrderService；Act 呼叫 Complete；Assert 檢查 `Assert.Single(fake.Sent)`。這就是 3-4 介面設計在測試上的回報。也可以用 NSubstitute 這類套件自動產生替身。',
+      ] },
+    ],
+    keypoints: [
+      'Fact 是單一測試，Theory 加 InlineData 跑多組資料。',
+      '測試分 Arrange、Act、Assert；名稱寫出情境與預期結果。',
+      '修 bug 先寫失敗的測試；不為了通過而改測試。',
+    ],
+    sources: ['xunit'],
+  },
+
+  '9-3': {
+    goals: [
+      '用 Minimal API 寫出 GET 與 POST 端點',
+      '用相依性注入取得服務',
+      '用 .NET 10 的內建驗證檢查輸入',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 6-1）`app.MapGet("/", () => "Hi")` 的第二個參數是什麼？', options: [
+        { text: '一個 lambda（委派），請求來時才執行', correct: true, why: '把「要做什麼」當成值交給框架。' },
+        { text: '回應給瀏覽器的字串，也就是固定的 Hi', why: '它是函式，不是字串本身。' },
+        { text: '路由名稱', why: '路由是第一個參數。' },
+        { text: '一個 Task', why: '它是 lambda；框架呼叫後才可能得到 Task。' },
+      ] },
+    ],
+    analogy: {
+      text: ['Minimal API 像餐廳的點餐櫃檯：每個路徑是一個窗口（`/orders` 窗口、`/menu` 窗口），窗口後面的人（處理函式）需要什麼工具，經理（DI 容器）就遞給他，不用自己去倉庫拿。'],
+      limit: ['餐廳窗口少；一個大型 API 可能有上百個端點，這時要用 MapGroup 分組，或改用 Controller 來組織。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="請求流程：HTTP 請求進來，經過中介軟體管線，路由比對到端點，DI 容器把需要的服務注入處理函式，處理函式回傳結果並序列化成 JSON 回應">
+        <rect x="10" y="20" width="120" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="70" y="56" text-anchor="middle" font-size="16" font-weight="900">HTTP 請求</text>
+        <rect x="150" y="20" width="120" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="210" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">中介軟體</text>
+        <rect x="290" y="20" width="120" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="350" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">路由比對</text>
+        <rect x="430" y="20" width="120" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="490" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">處理函式</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M130 50 H150"/><path d="M270 50 H290"/><path d="M410 50 H430"/></g>
+        <rect x="380" y="150" width="170" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="186" text-anchor="middle" font-size="16" font-weight="900" class="on-color">DI 容器給服務</text>
+        <path d="M465 150 V80" class="stroke-ink" stroke-width="4"/>
+        <rect x="10" y="200" width="200" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="110" y="236" text-anchor="middle" font-size="16" font-weight="900">JSON 回應</text>
+        <path d="M520 80 V120 H110 V200" class="stroke-ink" stroke-width="3" fill="none" stroke-dasharray="6 5"/>
+      </svg>`,
+      caption: '處理函式的參數：路由值、查詢字串、JSON 本文、DI 服務，框架都會自動填好。',
+      blocks: [
+        '[[Minimal API]] 用 `MapGet`、`MapPost` 等定義端點。處理函式的參數由框架自動繫結：路由參數、查詢字串、JSON 本文，以及透過[[相依性注入]]註冊的服務。.NET 10 起呼叫 `builder.Services.AddValidation()`，就會依 DataAnnotations 屬性自動驗證輸入，失敗回 400 ProblemDetails。',
+        { type: 'code', lang: 'csharp', title: 'Program.cs', code: 'using System.ComponentModel.DataAnnotations;\n\nvar builder = WebApplication.CreateBuilder(args);\nbuilder.Services.AddSingleton<ITodoStore, InMemoryTodoStore>();\nbuilder.Services.AddValidation();\nvar app = builder.Build();\n\nvar todos = app.MapGroup("/api/v1/todos");\n\ntodos.MapGet("/", (ITodoStore store) => store.All());\n\ntodos.MapGet("/{id:int}", (int id, ITodoStore store) =>\n    store.Find(id) is { } todo ? Results.Ok(todo) : Results.NotFound());\n\ntodos.MapPost("/", (CreateTodo input, ITodoStore store) =>\n{\n    var todo = store.Add(input.Title);\n    return Results.Created($"/api/v1/todos/{todo.Id}", todo);\n});\n\napp.Run();\n\npublic record CreateTodo([property: Required, StringLength(100)] string Title);' },
+      ],
+    },
+    define: [
+      { term: 'Minimal API', en: 'Minimal API', def: '以 `app.MapXxx(路由, 委派)` 定義端點；`MapGroup` 讓同一前綴的端點分組。', example: '`app.MapDelete("/todos/{id}", …)`' },
+      { term: '相依性注入', en: 'DI', def: '在 `builder.Services` 註冊服務；生命週期有 Singleton（整個 App 一個）、Scoped（每個請求一個）、Transient（每次都新的）。', example: '`AddScoped<IOrderService, OrderService>()`' },
+      { term: 'Results', en: 'Results / TypedResults', def: '產生 HTTP 回應的輔助方法：Ok、Created、NotFound、BadRequest、Problem。', example: '`return Results.NotFound();`' },
+    ],
+    examples: {
+      compare: [{
+        title: '處理函式取得資料存取服務',
+        kind: '自己 new vs 注入',
+        code: true,
+        badLabel: '端點裡 new',
+        goodLabel: '參數注入',
+        bad: 'app.MapGet("/todos", () =>\n{\n    var store = {{1:new SqlTodoStore("Server=…")}};\n    return store.All();\n});',
+        good: 'builder.Services.AddScoped<ITodoStore, SqlTodoStore>();\n\napp.MapGet("/todos", ({{1:ITodoStore store}}) => store.All());',
+        badResult: '連線字串寫死在端點；測試時換不掉真的資料庫。',
+        goodResult: '設定集中在一處；測試時註冊假的 ITodoStore。',
+        why: ['連線字串從設定或環境變數讀，不寫在程式碼裡'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'HTTP 請求與回應',
+          title: '先預測，再看回應',
+          code: '// 端點：\ntodos.MapGet("/{id:int}", (int id, ITodoStore store) =>\n    store.Find(id) is { } todo ? Results.Ok(todo) : Results.NotFound());\n\n// 目前資料：只有 id = 1 的「買牛奶」\n\nGET /api/v1/todos/1\nGET /api/v1/todos/99\nGET /api/v1/todos/abc',
+          predict: { q: '`GET /api/v1/todos/abc` 會得到什麼狀態碼？', options: ['404', '400', '500'], answer: 0 },
+          output: '200 {"id":1,"title":"買牛奶","isDone":false}\n404\n404（abc 不符合 {id:int} 約束，沒有任何路由符合）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'single', label: 'Singleton' }, { id: 'scoped', label: 'Scoped' }, { id: 'trans', label: 'Transient' }],
+          items: [
+            { text: 'EF Core 的 DbContext', answer: 'scoped', why: '每個請求一個工作階段，請求結束就釋放。' },
+            { text: '從設定檔讀進來、不會變的設定物件', answer: 'single', why: '整個 App 共用一份即可。' },
+            { text: '輕量、無狀態的格式化工具', answer: 'trans', why: '每次要都給新的也沒有成本；用 Singleton 也可以。' },
+            { text: '記憶體快取', answer: 'single', why: '要跨請求共用資料。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label=".NET 10 驗證：CreateTodo 的 Title 標示 Required 與 StringLength 100；送出空的 Title 時，框架在進入處理函式前就回傳 400 ProblemDetails">
+          <rect x="10" y="40" width="160" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="90" y="75" text-anchor="middle" font-size="15" class="mono">POST</text>
+          <text x="90" y="100" text-anchor="middle" font-size="15" class="mono">{"title": ""}</text>
+          <rect x="200" y="40" width="160" height="80" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="75" text-anchor="middle" font-size="16" font-weight="900" class="on-color">AddValidation</text>
+          <text x="280" y="100" text-anchor="middle" font-size="14" class="on-color">檢查 [Required]</text>
+          <rect x="390" y="40" width="160" height="80" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="470" y="75" text-anchor="middle" font-size="16" font-weight="900" class="on-color">400</text>
+          <text x="470" y="100" text-anchor="middle" font-size="14" class="on-color">ProblemDetails</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M170 80 H200"/><path d="M360 80 H390"/></g>
+          <text x="280" y="155" text-anchor="middle" font-size="15">處理函式根本不會被呼叫</text>
+        </svg>`, caption: 'record 的參數要用 `[property: Required]` 讓屬性套到產生的屬性上；型別要 public。' },
+      ],
+      tryit: {
+        q: ['加一個刪除端點：成功回 204，找不到回 404。'],
+        draft: 'todos.Map____("/{id:int}", (int id, ITodoStore store) =>\n    store.Remove(id) ? Results.____() : Results.NotFound());',
+        answer: ['`MapDelete`、`Results.NoContent()`。', '204 表示成功但沒有內容，符合 REST 慣例；路徑用名詞複數 `/api/v1/todos`，動作由 HTTP 方法表達。'],
+      },
+    },
+    mistakes: [
+      { wrong: '路徑寫成 `/api/getTodos`、`/api/deleteTodo`。', why: '動作重複寫在路徑，違反 REST 慣例。', right: '`GET /api/v1/todos`、`DELETE /api/v1/todos/{id}`。' },
+      { wrong: '把 DbContext 註冊成 Singleton。', why: 'DbContext 不是執行緒安全的，多個請求同時使用會出錯。', right: '`AddDbContext` 預設就是 Scoped。' },
+      { wrong: '500 錯誤把例外訊息與堆疊追蹤回傳給客戶端。', why: '洩漏內部實作細節，有安全風險。', right: '用 `app.UseExceptionHandler()` 加 ProblemDetails，詳細內容只寫進日誌。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '新增一筆資料成功時，REST API 慣例的狀態碼是？', options: [
+        { text: '201 Created', correct: true, why: '並在 Location 標頭附上新資源的網址。' },
+        { text: '200 OK', why: '200 用於讀取或一般成功；建立用 201。' },
+        { text: '204 No Content', why: '204 用於成功但沒有內容（例如刪除）。' },
+        { text: '202 Accepted', why: '202 表示已接受、稍後處理，不是建立完成。' },
+      ] },
+      { level: '應用', type: 'mc', q: '處理函式參數 `(int id, ITodoStore store)`，框架怎麼知道 store 從哪裡來？', options: [
+        { text: '它是已註冊的服務，從 DI 容器取得', correct: true, why: '介面型別且在 builder.Services 註冊過。' },
+        { text: '從查詢字串 ?store= 讀取', why: '複雜型別不會從查詢字串繫結。' },
+        { text: '從 JSON 本文反序列化', why: 'GET 請求通常沒有本文；而且它是已註冊的服務。' },
+        { text: '框架自動 new 一個', why: '沒有註冊的話會在啟動或請求時報錯。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要讓 9-2 的測試覆蓋這個 API 的端點（真的發 HTTP 請求），但不想真的部署。.NET 有什麼做法？'], answer: [
+        '用 `Microsoft.AspNetCore.Mvc.Testing` 的 WebApplicationFactory，在測試程序內啟動整個 App，取得一個 HttpClient 直接打端點。',
+        '在 factory 裡用 `ConfigureServices` 把 ITodoStore 換成記憶體版本，測試就不碰真的資料庫。這叫整合測試，和單元測試互補。',
+      ] },
+    ],
+    keypoints: [
+      'MapGet、MapPost 定義端點；MapGroup 把同一前綴的端點分組。',
+      '服務在 builder.Services 註冊，處理函式用參數取得（DI）。',
+      '.NET 10 的 AddValidation 依屬性自動驗證，失敗回 400。',
+    ],
+    sources: ['minimal-api', 'aspnet-validation', 'di'],
+  },
+
+  '9-4': {
+    goals: [
+      '用 EF Core 定義模型與 DbContext',
+      '用 LINQ 查詢資料庫並避免 N+1',
+      '用 dotnet publish 發布，知道 Native AOT 的取捨',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 9-3）DbContext 應該註冊成哪種生命週期？', options: [
+        { text: 'Scoped，每個請求一個', correct: true, why: 'AddDbContext 預設就是 Scoped。' },
+        { text: 'Singleton，整個 App 共用', why: 'DbContext 不是執行緒安全的。' },
+        { text: 'Transient，每次注入都新的', why: '同一個請求內不同服務會拿到不同的 DbContext，交易無法共用。' },
+        { text: '不需要註冊', why: '要註冊才能被注入。' },
+      ] },
+    ],
+    analogy: {
+      text: ['EF Core 像一位會說 SQL 的翻譯：你用 C# 的 LINQ 說「給我金額大於 1000 的訂單」，它翻成 SQL 交給資料庫，再把結果翻回 C# 物件。'],
+      limit: ['翻譯會照字面翻：你在 foreach 裡一筆一筆問，它就一筆一筆翻（N+1 查詢）。而且不是所有 C# 方法都翻得成 SQL，翻不了的會在執行時拋例外。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="EF Core 的翻譯流程：C# LINQ 查詢 db.Orders.Where Total 大於 1000 經過 EF Core 翻成 SQL SELECT 語句，資料庫回傳資料列，EF Core 再轉成 Order 物件">
+        <rect x="10" y="20" width="250" height="80" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="52" text-anchor="middle" font-size="16" font-weight="900" class="on-color">C# LINQ</text>
+        <text x="135" y="80" text-anchor="middle" font-size="13" class="on-color mono">Orders.Where(o =&gt; o.Total &gt; 1000)</text>
+        <rect x="300" y="20" width="250" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="425" y="52" text-anchor="middle" font-size="16" font-weight="900" class="on-color">SQL</text>
+        <text x="425" y="80" text-anchor="middle" font-size="13" class="on-color mono">SELECT … WHERE Total &gt; 1000</text>
+        <path d="M260 60 H300" class="stroke-ink" stroke-width="4"/>
+        <rect x="300" y="170" width="250" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="425" y="216" text-anchor="middle" font-size="16" font-weight="900" class="on-color">資料庫回傳資料列</text>
+        <rect x="10" y="170" width="250" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="135" y="216" text-anchor="middle" font-size="16" font-weight="900">List&lt;Order&gt; 物件</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M425 100 V170"/><path d="M300 210 H260"/></g>
+        <text x="280" y="140" text-anchor="middle" font-size="14">EF Core 負責雙向翻譯</text>
+      </svg>`,
+      caption: '在 ToListAsync 之前的 LINQ 都會被翻成 SQL，在資料庫端執行。',
+      blocks: [
+        '[[EF Core]] 用 [[DbContext]] 代表資料庫，DbSet 代表資料表。查詢用 LINQ，最後 `ToListAsync` 才送出（5-3 的延遲執行）。資料庫結構的變更用 [[migration]] 管理。發布時 `dotnet publish -c Release`；需要極快啟動與小體積時考慮 [[Native AOT]]，但 EF Core 對 AOT 的支援仍有限制，要先確認。',
+        { type: 'code', lang: 'csharp', title: 'ShopDb.cs', code: 'public class ShopDb(DbContextOptions<ShopDb> options) : DbContext(options)\n{\n    public DbSet<Order> Orders => Set<Order>();\n}\n\npublic class Order\n{\n    public int Id { get; set; }\n    public decimal Total { get; set; }\n    public List<OrderItem> Items { get; set; } = [];\n}\n\n// Program.cs\nbuilder.Services.AddDbContext<ShopDb>(o =>\n    o.UseSqlite(builder.Configuration.GetConnectionString("Shop")));\n\napp.MapGet("/api/v1/orders/big", async (ShopDb db, CancellationToken ct) =>\n    await db.Orders\n        .Where(o => o.Total > 1000)\n        .OrderByDescending(o => o.Total)\n        .Take(20)\n        .ToListAsync(ct));' },
+        { type: 'code', lang: 'bash', title: 'migration 與發布', code: 'dotnet tool install --global dotnet-ef\ndotnet ef migrations add Init\ndotnet ef database update\n\ndotnet publish -c Release' },
+      ],
+    },
+    define: [
+      { term: 'DbContext', en: 'DbContext', def: '工作單元：追蹤載入物件的變更，`SaveChangesAsync` 時一次寫回資料庫（同一個交易）。', example: '`db.Orders.Add(order); await db.SaveChangesAsync();`' },
+      { term: 'migration', en: 'migration', def: '由模型差異產生的結構變更腳本；可以套用（update）與回復。執行前先看產生的 SQL。', example: '`dotnet ef migrations script`' },
+      { term: 'Native AOT', en: 'Native AOT', def: '發布時預先編譯成原生機器碼；不能用依賴執行時產生程式碼的功能（部分反射、動態載入）。', example: '檔案型程式 `dotnet publish app.cs` 預設就是 Native AOT。' },
+    ],
+    examples: {
+      compare: [{
+        title: '列出訂單與它的明細數量',
+        kind: 'N+1 vs 一次查詢',
+        code: true,
+        badLabel: '迴圈裡查',
+        goodLabel: '投影一次查完',
+        bad: 'var orders = await db.Orders.ToListAsync(ct);\nforeach (var o in orders)\n{\n    var count = await db.OrderItems\n        .CountAsync(i => i.OrderId == o.Id, ct);   // 每筆訂單一次查詢\n}',
+        good: 'var rows = await db.Orders\n    {{1:.Select(o => new { o.Id, o.Total, ItemCount = o.Items.Count })}}\n    .ToListAsync(ct);',
+        badResult: '100 筆訂單 = 101 次資料庫往返。',
+        goodResult: '1 次查詢，只取需要的欄位。',
+        why: ['只需要部分欄位時用 Select 投影；需要完整的關聯物件時用 Include'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'EF Core 產生的 SQL（SQLite）',
+          title: '先預測，再看翻譯結果',
+          code: 'var names = await db.Customers\n    .Where(c => c.City == "台北")\n    .OrderBy(c => c.Name)\n    .Select(c => c.Name)\n    .Take(10)\n    .ToListAsync();',
+          predict: { q: 'Where、OrderBy、Take 是在哪裡執行？', options: ['資料庫（翻成 SQL）', '先全部載入，再在 C# 篩選', 'Where 在資料庫，其他在 C#'], answer: 0 },
+          output: 'SELECT "c"."Name"\nFROM "Customers" AS "c"\nWHERE "c"."City" = \'台北\'\nORDER BY "c"."Name"\nLIMIT @p\n（示意，實際 SQL 依 EF Core 版本與參數化方式略有不同）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'jit', label: '一般發布（JIT）' }, { id: 'aot', label: '考慮 Native AOT' }],
+          items: [
+            { text: '大量使用反射與動態載入外掛的桌面程式', answer: 'jit', why: 'AOT 不支援執行時產生或載入程式碼。' },
+            { text: '要在幾毫秒內啟動的 CLI 小工具', answer: 'aot', why: '啟動時間是 AOT 最大的優勢。' },
+            { text: '以 EF Core 為主、功能複雜的傳統後端', answer: 'jit', why: 'EF Core 的 AOT 支援仍有限制，先用一般發布。' },
+            { text: '冷啟動計費的雲端函式（Serverless）', answer: 'aot', why: '啟動快、記憶體小直接省錢。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="一般發布與 Native AOT 比較：一般發布需要 .NET runtime、啟動時 JIT、功能完整；Native AOT 不需要 runtime、啟動快、體積小，但限制反射">
+          <rect x="10" y="20" width="260" height="140" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color">一般發布</text>
+          <text x="140" y="92" text-anchor="middle" font-size="15" class="on-color">需要 .NET runtime</text>
+          <text x="140" y="120" text-anchor="middle" font-size="15" class="on-color">功能完整</text>
+          <rect x="290" y="20" width="260" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color">Native AOT</text>
+          <text x="420" y="92" text-anchor="middle" font-size="15" class="on-color">啟動快、體積小</text>
+          <text x="420" y="120" text-anchor="middle" font-size="15" class="on-color">限制反射與動態功能</text>
+          <path d="M270 90 H290" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: '0-1 說 C# 先編成 IL 再 JIT；Native AOT 是把 JIT 這一步提前到發布時做完。' },
+      ],
+      tryit: {
+        q: ['新增一筆訂單並存進資料庫：'],
+        draft: 'var order = new Order { Total = 1500m };\ndb.Orders.____(order);\nawait db.____(ct);\nConsole.WriteLine(order.Id);   // 存檔後 Id 已由資料庫產生',
+        answer: ['`db.Orders.Add(order);`、`await db.SaveChangesAsync(ct);`', 'Add 只是讓 DbContext 開始追蹤；SaveChangesAsync 才真的送出 INSERT。多筆變更在一次 SaveChanges 裡會包在同一個交易中。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`db.Orders.ToList().Where(o => o.Total > 1000)`', why: 'ToList 先把整張表載入記憶體，篩選在 C# 做。', right: '`db.Orders.Where(…).ToListAsync()`：篩選放在 ToList 前面。' },
+      { wrong: '在 Where 裡呼叫自己寫的 C# 方法。', why: 'EF Core 翻不成 SQL，執行時拋 InvalidOperationException（could not be translated）。', right: '只用 EF Core 能翻譯的運算，或先縮小範圍再在記憶體處理。' },
+      { wrong: '連線字串寫在程式碼或 commit 進 appsettings.json。', why: '密碼外洩。', right: '開發時用 user-secrets，正式環境用環境變數或金鑰保管服務。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'EF Core 的查詢什麼時候真的送到資料庫？', options: [
+        { text: '呼叫 ToListAsync、FirstAsync、CountAsync 等方法時', correct: true, why: '和 5-3 的延遲執行一樣。' },
+        { text: '寫下 Where 的那一行，條件一寫好就送出查詢', why: 'Where 只是建立查詢。' },
+        { text: '建立 DbContext 時', why: '建立 DbContext 不會查詢任何資料。' },
+        { text: '程式啟動時一次載入全部', why: 'EF Core 不會預先載入整個資料庫。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`db.Orders.Add(o);` 之後沒有呼叫 SaveChangesAsync，資料庫裡有這筆訂單嗎？', options: [
+        { text: '沒有，只是被 DbContext 追蹤', correct: true, why: 'SaveChanges 才會送出 INSERT。' },
+        { text: '有，Add 會立刻送出 INSERT 寫進資料庫', why: 'Add 只改變追蹤狀態。' },
+        { text: '有，請求結束時自動存檔', why: 'EF Core 不會自動存檔。' },
+        { text: '拋出例外', why: 'Add 不會拋例外。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['回頭看整門課：一個「訂單 API」從收到請求到存進資料庫，會用到哪些模組學過的東西？'], answer: [
+        '模組 9：Minimal API 端點、DI 注入 DbContext、AddValidation 驗證輸入、EF Core 存檔。模組 8：整條路徑 async 到底，傳遞 CancellationToken。',
+        '模組 7：防衛子句與例外處理、using 釋放資源。模組 3、4：record 當 DTO、nullable 標示可能缺少的欄位。模組 5：LINQ 查詢。模組 3-4 的介面讓 9-2 可以用假物件測試。',
+      ] },
+    ],
+    keypoints: [
+      'EF Core 把 LINQ 翻成 SQL；篩選、排序放在 ToListAsync 之前。',
+      '避免在迴圈裡查詢（N+1），用 Select 投影或 Include 一次取回。',
+      '一般用 dotnet publish；要極快啟動再評估 Native AOT 的限制。',
+    ],
+    sources: ['efcore', 'native-aot', 'file-based-apps'],
+  },
+});
+</script>

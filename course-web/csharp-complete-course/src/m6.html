@@ -1,0 +1,386 @@
+<script>
+/* ==========================================================================
+   模組 6：委派與事件
+   ========================================================================== */
+defineTerms({
+  '委派': { en: 'delegate', def: '可以裝「方法」的型別。有了它，方法就能當參數傳、存進變數、晚一點再呼叫。', example: '`Func<int, int> twice = x => x * 2;`' },
+  'Func': { en: 'Func<…, TResult>', def: '.NET 內建的泛型委派：有回傳值，最後一個型別參數是回傳型別。', example: '`Func<int, int, int> add = (a, b) => a + b;`' },
+  'Action': { en: 'Action<…>', def: '.NET 內建的泛型委派：沒有回傳值（void）。', example: '`Action<string> log = Console.WriteLine;`' },
+  'Predicate': { en: 'Predicate<T>', def: '回傳 bool 的委派，等同 `Func<T, bool>`，List 的 Find、RemoveAll 使用它。', example: '`list.RemoveAll(x => x < 0);`' },
+  '閉包': { en: 'closure', def: 'lambda 用到外面的變數時，會「捕捉」那個變數本身（不是當下的值），之後變數改了 lambda 也看到新的值。', example: '`int n = 1; Func<int> f = () => n; n = 5; f()` 得到 5。' },
+  '方法群組': { en: 'method group', def: '直接寫方法名稱（不加括號）來指定給委派。', example: '`names.ForEach(Console.WriteLine);`' },
+  '事件': { en: 'event', def: '類別對外公開的「通知點」：外面只能 += 訂閱或 -= 取消，只有類別自己能觸發。', example: '`public event EventHandler? Clicked;`' },
+  'EventHandler': { en: 'EventHandler<TEventArgs>', def: '.NET 事件的標準委派形式：`(object? sender, TEventArgs e)`。', example: '`event EventHandler<OrderEventArgs>? Paid;`' },
+  '訂閱': { en: 'subscribe', def: '用 `+=` 把處理方法加到事件上；用 `-=` 取消。', example: '`button.Clicked += OnClicked;`' },
+  '擴充區塊': { en: 'extension block', def: 'C# 14 起的寫法：`extension(型別 參數) { … }`，可以定義擴充方法、擴充屬性，以及「靜態」擴充成員。', example: '`extension(string s) { public bool IsBlank => string.IsNullOrWhiteSpace(s); }`' },
+});
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '用 Func、Action 把方法當成參數',
+      '讀懂 lambda 與閉包',
+      '寫一個接收「策略」的方法，讓呼叫端決定行為',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-2）`products.Where(p => p.Price > 100)` 中 `p => p.Price > 100` 是什麼？', options: [
+        { text: '一個 lambda，型別是 `Func<Product, bool>`', correct: true, why: 'Where 需要一個「給元素、回傳 bool」的委派。' },
+        { text: '一個 bool 值，代表這個商品是否超過 100 元', why: '它是函式，每個元素都會呼叫一次。' },
+        { text: '一個新的 Product', why: '它沒有建立任何物件。' },
+        { text: '一段 SQL 字串', why: '在記憶體集合上，它是 C# 委派。' },
+      ] },
+    ],
+    analogy: {
+      text: ['委派像便利商店的「代收服務單」：單子上不寫怎麼處理，只寫一個電話號碼。店員拿到單子就照號碼撥出去，接電話的是誰（哪個方法）由你決定。'],
+      limit: ['電話號碼是固定的；閉包捕捉的是「變數本身」，變數之後被改，lambda 執行時讀到的是新值，像電話那頭換了人接。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="委派是方法的容器：Func of int, int 型別的變數 op 可以裝 Double、Square 或一個 lambda；呼叫 Apply(op, 5) 時才執行裝在裡面的方法">
+        <rect x="190" y="20" width="180" height="80" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">Func&lt;int,int&gt;</text>
+        <text x="280" y="85" text-anchor="middle" font-size="16" class="on-color mono">op</text>
+        <rect x="10" y="160" width="160" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="90" y="202" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Double</text>
+        <rect x="200" y="160" width="160" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="202" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Square</text>
+        <rect x="390" y="160" width="160" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="470" y="202" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">x =&gt; x + 1</text>
+        <path d="M280 100 V130 H90 V160 M280 130 V160 M280 130 H470 V160" class="stroke-ink" stroke-width="4" fill="none"/>
+        <text x="300" y="125" font-size="14">裝其中一個</text>
+      </svg>`,
+      caption: '委派變數裝的是「一個方法」；同樣的呼叫，裝不同方法就做不同的事。',
+      blocks: [
+        '[[委派]]讓方法變成值。日常幾乎只用兩個內建的：[[Func]]（有回傳值）和 [[Action]]（沒有回傳值）。lambda 用到外部變數時會形成[[閉包]]。',
+        { type: 'table', caption: '讀懂 Func 與 Action 的型別參數', head: ['型別', '參數', '回傳', 'lambda 範例'], rows: [
+          ['`Action`', '無', '無', '`() => Console.WriteLine("hi")`'],
+          ['`Action<string>`', 'string', '無', '`s => Console.WriteLine(s)`'],
+          ['`Func<int>`', '無', 'int', '`() => 42`'],
+          ['`Func<int, bool>`', 'int', 'bool', '`n => n > 0`'],
+          ['`Func<int, int, int>`', 'int, int', 'int（最後一個）', '`(a, b) => a + b`'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '委派', en: 'delegate', def: '型別安全的方法參考；可以指向靜態方法、實例方法或 lambda。', example: '`delegate int Op(int x);`（自訂委派，現在多半用 Func 取代）' },
+      { term: '閉包', en: 'closure', def: 'lambda 捕捉外部變數，延長那個變數的生命期；捕捉的是變數，不是值。', example: '`int count = 0; Action inc = () => count++;`' },
+      { term: '方法群組', en: 'method group', def: '不加括號的方法名稱，可以直接轉成相容的委派。', example: '`Func<string, int> parse = int.Parse;`' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一份計算，不同的折扣規則',
+        kind: '寫死 vs 傳入策略',
+        code: true,
+        badLabel: '每種規則一個方法',
+        goodLabel: '把規則當參數',
+        bad: 'decimal TotalVip(decimal[] p) => p.Sum() * 0.8m;\ndecimal TotalNormal(decimal[] p) => p.Sum();\ndecimal TotalSale(decimal[] p) => p.Sum() - 100m;',
+        good: 'decimal Total(decimal[] p, {{1:Func<decimal, decimal> rule}})\n    => rule(p.Sum());\n\nTotal(prices, s => s * 0.8m);\nTotal(prices, s => s - 100m);',
+        badResult: '每加一種折扣就多一個幾乎一樣的方法。',
+        goodResult: '計算骨架一份，規則由呼叫端決定。',
+        why: ['LINQ 就是這個設計：Where 不知道條件，條件由你傳入'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var actions = new List<Action>();\nfor (int i = 0; i < 3; i++)\n{\n    int copy = i;\n    actions.Add(() => Console.Write(copy));\n}\nforeach (var a in actions) a();\nConsole.WriteLine();\n\nint n = 1;\nFunc<int> get = () => n;\nn = 5;\nConsole.WriteLine(get());',
+          predict: { q: '最後一行 `get()` 會印出什麼？', options: ['1', '5', '編譯錯誤'], answer: 1 },
+          output: '012\n5',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'action', label: 'Action<…>' }, { id: 'func', label: 'Func<…>' }],
+          items: [
+            { text: '`s => Console.WriteLine(s)`', answer: 'action', why: 'WriteLine 回傳 void。' },
+            { text: '`x => x * x`', answer: 'func', why: '有回傳值。' },
+            { text: '`() => DateTime.Now`', answer: 'func', why: '沒有參數但有回傳值：`Func<DateTime>`。' },
+            { text: '`(a, b) => list.Add(a + b)`', answer: 'action', why: 'List.Add 回傳 void。' },
+            { text: '`p => p.Age >= 18`', answer: 'func', why: '回傳 bool：`Func<Person, bool>`。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="閉包捕捉的是變數本身：lambda get 和外面的 n 指向同一個變數，n 改成 5 之後呼叫 get 得到 5">
+          <rect x="20" y="40" width="160" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="100" y="88" text-anchor="middle" font-size="18" class="mono">外面的 n</text>
+          <rect x="380" y="40" width="160" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="460" y="88" text-anchor="middle" font-size="18" class="on-color mono">() =&gt; n</text>
+          <rect x="220" y="50" width="120" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="88" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">n = 5</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M180 80 H220"/><path d="M340 80 H380"/></g>
+          <text x="280" y="160" text-anchor="middle" font-size="15">兩邊共用同一個變數，不是複製當下的值</text>
+        </svg>`, caption: '要固定當下的值，就先複製到迴圈內的區域變數（像上面的 copy）。' },
+      ],
+      tryit: {
+        q: ['寫一個方法 `Retry`：執行傳入的動作，失敗就重試，最多 times 次。'],
+        draft: 'void Retry(____ action, int times)\n{\n    for (int i = 1; i <= times; i++)\n    {\n        try { ____; return; }\n        catch when (i < times) { }\n    }\n}',
+        answer: ['`Action action`、`action()`。', '最後一次失敗時 `when (i < times)` 不成立，例外會往外拋，呼叫端就知道真的失敗了（例外過濾器在模組 7）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 `Func<int, bool>` 的參數順序讀反，以為 bool 是參數。', why: 'Func 的最後一個型別參數永遠是回傳值。', right: '從左讀：前面全是參數，最後一個是回傳。' },
+      { wrong: '委派變數可能是 null 就直接呼叫 `callback(x)`。', why: '沒指定時是 null，拋 NullReferenceException。', right: '`callback?.Invoke(x);`' },
+      { wrong: '在 lambda 裡捕捉一個之後還會改的變數，以為記住了當時的值。', why: '閉包捕捉的是變數。', right: '先複製到新的區域變數再捕捉。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`Func<string, int>` 代表哪種方法？', options: [
+        { text: '收一個 string，回傳 int', correct: true, why: '最後一個型別參數是回傳值。' },
+        { text: '收一個 int，回傳 string', why: '順序讀反了。' },
+        { text: '收 string 與 int，沒有回傳', why: '沒有回傳的是 Action。' },
+        { text: '回傳 string 與 int 兩個值', why: 'Func 只有一個回傳值。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`Action<string> log = Console.WriteLine;` 這行合法嗎？', options: [
+        { text: '合法，方法群組會轉成相容的委派', correct: true, why: 'WriteLine(string) 符合 Action<string>。' },
+        { text: '不合法，要寫成 Console.WriteLine()', why: '加括號就變成「呼叫」，得到 void。' },
+        { text: '不合法，Action 不能指向靜態方法', why: '靜態方法也可以。' },
+        { text: '合法，但 log 會是 null', why: '它指向 WriteLine，不是 null。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 ASP.NET Core 的 `app.MapGet("/", () => "Hello")` 可以直接傳一個 lambda？這跟本課的哪個概念有關？'], answer: [
+        'MapGet 的參數是一個 Delegate：框架把「收到請求時要執行什麼」當成值保存起來，等請求真的來了才呼叫。',
+        '就是本課的策略模式：框架負責路由、序列化等骨架，行為由你傳入。模組 9 會實際寫一個。',
+      ] },
+    ],
+    keypoints: [
+      '委派讓方法變成可以傳遞的值；Func 有回傳、Action 沒有。',
+      'Func 的最後一個型別參數是回傳型別。',
+      '閉包捕捉的是變數本身，要固定值就先複製。',
+    ],
+    sources: ['cs-delegates', 'cs-lambdas'],
+  },
+
+  '6-2': {
+    goals: [
+      '宣告並觸發一個事件',
+      '用 += 訂閱、-= 取消訂閱',
+      '說出事件比公開委派欄位安全在哪裡',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-1）委派變數可能是 null 時，最安全的呼叫方式是？', options: [
+        { text: '`callback?.Invoke(x);`', correct: true, why: 'null 時直接略過。' },
+        { text: '`callback(x);`', why: 'null 時拋 NullReferenceException。' },
+        { text: '`callback!(x);`', why: '`!` 只是讓編譯器不警告，執行時一樣會拋例外。' },
+        { text: '`try { callback(x); } catch { }`', why: '吞掉例外會藏住真正的錯誤。' },
+      ] },
+    ],
+    analogy: {
+      text: ['事件像 YouTube 頻道的「訂閱」：你按訂閱（+=），頻道發新片時（觸發事件）所有訂閱者都收到通知。觀眾只能訂閱或取消，不能替頻道發影片。'],
+      limit: ['YouTube 取消訂閱很容易忘了也沒關係；C# 的事件會讓發布者一直握著訂閱者的參考，忘了 -= 可能讓訂閱者無法被回收（記憶體洩漏）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="事件的流程：Order 類別有 Paid 事件；EmailService 與 Inventory 透過加等於訂閱；Order 呼叫 Pay 時觸發 Paid，兩個訂閱者依序收到通知">
+        <rect x="190" y="20" width="180" height="90" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">Order</text>
+        <text x="280" y="88" text-anchor="middle" font-size="16" class="on-color mono">event Paid</text>
+        <rect x="20" y="180" width="200" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="120" y="215" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">EmailService</text>
+        <text x="120" y="243" text-anchor="middle" font-size="15" class="on-color">寄收據</text>
+        <rect x="340" y="180" width="200" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="440" y="215" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Inventory</text>
+        <text x="440" y="243" text-anchor="middle" font-size="15" class="on-color">扣庫存</text>
+        <path d="M280 110 V145 H120 V180 M280 145 H440 V180" class="stroke-ink" stroke-width="4" fill="none"/>
+        <text x="290" y="138" font-size="15">Paid 觸發 → 通知</text>
+      </svg>`,
+      caption: 'Order 不需要知道誰在聽；新增一個「發推播」的訂閱者，Order 一行都不用改。',
+      blocks: [
+        '[[事件]]是加了保護的委派：外面只能 [[訂閱]]（`+=`）與取消（`-=`），只有宣告的類別能觸發。標準形式是 [[EventHandler]]。',
+        { type: 'code', lang: 'csharp', title: 'events.cs', code: 'var order = new Order();\norder.Paid += (sender, e) => Console.WriteLine($"寄收據：{e.Amount}");\norder.Paid += (sender, e) => Console.WriteLine("扣庫存");\norder.Pay(500m);\n\nclass Order\n{\n    public event EventHandler<PaidEventArgs>? Paid;\n\n    public void Pay(decimal amount)\n    {\n        // ……付款邏輯……\n        Paid?.Invoke(this, new PaidEventArgs(amount));\n    }\n}\n\nrecord PaidEventArgs(decimal Amount);' },
+      ],
+    },
+    define: [
+      { term: '事件', en: 'event', def: '以 `event` 修飾的委派成員；外部只能 += 與 -=，不能直接呼叫或用 = 覆蓋。', example: '`public event EventHandler? Changed;`' },
+      { term: 'EventHandler', en: 'EventHandler<T>', def: '`void (object? sender, T e)` 形式的委派；sender 是觸發事件的物件。', example: '`EventHandler<PaidEventArgs>`' },
+      { term: '訂閱', en: 'subscribe', def: '`+=` 加入處理方法；可以有多個，依加入順序呼叫。', example: '`order.Paid += OnPaid;` 與 `order.Paid -= OnPaid;`' },
+    ],
+    examples: {
+      compare: [{
+        title: '對外公開通知點',
+        kind: '公開委派欄位 vs 事件',
+        code: true,
+        badLabel: 'public Action',
+        goodLabel: 'public event',
+        bad: 'class Order { public Action? Paid; }\n\norder.Paid = Log;        // 把別人的訂閱整個蓋掉\norder.Paid?.Invoke();    // 外面也能假裝付款',
+        good: 'class Order { public {{1:event}} Action? Paid; }\n\norder.Paid += Log;       // 只能加\n// order.Paid = Log;     // 編譯錯誤 CS0070\n// order.Paid();         // 編譯錯誤',
+        badResult: '任何人都能清空訂閱或觸發通知。',
+        goodResult: '外部只能訂閱與取消，觸發權只在 Order 自己。',
+        why: ['event 關鍵字就是在委派上加了這兩道保護'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var b = new Button();\nvoid Hello(object? s, EventArgs e) => Console.WriteLine("Hello");\nb.Clicked += Hello;\nb.Clicked += Hello;\nb.Clicked -= Hello;\nb.Click();\n\nclass Button\n{\n    public event EventHandler? Clicked;\n    public void Click() => Clicked?.Invoke(this, EventArgs.Empty);\n}',
+          predict: { q: '加了兩次、取消一次，Click 後印出幾次 Hello？', options: ['0 次', '1 次', '2 次'], answer: 1 },
+          output: 'Hello',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="忘記取消訂閱的記憶體問題：長壽的發布者握著短命訂閱者的參考，訂閱者關閉後仍無法被回收">
+          <rect x="20" y="40" width="200" height="90" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="120" y="78" text-anchor="middle" font-size="17" font-weight="900" class="on-color">長壽的發布者</text>
+          <text x="120" y="108" text-anchor="middle" font-size="15" class="on-color">（整個 App 期間）</text>
+          <rect x="340" y="40" width="200" height="90" class="fill-surface stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+          <text x="440" y="78" text-anchor="middle" font-size="17" font-weight="900">已關閉的視窗</text>
+          <text x="440" y="108" text-anchor="middle" font-size="15">回收不了</text>
+          <path d="M220 85 H340" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="160" text-anchor="middle" font-size="15">事件握著參考 → 視窗關了還留在記憶體</text>
+        </svg>`, caption: '訂閱者比發布者短命時，在關閉或 Dispose 時記得 -=。' },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'event', label: '適合用事件' }, { id: 'call', label: '直接呼叫方法就好' }],
+          items: [
+            { text: '檔案下載完成時，不確定有幾個地方想知道', answer: 'event', why: '一對多、發布者不該認識訂閱者。' },
+            { text: '計算訂單總價', answer: 'call', why: '需要回傳值，而且呼叫者就是要結果的人。' },
+            { text: '使用者按下按鈕', answer: 'event', why: 'UI 框架的典型事件。' },
+            { text: '把一筆資料存進資料庫', answer: 'call', why: '一對一、需要知道成功與否。' },
+          ],
+        } },
+      ],
+      tryit: {
+        q: ['補完：讓 Timer 每次 Tick 都觸發 Elapsed 事件。'],
+        draft: 'class Timer\n{\n    public ____ EventHandler? Elapsed;\n    public void Tick() => Elapsed____(this, EventArgs.Empty);\n}',
+        answer: ['`public event EventHandler? Elapsed;`、`Elapsed?.Invoke(this, EventArgs.Empty)`。', '用 `?.Invoke` 是因為沒有任何訂閱者時事件是 null。'],
+      },
+    },
+    mistakes: [
+      { wrong: '直接 `Paid(this, e);` 觸發事件。', why: '沒有訂閱者時是 null，拋 NullReferenceException。', right: '`Paid?.Invoke(this, e);`' },
+      { wrong: '訂閱時用 lambda，取消時再寫一次同樣的 lambda。', why: '兩個 lambda 是不同的委派實例，-= 移除不了。', right: '要取消的訂閱用具名方法，或把 lambda 存進變數。' },
+      { wrong: '訂閱者的處理方法拋例外，結果後面的訂閱者都沒收到。', why: '事件依序同步呼叫，一個拋例外就中斷。', right: '處理方法內自行 try/catch，或發布端逐一呼叫 `GetInvocationList()`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在宣告事件的類別「外面」，可以對事件做什麼？', options: [
+        { text: '只能 += 和 -=', correct: true, why: 'event 限制外部只能訂閱與取消。' },
+        { text: '可以 = 指定新的處理方法', why: '外部用 = 是編譯錯誤 CS0070。' },
+        { text: '可以直接呼叫觸發', why: '只有宣告的類別能觸發。' },
+        { text: '可以讀出所有訂閱者', why: '外部無法存取事件背後的委派。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`b.Clicked += () => Log();` 之後 `b.Clicked -= () => Log();`，結果？（假設事件型別是 Action）', options: [
+        { text: '取消無效，原本的訂閱還在', correct: true, why: '兩個 lambda 是不同的委派實例。' },
+        { text: '成功取消，C# 會比較兩個 lambda 的內容', why: 'C# 不會比較 lambda 的內容。' },
+        { text: '編譯錯誤', why: '語法合法，只是沒有效果。' },
+        { text: '拋出例外', why: '移除不存在的處理方法不會拋例外。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在做一個「溫度感測器」類別，溫度超過 30 度要通知：亮紅燈、發 LINE、寫日誌，未來可能還會加。用事件設計會是什麼樣子？'], answer: [
+        'Sensor 宣告 `public event EventHandler<TemperatureEventArgs>? Overheated;`，在讀到超過 30 度時 `Overheated?.Invoke(this, new(temp))`。',
+        '紅燈、LINE、日誌各自訂閱。Sensor 完全不知道它們存在，未來加「關掉暖氣」只要再多一個訂閱者，Sensor 不用改。',
+      ] },
+    ],
+    keypoints: [
+      '事件 = 加了保護的委派：外面只能 += 與 -=，只有自己能觸發。',
+      '觸發用 `?.Invoke`，沒有訂閱者時才不會拋例外。',
+      '短命的訂閱者記得 -=；要取消的訂閱別用匿名 lambda。',
+    ],
+    sources: ['cs-events', 'cs-delegates'],
+  },
+
+  '6-3': {
+    goals: [
+      '寫一個擴充方法，讓既有型別多一個方法',
+      '用 C# 14 的 extension 區塊寫擴充屬性',
+      '判斷什麼時候適合用擴充、什麼時候不適合',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 6-2）為什麼取消訂閱不建議用匿名 lambda？', options: [
+        { text: '另一個寫法相同的 lambda 是不同實例，-= 移除不了', correct: true, why: '委派相等比較的是實例與目標方法。' },
+        { text: 'lambda 不能訂閱事件，只有具名方法能用 += 加入', why: 'lambda 可以訂閱，只是不好取消。' },
+        { text: 'lambda 執行比較慢', why: '效能不是問題所在。' },
+        { text: '-= 只能用在 static 方法', why: '任何方法都可以。' },
+      ] },
+    ],
+    analogy: {
+      text: ['擴充像幫手機加一個保護殼，殼上多了支架和卡夾：手機本身沒被拆開改造，但用起來好像它本來就有支架。'],
+      limit: ['保護殼可以裝很多個功能，但碰不到手機內部；擴充成員也一樣，只能用型別的公開成員，讀不到 private 欄位。而且同名時，型別自己的方法優先，擴充會被忽略。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="擴充成員的兩種寫法：傳統擴充方法在靜態類別裡用 this 參數；C# 14 的 extension 區塊把接收者寫在區塊開頭，裡面可以放方法、屬性與靜態成員；呼叫端看起來都像型別本身的成員">
+        <rect x="10" y="20" width="260" height="150" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="140" y="52" text-anchor="middle" font-size="17" font-weight="900" class="on-color">傳統（C# 3 起）</text>
+        <text x="25" y="92" font-size="14" class="on-color mono">static bool IsBlank(</text>
+        <text x="25" y="116" font-size="14" class="on-color mono">  this string s) =&gt; …</text>
+        <text x="25" y="150" font-size="14" class="on-color">只能寫方法</text>
+        <rect x="290" y="20" width="260" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="420" y="52" text-anchor="middle" font-size="17" font-weight="900" class="on-color">extension 區塊（C# 14）</text>
+        <text x="305" y="92" font-size="14" class="on-color mono">extension(string s) {</text>
+        <text x="305" y="116" font-size="14" class="on-color mono">  bool IsBlank =&gt; … }</text>
+        <text x="305" y="150" font-size="14" class="on-color">方法、屬性、靜態成員</text>
+        <path d="M270 95 H290" class="stroke-ink" stroke-width="4"/>
+        <rect x="130" y="200" width="300" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="232" text-anchor="middle" font-size="17" class="mono">"  ".IsBlank  // 呼叫端</text>
+        <path d="M140 170 V185 H280 V200 M420 170 V185 H280" class="stroke-ink" stroke-width="3" fill="none"/>
+      </svg>`,
+      caption: '兩種寫法可以並存；新程式要寫擴充屬性或靜態擴充時才需要 extension 區塊。',
+      blocks: [
+        '[[擴充方法]]讓你替無法修改的型別（string、別人的函式庫）加方法。C# 14 的[[擴充區塊]]把接收者宣告在區塊開頭，還能加入擴充屬性、靜態擴充方法與運算子。LINQ 的 Where、Select 就是 IEnumerable 的擴充方法。',
+        { type: 'code', lang: 'csharp', title: 'StringExtensions.cs（C# 14）', code: 'public static class StringExtensions\n{\n    extension(string s)\n    {\n        public bool IsBlank => string.IsNullOrWhiteSpace(s);\n        public string Truncate(int max) => s.Length <= max ? s : s[..max] + "…";\n    }\n}\n\nConsole.WriteLine("   ".IsBlank);            // True\nConsole.WriteLine("Hello world".Truncate(5)); // Hello…' },
+      ],
+    },
+    define: [
+      { term: '擴充方法', en: 'extension method', def: '定義在靜態類別中、第一個參數加 `this` 的靜態方法；呼叫時像實例方法。', example: '`public static int WordCount(this string s) => s.Split(\' \').Length;`' },
+      { term: '擴充區塊', en: 'extension block', def: 'C# 14：`extension(接收者) { 成員 }`；接收者不具名時（`extension(string)`）只能放靜態擴充成員。', example: '`extension(IEnumerable<int> seq) { public int Total => seq.Sum(); }`' },
+      { term: '擴充屬性', en: 'extension property', def: 'C# 14 新增：像屬性一樣讀取的擴充成員，不能有背後欄位（不能存狀態）。', example: '`list.IsEmpty`' },
+    ],
+    examples: {
+      compare: [{
+        title: '判斷集合是否為空',
+        kind: '工具類別 vs 擴充屬性',
+        code: true,
+        badLabel: '靜態工具方法',
+        goodLabel: 'C# 14 擴充屬性',
+        bad: 'if (CollectionHelper.IsEmpty(orders)) …',
+        good: 'if (orders.{{1:IsEmpty}}) …\n\n// 定義：\nextension<T>(IEnumerable<T> source)\n{\n    public bool IsEmpty => !source.Any();\n}',
+        badResult: '要記得工具類別的名字，讀起來是「誰對誰做什麼」倒過來。',
+        goodResult: '讀起來就像 orders 本身的屬性，IDE 打點就看得到。',
+        why: ['擴充屬性不能存資料，只能根據接收者計算'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'int[] scores = [80, 95, 60];\nConsole.WriteLine(scores.Average());\nConsole.WriteLine(scores.Spread);\nConsole.WriteLine(42.IsEven);\n\npublic static class Ext\n{\n    extension(int[] a)\n    {\n        public int Spread => a.Max() - a.Min();\n    }\n    extension(int n)\n    {\n        public bool IsEven => n % 2 == 0;\n    }\n}',
+          predict: { q: '`scores.Spread` 會印出什麼？', options: ['35', '95', '編譯錯誤：陣列沒有 Spread'], answer: 0 },
+          output: '78.33333333333333\n35\nTrue',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'yes', label: '適合寫成擴充' }, { id: 'no', label: '不適合' }],
+          items: [
+            { text: '幫 string 加 `ToSlug()`（轉成網址用的格式）', answer: 'yes', why: '無法修改 string，而且是純計算、沒有副作用。' },
+            { text: '幫自己寫的 Order 類別加 `CalculateTotal()`', answer: 'no', why: '自己的類別直接加方法就好，擴充反而分散了程式碼。' },
+            { text: '幫 IEnumerable<T> 加 `IsEmpty`', answer: 'yes', why: '介面不能加實作，擴充讓所有實作都能用。' },
+            { text: '幫 object 加 `SaveToDatabase()`', answer: 'no', why: '每個型別都多一個不相關的方法，IDE 提示被汙染，而且有副作用。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="名稱衝突時的優先順序：型別本身的成員優先於擴充成員，擴充同名時會被忽略">
+          <rect x="20" y="40" width="220" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="130" y="75" text-anchor="middle" font-size="17" font-weight="900" class="on-color">型別自己的成員</text>
+          <text x="130" y="103" text-anchor="middle" font-size="15" class="on-color">優先</text>
+          <rect x="320" y="40" width="220" height="80" class="fill-surface stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+          <text x="430" y="75" text-anchor="middle" font-size="17" font-weight="900">同名的擴充</text>
+          <text x="430" y="103" text-anchor="middle" font-size="15">被忽略</text>
+          <path d="M240 80 H320" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="155" text-anchor="middle" font-size="15">函式庫升級後新增同名方法，你的擴充就默默失效</text>
+        </svg>`, caption: '替別人的型別取擴充名稱時，避開它未來可能會加的通用名字。' },
+      ],
+      tryit: {
+        q: ['用 extension 區塊幫 DateTime 加一個 `IsWeekend` 擴充屬性：'],
+        draft: 'public static class DateExt\n{\n    ____(DateTime d)\n    {\n        public bool IsWeekend => d.DayOfWeek is DayOfWeek.Saturday ____ DayOfWeek.Sunday;\n    }\n}',
+        answer: ['`extension(DateTime d)`、`or`。', '擴充區塊必須放在非巢狀、非泛型的 static class 裡；用的時候要有對應的 using 命名空間。'],
+      },
+    },
+    mistakes: [
+      { wrong: '擴充區塊寫在一般 class 裡。', why: '擴充成員必須宣告在頂層的 static class。', right: '`public static class XxxExtensions { extension(...) { … } }`' },
+      { wrong: '想用擴充屬性「存」一個值，例如 `user.Tag = "VIP"`。', why: '擴充成員不能新增欄位，沒有地方存。', right: '真的要附加資料，用 ConditionalWeakTable 或改設計（包一層類別）。' },
+      { wrong: '擴充方法寫好了卻呼叫不到。', why: '擴充所在的命名空間沒有 using。', right: '加 `using 命名空間;`，或放在全域 using。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'C# 14 的 extension 區塊比傳統擴充方法「多」了什麼能力？', options: [
+        { text: '可以寫擴充屬性與靜態擴充成員', correct: true, why: '傳統寫法只能寫實例擴充方法。' },
+        { text: '可以讀取型別的 private 欄位', why: '擴充成員仍只能用公開成員。' },
+        { text: '可以在擴充裡新增欄位存資料', why: '擴充仍然不能有狀態。' },
+        { text: '可以覆寫型別原本的方法', why: '型別自己的成員永遠優先。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'string 已經有 `Trim()`，你又寫了一個同名同參數的擴充 `Trim()`，`" a ".Trim()` 會呼叫哪個？', options: [
+        { text: 'string 自己的 Trim', correct: true, why: '實例成員優先於擴充。' },
+        { text: '你的擴充 Trim', why: '擴充不會蓋過原本的成員。' },
+        { text: '編譯錯誤：名稱衝突', why: '不會報錯，只是擴充被忽略。' },
+        { text: '兩個都會執行', why: 'C# 只會選一個。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['LINQ 的 `Where` 為什麼要設計成 IEnumerable<T> 的擴充方法，而不是寫在 List、陣列等每個類別裡？'], answer: [
+        'IEnumerable<T> 是介面，在 C# 8 以前介面不能有實作；就算現在可以，在介面加成員也會影響所有實作者。',
+        '寫成擴充方法，任何實作 IEnumerable<T> 的型別（包括你自己寫的）自動擁有 Where、Select，而且 System.Linq 只要寫一次。',
+      ] },
+    ],
+    keypoints: [
+      '擴充讓你替改不了的型別加成員，呼叫時像它本來就有。',
+      'C# 14 的 extension 區塊還能寫擴充屬性與靜態擴充。',
+      '型別自己的成員優先；擴充不能存資料、不能讀 private。',
+    ],
+    sources: ['cs-extension', 'cs-whatsnew-14'],
+  },
+});
+</script>
