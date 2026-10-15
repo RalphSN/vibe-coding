@@ -129,7 +129,7 @@ defineLessons({
         { text: "`typeof data === 'object'`", why: 'text 是 `"null"` 或 `"[]"` 時也會通過，讀 theme 可能拋錯或讀到 undefined。' },
         { text: "`data !== null && typeof data === 'object' && !Array.isArray(data)`", correct: true, why: '同時排除 null 與陣列，只剩一般物件。' },
         { text: "`data instanceof Array === false`", why: 'null、數字、字串也都不是陣列，這個條件幾乎什麼都放行。' },
-        { text: "`data != undefined`", why: '只排除了 null 和 undefined，陣列、字串、數字都會通過。' },
+        { text: "`typeof data === 'object' && data !== undefined && data.length === undefined`", why: '只排除了 null 和 undefined，陣列、字串、數字都會通過。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['同事說：「我們用 TypeScript，`data` 的型別寫成 `Settings`，所以不用檢查。」你會怎麼說服他在讀設定檔時加上執行期檢查？'], answer: [
         'TypeScript 的型別只在編譯時存在，`JSON.parse` 的結果在執行時可能是任何東西：使用者改壞的檔案、舊版格式、null。',
@@ -274,7 +274,7 @@ defineLessons({
         { text: '對 undefined 讀了屬性', correct: true, why: '點的左邊是 undefined，任何屬性都讀不到。' },
         { text: '要讀的屬性名稱拼錯了', why: '拼錯只會讀到 undefined，不會拋錯；拋錯的是「對 undefined 再往下讀」。' },
         { text: '用到的變數沒有先宣告', why: '沒宣告的名字會是 ReferenceError。' },
-        { text: '語法寫錯', why: '語法錯誤是 SyntaxError，而且在執行前就擋下。' },
+        { text: '程式有語法錯誤，引擎讀不懂這一行程式碼', why: '語法錯誤是 SyntaxError，而且在執行前就擋下。' },
       ] },
     ],
     analogy: {
@@ -487,7 +487,7 @@ defineLessons({
     practice: [
       { level: '回想', type: 'mc', q: '下列哪一個「不會」得到 undefined？', options: [
         { text: '`JSON.parse("null")`', correct: true, why: '這會得到 null，是 JSON 裡明確寫的值。' },
-        { text: '`let x; x`', why: '宣告了沒給值，是 undefined。' },
+        { text: '`let x; x`（宣告了但沒有指定值）', why: '宣告了沒給值，是 undefined。' },
         { text: '`[1, 2][5]`', why: '超出範圍的元素是 undefined。' },
         { text: '沒有 return 的函式的回傳值', why: '函式沒有 return 時回傳 undefined。' },
       ] },

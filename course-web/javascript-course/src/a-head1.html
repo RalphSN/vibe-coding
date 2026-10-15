@@ -146,6 +146,8 @@ li + li { margin-top: var(--sp-1); }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 code, kbd, pre { font-family: var(--font-mono); }
+/* JetBrains Mono 的連字會把 === 畫成一條長符號；這門課要讀者分辨 == 與 ===，所以程式碼一律關掉連字 */
+code, kbd, pre, textarea, .mono, [class*="mono"] { font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
 :not(pre) > code {
   font-size: .9em;
   background: var(--highlight);
@@ -562,7 +564,9 @@ main:focus { outline: none; }
    6. 首頁、模組頁、單元頁
    ========================================================================== */
 .hero { position: relative; padding: var(--sp-5) 0 var(--sp-7); }
-.hero h1 { font-family: var(--font-display); font-size: calc(var(--fs-display) * var(--fit, 1)); line-height: 1.1; letter-spacing: -.01em; }
+.hero-grid > div:first-child { container-type: inline-size; }
+/* 字級 150% 時左欄只剩約 380px，最長的詞組「它會印出什麼」要放得下一行，所以用欄寬設上限 */
+.hero h1 { font-family: var(--font-display); font-size: min(calc(var(--fs-display) * var(--fit, 1)), 14cqi); line-height: 1.1; letter-spacing: -.01em; }
 .hero h1 .hl { display: inline-block; background: var(--primary); color: var(--on-color); padding: 0 .15em; border: var(--bw-lg) solid var(--on-color); transform: rotate(-1.5deg); }
 .hero h1 .hl2 { display: inline-block; background: var(--accent); color: var(--on-color); padding: 0 .15em; border: var(--bw-lg) solid var(--on-color); transform: rotate(1deg); }
 .hero .lead { max-width: 36rem; margin-top: var(--sp-5); font-size: 1.125rem; }

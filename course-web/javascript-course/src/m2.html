@@ -22,7 +22,7 @@ defineLessons({
       { level: '回想', type: 'mc', q: '（回顧 1-1）下列哪一個是物件，而不是原始值？', options: [
         { text: '`[80, 90]`', correct: true, why: '陣列是物件，可以被修改。' },
         { text: '`"80, 90"`', why: '這是字串，原始值。' },
-        { text: '`80`', why: '這是 number，原始值。' },
+        { text: '`Number("80")` 的結果', why: '這是 number，原始值。' },
         { text: '`null`', why: 'typeof null 雖然是 object，但 null 是原始值。' },
       ] },
     ],
@@ -141,8 +141,8 @@ defineLessons({
       { level: '應用', type: 'mc', q: '（回顧 2-1）`const list = []; list = [1];` 會怎樣？', options: [
         { text: '拋出 TypeError：Assignment to constant variable.', correct: true, why: '`list = [1]` 是重新指定，const 不允許。' },
         { text: '正常執行，list 變成 [1]', why: '這不是修改內容，而是換掉整個陣列。' },
-        { text: '拋出 ReferenceError', why: 'list 已經宣告過，名字存在。' },
-        { text: '只有在嚴格模式才會報錯', why: '對 const 重新指定，任何模式都會拋錯。' },
+        { text: '拋出 ReferenceError：Cannot access list before initialization', why: 'list 已經宣告過，名字存在。' },
+        { text: '只有在嚴格模式才會報錯，一般 script 會靜靜忽略這次指定', why: '對 const 重新指定，任何模式都會拋錯。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 1-4）`let x;` 之後讀 x，得到什麼？', options: [
         { text: '`undefined`', correct: true, why: '宣告了但沒給值，就是 undefined。' },
@@ -235,8 +235,8 @@ defineLessons({
       { level: '應用', type: 'mc', q: '`run(); const run = () => 1;` 的錯誤訊息最可能是？', options: [
         { text: "`Cannot access 'run' before initialization`", correct: true, why: 'run 是 const，呼叫時名字存在但在死區。' },
         { text: '`run is not defined`', why: '名字已經登記，所以不是 not defined。' },
-        { text: '`run is not a function`', why: '還沒走到「拿到值再呼叫」那一步，讀取就先失敗了。' },
-        { text: '不會出錯，回傳 1', why: '只有函式宣告會整個提升，箭頭函式不會。' },
+        { text: '`TypeError: Assignment to constant variable.`', why: '還沒走到「拿到值再呼叫」那一步，讀取就先失敗了。' },
+        { text: '不會出錯，const 宣告的箭頭函式也會整個提升', why: '只有函式宣告會整個提升，箭頭函式不會。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['為什麼語言設計者要讓 let／const 在宣告前「報錯」，而不是像 var 一樣給 undefined？從除錯的角度說說看。'], answer: [
         '給 undefined 的話，錯誤會「安靜地」往下傳：程式拿著 undefined 繼續跑，可能很多行之後才在別的地方爆掉，離真正的原因很遠。',
@@ -261,8 +261,8 @@ defineLessons({
       { level: '應用', type: 'mc', q: '（回顧 2-2）`console.log(n); let n = 1;` 的錯誤種類是？', options: [
         { text: 'ReferenceError（before initialization）', correct: true, why: 'n 已經登記但還在暫時性死區。' },
         { text: 'TypeError', why: 'TypeError 是對錯的型別做事；這裡是名字還不能用。' },
-        { text: 'SyntaxError', why: '語法完全正確。' },
-        { text: '沒有錯，印出 undefined', why: '那是 var 的行為。' },
+        { text: "SyntaxError: Identifier 'n' has already been declared", why: '語法完全正確。' },
+        { text: '沒有錯，let 和 var 一樣會先印出 undefined 再指定為 1', why: '那是 var 的行為。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 1-3）`"Hi".toUpperCase()` 之後，原本的 "Hi" 變成什麼？', options: [
         { text: '還是 "Hi"', correct: true, why: '字串不能被修改，方法回傳的是新字串。' },
@@ -342,7 +342,7 @@ defineLessons({
         { text: '目前的區塊 → 外層函式 → 模組', correct: true, why: '由內往外，找到第一個就停。' },
         { text: '模組 → 外層函式 → 目前的區塊', why: '方向反了；從最近的那一層開始找。' },
         { text: '呼叫這個函式的那段程式', why: '查找由程式碼寫的位置決定，與呼叫的位置無關。' },
-        { text: '全部同時找，取最後宣告的', why: '是依序找、找到就停。' },
+        { text: '全部作用域同時找，取最後一個被宣告的同名變數', why: '是依序找、找到就停。' },
       ] },
       { level: '應用', type: 'mc', q: '`var total = 100; function d(v) { if (v) { var total = 80; } return total; }`，`d(false)` 的結果是？', options: [
         { text: '`undefined`', correct: true, why: '函式內的 var total 被提升到整個函式，遮蔽外面的 total，沒進 if 就還是 undefined。（Node.js 22.13 實測）' },

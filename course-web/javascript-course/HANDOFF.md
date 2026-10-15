@@ -1,7 +1,7 @@
 # 交接文件：JavaScript 著作（互動課程網站）
 
-> 更新：2026-10-15
-> 一句話現況：**38 課內容全部完成並在 Chrome 驗證，書櫃顯示 38/38；剩第 4 階段驗證（10 種寬度、深色模式、對齊、得獎等級迴圈）與 Safari 實測。**
+> 更新：2026-10-15（第 4 階段）
+> 一句話現況：**38 課完成，第 4 階段自動與手動檢查在 Chrome 全部通過；剩 Safari 實測與效能（Core Web Vitals）量測。**
 
 ## 0. 新 session 的開場 prompt（直接貼）
 
@@ -52,8 +52,8 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - [x] 模組 6（6-1～6-4，含 loopsim、racer）、模組 7（7-1～7-4）
 - [x] 模組 8（8-1～8-4）
 - [x] 模組 9：9-1 期末實作、9-2～9-4 reference 版型
-- [ ] 第 4 階段驗證（verification.md 全部）
-- [ ] 得獎等級自我檢查迴圈
+- [x] 第 4 階段驗證（verification.md，Safari 除外）
+- [x] 得獎等級自我檢查迴圈 2 輪（見第 5 節）
 - [x] 兩個書櫃的 `readyLessons` 改成 38
 
 ## 3. 資料格式（本課新增）
@@ -92,6 +92,25 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 
 ## 5. 已知問題
 
+### 第 4 階段結果（2026-10-15，Chrome 內建瀏覽器；沒有 Playwright，檢查程式直接在瀏覽器執行）
+
+| 項目 | 結果 |
+|---|---|
+| 自動檢查 | 38 課、0 console 錯誤、0 缺漏術語、0 溢出 |
+| 選擇題 | 0 個問題；正確答案是最長選項（含並列）11/150＝7.3% |
+| SVG 端點與文字 | 73 張圖，0 懸空端點、0 文字問題 |
+| 10 種寬度 | 0 水平溢出；頂部列 0 重疊、圖示 44×44 |
+| 對齊（1280、1920） | 頂部列＝側欄＝把手；捲到底側欄＝把手＝頁尾；同一條線 |
+| 對比 | 淺色與深色最低 7.13（危險按鈕、5-2 的 var 標籤） |
+| 換行 | 375／768／1280 × 100%／150%，0 個孤行、拆詞、不平衡 |
+| 互動 | 把手鍵盤與雙擊、術語 popup 與 Esc、← → 換課、/ 搜尋、真實點擊複製、測驗與進度儲存、回書櫃 |
+
+得獎等級迴圈：第 1 輪 設計 8／易用 6／創意 8／內容 8（手機圖字 8px、=== 連字、150% 標題斷詞）→ 修正後第 2 輪 8／8／8／8。易用的效能沒有量（index.html 約 600 KB 單檔），列為待辦。
+
+- 手機上的圖用「放大看」按鈕開全螢幕檢視（最小字 ≥ 12.5px）。內嵌的圖仍然約 8px，嚴格來說不符 content-rules「375px 時 ≥ 12px」；使用者 2026-10-15 選擇這個做法，不重畫 73 張圖。
+- 程式碼關掉 JetBrains Mono 的連字，=== 才不會畫成一條長符號。
+- 字級 150% 測試要用網站的字級按鈕，不能只改 --font-scale（會漏掉 data-large-text、側欄加寬與 fit）。
+
 - 2026-10-15 模組 8–9：0 個語法錯誤；8-x 與 9-1 每課 2 張 SVG（9-2～9-4 reference 頁各 1 張）；1280 與 360px 頁面無水平溢出；runner 輸出與 predict 一致。
 - 寫課文的陷阱：字串裡不能出現 `<script>`（build 檢查會切錯），也不能出現 `</script>`（會提早結束頁面的 script），要寫成 `<\/script>`。
 - runner 的沙盒沒有 allow-forms：`requestSubmit()` 會被擋，8-3 改用 `dispatchEvent(new Event('submit'))`。
@@ -103,7 +122,7 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 
 ## 6. 下一步
 
-第 4 階段驗證：照 skill 的 verification.md 跑 10 種寬度、深色模式、對齊量測，再跑得獎等級自我檢查迴圈（至少 2 輪）；Safari 請使用者在 Mac 看。先在 Node.js 實測每段範例的輸出，再寫課文。做完更新兩個書櫃的 `readyLessons`、跑下面的檢查流程並回報。
+請使用者在 Mac 的 Safari 走一次：首頁、任一課的 runner（sandbox iframe 的 postMessage）、手機寬度的「放大看」。之後量 Core Web Vitals（Lighthouse）。先在 Node.js 實測每段範例的輸出，再寫課文。做完更新兩個書櫃的 `readyLessons`、跑下面的檢查流程並回報。
 
 ### 每批的檢查流程（2026-10-15 實際使用）
 

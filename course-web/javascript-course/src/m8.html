@@ -58,7 +58,7 @@ defineLessons({
         <text x="425" y="193" text-anchor="middle" font-size="14" class="mono">p</text>
         <rect x="471" y="170" width="64" height="34" class="fill-surface stroke-ink" stroke-width="3"/>
         <text x="503" y="193" text-anchor="middle" font-size="14" class="mono">ul</text>
-        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M425 104 V140 H347 V170 M425 140 V170 M425 140 H503 V170"/></g>
+        <g class="stroke-ink" stroke-width="3" fill="none"><path d="M347 170 V140 H503 V170 M425 104 V170"/></g>
       </svg>`,
       caption: '每個標籤變成樹上的一個[[節點]]；縮排的層級就是父子關係。',
       blocks: [
@@ -92,15 +92,15 @@ defineLessons({
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="DOM 的三個動作：找用 querySelector，改用 textContent 和 classList，加用 createElement 和 append">
           <rect x="10" y="10" width="170" height="180" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
-          <text x="95" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">找</text>
+          <text x="95" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">找元素</text>
           <text x="95" y="110" text-anchor="middle" font-size="14" class="mono on-color">querySelector</text>
           <text x="95" y="140" text-anchor="middle" font-size="14" class="mono on-color">querySelectorAll</text>
           <rect x="195" y="10" width="170" height="180" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
-          <text x="280" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">改</text>
+          <text x="280" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">改內容</text>
           <text x="280" y="110" text-anchor="middle" font-size="14" class="mono on-color">textContent</text>
           <text x="280" y="140" text-anchor="middle" font-size="14" class="mono on-color">classList</text>
           <rect x="380" y="10" width="170" height="180" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
-          <text x="465" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">加</text>
+          <text x="465" y="50" text-anchor="middle" font-size="20" font-weight="900" class="on-color">加元素</text>
           <text x="465" y="110" text-anchor="middle" font-size="14" class="mono on-color">createElement</text>
           <text x="465" y="140" text-anchor="middle" font-size="14" class="mono on-color">append</text>
         </svg>`, caption: '大部分 DOM 程式都是這三個動作的組合。' },
@@ -364,7 +364,7 @@ defineLessons({
       { level: '回想', type: 'mc', q: '`el.textContent = \'<b>hi</b>\'` 畫面上顯示？', options: [
         { text: '`<b>hi</b>` 這串文字', correct: true, why: 'textContent 不解析 HTML。' },
         { text: '粗體顯示的 hi 兩個字', why: '那是 innerHTML 的效果。' },
-        { text: 'hi', why: '標籤會原樣顯示出來。' },
+        { text: 'hi（標籤被瀏覽器拿掉，只剩下文字）', why: '標籤會原樣顯示出來。' },
         { text: '什麼都不顯示', why: '文字會正常顯示。' },
       ] },
       { level: '應用', type: 'mc', q: '下列哪一個用來顯示「從 API 拿到的使用者暱稱」是安全的？', options: [
@@ -490,8 +490,8 @@ defineLessons({
       ] },
       { level: '應用', type: 'mc', q: '存進去的 `{ when: new Date() }`，parse 回來後 `when` 是？', options: [
         { text: 'ISO 格式的字串，要自己 `new Date()` 轉回來', correct: true, why: 'JSON 沒有日期型別，stringify 時會變成字串。' },
-        { text: '原本的 Date 物件，可以直接呼叫 getTime()', why: 'JSON.parse 不會自動轉回 Date。' },
-        { text: '時間戳記數字', why: 'stringify 輸出的是 ISO 字串。' },
+        { text: '原本的 Date 物件，可以直接呼叫 getTime() 和 toLocaleString()', why: 'JSON.parse 不會自動轉回 Date。' },
+        { text: '從 1970 年起算的毫秒數字，可以直接比較大小', why: 'stringify 輸出的是 ISO 字串。' },
         { text: 'undefined', why: '屬性還在，只是變成字串。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['你的網站把購物車存在 localStorage。改版後商品的 `price` 從「元」改成「分」（整數）。舊使用者打開網站可能發生什麼？怎麼避免？'], answer: [

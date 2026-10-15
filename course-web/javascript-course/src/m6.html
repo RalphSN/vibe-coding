@@ -38,7 +38,7 @@ defineLessons({
         { text: '出錯時，一層一層正在執行的函式', correct: true, why: '那就是呼叫堆疊的內容，最上面是出錯的那一層。' },
         { text: '這個頁面載入過的所有檔案與順序', why: '只列出呼叫路徑上的函式。' },
         { text: '程式裡所有的變數', why: '堆疊追蹤不列變數。' },
-        { text: '最近執行過的 10 行', why: '它列的是「誰呼叫了誰」，不是行數紀錄。' },
+        { text: '最近執行過的 10 行程式碼，依時間排列', why: '它列的是「誰呼叫了誰」，不是行數紀錄。' },
       ] },
     ],
     analogy: {
@@ -104,7 +104,7 @@ defineLessons({
           <text x="240" y="77" text-anchor="middle" font-size="15" class="on-color">同步迴圈 3 秒（堆疊不空）</text>
           <rect x="450" y="50" width="80" height="40" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
           <text x="490" y="77" text-anchor="middle" font-size="14" class="on-color">點擊</text>
-          <g class="stroke-ink" stroke-width="3"><path d="M44 100 V130"/></g>
+          <g class="stroke-ink" stroke-width="3"><path d="M44 90 V134"/></g>
           <text x="40" y="155" font-size="15">0.1 秒：使用者點了按鈕，回呼進任務佇列</text>
           <text x="40" y="180" font-size="15">3 秒後：堆疊空了，回呼才執行</text>
         </svg>`, caption: '使用者感受到的是「點了沒反應，三秒後突然動了」。' },
@@ -259,8 +259,8 @@ defineLessons({
       { level: '應用', type: 'mc', q: '`Promise.any([失敗, 失敗])` 會怎樣？', options: [
         { text: '以 AggregateError 失敗，裡面收集所有錯誤', correct: true, why: 'any 要至少一個成功；全部失敗就把錯誤收在 errors 陣列裡。' },
         { text: '成功，值是 undefined', why: '沒有任何成功，不會變成成功。' },
-        { text: '以最先發生的那一個錯誤失敗', why: '那是 all 的行為。' },
-        { text: '永遠 pending', why: '全部定案了，any 也會定案。' },
+        { text: '以最先發生的那一個錯誤失敗，其餘錯誤都被丟掉，和 Promise.all 一樣', why: '那是 all 的行為。' },
+        { text: '永遠停在 pending，因為沒有任何一個成功', why: '全部定案了，any 也會定案。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['儀表板要載入「訂單」「庫存」「公告」三份資料，其中公告失敗不影響使用。你會怎麼組合這三個 Promise？'], answer: [
         '用 `Promise.allSettled` 一起發出，再逐一看 status：訂單或庫存失敗就顯示錯誤頁，公告失敗就隱藏公告區塊。',
@@ -370,13 +370,13 @@ defineLessons({
         { text: '一個成功值為 1 的 Promise', correct: true, why: 'async 函式的回傳值會被包成 Promise。' },
         { text: '數字 `1`，和一般函式一樣', why: '要 `await f()` 才拿到 1。' },
         { text: '`undefined`', why: '有 return 1。' },
-        { text: '拋出 SyntaxError', why: '這是合法的寫法。' },
+        { text: '拋出 SyntaxError，async 函式裡不能寫 return', why: '這是合法的寫法。' },
       ] },
       { level: '應用', type: 'mc', q: '`const a = getA(); const b = getB(); await a; await b;`（兩個都約 1 秒）大約花多久？', options: [
         { text: '約 1 秒', correct: true, why: '兩個請求在 await 之前就都發出了，同時進行。' },
         { text: '約 2 秒', why: '那是 `await getA(); await getB();` 的情況。' },
         { text: '0 秒', why: '還是要等請求完成。' },
-        { text: '拋出錯誤', why: '這是合法的寫法，只是失敗處理不如 Promise.all 完整。' },
+        { text: '拋出錯誤，Promise 不能先存進變數再 await', why: '這是合法的寫法，只是失敗處理不如 Promise.all 完整。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['要依序上傳 100 張照片（伺服器限制一次只能一張），同事寫了 `await Promise.all(photos.map(upload))`。會發生什麼？該怎麼寫？'], answer: [
         '100 個請求同時發出，伺服器會拒絕或限流，很多張上傳失敗；而且 all 遇到第一個失敗就整批失敗。',
@@ -402,13 +402,13 @@ defineLessons({
         { text: '先全部發出，再 await Promise.all', correct: true, why: '總時間是最慢的那一個。' },
         { text: '每個請求各寫一行 await，依序等待', why: '總時間是三個相加。' },
         { text: '用 forEach 加 async', why: 'forEach 不會等，你拿不到結果。' },
-        { text: '用 setTimeout 錯開', why: '只會更慢，而且拿不到結果。' },
+        { text: '用 setTimeout 把三個請求錯開，避免互相搶網路', why: '只會更慢，而且拿不到結果。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 6-2）`Promise.race([請求, 計時器])` 能做到什麼？', options: [
         { text: '逾時就先以失敗結束，但原本的請求沒有被取消', correct: true, why: 'race 只是不再等它，請求還在進行。' },
         { text: '逾時就取消請求', why: '要真的取消得用 AbortController。' },
         { text: '兩個都完成才結束', why: '那是 all。' },
-        { text: '請求失敗時自動重試', why: 'race 沒有重試的功能。' },
+        { text: '計時器先到時，自動取消還在進行的請求並重試，不用 AbortController', why: 'race 沒有重試的功能。' },
       ] },
     ],
     analogy: {
@@ -490,9 +490,9 @@ defineLessons({
     practice: [
       { level: '回想', type: 'mc', q: '伺服器回 500，`await fetch(url)` 會？', options: [
         { text: '成功，`res.ok` 是 false', correct: true, why: '有回應就算成功，要自己檢查 ok。' },
-        { text: '拋出錯誤，要用 catch 接住處理', why: '只有網路層面的失敗才會拋。' },
+        { text: '拋出錯誤，要用 try／catch 接住處理才不會中斷', why: '只有網路層面的失敗才會拋。' },
         { text: '自動重試三次', why: 'fetch 不會自動重試。' },
-        { text: '回傳 null', why: '一定回傳 Response 物件。' },
+        { text: '回傳 null，表示伺服器沒有資料', why: '一定回傳 Response 物件。' },
       ] },
       { level: '應用', type: 'mc', q: '`AbortSignal.timeout(50)` 到時間後，fetch 的錯誤名稱是？', options: [
         { text: "`'TimeoutError'`", correct: true, why: '逾時有自己的錯誤名稱，和手動取消分開（Node.js 22.13 實測）。' },

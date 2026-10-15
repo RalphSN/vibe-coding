@@ -24,12 +24,12 @@ defineLessons({
       { level: '應用', type: 'mc', q: '（回顧 4-3）`[1, 2, 3].map((n) => n * 10)` 裡，是誰呼叫了 `(n) => n * 10`？', options: [
         { text: 'map 方法，對每個元素各呼叫一次', correct: true, why: '你把函式交給 map，由 map 決定何時、用什麼引數呼叫。' },
         { text: '你自己，在寫下它的那一刻', why: '寫下箭頭函式只是建立它，沒有呼叫。' },
-        { text: '瀏覽器的事件迴圈', why: 'map 是同步的，當下就呼叫完了。' },
+        { text: '瀏覽器的事件迴圈，等同步程式跑完才呼叫', why: 'map 是同步的，當下就呼叫完了。' },
         { text: '只會呼叫一次，引數是整個陣列', why: '每個元素各呼叫一次。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 2-2）在 `const early = () => 1;` 這行之前呼叫 `early()` 會？', options: [
         { text: '拋出 ReferenceError（暫時性死區）', correct: true, why: 'const 有提升，但在宣告那行之前不能存取。' },
-        { text: '回傳 1', why: '那是函式宣告 `function early() {}` 的行為。' },
+        { text: '回傳 1，因為箭頭函式和函式宣告一樣會整個提升到最上面', why: '那是函式宣告 `function early() {}` 的行為。' },
         { text: '回傳 undefined', why: 'var 才會先是 undefined；而且 undefined 不能被呼叫。' },
         { text: '拋出 SyntaxError', why: '語法沒有錯，是執行期才發生的錯。' },
       ] },
@@ -47,7 +47,8 @@ defineLessons({
         <text x="95" y="180" text-anchor="middle" font-size="15" class="on-color">宣告前就能呼叫</text>
         <rect x="195" y="10" width="170" height="250" class="fill-surface stroke-ink" stroke-width="4"/>
         <text x="280" y="44" text-anchor="middle" font-size="18" font-weight="900">函式運算式</text>
-        <text x="280" y="90" text-anchor="middle" font-size="13" class="mono">const f = function () {}</text>
+        <text x="280" y="82" text-anchor="middle" font-size="14" class="mono">const f =</text>
+        <text x="280" y="104" text-anchor="middle" font-size="14" class="mono">function () {}</text>
         <text x="280" y="150" text-anchor="middle" font-size="15">存在變數裡</text>
         <text x="280" y="180" text-anchor="middle" font-size="15">宣告前不能用</text>
         <rect x="380" y="10" width="170" height="250" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
@@ -149,13 +150,13 @@ defineLessons({
         { text: '`save()` 立刻呼叫了，交出去的是回傳值', correct: true, why: '應該交出函式本身 `save`。' },
         { text: "'click' 要寫成 'onclick'", why: 'addEventListener 用的是不含 on 的事件名稱。' },
         { text: 'save 必須是箭頭函式', why: '一般函式也可以當回呼。' },
-        { text: '沒有錯', why: '載入時就會存檔一次，點擊反而沒反應。' },
+        { text: '沒有錯，addEventListener 會自己判斷要不要呼叫', why: '載入時就會存檔一次，點擊反而沒反應。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 2-3）`let` 宣告的變數，作用範圍是？', options: [
         { text: '它所在的那一對大括號（區塊）', correct: true, why: 'let 和 const 是區塊作用域。' },
         { text: '整個函式', why: '那是 var。' },
         { text: '整個檔案', why: '只有寫在最外層時才是。' },
-        { text: '只有宣告的那一行', why: '整個區塊都看得到。' },
+        { text: '整個檔案，和寫在最外層的 var 一樣', why: '整個區塊都看得到。' },
       ] },
     ],
     analogy: {
@@ -165,7 +166,7 @@ defineLessons({
     model: {
       svg: `<svg viewBox="0 0 560 250" role="img" aria-label="閉包：makeCounter 每呼叫一次就建立一個新的 count，回傳的函式帶著它；c1 與 c2 各有自己的 count">
         <rect x="10" y="10" width="540" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
-        <text x="280" y="48" text-anchor="middle" font-size="17" class="mono">function makeCounter() { let count = 0; return () => ++count; }</text>
+        <text x="280" y="46" text-anchor="middle" font-size="13" class="mono">function makeCounter() { let count = 0; return () => ++count; }</text>
         <rect x="10" y="90" width="265" height="150" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
         <text x="142" y="126" text-anchor="middle" font-size="18" font-weight="900" class="mono on-color">c1 = makeCounter()</text>
         <text x="142" y="170" text-anchor="middle" font-size="16" class="on-color">函式 ＋ 背包 { count }</text>
@@ -266,7 +267,7 @@ defineLessons({
     review: [
       { level: '應用', type: 'mc', q: '（回顧 5-2）閉包記住的是？', options: [
         { text: '變數本身，之後改了也看得到', correct: true, why: '閉包連到變數，不是拍照存值。' },
-        { text: '建立當下的值', why: '這是最常見的誤解。' },
+        { text: '建立當下的值，像拍照一樣存起來', why: '這是最常見的誤解。' },
         { text: '只有全域變數', why: '任何外層的變數都會被記住。' },
         { text: '函式的原始碼', why: '原始碼本來就在，閉包多的是變數環境。' },
       ] },
@@ -481,7 +482,7 @@ defineLessons({
         { text: 'Object.prototype', correct: true, why: 'p、Captain.prototype、Player.prototype 都沒有，往上到 Object.prototype 才找到。' },
         { text: 'p 自己', why: '你沒有在 p 上設定 toString。' },
         { text: 'Player.prototype', why: 'class 裡沒有寫 toString。' },
-        { text: '找不到，是 undefined', why: '幾乎所有物件都從 Object.prototype 繼承 toString。' },
+        { text: '找不到，class 沒有寫 toString 就是 undefined', why: '幾乎所有物件都從 Object.prototype 繼承 toString。' },
       ] },
       { level: '應用', type: 'mc', q: "`Object.hasOwn(p, 'score')` 與 `'score' in p` 分別是？", options: [
         { text: 'false 與 true', correct: true, why: 'score 在原型上：hasOwn 只看自己，in 會往上找。' },

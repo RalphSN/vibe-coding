@@ -26,7 +26,7 @@ defineLessons({
       { level: '應用', type: 'mc', q: '（回顧 3-3）`input.value` 是 "17"，`input.value + 1` 得到？', options: [
         { text: "`'171'`", correct: true, why: '`+` 有一邊是字串就相接。' },
         { text: '`18`', why: '要先 `Number(input.value)` 才會是加法。' },
-        { text: '`NaN`', why: '`+` 遇到字串會相接，不會產生 NaN。' },
+        { text: '`NaN`（字串不能和數字相加）', why: '`+` 遇到字串會相接，不會產生 NaN。' },
         { text: "`'18'`", why: '不會先算 17 + 1；"17" 是字串，直接相接。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 2-1）`const team = {}` 之後 `team.wins = 1` 會怎樣？', options: [
@@ -134,7 +134,7 @@ defineLessons({
         { text: '`const x = [1]; const y = x; x === y`', correct: true, why: 'x 與 y 指向同一個陣列。' },
         { text: '`[1] === [1]`', why: '兩個各自建立的陣列，內容一樣但不是同一個。' },
         { text: '`{} === {}`', why: '每寫一次 `{}` 就建立一個新物件。' },
-        { text: '`[1].toString() === [1]`', why: '左邊是字串，右邊是陣列，型別不同。' },
+        { text: '`[1] === [1].slice()`（slice 回傳的是同一個陣列物件）', why: '左邊是字串，右邊是陣列，型別不同。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['Vue 或 React 裡，你寫了 `state.list.push(item)`，畫面卻沒有更新（或更新得很奇怪）。用這一課的觀念解釋可能的原因，並寫出替代寫法。'], answer: [
         '框架常用「參考有沒有變」判斷資料有沒有變。`push` 改的是同一個陣列，參考沒變，框架可能以為沒有變化（React 尤其如此）。',
@@ -187,7 +187,7 @@ defineLessons({
         <text x="280" y="190" text-anchor="middle" font-size="16" class="on-color">內層：同一個</text>
         <rect x="380" y="10" width="170" height="280" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
         <text x="465" y="46" text-anchor="middle" font-size="20" font-weight="900" class="on-color">深複製</text>
-        <text x="465" y="90" text-anchor="middle" font-size="15" class="mono on-color">structuredClone(a)</text>
+        <text x="465" y="90" text-anchor="middle" font-size="13" class="mono on-color">structuredClone(a)</text>
         <text x="465" y="150" text-anchor="middle" font-size="16" class="on-color">外層：新的</text>
         <text x="465" y="190" text-anchor="middle" font-size="16" class="on-color">內層：新的</text>
       </svg>`,
@@ -291,7 +291,7 @@ defineLessons({
         { text: '沒有複製，新舊物件共用同一個陣列', correct: true, why: '展開只複製一層。' },
         { text: '也複製了一份新的陣列', why: '那是 structuredClone 的行為。' },
         { text: '把陣列轉成字串', why: '展開不會轉型。' },
-        { text: '刪掉陣列', why: '展開不會刪任何東西。' },
+        { text: '把巢狀陣列也展開，變成新物件的好幾個屬性', why: '展開不會刪任何東西。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 3-2）`players.find(…)` 找不到時回傳 undefined，下面哪個寫法安全地讀它的 name？', options: [
         { text: '`players.find(…)?.name`', correct: true, why: '找不到時直接得到 undefined，不拋錯。' },
@@ -383,7 +383,7 @@ defineLessons({
         { text: '`undefined`', correct: true, why: 'forEach 只負責「對每個做事」，永遠回傳 undefined。' },
         { text: '`[2, 4, 6]`', why: '那是 map 的結果。' },
         { text: '`[1, 2, 3]`', why: 'forEach 不回傳原陣列。' },
-        { text: '`6`', why: '那是最後一次回呼的結果，但 forEach 不會回傳它。' },
+        { text: '`6`（最後一次回呼的結果）', why: '那是最後一次回呼的結果，但 forEach 不會回傳它。' },
       ] },
       { level: '應用', type: 'mc', q: '要找出「第一個得分超過 20 的球員的名字」，哪個最合適？', options: [
         { text: '`players.find((p) => p.points > 20)?.name`', correct: true, why: 'find 找到第一個就停，?. 處理找不到的情況。' },
@@ -421,7 +421,7 @@ defineLessons({
         { text: '兩邊都是字串時比字典順序，"1" 在 "9" 前面', correct: true, why: '字串比較從第一個字元開始。' },
         { text: '字串不能比大小', why: '可以比，只是比的是字典順序。' },
         { text: '10 被轉成 1', why: '沒有這種轉換。' },
-        { text: '因為 "9" 比較長', why: '"10" 比 "9" 長，長短不是比較依據。' },
+        { text: '數字字串會先轉成數字再比，但 "10" 轉換失敗變成 NaN', why: '"10" 比 "9" 長，長短不是比較依據。' },
       ] },
     ],
     analogy: {
@@ -528,14 +528,14 @@ defineLessons({
       { level: '應用', type: 'mc', q: '（回顧 4-4）`[3, 1, 2].toSorted()` 之後原陣列是？', options: [
         { text: '`[3, 1, 2]`', correct: true, why: 'toSorted 回傳新陣列，不改原陣列。' },
         { text: '`[1, 2, 3]`', why: '那是 sort 的效果。' },
-        { text: '`[]`', why: '原陣列不會被清空。' },
+        { text: '`[]`（排好的元素被搬到新陣列）', why: '原陣列不會被清空。' },
         { text: '`undefined`', why: '原陣列完全不變。' },
       ] },
       { level: '回想', type: 'mc', q: '（回顧 4-1）兩個內容一樣的物件用 `===` 比較，結果是？', options: [
         { text: 'false，除非它們是同一個物件', correct: true, why: '物件比較的是「是不是同一個」。' },
         { text: 'true，因為內容一樣', why: '`===` 不比內容。' },
         { text: '拋出 TypeError', why: '物件可以用 `===` 比較。' },
-        { text: '看屬性數量決定', why: '屬性數量也不在比較範圍內。' },
+        { text: '屬性數量和每個值都相同時就是 true', why: '屬性數量也不在比較範圍內。' },
       ] },
     ],
     analogy: {
@@ -626,7 +626,7 @@ defineLessons({
         { text: '`new Map()`', correct: true, why: 'Map 的鍵可以是物件，而且不會被轉成字串。' },
         { text: '一般物件 `{}`', why: '元素當鍵會被轉成 "[object HTMLButtonElement]" 這類字串，不同元素撞在一起。' },
         { text: '`new Set()`', why: 'Set 只記得「有沒有」，不能存次數。' },
-        { text: '陣列', why: '要用位置對應元素，查找很麻煩。' },
+        { text: '陣列，用元素在頁面上的順序當索引', why: '要用位置對應元素，查找很麻煩。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['你要做「本週出席統計」：輸入是一串 `{ name, date }` 的打卡紀錄（同一人同一天可能重複打卡）。說出你會用哪些資料結構、各自做什麼。'], answer: [
         '先用 Set 去除重複：把每筆變成 `` `${name}|${date}` `` 這種字串放進 Set，同人同日只會留一筆。',
