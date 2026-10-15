@@ -4240,6 +4240,1027 @@ defineLessons({
 </script>
 <script>
 /* ==========================================================================
+   模組 6：非同步
+   ========================================================================== */
+defineTerms({
+  '事件迴圈': { en: 'event loop', def: '引擎的工作規則：堆疊空了，先清空微任務佇列，再從任務佇列拿一個來做，然後重複。', example: 'setTimeout 的回呼要等同步程式全部跑完。' },
+  '微任務': { en: 'microtask', def: 'Promise 的 then／catch／finally、await 之後的程式、queueMicrotask；每次堆疊清空就全部做完。', example: '比 `setTimeout(fn, 0)` 先執行。' },
+  '任務': { en: 'task, macrotask', def: '計時器、事件、網路回應的回呼；一次只拿一個出來做。', example: '`setTimeout` 的回呼。' },
+  '阻塞': { en: 'blocking', def: '同步程式跑太久，堆疊一直不空，排隊的回呼與畫面更新都動不了。', example: '跑 3 秒的迴圈期間按鈕點不動。' },
+  'Promise': { en: 'Promise', def: '代表「未來才會有的值」的物件：pending（等待中）、fulfilled（成功）、rejected（失敗）三種狀態之一。', example: '`fetch(url)` 立刻回傳一個 Promise。' },
+  'async 函式': { en: 'async function', def: '一律回傳 Promise 的函式；裡面可以用 await 暫停，等 Promise 有結果再繼續。', example: '`async function load() { const res = await fetch(url); }`' },
+  'await': { en: 'await', def: '暫停目前的 async 函式，等右邊的 Promise 有結果；成功拿到值，失敗就在這一行拋出錯誤。', example: '`const data = await res.json();`' },
+  'AbortController': { en: 'AbortController', def: '用來取消 fetch 等非同步工作的控制器；把它的 signal 傳進去，呼叫 abort() 就取消。', example: '`fetch(url, { signal: ac.signal })`' },
+});
+
+const PLAIN_LOOP_CODE = [
+  "console.log('1 同步');",
+  "setTimeout(() => console.log('4 任務'), 0);",
+  "Promise.resolve().then(() => console.log('3 微任務'));",
+  "console.log('2 同步');",
+];
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '預測同步程式、微任務、任務的執行順序',
+      '解釋 `setTimeout(fn, 0)` 為什麼不是「立刻」',
+      '說出長時間的同步程式為什麼會讓畫面卡住',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-2）`for (var i = 0; i < 3; i++) setTimeout(() => console.log(i))` 印出？', options: [
+        { text: '3 3 3', correct: true, why: '回呼在迴圈跑完後才執行，三個共用同一個 var i。' },
+        { text: '0 1 2', why: '那是 let 的結果。' },
+        { text: '0 0 0', why: '回呼讀的是執行當下的 i，不是一開始的值。' },
+        { text: '什麼都不印', why: '計時器到期後一定會執行回呼。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-3）錯誤訊息下方的「堆疊追蹤」列的是？', options: [
+        { text: '出錯時，一層一層正在執行的函式', correct: true, why: '那就是呼叫堆疊的內容，最上面是出錯的那一層。' },
+        { text: '這個頁面載入過的所有檔案與順序', why: '只列出呼叫路徑上的函式。' },
+        { text: '程式裡所有的變數', why: '堆疊追蹤不列變數。' },
+        { text: '最近執行過的 10 行', why: '它列的是「誰呼叫了誰」，不是行數紀錄。' },
+      ] },
+    ],
+    analogy: {
+      text: ['一間只有一位廚師的餐廳。廚師手上的單一次只做一道（[[呼叫堆疊]]）。旁邊有兩個籃子：「插隊籃」放熟客的追加（[[微任務]]），「一般籃」放新來的點單（[[任務]]）。規則是：手上的做完，先把插隊籃整個清空，才從一般籃拿一張。'],
+      limit: ['真的廚師會累、會分心；引擎完全照規則，不會因為某張單很急就中途換手。所以手上那道做太久（[[阻塞]]），兩個籃子裡的單全部卡住。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="事件迴圈：呼叫堆疊正在執行同步程式；堆疊空了之後，先清空微任務佇列（Promise 的 then），再從任務佇列取一個（setTimeout、事件），然後重複">
+        <rect x="10" y="10" width="190" height="260" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+        <text x="105" y="46" text-anchor="middle" font-size="18" font-weight="900" class="on-color">呼叫堆疊</text>
+        <text x="105" y="100" text-anchor="middle" font-size="15" class="on-color">正在做的同步程式</text>
+        <text x="105" y="140" text-anchor="middle" font-size="15" class="on-color">一次只有一件</text>
+        <text x="105" y="220" text-anchor="middle" font-size="15" class="on-color">① 先做完這裡</text>
+        <rect x="220" y="10" width="330" height="120" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="240" y="46" font-size="18" font-weight="900" class="on-color">② 微任務佇列：全部清空</text>
+        <text x="240" y="86" font-size="15" class="mono on-color">then／catch／await 之後</text>
+        <rect x="220" y="150" width="330" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="240" y="186" font-size="18" font-weight="900" class="on-color">③ 任務佇列：只拿一個</text>
+        <text x="240" y="226" font-size="15" class="mono on-color">setTimeout、點擊、網路回應</text>
+      </svg>`,
+      caption: '[[事件迴圈]]：① → ② → ③ → 回到 ①。瀏覽器通常在任務之間更新畫面。',
+      blocks: [
+        { type: 'widget', name: 'loopsim', props: {
+          code: PLAIN_LOOP_CODE,
+          steps: [
+            { line: 0, stack: ['console.log'], micro: [], task: [], out: ['1 同步'], note: '同步程式直接在堆疊上執行。' },
+            { line: 1, stack: ['setTimeout'], micro: [], task: ['() => log(4)'], out: ['1 同步'], note: '`setTimeout` 只是登記；0 毫秒後回呼被放進**任務**佇列，不會馬上執行。' },
+            { line: 2, stack: ['then'], micro: ['() => log(3)'], task: ['() => log(4)'], out: ['1 同步'], note: 'Promise 已經成功，then 的回呼放進**微任務**佇列。' },
+            { line: 3, stack: ['console.log'], micro: ['() => log(3)'], task: ['() => log(4)'], out: ['1 同步', '2 同步'], note: '同步程式繼續跑完。' },
+            { stack: ['() => log(3)'], micro: [], task: ['() => log(4)'], out: ['1 同步', '2 同步', '3 微任務'], note: '堆疊空了：先把微任務佇列清空。' },
+            { stack: ['() => log(4)'], micro: [], task: [], out: ['1 同步', '2 同步', '3 微任務', '4 任務'], note: '微任務清空後，才從任務佇列拿一個。' },
+          ],
+        } },
+      ],
+    },
+    define: [
+      { term: '呼叫堆疊', en: 'call stack', def: '正在執行的函式一層疊一層；JavaScript 一次只有一條。', example: '錯誤的堆疊追蹤就是它。' },
+      { term: '微任務', en: 'microtask', def: 'Promise 相關的回呼；堆疊空了就全部做完。', example: '`.then(fn)`' },
+      { term: '任務', en: 'task', def: '計時器、事件等回呼；一次一個。', example: '`setTimeout(fn, 0)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '處理一大批資料時',
+        kind: '一次做完 vs 分段讓出',
+        code: true,
+        badLabel: '一口氣做完',
+        goodLabel: '分段，中間讓出',
+        bad: 'for (const row of rows) {\n  heavyWork(row);\n}\n// 期間按鈕點不動',
+        good: 'for (let i = 0; i < rows.length; i++) {\n  heavyWork(rows[i]);\n  if (i % 500 === 0) {{1:await new Promise((r) => setTimeout(r))}};\n}',
+        badResult: '堆疊一直不空，點擊、畫面更新都在任務佇列裡等。',
+        goodResult: '每 500 筆讓出一次，讓事件迴圈有空處理點擊與重畫。',
+        why: ['長時間的同步工作會阻塞整個頁面'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          wait: 100,
+          code: "console.log('A');\nsetTimeout(() => console.log('B'), 0);\nPromise.resolve().then(() => console.log('C'));\nqueueMicrotask(() => console.log('D'));\nconsole.log('E');",
+          predict: { q: '印出的順序是？', options: ['A B C D E', 'A E C D B', 'A E B C D'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="阻塞時間軸：使用者在第 100 毫秒點擊，但同步迴圈跑到第 3000 毫秒才結束，點擊的回呼到那時才執行">
+          <rect x="10" y="10" width="540" height="180" class="fill-surface stroke-ink" stroke-width="4"/>
+          <rect x="30" y="50" width="420" height="40" style="fill:var(--danger)" class="stroke-ink" stroke-width="3"/>
+          <text x="240" y="77" text-anchor="middle" font-size="15" class="on-color">同步迴圈 3 秒（堆疊不空）</text>
+          <rect x="450" y="50" width="80" height="40" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+          <text x="490" y="77" text-anchor="middle" font-size="14" class="on-color">點擊</text>
+          <g class="stroke-ink" stroke-width="3"><path d="M44 100 V130"/></g>
+          <text x="40" y="155" font-size="15">0.1 秒：使用者點了按鈕，回呼進任務佇列</text>
+          <text x="40" y="180" font-size="15">3 秒後：堆疊空了，回呼才執行</text>
+        </svg>`, caption: '使用者感受到的是「點了沒反應，三秒後突然動了」。' },
+      ],
+      tryit: {
+        q: ['不執行，寫出印出的順序：'],
+        draft: "setTimeout(() => console.log('t'), 0);\nPromise.resolve()\n  .then(() => console.log('p1'))\n  .then(() => console.log('p2'));\nconsole.log('s');\n// ____",
+        answer: ['`s p1 p2 t`。', 'p1 執行完，p2 的回呼才被放進微任務佇列；但微任務佇列要「清空」才輪到任務，所以 p2 也排在 t 前面。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 `setTimeout(fn, 0)` 會立刻執行 fn。', why: '它只是把 fn 排進任務佇列，要等同步程式與所有微任務都做完。', right: '把 0 毫秒理解成「最快下一輪」，不是「現在」。' },
+      { wrong: '在主執行緒跑幾秒的大迴圈。', why: '期間事件迴圈卡住，頁面無法點擊也不會重畫。', right: '分段讓出，或把重運算交給 Web Worker。' },
+      { wrong: '用「setTimeout 0」去等 Promise 的結果。', why: '順序依賴微任務／任務的規則，換個寫法就壞。', right: '直接 await 那個 Promise。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '堆疊空了之後，事件迴圈先做哪一件？', options: [
+        { text: '把微任務佇列全部清空', correct: true, why: '微任務優先，而且一次清空。' },
+        { text: '從任務佇列依序拿一個出來執行', why: '任務要等微任務清空之後。' },
+        { text: '更新畫面', why: '畫面更新在任務之間，微任務之後。' },
+        { text: '隨機選一個佇列', why: '順序是固定的規則。' },
+      ] },
+      { level: '應用', type: 'mc', q: "`setTimeout(() => log('a'));` 接著 `queueMicrotask(() => log('b'));`，誰先印？", options: [
+        { text: 'b', correct: true, why: 'queueMicrotask 進微任務佇列，比任務先做。' },
+        { text: 'a', why: '寫在前面不代表先執行；它在任務佇列。' },
+        { text: '同時', why: '一條執行緒，不可能同時。' },
+        { text: '看瀏覽器', why: '這是規格明確定義的順序。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['頁面上有一個「匯出 CSV」按鈕，資料有 10 萬筆，按下去整個頁面凍住 5 秒，連 loading 圖示都沒出現。為什麼 loading 也沒出現？'], answer: [
+        '你在同一個點擊處理函式裡先顯示 loading、再跑 5 秒的迴圈。畫面更新要等這個任務結束才會發生，所以 loading 根本沒機會畫出來，迴圈結束時又馬上被隱藏。',
+        '修法：顯示 loading 後先讓出一次（`await new Promise((r) => setTimeout(r))`）再開始，或分段處理、交給 Web Worker。',
+      ] },
+    ],
+    keypoints: [
+      'JavaScript 一條執行緒：同步程式 → 清空微任務 → 拿一個任務 → 重複。',
+      'Promise 的回呼是微任務，比 setTimeout 的任務先執行；`setTimeout(fn, 0)` 不是立刻。',
+      '同步程式跑太久會阻塞點擊與畫面更新。',
+    ],
+    sources: ['mdn-eventloop'],
+  },
+
+  '6-2': {
+    goals: [
+      '說出 Promise 的三種狀態與轉換',
+      '讀懂 then 鏈裡錯誤怎麼往下傳',
+      '從四個組合工具挑出合適的一個',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-1）`Promise.resolve().then(f)` 的 f 什麼時候執行？', options: [
+        { text: '目前的同步程式跑完後，作為微任務', correct: true, why: 'then 的回呼一律非同步，進微任務佇列。' },
+        { text: '馬上，因為 Promise 已經成功了', why: '就算已經成功，then 的回呼也不會同步執行。' },
+        { text: '在 setTimeout 0 之後', why: '微任務比任務先。' },
+        { text: '永遠不會', why: 'Promise 成功後回呼一定會被呼叫。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 5-1）`arr.map(fn)` 和 `arr.map(fn())` 差在哪？', options: [
+        { text: '前者交出函式，後者交出 fn 的回傳值', correct: true, why: '加了括號就是立刻呼叫。' },
+        { text: '沒有差別，兩種都是把 fn 交給 map', why: '括號代表呼叫。' },
+        { text: '後者比較快', why: '後者通常是錯的寫法。' },
+        { text: '前者會改到原陣列', why: 'map 不改原陣列。' },
+      ] },
+    ],
+    analogy: {
+      text: ['在速食店點餐，店員給你一張號碼牌。號碼牌不是餐點，而是「之後會換到餐點」的憑證：可能等一下叫到號（成功），也可能廣播「抱歉，賣完了」（失敗）。你可以先去找位子，叫號了再回來。'],
+      limit: ['號碼牌可以被叫很多次；[[Promise]] 一旦變成成功或失敗，就永遠固定在那個結果，不會再改變。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="Promise 狀態圖：pending 等待中，只能轉成 fulfilled 成功並帶著值，或 rejected 失敗並帶著錯誤；轉換後就不再改變">
+        <rect x="10" y="80" width="170" height="70" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="112" text-anchor="middle" font-size="18" font-weight="900" class="mono on-color">pending</text>
+        <text x="95" y="136" text-anchor="middle" font-size="14" class="on-color">等待中</text>
+        <rect x="350" y="10" width="200" height="80" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="450" y="44" text-anchor="middle" font-size="18" font-weight="900" class="mono on-color">fulfilled</text>
+        <text x="450" y="72" text-anchor="middle" font-size="14" class="on-color">成功，帶著值 → then</text>
+        <rect x="350" y="140" width="200" height="80" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="450" y="174" text-anchor="middle" font-size="18" font-weight="900" class="mono on-color">rejected</text>
+        <text x="450" y="202" text-anchor="middle" font-size="14" class="on-color">失敗，帶著錯誤 → catch</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M180 105 H265 V50 H350 M180 125 H265 V180 H350"/></g>
+      </svg>`,
+      caption: '狀態只會轉換一次；成功或失敗之後都叫「已定案」（settled）。',
+      blocks: [
+        '`then` 會回傳一個**新的** Promise，所以可以串成一條鏈。鏈上任何一步拋出錯誤，後面的 then 都會被跳過，直到遇到 catch；finally 不管成功失敗都會執行。',
+        { type: 'widget', name: 'loopsim', props: {
+          title: 'then 鏈：一步一個微任務',
+          code: ['const p = Promise.resolve(10);', 'p.then((n) => n * 2)', " .then((n) => { throw new Error('壞了 ' + n); })", " .then(() => 'skip')", ' .catch((e) => console.log(e.message));'],
+          steps: [
+            { line: 0, stack: ['（同步）'], micro: [], task: [], out: [], note: 'p 已經是成功狀態，值是 10。' },
+            { line: 1, stack: [], micro: ['n * 2'], task: [], out: [], note: '同步程式只是把整條鏈接好；第一個 then 的回呼進微任務佇列。' },
+            { line: 2, stack: ['throw'], micro: [], task: [], out: [], note: '上一步回傳 20，這一步拿到 20 後拋出錯誤：這一段的 Promise 變成失敗。' },
+            { line: 3, stack: [], micro: [], task: [], out: [], note: "失敗會跳過一般的 then，`'skip'` 那一步完全不執行。" },
+            { line: 4, stack: ['catch'], micro: [], task: [], out: ['壞了 20'], note: 'catch 接住錯誤；之後的鏈又回到成功狀態。' },
+          ],
+        } },
+      ],
+    },
+    define: [
+      { term: 'Promise.all', en: 'Promise.all', def: '全部成功才成功，回傳結果陣列（順序同輸入）；任何一個失敗就立刻失敗。', example: '同時載入三份必要資料。' },
+      { term: 'Promise.allSettled', en: 'Promise.allSettled', def: '等全部定案，回傳每一個的狀態與結果，自己不會失敗。', example: '批次寄信，要知道哪幾封失敗。' },
+      { term: 'Promise.race／any', en: 'Promise.race / any', def: 'race：第一個定案的（成功或失敗）；any：第一個成功的，全部失敗才拋 AggregateError。', example: 'race 做逾時；any 從多個鏡像站拿最快成功的。' },
+    ],
+    examples: {
+      compare: [{
+        title: '錯誤去哪了',
+        kind: '忘了 return vs 有 return',
+        code: true,
+        badLabel: '忘了 return',
+        goodLabel: '回傳內層 Promise',
+        bad: "load()\n  .then((user) => { {{1:loadPosts(user.id)}}; })\n  .then((posts) => render(posts)); // posts 是 undefined",
+        good: "load()\n  .then((user) => {{1:loadPosts(user.id)}})\n  .then((posts) => render(posts));",
+        badResult: '大括號裡沒寫 return，then 回傳 undefined；loadPosts 的失敗也沒人接。',
+        goodResult: '回傳內層 Promise，下一個 then 會等它，錯誤也會沿鏈往下傳。',
+        why: ['then 裡要接下一個非同步工作，一定要回傳它'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          wait: 300,
+          code: "const ok = (v, ms) => new Promise((r) => setTimeout(() => r(v), ms));\nconst no = (m, ms) => new Promise((_, j) => setTimeout(() => j(new Error(m)), ms));\nconsole.log(await Promise.all([ok('a', 50), ok('b', 10)]));\ntry {\n  await Promise.all([ok('a', 50), no('b 失敗', 10)]);\n} catch (e) {\n  console.log('all:', e.message);\n}\nconst settled = await Promise.allSettled([ok('a', 10), no('x', 10)]);\nconsole.log(settled.map((s) => s.status));\nconsole.log(await Promise.race([ok('慢', 80), ok('快', 10)]));\nconsole.log(await Promise.any([no('x', 10), ok('b', 50)]));",
+          predict: { q: '第一行 `Promise.all` 的結果順序是？', options: ["[ 'b', 'a' ]（先完成的在前）", "[ 'a', 'b' ]（照輸入順序）", "'b'（只有最快的）"], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="四個組合工具對照表：all 全部成功才成功；allSettled 等全部結束；race 第一個結束的；any 第一個成功的">
+          <rect x="10" y="10" width="265" height="105" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="44" font-size="18" font-weight="900" class="mono on-color">all</text>
+          <text x="30" y="80" font-size="15" class="on-color">全部成功才成功，一個失敗就失敗</text>
+          <rect x="285" y="10" width="265" height="105" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="305" y="44" font-size="18" font-weight="900" class="mono on-color">allSettled</text>
+          <text x="305" y="80" font-size="15" class="on-color">等全部結束，各自報告</text>
+          <rect x="10" y="125" width="265" height="105" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="159" font-size="18" font-weight="900" class="mono on-color">race</text>
+          <text x="30" y="195" font-size="15" class="on-color">第一個結束的（成敗都算）</text>
+          <rect x="285" y="125" width="265" height="105" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="305" y="159" font-size="18" font-weight="900" class="mono on-color">any</text>
+          <text x="305" y="195" font-size="15" class="on-color">第一個成功的</text>
+        </svg>`, caption: '選擇的關鍵：一個失敗時，你要整批放棄（all），還是想知道每一個的結果（allSettled）？' },
+      ],
+      tryit: {
+        q: ['用 `Promise.race` 寫一個 `withTimeout(promise, ms)`：超過 ms 毫秒就以「逾時」錯誤失敗。'],
+        draft: "function withTimeout(promise, ms) {\n  const timer = new Promise((_, reject) =>\n    setTimeout(() => reject(new Error('逾時')), ms));\n  return ____;\n}",
+        answer: ['`Promise.race([promise, timer])`。', '誰先定案就用誰的結果。注意原本的 promise 並沒有被取消，只是不再有人等它；要真的取消 fetch，用 6-4 的 AbortController。'],
+      },
+    },
+    mistakes: [
+      { wrong: 'then 的大括號裡呼叫了下一個非同步函式，卻沒有 return。', why: '下一步不會等它，它的錯誤也沒人接。', right: '`return loadPosts(id)`，或改用箭頭函式的簡寫。' },
+      { wrong: '每個 then 都寫一個 catch。', why: '錯誤會沿鏈往下傳，只要在能處理的地方接一次。', right: '鏈的最後放一個 catch。' },
+      { wrong: '一個失敗就整批失敗的情況卻用了 all，結果其他成功的資料也拿不到。', why: 'all 在第一個失敗時就放棄。', right: '要每一個的結果就用 allSettled。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Promise 從 fulfilled 還能變成 rejected 嗎？', options: [
+        { text: '不能，定案後就固定了', correct: true, why: '狀態只轉換一次。' },
+        { text: '可以，再呼叫 reject 就會', why: '定案後再呼叫 resolve／reject 都會被忽略。' },
+        { text: '可以，等一段時間後', why: '狀態不會隨時間改變。' },
+        { text: '看是誰建立的', why: '規則對所有 Promise 都一樣。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`Promise.any([失敗, 失敗])` 會怎樣？', options: [
+        { text: '以 AggregateError 失敗，裡面收集所有錯誤', correct: true, why: 'any 要至少一個成功；全部失敗就把錯誤收在 errors 陣列裡。' },
+        { text: '成功，值是 undefined', why: '沒有任何成功，不會變成成功。' },
+        { text: '以最先發生的那一個錯誤失敗', why: '那是 all 的行為。' },
+        { text: '永遠 pending', why: '全部定案了，any 也會定案。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['儀表板要載入「訂單」「庫存」「公告」三份資料，其中公告失敗不影響使用。你會怎麼組合這三個 Promise？'], answer: [
+        '用 `Promise.allSettled` 一起發出，再逐一看 status：訂單或庫存失敗就顯示錯誤頁，公告失敗就隱藏公告區塊。',
+        '另一種寫法：訂單與庫存用 `Promise.all`（缺一不可），公告單獨 `.catch(() => [])` 給預設值後再放進同一個 all。',
+      ] },
+    ],
+    keypoints: [
+      'Promise 有 pending、fulfilled、rejected 三種狀態，定案後不再改變。',
+      'then 回傳新的 Promise；錯誤沿鏈往下傳到 catch；then 裡的非同步工作要 return。',
+      'all 全成功、allSettled 全結束、race 最先結束、any 最先成功。',
+    ],
+    sources: ['mdn-promise'],
+  },
+
+  '6-3': {
+    goals: [
+      '用 async／await 改寫 then 鏈',
+      '分辨「一個一個等」與「同時發出再一起等」',
+      '說出 forEach 搭配 async 為什麼不會等',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-2）三個彼此無關的請求都要成功才能繼續，用哪個？', options: [
+        { text: '`Promise.all`', correct: true, why: '全部成功才成功，結果照輸入順序。' },
+        { text: '`Promise.race`', why: 'race 只取第一個結束的。' },
+        { text: '`Promise.any`', why: 'any 只要一個成功。' },
+        { text: '寫三個 then', why: '可以，但會變成一個等完才做下一個。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 6-1）await 之後的程式，是哪一種排隊？', options: [
+        { text: '微任務', correct: true, why: 'await 底層就是 Promise 的 then。' },
+        { text: '任務', why: '那是 setTimeout、事件。' },
+        { text: '同步，不排隊', why: 'await 一定會讓出，之後才繼續。' },
+        { text: '看等的是什麼', why: '恢復執行一律是微任務。' },
+      ] },
+    ],
+    analogy: {
+      text: ['早上要煮咖啡、烤吐司、煎蛋。一種做法是站在咖啡機前等它好了，才去放吐司，吐司好了才開火煎蛋。另一種是三樣同時開始，再一起等。兩種都會做完，但第二種花的時間只是最慢那一樣。'],
+      limit: ['廚房的事都互不相干才能同時做；如果「煎蛋要用到吐司」，就只能照順序。程式裡也一樣：後一個請求需要前一個的結果時，必須一個一個等。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="兩種時間軸：逐一 await 時三段請求首尾相接，總時間是三段相加；先全部發出再 Promise.all 時三段同時開始，總時間是最長的那段">
+        <rect x="10" y="10" width="540" height="105" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="40" font-size="16" font-weight="900">逐一 await：300 + 200 + 100 = 600 ms</text>
+        <rect x="30" y="58" width="240" height="22" style="fill:var(--m6)" class="stroke-ink" stroke-width="2"/>
+        <rect x="270" y="58" width="160" height="22" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/>
+        <rect x="430" y="58" width="80" height="22" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/>
+        <rect x="10" y="125" width="540" height="105" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="155" font-size="16" font-weight="900">Promise.all：最長的 300 ms</text>
+        <rect x="30" y="170" width="240" height="16" style="fill:var(--m6)" class="stroke-ink" stroke-width="2"/>
+        <rect x="30" y="190" width="160" height="16" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/>
+        <rect x="30" y="210" width="80" height="16" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/>
+      </svg>`,
+      caption: '請求彼此無關時，逐一 await 是白白浪費時間。',
+      blocks: [
+        '[[async 函式]]一律回傳 Promise。[[await]] 讓函式暫停，等 Promise 有結果：成功就拿到值，失敗就在那一行拋出錯誤，可以用一般的 try／catch 接。暫停的只有這個函式，事件迴圈照常處理其他事情。',
+        { type: 'widget', name: 'racer', props: { tasks: [{ name: '使用者', ms: 300 }, { name: '訂單', ms: 200 }, { name: '公告', ms: 100 }] } },
+      ],
+    },
+    define: [
+      { term: 'async 函式', en: 'async function', def: '回傳 Promise；裡面可以 await。', example: '`(async () => 1)()` 是一個 Promise。' },
+      { term: 'await', en: 'await', def: '等 Promise 定案；失敗時在這一行拋錯。', example: '`const user = await getUser();`' },
+      { term: '頂層 await', en: 'top-level await', def: 'ES 模組最外層可以直接 await，不用包在 async 函式裡。', example: '這門課的 `.mjs` 範例。' },
+    ],
+    examples: {
+      compare: [{
+        title: '載入三份無關的資料',
+        kind: '序列 vs 平行',
+        code: true,
+        badLabel: '一個一個等',
+        goodLabel: '同時發出',
+        bad: 'const user = await getUser();\nconst orders = await getOrders();\nconst news = await getNews();',
+        good: 'const [user, orders, news] = {{1:await Promise.all}}([\n  getUser(), getOrders(), getNews(),\n]);',
+        badResult: '總時間是三個相加；後面的請求要等前面的結束才發出。',
+        goodResult: '三個請求同時發出，總時間是最慢的那一個。',
+        why: ['互不依賴的請求先全部發出，再一起等'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          wait: 400,
+          code: "const wait = (ms) => new Promise((r) => setTimeout(() => r(ms), ms));\nlet t = Date.now();\nfor (const ms of [60, 40, 20]) await wait(ms);\nconsole.log('逐一 await 至少 120 ms：', Date.now() - t >= 120);\nt = Date.now();\nawait Promise.all([60, 40, 20].map(wait));\nconsole.log('Promise.all 少於 100 ms：', Date.now() - t < 100);\nconst done = [];\n[30, 10, 20].forEach(async (ms) => { await wait(ms); done.push(ms); });\nconsole.log('forEach 之後：', done.length);",
+          predict: { q: '最後一行 `done.length` 是？', options: ['3', '0', '1'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="forEach 不會等：forEach 呼叫三次 async 回呼，每次拿回一個 Promise 就丟掉，立刻往下執行；for of 搭配 await 會停下來等">
+          <rect x="10" y="10" width="265" height="180" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">forEach(async …)</text>
+          <text x="142" y="96" text-anchor="middle" font-size="15" class="on-color">回呼回傳的 Promise</text>
+          <text x="142" y="124" text-anchor="middle" font-size="15" class="on-color">被 forEach 丟掉</text>
+          <text x="142" y="164" text-anchor="middle" font-size="15" class="on-color">沒有人等</text>
+          <rect x="285" y="10" width="265" height="180" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">for…of ＋ await</text>
+          <text x="417" y="96" text-anchor="middle" font-size="15" class="on-color">每一輪停下來等</text>
+          <text x="417" y="164" text-anchor="middle" font-size="15" class="on-color">要平行就用 Promise.all</text>
+        </svg>`, caption: 'forEach 不管回呼回傳什麼；async 回呼回傳的 Promise 沒有人等。' },
+      ],
+      tryit: {
+        q: ['把下面改成「三個 id 同時查、全部查完再印」：'],
+        draft: "const ids = [1, 2, 3];\nconst users = ____;\nconsole.log(users);",
+        answer: ['`await Promise.all(ids.map((id) => getUser(id)))`。', 'map 先把每個 id 變成一個 Promise（請求已經發出），再用 Promise.all 一起等。結果陣列的順序和 ids 一樣。'],
+      },
+    },
+    mistakes: [
+      { wrong: '互不相干的請求一行一行 await。', why: '每一個都等前一個結束才發出，總時間是相加。', right: '先發出，再 `await Promise.all([...])`。' },
+      { wrong: '`items.forEach(async (x) => { await save(x); })` 後面接著說「全部存好了」。', why: 'forEach 不等回呼回傳的 Promise。', right: '要一個一個存就用 `for…of` 加 await；要同時存就用 `Promise.all(items.map(save))`。' },
+      { wrong: '呼叫 async 函式時忘了 await，拿到的是 Promise 不是值。', why: 'async 函式一律回傳 Promise。', right: '`const user = await getUser()`；在 console 看到 `Promise { <pending> }` 就是這個問題。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`async function f() { return 1; }`，`f()` 的值是？', options: [
+        { text: '一個成功值為 1 的 Promise', correct: true, why: 'async 函式的回傳值會被包成 Promise。' },
+        { text: '數字 `1`，和一般函式一樣', why: '要 `await f()` 才拿到 1。' },
+        { text: '`undefined`', why: '有 return 1。' },
+        { text: '拋出 SyntaxError', why: '這是合法的寫法。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`const a = getA(); const b = getB(); await a; await b;`（兩個都約 1 秒）大約花多久？', options: [
+        { text: '約 1 秒', correct: true, why: '兩個請求在 await 之前就都發出了，同時進行。' },
+        { text: '約 2 秒', why: '那是 `await getA(); await getB();` 的情況。' },
+        { text: '0 秒', why: '還是要等請求完成。' },
+        { text: '拋出錯誤', why: '這是合法的寫法，只是失敗處理不如 Promise.all 完整。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['要依序上傳 100 張照片（伺服器限制一次只能一張），同事寫了 `await Promise.all(photos.map(upload))`。會發生什麼？該怎麼寫？'], answer: [
+        '100 個請求同時發出，伺服器會拒絕或限流，很多張上傳失敗；而且 all 遇到第一個失敗就整批失敗。',
+        '依序的需求用 `for (const p of photos) { await upload(p); }`。如果伺服器允許一次 3 張，可以每 3 張一批用 Promise.all。',
+      ] },
+    ],
+    keypoints: [
+      'async 函式回傳 Promise；await 暫停的只有這個函式，失敗時在那一行拋錯。',
+      '互不相干的請求先全部發出再 `await Promise.all`；有依賴或有限制時才一個一個等。',
+      'forEach 不會等 async 回呼；要等就用 for…of 或 Promise.all。',
+    ],
+    sources: ['mdn-promise'],
+  },
+
+  '6-4': {
+    goals: [
+      '分辨「網路失敗」與「伺服器回錯誤狀態碼」兩種情況',
+      '寫出檢查 `res.ok` 的 fetch 流程',
+      '用 AbortController 與 AbortSignal.timeout 取消請求',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-3）三個互不相干的請求，最快的寫法是？', options: [
+        { text: '先全部發出，再 await Promise.all', correct: true, why: '總時間是最慢的那一個。' },
+        { text: '每個請求各寫一行 await，依序等待', why: '總時間是三個相加。' },
+        { text: '用 forEach 加 async', why: 'forEach 不會等，你拿不到結果。' },
+        { text: '用 setTimeout 錯開', why: '只會更慢，而且拿不到結果。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 6-2）`Promise.race([請求, 計時器])` 能做到什麼？', options: [
+        { text: '逾時就先以失敗結束，但原本的請求沒有被取消', correct: true, why: 'race 只是不再等它，請求還在進行。' },
+        { text: '逾時就取消請求', why: '要真的取消得用 AbortController。' },
+        { text: '兩個都完成才結束', why: '那是 all。' },
+        { text: '請求失敗時自動重試', why: 'race 沒有重試的功能。' },
+      ] },
+    ],
+    analogy: {
+      text: ['寄掛號信。有兩種「沒成功」：一種是郵差根本送不到（地址不存在、路斷了）；另一種是信送到了，對方回信說「我們不受理」。第二種對郵局來說是一次成功的投遞。'],
+      limit: ['寄出去的信收不回來；fetch 可以用 [[AbortController]] 中途取消，取消後 fetch 會以 AbortError 失敗。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="fetch 的分界：網路錯誤、取消、逾時時 fetch 的 Promise 失敗；伺服器有回應時 fetch 成功，再看 res.ok：200 到 299 是 true，404、500 是 false">
+        <rect x="10" y="10" width="265" height="240" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="46" text-anchor="middle" font-size="18" font-weight="900" class="on-color">fetch 失敗（reject）</text>
+        <text x="142" y="100" text-anchor="middle" font-size="15" class="on-color">斷網、DNS 找不到</text>
+        <text x="142" y="134" text-anchor="middle" font-size="15" class="on-color">CORS 被擋</text>
+        <text x="142" y="168" text-anchor="middle" font-size="15" class="on-color">取消（AbortError）</text>
+        <text x="142" y="202" text-anchor="middle" font-size="15" class="on-color">逾時（TimeoutError）</text>
+        <rect x="285" y="10" width="265" height="240" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="46" text-anchor="middle" font-size="18" font-weight="900" class="on-color">fetch 成功（有回應）</text>
+        <text x="417" y="100" text-anchor="middle" font-size="15" class="mono on-color">200～299 → res.ok true</text>
+        <text x="417" y="134" text-anchor="middle" font-size="15" class="mono on-color">404、500 → res.ok false</text>
+        <text x="417" y="190" text-anchor="middle" font-size="15" class="on-color">要自己檢查 res.ok</text>
+      </svg>`,
+      caption: '最常見的漏洞：404 與 500 不會讓 fetch 失敗，不檢查 `res.ok` 就會把錯誤頁面當成資料。',
+      blocks: [
+        { type: 'code', lang: 'javascript', title: '標準流程', code: "async function getJson(url) {\n  const res = await fetch(url, { signal: AbortSignal.timeout(5000) });\n  if (!res.ok) throw new Error(`讀取 ${url} 失敗：HTTP ${res.status}`);\n  return res.json();\n}" },
+      ],
+    },
+    define: [
+      { term: 'res.ok', en: 'Response.ok', def: '狀態碼在 200–299 時是 true。', example: '404 時 fetch 成功，但 `res.ok` 是 false。' },
+      { term: 'AbortController', en: 'AbortController', def: '`ac.signal` 傳給 fetch，`ac.abort()` 取消；fetch 以 AbortError 失敗。', example: '使用者換頁時取消還沒回來的請求。' },
+      { term: 'AbortSignal.timeout', en: 'AbortSignal.timeout', def: '產生一個幾毫秒後自動取消的 signal；逾時的錯誤名稱是 TimeoutError。', example: '`fetch(url, { signal: AbortSignal.timeout(5000) })`' },
+    ],
+    examples: {
+      compare: [{
+        title: '讀取 API',
+        kind: '少一行檢查',
+        code: true,
+        badLabel: '直接 json()',
+        goodLabel: '先檢查 res.ok',
+        bad: 'const res = await fetch(url);\nconst data = await res.json();',
+        good: "const res = await fetch(url);\n{{1:if (!res.ok) throw new Error(`HTTP ${res.status}`);}}\nconst data = await res.json();",
+        badResult: '伺服器回 404 HTML 頁面時，json() 拋出看不懂的 SyntaxError，或把錯誤物件當成資料顯示。',
+        goodResult: '狀態碼不對就丟出清楚的錯誤，交給上層處理。',
+        why: ['fetch 成功只代表「有回應」，不代表「成功」'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          title: '模擬伺服器（用 Response 物件，不連網路）',
+          wait: 400,
+          code: "function fakeFetch(status, ms, signal) {\n  return new Promise((resolve, reject) => {\n    const timer = setTimeout(() => resolve(new Response('{}', { status })), ms);\n    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); });\n  });\n}\nconst res = await fakeFetch(404, 10);\nconsole.log('fetch 成功了，ok =', res.ok, res.status);\nconst ac = new AbortController();\nsetTimeout(() => ac.abort(), 20);\ntry { await fakeFetch(200, 200, ac.signal); } catch (e) { console.log(e.name); }\ntry { await fakeFetch(200, 200, AbortSignal.timeout(20)); } catch (e) { console.log(e.name); }",
+          predict: { q: '伺服器回 404 時，第一行印出的 ok 是？', options: ['拋出錯誤，不會印', 'false', 'true'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="取消流程：建立 AbortController，把 signal 傳給 fetch；使用者離開頁面時呼叫 abort；fetch 以 AbortError 失敗，catch 裡判斷名稱後忽略">
+          <rect x="10" y="10" width="125" height="190" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="72" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">① 建立</text>
+          <text x="72" y="100" text-anchor="middle" font-size="13" class="mono on-color">new Abort-</text>
+          <text x="72" y="120" text-anchor="middle" font-size="13" class="mono on-color">Controller()</text>
+          <rect x="145" y="10" width="125" height="190" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="207" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">② 傳入</text>
+          <text x="207" y="110" text-anchor="middle" font-size="13" class="mono on-color">{ signal }</text>
+          <rect x="280" y="10" width="125" height="190" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="342" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">③ 取消</text>
+          <text x="342" y="110" text-anchor="middle" font-size="13" class="mono on-color">ac.abort()</text>
+          <rect x="415" y="10" width="135" height="190" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="482" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">④ 處理</text>
+          <text x="482" y="110" text-anchor="middle" font-size="13" class="mono on-color">AbortError</text>
+          <text x="482" y="134" text-anchor="middle" font-size="13" class="on-color">通常靜靜忽略</text>
+        </svg>`, caption: '取消是「使用者不要了」，不是真正的錯誤，通常不必顯示錯誤訊息。' },
+      ],
+      tryit: {
+        q: ['補完 catch：取消時什麼都不做，逾時顯示「連線太慢」，其他錯誤顯示原本的訊息。'],
+        draft: "try {\n  await getJson(url);\n} catch (e) {\n  if (e.name === ____) return;\n  showError(e.name === ____ ? '連線太慢' : e.message);\n}",
+        answer: ["第一格 `'AbortError'`，第二格 `'TimeoutError'`。", '用 `e.name` 分辨錯誤種類，而不是比對訊息文字；訊息可能因瀏覽器或語言而不同，名稱是規格定好的。'],
+      },
+    },
+    mistakes: [
+      { wrong: '只用 catch 處理 fetch 錯誤，以為 404、500 也會進 catch。', why: '有回應 fetch 就算成功。', right: '先檢查 `res.ok`，不 ok 就自己 throw。' },
+      { wrong: '搜尋框每打一個字就 fetch，舊的回應比新的晚回來，結果顯示的是舊的。', why: '請求沒有取消，回應的順序不保證。', right: '發新請求前 abort 上一個（每次建立新的 AbortController）。' },
+      { wrong: '沒有逾時，伺服器不回應時 loading 永遠轉。', why: 'fetch 本身沒有預設的短逾時。', right: '加上 `signal: AbortSignal.timeout(毫秒)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '伺服器回 500，`await fetch(url)` 會？', options: [
+        { text: '成功，`res.ok` 是 false', correct: true, why: '有回應就算成功，要自己檢查 ok。' },
+        { text: '拋出錯誤，要用 catch 接住處理', why: '只有網路層面的失敗才會拋。' },
+        { text: '自動重試三次', why: 'fetch 不會自動重試。' },
+        { text: '回傳 null', why: '一定回傳 Response 物件。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`AbortSignal.timeout(50)` 到時間後，fetch 的錯誤名稱是？', options: [
+        { text: "`'TimeoutError'`", correct: true, why: '逾時有自己的錯誤名稱，和手動取消分開（Node.js 22.13 實測）。' },
+        { text: "`'AbortError'`", why: '那是手動呼叫 abort() 的情況。' },
+        { text: "`'TypeError'`", why: 'TypeError 是網路錯誤，例如連線被拒。' },
+        { text: "`'RangeError'`", why: '和範圍無關。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的 Vue 頁面在 `onMounted` 裡 fetch 資料。使用者快速切換頁面時，偶爾跳出「Cannot read properties of null」，因為回應回來時元件已經不在了。用這一課的工具修好它。'], answer: [
+        '在元件裡建立 AbortController，fetch 時傳 signal；`onUnmounted` 時呼叫 `ac.abort()`。',
+        'catch 裡遇到 AbortError 就直接 return，不去更新已經不存在的畫面。這樣也省掉沒人要的網路流量。',
+      ] },
+    ],
+    keypoints: [
+      'fetch 只有網路失敗、取消、逾時才會 reject；404、500 要自己檢查 `res.ok`。',
+      'AbortController 手動取消（AbortError），AbortSignal.timeout 自動逾時（TimeoutError）。',
+      '用 `e.name` 分辨錯誤種類；取消通常靜靜忽略。',
+    ],
+    sources: ['mdn-fetch'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
+   模組 7：程式組織與品質
+   ========================================================================== */
+defineTerms({
+  '具名匯出': { en: 'named export', def: '`export` 加在宣告前，匯入時要用同樣的名字（可以用 as 改名）。', example: '`import { increment } from \'./counter.mjs\'`' },
+  '預設匯出': { en: 'default export', def: '每個模組最多一個；匯入時自己取名字。', example: '`import hello from \'./counter.mjs\'`' },
+  '活的綁定': { en: 'live binding', def: '匯入的名字直接連到匯出模組裡的變數；那邊改了，這邊讀到的也跟著變，但這邊不能指定它。', example: '呼叫 increment() 之後，匯入的 count 也變了。' },
+  'CommonJS': { en: 'CommonJS', def: 'Node.js 早期的模組格式：`require()` 與 `module.exports`；新專案用 ES 模組。', example: '`const fs = require(\'fs\')`' },
+  'cause': { en: 'error cause', def: '`new Error(訊息, { cause: 原本的錯誤 })`：包一層更好懂的錯誤，同時保留原因。', example: '「讀取設定失敗」的 cause 是 SyntaxError。' },
+  '斷言': { en: 'assertion', def: '測試裡「我預期這個值等於那個」的檢查；不相等就讓測試失敗。', example: '`assert.equal(applyDiscount(100, 0.2), 80)`' },
+  '中斷點': { en: 'breakpoint', def: '在開發者工具裡標記的一行；執行到那裡會暫停，讓你看當下的變數。', example: '程式碼裡寫 `debugger;` 也有同樣效果。' },
+});
+
+defineLessons({
+  '7-1': {
+    goals: [
+      '寫出具名匯出、預設匯出與對應的 import',
+      '解釋「活的綁定」與「模組只執行一次」',
+      '分辨 ES 模組與 CommonJS',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-4）伺服器回 404，`await fetch(url)` 會？', options: [
+        { text: '成功，但 `res.ok` 是 false', correct: true, why: '有回應就算成功。' },
+        { text: '拋出 TypeError', why: '只有網路錯誤才會。' },
+        { text: '拋出 AbortError', why: '那是取消。' },
+        { text: '永遠等下去', why: '有回應就會結束。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 5-2）想讓一個變數「外面改不到、只能透過函式改」，可以用？', options: [
+        { text: '閉包（或模組裡不匯出的變數）', correct: true, why: '外面根本碰不到那個變數。' },
+        { text: '宣告在最外層的全域變數', why: '全域誰都能改。' },
+        { text: 'const', why: 'const 只禁止重新指定，物件內容照樣能改。' },
+        { text: '物件屬性', why: '屬性誰都能改。' },
+      ] },
+    ],
+    analogy: {
+      text: ['模組像公司的部門。每個部門內部有很多文件（變數、函式），但只把「對外窗口」（export）公布出來；其他部門只能透過窗口拿東西（import）。部門內部怎麼整理，別人看不到也不能動。'],
+      limit: ['真的部門給你的是影本；模組給的是[[活的綁定]]：對方內部改了，你讀到的也跟著變。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="模組相依圖：main.mjs 匯入 counter.mjs 與 format.mjs，format.mjs 也匯入 counter.mjs；counter.mjs 只執行一次，兩邊拿到的是同一份">
+        <rect x="200" y="10" width="160" height="60" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="47" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">main.mjs</text>
+        <rect x="10" y="170" width="200" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="110" y="202" text-anchor="middle" font-size="17" font-weight="900" class="mono">counter.mjs</text>
+        <text x="110" y="226" text-anchor="middle" font-size="14">只執行一次</text>
+        <rect x="350" y="170" width="200" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="450" y="210" text-anchor="middle" font-size="17" font-weight="900" class="mono">format.mjs</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M240 70 V120 H110 V170 M320 70 V120 H450 V170 M350 205 H210"/></g>
+        <text x="280" y="196" text-anchor="middle" font-size="13">也匯入 counter</text>
+      </svg>`,
+      caption: '不管被 import 幾次，一個模組只執行一次；所有匯入者共用同一份。',
+      blocks: [
+        { type: 'code', lang: 'javascript', title: 'counter.mjs', code: "console.log('counter 模組執行了');\nexport let count = 0;\nexport function increment() { count++; }\nexport default function hello() { return 'hi'; }" },
+        { type: 'code', lang: 'javascript', title: 'main.mjs', code: "import hello, { count, increment } from './counter.mjs';\nimport { count as again } from './counter.mjs';\nincrement();\nincrement();\nconsole.log(count, again, hello()); // 2 2 hi\ncount = 5; // TypeError: Assignment to constant variable." },
+        '`node main.mjs` 實測（Node.js 22.13）：「counter 模組執行了」只印一次；count 和 again 都是 2，因為它們連到同一個變數；在 main 裡指定 count 會拋出 TypeError：匯入的名字是唯讀的。',
+      ],
+    },
+    define: [
+      { term: '具名匯出', en: 'named export', def: '`export function f`／`export const x`；匯入 `{ f, x }`。', example: '一個模組可以有很多個。' },
+      { term: '預設匯出', en: 'default export', def: '`export default`；匯入時不加大括號、自己取名。', example: '一個模組最多一個。' },
+      { term: '動態匯入', en: 'dynamic import', def: '`await import(路徑)` 在需要時才載入，回傳模組物件。', example: '點了「匯出 PDF」才載入大型函式庫。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一件事的兩種格式',
+        kind: 'CommonJS vs ES 模組',
+        code: true,
+        badLabel: 'CommonJS（舊）',
+        goodLabel: 'ES 模組（新）',
+        bad: "const { readFile } = {{1:require}}('node:fs/promises');\nmodule.exports = { load };",
+        good: "import { readFile } from 'node:fs/promises';\n{{1:export}} { load };",
+        badResult: '同步載入、只有 Node.js 認得，瀏覽器不能直接用。',
+        goodResult: '語言標準，瀏覽器與 Node.js 都支援，還能用頂層 await。',
+        why: ['新程式一律寫 ES 模組'],
+      }],
+      blocks: [
+        { type: 'table', head: ['', 'ES 模組', 'CommonJS'], rows: [
+          ['語法', '`import`／`export`', '`require()`／`module.exports`'],
+          ['瀏覽器', '`<script type="module">`', '不支援'],
+          ['匯入的值', '活的綁定，唯讀', '當下的值的複製（物件仍是參考）'],
+          ['頂層 await', '可以', '不行'],
+          ['嚴格模式', '自動', '要自己寫 `\'use strict\'`'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="匯出與匯入的對應：具名匯出 increment 要用同名的大括號匯入；預設匯出 hello 匯入時可以自己取名為 greet">
+          <rect x="10" y="10" width="250" height="190" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="30" y="46" font-size="17" font-weight="900">counter.mjs</text>
+          <text x="30" y="100" font-size="15" class="mono">export function increment</text>
+          <text x="30" y="160" font-size="15" class="mono">export default hello</text>
+          <rect x="300" y="10" width="250" height="190" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="320" y="46" font-size="17" font-weight="900" class="on-color">main.mjs</text>
+          <text x="320" y="100" font-size="15" class="mono on-color">{ increment }  同名</text>
+          <text x="320" y="160" font-size="15" class="mono on-color">greet  自己取名</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M260 95 H300 M260 155 H300"/></g>
+        </svg>`, caption: '具名匯出靠名字對應；預設匯出靠「它是預設的那一個」對應。' },
+        { type: 'widget', name: 'runner', props: {
+          title: '用 data: 網址模擬另一個檔案',
+          code: "const counterUrl = 'data:text/javascript,' + encodeURIComponent(\n  'export let count = 0; export function increment() { count++; }'\n);\nconst a = await import(counterUrl);\nconst b = await import(counterUrl);\na.increment();\nconsole.log(a.count, b.count, a === b);",
+          predict: { q: '`b.count` 是？', options: ['0（b 是另一份）', '1（同一個模組）', 'undefined'], answer: 1 },
+        } },
+      ],
+      tryit: {
+        q: ['`utils.mjs` 有 `export function slugify() {}` 與 `export default function format() {}`。寫出一行把兩個都匯入，format 改叫 fmt：'],
+        draft: "import ____ from './utils.mjs';",
+        answer: ['`import fmt, { slugify } from \'./utils.mjs\';`', '預設匯出放前面、自己取名；具名匯出放大括號裡、名字要一樣。具名的也要改名時寫 `{ slugify as toSlug }`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '瀏覽器裡 `import \'./utils\'` 省略副檔名。', why: '瀏覽器不會猜副檔名，網址要完整。', right: "寫 `'./utils.js'`；省略副檔名是打包工具（Vite 等）提供的方便。" },
+      { wrong: '在 ES 模組裡用 `require` 或 `__dirname`。', why: 'ES 模組沒有這些 CommonJS 的變數。', right: '用 import；路徑用 `import.meta.dirname`（Node.js 20.11 起）。' },
+      { wrong: '直接用 file:// 打開含 `type="module"` 的 HTML。', why: '瀏覽器對 file:// 的模組載入有限制，會被 CORS 擋下。', right: '用本機伺服器（例如 `npx serve` 或 Vite）開。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`export default` 一個模組可以有幾個？', options: [
+        { text: '最多一個', correct: true, why: '「預設」只能有一個；其他用具名匯出。' },
+        { text: '不限', why: '多個 default 會是語法錯誤。' },
+        { text: '剛好一個，不能沒有', why: '可以完全沒有預設匯出。' },
+        { text: '和具名匯出一樣多', why: '兩者數量無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '兩個檔案都 `import` 同一個 config 模組，其中一個改了 `config.theme`，另一個讀到的是？', options: [
+        { text: '改過的值', correct: true, why: '模組只執行一次，兩邊拿到的是同一個物件。' },
+        { text: '原本的值', why: '不會為每個匯入者各執行一份。' },
+        { text: 'undefined', why: '屬性一直存在。' },
+        { text: '拋出 TypeError', why: '改物件的屬性是允許的，只是不能重新指定匯入的名字。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你接手一個 Node.js 舊專案，`package.json` 沒有 `"type"`，檔案都是 `.js` 並用 require。你想新增一個用 import 的檔案，有哪些做法？'], answer: [
+        '最小改動：新檔案用 `.mjs` 副檔名，它一定被當成 ES 模組；舊檔案不受影響。',
+        '整個專案轉換：`package.json` 加 `"type": "module"`，再把所有 require 改成 import（或把仍要用 CommonJS 的改名成 `.cjs`）。Node.js 22 也能在 CommonJS 裡 `require()` 同步的 ES 模組，但混用越少越好。',
+      ] },
+    ],
+    keypoints: [
+      '具名匯出用大括號、名字要一樣；預設匯出最多一個、匯入時自己取名。',
+      '模組只執行一次，所有匯入者共用；匯入的名字是活的綁定，而且唯讀。',
+      '新程式用 ES 模組；瀏覽器裡路徑要寫完整副檔名。',
+    ],
+    sources: ['mdn-modules'],
+  },
+
+  '7-2': {
+    goals: [
+      '判斷錯誤該在哪一層接住',
+      '用 cause 包裝錯誤又不丟掉原因',
+      '寫出帶有欄位資訊的自訂錯誤類別',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-3）async 函式裡 await 的 Promise 失敗了，會？', options: [
+        { text: '在 await 那一行拋出錯誤', correct: true, why: '可以用一般的 try／catch 接住。' },
+        { text: '回傳 undefined', why: '失敗不會被當成 undefined。' },
+        { text: '靜靜略過', why: '錯誤會拋出。' },
+        { text: '整個頁面重新整理', why: '只會拋錯。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 5-4）`class ValidationError extends Error` 的實例，`instanceof Error` 是？', options: [
+        { text: 'true', correct: true, why: '原型鏈上有 Error.prototype。' },
+        { text: 'false', why: 'extends 讓它接上 Error 的原型鏈。' },
+        { text: '要看 name', why: 'instanceof 看原型鏈，不看 name。' },
+        { text: '拋出 TypeError', why: 'instanceof 對任何物件都能用。' },
+      ] },
+    ],
+    analogy: {
+      text: ['餐廳裡出了問題：洗碗工打破盤子，自己能處理就換一個（在這一層接住）；處理不了的（冰箱壞了）往上報給主廚，主廚再處理不了就報給老闆。每一層都只處理「自己有能力處理」的事。'],
+      limit: ['員工往上報時會自己整理說明；程式要你主動用 [[cause]] 把「原本發生什麼」附上，不然上層只看到最後一句話。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="錯誤沿呼叫堆疊往上：parseConfig 拋出 SyntaxError；loadConfig 沒有處理，往上傳；main 有 try catch，在這一層接住並顯示訊息">
+        <rect x="10" y="10" width="540" height="70" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="40" font-size="17" font-weight="900" class="mono on-color">main()  try { … } catch</text>
+        <text x="30" y="66" font-size="15" class="on-color">能決定「告訴使用者什麼」→ 在這裡接</text>
+        <rect x="10" y="95" width="540" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="125" font-size="17" font-weight="900" class="mono">loadConfig()</text>
+        <text x="30" y="151" font-size="15">加上脈絡：throw new Error('讀取設定失敗', { cause })</text>
+        <rect x="10" y="180" width="540" height="70" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="210" font-size="17" font-weight="900" class="mono on-color">JSON.parse('{x')</text>
+        <text x="30" y="236" font-size="15" class="on-color">SyntaxError：在這裡拋出</text>
+      </svg>`,
+      caption: '錯誤沿[[呼叫堆疊]]往上冒，直到遇到 try／catch；沒人接就變成未處理的錯誤。',
+      blocks: [
+        '原則：只在**能做出決定**的那一層 catch（重試、改用預設值、告訴使用者）。中間層如果要加資訊，就包一層新錯誤、用 cause 帶著原本的錯誤再拋出，不要吞掉。',
+      ],
+    },
+    define: [
+      { term: 'throw', en: 'throw', def: '拋出錯誤，中斷目前的執行，往上找 catch。', example: "`throw new RangeError('rate 必須在 0 到 1 之間')`" },
+      { term: 'cause', en: 'Error cause', def: '`new Error(msg, { cause })`，保留原本的錯誤。', example: '`e.cause.name` 是 SyntaxError。' },
+      { term: '自訂錯誤', en: 'custom error', def: '`class X extends Error`，設定 name 與額外欄位。', example: '`ValidationError` 帶著出錯的 field。' },
+    ],
+    examples: {
+      compare: [{
+        title: '讀取設定失敗',
+        kind: '吞掉 vs 包裝',
+        code: true,
+        badLabel: '吞掉錯誤',
+        goodLabel: '包一層再拋',
+        bad: "try {\n  return JSON.parse(text);\n} catch (e) {\n  {{1:return {}}};\n}",
+        good: "try {\n  return JSON.parse(text);\n} catch (e) {\n  {{1:throw new Error('讀取設定失敗', { cause: e })}};\n}",
+        badResult: '設定檔壞了也不會有人知道，程式用空設定繼續跑，之後在奇怪的地方出錯。',
+        goodResult: '上層看到「讀取設定失敗」，需要細節時看 cause 裡的 SyntaxError。',
+        why: ['catch 裡至少要記錄或重新拋出，不能空的'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          wait: 200,
+          code: "class ValidationError extends Error {\n  constructor(message, field) {\n    super(message);\n    this.name = 'ValidationError';\n    this.field = field;\n  }\n}\ntry {\n  try { JSON.parse('{x'); }\n  catch (e) { throw new Error('讀取設定失敗', { cause: e }); }\n} catch (e) {\n  console.log(e.message, '|', e.cause.name);\n}\nconst ve = new ValidationError('email 格式錯', 'email');\nconsole.log(ve instanceof Error, ve.field, String(ve));\nasync function bad() { throw new Error('async 錯'); }\ntry { bad(); console.log('沒接到'); } catch { console.log('接到'); }\nawait bad().catch((e) => console.log('catch:', e.message));",
+          predict: { q: '`try { bad(); }`（沒有 await）會印出？', options: ['接到', '沒接到', '什麼都不印'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="try 接不到非同步錯誤：try 區塊在 bad 拋錯之前就結束了；加上 await 之後，try 會等到結果，錯誤在 await 那行拋出被 catch 接到">
+          <rect x="10" y="10" width="265" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">try { bad(); }</text>
+          <text x="142" y="100" text-anchor="middle" font-size="15" class="on-color">bad() 回傳失敗的 Promise</text>
+          <text x="142" y="130" text-anchor="middle" font-size="15" class="on-color">try 不會拋錯，直接結束</text>
+          <text x="142" y="170" text-anchor="middle" font-size="15" class="on-color">→ 未處理的 rejection</text>
+          <rect x="285" y="10" width="265" height="200" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="mono on-color">try { await bad(); }</text>
+          <text x="417" y="100" text-anchor="middle" font-size="15" class="on-color">await 等到失敗</text>
+          <text x="417" y="130" text-anchor="middle" font-size="15" class="on-color">在這一行拋出</text>
+          <text x="417" y="170" text-anchor="middle" font-size="15" class="on-color">→ catch 接到</text>
+        </svg>`, caption: 'Node.js 22 遇到沒人處理的 rejection 會印出錯誤並結束程式（實測）。' },
+      ],
+      tryit: {
+        q: ['補完：email 不合法時拋出 ValidationError，上層依錯誤種類決定怎麼顯示。'],
+        draft: "function checkEmail(email) {\n  if (!email.includes('@')) throw ____;\n}\ntry {\n  checkEmail(input);\n} catch (e) {\n  if (e instanceof ValidationError) markField(e.field);\n  else ____;\n}",
+        answer: ["第一格 `new ValidationError('email 格式錯', 'email')`，第二格 `throw e`。", '這一層只知道怎麼處理「欄位驗證錯誤」；其他錯誤（例如程式寫錯的 TypeError）它處理不了，就原封不動往上拋。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`catch (e) {}` 空的。', why: '錯誤消失，出問題時完全沒有線索。', right: '至少記錄（`console.error`）或重新拋出。' },
+      { wrong: '`throw \'找不到使用者\'`，拋出字串。', why: '字串沒有堆疊追蹤，也沒有 name，上層不好分辨。', right: '一律 `throw new Error(...)` 或它的子類別。' },
+      { wrong: '包錯誤時把原本的訊息拼進字串，丟掉原本的錯誤物件。', why: '原本錯誤的堆疊追蹤與類型都沒了。', right: '`new Error(\'讀取設定失敗\', { cause: e })`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`new Error(\'A\', { cause: e })` 之後，原本的錯誤在哪？', options: [
+        { text: '新錯誤的 cause 屬性', correct: true, why: 'cause 保留原本的錯誤物件。' },
+        { text: '被丟掉了', why: '這正是 cause 要避免的事。' },
+        { text: '合併進 message', why: 'message 只有「A」。' },
+        { text: '在 e.stack 的最後一行', why: '它是獨立的屬性。' },
+      ] },
+      { level: '應用', type: 'mc', q: '哪一層最適合 catch「網路請求失敗」？', options: [
+        { text: '能決定「重試或告訴使用者」的那一層', correct: true, why: '在能處理的地方接，其他層讓它往上拋。' },
+        { text: '每一層都接一次', why: '重複處理，訊息會被層層蓋掉。' },
+        { text: '最底層的 fetch 包裝函式，接了回傳 null', why: '上層分不清「沒資料」與「失敗」。' },
+        { text: '不要接，讓程式結束', why: '使用者需要知道發生了什麼。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['表單送出時，API 回 422 並附上 `{ field: "email", message: "已被註冊" }`。設計一個錯誤類別與處理流程，讓畫面能在 email 欄位旁顯示訊息。'], answer: [
+        '在 fetch 包裝函式裡：`if (res.status === 422) { const body = await res.json(); throw new ValidationError(body.message, body.field); }`，其他不 ok 的狀態丟一般 Error。',
+        '表單送出的地方：`catch (e) { if (e instanceof ValidationError) showFieldError(e.field, e.message); else showToast(\'送出失敗，請稍後再試\'); }`。',
+      ] },
+    ],
+    keypoints: [
+      '只在能做出決定的那一層 catch；其他層讓錯誤往上拋。',
+      '包裝錯誤用 `{ cause: e }` 保留原因；catch 不能是空的，只拋 Error 物件。',
+      '`try { bad() }` 接不到非同步錯誤，要 `await`；自訂錯誤用 extends Error 加欄位。',
+    ],
+    sources: ['mdn-errors'],
+  },
+
+  '7-3': {
+    goals: [
+      '用 node:test 與 assert 寫出第一個測試',
+      '寫出「情境＋預期結果」的測試名稱',
+      '先看到測試失敗，再修程式',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 7-2）函式收到不合法的參數，該怎麼做？', options: [
+        { text: '拋出帶有清楚訊息的錯誤（例如 RangeError）', correct: true, why: '呼叫者馬上知道哪裡錯，也能在測試裡檢查。' },
+        { text: '回傳 null', why: '呼叫者分不清是錯誤還是正常的空值。' },
+        { text: '自己改成合法的值繼續跑', why: '錯誤被掩蓋。' },
+        { text: '用 console.log 印出警告，再照原本的值繼續算', why: '程式還是用錯的值在跑。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 4-1）`{ a: [1] } === { a: [1] }` 是？', options: [
+        { text: 'false', correct: true, why: '兩個不同的物件。測試時要用 deepEqual 比內容。' },
+        { text: 'true', why: '=== 不比內容。' },
+        { text: '拋出 TypeError', why: '物件可以用 === 比較。' },
+        { text: 'undefined', why: '比較一定得到布林值。' },
+      ] },
+    ],
+    analogy: {
+      text: ['測試像餐廳的試吃清單：「這道菜放 100 元的料、打八折，端出來應該是 80 元份量」。每次換食譜（改程式），廚師把清單上的每一道都試一次，馬上知道有沒有哪道走味。'],
+      limit: ['試吃是人的感覺；測試是精確比對，一個字元不同就失敗。這是優點，但也代表測試要寫「真正在乎的結果」，不要把無關的細節也寫死。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="紅綠循環：先寫測試並看它失敗（紅），再寫最少的程式讓它通過（綠），然後整理程式碼，測試仍要通過，再寫下一個測試">
+        <rect x="10" y="60" width="170" height="120" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="108" text-anchor="middle" font-size="20" font-weight="900" class="on-color">① 紅</text>
+        <text x="95" y="140" text-anchor="middle" font-size="15" class="on-color">寫測試，看它失敗</text>
+        <rect x="195" y="60" width="170" height="120" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="108" text-anchor="middle" font-size="20" font-weight="900" class="on-color">② 綠</text>
+        <text x="280" y="140" text-anchor="middle" font-size="15" class="on-color">改程式讓它通過</text>
+        <rect x="380" y="60" width="170" height="120" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="108" text-anchor="middle" font-size="20" font-weight="900" class="on-color">③ 整理</text>
+        <text x="465" y="140" text-anchor="middle" font-size="15" class="on-color">重構，仍然綠</text>
+        <text x="280" y="225" text-anchor="middle" font-size="15">然後回到 ①，寫下一個測試</text>
+      </svg>`,
+      caption: '先看到紅色，才能確定這個測試「真的會抓到錯」。',
+      blocks: [
+        'Node.js 內建 `node:test`（18 起），不用裝任何套件。檔名用 `*.test.mjs`，執行 `node --test`，它會自動找測試檔。[[斷言]]用 `node:assert/strict`：`equal` 比原始值、`deepEqual` 比物件內容、`throws` 檢查有沒有拋錯。',
+        { type: 'code', lang: 'javascript', title: 'price.test.mjs', code: "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { applyDiscount } from './price.mjs';\n\ntest('returns 80 when 100 has 20% off', () => {\n  assert.equal(applyDiscount(100, 0.2), 80);\n});\n\ntest('throws RangeError when rate is above 1', () => {\n  assert.throws(() => applyDiscount(100, 2), RangeError);\n});" },
+      ],
+    },
+    define: [
+      { term: 'assert.equal', en: 'strict equal', def: '用 `===` 比較（從 `node:assert/strict` 匯入時）。', example: '`assert.equal(1 + 1, 2)`' },
+      { term: 'assert.deepEqual', en: 'deep equal', def: '比較物件、陣列的內容。', example: '`assert.deepEqual({ a: [1] }, { a: [1] })` 通過。' },
+      { term: 'assert.throws', en: 'throws', def: '傳一個函式進去，檢查它會拋出指定的錯誤。', example: '`assert.throws(() => f(-1), RangeError)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '測試名稱',
+        kind: '看不出在測什麼 vs 情境＋預期',
+        code: true,
+        badLabel: '模糊',
+        goodLabel: '情境＋預期結果',
+        bad: "test({{1:'discount works'}}, () => { … });",
+        good: "test({{1:'returns 0 when cart is empty'}}, () => { … });",
+        badResult: '失敗時只知道「折扣壞了」，不知道是哪種情況。',
+        goodResult: '失敗訊息本身就說明了哪個情境、預期什麼。',
+        why: ['測試名稱寫「在什麼情況下，應該得到什麼」'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          title: '迷你測試執行器（模擬 node --test 的輸出）',
+          code: "function applyDiscount(price, rate) {\n  if (rate < 0 || rate > 1) throw new RangeError(`rate 必須在 0 到 1 之間：${rate}`);\n  return Math.round(price * (1 - rate));\n}\nfunction test(name, fn) {\n  try { fn(); console.log('✔', name); }\n  catch (e) { console.log('✖', name, '→', e.message); }\n}\nconst equal = (a, b) => { if (a !== b) throw new Error(`${a} !== ${b}`); };\ntest('returns 80 when 100 has 20% off', () => equal(applyDiscount(100, 0.2), 80));\ntest('returns 90 when 99 has 10% off', () => equal(applyDiscount(99, 0.1), 90));",
+          predict: { q: '第二個測試會？', options: ['通過', '失敗，實際是 89', '失敗，拋出 RangeError'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="一個測試的三段：準備輸入，呼叫要測的函式，用斷言比對結果">
+          <rect x="10" y="10" width="170" height="190" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="95" y="50" text-anchor="middle" font-size="18" font-weight="900">① 準備</text>
+          <text x="95" y="110" text-anchor="middle" font-size="15" class="mono">price = 100</text>
+          <rect x="195" y="10" width="170" height="190" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="50" text-anchor="middle" font-size="18" font-weight="900" class="on-color">② 執行</text>
+          <text x="280" y="110" text-anchor="middle" font-size="14" class="mono on-color">applyDiscount(…)</text>
+          <rect x="380" y="10" width="170" height="190" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="50" text-anchor="middle" font-size="18" font-weight="900" class="on-color">③ 斷言</text>
+          <text x="465" y="110" text-anchor="middle" font-size="14" class="mono on-color">assert.equal(…, 80)</text>
+        </svg>`, caption: '每個測試都是這三段：準備（Arrange）、執行（Act）、斷言（Assert）。' },
+        { type: 'table', head: ['情境', '輸入', '預期'], rows: [
+          ['一般折扣', '`(100, 0.2)`', '`80`'],
+          ['不打折', '`(100, 0)`', '`100`'],
+          ['四捨五入', '`(99, 0.1)`', '`89`（89.1 四捨五入）'],
+          ['折扣超過 100%', '`(100, 2)`', '拋出 RangeError'],
+        ] },
+      ],
+      tryit: {
+        q: ['為 4-5 的「去除重複」寫一個測試：`unique([1, 1, 2])` 應該得到 `[1, 2]`。'],
+        draft: "test('returns each value once when input has duplicates', () => {\n  assert.____(unique([1, 1, 2]), [1, 2]);\n});",
+        answer: ['`deepEqual`。', '用 `equal` 會失敗：兩個陣列內容一樣，但不是同一個物件（4-1）。比較物件與陣列的內容一律用 deepEqual。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `assert.equal` 比較兩個陣列。', why: '`===` 比的是不是同一個物件。', right: '用 `assert.deepEqual`。' },
+      { wrong: '測試一寫就通過，沒看過它失敗。', why: '可能測錯東西，或斷言根本沒被執行，永遠不會抓到錯。', right: '先故意把預期值改錯，確認它會紅，再改回來。' },
+      { wrong: '`assert.throws(applyDiscount(100, 2), RangeError)`。', why: '還沒交給 throws，函式就已經在這一行拋錯了。', right: '傳函式進去：`assert.throws(() => applyDiscount(100, 2), RangeError)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'node:test 要不要另外安裝？', options: [
+        { text: '不用，Node.js 18 起內建', correct: true, why: '`import { test } from \'node:test\'` 直接可用。' },
+        { text: '要，npm install node-test', why: '它是 Node.js 內建模組。' },
+        { text: '要裝 Jest 才能用', why: 'Jest 是另一套測試工具。' },
+        { text: '只有瀏覽器有', why: '它是 Node.js 的模組。' },
+      ] },
+      { level: '應用', type: 'mc', q: '下面哪個測試名稱最好？', options: [
+        { text: "`'throws RangeError when rate is negative'`", correct: true, why: '有情境（rate 是負數）、有預期（拋 RangeError）。' },
+        { text: "`'test 1'`", why: '完全看不出在測什麼。' },
+        { text: "`'applyDiscount'`", why: '只有函式名稱，沒有情境與預期。' },
+        { text: "`'should calculate the discount correctly'`", why: '「正確」是什麼沒有說。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['使用者回報：購物車有 3 件 33.33 元的商品，總額顯示 99.99000000000001。照「修 bug 先寫失敗測試」的原則，寫出你的第一步與第二步。'], answer: [
+        "第一步：寫測試重現它，`test('returns 99.99 when 3 items cost 33.33', () => assert.equal(cartTotal([33.33, 33.33, 33.33]), 99.99))`，執行確認它是紅的。",
+        '第二步：修程式（1-2：用整數的分計算，最後才除以 100），再執行測試變綠。這個測試留著，以後有人改壞會馬上被抓到。',
+      ] },
+    ],
+    keypoints: [
+      'node:test 內建：`*.test.mjs` 檔案、`node --test` 執行；斷言用 `node:assert/strict`。',
+      '原始值用 equal、物件用 deepEqual、錯誤用 throws（傳函式進去）。',
+      '測試名稱寫情境與預期；一定要先看到它失敗。',
+    ],
+    sources: ['node-test'],
+  },
+
+  '7-4': {
+    goals: [
+      '在開發者工具裡設中斷點並逐步執行',
+      '分辨「逐步執行」的三個按鈕',
+      '用固定流程找出 bug，而不是到處加 console.log',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 7-3）修 bug 的第一步是？', options: [
+        { text: '寫一個能重現它的失敗測試', correct: true, why: '先確定能穩定重現，修好後也能證明。' },
+        { text: '直接改程式碼', why: '不確定改對沒有。' },
+        { text: '刪掉相關的測試', why: '只會讓 bug 更難被發現。' },
+        { text: '重新安裝套件', why: '多數 bug 和安裝無關。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-3）錯誤訊息的堆疊追蹤，最上面一行通常是？', options: [
+        { text: '錯誤實際發生的位置', correct: true, why: '往下是一層層呼叫它的地方。' },
+        { text: '程式的進入點', why: '進入點在最下面。' },
+        { text: '最後一次 console.log 的位置', why: '堆疊追蹤和 console.log 無關。' },
+        { text: '隨機一行', why: '順序是固定的。' },
+      ] },
+    ],
+    analogy: {
+      text: ['看監視器找掉東西的時間點：與其從頭快轉、到處貼便利貼（console.log），不如直接跳到「應該還在」的那一刻按暫停，然後一格一格往前看，東西在哪一格消失就是答案。'],
+      limit: ['監視器只能看；[[中斷點]]暫停時還能在 Console 裡讀寫當下的變數、呼叫函式，甚至改值後繼續跑。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="開發者工具 Sources 面板：左邊是檔案清單；中間是程式碼，點行號設中斷點；右邊是逐步執行按鈕、Scope 區塊的變數、Call Stack 呼叫堆疊">
+        <rect x="10" y="10" width="130" height="230" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="75" y="44" text-anchor="middle" font-size="16" font-weight="900">檔案</text>
+        <text x="75" y="84" text-anchor="middle" font-size="14" class="mono">main.js</text>
+        <rect x="150" y="10" width="230" height="230" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="265" y="44" text-anchor="middle" font-size="16" font-weight="900">程式碼</text>
+        <rect x="160" y="100" width="210" height="28" style="fill:var(--m7)" class="stroke-ink" stroke-width="2"/>
+        <text x="170" y="120" font-size="14" class="mono on-color">12 ● total += p;</text>
+        <text x="265" y="170" text-anchor="middle" font-size="14">點行號 = 設中斷點</text>
+        <rect x="390" y="10" width="160" height="230" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+        <text x="470" y="44" text-anchor="middle" font-size="16" font-weight="900" class="on-color">右側面板</text>
+        <text x="470" y="90" text-anchor="middle" font-size="14" class="on-color">逐步執行按鈕</text>
+        <text x="470" y="130" text-anchor="middle" font-size="14" class="on-color">Scope：變數</text>
+        <text x="470" y="170" text-anchor="middle" font-size="14" class="on-color">Call Stack</text>
+      </svg>`,
+      caption: 'Chrome：F12 → Sources；Safari 要先在設定 → 進階 打開「顯示網頁開發者功能」。',
+      blocks: [
+        { type: 'table', head: ['按鈕', '快捷鍵（Chrome）', '做什麼'], rows: [
+          ['繼續', '{kbd:F8}', '跑到下一個中斷點'],
+          ['跳過', '{kbd:F10}', '執行這一行，遇到函式呼叫不進去'],
+          ['進入', '{kbd:F11}', '走進這一行呼叫的函式裡'],
+          ['跳出', '{kbd:Shift}＋{kbd:F11}', '把目前函式跑完，回到呼叫它的地方'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '中斷點', en: 'breakpoint', def: '執行到那一行前暫停。', example: '程式碼裡的 `debugger;` 在開發者工具打開時也會暫停。' },
+      { term: '條件中斷點', en: 'conditional breakpoint', def: '只在條件成立時暫停；在行號上按右鍵設定。', example: '`i === 999` 時才停，不用按 F8 一千次。' },
+      { term: 'Scope 面板', en: 'Scope', def: '暫停當下，看得到的所有變數與值（包含閉包）。', example: '看 total 在哪一圈變成 NaN。' },
+    ],
+    examples: {
+      compare: [{
+        title: '找出 total 為什麼變成 NaN',
+        kind: '猜測 vs 觀察',
+        code: true,
+        badLabel: '到處加 log',
+        goodLabel: '條件中斷點',
+        bad: 'for (const p of prices) {\n  {{1:console.log(p, total)}};\n  total += p;\n}',
+        good: '// 在 total += p 那一行設條件中斷點：\n// {{1:Number.isNaN(total + p)}}',
+        badResult: '一千筆資料印一千行，還要記得事後刪掉。',
+        goodResult: '只在「這一筆會讓 total 變 NaN」時停下來，直接看 p 是什麼。',
+        why: ['讓工具幫你找到出錯的那一刻'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'checklist', props: { key: 'debug-steps', items: [
+          '重現：寫下穩定重現的步驟（或寫成失敗測試，7-3）',
+          '縮小範圍：從錯誤訊息的堆疊追蹤找出最上面那行自己的程式碼',
+          '設中斷點：在「值應該還是對的」那一行',
+          '逐步執行：F10 一行一行走，看 Scope 裡哪個值第一次變錯',
+          '提出假設：用一句話寫出「因為 ___，所以 ___」',
+          '驗證並修正：改程式後重跑重現步驟與測試',
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="逐步執行按鈕對照：跳過是執行這一行但不進入函式；進入是走進被呼叫的函式；跳出是跑完目前函式回到上一層">
+          <rect x="10" y="10" width="170" height="180" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="50" text-anchor="middle" font-size="18" font-weight="900" class="on-color">跳過 F10</text>
+          <text x="95" y="100" text-anchor="middle" font-size="15" class="on-color">calc() 整個跑完</text>
+          <text x="95" y="130" text-anchor="middle" font-size="15" class="on-color">停在下一行</text>
+          <rect x="195" y="10" width="170" height="180" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="50" text-anchor="middle" font-size="18" font-weight="900" class="on-color">進入 F11</text>
+          <text x="280" y="100" text-anchor="middle" font-size="15" class="on-color">走進 calc() 裡</text>
+          <text x="280" y="130" text-anchor="middle" font-size="15" class="on-color">停在第一行</text>
+          <rect x="380" y="10" width="170" height="180" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">跳出 ⇧F11</text>
+          <text x="465" y="100" text-anchor="middle" font-size="15" class="on-color">calc() 剩下的跑完</text>
+          <text x="465" y="130" text-anchor="middle" font-size="15" class="on-color">回到呼叫它的地方</text>
+        </svg>`, caption: '目前停在 `const total = calc(items);` 這一行時，三個按鈕的差別。' },
+      ],
+      tryit: {
+        q: ['迴圈跑 5000 次，第 3721 次時結果開始出錯。你會怎麼設中斷點，才不用按 F8 三千多次？'],
+        draft: '// 在迴圈裡的那一行按右鍵 → 新增條件中斷點，條件寫：____',
+        answer: ['`i === 3721`（或更直接的條件，例如 `Number.isNaN(result)`）。', '條件中斷點只在條件為 true 時暫停。條件寫「錯誤狀態本身」通常更好，因為你不一定知道是第幾次。'],
+      },
+    },
+    mistakes: [
+      { wrong: '到處加 console.log，修好後忘了刪。', why: '輸出污染 console，也可能把敏感資料印出來。', right: '用中斷點或 logpoint（不改程式碼的 log）；必要的 log 在 commit 前刪掉。' },
+      { wrong: '一看到錯誤就改程式，改了好幾處才好。', why: '不知道是哪一處修好的，其他改動可能帶來新 bug。', right: '先找到原因，一次只改一處。' },
+      { wrong: '在 console 只印物件，之後展開時看到的是「現在的值」。', why: 'console 顯示的是物件的參考（4-1），展開時才讀內容。', right: '要當下的值用 `structuredClone(obj)` 或 `JSON.stringify(obj)` 印，或直接用中斷點。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '停在 `render(data)` 這一行，想看 render 裡面發生什麼，要按？', options: [
+        { text: '進入（F11）', correct: true, why: '走進被呼叫的函式。' },
+        { text: '跳過（F10）', why: '會把 render 整個跑完。' },
+        { text: '跳出（Shift＋F11）', why: '會把目前所在的函式跑完。' },
+        { text: '繼續（F8）', why: '跑到下一個中斷點。' },
+      ] },
+      { level: '應用', type: 'mc', q: '程式碼裡寫 `debugger;`，但使用者沒有開開發者工具，會怎樣？', options: [
+        { text: '什麼事都不會發生，直接跳過', correct: true, why: '只有開發者工具開著時才會暫停。' },
+        { text: '頁面暫停並跳出提示', why: '一般使用者不會看到任何東西。' },
+        { text: '拋出 SyntaxError', why: 'debugger 是合法的陳述式。' },
+        { text: '頁面重新整理', why: '它不影響頁面。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['按「儲存」後畫面沒反應，console 也沒有錯誤。照本課的除錯流程，你的前三步是什麼？'], answer: [
+        '一、重現：確認哪些步驟一定會發生（每次？特定資料？）。二、縮小範圍：在儲存按鈕的事件處理函式第一行設中斷點，確認點擊有沒有進來。',
+        '三、逐步執行：有進來就 F10 往下走，看是哪個 if 提早 return、或哪個 Promise 沒被 await（6-3）；沒進來就檢查事件綁定（5-1：是不是寫成 `save()`）。',
+      ] },
+    ],
+    keypoints: [
+      '中斷點加逐步執行，直接看變數在哪一步變錯，取代到處 console.log。',
+      'F10 跳過、F11 進入、Shift＋F11 跳出、F8 繼續；條件中斷點只在需要時停。',
+      '除錯流程：重現 → 縮小範圍 → 觀察 → 假設 → 驗證，一次只改一處。',
+    ],
+    sources: ['mdn-js'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
    App：狀態、路由、版面
    ========================================================================== */
 (() => {
