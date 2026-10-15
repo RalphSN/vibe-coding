@@ -131,8 +131,11 @@ Widgets.runner = {
     let frame = $('.run-frame', el);
     let lineCount = 0;
     let token = '';
+    let placeholder = null;
     const add = (kind, text) => {
       if (lineCount >= RUN_MAX_LINES) return;
+      // 輸出比等待時間晚到時，拿掉「沒有任何輸出」
+      if (placeholder) { placeholder.remove(); placeholder = null; }
       lineCount += 1;
       const span = document.createElement('span');
       span.className = `ln${kind === 'err' ? ' err' : ''}`;
@@ -156,6 +159,7 @@ Widgets.runner = {
       runSeq += 1;
       token = `run-${runSeq}`;
       lineCount = 0;
+      placeholder = null;
       out.textContent = '';
       verdict.className = 'run-verdict';
       verdict.textContent = '';
@@ -172,7 +176,12 @@ Widgets.runner = {
       if (old) old.replaceWith(frame); else out.before(frame);
       window.setTimeout(() => {
         if (!document.body.contains(el)) return;
-        if (!lineCount) add('log', '（沒有任何輸出）');
+        if (!lineCount) {
+          placeholder = document.createElement('span');
+          placeholder.className = 'ln dim';
+          placeholder.textContent = '（目前沒有輸出）';
+          out.appendChild(placeholder);
+        }
         judge();
       }, props.wait || RUN_WAIT_MS);
     }

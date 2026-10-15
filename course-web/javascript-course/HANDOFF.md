@@ -1,7 +1,7 @@
 # 交接文件：JavaScript 著作（互動課程網站）
 
 > 更新：2026-10-14
-> 一句話現況：**骨架、互動元件與模組 0（3 課）完成並在 Chrome 驗證；模組 1–9（35 課）待寫。**
+> 一句話現況：**骨架、互動元件、模組 0–1（7 課）完成並在 Chrome 驗證，已上書櫃（顯示 7/38 製作中）；模組 2–9（31 課）待寫。**
 
 ## 0. 新 session 的開場 prompt（直接貼）
 
@@ -45,7 +45,9 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - [x] 骨架：站名、品牌、儲存 key、`--m9`、首頁三個問題、`COURSES`（38 課）、參考資料
 - [x] 互動元件 11 個（f-widgets.js、b-widgets.css）
 - [x] 模組 0（0-1～0-3）
-- [ ] 模組 1～8 內容（每 2–3 個模組自我檢查一次）
+- [x] 模組 1（1-1～1-4）
+- [x] 書櫃入口（3D 與 2D， 每完成一批就更新）
+- [ ] 模組 2～8 內容（每 2–3 個模組自我檢查一次）
 - [ ] 模組 9：9-1 期末實作、9-2～9-4 reference 版型
 - [ ] 第 4 階段驗證（verification.md 全部）
 - [ ] 得獎等級自我檢查迴圈
@@ -90,4 +92,4 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 
 ## 6. 下一步
 
-寫 `src/m1.html`（模組 1：值與型別，含 floatbits），接著 m2、m3，三個模組做完跑一次自我檢查並回報。
+寫 `src/m2.html`（模組 2：變數與作用域）與 `src/m3.html`（模組 3：比較與轉型，含 coerce 元件），做完更新書櫃 readyLessons、跑自我檢查並回報。
