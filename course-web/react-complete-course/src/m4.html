@@ -1,0 +1,433 @@
+<script>
+/* ==========================================================================
+   模組 4：架構與效能
+   ========================================================================== */
+defineTerms({
+  'Context': { en: 'Context', def: '讓上層元件把資料提供給整個子樹，任何深度的子元件都能讀取，不必一層層傳 props。', example: '主題、登入使用者、語言。' },
+  'createContext': { en: 'createContext', def: '建立一個 Context 物件，給定沒有 Provider 時的預設值。', example: '`const ThemeContext = createContext("light");`' },
+  'Provider': { en: 'Context provider', def: '包住子樹並提供值；React 19 起可以直接寫 `<ThemeContext value={…}>`。', example: '`<ThemeContext value="dark">…</ThemeContext>`' },
+  'prop drilling': { en: 'prop drilling', def: '資料經過很多層「自己用不到、只是轉傳」的元件才到達需要的地方。', example: 'App → Layout → Sidebar → Menu → Avatar 都傳 user。' },
+  'reducer': { en: 'reducer', def: '`(state, action) => newState` 的純函式，把所有更新邏輯集中在一個地方。', example: '`case "added": return [...todos, action.todo];`' },
+  'useReducer': { en: 'useReducer', def: '用 reducer 管理 state 的 Hook，回傳 [state, dispatch]。', example: '`const [state, dispatch] = useReducer(reducer, initial);`' },
+  'dispatch': { en: 'dispatch', def: '送出一個描述「發生了什麼事」的 action 物件給 reducer。', example: '`dispatch({ type: "deleted", id })`' },
+  '自訂 Hook': { en: 'custom Hook', def: '以 use 開頭、內部呼叫其他 Hook 的函式，用來重用「有狀態的邏輯」。', example: '`function useOnlineStatus() { … }`' },
+  '記憶化': { en: 'memoization', def: '記住計算結果或元件輸出，輸入沒變時直接重用，避免重複運算或重新渲染。', example: '`useMemo`、`useCallback`、`memo`' },
+  'React Compiler': { en: 'React Compiler', def: '在建置時自動分析元件並加上記憶化的編譯器，2025-10 發布 1.0。', example: '`babel-plugin-react-compiler`' },
+  'React DevTools Profiler': { en: 'Profiler', def: '瀏覽器擴充功能中的效能工具，可以看到每次渲染哪些元件花了多少時間。', example: '先量測，再優化。' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '用 createContext 與 Provider 提供資料',
+      '用 useContext（或 use）讀取 Context',
+      '判斷什麼資料適合放 Context',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-4）除了 Context，減少 prop drilling 還可以先考慮？', options: [
+        { text: '組合：用 children 把元件傳下去', correct: true, why: '中間層不必知道資料。' },
+        { text: '全域變數', why: 'React 不會知道它改變。' },
+        { text: '把所有元件寫在同一個檔案，就不用傳 props', why: '檔案位置和 props 傳遞無關。' },
+        { text: 'useRef', why: '無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['Context 像大樓的廣播系統：管理室（Provider）廣播「今天停水」，任何樓層的住戶（子元件）只要打開收音機（useContext）就聽得到，不用一戶戶傳話（prop drilling）。'],
+      limit: ['廣播一響全大樓都會聽到；Context 的值改變時，所有讀取它的元件都會重新渲染。頻繁變動的資料放 Context，可能讓大片畫面一直重繪。'],
+    },
+    model: {
+      svg: Fig.tree('Context 的結構：ThemeContext 的 Provider 包住整個 App 並提供 dark；中間的 Layout 與 Sidebar 不需要傳任何 props；深層的 Button 直接用 useContext 讀到 dark', { title: '<ThemeContext value="dark">', lines: ['在上層提供'], tone: 2 }, [
+        { title: 'Layout', lines: ['不用轉傳'], tone: 1 },
+        { title: 'Sidebar', lines: ['不用轉傳'], tone: 1 },
+        { title: 'Button', lines: ['`useContext`', '讀到 dark'], tone: 4 },
+      ]),
+      caption: '讀取時找「最近的」上層 Provider；找不到就用預設值。',
+      blocks: [
+        '[[Context]] 用 [[createContext]] 建立，[[Provider]] 提供值，子元件用 useContext 讀取。React 19 起 `<ThemeContext value={…}>` 可以直接當 Provider，也可以用 `use(ThemeContext)` 讀取（use 可以寫在條件裡）。適合放「很多地方都要用、不常變」的資料：主題、語言、登入使用者。',
+        { type: 'code', lang: 'tsx', title: 'theme.tsx', code: 'import { createContext, useContext, useState } from "react";\n\ntype Theme = "light" | "dark";\nconst ThemeContext = createContext<Theme>("light");\n\nexport function App() {\n  const [theme, setTheme] = useState<Theme>("light");\n  return (\n    <ThemeContext value={theme}>\n      <Layout />\n      <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>切換</button>\n    </ThemeContext>\n  );\n}\n\nfunction Button({ children }: { children: React.ReactNode }) {\n  const theme = useContext(ThemeContext);\n  return <button className={`btn-${theme}`}>{children}</button>;\n}' },
+      ],
+    },
+    define: [
+      { term: 'Context', en: 'Context', def: '`createContext(預設值)`；值改變時所有讀取它的元件重新渲染。', example: '可以有多個 Context，各自獨立。' },
+      { term: 'useContext', en: 'useContext / use', def: '讀取最近上層 Provider 的值；React 19 的 use(Context) 可以在條件中呼叫。', example: '`if (show) { const t = use(ThemeContext); }`' },
+      { term: 'prop drilling', en: 'prop drilling', def: '中間元件只為了轉傳而接收 props；層數少時其實沒問題。', example: '2–3 層的傳遞通常不需要 Context。' },
+    ],
+    examples: {
+      compare: [{
+        title: '把登入使用者傳到深層的頭像',
+        kind: 'prop drilling vs Context',
+        code: true,
+        badLabel: '一層層傳',
+        goodLabel: 'Context',
+        bad: '<App user={user}>\n  <Layout user={user}>\n    <Header user={user}>\n      <Avatar user={user} />',
+        good: '<{{1:UserContext value={user}}}>\n  <Layout>\n    <Header>\n      <Avatar />   {/* 裡面 useContext(UserContext) */}',
+        badResult: 'Layout、Header 根本不用 user，卻要接收並轉傳。',
+        goodResult: '只有真正需要的 Avatar 讀取。',
+        why: ['先試組合；很多地方都要用時再用 Context'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'const LangContext = createContext("zh-TW");\n\nfunction Label() {\n  const lang = useContext(LangContext);\n  return <span>{lang}</span>;\n}\n\nexport default function App() {\n  return (\n    <>\n      <Label />\n      <LangContext value="en">\n        <Label />\n        <LangContext value="ja">\n          <Label />\n        </LangContext>\n      </LangContext>\n    </>\n  );\n}',
+          predict: { q: '三個 Label 分別顯示？', options: ['zh-TW、en、ja', 'en、en、ja', 'ja、ja、ja'], answer: 0 },
+          output: 'zh-TW en ja\n（第一個沒有 Provider，用預設值；其他讀最近的上層 Provider）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ctx', label: '適合 Context' }, { id: 'not', label: '不適合' }],
+          items: [
+            { text: '深色或淺色主題', answer: 'ctx', why: '到處都要用、很少變。' },
+            { text: '登入的使用者資訊', answer: 'ctx', why: '很多元件需要。' },
+            { text: '輸入框每打一個字的內容', answer: 'not', why: '變動頻繁，會讓所有讀取者一直重新渲染。' },
+            { text: '只有父子兩層用到的資料', answer: 'not', why: '直接用 props。' },
+            { text: '介面語言', answer: 'ctx', why: '全域、不常變。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('Context 值改變的影響：值是新物件時，所有讀取者都重新渲染；把變動頻繁與不常變的資料拆成不同 Context，可以縮小影響範圍', { title: '一個大 Context', lines: ['任何欄位改變', '所有讀取者重繪'], tone: 5 }, { title: '拆成多個 Context', lines: ['只影響', '讀取那一個的元件'], tone: 4 }), caption: '每次渲染都建立新的 value 物件，也會讓讀取者重繪（React Compiler 可自動記憶化）。' },
+      ],
+      tryit: {
+        q: ['建立一個 Context，並在沒有 Provider 時拋出清楚的錯誤：'],
+        draft: 'const CartContext = createContext<Cart | null>(____);\n\nexport function useCart() {\n  const cart = useContext(CartContext);\n  if (!cart) throw new Error("useCart 必須在 ____ 裡使用");\n  return cart;\n}',
+        answer: ['`createContext<Cart | null>(null)`、`CartProvider`（或你的 Provider 名稱）。', '包一個自訂 Hook（4-3）：呼叫端不用每次檢查 null，忘記包 Provider 時錯誤訊息也很清楚。'],
+      },
+    },
+    mistakes: [
+      { wrong: '所有 state 都丟進一個全域 Context。', why: '任何一個欄位改變都讓整棵樹重新渲染。', right: '只放全域、不常變的資料；依用途拆成多個 Context。' },
+      { wrong: '兩三層的傳遞也改用 Context。', why: '資料來源變得不明顯。', right: '少量層級直接用 props 或組合。' },
+      { wrong: '忘了包 Provider，元件默默拿到預設值。', why: '不容易察覺。', right: '預設值設 null，用自訂 Hook 檢查並拋錯。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '沒有任何上層 Provider 時，useContext 會回傳？', options: [
+        { text: 'createContext 時給的預設值', correct: true, why: '找不到 Provider 就用預設值。' },
+        { text: 'undefined，因為找不到任何 Provider', why: '是預設值（除非預設值就是 undefined）。' },
+        { text: '拋出例外', why: 'React 不會自動拋例外。' },
+        { text: 'null', why: '同上。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'Context 的值是每次渲染都新建的物件 `{ user, logout }`，會造成？', options: [
+        { text: '每次 Provider 重新渲染，所有讀取者都重新渲染', correct: true, why: '參考每次都不同。' },
+        { text: '什麼都不會發生', why: '參考改變會觸發更新。' },
+        { text: '報錯', why: '不會報錯。' },
+        { text: '只有用到 user 的讀取者重新渲染，用 logout 的不會', why: 'Context 不會細分欄位，所有讀取者都會。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['Context 加上 useReducer（下一課）常被當成「輕量版 Redux」。什麼時候這樣就夠，什麼時候該用專門的狀態管理函式庫？'], answer: [
+        '中小型應用、全域狀態不多且更新不頻繁時，Context + useReducer 就夠。',
+        '狀態很多、更新很頻繁、需要細緻地只讓用到某欄位的元件重新渲染、或需要開發工具（時間旅行除錯）時，可以考慮 Zustand、Redux Toolkit 等。伺服器資料（快取、重新驗證）則交給 TanStack Query 或框架。',
+      ] },
+    ],
+    keypoints: [
+      'Context 讓深層元件直接讀取上層提供的資料。',
+      '適合全域、不常變的資料：主題、語言、登入使用者。',
+      '值改變時所有讀取者重新渲染；依用途拆分，忘記 Provider 要能報錯。',
+    ],
+    sources: ['react-context'],
+  },
+
+  '4-2': {
+    goals: [
+      '把分散的 setState 集中到 reducer',
+      '用 dispatch 送出描述事件的 action',
+      '判斷什麼時候用 useReducer 比 useState 好',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-3）reducer 裡更新陣列 state 應該？', options: [
+        { text: '回傳新陣列', correct: true, why: 'reducer 也必須是不可變更新。' },
+        { text: 'push 後回傳原陣列', why: '參考沒變，不會更新。' },
+        { text: '直接修改，不用回傳', why: 'reducer 要回傳新 state。' },
+        { text: '呼叫 setState', why: 'reducer 裡不呼叫 setState。' },
+      ] },
+    ],
+    analogy: {
+      text: ['useState 像每個員工自己改帳本；useReducer 像所有人都只填「異動單」（action），交給會計（reducer）統一入帳。帳要怎麼改，全部寫在會計的規則裡，查帳時只看一個地方。'],
+      limit: ['只有一兩個欄位時，填單、交單反而麻煩；簡單的 state 用 useState 更直接。'],
+    },
+    model: {
+      svg: Fig.row('useReducer 的流程：事件處理函式 dispatch 一個 action，例如 type added；reducer 根據目前 state 與 action 計算新 state；React 用新 state 重新渲染', [
+        { title: '事件', lines: ['`dispatch({`', '`type: "added" })`'], tone: 1 },
+        { title: 'reducer', lines: ['`(state, action)`', '`=> newState`'], tone: 3 },
+        { title: '重新渲染', lines: ['用新 state'], tone: 4 },
+      ]),
+      caption: '元件只說「發生了什麼」，reducer 決定「state 怎麼變」。',
+      blocks: [
+        '[[useReducer]] 把更新邏輯集中在 [[reducer]] 純函式裡。元件用 [[dispatch]] 送出 action（描述發生了什麼，例如 "added"、"deleted"），而不是直接設定值。好處：邏輯集中、容易測試（純函式）、多個欄位要一起改時不會漏。',
+        { type: 'code', lang: 'tsx', title: 'todos.ts', code: 'type Todo = { id: number; text: string; done: boolean };\ntype Action =\n  | { type: "added"; text: string }\n  | { type: "toggled"; id: number }\n  | { type: "deleted"; id: number };\n\nfunction todosReducer(todos: Todo[], action: Action): Todo[] {\n  switch (action.type) {\n    case "added":\n      return [...todos, { id: Date.now(), text: action.text, done: false }];\n    case "toggled":\n      return todos.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t));\n    case "deleted":\n      return todos.filter((t) => t.id !== action.id);\n  }\n}\n\n// 元件裡\nconst [todos, dispatch] = useReducer(todosReducer, []);\ndispatch({ type: "added", text: "買牛奶" });' },
+      ],
+    },
+    define: [
+      { term: 'reducer', en: 'reducer', def: '純函式：相同 state 與 action 一定得到相同結果；不呼叫 API、不產生亂數副作用（Date.now 這類最好由 action 帶入）。', example: '可以單獨寫單元測試。' },
+      { term: 'action', en: 'action', def: '描述使用者做了什麼的物件，慣例有 type 欄位；用 TypeScript 的可辨識聯合定義。', example: '`{ type: "deleted", id: 3 }`' },
+      { term: 'dispatch', en: 'dispatch', def: '送出 action；React 呼叫 reducer 算出新 state 並重新渲染。dispatch 函式本身是穩定的。', example: '可以安全地傳給子元件或放在 Context。' },
+    ],
+    examples: {
+      compare: [{
+        title: '購物車的多個操作',
+        kind: '分散的 setState vs reducer',
+        code: true,
+        badLabel: '每個處理函式各自改',
+        goodLabel: 'dispatch action',
+        bad: 'function add(p) { setItems([...items, p]); setTotal(total + p.price); }\nfunction remove(id) { setItems(items.filter(…)); /* 忘了改 total */ }',
+        good: 'function add(p) { {{1:dispatch({ type: "added", product: p })}}; }\nfunction remove(id) { {{1:dispatch({ type: "removed", id })}}; }\n// 規則都在 cartReducer 裡',
+        badResult: '邏輯散在各處，改一個地方忘了另一個。',
+        goodResult: '所有規則在 reducer 一個地方，容易檢查與測試。',
+        why: ['action 用「發生了什麼」命名（added），不是「要設定什麼」（setItems）'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'function counter(state: number, action: { type: "inc" | "dec" | "reset" }) {\n  switch (action.type) {\n    case "inc": return state + 1;\n    case "dec": return state - 1;\n    case "reset": return 0;\n  }\n}\n\nlet s = 5;\nfor (const a of ["inc", "inc", "dec", "reset", "inc"] as const) {\n  s = counter(s, { type: a });\n}\nconsole.log(s);',
+          predict: { q: '最後印出？', options: ['1', '6', '7'], answer: 0 },
+          output: '1\n（5 → 6 → 7 → 6 → 0 → 1；reducer 是純函式，可以這樣單獨測試）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'state', label: 'useState 就好' }, { id: 'reducer', label: '考慮 useReducer' }],
+          items: [
+            { text: '一個開關（是否展開）', answer: 'state', why: '單一簡單值。' },
+            { text: '待辦清單：新增、刪除、勾選、編輯、清除已完成', answer: 'reducer', why: '多種操作改同一份資料。' },
+            { text: '表單有 10 個欄位且彼此有連動規則', answer: 'reducer', why: '邏輯集中比較好管理。' },
+            { text: '輸入框文字', answer: 'state', why: '單一值。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('useState 與 useReducer：useState 簡單、更新邏輯寫在事件處理函式裡；useReducer 把邏輯集中在 reducer，元件只送出 action，適合多種操作改同一份資料', { title: 'useState', lines: ['簡單直接', '邏輯在事件處理'], tone: 3 }, { title: 'useReducer', lines: ['邏輯集中', '元件只 dispatch'], tone: 4 }), caption: '兩者可以混用；從 useState 開始，變複雜再改。' },
+      ],
+      tryit: {
+        q: ['為 reducer 加上「清除已完成」的 action：'],
+        draft: 'type Action = … | { type: "____" };\n\ncase "clearedDone":\n  return todos.____((t) => !t.done);',
+        answer: ['`{ type: "clearedDone" }`、`todos.filter((t) => !t.done)`。', 'Action 是可辨識聯合（TypeScript 2-2），switch 漏處理新的 type 時 TypeScript 會提醒。'],
+      },
+    },
+    mistakes: [
+      { wrong: 'reducer 裡修改 state 再回傳。', why: '參考沒變，React 不會更新；也破壞純函式。', right: '回傳新物件或新陣列。' },
+      { wrong: 'reducer 裡呼叫 API 或 setTimeout。', why: 'reducer 要是純函式，可能被呼叫多次。', right: '副作用放在事件處理函式，結果再 dispatch。' },
+      { wrong: 'action 命名成 `setItems`、`setTotal`。', why: '又回到「元件決定怎麼改」，失去集中的好處。', right: '用事件命名：`added`、`removed`、`checkedOut`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'reducer 的簽章是？', options: [
+        { text: '`(state, action) => newState`', correct: true, why: '純函式。' },
+        { text: '`(action) => void`', why: '要接收 state 並回傳新 state。' },
+        { text: '`() => state`', why: '需要 action。' },
+        { text: '`(state) => { setState(next); }`', why: 'reducer 不呼叫 setState，而是回傳新 state。' },
+      ] },
+      { level: '應用', type: 'mc', q: '為什麼 reducer 很好測試？', options: [
+        { text: '它是純函式，給定輸入就能斷言輸出', correct: true, why: '不需要渲染元件。' },
+        { text: 'React 會自動測試', why: '不會。' },
+        { text: '它不需要測試', why: '仍需要。' },
+        { text: '它沒有分支，所以一個測試就夠了', why: '通常有很多分支。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['C# 與 TypeScript 課程都提到「可辨識聯合」。在 useReducer 裡它扮演什麼角色？'], answer: [
+        'Action 型別寫成可辨識聯合（以 type 欄位區分）：在 switch 的每個 case 裡，TypeScript 知道 action 有哪些欄位（例如 "deleted" 一定有 id）。',
+        '新增一種 action 時，加上窮舉檢查（never），所有沒處理的 reducer 都會在編譯時報錯。',
+      ] },
+    ],
+    keypoints: [
+      'useReducer 把更新邏輯集中在純函式 reducer。',
+      '元件 dispatch 描述「發生什麼」的 action，不直接設定值。',
+      '多種操作改同一份資料時用它；reducer 要純、要回傳新 state。',
+    ],
+    sources: ['react-reducer'],
+  },
+
+  '4-3': {
+    goals: [
+      '把重複的有狀態邏輯抽成自訂 Hook',
+      '遵守自訂 Hook 的命名與規則',
+      '分辨「共用邏輯」與「共用狀態」',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）Hook 只能在哪裡呼叫？', options: [
+        { text: '元件或自訂 Hook 的最上層', correct: true, why: '這課會寫自訂 Hook。' },
+        { text: '任何函式', why: '一般函式不能呼叫 Hook。' },
+        { text: '條件判斷裡', why: '違反規則。' },
+        { text: '事件處理函式或 useEffect 的回呼裡', why: '不行，只能在最上層。' },
+      ] },
+    ],
+    analogy: {
+      text: ['自訂 Hook 像一份食譜卡：「如何追蹤網路是否連線」寫一次，任何元件照食譜做都會有自己的一份。兩個元件用同一張食譜，做出的是兩盤菜，不是共用同一盤。'],
+      limit: ['食譜不會讓兩盤菜同步；需要多個元件共用「同一份」資料時，要提升 state 或用 Context，自訂 Hook 本身不會共享狀態。'],
+    },
+    model: {
+      svg: Fig.tree('自訂 Hook useOnlineStatus 封裝了 useState 與 useEffect；StatusBar 與 SaveButton 都呼叫它，各自得到一份獨立的 state，但邏輯只寫一次', { title: 'useOnlineStatus()', lines: ['`useState` + `useEffect`'], tone: 2 }, [
+        { title: 'StatusBar', lines: ['自己的一份 state'], tone: 3 },
+        { title: 'SaveButton', lines: ['自己的一份 state'], tone: 4 },
+      ]),
+      caption: '共用的是邏輯，不是狀態。',
+      blocks: [
+        '[[自訂 Hook]] 是名稱以 use 開頭、內部呼叫其他 Hook 的函式。它讓「有狀態的邏輯」（訂閱、表單、資料抓取）可以重用。每次呼叫都有獨立的 state。好的自訂 Hook 描述「做什麼」（useOnlineStatus），而不是「怎麼做」（useMountEffect）。',
+        { type: 'code', lang: 'tsx', title: 'useOnlineStatus.ts', code: 'import { useSyncExternalStore } from "react";\n\nfunction subscribe(callback: () => void) {\n  window.addEventListener("online", callback);\n  window.addEventListener("offline", callback);\n  return () => {\n    window.removeEventListener("online", callback);\n    window.removeEventListener("offline", callback);\n  };\n}\n\nexport function useOnlineStatus(): boolean {\n  return useSyncExternalStore(subscribe, () => navigator.onLine, () => true);\n}\n\n// 使用\nfunction SaveButton() {\n  const isOnline = useOnlineStatus();\n  return <button disabled={!isOnline}>{isOnline ? "儲存" : "離線中…"}</button>;\n}' },
+      ],
+    },
+    define: [
+      { term: '自訂 Hook', en: 'custom Hook', def: '以 `use` 開頭的函式，內部可以呼叫 Hook；同樣遵守 Hook 規則。', example: '`useDebounce`、`useLocalStorage`、`useMediaQuery`' },
+      { term: 'useSyncExternalStore', en: 'useSyncExternalStore', def: '訂閱 React 以外的資料來源（瀏覽器 API、第三方 store）的官方 Hook，避免撕裂（tearing）。', example: '訂閱 navigator.onLine、matchMedia。' },
+      { term: '獨立狀態', en: 'isolated state', def: '每個呼叫自訂 Hook 的元件都有自己的 state；要共享就提升或用 Context。', example: '兩個 `useCounter()` 互不影響。' },
+    ],
+    examples: {
+      compare: [{
+        title: '兩個元件都要追蹤視窗寬度',
+        kind: '複製貼上 vs 自訂 Hook',
+        code: true,
+        badLabel: '每個元件各寫一次',
+        goodLabel: 'useWindowWidth',
+        bad: 'function Header() {\n  const [w, setW] = useState(window.innerWidth);\n  useEffect(() => { /* 監聽 resize… */ }, []);\n}\nfunction Sidebar() {\n  const [w, setW] = useState(window.innerWidth);\n  useEffect(() => { /* 再寫一次… */ }, []);\n}',
+        good: 'function Header() {\n  const w = {{1:useWindowWidth()}};\n}\nfunction Sidebar() {\n  const w = {{1:useWindowWidth()}};\n}',
+        badResult: '相同邏輯寫兩次，修 bug 要改兩處。',
+        goodResult: '邏輯寫一次；元件只表達「我需要視窗寬度」。',
+        why: ['元件裡出現一大段 useState + useEffect 時，考慮抽成自訂 Hook'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'function useCounter() {\n  const [n, setN] = useState(0);\n  return { n, inc: () => setN((x) => x + 1) };\n}\n\nfunction A() { const c = useCounter(); return <button onClick={c.inc}>A：{c.n}</button>; }\nfunction B() { const c = useCounter(); return <span>B：{c.n}</span>; }\n// 點 A 三下',
+          predict: { q: 'B 顯示多少？', options: ['B：0', 'B：3', 'B：1'], answer: 0 },
+          output: 'A：3\nB：0\n（每次呼叫自訂 Hook 都有自己的 state）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'hook', label: '適合自訂 Hook' }, { id: 'fn', label: '一般函式就好' }],
+          items: [
+            { text: '追蹤 localStorage 某個鍵的值並同步', answer: 'hook', why: '需要 state 與 effect。' },
+            { text: '把金額格式化成千分位字串', answer: 'fn', why: '純計算，不用 Hook。' },
+            { text: '輸入防抖：停止輸入 300ms 後才更新值', answer: 'hook', why: '需要 state 與計時器 effect。' },
+            { text: '計算兩個日期相差幾天', answer: 'fn', why: '純計算。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('命名：好的自訂 Hook 描述目的，例如 useOnlineStatus、useChatRoom；不好的描述生命週期，例如 useMount、useUpdateEffect', { title: '描述目的 ✓', lines: ['useOnlineStatus', 'useChatRoom'], tone: 4 }, { title: '描述生命週期 ✗', lines: ['useMount', 'useUpdateEffect'], tone: 5 }), caption: '函式不用到任何 Hook 時，不要用 use 開頭。' },
+      ],
+      tryit: {
+        q: ['寫一個 useToggle：回傳目前的布林值與切換函式：'],
+        draft: 'function useToggle(initial = false) {\n  const [on, setOn] = ____(initial);\n  const toggle = () => setOn((v) => ____);\n  return [on, toggle] as const;\n}',
+        answer: ['`useState(initial)`、`!v`。', '`as const` 讓回傳型別是 `readonly [boolean, () => void]`，呼叫端解構時每個位置的型別都正確。'],
+      },
+    },
+    mistakes: [
+      { wrong: '純計算的函式也取名 useXxx。', why: '誤導讀者，也受到 Hook 規則限制（不能在條件裡呼叫）。', right: '沒用到 Hook 就用一般函式名稱。' },
+      { wrong: '以為兩個元件用同一個自訂 Hook 就會共享 state。', why: '每次呼叫都有獨立的 state。', right: '共享用狀態提升或 Context。' },
+      { wrong: '寫一個 useMount(fn) 包住 `useEffect(fn, [])`。', why: '隱藏了相依陣列，容易讀到舊值。', right: '寫描述目的的 Hook，內部的 Effect 正確列出相依。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '自訂 Hook 的名稱必須？', options: [
+        { text: '以 use 開頭', correct: true, why: 'lint 與 React 依此辨識 Hook。' },
+        { text: '以 Hook 結尾', why: '不是規則。' },
+        { text: '大寫開頭', why: '那是元件。' },
+        { text: '沒有規定', why: '有規定。' },
+      ] },
+      { level: '應用', type: 'mc', q: '兩個元件都呼叫 `useCart()`（內部用 useState），其中一個加入商品後，另一個？', options: [
+        { text: '看不到變化，因為各自有獨立 state', correct: true, why: '要共享就把 state 放進 Context 再由 Hook 讀取。' },
+        { text: '自動同步，因為用的是同一個 useCart', why: '自訂 Hook 不共享狀態。' },
+        { text: '報錯', why: '不會報錯。' },
+        { text: '要重新整理頁面才同步', why: '根本不會同步。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你常在元件裡寫「fetch 資料 + loading + error + 取消」的 Effect。抽成 useFetch 自訂 Hook 之後，還缺少什麼？為什麼很多團隊最後改用 TanStack Query 或框架？'], answer: [
+        'useFetch 解決了重複程式碼，但仍缺：跨元件快取、重複請求合併、背景重新驗證、分頁、重試、伺服器渲染整合。',
+        '這些自己做很容易出錯，所以資料抓取通常交給專門函式庫或框架的資料層（5-3）。自訂 Hook 適合包裝這些函式庫，例如 `useProducts()` 內部呼叫 useQuery。',
+      ] },
+    ],
+    keypoints: [
+      '自訂 Hook 以 use 開頭，用來重用有狀態的邏輯。',
+      '每次呼叫都有獨立 state；共享要提升或用 Context。',
+      '用目的命名（useOnlineStatus），不用生命週期命名（useMount）。',
+    ],
+    sources: ['react-custom-hooks'],
+  },
+
+  '4-4': {
+    goals: [
+      '說出元件什麼時候會重新渲染',
+      '知道 memo、useMemo、useCallback 的用途',
+      '了解 React Compiler 自動記憶化，先量測再優化',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-1）Context 的 value 每次都是新物件，會？', options: [
+        { text: '讓所有讀取者每次都重新渲染', correct: true, why: '參考每次都不同。' },
+        { text: '沒有影響', why: '有影響。' },
+        { text: '只影響 Provider 本身', why: '影響讀取者。' },
+        { text: '報錯', why: '不會報錯。' },
+      ] },
+    ],
+    analogy: {
+      text: ['記憶化像便利商店的熱食櫃：同樣的便當有人點，直接從櫃子拿（重用結果），不用重做。但熱食櫃也要花電與空間；不熱門的東西放進去反而浪費。React Compiler 像一位會自動判斷「哪些值得放熱食櫃」的店長。'],
+      limit: ['店長再厲害也只能幫你省「重做」的時間；如果問題是食材本身就難做（演算法太慢、清單有上萬筆），要換做法（虛擬化清單、分頁），不是靠熱食櫃。'],
+    },
+    model: {
+      svg: Fig.row('元件重新渲染的三個原因：自己的 state 改變；讀取的 Context 改變；父元件重新渲染（預設子元件也跟著渲染，除非被記憶化而且 props 沒變）', [
+        { title: '自己的 state', lines: ['改變'], tone: 1 },
+        { title: '讀取的 Context', lines: ['改變'], tone: 3 },
+        { title: '父元件渲染', lines: ['子元件預設跟著', '（memo 可略過）'], tone: 4 },
+      ], { arrows: false }),
+      caption: 'props 改變並不是單獨的原因：子元件跟著渲染，是因為父元件渲染了。',
+      blocks: [
+        '大部分重新渲染都很便宜，不需要優化。真的慢時：先用 [[React DevTools Profiler]] 量測，再考慮[[記憶化]]：`memo` 讓 props 沒變的元件略過渲染、`useMemo` 記住計算結果、`useCallback` 記住函式。[[React Compiler]] 1.0（2025-10）在建置時自動加上這些記憶化，新專案建議開啟，大多數情況不必再手寫。',
+        { type: 'code', lang: 'ts', title: 'vite.config.ts（啟用 React Compiler）', code: 'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({\n  plugins: [\n    react({\n      babel: { plugins: ["babel-plugin-react-compiler"] },\n    }),\n  ],\n});' },
+      ],
+    },
+    define: [
+      { term: '記憶化', en: 'memo / useMemo / useCallback', def: 'memo(Component)：props 淺比較沒變就略過；useMemo(() => 計算, deps)；useCallback(fn, deps)。', example: '`const sorted = useMemo(() => sort(list), [list]);`' },
+      { term: 'React Compiler', en: 'React Compiler', def: '建置時分析元件與 Hook，自動記憶化；要求程式遵守 React 規則（純渲染、不可變更新）。', example: '`npm i -D babel-plugin-react-compiler`' },
+      { term: 'Profiler', en: 'React DevTools Profiler', def: '錄製一段操作，顯示每個元件渲染的次數與時間，以及渲染的原因。', example: '找出真正慢的元件再優化。' },
+    ],
+    examples: {
+      compare: [{
+        title: '昂貴的篩選與排序',
+        kind: '手寫記憶化 vs React Compiler',
+        code: true,
+        badLabel: '到處手寫 useMemo／useCallback',
+        goodLabel: '交給 Compiler',
+        bad: 'const visible = useMemo(\n  () => products.filter((p) => p.name.includes(q)).toSorted(byPrice),\n  [products, q],\n);\nconst onSelect = useCallback((id) => setSelected(id), []);',
+        good: '// 開啟 React Compiler 後，照一般寫法即可\nconst visible = products.filter((p) => p.name.includes(q)).toSorted(byPrice);\nconst onSelect = (id: number) => setSelected(id);',
+        badResult: '可行，但相依陣列容易寫錯，程式也變冗長。',
+        goodResult: 'Compiler 自動記憶化，程式維持簡單。',
+        why: ['Compiler 依賴你遵守 React 規則；違反規則的元件會被它略過'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'function Child({ label }: { label: string }) {\n  console.log("Child 渲染");\n  return <p>{label}</p>;\n}\n\nexport default function Parent() {\n  const [n, setN] = useState(0);\n  return (\n    <>\n      <button onClick={() => setN(n + 1)}>{n}</button>\n      <Child label="固定文字" />\n    </>\n  );\n}\n// 沒有開 React Compiler，點按鈕一下',
+          predict: { q: 'Child 會重新渲染嗎？', options: ['會', '不會，因為 label 沒變', '只有第一次'], answer: 0 },
+          output: 'Child 渲染\n（父元件渲染時子元件預設也會渲染；用 memo(Child) 或開啟 React Compiler 可略過）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'need', label: '值得優化' }, { id: 'skip', label: '不需要' }],
+          items: [
+            { text: 'Profiler 顯示某個清單元件每次輸入都花 80ms', answer: 'need', why: '量測證實有問題。' },
+            { text: '一個只顯示標題的小元件多渲染了一次', answer: 'skip', why: '成本極低。' },
+            { text: '渲染一萬筆資料的表格', answer: 'need', why: '考慮虛擬化（只渲染看得到的列）。' },
+            { text: '「感覺」useCallback 比較快，全部包起來', answer: 'skip', why: '沒有量測依據，徒增複雜度。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.stack('效能優化的順序：先用 Profiler 量測找出慢的元件；確認是渲染次數多還是單次太慢；次數多就開啟 React Compiler 或 memo；單次太慢就改演算法、分頁或虛擬化', [
+          { title: '1. Profiler 量測，找出慢的元件', tone: 1 },
+          { title: '2. 是「次數多」還是「單次慢」？', tone: 2 },
+          { title: '3. 次數多 → React Compiler／memo', tone: 3 },
+          { title: '4. 單次慢 → 改演算法、分頁、虛擬化', tone: 4 },
+        ]), caption: '沒量測就優化，常常白忙一場。' },
+      ],
+      tryit: {
+        q: ['沒有 React Compiler 的專案，要讓 Child 在 label 沒變時略過渲染：'],
+        draft: 'import { ____ } from "react";\n\nconst Child = ____(function Child({ label }: { label: string }) {\n  return <p>{label}</p>;\n});',
+        answer: ['`import { memo } from "react";`、`const Child = memo(function Child(…) {…})`。', '注意：如果父元件每次傳入新的物件或函式 prop，淺比較仍會判定改變；這時還要 useMemo／useCallback，這也是 Compiler 方便的原因。'],
+      },
+    },
+    mistakes: [
+      { wrong: '沒有量測就到處加 useMemo、useCallback。', why: '增加複雜度與記憶體，效能不一定變好。', right: '先 Profiler；新專案直接開 React Compiler。' },
+      { wrong: 'memo 了子元件，卻每次傳新的物件或箭頭函式 prop。', why: '淺比較每次都判定不同，memo 白做。', right: '搭配 useMemo／useCallback，或交給 Compiler。' },
+      { wrong: '一萬筆清單想靠 memo 解決卡頓。', why: '單次渲染本身太重。', right: '虛擬化（只渲染可見的列）或分頁。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '父元件重新渲染時，子元件預設會？', options: [
+        { text: '也重新渲染', correct: true, why: '除非被記憶化且 props 沒變。' },
+        { text: '只有 props 改變才渲染', why: '那是 memo 之後的行為。' },
+        { text: '永遠不渲染', why: '會渲染。' },
+        { text: '看子元件有沒有 state', why: '和這無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'React Compiler 主要做什麼？', options: [
+        { text: '建置時自動為元件與 Hook 加上記憶化', correct: true, why: '減少手寫 useMemo／useCallback。' },
+        { text: '把 React 編譯成原生 App', why: '那是 React Native。' },
+        { text: '取代 TypeScript 型別檢查', why: '無關。' },
+        { text: '讓 Effect 不需要相依陣列', why: '不會。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 React Compiler「要求程式遵守 React 規則」？舉一個違反規則、會讓 Compiler 出問題的寫法。'], answer: [
+        'Compiler 假設渲染是純函式、state 與 props 不會被直接修改，才能安全地重用上次的結果。',
+        '例如直接修改 state 物件（`items.push(x); setItems(items)`）或在渲染時修改外部變數：Compiler 可能重用舊結果，畫面就不會更新。eslint-plugin-react-hooks 的 recommended 規則會先幫你抓出這些問題。',
+      ] },
+    ],
+    keypoints: [
+      '重新渲染的原因：自己的 state、讀取的 Context、父元件渲染。',
+      '先用 Profiler 量測；次數多用記憶化，單次慢改演算法或虛擬化。',
+      'React Compiler 1.0 自動記憶化，前提是遵守 React 規則。',
+    ],
+    sources: ['react-compiler', 'react-learn'],
+  },
+});
+</script>

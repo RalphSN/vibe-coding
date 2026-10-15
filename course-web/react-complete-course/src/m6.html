@@ -1,0 +1,449 @@
+<script>
+/* ==========================================================================
+   模組 6：實戰工具
+   ========================================================================== */
+defineTerms({
+  'Props 型別': { en: 'props type', def: '用 type 或 interface 描述元件接收的 props；TypeScript 會檢查每個使用處。', example: '`type ButtonProps = { variant: "primary" | "ghost" }`' },
+  'ComponentProps': { en: 'React.ComponentProps', def: '取得某個元件或 HTML 元素的 props 型別，用來擴充原生元素。', example: '`React.ComponentProps<"button">`' },
+  '事件型別': { en: 'event types', def: 'React 的事件型別，例如 React.ChangeEvent<HTMLInputElement>、React.MouseEvent<HTMLButtonElement>。', example: '`(e: React.ChangeEvent<HTMLInputElement>) => …`' },
+  'Vitest': { en: 'Vitest', def: '與 Vite 整合的測試框架，API 與 Jest 相近、速度快。', example: '`npx vitest`' },
+  'Testing Library': { en: 'React Testing Library', def: '以「使用者怎麼看、怎麼操作」來測試元件的函式庫：依角色、文字找元素，而不是依實作細節。', example: '`screen.getByRole("button", { name: "送出" })`' },
+  'user-event': { en: '@testing-library/user-event', def: '模擬真實使用者操作（打字、點擊、Tab）的工具，比直接觸發事件更接近實際行為。', example: '`await user.click(button)`' },
+  'Activity': { en: '<Activity>', def: 'React 19.2 起的元件：用 mode="hidden" 隱藏一塊畫面，同時保留它的 state，並延後它的更新與 Effect。', example: '`<Activity mode={tab === "a" ? "visible" : "hidden"}>`' },
+  'ViewTransition': { en: '<ViewTransition>', def: 'React 19.3 起穩定的元件：在 Transition 更新時，用瀏覽器的 View Transition API 為進場、離場、變化加上動畫。', example: '`<ViewTransition><Item /></ViewTransition>`' },
+  'Fragment ref': { en: 'Fragment refs', def: 'React 19.3 起穩定：可以對 Fragment 加 ref，取得能操作其下所有 DOM 子節點的物件（加事件、聚焦、觀察）。', example: '`<Fragment ref={fragmentRef}>`' },
+  '框架': { en: 'React framework', def: '在 React 之上提供路由、資料抓取、伺服器渲染、打包設定的整套工具，例如 Next.js、React Router。', example: 'React 官方建議新專案從框架開始。' },
+  'SPA': { en: 'single-page application', def: '單頁應用：只載入一次 HTML，之後全部由瀏覽器端的 JavaScript 切換畫面。', example: 'Vite + React Router 的資料模式。' },
+});
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '為 props、state、事件寫型別',
+      '用 ComponentProps 擴充原生元素',
+      '用可辨識聯合讓 props 組合不會出錯',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-4）children 的型別通常寫？', options: [
+        { text: '`React.ReactNode`', correct: true, why: '可以是文字、元素、陣列、null。' },
+        { text: '`JSX.Element`', why: '太窄，不接受文字或陣列。' },
+        { text: '`string`', why: '太窄。' },
+        { text: '`any`', why: '失去檢查。' },
+      ] },
+    ],
+    analogy: {
+      text: ['為 props 寫型別，像在插座旁貼上「只接受 110V、兩孔」：任何人插錯插頭，在動工前（編譯時）就會被擋下，而不是插上去才冒煙（執行時錯誤）。'],
+      limit: ['規格貼紙只對「從程式碼插進來」的東西有效；從 API 來的資料仍要在邊界驗證（TypeScript 課程 6-2）。'],
+    },
+    model: {
+      svg: Fig.row('React 中最常寫型別的三個地方：元件的 props 用 type 定義；useState 的泛型，初始值推不出來時才寫；事件處理函式的參數使用 React 的事件型別', [
+        { title: 'props', lines: ['`type Props = {…}`'], tone: 1 },
+        { title: 'useState', lines: ['`useState<User | null>`', '`(null)`'], tone: 3 },
+        { title: '事件', lines: ['`React.ChangeEvent`', '`<HTMLInputElement>`'], tone: 4 },
+      ], { arrows: false }),
+      caption: '其他大多交給推斷。',
+      blocks: [
+        '[[Props 型別]]用 type 描述；可選 props 加 `?`。useState 的初始值推不出完整型別時寫泛型（例如 `useState<User | null>(null)`）。[[事件型別]]用 React 提供的型別。要包裝原生元素時，用 [[ComponentProps]] 繼承所有原生屬性。',
+        { type: 'code', lang: 'tsx', title: 'Button.tsx', code: 'import type { ComponentProps } from "react";\n\ntype ButtonProps = ComponentProps<"button"> & {\n  variant?: "primary" | "ghost" | "danger";\n};\n\nexport function Button({ variant = "primary", className = "", ...rest }: ButtonProps) {\n  return <button className={`btn btn-${variant} ${className}`} {...rest} />;\n}\n\n// 使用：所有原生 button 屬性都有型別檢查與自動完成\n<Button variant="danger" type="submit" disabled={saving} onClick={handleDelete}>\n  刪除\n</Button>' },
+      ],
+    },
+    define: [
+      { term: 'Props 型別', en: 'props typing', def: '不需要 React.FC；直接為函式參數寫型別即可。', example: '`function Card({ title }: { title: string })`' },
+      { term: 'ComponentProps', en: 'ComponentProps<T>', def: 'T 可以是 HTML 標籤名（"input"）或元件；常搭配展開把其餘屬性傳給原生元素。', example: '`ComponentProps<typeof Button>`' },
+      { term: '事件型別', en: 'React event types', def: 'ChangeEvent、MouseEvent、KeyboardEvent、FormEvent 等，泛型參數是元素型別。', example: '`React.KeyboardEvent<HTMLInputElement>`' },
+    ],
+    examples: {
+      compare: [{
+        title: '連結或按鈕二選一的元件',
+        kind: '各自可選 vs 可辨識聯合',
+        code: true,
+        badLabel: 'href 與 onClick 都可選',
+        goodLabel: '用 as 區分',
+        bad: 'type Props = { href?: string; onClick?: () => void; label: string };\n// <Action label="x" />  兩個都沒給也通過',
+        good: 'type Props =\n  | { {{1:as: "link"}}; href: string; label: string }\n  | { {{1:as: "button"}}; onClick: () => void; label: string };',
+        badResult: '兩個都沒給、或兩個都給，型別都不擋。',
+        goodResult: '一定是「連結 + href」或「按鈕 + onClick」其中一種。',
+        why: ['props 有互斥組合時，用可辨識聯合（TypeScript 課程 2-2）'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'function Search() {\n  const [q, setQ] = useState("");\n  function handleChange(e) {\n    setQ(e.target.value);\n  }\n  return <input value={q} onChange={handleChange} />;\n}\n// tsc --noEmit（strict）',
+          predict: { q: 'tsc 會怎樣？', options: ['參數 e 隱含 any 的錯誤', '通過', 'useState 型別錯誤'], answer: 0 },
+          output: "!Search.tsx:3:24 - error TS7006: Parameter 'e' implicitly has an 'any' type.\n（改成 e: React.ChangeEvent<HTMLInputElement>，或直接寫成行內箭頭函式讓 TypeScript 推斷）",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'write', label: '要寫型別' }, { id: 'infer', label: '交給推斷' }],
+          items: [
+            { text: '元件的 props', answer: 'write', why: '參數無法推斷。' },
+            { text: '`useState(0)`', answer: 'infer', why: '推斷為 number。' },
+            { text: '`useState(null)` 之後要放 User', answer: 'write', why: '`useState<User | null>(null)`。' },
+            { text: '行內的 `onChange={(e) => …}`', answer: 'infer', why: '從 onChange 的型別推斷 e。' },
+            { text: '抽出去的 handleChange 函式參數', answer: 'write', why: '脫離了上下文，要寫事件型別。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('React.FC 與直接寫參數型別：舊寫法 const Card: React.FC<Props>；現在建議 function Card(props: Props)，比較簡單，泛型元件也比較好寫', { title: 'React.FC<Props>（舊）', lines: ['多一層包裝', '泛型元件難寫'], tone: 2 }, { title: '(props: Props)（建議）', lines: ['就是一般函式', '回傳型別自動推斷'], tone: 4 }), caption: '兩種都能用；新程式直接為參數寫型別。' },
+      ],
+      tryit: {
+        q: ['為輸入框的 onKeyDown 寫型別，按 Enter 時送出：'],
+        draft: 'function handleKeyDown(e: React.____<HTMLInputElement>) {\n  if (e.key === "____") submit();\n}',
+        answer: ['`React.KeyboardEvent<HTMLInputElement>`、`"Enter"`。', '注意中文輸入法選字時也會觸發 Enter，可以檢查 `e.nativeEvent.isComposing` 避免誤送。'],
+      },
+    },
+    mistakes: [
+      { wrong: 'props 寫成 any 或不寫型別。', why: '失去所有檢查與自動完成。', right: '一律為 props 寫 type。' },
+      { wrong: '`useState(null)` 沒寫泛型，之後 setUser(user) 報錯。', why: '推斷成只能是 null。', right: '`useState<User | null>(null)`。' },
+      { wrong: '包裝原生元素時手動列出 onClick、disabled 等屬性。', why: '永遠列不完，型別也不精確。', right: '`ComponentProps<"button">` 加上展開。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '輸入框 onChange 的事件型別是？', options: [
+        { text: '`React.ChangeEvent<HTMLInputElement>`', correct: true, why: 'React 的事件型別。' },
+        { text: '`Event`（瀏覽器原生的事件型別）', why: '原生型別，缺少 React 與目標元素的型別資訊。' },
+        { text: '`InputEvent<HTMLInputElement>`（原生輸入事件）', why: '不是 React 的型別，原生 InputEvent 也不是泛型。' },
+        { text: '`string`', why: '是事件物件。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`useState<User | null>(null)` 之後讀 `user.name` 會？', options: [
+        { text: '報錯：user 可能是 null', correct: true, why: '要先檢查或用 `user?.name`。' },
+        { text: '通過', why: 'strict 下會報錯。' },
+        { text: '自動轉成 User', why: '不會。' },
+        { text: '通過編譯，執行時才拋 TypeError', why: '型別錯誤在編譯時就被抓到。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做一個泛型的 Select 元件：options 是任意型別的陣列，onChange 回傳選中的那一個（型別要正確）。型別大概怎麼寫？'], answer: [
+        '`function Select<T>({ options, getLabel, onChange }: { options: T[]; getLabel: (o: T) => string; onChange: (o: T) => void })`。',
+        '傳入 `User[]` 時 onChange 的參數自動是 User。這是 TypeScript 課程 3-1 的泛型，用在元件上；用 `function` 宣告比 React.FC 好寫。',
+      ] },
+    ],
+    keypoints: [
+      'props 一定寫型別；useState 初始值推不出來時寫泛型。',
+      '事件用 React.ChangeEvent 等型別；包裝原生元素用 ComponentProps。',
+      '互斥的 props 組合用可辨識聯合。',
+    ],
+    sources: ['react-ts'],
+  },
+
+  '6-2': {
+    goals: [
+      '用 Vitest 與 Testing Library 測試元件',
+      '依角色與文字找元素，模擬使用者操作',
+      '說出「測行為不測實作」的意思',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-2）為什麼 reducer 特別好測試？', options: [
+        { text: '它是純函式，不用渲染就能測', correct: true, why: '元件測試則要渲染（這課）。' },
+        { text: 'React 會自動測試', why: '不會。' },
+        { text: '它沒有邏輯', why: '有很多邏輯。' },
+        { text: '它一定會用到 DOM', why: '不會。' },
+      ] },
+    ],
+    analogy: {
+      text: ['Testing Library 的哲學像請一位真實顧客試用：顧客不會去看你的 state 叫什麼名字，只會找到「送出」按鈕、點下去、看畫面上出現什麼。測試寫得像顧客，重構內部時測試就不會壞。'],
+      limit: ['顧客測試看不到內部細節，有些純邏輯（計算、reducer）直接寫單元測試更快、更精確。'],
+    },
+    model: {
+      svg: Fig.row('元件測試的四個步驟：render 渲染元件；用 screen.getByRole 依角色與名稱找元素；用 user-event 模擬點擊或輸入；用 expect 檢查畫面上出現的結果', [
+        { title: 'render', lines: ['渲染元件'], tone: 1 },
+        { title: '找元素', lines: ['`getByRole`'], tone: 2 },
+        { title: '操作', lines: ['`user.click`', '`user.type`'], tone: 3 },
+        { title: '斷言', lines: ['`expect(…)`'], tone: 4 },
+      ]),
+      caption: '依「使用者看得到的東西」找元素：角色、標籤文字、按鈕名稱。',
+      blocks: [
+        '[[Vitest]] 執行測試，[[Testing Library]] 渲染元件並找元素，[[user-event]] 模擬操作。優先用 `getByRole`（也順便檢查了無障礙），其次 `getByLabelText`、`getByText`；盡量不用 test id 與 CSS 選擇器。非同步出現的內容用 `findBy…`。',
+        { type: 'code', lang: 'tsx', title: 'Counter.test.tsx', code: 'import { render, screen } from "@testing-library/react";\nimport userEvent from "@testing-library/user-event";\nimport { expect, test } from "vitest";\nimport { Counter } from "./Counter";\n\ntest("clicking + increases the count", async () => {\n  const user = userEvent.setup();\n  render(<Counter />);\n\n  await user.click(screen.getByRole("button", { name: "+1" }));\n  await user.click(screen.getByRole("button", { name: "+1" }));\n\n  expect(screen.getByText("目前：2")).toBeInTheDocument();\n});' },
+      ],
+    },
+    define: [
+      { term: 'Testing Library', en: 'queries', def: 'getBy（找不到就失敗）、queryBy（找不到回傳 null，用來斷言不存在）、findBy（非同步等待出現）。', example: '`expect(screen.queryByText("錯誤")).toBeNull()`' },
+      { term: 'user-event', en: 'user-event', def: '`userEvent.setup()` 後 `await user.click/type/keyboard`，會依序觸發真實的事件順序。', example: '`await user.type(input, "hello")`' },
+      { term: '測行為不測實作', en: 'test behavior, not implementation', def: '只透過畫面與操作測試；不檢查 state 變數名、不呼叫元件內部函式。', example: '把 useState 改成 useReducer，測試不需要改。' },
+    ],
+    examples: {
+      compare: [{
+        title: '找到「送出」按鈕',
+        kind: '依實作 vs 依使用者',
+        code: true,
+        badLabel: 'CSS 選擇器',
+        goodLabel: '角色與名稱',
+        bad: 'container.querySelector(".form .btn-primary")',
+        good: 'screen.{{1:getByRole("button", { name: "送出" })}}',
+        badResult: '改 class 名稱測試就壞；也不知道按鈕對螢幕閱讀器是否可用。',
+        goodResult: '只要畫面上有名為「送出」的按鈕就找得到，還順便驗證了無障礙。',
+        why: ['找不到 getByRole 的元素，常常代表無障礙有問題'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'npx vitest 的輸出',
+          title: '先預測，再看測試結果',
+          code: '// 元件：送出後呼叫 API，1 秒後才顯示「已儲存」\ntest("shows saved message", async () => {\n  const user = userEvent.setup();\n  render(<SaveForm />);\n  await user.click(screen.getByRole("button", { name: "儲存" }));\n  expect(screen.getByText("已儲存")).toBeInTheDocument();\n});',
+          predict: { q: '這個測試會通過嗎？', options: ['不會：要用 findByText 等待', '會', '會，但很慢'], answer: 0 },
+          output: '!FAIL SaveForm.test.tsx > shows saved message\n!TestingLibraryElementError: Unable to find an element with the text: 已儲存\n（改成 expect(await screen.findByText("已儲存")).toBeInTheDocument()，並 mock API）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'get', label: 'getBy' }, { id: 'query', label: 'queryBy' }, { id: 'find', label: 'findBy' }],
+          items: [
+            { text: '確認按鈕存在（應該立刻在畫面上）', answer: 'get', why: '找不到就失敗。' },
+            { text: '確認錯誤訊息「不存在」', answer: 'query', why: '回傳 null 不會拋錯。' },
+            { text: '等待 API 回來後出現的清單', answer: 'find', why: '非同步等待。' },
+            { text: '確認標題文字正確', answer: 'get', why: '同步出現。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.stack('React 測試的分層：reducer、工具函式用單元測試，最快最多；元件用 Testing Library 測互動行為；少量端對端測試用 Playwright 驗證主要流程', [
+          { title: '單元測試：reducer、工具函式（最多）', tone: 4 },
+          { title: '元件測試：Testing Library（互動行為）', tone: 3 },
+          { title: '端對端：Playwright（主要流程，少量）', tone: 2 },
+        ], { arrows: false }), caption: '越往下越慢、越接近真實；比例上越少。' },
+      ],
+      tryit: {
+        q: ['測試「輸入少於 8 個字的密碼時顯示錯誤」：'],
+        draft: 'const user = userEvent.setup();\nrender(<SignupForm />);\nawait user.____(screen.getByLabelText("密碼"), "123");\nexpect(screen.getByRole("____")).toHaveTextContent("至少 8 個字元");',
+        answer: ['`await user.type(...)`、`getByRole("alert")`。', '元件裡錯誤訊息用 `role="alert"`（5-1），測試就能依角色找到；label 與 input 正確關聯時 getByLabelText 才找得到。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 class 或 test id 找元素。', why: '和實作綁太緊，也測不到無障礙。', right: '優先 getByRole、getByLabelText。' },
+      { wrong: '非同步出現的內容用 getBy。', why: '查詢時還沒出現就失敗。', right: '`await screen.findBy…`。' },
+      { wrong: '測試裡真的打外部 API。', why: '慢、不穩定、可能有副作用。', right: '用 MSW 之類的工具攔截請求並回傳假資料。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Testing Library 最推薦的查詢方式是？', options: [
+        { text: '`getByRole`', correct: true, why: '接近使用者與輔助科技的認知。' },
+        { text: '`getByTestId`', why: '最後手段。' },
+        { text: '`container.querySelector`', why: '依實作細節。' },
+        { text: '直接讀元件的 state', why: '測不到。' },
+      ] },
+      { level: '應用', type: 'mc', q: '要斷言「載入完成後，『載入中』文字消失」，用哪個查詢？', options: [
+        { text: '`queryByText` 搭配 `toBeNull`', correct: true, why: '不存在時不會拋錯。' },
+        { text: '`getByText`', why: '找不到會直接失敗。' },
+        { text: '`findByText`', why: '用來等待出現，不是消失。' },
+        { text: '`getByText("載入中")` 再檢查 `toBeInTheDocument()`', why: '那是驗證存在；找不到時 getBy 會直接失敗。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事把元件從 useState 重構成 useReducer，結果 20 個測試全壞了。這說明那些測試有什麼問題？'], answer: [
+        '測試在檢查實作細節（state 的名稱、內部函式、某個 setState 是否被呼叫），而不是使用者看得到的行為。',
+        '好的測試只透過畫面與操作驗證結果；重構不改變行為時，測試應該全部通過——這正是測試在重構時要提供的保護。',
+      ] },
+    ],
+    keypoints: [
+      'render → 依角色找元素 → user-event 操作 → 斷言畫面結果。',
+      '非同步用 findBy；斷言不存在用 queryBy。',
+      '測行為不測實作，重構時測試才不會壞。',
+    ],
+    sources: ['vitest', 'testing-library'],
+  },
+
+  '6-3': {
+    goals: [
+      '用 Activity 隱藏畫面但保留狀態',
+      '用 ViewTransition 為 Transition 更新加上動畫',
+      '知道 Fragment refs 能做什麼',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）用 key 改變元件會怎樣？', options: [
+        { text: '元件重建，內部 state 全部重置', correct: true, why: '這課的 Activity 則是「隱藏但保留」。' },
+        { text: '只重新渲染，state 保留不變', why: 'key 改變是重建，state 會重置。' },
+        { text: '沒有影響', why: '有影響。' },
+        { text: '報錯', why: '不會。' },
+      ] },
+    ],
+    analogy: {
+      text: ['條件渲染 `{show && <Panel />}` 像把房間拆掉，下次要用再重蓋（狀態歸零）。Activity 像把房間的燈關掉、門關上：裡面的東西都還在，下次打開門就是原樣。ViewTransition 則像換房間時的轉場：門滑開、新房間淡入。'],
+      limit: ['關燈的房間仍然佔空間；Activity 隱藏的子樹仍在記憶體裡，大量使用會增加記憶體。'],
+    },
+    model: {
+      svg: Fig.row('三個較新的功能：Activity（19.2）隱藏但保留狀態；ViewTransition（19.3 穩定）為 Transition 更新加動畫；Fragment refs（19.3 穩定）對 Fragment 加 ref 操作多個子節點', [
+        { title: '<Activity>', lines: ['19.2', '隱藏但保留 state'], tone: 1 },
+        { title: '<ViewTransition>', lines: ['19.3 穩定', 'Transition 時動畫'], tone: 3 },
+        { title: 'Fragment ref', lines: ['19.3 穩定', '操作多個子節點'], tone: 4 },
+      ], { arrows: false }),
+      caption: '2026-10-16 查證；以 react.dev 文件為準。',
+      blocks: [
+        '[[Activity]]（19.2）：`mode="hidden"` 時隱藏子樹、保留 state，並暫停它的 Effect，切回 visible 時恢復，適合分頁、側欄、預先渲染下一頁。[[ViewTransition]]（19.3 穩定）：包住要動畫的區塊，只有標記為 Transition 的更新（startTransition、Suspense 揭示、useDeferredValue）會觸發動畫，預設交叉淡入淡出。[[Fragment ref]]（19.3 穩定）：不用多包一層 div 就能對多個子節點加事件監聽、聚焦、觀察可見度。',
+        { type: 'code', lang: 'tsx', title: 'Tabs.tsx（React 19.3）', code: 'import { Activity, ViewTransition, startTransition, useState } from "react";\n\nexport function Tabs() {\n  const [tab, setTab] = useState<"posts" | "settings">("posts");\n\n  function select(next: typeof tab) {\n    startTransition(() => setTab(next));   // Transition 才會觸發 ViewTransition 動畫\n  }\n\n  return (\n    <>\n      <button onClick={() => select("posts")}>文章</button>\n      <button onClick={() => select("settings")}>設定</button>\n      <ViewTransition>\n        <Activity mode={tab === "posts" ? "visible" : "hidden"}>\n          <Posts />          {/* 切走再切回，捲動位置與輸入內容都還在 */}\n        </Activity>\n        <Activity mode={tab === "settings" ? "visible" : "hidden"}>\n          <Settings />\n        </Activity>\n      </ViewTransition>\n    </>\n  );\n}' },
+      ],
+    },
+    define: [
+      { term: 'Activity', en: '<Activity>', def: 'mode 為 "visible" 或 "hidden"；hidden 時以 CSS 隱藏、保留 state、卸除 Effect（清理）並以低優先度更新。', example: '分頁切換保留草稿。' },
+      { term: 'ViewTransition', en: '<ViewTransition>', def: '動畫類型：enter（加入）、exit（移除）、update（內容或樣式改變）、share（具名元素從一處移到另一處）；可用 CSS 類別或事件 props 自訂。', example: '`addTransitionType("forward")` 區分前進、後退動畫。' },
+      { term: 'Fragment ref', en: 'Fragment refs', def: '`<Fragment ref={r}>`；r.current 可以 addEventListener、focus、observeUsing 等，作用在 Fragment 底下的 DOM 子節點。', example: '用 IntersectionObserver 觀察一組項目是否可見。' },
+    ],
+    examples: {
+      compare: [{
+        title: '切換分頁時保留表單草稿',
+        kind: '條件渲染 vs Activity',
+        code: true,
+        badLabel: '條件渲染',
+        goodLabel: 'Activity',
+        bad: '{tab === "draft" && <DraftForm />}\n// 切到別的分頁，DraftForm 被卸載',
+        good: '<{{1:Activity mode={tab === "draft" ? "visible" : "hidden"}}}>\n  <DraftForm />\n</Activity>',
+        badResult: '切回來時輸入的內容全部消失。',
+        goodResult: '切回來時草稿還在；隱藏期間不執行它的 Effect。',
+        why: ['以前常把 state 提升到上層或存 localStorage 來避免這個問題'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'function Panel() {\n  const [open, setOpen] = useState(false);\n  return (\n    <>\n      <button onClick={() => setOpen(!open)}>切換</button>\n      {open && (\n        <ViewTransition>\n          <Details />\n        </ViewTransition>\n      )}\n    </>\n  );\n}\n// 點按鈕',
+          predict: { q: 'Details 出現時會有動畫嗎？', options: ['不會：這不是 Transition 更新', '會，預設淡入', '會，但只有離場'], answer: 0 },
+          output: '沒有動畫。\n（一般的 setState 是緊急更新；改成 startTransition(() => setOpen(!open)) 才會觸發 enter／exit 動畫）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'activity', label: 'Activity' }, { id: 'vt', label: 'ViewTransition' }, { id: 'frag', label: 'Fragment ref' }],
+          items: [
+            { text: '分頁切換時保留各分頁的捲動位置與輸入', answer: 'activity', why: '隱藏但保留狀態。' },
+            { text: '清單項目新增或刪除時淡入淡出', answer: 'vt', why: 'enter／exit 動畫。' },
+            { text: '對一組相鄰元素統一加上點擊監聽，又不想多包一層 div', answer: 'frag', why: 'Fragment ref。' },
+            { text: '預先在背景渲染使用者「可能」會點的下一頁', answer: 'activity', why: 'hidden 模式可以預先渲染。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('條件渲染與 Activity：條件渲染隱藏時卸載元件，state 消失，Effect 清理；Activity 隱藏時保留 state，Effect 清理，顯示時重新執行 Effect', { title: '{show && <X />}', lines: ['隱藏 = 卸載', 'state 消失'], tone: 5 }, { title: '<Activity hidden>', lines: ['隱藏 = 保留 state', 'Effect 暫停'], tone: 4 }), caption: 'Activity 隱藏時會執行 Effect 的清理，顯示時再執行 Effect；所以 Effect 一定要寫好清理（3-2）。' },
+      ],
+      tryit: {
+        q: ['讓側欄關閉時保留它的狀態：'],
+        draft: '<____ mode={isOpen ? "____" : "hidden"}>\n  <Sidebar />\n</Activity>',
+        answer: ['`<Activity mode={isOpen ? "visible" : "hidden"}>`。', '隱藏時 Sidebar 的 Effect 會被清理（例如停止輪詢），再打開時重新執行。'],
+      },
+    },
+    mistakes: [
+      { wrong: '包了 ViewTransition 卻沒有動畫。', why: '只有 Transition 更新會觸發。', right: '用 startTransition 包住更新，或在 Suspense、useDeferredValue 情境下使用。' },
+      { wrong: '把所有分頁都包 Activity 而且內容很重。', why: '隱藏的子樹仍佔記憶體。', right: '只對需要保留狀態的區塊使用；很少切回的直接卸載。' },
+      { wrong: 'Effect 沒寫清理，用了 Activity 之後行為異常。', why: 'hidden 時會清理、visible 時重新執行。', right: '每個 Effect 都要能正確地「清理再重來」。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`<Activity mode="hidden">` 的子元件會？', options: [
+        { text: '被隱藏但保留 state', correct: true, why: '顯示時恢復原樣。' },
+        { text: '被卸載，state 消失', why: '那是條件渲染。' },
+        { text: '照常顯示', why: 'hidden 會隱藏。' },
+        { text: '拋出錯誤', why: '不會。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'ViewTransition 在 React 19.3 的狀態是？', options: [
+        { text: '穩定 API', correct: true, why: '19.3 將 ViewTransition 與 Fragment Refs 轉為穩定。' },
+        { text: '仍是實驗性', why: '19.3 已轉為穩定。' },
+        { text: '已被移除', why: '沒有。' },
+        { text: '只能在 React Native 使用', why: '目前只支援 DOM。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['動畫原則說「只在真的有東西移動或變化時使用動畫」。ViewTransition 很方便，什麼情況下你會選擇「不加」動畫？'], answer: [
+        '純粹的資料更新（例如每秒更新的數字）、使用者需要快速連續操作的地方、以及使用者設定了「減少動態效果」時。',
+        'ViewTransition 建立在瀏覽器的 View Transition API 上，CSS 可以用 `@media (prefers-reduced-motion: reduce)` 關閉動畫；動畫應該幫助理解「什麼從哪裡變成什麼」，不是裝飾。',
+      ] },
+    ],
+    keypoints: [
+      'Activity（19.2）隱藏但保留 state，隱藏時清理 Effect。',
+      'ViewTransition（19.3 穩定）只對 Transition 更新加動畫。',
+      'Fragment refs（19.3 穩定）不用多包 div 就能操作多個子節點。',
+    ],
+    sources: ['react-activity', 'react-view-transition', 'react-193'],
+  },
+
+  '6-4': {
+    goals: [
+      '分辨 Vite SPA 與全端框架的差別',
+      '依需求選擇 Vite、React Router、Next.js',
+      '列出一個 React 專案上線前的檢查清單',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-4）Server Components 需要什麼？', options: [
+        { text: '支援 RSC 的框架', correct: true, why: '純 Vite SPA 不支援。' },
+        { text: '只要 React 19', why: '還需要框架整合。' },
+        { text: 'TypeScript', why: '不需要。' },
+        { text: 'Redux', why: '無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['Vite + React 像買一套好用的工具與木材，自己蓋小木屋：彈性大，但水電（路由、資料、伺服器渲染）要自己接。框架像買預售屋：格局、水電、管線都配好，照它的規矩住進去就好。'],
+      limit: ['預售屋改格局比較難；框架的慣例（檔案路由、資料載入方式）你得跟著走。小工具或內部系統未必需要整棟房子。'],
+    },
+    model: {
+      svg: Fig.tree('選擇方式：只在瀏覽器執行、不需要 SEO 的工具或內部系統，用 Vite 加 React Router 的 SPA；需要伺服器渲染、SEO、Server Components 的網站，用 Next.js 或 React Router 的框架模式', { title: '需要伺服器渲染或 SEO 嗎？' }, [
+        { title: '不需要', lines: ['Vite SPA', '+ React Router'], tone: 3 },
+        { title: '需要', lines: ['Next.js', 'React Router 框架模式'], tone: 4 },
+      ]),
+      caption: 'React 官方文件建議新專案從框架開始；確定不需要時再選 SPA。',
+      blocks: [
+        '[[SPA]] 只需要靜態主機（GitHub Pages、任何 CDN），部署最簡單。[[框架]]提供檔案式路由、資料載入、伺服器渲染、Server Components 與 Server Functions，需要能執行 Node.js（或邊緣執行環境）的主機。不論哪一種，上線前都要確認效能、無障礙、錯誤處理與安全。',
+        { type: 'table', caption: '常見選擇（2026-10）', head: ['選擇', '適合', '部署'], rows: [
+          ['Vite + React Router（SPA）', '內部系統、儀表板、工具', '靜態主機即可'],
+          ['React Router（框架模式）', '需要伺服器渲染、漸進增強的網站', 'Node 或邊緣執行環境'],
+          ['Next.js（App Router）', 'Server Components 為主的全端網站', 'Vercel 或任何 Node 主機'],
+          ['Expo', '手機 App（React Native）', 'App Store、Google Play'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'SPA', en: 'single-page app', def: '首次載入後由瀏覽器渲染所有畫面；首屏需要等 JavaScript 下載與執行。', example: 'Vite 產生的 dist/ 直接放到靜態主機。' },
+      { term: '伺服器渲染', en: 'SSR', def: '在伺服器先產生 HTML，使用者更快看到內容，搜尋引擎也能讀取；之後在瀏覽器 hydrate 成可互動。', example: '框架預設支援。' },
+      { term: '框架', en: 'framework', def: '在 React 之上整合路由、資料、渲染策略與建置的工具。', example: 'Next.js、React Router、Expo。' },
+    ],
+    examples: {
+      compare: [{
+        title: '公司內部的報表儀表板',
+        kind: '過度設計 vs 剛好',
+        badLabel: '全端框架 + Server Components',
+        goodLabel: 'Vite SPA',
+        bad: '登入後才看得到、不需要 SEO\n卻選了需要 Node 伺服器的框架\n還要維護伺服器、處理 RSC 邊界',
+        good: 'Vite + React Router + TanStack Query\nnpm run build → 靜態檔案\n放到內部的靜態主機或 CDN',
+        badResult: '多了伺服器維運與學習成本，換來用不到的 SEO 與首屏優化。',
+        goodResult: '部署最簡單，開發體驗快。',
+        why: ['公開網站、內容型網站、需要 SEO 時，才是框架的主場'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'spa', label: 'Vite SPA' }, { id: 'framework', label: '全端框架' }],
+          items: [
+            { text: '公司內部的請假系統', answer: 'spa', why: '登入後使用、不需要 SEO。' },
+            { text: '電商網站的商品頁', answer: 'framework', why: 'SEO 與首屏速度很重要。' },
+            { text: '部落格與文件網站', answer: 'framework', why: '內容需要被搜尋引擎讀取（也可以用靜態網站產生器）。' },
+            { text: '一個在瀏覽器裡跑的圖片編輯工具', answer: 'spa', why: '全部在客戶端運作。' },
+          ],
+        } },
+        { type: 'widget', name: 'csrun', props: {
+          file: '終端機（Vite SPA）',
+          title: '先預測，再看結果',
+          lang: 'BASH',
+          hl: 'bash',
+          code: 'npm run build\nls dist',
+          predict: { q: 'dist 資料夾裡主要是什麼？', options: ['index.html 與 assets（JS、CSS）靜態檔案', '需要 Node 執行的伺服器程式', '原始的 .tsx 檔'], answer: 0 },
+          output: 'index.html\nassets/\n  index-Bx3k.js\n  index-D9aQ.css\n（檔名中的雜湊為示意；可以直接放到任何靜態主機）',
+        } },
+        { type: 'svg', svg: Fig.stack('上線前的檢查清單：TypeScript 與 ESLint 零錯誤、測試通過；Lighthouse 或 Core Web Vitals 檢查效能；鍵盤與螢幕閱讀器能操作；錯誤邊界與錯誤回報；環境變數與金鑰不進前端程式碼', [
+          { title: '1. tsc、eslint 零錯誤，測試通過', tone: 1 },
+          { title: '2. 效能：Core Web Vitals、bundle 大小', tone: 3 },
+          { title: '3. 無障礙：鍵盤、螢幕閱讀器', tone: 4 },
+          { title: '4. 錯誤邊界與錯誤回報', tone: 2 },
+          { title: '5. 金鑰不進前端（VITE_ 開頭會公開）', tone: 5 },
+        ], { arrows: false }), caption: 'Vite 只會把 VITE_ 開頭的環境變數放進前端程式碼，所以祕密金鑰絕對不能用 VITE_ 開頭。' },
+      ],
+      tryit: {
+        q: ['把 Vite SPA 部署到 GitHub Pages 的子路徑 `/my-app/`，vite.config.ts 要設定什麼？'],
+        draft: 'export default defineConfig({\n  ____: "/my-app/",\n  plugins: [react()],\n});',
+        answer: ['`base: "/my-app/"`。', 'SPA 使用瀏覽器路由時，GitHub Pages 重新整理子頁面會 404；常見解法是用 hash 路由或提供 404.html 轉址。'],
+      },
+    },
+    mistakes: [
+      { wrong: '內部工具也選全端框架，結果大部分時間在處理伺服器與部署。', why: '用不到的能力也有成本。', right: '依需求選擇，不需要 SEO 與 SSR 就用 SPA。' },
+      { wrong: '把 API 金鑰放在 `VITE_API_KEY`。', why: 'VITE_ 開頭的變數會被打包進前端，任何人都看得到。', right: '金鑰只放在伺服器端，前端呼叫自己的後端代理。' },
+      { wrong: '照舊教學用 create-react-app。', why: '已停止維護。', right: 'Vite 或框架的官方建立指令。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Vite SPA 的 `npm run build` 產生的是？', options: [
+        { text: '可以放到靜態主機的 HTML、JS、CSS', correct: true, why: '不需要 Node 伺服器。' },
+        { text: '一定要 Node 才能執行的伺服器', why: '那是全端框架。' },
+        { text: '手機 App', why: '那是 React Native／Expo。' },
+        { text: '資料庫', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '需要 SEO 的電商網站，比較適合？', options: [
+        { text: '支援伺服器渲染的框架', correct: true, why: '首屏 HTML 就有內容。' },
+        { text: '純 SPA，SEO 交給搜尋引擎爬蟲自己執行 JavaScript', why: '不可靠，首屏也慢。' },
+        { text: 'create-react-app', why: '已停止維護。' },
+        { text: '不用 React', why: '不一定需要放棄 React。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['回顧整門課：一個「待辦清單」從 SPA 演變成多人協作的全端網站，會依序用到哪些模組的知識？'], answer: [
+        '起步：元件、props、state、清單 key、事件（模組 0–2）；不可變更新與 useReducer 管理清單（2-3、4-2）；自訂 Hook 包裝 localStorage 同步（4-3）。',
+        '變成全端：表單 Actions 與樂觀更新（5-2）、Suspense 載入資料（5-3）、Server Components 與 Server Functions（5-4，注意權限）；全程用 TypeScript 型別與 Testing Library 測試（6-1、6-2），最後依需求選擇框架部署（6-4）。',
+      ] },
+    ],
+    keypoints: [
+      '不需要 SEO 與伺服器渲染：Vite SPA，部署成靜態檔案。',
+      '公開網站、需要 SSR 或 Server Components：Next.js、React Router 框架模式。',
+      '上線前：型別與測試、效能、無障礙、錯誤處理、金鑰不進前端。',
+    ],
+    sources: ['react-frameworks', 'vite'],
+  },
+});
+</script>

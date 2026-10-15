@@ -1,0 +1,439 @@
+<script>
+/* ==========================================================================
+   模組 3：物件與模組
+   ========================================================================== */
+defineTerms({
+  '類別': { en: 'class', def: '描述一種東西「有哪些資料、能做哪些事」的藍圖；呼叫類別就會建立實例。', example: '`class Dog: ...`、`d = Dog()`' },
+  '實例': { en: 'instance', def: '依照類別建立出來的物件，各自有一份屬性。', example: '`a = Account("阿明")` 中的 a。' },
+  '__init__': { en: 'initializer', def: '建立實例後自動呼叫的方法，用來設定初始屬性。', example: '`def __init__(self, name): self.name = name`' },
+  'self': { en: 'self', def: '方法的第一個參數，代表「這個實例本身」；呼叫 `a.deposit(10)` 時 Python 自動把 a 傳進去。', example: '`self.balance += amount`' },
+  '特殊方法': { en: 'dunder method', def: '前後各有兩個底線的方法，讓物件配合內建語法，例如 `__repr__` 決定印出的樣子、`__eq__` 決定 `==`。', example: '`def __repr__(self): return f"Point({self.x}, {self.y})"`' },
+  '繼承': { en: 'inheritance', def: '子類別自動擁有父類別的屬性與方法，可以覆寫或用 `super()` 擴充。', example: '`class Cat(Animal):`' },
+  'property': { en: 'property', def: '讓方法看起來像屬性，可以在讀寫時加上檢查或計算。', example: '`@property def area(self): ...`' },
+  'dataclass': { en: 'dataclass', def: '`@dataclass` 裝飾器會自動產生 `__init__`、`__repr__`、`__eq__`，適合「主要用來裝資料」的類別。', example: '`@dataclass class Point: x: int; y: int`' },
+  'frozen': { en: 'frozen dataclass', def: '`@dataclass(frozen=True)`：建立後不能修改屬性，並且可以雜湊。', example: '`p.x = 5` 會拋 FrozenInstanceError。' },
+  '模組': { en: 'module', def: '一個 .py 檔就是一個模組，可以被其他檔案 import。', example: '`import math`' },
+  '套件': { en: 'package', def: '包含多個模組的資料夾（通常有 `__init__.py`）。', example: '`from myapp.utils import slugify`' },
+  '__name__': { en: '__name__', def: '模組的名稱；直接執行的檔案中它是 "__main__"，被 import 時是模組名。', example: '`if __name__ == "__main__": main()`' },
+  'lazy import': { en: 'lazy import', def: 'Python 3.15 新增（PEP 810）：`lazy import x` 不會立刻載入模組，第一次用到時才載入，加快程式啟動。', example: '`lazy import json`' },
+  'try': { en: 'try statement', def: '`try` 放可能出錯的程式，`except` 處理指定型別的例外，`else` 在沒出錯時執行，`finally` 一定執行。', example: '`try: ... except ValueError: ...`' },
+  'raise': { en: 'raise', def: '主動拋出例外。', example: '`raise ValueError("數量不能是負數")`' },
+  'with': { en: 'with statement', def: '進入時取得資源、離開區塊時自動釋放（即使中途出錯），例如自動關檔。', example: '`with open("a.txt") as f:`' },
+  '情境管理器': { en: 'context manager', def: '可以用在 with 的物件，實作 `__enter__` 與 `__exit__`。', example: '檔案物件、`threading.Lock`。' },
+});
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '寫一個有 __init__、屬性與方法的類別',
+      '說出 self 是什麼',
+      '用 __repr__ 讓物件印出來好讀',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-4）`(x * 2 for x in nums)` 是什麼？', options: [
+        { text: '產生器運算式，需要時才計算', correct: true, why: '小括號版本是延遲的。' },
+        { text: 'tuple 推導式', why: 'Python 沒有 tuple 推導式；要 tuple 寫 `tuple(...)`。' },
+        { text: 'list 推導式', why: 'list 推導式用中括號。' },
+        { text: '語法錯誤', why: '合法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['類別像蛋糕模具，實例是用模具做出來的蛋糕：每個蛋糕形狀一樣，但口味（屬性）可以不同，切了一個也不影響另一個。'],
+      limit: ['模具不會跟蛋糕說話；Python 的方法卻需要知道「現在在處理哪個蛋糕」，這就是 self：呼叫 `cake.cut()` 時，Python 自動把 cake 交給方法的 self。'],
+    },
+    model: {
+      svg: Fig.tree('類別 Account 是藍圖，定義 __init__ 與 deposit；呼叫 Account("阿明") 與 Account("小華") 建立兩個實例，各自有自己的 owner 與 balance', { title: 'class Account', lines: ['`__init__`、`deposit`'], tone: 2 }, [
+        { title: 'a = Account("阿明")', lines: ['owner = 阿明', 'balance = 100'], tone: 3 },
+        { title: 'b = Account("小華")', lines: ['owner = 小華', 'balance = 500'], tone: 4 },
+      ]),
+      caption: '一個類別、很多實例；每個實例有自己的一份屬性。',
+      blocks: [
+        '[[類別]]定義資料與行為，呼叫類別建立[[實例]]。[[__init__]] 設定初始屬性，每個方法的第一個參數是 [[self]]。[[特殊方法]] `__repr__` 決定物件印出來的樣子。',
+        { type: 'code', lang: 'python', title: 'account.py', code: 'class Account:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n\n    def deposit(self, amount):\n        if amount <= 0:\n            raise ValueError("存款金額要大於 0")\n        self.balance += amount\n\n    def __repr__(self):\n        return f"Account({self.owner!r}, {self.balance})"\n\na = Account("阿明", 100)\na.deposit(50)\nprint(a)          # Account(\'阿明\', 150)' },
+      ],
+    },
+    define: [
+      { term: '__init__', en: '__init__', def: '初始化方法，不是建構子本身（物件已由 `__new__` 建好）；不能 return 非 None 的值。', example: '`def __init__(self, x): self.x = x`' },
+      { term: 'self', en: 'self', def: '慣例名稱，代表實例；`obj.method(arg)` 等於 `Class.method(obj, arg)`。', example: '`Account.deposit(a, 50)` 和 `a.deposit(50)` 一樣。' },
+      { term: '特殊方法', en: 'special method', def: '例如 `__repr__`、`__str__`、`__eq__`、`__len__`、`__lt__`。', example: '有 `__len__` 就能 `len(obj)`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '方法裡改屬性',
+        kind: '錯誤 vs 正確',
+        code: true,
+        badLabel: '忘了 self',
+        goodLabel: '用 self.屬性',
+        bad: 'class Counter:\n    def __init__(self):\n        count = 0\n    def add(self):\n        count += 1',
+        good: 'class Counter:\n    def __init__(self):\n        {{1:self.count}} = 0\n    def add(self):\n        {{1:self.count}} += 1',
+        badResult: '`count = 0` 只是區域變數；add 時 UnboundLocalError。',
+        goodResult: '屬性存在實例上，每次 add 都改到同一個 count。',
+        why: ['在方法裡讀寫實例的資料，一律透過 self'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'class Dog:\n    sound = "汪"          # 類別屬性，所有實例共用\n    def __init__(self, name):\n        self.name = name   # 實例屬性\n    def speak(self):\n        return f"{self.name}：{self.sound}"\n\na = Dog("小白")\nb = Dog("小黑")\nDog.sound = "嗚汪"\nprint(a.speak())\nprint(b.speak())',
+          predict: { q: '改了 `Dog.sound` 之後，a.speak() 印出什麼？', options: ['小白：汪', '小白：嗚汪', '錯誤'], answer: 1 },
+          output: '小白：嗚汪\n小黑：嗚汪',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'attr', label: '屬性（資料）' }, { id: 'method', label: '方法（行為）' }],
+          items: [
+            { text: '購物車的商品清單', answer: 'attr', why: '狀態。' },
+            { text: '購物車的「加入商品」', answer: 'method', why: '改變狀態的動作。' },
+            { text: '使用者的 Email', answer: 'attr', why: '一個值。' },
+            { text: '訂單的「計算總價」', answer: 'method', why: '根據資料計算，也可以做成 property。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('類別屬性與實例屬性：類別屬性寫在 class 底下，所有實例共用；實例屬性在 __init__ 用 self 設定，每個實例各一份', { title: '類別屬性', lines: ['寫在 class 下', '所有實例共用', '`Dog.sound`'], tone: 2 }, { title: '實例屬性', lines: ['`self.x = ...`', '每個實例一份', '`a.name`'], tone: 4 }), caption: '可變的類別屬性（例如 list）會被所有實例共用，通常是 bug。' },
+      ],
+      tryit: {
+        q: ['補完 __repr__，讓 `print(Point(3, 4))` 印出 `Point(3, 4)`：'],
+        draft: 'class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def ____(self):\n        return f"Point({____}, {self.y})"',
+        answer: ['`def __repr__(self):`、`self.x`。', '下一課的 dataclass 會自動產生 `__repr__`，不用自己寫。'],
+      },
+    },
+    mistakes: [
+      { wrong: '方法定義忘了寫 self 參數：`def add(amount):`。', why: '呼叫 `a.add(5)` 時 Python 會傳兩個參數，TypeError。', right: '`def add(self, amount):`。' },
+      { wrong: '在 class 底下寫 `items = []` 當成每個實例的清單。', why: '類別屬性被所有實例共用。', right: '在 `__init__` 裡 `self.items = []`。' },
+      { wrong: '想從外部直接改 balance 成負數，類別也沒擋。', why: 'Python 沒有真正的 private。', right: '慣例用 `_balance` 表示內部屬性，對外提供方法或 property 並檢查規則。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`a.deposit(50)` 時，deposit 方法的 self 是？', options: [
+        { text: '實例 a', correct: true, why: 'Python 自動把點前面的物件傳給 self。' },
+        { text: '類別 Account', why: 'self 是實例，不是類別。' },
+        { text: '數字 50', why: '50 是第二個參數 amount。' },
+        { text: 'None', why: 'self 一定是實例。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`class Box:\\n    items = []`，`a = Box(); b = Box(); a.items.append(1); print(b.items)` 印出？', options: [
+        { text: '`[1]`', correct: true, why: 'items 是類別屬性，a 和 b 共用同一個 list。' },
+        { text: '`[]`', why: '沒有在 __init__ 建立各自的 list。' },
+        { text: 'AttributeError', why: 'b 可以透過類別讀到 items。' },
+        { text: '`None`', why: 'items 是一個 list。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要設計一個「溫度計」類別：攝氏溫度不能低於 -273.15，並且能讀出華氏溫度。用本課與 property 怎麼設計？'], answer: [
+        '`__init__` 存 `self._celsius`；用 `@property def celsius(self)` 讀取，`@celsius.setter` 寫入時檢查下限，不合法就 `raise ValueError`。',
+        '`@property def fahrenheit(self): return self._celsius * 9 / 5 + 32`：外部像讀屬性一樣 `t.fahrenheit`，實際上每次都依攝氏計算，不會不同步。',
+      ] },
+    ],
+    keypoints: [
+      '類別是藍圖，呼叫類別建立實例；`__init__` 設定初始屬性。',
+      '方法的第一個參數 self 就是實例本身。',
+      '每個實例自己的資料放在 `self.x`，不要用可變的類別屬性。',
+    ],
+    sources: ['py-classes'],
+  },
+
+  '3-2': {
+    goals: [
+      '用 @dataclass 寫資料類別',
+      '用 field(default_factory=…) 處理可變預設值',
+      '用 frozen=True 做出不可修改的資料',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-1）每個實例要有自己的清單，應該寫在哪裡？', options: [
+        { text: '`__init__` 裡的 `self.items = []`', correct: true, why: '每次建立實例都產生新的 list。' },
+        { text: 'class 底下的 `items = []`', why: '那是所有實例共用的類別屬性。' },
+        { text: '模組最上面的全域變數', why: '所有地方共用，更糟。' },
+        { text: '方法的預設參數 `def add(self, items=[])`', why: '可變預設值陷阱。' },
+      ] },
+    ],
+    analogy: {
+      text: ['dataclass 像填好欄位的表格範本：你只要寫「姓名、年齡、Email」三個欄位，表格自動有填寫方式（__init__）、列印格式（__repr__）和比對方式（__eq__）。'],
+      limit: ['範本只管格式；dataclass 不會幫你檢查「年齡不能是負數」，驗證要自己寫在 `__post_init__`，或改用 pydantic 這類套件。'],
+    },
+    model: {
+      svg: Fig.row('寫 @dataclass 與欄位後，Python 自動產生 __init__ 接收欄位、__repr__ 好讀的輸出、__eq__ 依內容比較', [
+        { title: '你寫的', lines: ['`@dataclass`', '`name: str`', '`age: int`'], tone: 2 },
+        { title: '自動產生', lines: ['`__init__`', '`__repr__`', '`__eq__`'], tone: 4 },
+      ]),
+      caption: '欄位要寫型別註記，dataclass 才知道它是欄位。',
+      blocks: [
+        '[[dataclass]] 從型別註記產生欄位。可變的預設值要用 `field(default_factory=list)`。[[frozen]] 讓資料建立後不可改，還能雜湊（可當 dict 的鍵）。`slots=True` 讓實例更省記憶體。',
+        { type: 'code', lang: 'python', title: 'models.py', code: 'from dataclasses import dataclass, field\n\n@dataclass\nclass Order:\n    id: int\n    customer: str\n    items: list[str] = field(default_factory=list)\n    total: float = 0.0\n\n    def __post_init__(self):\n        if self.total < 0:\n            raise ValueError("total 不能是負數")\n\no = Order(1, "阿明")\no.items.append("咖啡")\nprint(o)\n# Order(id=1, customer=\'阿明\', items=[\'咖啡\'], total=0.0)' },
+      ],
+    },
+    define: [
+      { term: 'dataclass', en: '@dataclass', def: '依類別中的型別註記產生特殊方法；常用參數 frozen、order、slots、kw_only。', example: '`@dataclass(order=True)` 可以用 < 比較。' },
+      { term: 'default_factory', en: 'field(default_factory=…)', def: '每次建立實例時呼叫工廠函式產生新的預設值。', example: '`tags: set[str] = field(default_factory=set)`' },
+      { term: 'frozen', en: 'frozen=True', def: '屬性唯讀，修改時拋 FrozenInstanceError；產生 `__hash__`。', example: '`@dataclass(frozen=True) class Point: ...`' },
+    ],
+    examples: {
+      compare: [{
+        title: '寫一個 Point 類別',
+        kind: '手寫 vs dataclass',
+        code: true,
+        badLabel: '手寫三個特殊方法',
+        goodLabel: '@dataclass',
+        bad: 'class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def __repr__(self):\n        return f"Point(x={self.x}, y={self.y})"\n    def __eq__(self, other):\n        return (self.x, self.y) == (other.x, other.y)',
+        good: '{{1:@dataclass}}\nclass Point:\n    x: int\n    y: int',
+        badResult: '8 行，新增欄位要改三個地方。',
+        goodResult: '3 行，行為相同；新增欄位只要加一行。',
+        why: ['主要用來裝資料的類別，預設用 dataclass'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'from dataclasses import dataclass\n\n@dataclass(frozen=True)\nclass Point:\n    x: int\n    y: int\n\np = Point(1, 2)\nprint(p == Point(1, 2))\nprint({p: "起點"})\np.x = 5',
+          predict: { q: '最後一行 `p.x = 5` 會怎樣？', options: ['p 變成 Point(5, 2)', '拋出 FrozenInstanceError', '產生新的 Point'], answer: 1 },
+          output: "True\n{Point(x=1, y=2): '起點'}\n!Traceback (most recent call last):\n!  File \"app.py\", line 11, in <module>\n!    p.x = 5\n!dataclasses.FrozenInstanceError: cannot assign to field 'x'",
+        } },
+        { type: 'svg', svg: Fig.stack('建立 dataclass 實例的順序：先由自動產生的 __init__ 設定欄位，再呼叫你寫的 __post_init__ 做驗證，最後得到實例', [
+          { title: '1. 自動 __init__ 設定欄位' },
+          { title: '2. 你寫的 __post_init__ 驗證', tone: 3 },
+          { title: '3. 得到實例', tone: 4 },
+        ]), caption: '驗證規則寫在 `__post_init__`。' },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'dc', label: '適合 dataclass' }, { id: 'cls', label: '一般類別' }],
+          items: [
+            { text: 'API 回傳的使用者資料（id、name、email）', answer: 'dc', why: '主要是裝資料。' },
+            { text: '管理資料庫連線池、有開關狀態', answer: 'cls', why: '以行為與資源管理為主。' },
+            { text: '設定值：主題、語言、字級', answer: 'dc', why: '純資料，可以加 frozen。' },
+            { text: '座標點 (x, y)', answer: 'dc', why: 'frozen dataclass 還能當 dict 的鍵。' },
+          ],
+        } },
+      ],
+      tryit: {
+        q: ['補完：讓每個 Cart 實例都有自己的商品清單。'],
+        draft: 'from dataclasses import dataclass, field\n\n@dataclass\nclass Cart:\n    owner: str\n    items: list[str] = ____(default_factory=____)',
+        answer: ['`field(default_factory=list)`。', '直接寫 `items: list[str] = []` 時，dataclass 會拋 ValueError 阻止你，因為那會讓所有實例共用同一個清單。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`items: list = []`', why: 'dataclass 直接拋 ValueError: mutable default。', right: '`field(default_factory=list)`。' },
+      { wrong: '欄位沒寫型別註記：`name = ""`。', why: '沒有註記就不會被當成欄位，不會出現在 __init__。', right: '`name: str = ""`。' },
+      { wrong: '有預設值的欄位寫在沒有預設值的欄位前面。', why: 'TypeError: non-default argument follows default argument。', right: '有預設值的放後面，或用 `kw_only=True`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`@dataclass` 預設「不會」自動產生哪一個？', options: [
+        { text: '`__lt__`（小於比較）', correct: true, why: '要 `order=True` 才會產生排序用的比較方法。' },
+        { text: '`__init__`', why: '預設就會產生。' },
+        { text: '`__repr__`', why: '預設就會產生。' },
+        { text: '`__eq__`', why: '預設就會產生。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`frozen=True` 的 dataclass 實例可以拿來做什麼，一般的不行？', options: [
+        { text: '當 dict 的鍵或放進 set', correct: true, why: 'frozen 會產生 __hash__。' },
+        { text: '用 print 印出', why: '一般 dataclass 也能印。' },
+        { text: '用 == 比較', why: '一般 dataclass 也有 __eq__。' },
+        { text: '被繼承', why: '兩者都能被繼承。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你從 JSON 讀進一筆訂單 dict，想轉成 Order dataclass。`Order(**data)` 有什麼風險？怎麼處理？'], answer: [
+        'JSON 多了欄位會 TypeError；少了必要欄位也會 TypeError；型別錯了（total 是字串）dataclass 不會檢查。',
+        '在邊界做驗證：挑出需要的鍵、轉型、檢查範圍後再建立；或用 pydantic 這類會依型別註記驗證的套件。dataclass 只負責「裝資料」，不負責「驗資料」。',
+      ] },
+    ],
+    keypoints: [
+      '主要裝資料的類別用 @dataclass，自動有 __init__、__repr__、__eq__。',
+      '可變預設值用 field(default_factory=…)。',
+      'frozen=True 讓資料不可修改又能雜湊；驗證寫在 __post_init__。',
+    ],
+    sources: ['py-dataclasses'],
+  },
+
+  '3-3': {
+    goals: [
+      '用 import 與 from … import 使用其他模組',
+      '寫出 `if __name__ == "__main__":` 的入口',
+      '用 3.15 的 lazy import 加快啟動',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）dataclass 的可變預設值要怎麼寫？', options: [
+        { text: '`field(default_factory=list)`', correct: true, why: '每個實例產生新的 list。' },
+        { text: '`items: list = []`', why: 'dataclass 會直接拋 ValueError。' },
+        { text: '`items: list = None`', why: '可以，但還要另外處理 None，不如 default_factory。' },
+        { text: '不能有可變欄位', why: '可以，只是要用 default_factory。' },
+      ] },
+    ],
+    analogy: {
+      text: ['模組像工具箱：`import math` 是把整個工具箱搬到桌上，用時寫 `math.sqrt`；`from math import sqrt` 是只拿出一把螺絲起子放在手邊。lazy import 像先在桌上放一張「工具箱在倉庫」的紙條，真的要用時才去搬。'],
+      limit: ['真的工具箱搬兩次會累；Python 同一個模組只會載入一次，之後的 import 都從快取（sys.modules）拿。'],
+    },
+    model: {
+      svg: Fig.row('import 的流程：先查快取 sys.modules，有就直接用；沒有就依序在目前資料夾、標準函式庫、已安裝套件中尋找；找到後執行模組並放進快取', [
+        { title: '查快取', lines: ['`sys.modules`', '有就直接用'], tone: 1 },
+        { title: '找檔案', lines: ['目前資料夾', '→ 標準函式庫', '→ 已安裝套件'], tone: 3 },
+        { title: '執行並快取', lines: ['模組頂層程式', '只執行一次'], tone: 4 },
+      ]),
+      caption: '模組的頂層程式在第一次 import 時執行；所以模組裡不要放「被 import 就會做事」的程式。',
+      blocks: [
+        '一個 .py 檔就是一個[[模組]]，資料夾是[[套件]]。直接執行的檔案 [[__name__]] 是 `"__main__"`，用它區分「被執行」與「被匯入」。Python 3.15 新增 [[lazy import]]：大型程式啟動時常常匯入很多用不到的模組，延遲載入可以大幅縮短啟動時間。',
+        { type: 'code', lang: 'python', title: 'cli.py（Python 3.15）', code: 'lazy import json          # 第一次用到 json 時才載入\nlazy from pathlib import Path\nimport sys\n\ndef main():\n    if len(sys.argv) < 2:\n        print("用法：python cli.py <檔案>")\n        return\n    data = json.loads(Path(sys.argv[1]).read_text())\n    print(len(data))\n\nif __name__ == "__main__":\n    main()' },
+      ],
+    },
+    define: [
+      { term: '模組', en: 'module', def: '`.py` 檔；import 時執行一次，結果存在 sys.modules。', example: '`import utils` 會執行 utils.py。' },
+      { term: '__name__', en: '__name__', def: '直接執行時是 "__main__"；被 import 時是模組名稱。', example: '`python utils.py` 時 __name__ 是 "__main__"。' },
+      { term: 'lazy import', en: 'lazy import', def: '3.15 的軟關鍵字 `lazy`：只能用在模組頂層，不能在函式、類別、try 裡；`lazy from x import *` 不允許。', example: '`lazy import pandas as pd`' },
+    ],
+    examples: {
+      compare: [{
+        title: '寫一個可以被匯入、也能直接執行的模組',
+        kind: '錯誤 vs 正確',
+        code: true,
+        badLabel: '頂層直接執行',
+        goodLabel: '用 __main__ 守門',
+        bad: '# utils.py\ndef slugify(s):\n    return s.lower().replace(" ", "-")\n\n{{1:print(slugify("Hello World"))}}',
+        good: '# utils.py\ndef slugify(s):\n    return s.lower().replace(" ", "-")\n\n{{1:if __name__ == "__main__":}}\n    print(slugify("Hello World"))',
+        badResult: '別的檔案 `import utils` 時也會印出 hello-world。',
+        goodResult: '只有 `python utils.py` 時才印，被匯入時安靜。',
+        why: ['測試、示範用的程式碼都放在 __main__ 區塊'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'main.py（同資料夾有 greet.py）',
+          code: '# greet.py 內容：\n#   print("載入 greet")\n#   def hi(): return "嗨"\n\nimport greet\nimport greet\nfrom greet import hi\nprint(hi())\nprint(__name__)',
+          predict: { q: '「載入 greet」會印出幾次？', options: ['1 次', '2 次', '3 次'], answer: 0 },
+          output: '載入 greet\n嗨\n__main__',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ok', label: '合法的 lazy import' }, { id: 'no', label: 'SyntaxError' }],
+          items: [
+            { text: '模組頂層：`lazy import json`', answer: 'ok', why: '只能放在模組頂層。' },
+            { text: '模組頂層：`lazy from pathlib import Path`', answer: 'ok', why: 'from 形式也支援。' },
+            { text: '函式內：`lazy import json`', answer: 'no', why: '只允許在模組頂層。' },
+            { text: '`lazy from os import *`', answer: 'no', why: '星號匯入不能延遲。' },
+            { text: '`try:` 區塊內的 lazy import', answer: 'no', why: 'try／except／finally 裡不允許。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('一般 import 與 lazy import：一般 import 在啟動時就載入模組，啟動比較慢；lazy import 先放一個代理，第一次用到名字時才載入', { title: 'import json', lines: ['啟動時就載入', '用不到也付出時間'], tone: 1 }, { title: 'lazy import json', lines: ['先放代理', '第一次用到才載入'], tone: 4 }), caption: '命令列工具、測試大量匯入時，啟動時間差異最明顯。' },
+      ],
+      tryit: {
+        q: ['只從 math 匯入 sqrt 與 pi，然後計算半徑 2 的圓面積：'],
+        draft: '____ math ____ sqrt, pi\nprint(pi * 2 ** 2)',
+        answer: ['`from math import sqrt, pi`。', '`from … import` 把名字直接放進目前模組；名字太多時用 `import math` 再寫 `math.pi`，比較不會撞名。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`from module import *`。', why: '不知道匯入了哪些名字，容易覆蓋自己的變數，工具也無法分析。', right: '明確列出名字，或 `import module`。' },
+      { wrong: '兩個模組互相 import（循環匯入），出現 ImportError 或屬性不存在。', why: 'A 匯入 B 時 B 又回頭匯入還沒執行完的 A。', right: '把共用的東西搬到第三個模組；3.15 的 lazy import 也能緩解部分情況。' },
+      { wrong: '把 lazy import 寫在函式裡想延遲載入。', why: 'SyntaxError：lazy 只能在模組頂層。', right: '在函式裡直接寫一般的 import（本來就是延遲到呼叫時才執行）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`python app.py` 執行時，app.py 裡的 `__name__` 是？', options: [
+        { text: '`"__main__"`', correct: true, why: '直接執行的模組名稱固定是 __main__。' },
+        { text: '`"app"`', why: '被別人 import 時才是 "app"。' },
+        { text: '`"app.py"`', why: '不包含副檔名，而且這裡是 __main__。' },
+        { text: '`None`', why: '一定有值。' },
+      ] },
+      { level: '應用', type: 'mc', q: '同一個程式 import 同一個模組三次，模組頂層的程式執行幾次？', options: [
+        { text: '1 次', correct: true, why: '第一次之後從 sys.modules 快取取得。' },
+        { text: '3 次', why: 'Python 會快取已載入的模組。' },
+        { text: '0 次', why: '第一次 import 會執行。' },
+        { text: '看是 import 還是 from import', why: '兩種寫法都共用同一個快取。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個 CLI 工具 import 了 pandas、matplotlib，但大部分指令只是 `--help`，每次都要等 2 秒。3.15 以前和以後各怎麼改善？'], answer: [
+        '3.15 以前：把 `import pandas` 搬進真正需要它的函式裡，只在呼叫時載入。',
+        '3.15 起：在頂層寫 `lazy import pandas as pd`，程式結構不用改，第一次用到 pd 時才載入；--help 就不必付出載入成本。可以用 `python -X importtime` 量測差異。',
+      ] },
+    ],
+    keypoints: [
+      '一個 .py 就是模組，只在第一次 import 時執行並快取。',
+      '直接執行的程式放在 `if __name__ == "__main__":` 裡。',
+      '3.15 的 `lazy import` 延遲載入、加快啟動，只能寫在模組頂層。',
+    ],
+    sources: ['py-modules', 'pep-810', 'py-315'],
+  },
+
+  '3-4': {
+    goals: [
+      '用 try／except 只處理預期的例外',
+      '用 raise 拋出有意義的例外',
+      '用 with 確保檔案、鎖等資源一定會釋放',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-3）lazy import 可以寫在哪裡？', options: [
+        { text: '只能在模組頂層', correct: true, why: '函式、類別、try 裡都會 SyntaxError。' },
+        { text: '任何地方', why: '有嚴格限制。' },
+        { text: '只能在函式裡', why: '剛好相反。' },
+        { text: '只能在 __main__ 區塊', why: '那是 if 區塊，不是模組頂層的直接陳述式。' },
+      ] },
+    ],
+    analogy: {
+      text: ['try／except 像高空作業的安全網：只在「可能掉下來」的地方張網（try），網子只接住特定的掉落物（except 指定型別）。with 像飯店的房卡：進房自動開燈，離開拔卡自動斷電，不管你是正常退房還是緊急離開。'],
+      limit: ['安全網張太大會把不該接的也接住；`except Exception:` 包住整段程式，連程式 bug 都被吞掉，問題反而更難找。'],
+    },
+    model: {
+      svg: Fig.stack('try 陳述式的四段：try 放可能出錯的程式；except 處理指定例外；else 在沒出錯時執行；finally 不管如何都執行', [
+        { title: 'try：可能出錯的程式', tone: 1 },
+        { title: 'except ValueError：處理預期的錯誤', tone: 5 },
+        { title: 'else：沒出錯才執行', tone: 3 },
+        { title: 'finally：一定執行（清理）', tone: 4 },
+      ], { arrows: false }),
+      caption: 'try 區塊只放「可能拋出你要處理的例外」的那幾行，越小越好。',
+      blocks: [
+        '[[try]] 搭配 except 處理例外，[[raise]] 主動拋出。檔案、網路連線、鎖這類資源用 [[with]]，離開區塊時[[情境管理器]]會自動清理。Python 3.11 起還可以用 `add_note` 補充說明、`except*` 處理例外群組。',
+        { type: 'code', lang: 'python', title: 'read_age.py', code: 'def read_age(text: str) -> int:\n    try:\n        age = int(text)\n    except ValueError:\n        raise ValueError(f"年齡要是數字，收到 {text!r}") from None\n    if age < 0:\n        raise ValueError("年齡不能是負數")\n    return age\n\nwith open("ages.txt", encoding="utf-8") as f:\n    for line in f:\n        try:\n            print(read_age(line.strip()))\n        except ValueError as e:\n            print("略過：", e)' },
+      ],
+    },
+    define: [
+      { term: 'try', en: 'try/except/else/finally', def: 'except 依型別比對（子類別也符合）；else 在 try 沒拋例外時執行；finally 一定執行。', example: '`except (KeyError, IndexError):` 一次處理兩種。' },
+      { term: 'raise', en: 'raise', def: '`raise 例外` 拋出；`raise` 單獨使用時重新拋出目前的例外；`raise X from e` 保留原因鏈。', example: '`raise ConfigError("缺少 API_KEY") from e`' },
+      { term: 'with', en: 'with', def: '呼叫物件的 `__enter__`，離開時呼叫 `__exit__`（有例外也會）。可以一次管理多個。', example: '`with open(a) as src, open(b, "w") as dst:`' },
+    ],
+    examples: {
+      compare: [{
+        title: '讀設定檔',
+        kind: '吞掉 vs 精準處理',
+        code: true,
+        badLabel: '裸 except',
+        goodLabel: '只抓預期的錯誤',
+        bad: 'try:\n    config = load_config("app.toml")\n    start_server(config)\n{{1:except:}}\n    pass',
+        good: 'try:\n    config = load_config("app.toml")\n{{1:except FileNotFoundError:}}\n    config = DEFAULT_CONFIG\nstart_server(config)',
+        badResult: '連 start_server 的 bug、甚至 Ctrl+C（KeyboardInterrupt）都被吞掉，程式默默失敗。',
+        goodResult: '只有「找不到檔案」用預設值，其他錯誤照常顯示。',
+        why: ['不寫裸 `except:`；except 裡至少要處理、記錄或重新拋出'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'def test(x):\n    try:\n        result = 10 / x\n    except ZeroDivisionError:\n        print("不能除以 0")\n        return "A"\n    else:\n        print("成功", result)\n        return "B"\n    finally:\n        print("finally")\n\nprint(test(0))\nprint(test(5))',
+          predict: { q: '`test(0)` 時，「finally」會在回傳 A 之前印出嗎？', options: ['會', '不會，return 直接離開', '只有 test(5) 會印'], answer: 0 },
+          output: '不能除以 0\nfinally\nA\n成功 2.0\nfinally\nB',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'catch', label: '在這裡 except' }, { id: 'let', label: '讓它往上拋' }],
+          items: [
+            { text: '使用者輸入的年齡不是數字', answer: 'catch', why: '預期中的錯誤，可以請使用者重新輸入。' },
+            { text: '程式寫錯造成的 AttributeError', answer: 'let', why: '是 bug，應該修程式而不是吞掉。' },
+            { text: '選用的設定檔不存在', answer: 'catch', why: '有明確的預設值可用。' },
+            { text: '資料庫密碼錯誤', answer: 'let', why: '需要人修設定，讓程式明確失敗。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('不用 with 時，例外發生會跳過 close，檔案沒關；用 with 時，不管有沒有例外，離開區塊都會自動關檔', { title: 'f = open() … f.close()', lines: ['中途出錯', 'close 被跳過'], tone: 5 }, { title: 'with open() as f', lines: ['中途出錯', '照樣自動關檔'], tone: 4 }), caption: '開檔一律用 with。' },
+      ],
+      tryit: {
+        q: ['讀取使用者輸入，直到輸入的是整數為止：'],
+        draft: 'while True:\n    text = input("數量：")\n    ____:\n        n = int(text)\n        break\n    except ____:\n        print("請輸入整數")',
+        answer: ['`try:`、`except ValueError:`。', 'try 只包 `int(text)` 那一行；break 放在 try 裡、成功轉換後才離開迴圈。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`except:` 或 `except Exception: pass`。', why: '吞掉所有錯誤，包括 bug 與 Ctrl+C（裸 except 連 KeyboardInterrupt 都抓）。', right: '只抓具體型別；必須抓全部時記錄日誌並重新 raise。' },
+      { wrong: 'try 包住 50 行程式。', why: '不知道是哪一行出錯，也可能抓到不該抓的例外。', right: 'try 只包可能拋出那個例外的幾行，其他放 else。' },
+      { wrong: '`f = open(path)` 之後忘了 close。', why: '例外或提早 return 時檔案不會被關閉。', right: '`with open(path, encoding="utf-8") as f:`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'try 裡沒有發生例外時，下列哪一段「不會」執行？', options: [
+        { text: 'except', correct: true, why: '沒有例外就不會進 except。' },
+        { text: 'else', why: 'else 正是在沒有例外時執行。' },
+        { text: 'finally', why: 'finally 一定執行。' },
+        { text: 'try 本身', why: 'try 一定會先執行。' },
+      ] },
+      { level: '應用', type: 'mc', q: '要在 except 裡記錄錯誤後把同一個例外繼續往外拋，寫法是？', options: [
+        { text: '`logger.exception("失敗"); raise`', correct: true, why: '單獨的 raise 重新拋出目前的例外，保留 Traceback。' },
+        { text: '`logger.exception("失敗"); return`', why: '這是吞掉例外。' },
+        { text: '`raise Exception("失敗")`', why: '丟失原本的型別與原因（除非加 from e）。' },
+        { text: '`pass`', why: '什麼都沒做。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你寫一個函式庫，底層用 json 解析設定；呼叫端不該知道你用了 json。解析失敗時該拋什麼例外？'], answer: [
+        '定義自己的 `class ConfigError(Exception): ...`，在 `except json.JSONDecodeError as e:` 裡 `raise ConfigError(f"設定檔第 {e.lineno} 行格式錯誤") from e`。',
+        '呼叫端只要處理 ConfigError；`from e` 保留原本的例外當原因，除錯時 Traceback 仍看得到 JSON 的細節。',
+      ] },
+    ],
+    keypoints: [
+      '只 except 預期中、能處理的例外型別；try 區塊越小越好。',
+      '用 raise 拋出說明清楚的例外，包裝時加 `from e`。',
+      '檔案、鎖、連線一律用 with，離開時自動釋放。',
+    ],
+    sources: ['py-errors', 'py-with'],
+  },
+});
+</script>

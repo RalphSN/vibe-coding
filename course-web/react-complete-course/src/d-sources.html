@@ -1,0 +1,155 @@
+<script>
+/* ==========================================================================
+   參考資料（皆於 2026-10-16 查證，詳見 research-notes.md）
+   ========================================================================== */
+defineSources({
+  'react-learn': { title: 'react.dev｜Learn React', url: 'https://react.dev/learn' },
+  'react-blog': { title: 'react.dev｜Blog', url: 'https://react.dev/blog' },
+  'react-193': { title: 'react.dev｜React 19.3（2026-09-09）', url: 'https://react.dev/blog/2026/09/09/react-19-3' },
+  'react-192': { title: 'react.dev｜React 19.2（2025-10-01）', url: 'https://react.dev/blog/2025/10/01/react-19-2' },
+  'react-compiler': { title: 'react.dev｜React Compiler v1.0（2025-10-07）', url: 'https://react.dev/blog/2025/10/07/react-compiler-1' },
+  'vite': { title: 'Vite 官方文件｜Getting Started', url: 'https://vite.dev/guide/' },
+  'react-jsx': { title: 'react.dev｜Writing Markup with JSX', url: 'https://react.dev/learn/writing-markup-with-jsx' },
+  'react-props': { title: 'react.dev｜Passing Props to a Component', url: 'https://react.dev/learn/passing-props-to-a-component' },
+  'react-conditional': { title: 'react.dev｜Conditional Rendering', url: 'https://react.dev/learn/conditional-rendering' },
+  'react-lists': { title: 'react.dev｜Rendering Lists', url: 'https://react.dev/learn/rendering-lists' },
+  'react-events': { title: 'react.dev｜Responding to Events', url: 'https://react.dev/learn/responding-to-events' },
+  'react-state': { title: 'react.dev｜State: A Component\'s Memory', url: 'https://react.dev/learn/state-a-components-memory' },
+  'react-snapshot': { title: 'react.dev｜State as a Snapshot', url: 'https://react.dev/learn/state-as-a-snapshot' },
+  'react-queue': { title: 'react.dev｜Queueing a Series of State Updates', url: 'https://react.dev/learn/queueing-a-series-of-state-updates' },
+  'react-objects': { title: 'react.dev｜Updating Objects in State', url: 'https://react.dev/learn/updating-objects-in-state' },
+  'react-arrays': { title: 'react.dev｜Updating Arrays in State', url: 'https://react.dev/learn/updating-arrays-in-state' },
+  'react-sharing': { title: 'react.dev｜Sharing State Between Components', url: 'https://react.dev/learn/sharing-state-between-components' },
+  'react-no-effect': { title: 'react.dev｜You Might Not Need an Effect', url: 'https://react.dev/learn/you-might-not-need-an-effect' },
+  'react-sync-effects': { title: 'react.dev｜Synchronizing with Effects', url: 'https://react.dev/learn/synchronizing-with-effects' },
+  'react-refs': { title: 'react.dev｜Referencing Values with Refs', url: 'https://react.dev/learn/referencing-values-with-refs' },
+  'react-effect-event': { title: 'react.dev｜useEffectEvent', url: 'https://react.dev/reference/react/useEffectEvent' },
+  'react-context': { title: 'react.dev｜Passing Data Deeply with Context', url: 'https://react.dev/learn/passing-data-deeply-with-context' },
+  'react-reducer': { title: 'react.dev｜Extracting State Logic into a Reducer', url: 'https://react.dev/learn/extracting-state-logic-into-a-reducer' },
+  'react-custom-hooks': { title: 'react.dev｜Reusing Logic with Custom Hooks', url: 'https://react.dev/learn/reusing-logic-with-custom-hooks' },
+  'react-forms': { title: 'react.dev｜<form>（Actions）', url: 'https://react.dev/reference/react-dom/components/form' },
+  'react-action-state': { title: 'react.dev｜useActionState', url: 'https://react.dev/reference/react/useActionState' },
+  'react-suspense': { title: 'react.dev｜<Suspense>', url: 'https://react.dev/reference/react/Suspense' },
+  'react-use': { title: 'react.dev｜use', url: 'https://react.dev/reference/react/use' },
+  'react-rsc': { title: 'react.dev｜Server Components', url: 'https://react.dev/reference/rsc/server-components' },
+  'react-ts': { title: 'react.dev｜Using TypeScript', url: 'https://react.dev/learn/typescript' },
+  'vitest': { title: 'Vitest 官方文件', url: 'https://vitest.dev/' },
+  'testing-library': { title: 'Testing Library｜React Testing Library', url: 'https://testing-library.com/docs/react-testing-library/intro/' },
+  'react-activity': { title: 'react.dev｜<Activity>', url: 'https://react.dev/reference/react/Activity' },
+  'react-view-transition': { title: 'react.dev｜<ViewTransition>', url: 'https://react.dev/reference/react/ViewTransition' },
+  'react-frameworks': { title: 'react.dev｜Creating a React App（框架建議）', url: 'https://react.dev/learn/creating-a-react-app' },
+});
+
+/* ==========================================================================
+   Fig：產生課程圖解 SVG 的小工具。
+   座標與字級由程式計算，確保文字不壓框、連接線兩端都接在方塊上。
+   文字以 ` 開頭的行用等寬字。tone 用 1–5 對應 --m1…--m5，0 是白底。
+   ========================================================================== */
+const Fig = (() => {
+  const W = 560;
+  const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  /** 估計文字寬度（單位：字級倍數）：中日韓全形 1、等寬 0.6、其他 0.56 */
+  function units(text, mono) {
+    let u = 0;
+    for (const ch of String(text)) {
+      if (/[⺀-鿿豈-﫿＀-￯　-〿]/.test(ch)) u += 1;
+      else u += mono ? 0.6 : 0.56;
+    }
+    return u;
+  }
+  /** 在寬度 w 內放得下的字級，介於 min 與 max 之間 */
+  function fit(lines, w, max, min = 12) {
+    let fs = max;
+    lines.forEach((l) => {
+      const mono = String(l).startsWith('`');
+      const t = mono ? String(l).slice(1) : String(l);
+      const need = units(t, mono);
+      if (need > 0) fs = Math.min(fs, (w - 16) / need);
+    });
+    return Math.max(min, Math.floor(fs * 10) / 10);
+  }
+  function fillOf(tone) {
+    return tone ? { attr: `style="fill:var(--m${tone})"`, text: ' on-color' } : { attr: 'class="fill-surface"', text: '' };
+  }
+  function textLine(x, y, l, fs, extra = '', anchor = 'middle') {
+    const mono = String(l).startsWith('`');
+    const t = mono ? String(l).slice(1) : String(l);
+    return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${fs}" class="${(mono ? 'mono' : '') + extra}">${xmlEsc(t)}</text>`;
+  }
+  /** 一個方塊：標題粗體＋若干行內文，全部置中 */
+  function box(x, y, w, h, node, opts = {}) {
+    const f = fillOf(node.tone);
+    const dash = node.dashed ? ' stroke-dasharray="8 6"' : '';
+    const title = node.title || '';
+    const lines = node.lines || [];
+    const tfs = Math.min(opts.titleMax || 19, fit([title], w, opts.titleMax || 19));
+    const lfs = lines.length ? Math.min(tfs - 2, fit(lines, w, opts.lineMax || 16)) : 0;
+    const blockH = tfs + lines.length * (lfs + 9);
+    let ty = y + (h - blockH) / 2 + tfs * 0.85;
+    let out = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${f.attr} class="stroke-ink" stroke-width="4"${dash}/>`;
+    // fill-surface 與 stroke-ink 要在同一個 class 屬性裡
+    out = out.replace('class="fill-surface" class="stroke-ink"', 'class="fill-surface stroke-ink"');
+    if (title) { out += textLine(x + w / 2, Math.round(ty), title, tfs, f.text).replace('<text ', '<text font-weight="900" '); ty += lfs + 12; }
+    lines.forEach((l) => { out += textLine(x + w / 2, Math.round(ty), l, lfs, f.text); ty += lfs + 9; });
+    return out;
+  }
+  function wrap(label, h, body, caption) {
+    return `<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${xmlEsc(label)}">${body}</svg>`;
+  }
+  /** 橫向並排的方塊；arrows 為 true 時用線接起相鄰方塊 */
+  function row(label, nodes, opts = {}) {
+    const n = nodes.length;
+    const gap = opts.gap ?? (n > 3 ? 18 : 24);
+    const w = Math.floor((W - 20 - gap * (n - 1)) / n);
+    const maxLines = Math.max(...nodes.map((d) => (d.lines || []).length));
+    const h = opts.h || Math.max(90, 70 + maxLines * 26);
+    let body = '';
+    nodes.forEach((d, i) => { body += box(10 + i * (w + gap), 15, w, h, d); });
+    if (opts.arrows !== false) {
+      for (let i = 0; i < n - 1; i++) {
+        const x1 = 10 + i * (w + gap) + w; const x2 = x1 + gap; const y = 15 + h / 2;
+        body += `<path d="M${x1} ${y} H${x2}" class="stroke-ink" stroke-width="4"/>`;
+      }
+    }
+    let total = h + 30;
+    if (opts.note) { body += textLine(W / 2, h + 50, opts.note, fit([opts.note], W, 15)); total += 30; }
+    return wrap(label, total, body);
+  }
+  /** 上面一個根，下面一排子節點，用折線接起來 */
+  function tree(label, root, kids, opts = {}) {
+    const n = kids.length;
+    const gap = 18;
+    const w = Math.floor((W - 20 - gap * (n - 1)) / n);
+    const rw = Math.min(300, Math.max(200, units(root.title || '', false) * 20 + 40));
+    const rh = root.lines && root.lines.length ? 90 : 60;
+    let body = box((W - rw) / 2, 10, rw, rh, root);
+    const maxLines = Math.max(...kids.map((d) => (d.lines || []).length));
+    const kh = Math.max(80, 64 + maxLines * 26);
+    const ky = rh + 70;
+    const midY = rh + 10 + 30;
+    const cx = W / 2;
+    const centers = kids.map((_, i) => 10 + i * (w + gap) + w / 2);
+    body += `<path d="M${cx} ${rh + 10} V${midY} M${centers[0]} ${midY} H${centers[n - 1]}" class="stroke-ink" stroke-width="4" fill="none"/>`;
+    centers.forEach((c) => { body += `<path d="M${c} ${midY} V${ky}" class="stroke-ink" stroke-width="4"/>`; });
+    kids.forEach((d, i) => { body += box(10 + i * (w + gap), ky, w, kh, d); });
+    let total = ky + kh + 15;
+    if (opts.note) { body += textLine(W / 2, total + 15, opts.note, fit([opts.note], W, 15)); total += 35; }
+    return wrap(label, total, body);
+  }
+  /** 直向堆疊的橫條，適合流程或層級；arrows 為 true 時用線接起來 */
+  function stack(label, nodes, opts = {}) {
+    const h = opts.h || 54;
+    const gap = opts.arrows === false ? 12 : 26;
+    let body = '';
+    nodes.forEach((d, i) => {
+      const y = 10 + i * (h + gap);
+      body += box(20, y, W - 40, h, { ...d, lines: d.lines || [] }, { titleMax: 18, lineMax: 15 });
+      if (opts.arrows !== false && i < nodes.length - 1) body += `<path d="M${W / 2} ${y + h} V${y + h + gap}" class="stroke-ink" stroke-width="4"/>`;
+    });
+    return wrap(label, 20 + nodes.length * h + (nodes.length - 1) * gap, body);
+  }
+  /** 左右對照兩欄，中間一條線 */
+  function vs(label, left, right, opts = {}) { return row(label, [left, right], { ...opts, gap: 40 }); }
+  return { row, tree, stack, vs };
+})();
+</script>

@@ -1,0 +1,450 @@
+<script>
+/* ==========================================================================
+   模組 1：基礎語法
+   ========================================================================== */
+defineTerms({
+  '名字': { en: 'name', def: 'Python 的變數其實是「貼在物件上的名字」：指定 `=` 是把名字綁到某個物件，不是把值裝進盒子。', example: '`a = [1]; b = a` 之後 a、b 是同一個物件的兩個名字。' },
+  '物件': { en: 'object', def: 'Python 裡的每個值都是物件，有型別、有身分（id）、有值。', example: '`42`、`"hi"`、`[1, 2]`、函式本身都是物件。' },
+  '動態型別': { en: 'dynamic typing', def: '名字沒有固定型別，型別屬於物件；同一個名字可以先指向 int，再指向 str。', example: '`x = 1; x = "a"` 是合法的。' },
+  'id': { en: 'id()', def: '回傳物件的身分編號；兩個名字的 id 相同，代表指向同一個物件。', example: '`id(a) == id(b)`' },
+  'is': { en: 'is operator', def: '比較兩個名字是否指向「同一個物件」；`==` 比較的是值是否相等。', example: '`x is None`' },
+  'None': { en: 'None', def: '表示「沒有值」的唯一物件，函式沒有 return 時回傳它。', example: '`result = print("hi")` 之後 result 是 None。' },
+  'int': { en: 'int', def: 'Python 的整數沒有大小上限，不會溢位，只受記憶體限制。', example: '`2 ** 100` 可以算出精確結果。' },
+  'float': { en: 'float', def: '64 位元二進位浮點數，和其他語言的 double 一樣有 0.1 + 0.2 的誤差。', example: '`0.1 + 0.2 == 0.3` 是 False。' },
+  'f-string': { en: 'formatted string literal', def: '以 f 開頭的字串，`{}` 裡可以放運算式與格式；`{x=}` 會同時印出運算式與值。', example: '`f"{price:,.0f} 元"`' },
+  '縮排': { en: 'indentation', def: 'Python 用縮排表示程式區塊（其他語言用大括號），慣例是 4 個空白。', example: '`if` 下一行縮排 4 格。' },
+  'truthy': { en: 'truthiness', def: '在 if 裡被當成真或假的規則：0、空字串、空容器、None 是假，其他大多是真。', example: '`if items:` 代表「items 不是空的」。' },
+  'match': { en: 'match statement', def: 'Python 3.10 起的結構化模式比對，可以比對常數、型別、序列形狀、字典鍵。', example: '`match cmd: case ["go", direction]: ...`' },
+  'range': { en: 'range', def: '產生一串整數的物件，含起點不含終點，不會一次佔用大量記憶體。', example: '`range(3)` 是 0、1、2。' },
+  '預設參數': { en: 'default argument', def: '呼叫時沒傳就用的值；預設值在「定義函式時」只算一次。', example: '`def greet(name="朋友"):`' },
+  '關鍵字參數': { en: 'keyword argument', def: '呼叫時用 `名稱=值` 傳入，順序可以不同，可讀性高。', example: '`sorted(names, reverse=True)`' },
+  '*args': { en: '*args / **kwargs', def: '收集多出來的位置參數成 tuple（*args）、關鍵字參數成 dict（**kwargs）。', example: '`def log(*args, **kwargs):`' },
+});
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '說出 Python 變數是「名字」而不是「盒子」',
+      '分辨 `==` 與 `is`',
+      '知道型別屬於物件、不屬於名字',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-3）Traceback 中，錯誤型別與訊息在哪裡？', options: [
+        { text: '最後一行', correct: true, why: 'most recent call last，原因在最下面。' },
+        { text: '第一行', why: '第一行是固定標頭。' },
+        { text: '倒數第二行', why: '倒數第二行通常是出錯的程式碼內容。' },
+        { text: '不會顯示', why: '一定會顯示型別與訊息。' },
+      ] },
+    ],
+    analogy: {
+      text: ['變數像便利貼：`a = [1, 2]` 是把寫著 a 的便利貼貼在一個清單上；`b = a` 是再拿一張寫著 b 的便利貼，貼在同一個清單上。清單只有一個，便利貼有兩張。'],
+      limit: ['便利貼貼久了會掉，名字不會；但名字可以被「撕下來貼到別的物件上」（重新指定），原本的物件如果沒有任何名字指著，之後會被回收。'],
+    },
+    model: {
+      svg: Fig.tree('名字與物件：名字 a 與 b 都指向同一個 list 物件 [1, 2]；名字 c 指向另一個內容相同但不同的 list', { title: 'list [1, 2]', lines: ['id = 1001'], tone: 3 }, [
+        { title: 'a', lines: ['名字'] },
+        { title: 'b', lines: ['名字，b = a'] },
+        { title: 'c = [1, 2]', lines: ['另一個物件', 'id = 2002'], dashed: true },
+      ], { note: 'a is b → True；a == c → True；a is c → False' }),
+      caption: '`=` 只是把名字貼到物件上，不複製物件。',
+      blocks: [
+        'Python 的每個值都是[[物件]]，變數是指向物件的[[名字]]。型別屬於物件，名字可以改指別種型別的物件，這叫[[動態型別]]。用 [[id]] 看物件身分，用 [[is]] 判斷是不是同一個物件。',
+        { type: 'table', caption: '`==` 與 `is`', head: ['運算子', '比較什麼', '典型用途'], rows: [
+          ['`==`', '值是否相等', '`if total == 100:`'],
+          ['`is`', '是否同一個物件', '`if x is None:`（判斷 None 一律用 is）'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '名字', en: 'name binding', def: '指定陳述式把名字綁定到物件；名字本身沒有型別。', example: '`x = 5` 把 x 綁到 int 物件 5。' },
+      { term: '動態型別', en: 'dynamic typing', def: '型別在執行時屬於物件；型別錯誤要到執行那行才會發現。', example: '`"a" + 1` 執行時拋 TypeError。' },
+      { term: 'is', en: 'identity comparison', def: '`a is b` 等於 `id(a) == id(b)`。', example: '`[] is []` 是 False（兩個不同的空清單）。' },
+    ],
+    examples: {
+      compare: [{
+        title: '判斷是不是 None',
+        kind: '不建議 vs 建議',
+        code: true,
+        badLabel: '用 ==',
+        goodLabel: '用 is',
+        bad: 'if result {{1:==}} None:\n    print("沒有結果")',
+        good: 'if result {{1:is}} None:\n    print("沒有結果")',
+        badResult: '多半能用，但物件可以自訂 `==` 的行為，可能出現意外。',
+        goodResult: 'None 只有一個，用 is 最精確，也是 PEP 8 的建議。',
+        why: ['None、True、False 這類唯一物件用 is 比較'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'a = [1, 2]\nb = a\nc = [1, 2]\nb.append(3)\nprint(a)\nprint(a == c, a is b, a is c)\n\nx = 10\nx = "十"\nprint(type(x).__name__)',
+          predict: { q: '第一個 print 印出什麼？', options: ['[1, 2]', '[1, 2, 3]', '錯誤'], answer: 1 },
+          output: '[1, 2, 3]\nFalse True False\nstr',
+        } },
+        { type: 'svg', svg: Fig.row('重新指定名字：x 原本指向 int 10，執行 x = "十" 之後 x 改指向 str 物件，int 10 若沒有其他名字指著就會被回收', [
+          { title: 'x → 10', lines: ['int 物件'] },
+          { title: 'x = "十"', lines: ['改貼便利貼'], tone: 2 },
+          { title: 'x → "十"', lines: ['str 物件'], tone: 4 },
+        ]), caption: '名字換了物件，型別也跟著換；原本的物件沒被改。' },
+      ],
+      tryit: {
+        q: ['預測輸出，並說明原因：'],
+        draft: 'n = 5\nm = n\nm = m + 1\nprint(n, m)\n# 輸出：____',
+        answer: ['`5 6`。', 'm + 1 產生一個新的 int 物件 6，再把 m 改貼到 6 上；n 仍然指向 5。int 是不可變的，2-3 會完整說明。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`b = a` 之後修改 b 的清單，以為 a 不會變。', why: 'b 和 a 指向同一個 list。', right: '要複本用 `b = a.copy()` 或 `b = list(a)`。' },
+      { wrong: '用 `is` 比較數字或字串的值，例如 `if code is 200:`。', why: '`is` 比的是身分；小整數剛好被快取時才會 True，結果不可靠（3.8 起還會出 SyntaxWarning）。', right: '比較值一律用 `==`。' },
+      { wrong: '以為名字有型別，`x = 1` 之後 x 只能放整數。', why: '型別屬於物件，名字可以改指任何物件。', right: '用型別提示（4-3）加上檢查器來約束。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '判斷 x 是不是 None，最建議的寫法是？', options: [
+        { text: '`x is None`', correct: true, why: 'None 是唯一物件，用身分比較最精確。' },
+        { text: '`x == None`', why: '能用但不建議，自訂 `__eq__` 可能影響結果。' },
+        { text: '`not x`', why: '0、空字串也會被當成假，意思不同。' },
+        { text: '`x === None`', why: 'Python 沒有 `===` 運算子。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`a = [1]; b = a; b = [2]; print(a)` 印出？', options: [
+        { text: '`[1]`', correct: true, why: '`b = [2]` 是把 b 改貼到新清單，沒有修改 a 指向的清單。' },
+        { text: '`[2]`', why: '重新指定不會影響其他名字。' },
+        { text: '`[1, 2]`', why: '沒有任何 append。' },
+        { text: '錯誤', why: '程式合法。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 `b = a` 之後 `b.append(3)` 會影響 a，但 `b = b + [3]` 不會？'], answer: [
+        '`append` 是「修改 b 指向的那個物件」，a 也指著它，所以看得到變化。',
+        '`b + [3]` 產生一個新清單，再把 b 改貼過去；a 仍指向原本的清單。關鍵是分清「改物件」和「改名字指向」。（`b += [3]` 對 list 是原地修改，又會影響 a。）',
+      ] },
+    ],
+    keypoints: [
+      '變數是貼在物件上的名字，`=` 不複製物件。',
+      '`==` 比值、`is` 比是不是同一個物件；判斷 None 用 is。',
+      '型別屬於物件，同一個名字可以改指不同型別的物件。',
+    ],
+    sources: ['py-datamodel', 'py-tutorial'],
+  },
+
+  '1-2': {
+    goals: [
+      '說出 int 沒有上限、float 有誤差',
+      '分辨 `/`、`//`、`%`',
+      '用 f-string 格式化數字與除錯',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-1）`a = "hi"; b = a; b = b.upper(); print(a)` 印出？', options: [
+        { text: '`hi`', correct: true, why: 'upper 回傳新字串，b 改指新物件，a 不變。' },
+        { text: '`HI`', why: '字串不可變，a 指向的物件沒被改。' },
+        { text: '`Hi`', why: 'upper 是全大寫，而且根本沒影響 a。' },
+        { text: '錯誤', why: '程式合法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['Python 的 int 像可以無限加頁的帳本：數字再大都寫得下。float 像只有 15–17 位有效數字的計算機：大部分時候夠用，但 0.1 這種數字在二進位寫不完，會有一點點誤差。'],
+      limit: ['無限加頁也要紙；int 越大越佔記憶體、算得越慢，而且 3.11 起把很長的數字轉成字串有位數上限（預設 4300 位），避免被惡意輸入拖垮。'],
+    },
+    model: {
+      svg: Fig.row('三種除法：/ 一定得到 float，7 / 2 是 3.5；// 向下取整，7 // 2 是 3、-7 // 2 是 -4；% 取餘數，7 % 2 是 1', [
+        { title: '/', lines: ['`7 / 2 → 3.5`', '一定是 float'], tone: 1 },
+        { title: '//', lines: ['`7 // 2 → 3`', '`-7 // 2 → -4`'], tone: 3 },
+        { title: '%', lines: ['`7 % 2 → 1`', '`-7 % 2 → 1`'], tone: 4 },
+      ]),
+      caption: '`//` 是「向下」取整（往負無限大），不是往 0 截斷，這點和 C#、JavaScript 的 Math.trunc 不同。',
+      blocks: [
+        '[[int]] 沒有溢位；[[float]] 是二進位浮點數。字串組合用 [[f-string]]：`{值:格式}`，例如 `{n:,}` 加千分位、`{x:.2f}` 兩位小數、`{x=}` 除錯時印出名稱與值。金額要精確時用 `decimal.Decimal`。',
+        { type: 'table', caption: '常用 f-string 格式', head: ['寫法', '值', '結果'], rows: [
+          ['`f"{n:,}"`', '1234567', '1,234,567'],
+          ['`f"{x:.2f}"`', '3.14159', '3.14'],
+          ['`f"{r:.0%}"`', '0.25', '25%'],
+          ['`f"{name!r}"`', '\'阿明\'', '\'阿明\'（帶引號）'],
+          ['`f"{total=}"`', '42', 'total=42'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'int', en: 'int', def: '任意精度整數；`2 ** 100` 精確計算。', example: '`1_000_000` 可以用底線分隔位數。' },
+      { term: 'float', en: 'float', def: 'IEEE 754 雙精度；比較時用 `math.isclose`。', example: '`math.isclose(0.1 + 0.2, 0.3)` 是 True。' },
+      { term: 'f-string', en: 'f-string', def: '`f"…{運算式:格式規格}…"`；3.12 起大括號裡可以用相同的引號與換行。', example: '`f"{price:>8,.0f}"` 靠右 8 格、千分位、無小數。' },
+    ],
+    examples: {
+      compare: [{
+        title: '計算兩數平均',
+        kind: '錯誤 vs 正確',
+        code: true,
+        badLabel: '用 // 以為會四捨五入',
+        goodLabel: '用 /，再格式化',
+        bad: 'avg = (85 + 90) {{1://}} 2\nprint(avg)',
+        good: 'avg = (85 + 90) {{1:/}} 2\nprint(f"{avg:.1f}")',
+        badResult: '印出 87：小數被向下捨去了。',
+        goodResult: '印出 87.5。',
+        why: ['Python 3 的 `/` 一律是真正的除法；要整數除法才用 `//`'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'print(2 ** 64)\nprint(0.1 + 0.2)\nprint(-7 // 2)\nprint(round(2.5), round(3.5))\nscore = 92\nprint(f"{score=}, 及格：{score >= 60}")',
+          predict: { q: '`round(2.5)` 是多少？', options: ['3', '2', '2.5'], answer: 1 },
+          output: '18446744073709551616\n0.30000000000000004\n-4\n2 4\nscore=92, 及格：True',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'int', label: '結果是 int' }, { id: 'float', label: '結果是 float' }, { id: 'err', label: 'TypeError' }],
+          items: [
+            { text: '`7 // 2`', answer: 'int', why: '兩個 int 做整數除法。' },
+            { text: '`6 / 3`', answer: 'float', why: '`/` 一律回傳 float，結果是 2.0。' },
+            { text: '`"3" + 4`', answer: 'err', why: 'str 和 int 不能相加，要先 int("3") 或 str(4)。' },
+            { text: '`2 ** 10`', answer: 'int', why: '1024。' },
+            { text: '`7.0 // 2`', answer: 'float', why: '有一邊是 float，結果是 3.0。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('round 使用銀行家捨入：0.5 時取最接近的偶數，round(2.5) 是 2、round(3.5) 是 4；要一般四捨五入用 decimal 的 ROUND_HALF_UP', { title: 'round()', lines: ['`2.5 → 2`', '`3.5 → 4`', '往偶數靠'], tone: 3 }, { title: 'Decimal', lines: ['ROUND_HALF_UP', '`2.5 → 3`', '一般四捨五入'], tone: 4 }), caption: '算成績、金額前先確認捨入規則。' },
+      ],
+      tryit: {
+        q: ['讓價格印成「NT$ 12,800」：'],
+        draft: 'price = 12800\nprint(f"NT$ {price:____}")',
+        answer: ['`f"NT$ {price:,}"`。', '`,` 是千分位格式；如果 price 是 float，寫 `{price:,.0f}` 去掉小數。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`input()` 拿到的值直接拿去加數字。', why: 'input 一律回傳 str，`"3" + 4` 是 TypeError。', right: '`n = int(input("數量："))`。' },
+      { wrong: '用 `==` 比較兩個 float。', why: '二進位誤差讓本來該相等的值差一點點。', right: '`math.isclose(a, b)`；金額用 Decimal 或以「分」為單位存 int。' },
+      { wrong: '以為 `round(2.5)` 是 3。', why: 'round 採用銀行家捨入（往偶數）。', right: '需要四捨五入時用 `Decimal.quantize(..., rounding=ROUND_HALF_UP)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`-7 // 2` 的結果是？', options: [
+        { text: '`-4`', correct: true, why: '`//` 向下取整（往負無限大）。' },
+        { text: '`-3`', why: '那是往 0 截斷的結果，Python 的 // 不是這樣。' },
+        { text: '`-3.5`', why: '那是 `/` 的結果。' },
+        { text: 'ZeroDivisionError', why: '除數是 2，不是 0。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`f"{0.256:.0%}"` 會得到？', options: [
+        { text: '`26%`', correct: true, why: '% 格式乘以 100，再四捨五入到 0 位小數。' },
+        { text: '`0.256%`', why: '% 格式會先乘 100。' },
+        { text: '`25.6%`', why: '`.0` 表示 0 位小數。' },
+        { text: '`0%`', why: '是先乘 100 再取到整數。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['有人說「Python 的整數不會溢位，所以算錢用 int 最好」。這句話對了一半，錯在哪？'], answer: [
+        '對的部分：以「分」或「元」為單位存 int，不會有浮點誤差也不會溢位。',
+        '錯的部分：遇到折扣、匯率、分攤時會出現小數，要決定捨入規則；這時用 `decimal.Decimal` 並明確指定 rounding 比較安全。',
+      ] },
+    ],
+    keypoints: [
+      'int 沒有上限；float 有二進位誤差，比較用 math.isclose。',
+      '`/` 一定是 float，`//` 向下取整，`%` 取餘數。',
+      'f-string 用 `{值:格式}`，除錯用 `{x=}`。',
+    ],
+    sources: ['py-numbers', 'py-fstring'],
+  },
+
+  '1-3': {
+    goals: [
+      '用縮排寫出 if／elif／else',
+      '用 for 搭配 range、enumerate 走過資料',
+      '用 match 比對結構化資料',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-2）`7 / 7` 的結果型別是？', options: [
+        { text: 'float（1.0）', correct: true, why: '`/` 一律回傳 float。' },
+        { text: 'int（1）', why: '要 `7 // 7` 才是 int。' },
+        { text: 'bool', why: '除法不會得到 bool。' },
+        { text: 'str', why: '數字運算不會得到字串。' },
+      ] },
+    ],
+    analogy: {
+      text: ['縮排像書的目錄層級：章底下縮一格是節，節底下再縮一格是小節。Python 用縮排決定「這幾行屬於哪個 if、哪個 for」，就像目錄用縮排決定哪一節屬於哪一章。'],
+      limit: ['書的縮排只是排版；Python 的縮排是語法，縮錯一格意思就變了，甚至直接 IndentationError。'],
+    },
+    model: {
+      svg: Fig.tree('選迴圈：走過一個集合用 for x in 集合；需要索引用 for i, x in enumerate；不知道次數、看條件用 while', { title: '要重複做事' }, [
+        { title: 'for x in 集合', lines: ['走過每一個', '最常用'], tone: 3 },
+        { title: 'enumerate', lines: ['同時要索引'], tone: 4 },
+        { title: 'while 條件', lines: ['次數未知'], tone: 1 },
+      ]),
+      caption: 'Python 的 for 直接走過元素，很少需要 `range(len(x))`。',
+      blocks: [
+        'Python 用[[縮排]]表示區塊。if 的條件用 [[truthy]] 規則判斷。`for` 走過任何可迭代物件，[[range]] 產生數字序列。比對資料形狀時，3.10 起的 [[match]] 比一串 if 清楚。',
+        { type: 'code', lang: 'python', title: 'commands.py', code: 'command = input("> ").split()\n\nmatch command:\n    case ["quit"]:\n        print("再見")\n    case ["go", direction]:\n        print(f"往 {direction} 走")\n    case ["take", *items]:\n        print(f"撿起 {len(items)} 樣東西")\n    case _:\n        print("看不懂")' },
+      ],
+    },
+    define: [
+      { term: 'truthy', en: 'truth value testing', def: '`False`、`None`、`0`、`0.0`、`""`、`[]`、`{}`、`set()` 為假，其他為真。', example: '`if not name:` 代表 name 是空字串或 None。' },
+      { term: 'match', en: 'structural pattern matching', def: '`match 值:` 搭配多個 `case 模式:`，由上往下第一個符合的執行；`case _` 是其他。', example: '`case {"type": "click", "x": x}:`' },
+      { term: 'range', en: 'range', def: '`range(停止)`、`range(起, 止)`、`range(起, 止, 間隔)`，不含止。', example: '`range(10, 0, -2)` 是 10、8、6、4、2。' },
+    ],
+    examples: {
+      compare: [{
+        title: '印出每個名字和編號',
+        kind: '其他語言的習慣 vs Python 的寫法',
+        code: true,
+        badLabel: 'range(len())',
+        goodLabel: 'enumerate',
+        bad: 'for i in range(len(names)):\n    print(i + 1, names[i])',
+        good: 'for i, name in {{1:enumerate(names, start=1)}}:\n    print(i, name)',
+        badResult: '能用，但要自己管索引，容易差一。',
+        goodResult: '索引和元素一次拿到，start=1 從 1 開始編號。',
+        why: ['要同時走兩個清單用 `zip(a, b)`'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'for i in range(1, 10, 3):\n    print(i, end=" ")\nprint()\n\nitems = []\nif items:\n    print("有東西")\nelse:\n    print("空的")\n\nfor n in [3, 8, 5]:\n    if n > 6:\n        break\n    print(n)\nelse:\n    print("全部走完")',
+          predict: { q: '最後的 `else:` 會印出「全部走完」嗎？', options: ['會', '不會，因為 break 了', '語法錯誤'], answer: 1 },
+          output: '1 4 7 \n空的\n3',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 't', label: '當成真' }, { id: 'f', label: '當成假' }],
+          items: [
+            { text: '`0`', answer: 'f', why: '數字 0 為假。' },
+            { text: '`"0"`', answer: 't', why: '非空字串為真，即使內容是 "0"。' },
+            { text: '`[]`', answer: 'f', why: '空容器為假。' },
+            { text: '`[0]`', answer: 't', why: '有一個元素的清單為真。' },
+            { text: '`None`', answer: 'f', why: 'None 為假。' },
+            { text: '`" "`', answer: 't', why: '只有一個空白也是非空字串。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.stack('match 由上往下比對：先比 quit，再比 go 加一個方向，再比 take 加任意數量物品，最後 case _ 接住其他所有情況', [
+          { title: 'case ["quit"]' },
+          { title: 'case ["go", direction]', tone: 3 },
+          { title: 'case ["take", *items]', tone: 4 },
+          { title: 'case _：其他', tone: 1 },
+        ]), caption: '第一個符合的就執行，後面不再比對；最後放 `case _`。' },
+      ],
+      tryit: {
+        q: ['用 for 和 zip 印出「品名：價格」：'],
+        draft: 'names = ["咖啡", "蛋糕"]\nprices = [60, 90]\nfor name, price in ____(names, prices):\n    print(f"{name}：{price}")',
+        answer: ['`zip(names, prices)`。', 'zip 把兩個序列一對一配對；長度不同時以短的為準，3.10 起可以加 `strict=True` 讓長度不同時報錯。'],
+      },
+    },
+    mistakes: [
+      { wrong: 'if 的下一行忘了縮排，或混用 Tab 和空白。', why: 'IndentationError／TabError。', right: '編輯器設定 Tab 轉成 4 個空白。' },
+      { wrong: '`if x == 1 or 2:` 想判斷 x 是 1 或 2。', why: '被解讀成 `(x == 1) or 2`，2 永遠為真。', right: '`if x in (1, 2):`。' },
+      { wrong: '在 for 裡 remove 正在走過的清單元素。', why: '索引位移，會跳過某些元素。', right: '建立新清單：`items = [x for x in items if keep(x)]`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`list(range(2, 8, 2))` 是？', options: [
+        { text: '`[2, 4, 6]`', correct: true, why: '從 2 開始、間隔 2、不含 8。' },
+        { text: '`[2, 4, 6, 8]`', why: 'range 不包含終點。' },
+        { text: '`[2, 3, 4, 5, 6, 7]`', why: '間隔是 2。' },
+        { text: '`[4, 6, 8]`', why: '從 2 開始。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`x = 5; if x == 1 or 2: print("A")` 會？', options: [
+        { text: '印出 A', correct: true, why: '`or 2` 永遠為真，這是常見陷阱。' },
+        { text: '什麼都不印', why: '直覺以為不會印，但 2 是 truthy。' },
+        { text: 'SyntaxError', why: '語法合法。' },
+        { text: 'TypeError', why: '沒有型別錯誤。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['處理 API 回傳的 JSON：`{"type": "order", "id": 5}` 或 `{"type": "refund", "id": 5, "amount": 100}`。用 match 怎麼寫比 if 清楚？'], answer: [
+        '`match event: case {"type": "order", "id": id}: ... case {"type": "refund", "id": id, "amount": amt}: ... case _: log_unknown(event)`。',
+        '字典模式同時檢查鍵是否存在並取出值；if 寫法要先檢查鍵、再取值，巢狀很多層。',
+      ] },
+    ],
+    keypoints: [
+      '縮排就是區塊；一律用 4 個空白。',
+      'for 直接走過元素，要索引用 enumerate，配對用 zip。',
+      'match 比對資料形狀，最後放 `case _`。',
+    ],
+    sources: ['py-control'],
+  },
+
+  '1-4': {
+    goals: [
+      '定義有預設值與關鍵字參數的函式',
+      '避開「可變預設值」陷阱',
+      '用 *args、**kwargs 收集不定數量的參數',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-3）`if []:` 會進入 if 嗎？', options: [
+        { text: '不會，空清單是假', correct: true, why: '空容器為假。' },
+        { text: '會，清單物件存在就是真', why: 'truthy 看的是內容是否為空。' },
+        { text: 'TypeError', why: 'if 可以接任何物件。' },
+        { text: '要寫成 `if len([]):`', why: '可以，但直接 `if items:` 是慣用寫法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['函式像飲料店的點單：品名必填（位置參數），甜度冰塊有預設（預設參數），你也可以直接說「甜度：半糖」不管順序（關鍵字參數）。'],
+      limit: ['飲料店每杯的預設甜度都是新的；Python 的預設值只在「定義函式時」建立一次。如果預設值是清單，每次呼叫共用同一個清單，這就是本課最重要的陷阱。'],
+    },
+    model: {
+      svg: Fig.row('呼叫函式時的參數對應：位置參數依順序對應，關鍵字參數依名稱對應，沒傳的參數使用預設值', [
+        { title: '位置參數', lines: ['依順序', '`order("奶茶")`'], tone: 1 },
+        { title: '關鍵字參數', lines: ['依名稱', '`ice="少冰"`'], tone: 3 },
+        { title: '預設值', lines: ['沒傳就用', '定義時算一次'], tone: 4 },
+      ]),
+      caption: '`def order(name, sugar="全糖", ice="正常冰"):`',
+      blocks: [
+        '`def` 定義函式，`return` 回傳值（沒寫就回傳 [[None]]）。參數可以有[[預設參數]]，呼叫時可用[[關鍵字參數]]。[[*args]] 收集多的位置參數。預設值在 def 執行時只算一次，所以可變物件不能當預設值。',
+        { type: 'code', lang: 'python', title: 'order.py', code: 'def order(name, sugar="全糖", ice="正常冰"):\n    return f"{name}／{sugar}／{ice}"\n\nprint(order("奶茶"))\nprint(order("紅茶", ice="去冰"))\n\ndef total(*prices, discount=0):\n    return sum(prices) * (1 - discount)\n\nprint(total(100, 50, 30, discount=0.1))   # 162.0' },
+      ],
+    },
+    define: [
+      { term: '預設參數', en: 'default parameter value', def: '在 def 執行時計算一次並保存；之後每次呼叫共用同一個物件。', example: '`def f(items=None):` 是處理可變預設值的慣用寫法。' },
+      { term: '關鍵字參數', en: 'keyword argument', def: '`f(x=1)`；`*` 之後的參數只能用關鍵字傳入。', example: '`def connect(host, *, timeout=5):`' },
+      { term: '*args', en: 'variadic arguments', def: '`*args` 是 tuple、`**kwargs` 是 dict；呼叫時 `f(*list)` 展開。', example: '`print(*["a", "b"], sep="-")` 印出 a-b' },
+    ],
+    examples: {
+      compare: [{
+        title: '收集項目的函式',
+        kind: '陷阱 vs 正確',
+        code: true,
+        badLabel: '可變預設值',
+        goodLabel: '用 None 當預設',
+        bad: 'def add_item(item, bag={{1:[]}}):\n    bag.append(item)\n    return bag\n\nprint(add_item("A"))\nprint(add_item("B"))',
+        good: 'def add_item(item, bag={{1:None}}):\n    if bag is None:\n        bag = []\n    bag.append(item)\n    return bag',
+        badResult: '第二次印出 [\'A\', \'B\']：兩次呼叫共用同一個預設清單。',
+        goodResult: '每次呼叫都建立新清單。',
+        why: ['預設值是 list、dict、set 時一律改成 None'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'def greet(name, greeting="嗨"):\n    print(f"{greeting}，{name}")\n\ngreet("阿明")\ngreet(greeting="早安", name="小華")\nresult = greet("阿花")\nprint(result)',
+          predict: { q: '最後一行 `print(result)` 印出什麼？', options: ['嗨，阿花', 'None', '空白'], answer: 1 },
+          output: '嗨，阿明\n早安，小華\n嗨，阿花\nNone',
+        } },
+        { type: 'svg', svg: Fig.row('可變預設值的時間線：定義函式時建立一個空清單當預設值；第一次呼叫加入 A；第二次呼叫拿到同一個清單，變成 A 和 B', [
+          { title: 'def 時', lines: ['建立 []', '只有一次'], tone: 2 },
+          { title: '第 1 次呼叫', lines: ['`["A"]`'], tone: 3 },
+          { title: '第 2 次呼叫', lines: ['`["A", "B"]`', '同一個清單'], tone: 5 },
+        ]), caption: '預設值在定義時就決定了，不是每次呼叫才建立。' },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ok', label: '可以當預設值' }, { id: 'no', label: '要改成 None' }],
+          items: [
+            { text: '`0`', answer: 'ok', why: '不可變的 int。' },
+            { text: '`[]`', answer: 'no', why: '可變，會被共用。' },
+            { text: '`"預設"`', answer: 'ok', why: '字串不可變。' },
+            { text: '`{}`', answer: 'no', why: 'dict 可變。' },
+            { text: '`(1, 2)`', answer: 'ok', why: 'tuple 不可變（裡面沒有可變物件時）。' },
+          ],
+        } },
+      ],
+      tryit: {
+        q: ['讓 timeout 只能用關鍵字傳入，避免 `fetch("url", 30)` 這種看不懂的呼叫：'],
+        draft: 'def fetch(url, ____, timeout=10):\n    ...\n\nfetch("https://example.com", timeout=30)',
+        answer: ['`def fetch(url, *, timeout=10):`。', '`*` 之後的參數只能用關鍵字傳入；`fetch("…", 30)` 會變成 TypeError。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`def f(items=[]):`', why: '所有呼叫共用同一個清單，資料會累積。', right: '`def f(items=None): items = [] if items is None else items`。' },
+      { wrong: '函式最後忘了 return，呼叫端拿到 None。', why: '沒有 return 就回傳 None。', right: '確認每條路徑都 return 需要的值。' },
+      { wrong: '函式裡指定全域變數，結果 UnboundLocalError。', why: '在函式內指定的名字被視為區域變數。', right: '用參數傳入、回傳新值；真的要改全域才用 `global`（盡量避免）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '函式沒有 return 陳述式時，呼叫結果是？', options: [
+        { text: '`None`', correct: true, why: '沒有 return 就回傳 None。' },
+        { text: '最後一行的值', why: 'Python 不會自動回傳最後一行。' },
+        { text: '`0`', why: '不是 0。' },
+        { text: '拋出例外', why: '合法，不會拋例外。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`def f(a, b=2, *, c): ...` 下列哪個呼叫合法？', options: [
+        { text: '`f(1, c=3)`', correct: true, why: 'a=1、b 用預設、c 用關鍵字。' },
+        { text: '`f(1, 2, 3)`', why: 'c 在 `*` 之後，只能用關鍵字。' },
+        { text: '`f(c=3)`', why: '缺少必要的 a。' },
+        { text: '`f(1)`', why: 'c 沒有預設值，必須提供。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事寫了 `def log(msg, time=datetime.now()):`，發現所有日誌的時間都一樣。為什麼？怎麼修？'], answer: [
+        '預設值在 def 執行時算一次，所以 time 永遠是程式啟動時的時間。這和可變預設值是同一個原理。',
+        '改成 `def log(msg, time=None): time = time or datetime.now()`（或 `if time is None:`）。',
+      ] },
+    ],
+    keypoints: [
+      '沒有 return 就回傳 None。',
+      '預設值在定義時算一次；list、dict、時間這類預設值改用 None。',
+      '用關鍵字參數讓呼叫好讀；`*` 之後強制用關鍵字。',
+    ],
+    sources: ['py-control', 'py-tutorial'],
+  },
+});
+</script>

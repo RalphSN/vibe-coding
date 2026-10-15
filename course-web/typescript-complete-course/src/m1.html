@@ -1,0 +1,437 @@
+<script>
+/* ==========================================================================
+   模組 1：基本型別
+   ========================================================================== */
+defineTerms({
+  '型別註記': { en: 'type annotation', def: '在名字後面用冒號寫出型別，告訴檢查器「這裡應該是什麼」。', example: '`let age: number = 30;`' },
+  '型別推斷': { en: 'type inference', def: '沒寫註記時，TypeScript 從初始值或回傳值自動推出型別。', example: '`let n = 1;` 推斷為 number。' },
+  '字面型別': { en: 'literal type', def: '只允許一個特定值的型別，例如 `"red"` 或 `42`。const 宣告的原始值會被推斷成字面型別。', example: '`const c = "red";` 的型別是 `"red"`。' },
+  'string': { en: 'string', def: '文字型別。', example: '`let name: string = "阿明";`' },
+  'number': { en: 'number', def: '所有數字（整數與小數）都是 number；大整數另有 bigint。', example: '`let price: number = 19.9;`' },
+  'boolean': { en: 'boolean', def: '真或假。', example: '`let done: boolean = false;`' },
+  'tuple': { en: 'tuple type', def: '長度與每個位置型別都固定的陣列。', example: '`let point: [number, number] = [3, 4];`' },
+  'readonly': { en: 'readonly', def: '標示屬性或陣列不能被修改（只在檢查時有效）。', example: '`readonly string[]`' },
+  'interface': { en: 'interface', def: '描述物件形狀的宣告，可以被擴充（extends）與合併。', example: '`interface User { name: string }`' },
+  'type 別名': { en: 'type alias', def: '用 `type` 幫任何型別取名字，可以是物件、聯合、函式等。', example: '`type Id = string | number;`' },
+  '可選屬性': { en: 'optional property', def: '屬性名稱後加 `?`，表示可以沒有；讀取時型別包含 undefined。', example: '`email?: string`' },
+  '多餘屬性檢查': { en: 'excess property check', def: '直接寫物件字面值指定給型別時，多出型別沒定義的屬性會報錯，用來抓打錯字。', example: '`const u: User = { nmae: "x" }` 會報錯。' },
+  '函式型別': { en: 'function type', def: '描述函式的參數與回傳值的型別。', example: '`(a: number, b: number) => number`' },
+  'void': { en: 'void', def: '函式沒有有意義的回傳值。', example: '`function log(msg: string): void`' },
+  '多載': { en: 'overload', def: '同一個函式宣告多組參數與回傳型別的組合。', example: '`function parse(x: string): number; function parse(x: number): string;`' },
+});
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '寫出變數、參數、回傳值的型別註記',
+      '知道什麼時候可以交給型別推斷',
+      '分辨 let 與 const 推斷出的型別差異',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-3）TS7006「參數隱含 any」的意思是？', options: [
+        { text: '參數沒寫型別，也推斷不出來', correct: true, why: 'strict 下這是錯誤。' },
+        { text: '參數型別寫錯，和宣告的型別不一致', why: '那是 TS2345 等。' },
+        { text: '參數太多', why: '那是 TS2554。' },
+        { text: '參數名稱打錯', why: '那是 TS2304 或 TS2552。' },
+      ] },
+    ],
+    analogy: {
+      text: ['型別註記像在收納盒上貼標籤；型別推斷像看一眼你放進去的東西就自動貼好標籤。第一次放進的是襪子，盒子就被標成「襪子」，之後放毛衣會被擋下來。'],
+      limit: ['真的收納員看得出你的意圖；TypeScript 只看初始值。宣告時沒給值（`let x;`）它就推不出來，要自己寫註記。'],
+    },
+    model: {
+      svg: Fig.tree('什麼時候要寫型別註記：函式參數一定要寫；有初始值的變數交給推斷；匯出的函式回傳值建議寫出', { title: '要不要寫註記？' }, [
+        { title: '函式參數', lines: ['一定要寫'], tone: 5 },
+        { title: '有初始值的變數', lines: ['交給推斷'], tone: 4 },
+        { title: '匯出函式的回傳', lines: ['建議寫出'], tone: 3 },
+      ]),
+      caption: '參數是「外面傳進來的」，推斷不出來；變數有初始值就看得出來。',
+      blocks: [
+        '[[型別註記]]寫在名字後面。[[型別推斷]]會從初始值推出型別。`let` 推斷出一般型別（`string`），`const` 推斷出[[字面型別]]（`"red"`），因為 const 不會再變。',
+        { type: 'code', lang: 'typescript', title: 'infer.ts', code: 'let city = "台北";        // string\nconst unit = "公里";      // "公里"（字面型別）\nlet scores = [90, 85];    // number[]\n\nfunction area(w: number, h: number): number {\n  return w * h;\n}\n\nconst big = area(3, 4) > 10;   // boolean' },
+      ],
+    },
+    define: [
+      { term: '型別註記', en: 'annotation', def: '`名字: 型別`；寫在變數、參數、回傳值、屬性上。', example: '`const ids: number[] = [];`' },
+      { term: '型別推斷', en: 'inference', def: '依初始值、回傳運算式、上下文（例如 callback 參數）推出型別。', example: '`[1, 2].map(n => n * 2)` 的 n 推斷為 number。' },
+      { term: '字面型別', en: 'literal type', def: '單一值的型別；let 會「放寬」成一般型別，const 保留字面型別。', example: '`let a = "x"` 是 string，`const b = "x"` 是 "x"。' },
+    ],
+    examples: {
+      compare: [{
+        title: '宣告一個之後才給值的變數',
+        kind: '錯誤 vs 正確',
+        code: true,
+        badLabel: '沒有初始值也沒有註記',
+        goodLabel: '寫出註記',
+        bad: 'let result;\nresult = 42;\nresult = "完成";   // 也可以',
+        good: 'let result{{1:: number}};\nresult = 42;\n// result = "完成";  // TS2322',
+        badResult: 'result 變成 any（strict 下會隨指定演變），型別保護變弱。',
+        goodResult: '型別固定，放錯值馬上報錯。',
+        why: ['沒有初始值時，一定要寫註記'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'let a = "red";\nconst b = "red";\nlet c = [1, "two"];\n\n// 把滑鼠移到 a、b、c 上，編輯器顯示的型別是？',
+          predict: { q: 'b 的型別是？', options: ['string', '"red"', 'any'], answer: 1 },
+          output: 'let a: string\nconst b: "red"\nlet c: (string | number)[]',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'need', label: '要寫註記' }, { id: 'infer', label: '交給推斷' }],
+          items: [
+            { text: '`function greet(name) {}` 的 name', answer: 'need', why: '參數無法推斷。' },
+            { text: '`const total = price * qty;`', answer: 'infer', why: '從運算式就知道是 number。' },
+            { text: '`let selected;` 之後才指定', answer: 'need', why: '沒有初始值。' },
+            { text: '`const names = ["a", "b"];`', answer: 'infer', why: '推斷為 string[]。' },
+            { text: '`const empty = [];` 之後要放 User', answer: 'need', why: '空陣列推不出元素型別，寫 `const empty: User[] = [];`。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('let 與 const 的推斷：let color = "red" 推斷為 string，因為之後可能改成別的字串；const color = "red" 推斷為字面型別 "red"，因為不會再變', { title: 'let', lines: ['`let c = "red"`', '→ string'], tone: 3 }, { title: 'const', lines: ['`const c = "red"`', '→ "red"'], tone: 4 }), caption: '字面型別在 2-2 會變得很重要。' },
+      ],
+      tryit: {
+        q: ['補上型別註記，讓函式的參數與回傳值都明確：'],
+        draft: 'function bmi(weight____, height____)____ {\n  return weight / (height * height);\n}',
+        answer: ['`function bmi(weight: number, height: number): number`。', '回傳型別可以推斷，但匯出或公開的函式寫出來，能避免實作改錯時默默改變介面。'],
+      },
+    },
+    mistakes: [
+      { wrong: '每個變數都寫註記：`const n: number = 5;`。', why: '重複資訊，程式變冗長。', right: '有初始值就交給推斷。' },
+      { wrong: '`const list = [];` 之後 push 物件。', why: '空陣列的元素型別推不出來。', right: '`const list: Item[] = [];`。' },
+      { wrong: '以為推斷出來的型別比較「鬆」。', why: '推斷出的型別和寫註記一樣嚴格。', right: '放心交給推斷，只在需要時寫。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`const size = 10;` 的型別是？', options: [
+        { text: '`10`', correct: true, why: 'const 保留字面型別。' },
+        { text: '`number`', why: 'let 才會放寬成 number。' },
+        { text: '`any`', why: '有初始值就推得出來。' },
+        { text: '`const`', why: 'const 不是型別。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`let x = 5; x = "5";` 會？', options: [
+        { text: 'TS2322：string 不能指定給 number', correct: true, why: 'x 被推斷為 number。' },
+        { text: '可以，因為沒寫註記時型別不會固定', why: '推斷出的型別一樣會被檢查。' },
+        { text: 'x 變成 string | number', why: '型別在宣告時就固定了。' },
+        { text: '執行時錯誤', why: '是編譯時錯誤，而且執行時其實能跑。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼「匯出的函式」建議寫出回傳型別，即使能推斷？'], answer: [
+        '回傳型別是函式對外的承諾。只靠推斷時，改實作（例如某個分支忘了 return）可能讓回傳型別默默變成 `number | undefined`，錯誤出現在很遠的呼叫端。',
+        '寫出回傳型別後，錯誤會出現在函式本身，離原因最近；大型專案也能加快型別檢查。',
+      ] },
+    ],
+    keypoints: [
+      '參數要寫型別；有初始值的變數交給推斷。',
+      'let 推斷成一般型別，const 推斷成字面型別。',
+      '沒有初始值、空陣列時要自己寫註記。',
+    ],
+    sources: ['ts-everyday'],
+  },
+
+  '1-2': {
+    goals: [
+      '使用 string、number、boolean 與陣列型別',
+      '用 tuple 表示固定長度的一組值',
+      '用 readonly 防止陣列被修改',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-1）`const empty = [];` 之後要放 User，最好怎麼寫？', options: [
+        { text: '`const empty: User[] = [];`', correct: true, why: '空陣列推不出元素型別。' },
+        { text: '不用處理，push 時自動推斷', why: '結果型別會很寬鬆或報錯。' },
+        { text: '`const empty = [] as any;`', why: '關掉檢查。' },
+        { text: '`const empty = new User[]();`', why: '不是合法語法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['陣列 `string[]` 像一排一樣大的置物格，每格都放字串，格數不限。tuple `[string, number]` 像飯店的鑰匙卡套：第一格一定是房號、第二格一定是張數，位置有固定意義。'],
+      limit: ['卡套只有兩格就裝不下第三樣；但 JavaScript 的陣列在執行時還是能 push，TypeScript 只在檢查時限制（readonly tuple 才會擋 push）。'],
+    },
+    model: {
+      svg: Fig.row('三種常見集合型別：string 陣列長度不限、每個都是 string；tuple [string, number] 長度與每個位置型別固定；readonly string 陣列不能 push 或修改', [
+        { title: 'string[]', lines: ['長度不限', '都是 string'], tone: 1 },
+        { title: '[string, number]', lines: ['長度固定', '每格型別固定'], tone: 3 },
+        { title: 'readonly string[]', lines: ['不能 push', '不能改元素'], tone: 4 },
+      ], { arrows: false }),
+      caption: '`string[]` 和 `Array<string>` 是同一件事。',
+      blocks: [
+        '原始型別：[[string]]、[[number]]、[[boolean]]，還有 bigint、symbol、null、undefined。陣列寫 `T[]`；[[tuple]] 寫 `[T1, T2]`，可以為位置命名 `[name: string, age: number]`。[[readonly]] 讓檢查器禁止修改。',
+        { type: 'code', lang: 'typescript', title: 'arrays.ts', code: 'const tags: string[] = ["ts", "node"];\nconst entry: [name: string, score: number] = ["阿明", 92];\nconst [who, score] = entry;\n\nfunction total(nums: readonly number[]): number {\n  // nums.push(1);   // TS2339：readonly 陣列沒有 push\n  return nums.reduce((s, n) => s + n, 0);\n}\n\nconst big: bigint = 2n ** 64n;' },
+      ],
+    },
+    define: [
+      { term: 'tuple', en: 'tuple', def: '`[A, B]` 固定長度；可選元素 `[A, B?]`；剩餘元素 `[A, ...B[]]`。', example: '`useState` 回傳 `[值, 設定函式]` 就是 tuple。' },
+      { term: 'readonly', en: 'readonly array', def: '`readonly T[]` 或 `ReadonlyArray<T>`；沒有 push、pop、sort 等修改方法。', example: '函式參數寫 readonly，承諾不修改呼叫端的陣列。' },
+      { term: 'number', en: 'number', def: '64 位元浮點數；沒有 int、float 之分。超過 2⁵³ 的整數用 bigint。', example: '`0.1 + 0.2 !== 0.3`' },
+    ],
+    examples: {
+      compare: [{
+        title: '函式回傳兩個值',
+        kind: '不明確 vs 明確',
+        code: true,
+        badLabel: '回傳陣列',
+        goodLabel: '回傳 tuple',
+        bad: 'function minMax(xs: number[]) {\n  return [Math.min(...xs), Math.max(...xs)];\n}\n// 推斷為 number[]，長度不固定',
+        good: 'function minMax(xs: number[]): {{1:[min: number, max: number]}} {\n  return [Math.min(...xs), Math.max(...xs)];\n}',
+        badResult: '呼叫端 `const [a, b, c] = minMax(x)` 也不會報錯，c 其實是 undefined。',
+        goodResult: '長度固定為 2，解構第三個會報錯；位置有名稱，提示更清楚。',
+        why: ['回傳 3 個以上的值時，改用物件更好讀'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'const pair: [string, number] = ["a", 1];\nconst nums = [1, 2, 3];\nconst first = nums[5];\n\nconsole.log(first);\n// 編輯器顯示 first 的型別是？',
+          predict: { q: '預設設定下，first 的型別是？', options: ['number', 'number | undefined', 'undefined'], answer: 0 },
+          output: 'const first: number\n執行結果：undefined\n（開啟 noUncheckedIndexedAccess 後型別才會是 number | undefined）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'arr', label: '陣列 T[]' }, { id: 'tuple', label: 'tuple' }],
+          items: [
+            { text: '購物車裡的商品清單', answer: 'arr', why: '數量不固定、型別相同。' },
+            { text: '座標 [緯度, 經度]', answer: 'tuple', why: '固定兩個、位置有意義。' },
+            { text: 'React 的 `[count, setCount]`', answer: 'tuple', why: '第一個是值、第二個是函式。' },
+            { text: '所有學生的分數', answer: 'arr', why: '數量不固定。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('索引存取的陷阱：預設 nums[5] 的型別是 number，但執行時是 undefined；開啟 noUncheckedIndexedAccess 後型別變成 number | undefined，逼你檢查', { title: '預設', lines: ['`nums[5]`: number', '實際 undefined'], tone: 5 }, { title: 'noUncheckedIndexedAccess', lines: ['`number | undefined`', '要先檢查'], tone: 4 }), caption: '這個選項不在 strict 裡，要另外開（6-1）。' },
+      ],
+      tryit: {
+        q: ['把參數改成唯讀，讓函式不能修改呼叫端的陣列：'],
+        draft: 'function sortedCopy(items: ____ string[]): string[] {\n  return [...items].sort();\n}',
+        answer: ['`readonly string[]`。', '注意 `items.sort()` 會原地修改，所以先複製 `[...items]`（或用 ES2023 的 `items.toSorted()`）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `Number`、`String`（大寫）當型別。', why: '那是包裝物件型別，不是原始型別。', right: '一律小寫 `number`、`string`、`boolean`。' },
+      { wrong: '以為 `arr[i]` 一定有值。', why: '預設設定下型別不包含 undefined。', right: '開啟 noUncheckedIndexedAccess，或先檢查長度。' },
+      { wrong: '用 tuple 回傳 5 個值。', why: '呼叫端要記住每個位置的意義。', right: '超過 2–3 個值就回傳物件。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`[string, number]` 表示？', options: [
+        { text: '長度 2，第一個 string、第二個 number', correct: true, why: 'tuple。' },
+        { text: '可以放 string 或 number 的陣列', why: '那是 `(string | number)[]`。' },
+        { text: '兩個陣列', why: '是一個陣列。' },
+        { text: 'string 或 number', why: '那是 `string | number`。' },
+      ] },
+      { level: '應用', type: 'mc', q: '參數是 `readonly number[]` 時，哪個操作會報錯？', options: [
+        { text: '`nums.push(1)`', correct: true, why: 'readonly 陣列沒有 push。' },
+        { text: '`nums.map(n => n * 2)`', why: 'map 回傳新陣列，不修改原陣列。' },
+        { text: '`nums.length`', why: '讀取長度可以。' },
+        { text: '`nums[0]`', why: '讀取元素可以。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['readonly 只在檢查時有效。如果你真的需要執行時也不能被修改的陣列，要怎麼做？'], answer: [
+        '用 `Object.freeze(arr)`：執行時修改會失敗（嚴格模式下拋 TypeError），而且它的回傳型別就是 readonly 陣列。',
+        '兩者互補：readonly 讓錯誤在寫程式時被抓到；freeze 保護來自不受控程式碼的修改。',
+      ] },
+    ],
+    keypoints: [
+      '原始型別用小寫：string、number、boolean。',
+      '陣列 `T[]` 長度不限；tuple `[A, B]` 長度與位置固定。',
+      '參數加 readonly，承諾不修改呼叫端的陣列。',
+    ],
+    sources: ['ts-everyday', 'ts-objects'],
+  },
+
+  '1-3': {
+    goals: [
+      '用 interface 或 type 描述物件',
+      '使用可選屬性與 readonly 屬性',
+      '理解多餘屬性檢查在抓什麼錯',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-2）函式回傳 5 個值，最好用？', options: [
+        { text: '回傳物件', correct: true, why: '屬性有名字，呼叫端不用記位置。' },
+        { text: '回傳 5 個元素的 tuple', why: '呼叫端要記住每個位置的意義。' },
+        { text: '回傳 any', why: '失去型別保護。' },
+        { text: '分成 5 個函式', why: '不一定需要。' },
+      ] },
+    ],
+    analogy: {
+      text: ['物件型別像報名表的欄位規定：姓名必填、Email 選填、會員編號填了就不能改。interface 和 type 都是在寫這份規定，差別在於 interface 之後可以「補欄位」，type 寫好就固定。'],
+      limit: ['報名表只檢查有沒有填；TypeScript 用「結構」判斷：一個物件只要有規定的欄位，就算多了別的欄位，透過變數傳遞時也能通過（只有直接寫字面值時才會擋多餘欄位）。'],
+    },
+    model: {
+      svg: Fig.vs('interface 與 type：interface 只能描述物件形狀，可以用 extends 擴充、同名宣告會合併；type 可以描述任何型別，包括聯合與函式，用 & 組合', { title: 'interface', lines: ['物件形狀', '`extends` 擴充', '同名會合併'], tone: 3 }, { title: 'type', lines: ['任何型別', '聯合、函式都行', '用 `&` 組合'], tone: 4 }),
+      caption: '多數情況兩者都可以；團隊統一一種即可，聯合型別只能用 type。',
+      blocks: [
+        '[[interface]] 與 [[type 別名]]都能描述物件。屬性後加 `?` 是[[可選屬性]]，前面加 readonly 是唯讀屬性。直接把物件字面值指定給型別時，會觸發[[多餘屬性檢查]]，抓出打錯的屬性名稱。',
+        { type: 'code', lang: 'typescript', title: 'user.ts', code: 'interface User {\n  readonly id: number;\n  name: string;\n  email?: string;          // 可選\n}\n\ninterface Admin extends User {\n  permissions: string[];\n}\n\ntype Point = { x: number; y: number };\ntype Point3D = Point & { z: number };\n\nconst u: User = { id: 1, name: "阿明" };\n// u.id = 2;                // TS2540：唯讀\nconsole.log(u.email?.toUpperCase());' },
+      ],
+    },
+    define: [
+      { term: 'interface', en: 'interface', def: '物件型別宣告；`extends` 繼承；同名 interface 會宣告合併（常用來擴充第三方型別）。', example: '`interface Window { myGlobal: string }`' },
+      { term: 'type 別名', en: 'type alias', def: '`type 名稱 = 任何型別`；用 `&` 交集組合物件型別。', example: '`type Result = Ok | Err;`' },
+      { term: '可選屬性', en: 'optional property', def: '`prop?: T`，讀取時型別是 `T | undefined`。', example: '`user.email?.length`' },
+    ],
+    examples: {
+      compare: [{
+        title: '建立設定物件時打錯字',
+        kind: '直接字面值 vs 經過變數',
+        code: true,
+        badLabel: '先存變數再傳',
+        goodLabel: '直接寫字面值',
+        bad: 'type Options = { timeout?: number };\nconst raw = { timout: 5000 };\nconst opts: Options = raw;   // 通過！',
+        good: 'type Options = { timeout?: number };\nconst opts: Options = { {{1:timout}}: 5000 };\n// TS2561：…did you mean to write \'timeout\'?',
+        badResult: '經過變數時不做多餘屬性檢查，timeout 默默變成 undefined。',
+        goodResult: '直接寫字面值時，打錯的屬性被抓出來。',
+        why: ['設定物件盡量直接寫在需要型別的位置，或用 satisfies（3-4）'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'interface Box { width: number }\ninterface Box { height: number }\n\nconst b: Box = { width: 10 };\n// tsc 會說什麼？',
+          predict: { q: '兩個同名 interface 會怎樣？', options: ['合併，b 少了 height 會報錯', '後面的蓋掉前面，b 少了 width', '重複宣告的錯誤'], answer: 0 },
+          output: "!app.ts:4:7 - error TS2741: Property 'height' is missing in type '{ width: number; }' but required in type 'Box'.",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'both', label: '兩者都可以' }, { id: 'type', label: '只能用 type' }, { id: 'iface', label: '只能用 interface' }],
+          items: [
+            { text: '描述 User 物件的欄位', answer: 'both', why: '物件形狀兩者都行。' },
+            { text: '`"asc" | "desc"`', answer: 'type', why: '聯合型別只能用 type。' },
+            { text: '`(a: number) => number` 函式型別別名', answer: 'type', why: '雖然 interface 也能寫呼叫簽章，但慣例用 type。' },
+            { text: '擴充第三方函式庫的型別（宣告合併）', answer: 'iface', why: '只有 interface 會宣告合併。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.row('結構型別：函式需要有 name 的物件；傳入有 name 與 age 的變數可以通過，因為結構符合；直接寫字面值時多出的 age 會被多餘屬性檢查擋下', [
+          { title: '需要', lines: ['`{ name: string }`'], tone: 1 },
+          { title: '傳變數', lines: ['有 name、age', '✓ 通過'], tone: 4 },
+          { title: '傳字面值', lines: ['多了 age', '✗ 多餘屬性'], tone: 5 },
+        ]), caption: 'TypeScript 比的是「形狀夠不夠」，字面值多寫屬性時額外提醒。' },
+      ],
+      tryit: {
+        q: ['定義 Product：id 唯讀、name 必填、discount 選填：'],
+        draft: 'interface Product {\n  ____ id: number;\n  name: string;\n  discount____: number;\n}',
+        answer: ['`readonly id: number;`、`discount?: number;`。', '讀 discount 時型別是 `number | undefined`，計算前要給預設值：`p.discount ?? 0`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為屬性多了一定會被擋。', why: '只有直接寫物件字面值時才做多餘屬性檢查。', right: '在需要型別的位置直接寫字面值，或用 satisfies。' },
+      { wrong: '可選屬性直接拿來計算：`p.discount * 0.9`。', why: '可能是 undefined（TS18048）。', right: '`(p.discount ?? 0) * 0.9`。' },
+      { wrong: '以為 readonly 讓物件在執行時不能改。', why: '只在檢查時有效。', right: '需要執行時保護用 Object.freeze。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '哪一個「只能」用 type 寫？', options: [
+        { text: '`type Dir = "up" | "down"`', correct: true, why: '聯合型別。' },
+        { text: '有 name、age 兩個屬性的一般物件型別', why: 'interface 也可以。' },
+        { text: '繼承另一個物件型別', why: 'interface 用 extends，type 用 &，兩者都行。' },
+        { text: '有可選屬性的物件', why: '兩者都可以。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`interface A { x?: number }`，`const a: A = {}; a.x.toFixed()` 會？', options: [
+        { text: 'TS18048：a.x 可能是 undefined', correct: true, why: '可選屬性讀出來包含 undefined。' },
+        { text: '可以編譯', why: 'strict 下會報錯。' },
+        { text: 'TS2741：缺少 x', why: 'x 是可選的，可以不給。' },
+        { text: 'TS2339：沒有 toFixed', why: 'number 有 toFixed，問題是可能 undefined。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你想幫 Express 的 Request 加上自訂的 `user` 屬性，讓所有 middleware 都看得到型別。用這課學到的哪個特性？'], answer: [
+        'interface 的宣告合併：在宣告檔裡寫 `declare global { namespace Express { interface Request { user?: User } } }`（依套件的型別結構而定）。',
+        'type 不能合併，所以擴充第三方型別是少數必須用 interface 的情況（5-4 會講宣告檔）。',
+      ] },
+    ],
+    keypoints: [
+      '物件用 interface 或 type 描述；聯合型別只能用 type。',
+      '`?` 可選、readonly 唯讀，都只在檢查時有效。',
+      '多餘屬性檢查只在直接寫字面值時發生。',
+    ],
+    sources: ['ts-objects', 'ts-compat'],
+  },
+
+  '1-4': {
+    goals: [
+      '為函式參數、回傳值與 callback 寫型別',
+      '使用可選參數、預設參數與剩餘參數',
+      '用函式型別描述「傳進來的函式」',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-3）可選屬性 `discount?: number` 拿來計算前要？', options: [
+        { text: '處理 undefined，例如 `discount ?? 0`', correct: true, why: '型別是 number | undefined。' },
+        { text: '什麼都不用做', why: 'strict 下會報 TS18048。' },
+        { text: '改成 any', why: '關掉檢查。' },
+        { text: '直接用 `!` 斷言，告訴檢查器 discount 一定有值', why: '可以讓錯誤消失，但不安全。' },
+      ] },
+    ],
+    analogy: {
+      text: ['函式型別像插座規格：「兩孔、輸入 110V、輸出 5V」。任何符合規格的充電器（函式）都能插。callback 就是你交給別人、讓他在適當時機插上的那個充電器。'],
+      limit: ['插座規格嚴格；TypeScript 對 callback 參數比較寬鬆：參數比較少的函式可以傳給要求比較多參數的位置（例如 forEach 傳入只收一個參數的函式）。'],
+    },
+    model: {
+      svg: Fig.row('函式型別的組成：參數清單 (price: number, qty: number)，箭頭，回傳型別 number；組成 (price: number, qty: number) => number', [
+        { title: '參數', lines: ['`(price: number,`', '`qty: number)`'], tone: 1 },
+        { title: '=>', lines: ['箭頭'], tone: 2 },
+        { title: '回傳', lines: ['`number`'], tone: 4 },
+      ]),
+      caption: '函式型別裡的參數名稱只是說明，比對時看的是位置與型別。',
+      blocks: [
+        '[[函式型別]]寫成 `(參數) => 回傳`。沒有回傳值用 [[void]]。參數可以有 `?`（可選）、預設值、`...rest`。同一個函式依參數回傳不同型別時可以寫[[多載]]，但多半用聯合或泛型（模組 3）更簡單。',
+        { type: 'code', lang: 'typescript', title: 'functions.ts', code: 'type Discount = (price: number) => number;\n\nfunction checkout(prices: number[], discount: Discount = (p) => p): number {\n  const sum = prices.reduce((s, p) => s + p, 0);\n  return discount(sum);\n}\n\ncheckout([100, 200]);\ncheckout([100, 200], (p) => p * 0.9);   // p 自動推斷為 number\n\nfunction log(message: string, ...tags: string[]): void {\n  console.log(`[${tags.join(",")}] ${message}`);\n}' },
+      ],
+    },
+    define: [
+      { term: '函式型別', en: 'function type', def: '`(a: A, b: B) => R`；用在變數、參數、屬性。', example: '`onClick: (e: MouseEvent) => void`' },
+      { term: 'void', en: 'void', def: '回傳值不應被使用；callback 型別是 void 時，傳入有回傳值的函式也可以。', example: '`[1, 2].forEach(n => arr.push(n))` 合法。' },
+      { term: '剩餘參數', en: 'rest parameter', def: '`...args: T[]` 收集多個參數成陣列。', example: '`function sum(...ns: number[])`' },
+    ],
+    examples: {
+      compare: [{
+        title: '可選參數',
+        kind: '錯誤 vs 正確',
+        code: true,
+        badLabel: '直接使用可選參數',
+        goodLabel: '給預設值',
+        bad: 'function greet(name?: string) {\n  return "嗨，" + name.trim();\n}',
+        good: 'function greet(name{{1: = "朋友"}}) {\n  return "嗨，" + name.trim();\n}',
+        badResult: 'TS18048：name 可能是 undefined。',
+        goodResult: '有預設值時型別就是 string，不用另外檢查。',
+        why: ['有合理預設值時用預設參數，比 `?` 好處理'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'function apply(n: number, fn: (x: number) => number) {\n  return fn(n);\n}\n\nconsole.log(apply(5, (x) => x * 2));\nconsole.log(apply(5, (x) => String(x)));',
+          predict: { q: '第二個呼叫（回傳字串的 callback）tsc 會怎樣？', options: ['型別錯誤', '通過，印出 "5"', '通過，印出 5'], answer: 0 },
+          output: "!app.ts:6:27 - error TS2322: Type 'string' is not assignable to type 'number'.",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'void', label: '回傳 void' }, { id: 'val', label: '回傳有意義的值' }],
+          items: [
+            { text: '按鈕的 onClick 處理函式', answer: 'void', why: '呼叫者不使用回傳值。' },
+            { text: 'Array.map 的 callback', answer: 'val', why: '回傳值組成新陣列。' },
+            { text: '寫日誌的 log 函式', answer: 'void', why: '只有副作用。' },
+            { text: 'Array.filter 的 callback', answer: 'val', why: '回傳 boolean 決定是否保留。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.tree('參數的三種寫法：可選參數 name? 型別包含 undefined；預設參數 name = "朋友" 型別就是 string；剩餘參數 ...tags 收集成陣列', { title: '參數寫法' }, [
+          { title: 'name?: string', lines: ['可能 undefined'], tone: 5 },
+          { title: 'name = "朋友"', lines: ['型別是 string'], tone: 4 },
+          { title: '...tags: string[]', lines: ['收集成陣列'], tone: 3 },
+        ]), caption: '可選與預設參數都要放在必要參數後面。' },
+      ],
+      tryit: {
+        q: ['為這個「重試」函式寫出型別：task 是不收參數、回傳 Promise<T> 的函式。'],
+        draft: 'async function retry<T>(task: ____, times = 3): Promise<T> {\n  for (let i = 1; ; i++) {\n    try { return await task(); }\n    catch (e) { if (i >= times) throw e; }\n  }\n}',
+        answer: ['`task: () => Promise<T>`。', '`<T>` 是泛型（3-1）：retry 回傳的型別跟著 task 回傳的型別走。'],
+      },
+    },
+    mistakes: [
+      { wrong: '參數型別寫 `Function`。', why: '等於什麼都能傳、呼叫時參數與回傳都是 any。', right: '寫出具體的 `(x: number) => string`。' },
+      { wrong: '可選參數放在必要參數前面。', why: 'TS1016：必要參數不能在可選參數之後。', right: '可選、預設參數放最後。' },
+      { wrong: '回傳型別寫 `any` 讓 callback 好傳。', why: '呼叫端拿到 any，錯誤一路擴散。', right: '用 void（不用回傳值）或具體型別。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`(a: string) => void` 描述的是？', options: [
+        { text: '收一個 string、不回傳有意義值的函式', correct: true, why: '函式型別。' },
+        { text: '回傳 string 的函式', why: 'string 是參數。' },
+        { text: '一個 string 變數', why: '這是函式型別。' },
+        { text: '可以回傳任何東西的函式，而且一定要用回傳值', why: 'void 表示不使用回傳值。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`function f(a: number, b?: number) {}`，哪個呼叫「不」合法？', options: [
+        { text: '`f()`', correct: true, why: 'a 是必要參數。' },
+        { text: '`f(1)`', why: 'b 可以省略。' },
+        { text: '`f(1, 2)`', why: '合法。' },
+        { text: '`f(1, undefined)`', why: '可選參數可以明確傳 undefined。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['`["1", "2", "3"].map(parseInt)` 在 JavaScript 會得到 [1, NaN, NaN]。TypeScript 為什麼沒有攔下來？'], answer: [
+        'map 會把 (元素, 索引, 陣列) 傳給 callback；parseInt 的型別是 (string, radix?: number) => number，第二個參數剛好接住索引，型別完全相容，所以不報錯。',
+        '這是型別系統抓不到的「語意」錯誤：要寫成 `.map((s) => parseInt(s, 10))` 或 `.map(Number)`。型別正確不等於行為正確，還需要測試。',
+      ] },
+    ],
+    keypoints: [
+      '函式型別寫成 `(參數) => 回傳`，callback 參數會自動推斷。',
+      '可選參數型別含 undefined；有預設值時更好處理。',
+      '不用 `Function` 與 `any`，寫出具體的函式型別。',
+    ],
+    sources: ['ts-functions'],
+  },
+});
+</script>

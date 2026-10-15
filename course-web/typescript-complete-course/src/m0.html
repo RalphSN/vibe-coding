@@ -1,0 +1,318 @@
+<script>
+/* ==========================================================================
+   模組 0：認識 TypeScript
+   ========================================================================== */
+defineTerms({
+  'TypeScript': { en: 'TypeScript', def: '在 JavaScript 上加入型別系統的語言。寫的是 .ts 檔，檢查完型別後變成一般的 JavaScript 執行。', example: '`let n: number = 1;`' },
+  'JavaScript': { en: 'JavaScript', def: '瀏覽器與 Node.js 實際執行的語言；TypeScript 的所有程式最後都會變成 JavaScript。', example: '`let n = 1;`' },
+  '型別擦除': { en: 'type erasure', def: 'TypeScript 的型別只在檢查時存在，產生 JavaScript 時全部被刪掉，執行時完全沒有型別資訊。', example: '`let n: number = 1` 變成 `let n = 1`。' },
+  '型別檢查器': { en: 'type checker', def: '讀取型別、找出不一致的程式，例如 tsc。它不會改變程式的執行行為。', example: '`npx tsc --noEmit`' },
+  'tsc': { en: 'TypeScript compiler', def: 'TypeScript 官方的編譯器與型別檢查器。TypeScript 7 起改用 Go 重寫，速度約快 10 倍。', example: '`npx tsc --noEmit`' },
+  '靜態型別': { en: 'static typing', def: '在程式執行前（編譯時）就檢查型別。', example: '把字串傳給要數字的函式，存檔時編輯器就會畫紅線。' },
+  'Node.js': { en: 'Node.js', def: '在瀏覽器以外執行 JavaScript 的環境。22.18 起可以直接執行 .ts 檔（自動擦除型別）。', example: '`node app.ts`' },
+  '錯誤代碼': { en: 'error code', def: 'tsc 錯誤訊息裡 TS 開頭的編號，可以直接搜尋，例如 TS2322 是「型別不能指定」。', example: '`error TS2322`' },
+});
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出 TypeScript 與 JavaScript 的關係',
+      '解釋「型別擦除」對執行時的影響',
+      '知道 2026-10 該用的版本（TypeScript 7）',
+    ],
+    analogy: {
+      text: ['TypeScript 像寫完作文後的「文法檢查」：它在交出去之前幫你找錯字和不通順的句子，但交出去的作文（JavaScript）上不會留下任何紅筆痕跡。'],
+      limit: ['文法檢查只看你寫的字；TypeScript 也只能檢查程式碼裡看得到的東西。從網路、檔案、使用者輸入進來的資料，它在執行時完全看不到（模組 6 會處理）。'],
+    },
+    model: {
+      svg: Fig.row('TypeScript 的流程：app.ts 先經過 tsc 型別檢查，再擦除型別變成 app.js，最後由瀏覽器或 Node.js 執行；執行時沒有任何型別資訊', [
+        { title: 'app.ts', lines: ['有型別'] },
+        { title: '型別檢查', lines: ['tsc 找錯', '不改行為'], tone: 3 },
+        { title: '擦除型別', lines: ['變成 app.js'], tone: 2 },
+        { title: '執行', lines: ['瀏覽器／Node', '沒有型別'], tone: 4 },
+      ]),
+      caption: '型別只活在檢查階段；執行的永遠是 JavaScript。',
+      blocks: [
+        '[[TypeScript]] 是 [[JavaScript]] 的超集：合法的 JS 幾乎都是合法的 TS。它提供[[靜態型別]]，由[[型別檢查器]]在執行前找錯；產生 JavaScript 時進行[[型別擦除]]。',
+        { type: 'table', caption: '2026-10-16 查證的版本狀態', head: ['版本', '發布', '說明', '這門課'], rows: [
+          ['TypeScript 7.0', '2026-07-08', '用 Go 重寫的原生編譯器，約快 10 倍', '**主線**'],
+          ['TypeScript 6.0', '2026-03-23', '最後一個 JavaScript 版編譯器；預設改為 strict', '部分工具（typescript-eslint 等）暫時仍需要'],
+          ['5.x 以前', '—', '預設不是 strict', '舊專案'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'TypeScript', en: 'TypeScript', def: 'JavaScript 的型別化超集，由微軟開發、開放原始碼。', example: '.ts、.tsx 檔。' },
+      { term: '型別擦除', en: 'type erasure', def: '輸出 JavaScript 時移除所有型別註記；型別不影響執行結果。', example: '`function f(x: string) {}` → `function f(x) {}`' },
+      { term: 'tsc', en: 'tsc', def: '`tsc` 檢查並輸出 JS；`tsc --noEmit` 只檢查不輸出。', example: '`npx tsc --noEmit`' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一個錯誤，什麼時候被發現？',
+        kind: 'JavaScript vs TypeScript',
+        code: true,
+        badLabel: 'JavaScript',
+        goodLabel: 'TypeScript',
+        bad: 'function upper(s) {\n  return s.toUpperCase();\n}\nupper(42);',
+        good: 'function upper(s: {{1:string}}) {\n  return s.toUpperCase();\n}\nupper(42);',
+        badResult: '執行到那行才拋 TypeError: s.toUpperCase is not a function。',
+        goodResult: '存檔時就看到 TS2345：number 不能傳給 string 參數。',
+        why: ['錯誤從「使用者踩到」提前到「寫程式時」'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'compile', label: '只在檢查時存在' }, { id: 'runtime', label: '執行時也存在' }],
+          items: [
+            { text: '`let age: number`  的 `: number`', answer: 'compile', why: '型別註記會被擦掉。' },
+            { text: '`typeof x === "string"`', answer: 'runtime', why: '這是 JavaScript 的運算子，會留在程式裡。' },
+            { text: '`interface User { … }`', answer: 'compile', why: 'interface 只是型別，輸出的 JS 裡完全不存在。' },
+            { text: '`class User { … }`', answer: 'runtime', why: 'class 是 JavaScript 的語法，執行時真的存在。' },
+            { text: '`x as string`', answer: 'compile', why: '型別斷言只告訴檢查器，執行時不做任何轉換。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('JavaScript 的錯誤在執行時才出現；TypeScript 把一部分錯誤提前到寫程式時，但外部資料的錯誤仍要在執行時檢查', { title: 'JavaScript', lines: ['執行時才發現', '使用者先踩到'], tone: 5 }, { title: 'TypeScript', lines: ['寫程式時發現', '外部資料仍要驗證'], tone: 4 }), caption: 'TypeScript 不是萬靈丹，它只檢查程式碼本身。' },
+      ],
+      tryit: {
+        q: ['填空：下面三樣在輸出的 JavaScript 裡會留下嗎？'],
+        draft: 'A. type Id = string;　→ ____\nB. enum Color { Red }　→ ____\nC. const id: Id = "a1";　→ ____',
+        answer: ['A 不留（純型別）；B 會留下（enum 會產生 JavaScript 物件）；C 留下 `const id = "a1";`，只擦掉 `: Id`。', '所以 Node.js 直接執行 .ts 時不支援 enum：它只會擦除型別，不會產生新程式碼（0-2 會講）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為加了型別，執行時就會檢查參數。', why: '型別在執行時已經被擦掉。', right: '外部資料用執行期驗證（6-2）。' },
+      { wrong: '把 TypeScript 當成另一個完全不同的語言重新學。', why: 'TypeScript 就是 JavaScript 加型別，執行規則完全一樣。', right: '先熟悉 JavaScript 的值、物件、函式，再學型別。' },
+      { wrong: '新專案裝 TypeScript 5.x。', why: '2026-10 最新是 7.0；6.0 起預設 strict。', right: '`npm install -D typescript` 會裝到 7.x。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`function f(x: number) {}` 編譯成 JavaScript 後是？', options: [
+        { text: '`function f(x) {}`', correct: true, why: '型別註記被擦除。' },
+        { text: '`function f(x) { if (typeof x !== "number") throw … }`', why: 'TypeScript 不會自動加執行期檢查。' },
+        { text: '`function f(x: number) {}`', why: 'JavaScript 不認得 `: number`。' },
+        { text: '不能編譯', why: '這是合法的 TypeScript。' },
+      ] },
+      { level: '應用', type: 'mc', q: '2026-10 開新專案，哪個說法正確？', options: [
+        { text: '用 TypeScript 7；有工具還不支援時可暫時用 6.0', correct: true, why: '7.0 尚無穩定的程式化 API，部分工具（如 typescript-eslint）需要 6.x。' },
+        { text: '用 TypeScript 4.x，比較穩定', why: '已經過時，很多新語法不支援。' },
+        { text: 'TypeScript 7 要另外裝 tsgo 套件', why: '正式版已併入一般的 typescript 套件，指令仍是 tsc。' },
+        { text: 'TypeScript 7 預設關閉 strict', why: '6.0 起預設就是 strict。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說：「我們用 TypeScript，所以 API 回傳的資料一定符合我們定義的 User 型別。」你怎麼回應？'], answer: [
+        '型別只在檢查程式碼時存在。API 回傳什麼是執行時才知道的事，TypeScript 看不到；`as User` 只是告訴檢查器「相信我」。',
+        '在資料進入程式的地方（fetch 之後）用 zod 這類工具驗證一次，驗證過的資料才能放心當 User 使用（6-2）。',
+      ] },
+    ],
+    keypoints: [
+      'TypeScript = JavaScript + 型別；執行的永遠是 JavaScript。',
+      '型別在輸出時被擦除，執行時不存在。',
+      '2026-10 主線是 TypeScript 7（Go 原生編譯器），預設 strict。',
+    ],
+    sources: ['ts-handbook', 'ts-60', 'ts-70'],
+  },
+
+  '0-2': {
+    goals: [
+      '安裝 Node.js 與 TypeScript',
+      '用 `node app.ts` 直接執行',
+      '分清「執行」與「型別檢查」是兩件事',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1）型別擦除是指？', options: [
+        { text: '輸出 JavaScript 時刪掉所有型別', correct: true, why: '執行時沒有型別資訊。' },
+        { text: '執行時把不符合型別的值自動清掉', why: '執行時根本沒有型別。' },
+        { text: '刪掉沒用到的變數', why: '那是 tree shaking。' },
+        { text: '把 any 改成 unknown', why: '和擦除無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['直接執行 .ts 像影印時用修正液塗掉鉛筆註記再印：內容照印，但註記對不對，影印機完全不管。型別檢查是另一位校對，要另外請他看。'],
+      limit: ['修正液只塗得掉「註記」；如果你寫的東西需要「改寫成別的句子」（例如 enum），影印機就無法處理，會直接報錯。'],
+    },
+    model: {
+      svg: Fig.vs('兩條路：node app.ts 只擦除型別然後執行，不檢查型別；tsc --noEmit 只檢查型別，不執行', { title: 'node app.ts', lines: ['擦掉型別', '直接執行', '不檢查型別'], tone: 3 }, { title: 'tsc --noEmit', lines: ['檢查型別', '不輸出、不執行'], tone: 4 }),
+      caption: '型別錯的程式用 node 照樣會執行；型別檢查要另外跑 tsc。',
+      blocks: [
+        '[[Node.js]] 22.18 起內建型別擦除，可以直接 `node app.ts`（24.12、25.2 起列為穩定）。它不檢查型別，也不支援需要產生程式碼的語法：enum、帶執行期程式碼的 namespace、建構子參數屬性。型別檢查用 [[tsc]]。',
+        { type: 'code', lang: 'bash', title: '建立一個小專案', code: 'npm init -y\nnpm install -D typescript @types/node\nnpx tsc --init        # 產生 tsconfig.json\n\nnode app.ts           # 執行\nnpx tsc --noEmit      # 型別檢查' },
+        { type: 'tabs', label: '安裝 Node.js', tabs: [
+          { label: 'Windows', blocks: ['PowerShell：`winget install OpenJS.NodeJS.LTS`，裝完重開終端機，`node --version` 應該是 24 以上。'] },
+          { label: 'macOS', blocks: ['`brew install node`，或用 fnm／nvm 管理多個版本。'] },
+        ] },
+      ],
+    },
+    define: [
+      { term: 'Node.js', en: 'Node.js', def: '伺服器與命令列的 JavaScript 執行環境；22.18／23.6 起預設擦除 .ts 的型別。', example: '`node --version`' },
+      { term: 'tsc', en: 'tsc --noEmit', def: '只做型別檢查、不產生檔案；適合搭配直接執行 .ts 的工具或打包工具。', example: '在 CI 跑 `npx tsc --noEmit`。' },
+      { term: 'erasableSyntaxOnly', en: 'erasableSyntaxOnly', def: 'tsconfig 選項（TS 5.8 起）：禁止 enum、參數屬性等「無法單純擦除」的語法，確保程式能被 Node 直接執行。', example: '`"erasableSyntaxOnly": true`' },
+    ],
+    examples: {
+      compare: [{
+        title: '用 Node 直接執行',
+        kind: '不支援 vs 支援',
+        code: true,
+        badLabel: '用 enum',
+        goodLabel: '用物件 + 字面型別',
+        bad: '{{1:enum}} Color { Red, Green }\nconsole.log(Color.Red);',
+        good: 'const Color = { Red: "red", Green: "green" } {{1:as const}};\ntype Color = (typeof Color)[keyof typeof Color];\nconsole.log(Color.Red);',
+        badResult: '`node app.ts` → ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX。',
+        goodResult: '只有型別要擦，Node 可以直接執行。',
+        why: ['新專案開 `erasableSyntaxOnly`，避開需要轉換的語法'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'const price: number = "100";\nconsole.log(price + 1);\n\n// 終端機：\n// $ node app.ts\n// $ npx tsc --noEmit',
+          predict: { q: '`node app.ts` 會印出什麼？', options: ['1001', '101', '型別錯誤，不執行'], answer: 0 },
+          output: '1001\n!app.ts:1:7 - error TS2322: Type \'string\' is not assignable to type \'number\'.',
+        } },
+        { type: 'svg', svg: Fig.stack('日常開發流程：在編輯器寫程式時即時看到型別錯誤；用 node app.ts 快速執行；提交前或在 CI 用 tsc --noEmit 做完整檢查', [
+          { title: '1. 編輯器即時畫紅線', tone: 1 },
+          { title: '2. node app.ts 快速執行', tone: 3 },
+          { title: '3. 提交前 tsc --noEmit 完整檢查', tone: 4 },
+        ]), caption: '執行和檢查分開，各自都很快。' },
+      ],
+      tryit: {
+        q: ['只檢查型別、不產生任何 .js 檔，指令是？'],
+        draft: 'npx tsc ____',
+        answer: ['`npx tsc --noEmit`。', '現在多數專案由 Node、Vite 或打包工具負責執行與輸出，tsc 只負責檢查。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`node app.ts` 跑得起來，就以為型別都對。', why: 'Node 只擦除型別、不檢查。', right: '另外跑 `tsc --noEmit`，並放進 CI。' },
+      { wrong: '直接執行的程式裡用 enum 或 `constructor(private x)`。', why: '這些語法需要轉換，Node 不支援。', right: '開 `erasableSyntaxOnly`，改用物件常數與一般屬性。' },
+      { wrong: '全域安裝 `npm i -g typescript`。', why: '不同專案需要不同版本時會衝突。', right: '每個專案 `npm install -D typescript`，用 npx 執行。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`node app.ts` 會做哪件事？', options: [
+        { text: '擦除型別後執行', correct: true, why: '不做型別檢查。' },
+        { text: '檢查型別，有錯就不執行', why: '那是 tsc 的工作。' },
+        { text: '產生 app.js 檔', why: '只在記憶體中處理，不產生檔案。' },
+        { text: '把 enum 轉成物件', why: '不支援需要轉換的語法。' },
+      ] },
+      { level: '應用', type: 'mc', q: '程式裡有型別錯誤，`node app.ts` 會怎樣？', options: [
+        { text: '照樣執行', correct: true, why: '型別錯誤不影響擦除。' },
+        { text: '拒絕執行', why: 'Node 不檢查型別。' },
+        { text: '只執行到錯誤那行', why: '型別錯誤不是執行時錯誤。' },
+        { text: '自動修正型別', why: '不會修改程式。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['團隊想讓 CI 在型別錯誤時擋下合併。要加什麼步驟？為什麼光靠「測試會執行程式」不夠？'], answer: [
+        'CI 加一步 `npx tsc --noEmit`，失敗就讓 pipeline 失敗。',
+        '測試執行時型別已被擦除，型別錯誤只有在剛好走到、而且造成執行錯誤時才會被發現；tsc 會檢查所有程式碼，包括測試沒覆蓋的分支。',
+      ] },
+    ],
+    keypoints: [
+      'Node 22.18 起可 `node app.ts`，只擦除型別、不檢查。',
+      '型別檢查另外跑 `tsc --noEmit`。',
+      '直接執行時避開 enum、參數屬性；開 erasableSyntaxOnly。',
+    ],
+    sources: ['node-ts', 'ts-erasable', 'ts-tsconfig'],
+  },
+
+  '0-3': {
+    goals: [
+      '從錯誤訊息找出檔案、行號、錯誤代碼',
+      '讀懂「Type A is not assignable to type B」',
+      '從多行錯誤的最後一行找到真正的原因',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 0-2）型別有錯的程式，CI 要怎麼擋下來？', options: [
+        { text: '執行 `tsc --noEmit`，失敗就中止', correct: true, why: 'tsc 失敗會回傳非 0 的結束代碼。' },
+        { text: '執行 `node app.ts`，型別錯誤時它會拒絕執行', why: 'node 不檢查型別。' },
+        { text: '執行 `npm install`', why: '只是安裝套件。' },
+        { text: '不需要，編輯器會擋', why: '編輯器只提示，不會阻止提交。' },
+      ] },
+    ],
+    analogy: {
+      text: ['型別錯誤訊息像退貨單：「您寄的是 A，但收件規格要求 B」。多行的錯誤像層層的退貨原因：「整箱不合格 → 因為其中一盒不合格 → 因為那盒裡有一顆是壞的」，最後一行才是真正的原因。'],
+      limit: ['退貨單會附照片；型別錯誤訊息有時很長、型別名稱很複雜。先找最後一行與屬性名稱，再回頭看整體。'],
+    },
+    model: {
+      svg: Fig.stack('tsc 錯誤訊息的結構：位置 app.ts 第 8 行第 3 欄；錯誤代碼 TS2322；說明 Type A is not assignable to type B；接著縮排的細節，最後一行是根本原因', [
+        { title: 'app.ts:8:3 — 位置（行:欄）' },
+        { title: 'error TS2322 — 代碼，可以搜尋', tone: 2 },
+        { title: "Type '{…}' is not assignable to type 'User'.", tone: 3 },
+        { title: "  Property 'email' is missing … ← 真正原因", tone: 5 },
+      ], { arrows: false }),
+      caption: '讀法：先看位置與代碼，再看縮排最深的那一行。',
+      blocks: [
+        'tsc 的錯誤格式是「檔案:行:欄 - error 代碼: 說明」。最常見的[[錯誤代碼]]：TS2322（型別不能指定）、TS2345（引數型別不符）、TS2339（屬性不存在）、TS2532／TS18048（可能是 undefined）、TS7006（參數隱含 any）。',
+        { type: 'table', caption: '常見錯誤代碼', head: ['代碼', '意思', '常見原因'], rows: [
+          ['TS2322', 'A 不能指定給 B', '把錯的型別存進變數或屬性'],
+          ['TS2345', '引數 A 不能傳給參數 B', '呼叫函式時型別不符'],
+          ['TS2339', '屬性不存在', '打錯字，或型別還沒收斂'],
+          ['TS18048', '可能是 undefined', '沒檢查可選值就使用'],
+          ['TS7006', '參數隱含 any', 'strict 下參數沒寫型別也推斷不出'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '錯誤代碼', en: 'diagnostic code', def: 'TS 加四到五位數字；可以在 IDE 或網路上直接搜尋。', example: '`TS2339: Property \'nmae\' does not exist on type \'User\'.`' },
+      { term: '可指定性', en: 'assignability', def: 'TypeScript 判斷 A 能不能放進 B 的規則；看的是結構（屬性與型別），不是名字。', example: '有 name 與 age 的物件可以指定給只要求 name 的型別。' },
+      { term: '隱含 any', en: 'implicit any', def: '推斷不出型別時變成 any；strict 模式下這是錯誤 TS7006。', example: '`function f(x) {}`' },
+    ],
+    examples: {
+      compare: [{
+        title: '建立一個 User 物件',
+        kind: '錯誤 vs 正確',
+        code: true,
+        badLabel: '少了一個屬性',
+        goodLabel: '補齊',
+        bad: 'type User = { name: string; email: string };\nconst u: User = { name: "阿明" };',
+        good: 'type User = { name: string; email: string };\nconst u: User = { name: "阿明", {{1:email: "a@x.tw"}} };',
+        badResult: 'TS2741：Property \'email\' is missing in type … but required in type \'User\'。',
+        goodResult: '通過。',
+        why: ['錯誤訊息直接說出缺少的屬性名稱'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'type User = { name: string };\nconst user: User = { name: "阿明" };\nconsole.log(user.nmae);',
+          predict: { q: 'tsc 會回報哪個代碼？', options: ['屬性不存在（TS2551／TS2339）', 'TS2322 型別不能指定', '沒有錯誤'], answer: 0 },
+          output: "!app.ts:3:18 - error TS2551: Property 'nmae' does not exist on type 'User'. Did you mean 'name'?",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: '2322', label: 'TS2322 不能指定' }, { id: '2345', label: 'TS2345 引數不符' }, { id: '2339', label: 'TS2339 屬性不存在' }],
+          items: [
+            { text: '`let n: number = "1";`', answer: '2322', why: '指定時型別不符。' },
+            { text: '`Math.round("1.5")`', answer: '2345', why: '呼叫時傳錯型別。' },
+            { text: '`"abc".size`', answer: '2339', why: 'string 沒有 size（有 length）。' },
+            { text: '`const ok: boolean = 1;`', answer: '2322', why: 'number 不能指定給 boolean。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('解讀錯誤的順序：先找位置與代碼定位，再讀縮排最深的最後一行找原因', { title: '先定位', lines: ['檔案:行:欄', 'TS 代碼'], tone: 3 }, { title: '再找原因', lines: ['縮排最深的', '最後一行'], tone: 4 }), caption: 'TS2551 是 TS2339 的「你是不是要打 …」版本，會附上建議。' },
+      ],
+      tryit: {
+        q: ['下面的錯誤，要改哪個檔案、第幾行、什麼問題？'],
+        draft: "src/order.ts:14:9 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.\n\n14   addItem(\"3\");\n             ~~~\n\n檔案：____　行：____　問題：____",
+        answer: ['`src/order.ts` 第 14 行：addItem 需要 number，卻傳了字串 "3"。', '改成 `addItem(3)`；如果 "3" 來自使用者輸入，先 `Number(text)` 並檢查不是 NaN。'],
+      },
+    },
+    mistakes: [
+      { wrong: '看到一大段錯誤就加 `as any` 讓它消失。', why: '錯誤沒有被解決，只是被藏起來，執行時照樣出事。', right: '讀最後一行找出真正不符的屬性，修正資料或型別。' },
+      { wrong: '只看第一行「Type … is not assignable」。', why: '第一行常是很長的整體型別，看不出差在哪。', right: '看縮排最深的那一行，通常點名了具體屬性。' },
+      { wrong: '一次出現 50 個錯誤，從最後一個開始修。', why: '前面的一個錯（例如型別定義錯）常常連帶造成後面一大串。', right: '從第一個開始修，修完重跑。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`app.ts:8:3` 中的 8 和 3 分別是？', options: [
+        { text: '第 8 行、第 3 欄', correct: true, why: '行在前、欄在後。' },
+        { text: '第 3 行、第 8 欄', why: '順序反了。' },
+        { text: '錯誤數與警告數', why: '那是位置。' },
+        { text: '錯誤代碼', why: '代碼是 TS 開頭的數字。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`function add(a, b) { return a + b; }` 在 strict 下會出現什麼錯誤？', options: [
+        { text: 'TS7006：參數隱含 any', correct: true, why: 'strict 包含 noImplicitAny。' },
+        { text: 'TS2322：a + b 的結果不能指定給回傳值', why: '沒有指定動作。' },
+        { text: '沒有錯誤', why: 'strict 會要求參數有型別。' },
+        { text: 'TS2339', why: '沒有存取不存在的屬性。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 TypeScript 比較型別時看「結構」而不是「名字」？這對讀錯誤訊息有什麼幫助？'], answer: [
+        'JavaScript 的物件本來就是「有什麼屬性就能怎麼用」，TypeScript 依結構比較（結構型別），所以兩個名字不同但屬性相同的型別可以互相指定。',
+        '因此錯誤訊息會指出「哪個屬性缺少或型別不符」，而不是只說名字不同；讀錯誤時要找的是那個屬性。',
+      ] },
+    ],
+    keypoints: [
+      '錯誤格式：檔案:行:欄 - error TS代碼: 說明。',
+      '多行錯誤看縮排最深的最後一行。',
+      '不要用 `as any` 讓錯誤消失，要修正型別或資料。',
+    ],
+    sources: ['ts-handbook', 'ts-compat'],
+  },
+});
+</script>

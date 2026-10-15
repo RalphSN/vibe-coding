@@ -1,0 +1,440 @@
+<script>
+/* ==========================================================================
+   模組 4：進階型別
+   ========================================================================== */
+defineTerms({
+  'typeof 型別運算子': { en: 'typeof type operator', def: '在型別位置寫 `typeof 變數`，取得那個值的型別。', example: '`type Cfg = typeof config;`' },
+  '型別空間': { en: 'type space', def: 'TypeScript 有兩個世界：值（執行時存在）與型別（只在檢查時存在）。同一個名字可以同時是值與型別。', example: 'class 同時產生值（建構子）與型別（實例型別）。' },
+  '映射型別': { en: 'mapped type', def: '用 `[K in 鍵的聯合]: …` 走過每個鍵，產生新的物件型別。', example: '`{ [K in keyof T]: T[K] | null }`' },
+  '修飾詞': { en: 'mapping modifier', def: '映射型別中用 `+`／`-` 加上或移除 readonly 與 `?`。', example: '`{ -readonly [K in keyof T]-?: T[K] }`' },
+  '鍵重新對應': { en: 'key remapping', def: '映射型別中用 `as` 改變鍵名或篩掉鍵（TS 4.1 起）。', example: '`[K in keyof T as \\`get${Capitalize<K & string>}\\`]`' },
+  '條件型別': { en: 'conditional type', def: '型別層面的 if：`T extends U ? X : Y`。', example: '`type IsString<T> = T extends string ? true : false;`' },
+  'infer': { en: 'infer', def: '在條件型別裡「抓出」某個部分的型別。', example: '`T extends Promise<infer V> ? V : T`' },
+  '分配': { en: 'distributive conditional type', def: '條件型別作用在「裸的」型別參數聯合上時，會對每個成員分別計算再合併。', example: '`NonNullable<string | null>` 對 string 與 null 各算一次。' },
+  '樣板字面型別': { en: 'template literal type', def: '用反引號在型別層面組合字串字面型別。', example: '`` type Event = `on${"Click" | "Hover"}` `` 是 `"onClick" | "onHover"`。' },
+  '內建字串型別': { en: 'intrinsic string manipulation types', def: 'Uppercase、Lowercase、Capitalize、Uncapitalize，在型別層面轉換字串字面型別。', example: '`Capitalize<"name">` 是 `"Name"`。' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '分辨值空間與型別空間',
+      '用 typeof 從值取得型別',
+      '用索引存取取出巢狀與陣列元素的型別',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-4）`(typeof SIZES)[number]` 的作用是？', options: [
+        { text: '取出陣列元素的型別', correct: true, why: '搭配 as const 得到字面聯合。' },
+        { text: '取出陣列長度', why: '那是 `["length"]`。' },
+        { text: '取得第一個元素的值', why: '這是型別運算，不是取值。' },
+        { text: '把陣列轉成 number', why: '不是轉換。' },
+      ] },
+    ],
+    analogy: {
+      text: ['值空間與型別空間像建築物與藍圖：建築物（值）是真的蓋起來、住得進去的；藍圖（型別）只在設計階段存在。typeof 像對著蓋好的房子反推出一份藍圖。'],
+      limit: ['反推的藍圖只記得「蓋好時的樣子」；如果值是 let 而且之後會變，typeof 取到的是宣告時推斷出的型別，不是某個時刻的實際內容。'],
+    },
+    model: {
+      svg: Fig.vs('值空間與型別空間：值空間有 const、let、function、class，執行時存在；型別空間有 type、interface，只在檢查時存在；typeof 把值帶到型別空間，class 兩邊都有', { title: '值空間', lines: ['const、let、function', '執行時存在'], tone: 3 }, { title: '型別空間', lines: ['type、interface', '檢查時存在'], tone: 4 }, { note: 'typeof 值 → 型別；class 同時存在兩邊' }),
+      caption: '型別不能當值用（`console.log(User)` 會錯），值要用 typeof 才能當型別。',
+      blocks: [
+        'TypeScript 有[[型別空間]]與值空間。[[typeof 型別運算子]]把值的型別帶進型別空間，讓「值為主」的程式（設定物件、常數表）不用重複寫型別。搭配索引存取 `T["a"]["b"]`、`T[number]` 取出深層型別。',
+        { type: 'code', lang: 'typescript', title: 'typeof.ts', code: 'const defaults = {\n  theme: "light",\n  fontSize: 16,\n  shortcuts: [{ key: "/", action: "search" }],\n};\n\ntype Settings = typeof defaults;\ntype Shortcut = Settings["shortcuts"][number];   // { key: string; action: string }\n\nfunction createStore() {\n  return { items: [] as string[], add(x: string) {} };\n}\ntype Store = ReturnType<typeof createStore>;' },
+      ],
+    },
+    define: [
+      { term: 'typeof 型別運算子', en: 'typeof (type)', def: '只能接在識別字或屬性存取之後；和 JavaScript 執行時的 typeof 是同一個字、不同的東西。', example: '`let x: typeof y;`' },
+      { term: '型別空間', en: 'declaration spaces', def: 'type／interface 只在型別空間；const／function 只在值空間；class、enum 兩邊都有。', example: '`class User {}` 之後 `let u: User` 和 `new User()` 都可以。' },
+      { term: 'T[number]', en: 'array element type', def: '陣列或 tuple 型別的元素型別。', example: '`string[][number]` 是 string。' },
+    ],
+    examples: {
+      compare: [{
+        title: '為一份預設設定寫型別',
+        kind: '重複 vs 從值推出',
+        code: true,
+        badLabel: '值與型別各寫一次',
+        goodLabel: 'typeof',
+        bad: 'interface Settings { theme: string; fontSize: number }\nconst defaults: Settings = { theme: "light", fontSize: 16 };',
+        good: 'const defaults = { theme: "light", fontSize: 16 };\ntype Settings = {{1:typeof defaults}};',
+        badResult: '新增一個設定要改兩個地方。',
+        goodResult: '只改 defaults，型別自動更新。',
+        why: ['值是唯一來源時，用 typeof 推出型別'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'const api = {\n  users: { list: "/users", detail: "/users/:id" },\n  posts: { list: "/posts" },\n} as const;\n\ntype Api = typeof api;\ntype UserPaths = Api["users"][keyof Api["users"]];',
+          predict: { q: 'UserPaths 是？', options: ['"/users" | "/users/:id"', 'string', '"list" | "detail"'], answer: 0 },
+          output: 'type UserPaths = "/users" | "/users/:id"',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'value', label: '只在值空間' }, { id: 'type', label: '只在型別空間' }, { id: 'both', label: '兩邊都有' }],
+          items: [
+            { text: '`interface User {}`', answer: 'type', why: '執行時不存在。' },
+            { text: '`const config = {}`', answer: 'value', why: '要用 typeof 才能當型別。' },
+            { text: '`class Account {}`', answer: 'both', why: '值是建構子，型別是實例的形狀。' },
+            { text: '`type Id = string`', answer: 'type', why: '純型別。' },
+            { text: '`function load() {}`', answer: 'value', why: '要 typeof 才能當型別。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.stack('深層型別的取法：typeof api 取得整體型別；["users"] 取屬性；[keyof …] 取所有值的聯合；陣列用 [number] 取元素', [
+          { title: 'typeof api', tone: 1 },
+          { title: '…["users"]', tone: 3 },
+          { title: '…[keyof Api["users"]] → 所有值的聯合', tone: 4 },
+        ]), caption: '`T[keyof T]` 是「T 所有屬性值型別的聯合」。' },
+      ],
+      tryit: {
+        q: ['從這個常數陣列取出單一商品的型別：'],
+        draft: 'const products = [\n  { id: 1, title: "書", price: 300 },\n  { id: 2, title: "筆", price: 30 },\n];\ntype Product = (____ products)[____];',
+        answer: ['`(typeof products)[number]` → `{ id: number; title: string; price: number }`。', '常用在測試資料、mock 資料：先寫資料，再推出型別。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 interface 當值用：`console.log(User)`。', why: 'TS2693：只是型別，執行時不存在。', right: '要執行時存在的東西用 class 或 const。' },
+      { wrong: '把變數當型別用：`let x: config`。', why: 'TS2749：config 是值。', right: '`let x: typeof config`。' },
+      { wrong: '對函式呼叫結果用 typeof：`typeof load()`。', why: 'typeof 只能接識別字或屬性存取。', right: '`ReturnType<typeof load>`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`type T = typeof x` 中的 typeof 是？', options: [
+        { text: '型別運算子，取 x 的型別', correct: true, why: '在型別位置。' },
+        { text: 'JavaScript 執行時的 typeof，回傳字串', why: '那是在運算式位置。' },
+        { text: '語法錯誤', why: '合法。' },
+        { text: '取 x 的值', why: '型別位置不會取值。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`type E = string[][number]` 是？', options: [
+        { text: '`string`', correct: true, why: '陣列元素型別。' },
+        { text: '`number`', why: 'number 是索引的型別。' },
+        { text: '`string[]`', why: '已經取出元素。' },
+        { text: '錯誤', why: '合法。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 class 可以同時當型別和值，interface 只能當型別？這對「依賴注入要在執行時知道型別」有什麼影響？'], answer: [
+        'class 會編譯成 JavaScript 的建構子（值），同時宣告實例的形狀（型別）；interface 編譯後完全消失。',
+        '所以需要在執行時辨識型別的機制（例如 Angular、NestJS 的 DI 依建構子參數型別注入）只能依賴 class 或額外的 token，不能只靠 interface。',
+      ] },
+    ],
+    keypoints: [
+      '值與型別是兩個空間；interface 只是型別、const 只是值。',
+      '`typeof 值` 把值的型別帶進型別空間。',
+      '`T["a"]`、`T[number]`、`T[keyof T]` 取出深層型別。',
+    ],
+    sources: ['ts-typeof', 'ts-indexed'],
+  },
+
+  '4-2': {
+    goals: [
+      '讀懂並寫出簡單的映射型別',
+      '用 +／- 修飾詞加上或移除 readonly 與 ?',
+      '用 as 重新命名或篩選鍵',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-1）`T[keyof T]` 代表？', options: [
+        { text: 'T 所有屬性值型別的聯合', correct: true, why: '用所有鍵去索引。' },
+        { text: 'T 的所有鍵', why: '那是 keyof T。' },
+        { text: 'T 本身', why: '不是。' },
+        { text: 'T 的第一個屬性', why: '物件沒有順序概念。' },
+      ] },
+    ],
+    analogy: {
+      text: ['映射型別像郵件合併：有一份收件人名單（鍵的聯合），一份信件範本（每個屬性要變成什麼），一鍵就產生每個人的信。Partial、Readonly 都是用這個機制寫的。'],
+      limit: ['郵件合併的範本是文字；映射型別的「範本」是型別運算，寫太複雜會讓錯誤訊息很難讀，團隊成員也看不懂。'],
+    },
+    model: {
+      svg: Fig.row('映射型別的三個部分：走過 K in keyof T 每一個鍵；可以用 as 改鍵名；每個屬性的新型別例如 T[K] | null', [
+        { title: '走過每個鍵', lines: ['`[K in keyof T]`'], tone: 1 },
+        { title: '（可選）改鍵名', lines: ['`as …`'], tone: 2 },
+        { title: '新的值型別', lines: ['`: T[K] | null`'], tone: 4 },
+      ]),
+      caption: '`{ [K in keyof T]: T[K] | null }` = 每個屬性都允許 null。',
+      blocks: [
+        '[[映射型別]]走過鍵的聯合產生新物件型別。用[[修飾詞]] `-?` 移除可選、`-readonly` 移除唯讀。[[鍵重新對應]]用 `as` 改名或用 never 篩掉鍵。內建的 Partial 就是 `{ [K in keyof T]?: T[K] }`。',
+        { type: 'code', lang: 'typescript', title: 'mapped.ts', code: 'type Nullable<T> = { [K in keyof T]: T[K] | null };\ntype Mutable<T> = { -readonly [K in keyof T]: T[K] };\ntype Complete<T> = { [K in keyof T]-?: T[K] };\n\ntype Getters<T> = {\n  [K in keyof T as `get${Capitalize<K & string>}`]: () => T[K];\n};\n\ntype User = { name: string; age: number };\ntype UserGetters = Getters<User>;\n// { getName: () => string; getAge: () => number }\n\ntype OnlyStrings<T> = {\n  [K in keyof T as T[K] extends string ? K : never]: T[K];\n};' },
+      ],
+    },
+    define: [
+      { term: '映射型別', en: 'mapped type', def: '`{ [P in K]: X }`；K 通常是 `keyof T`，也可以是任何字面聯合。', example: '`{ [P in "a" | "b"]: number }` 是 `{ a: number; b: number }`。' },
+      { term: '修飾詞', en: '+ / - modifiers', def: '`readonly`、`?` 前加 `-` 移除、加 `+`（或不寫）加上。', example: 'Required<T> = `{ [K in keyof T]-?: T[K] }`' },
+      { term: '鍵重新對應', en: 'as clause', def: '`[K in keyof T as 新鍵]`；新鍵是 never 時該屬性被移除。', example: '用來實作「只保留函式屬性」等篩選。' },
+    ],
+    examples: {
+      compare: [{
+        title: '表單的錯誤訊息型別',
+        kind: '手寫 vs 映射',
+        code: true,
+        badLabel: '另外定義',
+        goodLabel: '從表單型別映射',
+        bad: 'type Form = { email: string; age: number };\ntype FormErrors = { email?: string; age?: string };',
+        good: 'type Form = { email: string; age: number };\ntype FormErrors = {{1:{ [K in keyof Form]?: string }}};',
+        badResult: '表單加欄位時，錯誤型別要記得同步。',
+        goodResult: '每個欄位自動有一個可選的錯誤訊息。',
+        why: ['「每個欄位都對應某個東西」就是映射型別的用途'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'type Flags<T> = { [K in keyof T]: boolean };\ntype Settings = { darkMode: string; fontSize: number };\ntype SettingFlags = Flags<Settings>;',
+          predict: { q: 'SettingFlags 是？', options: ['{ darkMode: boolean; fontSize: boolean }', '{ darkMode: string; fontSize: number }', 'boolean'], answer: 0 },
+          output: 'type SettingFlags = {\n    darkMode: boolean;\n    fontSize: boolean;\n}',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'partial', label: 'Partial 的寫法' }, { id: 'required', label: 'Required 的寫法' }, { id: 'readonly', label: 'Readonly 的寫法' }],
+          items: [
+            { text: '`{ [K in keyof T]?: T[K] }`', answer: 'partial', why: '加上 ?。' },
+            { text: '`{ [K in keyof T]-?: T[K] }`', answer: 'required', why: '移除 ?。' },
+            { text: '`{ readonly [K in keyof T]: T[K] }`', answer: 'readonly', why: '加上 readonly。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.row('Getters 映射的過程：User 的鍵 name 與 age；用 as 把鍵改成 getName 與 getAge；值型別改成回傳原屬性型別的函式', [
+          { title: '原本的鍵', lines: ['name、age'], tone: 1 },
+          { title: 'as 重新命名', lines: ['getName', 'getAge'], tone: 3 },
+          { title: '新的值型別', lines: ['`() => string`', '`() => number`'], tone: 4 },
+        ]), caption: '鍵重新對應常搭配樣板字面型別（4-4）。' },
+      ],
+      tryit: {
+        q: ['寫一個 `Optional<T, K>`：只把指定的鍵變成可選，其他不變（提示：組合 Omit、Pick、Partial）：'],
+        draft: 'type Optional<T, K extends keyof T> = ____<T, K> & Partial<____<T, K>>;',
+        answer: ['`Omit<T, K> & Partial<Pick<T, K>>`。', '常用在「建立時 id 可以不給」：`Optional<User, "id">`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '為了炫技寫三層巢狀的映射加條件型別。', why: '錯誤訊息難讀，維護困難。', right: '先用內建工具型別組合；真的需要才寫，並加上註解與範例。' },
+      { wrong: '在映射型別裡忘了 `K & string`，樣板字面型別報錯。', why: 'keyof 可能包含 number、symbol。', right: '`Capitalize<K & string>`。' },
+      { wrong: '以為映射型別會影響執行時的物件。', why: '純型別運算。', right: '執行時的轉換要自己寫函式（例如 Object.fromEntries）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`{ [K in "a" | "b"]: number }` 是？', options: [
+        { text: '`{ a: number; b: number }`', correct: true, why: '走過聯合中每個鍵。' },
+        { text: '`number[]`', why: '產生的是物件型別。' },
+        { text: '`{ K: number }`，K 是固定的屬性名稱', why: 'K 會被每個鍵取代。' },
+        { text: '`"a" | "b"`', why: '那是鍵本身。' },
+      ] },
+      { level: '應用', type: 'mc', q: '映射型別中 `as never` 的效果是？', options: [
+        { text: '移除該屬性', correct: true, why: '鍵是 never 時不會出現在結果中。' },
+        { text: '屬性型別變成 never', why: '那是改值型別，不是 as 子句。' },
+        { text: '變成可選', why: '可選要用 ?。' },
+        { text: '語法錯誤', why: '合法用法。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['ORM 或 API 用戶端常有「從資料表定義自動產生查詢條件型別」的功能（每個欄位都可以傳 equals、in、gt 等）。這背後大概用了什麼？'], answer: [
+        '映射型別走過每個欄位：`{ [K in keyof Row]?: Filter<Row[K]> }`，再用條件型別依欄位型別決定可用的運算子（數字有 gt、字串有 contains）。',
+        '這讓你寫查詢時打錯欄位名或用錯運算子都會在編譯時報錯。',
+      ] },
+    ],
+    keypoints: [
+      '映射型別 `{ [K in keyof T]: … }` 走過每個鍵產生新型別。',
+      '`-?`、`-readonly` 移除修飾詞；`as` 改鍵名或篩掉鍵。',
+      'Partial、Required、Readonly 都是映射型別。',
+    ],
+    sources: ['ts-mapped'],
+  },
+
+  '4-3': {
+    goals: [
+      '讀懂條件型別 `T extends U ? X : Y`',
+      '用 infer 抓出部分型別',
+      '理解聯合型別的分配行為',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-2）`{ [K in keyof T]-?: T[K] }` 是哪個工具型別的寫法？', options: [
+        { text: 'Required', correct: true, why: '移除所有 ?。' },
+        { text: 'Partial', why: 'Partial 是加上 ?。' },
+        { text: 'Readonly', why: '和 readonly 無關。' },
+        { text: 'Pick', why: 'Pick 會篩選鍵。' },
+      ] },
+    ],
+    analogy: {
+      text: ['條件型別像郵局的分揀規則：「如果包裹是易碎品，走 A 線；否則走 B 線」。infer 像拆開外箱看裡面是什麼：「如果是一個裝著某樣東西的盒子，把那樣東西拿出來」。'],
+      limit: ['分揀員一次處理一件；條件型別遇到聯合型別時會「每件都分揀一次」再合起來，這叫分配，有時是你要的，有時會出乎意料。'],
+    },
+    model: {
+      svg: Fig.tree('UnwrapPromise 的判斷：T 是否 extends Promise<infer V>；是的話結果是 V，例如 Promise<string> 得到 string；不是的話結果是 T 本身，例如 number 仍是 number', { title: 'T extends Promise<infer V> ?', lines: ['是不是 Promise？'] }, [
+        { title: '是 → V', lines: ['`Promise<string>`', '→ string'], tone: 4 },
+        { title: '否 → T', lines: ['`number`', '→ number'], tone: 3 },
+      ]),
+      caption: '內建的 Awaited<T> 就是這個概念（還會遞迴處理巢狀 Promise）。',
+      blocks: [
+        '[[條件型別]]在型別層面做判斷。[[infer]] 在 extends 右邊宣告一個要「抓出來」的型別變數。條件型別作用在聯合上時會[[分配]]到每個成員。內建的 ReturnType、Parameters、Awaited、NonNullable、Exclude、Extract 都是條件型別。',
+        { type: 'code', lang: 'typescript', title: 'conditional.ts', code: 'type IsArray<T> = T extends unknown[] ? true : false;\ntype A = IsArray<string[]>;   // true\ntype B = IsArray<string>;     // false\n\ntype ElementOf<T> = T extends (infer E)[] ? E : never;\ntype C = ElementOf<number[]>; // number\n\ntype MyReturnType<F> = F extends (...args: any[]) => infer R ? R : never;\n\n// 分配：對聯合的每個成員分別計算\ntype MyExclude<T, U> = T extends U ? never : T;\ntype D = MyExclude<"a" | "b" | "c", "a">;   // "b" | "c"' },
+      ],
+    },
+    define: [
+      { term: '條件型別', en: 'conditional type', def: '`T extends U ? X : Y`；extends 在這裡是「可指定給」的判斷。', example: '`type NonNull<T> = T extends null | undefined ? never : T;`' },
+      { term: 'infer', en: 'infer', def: '只能用在條件型別的 extends 子句中，宣告待推斷的型別變數。', example: '`T extends [infer First, ...unknown[]] ? First : never`' },
+      { term: '分配', en: 'distribution', def: '型別參數是「裸的」（沒被包起來）時對聯合分配；寫成 `[T] extends [U]` 可以關掉分配。', example: '`IsString<string | number>` 是 `boolean`（true | false）。' },
+    ],
+    examples: {
+      compare: [{
+        title: '取得 async 函式回傳的資料型別',
+        kind: '手寫 vs 推出',
+        code: true,
+        badLabel: '手動重寫',
+        goodLabel: 'Awaited + ReturnType',
+        bad: 'async function loadUser() { return { id: 1, name: "阿明" }; }\ntype User = { id: number; name: string };   // 手寫一份',
+        good: 'async function loadUser() { return { id: 1, name: "阿明" }; }\ntype User = {{1:Awaited<ReturnType<typeof loadUser>>}};',
+        badResult: '函式回傳多一個欄位，型別要另外改。',
+        goodResult: '從函式推出，永遠同步。',
+        why: ['ReturnType 得到 Promise<…>，Awaited 再把 Promise 拆開'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'type IsString<T> = T extends string ? "是" : "否";\n\ntype A = IsString<"hi">;\ntype B = IsString<number>;\ntype C = IsString<string | number>;',
+          predict: { q: 'C 是？', options: ['"是" | "否"', '"否"', '"是"'], answer: 0 },
+          output: 'type A = "是"\ntype B = "否"\ntype C = "是" | "否"\n（聯合被分配：string → "是"、number → "否"）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'cond', label: '條件型別' }, { id: 'mapped', label: '映射型別' }],
+          items: [
+            { text: 'ReturnType<F>', answer: 'cond', why: '用 infer 抓出回傳型別。' },
+            { text: 'Partial<T>', answer: 'mapped', why: '走過每個鍵加上 ?。' },
+            { text: 'Exclude<T, U>', answer: 'cond', why: '分配到每個成員，符合 U 就變成 never。' },
+            { text: 'Record<K, V>', answer: 'mapped', why: '走過 K 產生屬性。' },
+            { text: 'Awaited<T>', answer: 'cond', why: '判斷是不是 Promise 並拆開。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.row('Exclude<"a" | "b" | "c", "a"> 的分配計算：對 "a" 計算得到 never；對 "b" 得到 "b"；對 "c" 得到 "c"；合併後 never 消失，結果是 "b" | "c"', [
+          { title: '"a"', lines: ['extends "a"', '→ never'], tone: 5 },
+          { title: '"b"', lines: ['不符合', '→ "b"'], tone: 4 },
+          { title: '"c"', lines: ['不符合', '→ "c"'], tone: 4 },
+        ], { arrows: false, note: '合併：never | "b" | "c" = "b" | "c"' }), caption: 'never 在聯合中會消失，所以可以用來「刪掉」成員。' },
+      ],
+      tryit: {
+        q: ['用 infer 寫一個取出 tuple 第一個元素型別的 First<T>：'],
+        draft: 'type First<T> = T extends [____ F, ...unknown[]] ? ____ : never;\ntype X = First<[string, number]>;   // string',
+        answer: ['`T extends [infer F, ...unknown[]] ? F : never`。', '空 tuple `[]` 不符合模式，結果是 never。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在業務程式裡大量寫條件型別。', why: '大多數應用程式只需要使用內建工具型別。', right: '條件型別留給函式庫、共用型別；一般程式用 ReturnType、Awaited 等現成的。' },
+      { wrong: '沒預期到分配，結果多出 boolean。', why: '裸型別參數遇到聯合會分配。', right: '要整體判斷時寫 `[T] extends [U]`。' },
+      { wrong: '在 extends 左邊用 infer。', why: 'infer 只能出現在 extends 右邊的模式中。', right: '`T extends Array<infer E> ? E : never`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`Exclude<"x" | "y", "x">` 是？', options: [
+        { text: '`"y"`', correct: true, why: '去掉可指定給 "x" 的成員。' },
+        { text: '`"x"`', why: '那是 Extract。' },
+        { text: '`"x" | "y"`', why: '有去掉 "x"。' },
+        { text: '`never`', why: '還剩 "y"。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`type T = ReturnType<() => Promise<number>>` 是？', options: [
+        { text: '`Promise<number>`', correct: true, why: 'ReturnType 不拆 Promise，要再包 Awaited。' },
+        { text: '`number`', why: '那是 Awaited<ReturnType<…>>。' },
+        { text: '`() => Promise<number>`', why: '已經取出回傳型別。' },
+        { text: '`void`', why: '有回傳 Promise。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 `NonNullable<string | null | undefined>` 能得到 string？用分配解釋。'], answer: [
+        'NonNullable<T> 等同 `T extends null | undefined ? never : T`（現在實作為 `T & {}`，效果相同）。對 string 計算得 string；對 null、undefined 計算得 never。',
+        '合併後 never 消失，只剩 string。這就是「用分配 + never 刪除聯合成員」的模式。',
+      ] },
+    ],
+    keypoints: [
+      '條件型別是型別層面的 if；infer 抓出模式中的一部分。',
+      '作用在聯合上時會分配到每個成員，never 會被刪掉。',
+      '日常多用內建的 ReturnType、Awaited、Exclude，不必自己寫。',
+    ],
+    sources: ['ts-conditional', 'ts-utility'],
+  },
+
+  '4-4': {
+    goals: [
+      '用樣板字面型別組合字串型別',
+      '用 Uppercase、Capitalize 轉換字串型別',
+      '用樣板字面型別約束事件名、CSS 值等格式',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-3）條件型別裡的 never 在聯合結果中會？', options: [
+        { text: '消失', correct: true, why: '`X | never` 就是 X。' },
+        { text: '讓整個結果變成 never', why: '只有交集時才會。' },
+        { text: '變成 undefined', why: '不會。' },
+        { text: '報錯', why: '合法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['樣板字面型別像印章組合：一顆印章刻「on」，另一組刻「Click、Hover、Focus」，蓋在一起就自動得到「onClick、onHover、onFocus」三種，不用一個個刻。'],
+      limit: ['印章的組合數是乘出來的：兩組各 20 個就有 400 種。型別組合太多會讓檢查變慢，TypeScript 也有聯合成員數上限（約 10 萬）。'],
+    },
+    model: {
+      svg: Fig.row('樣板字面型別的組合：前綴 "on" 加上 Capitalize 過的事件名 "click" | "hover"，組成 "onClick" | "onHover"', [
+        { title: '"on"', lines: ['固定前綴'], tone: 1 },
+        { title: 'Capitalize<E>', lines: ['`"click" | "hover"`', '→ "Click" | "Hover"'], tone: 3 },
+        { title: '結果', lines: ['"onClick"', '"onHover"'], tone: 4 },
+      ]),
+      caption: '`` type Handler = `on${Capitalize<E>}` ``；遇到聯合會產生所有組合。',
+      blocks: [
+        '[[樣板字面型別]]用反引號在型別層面組字串，聯合會展開成所有組合。[[內建字串型別]] Uppercase、Lowercase、Capitalize、Uncapitalize 轉換大小寫。也可以用 `${number}`、`${string}` 描述格式，例如「# 開頭的顏色」「數字加 px」。',
+        { type: 'code', lang: 'typescript', title: 'template.ts', code: 'type Size = "sm" | "md" | "lg";\ntype Color = "red" | "blue";\ntype ButtonClass = `btn-${Size}-${Color}`;   // 6 種組合\n\ntype Px = `${number}px`;\nconst gap: Px = "16px";\n// const bad: Px = "16";           // TS2322\n\ntype EventName = "click" | "focus";\ntype Handlers = { [E in EventName as `on${Capitalize<E>}`]: () => void };\n// { onClick: () => void; onFocus: () => void }\n\ntype Route = `/users/${number}`;\nconst r: Route = "/users/42";' },
+      ],
+    },
+    define: [
+      { term: '樣板字面型別', en: 'template literal type', def: '`` `前綴${型別}後綴` ``；插入的型別可以是字串、數字字面聯合，或 string、number。', example: '`` `${number}%` ``' },
+      { term: '內建字串型別', en: 'Uppercase / Capitalize …', def: '編譯器內建，只作用在字串字面型別。', example: '`Uppercase<"get">` 是 `"GET"`。' },
+      { term: '組合展開', en: 'cross product', def: '多個聯合插入同一個樣板時，產生笛卡兒積。', example: '3 個 Size × 2 個 Color = 6 個成員。' },
+    ],
+    examples: {
+      compare: [{
+        title: 'CSS 間距的型別',
+        kind: 'string vs 樣板字面型別',
+        code: true,
+        badLabel: 'string',
+        goodLabel: '`${number}px`',
+        bad: 'function setGap(gap: string) { … }\nsetGap("16");    // 忘了單位也通過',
+        good: 'function setGap(gap: {{1:`${number}px` | `${number}rem`}}) { … }\nsetGap("16");    // TS2345',
+        badResult: '少了單位，CSS 無效，畫面默默跑版。',
+        goodResult: '格式在編譯時就被檢查。',
+        why: ['有固定格式的字串，用樣板字面型別描述'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'type Method = "get" | "post";\ntype Entity = "user" | "order";\ntype Action = `${Uppercase<Method>} /${Entity}s`;\n// Action 有幾個成員？',
+          predict: { q: 'Action 有幾種字串？', options: ['4 種', '2 種', '1 種'], answer: 0 },
+          output: 'type Action = "GET /users" | "GET /orders" | "POST /users" | "POST /orders"',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ok', label: '符合 `${number}px`' }, { id: 'no', label: '不符合' }],
+          items: [
+            { text: '`"16px"`', answer: 'ok', why: '數字加 px。' },
+            { text: '`"1.5px"`', answer: 'ok', why: '小數也是 number。' },
+            { text: '`"16 px"`', answer: 'no', why: '多了空白。' },
+            { text: '`"px"`', answer: 'no', why: '沒有數字。' },
+            { text: '`"-4px"`', answer: 'ok', why: '負數也是 number。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.row('組合展開：Size 有 sm、md、lg 三種，Color 有 red、blue 兩種，btn-${Size}-${Color} 展開成 3 × 2 = 6 種 class 名稱', [
+          { title: 'Size', lines: ['sm、md、lg', '3 種'], tone: 1 },
+          { title: 'Color', lines: ['red、blue', '2 種'], tone: 3 },
+          { title: 'ButtonClass', lines: ['3 × 2 = 6 種'], tone: 4 },
+        ]), caption: '組合數相乘；超大的組合會拖慢型別檢查。' },
+      ],
+      tryit: {
+        q: ['為 i18n 的翻譯鍵寫型別：格式是「頁面.欄位」，頁面有 home、cart，欄位有 title、desc：'],
+        draft: 'type Page = "home" | "cart";\ntype Field = "title" | "desc";\ntype I18nKey = `${____}.${____}`;\nconst k: I18nKey = "cart.title";',
+        answer: ['`` `${Page}.${Field}` `` → 4 種鍵。', '翻譯函式 `t(key: I18nKey)` 就能檢查鍵是否存在、並提供自動完成。'],
+      },
+    },
+    mistakes: [
+      { wrong: '映射型別裡 `` `on${K}` `` 沒有 `& string`。', why: 'keyof 可能包含 symbol，不能放進樣板。', right: '`` `on${K & string}` ``。' },
+      { wrong: '組合太多聯合，型別檢查變很慢或報「過於複雜」。', why: '組合數是乘出來的。', right: '只在真的需要精確檢查時使用，或改用 `${string}` 放寬。' },
+      { wrong: '以為 `${number}px` 會在執行時驗證輸入。', why: '純型別，只檢查程式碼中的字面值。', right: '使用者輸入仍要執行期驗證。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`` type T = `id-${1 | 2}` `` 是？', options: [
+        { text: '`"id-1" | "id-2"`', correct: true, why: '聯合展開。' },
+        { text: '`` `id-${number}` ``', why: '插入的是字面聯合，會展開成具體值。' },
+        { text: '`string`', why: '更精確。' },
+        { text: '錯誤：不能放數字', why: '數字字面型別可以。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`Capitalize<"hello world">` 是？', options: [
+        { text: '`"Hello world"`', correct: true, why: '只把第一個字母大寫。' },
+        { text: '`"Hello World"`', why: '不會把每個單字都大寫。' },
+        { text: '`"HELLO WORLD"`', why: '那是 Uppercase。' },
+        { text: '`string`', why: '作用在字面型別上會得到字面型別。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['路由函式庫能讓 `navigate("/users/:id", { id: 5 })` 的參數型別自動從路徑字串推出 `{ id: … }`。這是怎麼做到的？'], answer: [
+        '用條件型別加 infer 解析樣板字面型別：`` T extends `${string}:${infer P}/${infer Rest}` ? P | Params<`/${Rest}`> : … ``，遞迴抓出所有冒號開頭的片段。',
+        '再用映射型別把這些片段變成 `{ [K in P]: string | number }`。這是 4-2、4-3、4-4 三種工具的組合。',
+      ] },
+    ],
+    keypoints: [
+      '樣板字面型別在型別層面組合字串，聯合會展開成所有組合。',
+      'Uppercase、Capitalize 等轉換字串字面型別。',
+      '有固定格式的字串（px、事件名、路由）用它約束，但仍不做執行期驗證。',
+    ],
+    sources: ['ts-template', 'ts-mapped'],
+  },
+});
+</script>
