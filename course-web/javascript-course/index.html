@@ -1806,6 +1806,1291 @@ defineLessons({
 </script>
 <script>
 /* ==========================================================================
+   模組 1：值與型別
+   ========================================================================== */
+defineTerms({
+  '原始值': { en: 'primitive value', def: '不能再拆、也不能被修改的基本值。JavaScript 有七種：number、string、boolean、undefined、null、bigint、symbol。', example: '`42`、`"hi"`、`true` 都是原始值。' },
+  '物件': { en: 'object', def: '可以裝很多屬性、可以被修改的值。陣列、函式、日期都是物件。', example: '`{ name: "阿明" }`、`[1, 2, 3]`。' },
+  'typeof': { en: 'typeof operator', def: '回傳一個值的型別名稱（字串）的運算子。對不存在的名字也不會報錯。', example: '`typeof 42` 是 `"number"`。' },
+  '浮點數': { en: 'floating-point number', def: '用「有效數字 × 2 的幾次方」存的數字。JavaScript 的 number 全部是 64 位元浮點數（IEEE 754 雙精度）。', example: '`0.1` 存進去其實是 0.1000000000000000055511151…' },
+  '安全整數': { en: 'safe integer', def: '能被 number 精確表示、而且相鄰整數也都能精確表示的整數，範圍是 ±(2⁵³ − 1)。', example: '`Number.MAX_SAFE_INTEGER` 是 9007199254740991。' },
+  'BigInt': { en: 'BigInt', def: '可以表示任意大整數的原始值，數字後面加 `n`。不能和一般 number 直接相加。', example: '`10n ** 20n` 是 100000000000000000000n。' },
+  '嚴格模式': { en: 'strict mode', def: '比較嚴格的執行規則，把很多「安靜失敗」改成直接拋錯。ES 模組（.mjs、`script type="module"`）預設就是嚴格模式。', example: '改字串的某個字元：嚴格模式會拋出 TypeError。' },
+  '樣板字串': { en: 'template literal', def: '用反引號包住的字串，可以用 `${…}` 嵌入運算式，也可以直接換行。', example: '`第 ${n} 課`。' },
+  'UTF-16': { en: 'UTF-16', def: 'JavaScript 字串內部用的編碼。大部分字一個單位，emoji 和少數罕用字要兩個單位，所以 `length` 會算成 2。', example: '`"😀".length` 是 2。' },
+  'undefined': { en: 'undefined', def: '「還沒有值」：宣告了沒給值、讀不存在的屬性、函式沒有 return，得到的都是它。', example: '`let x; console.log(x)` 印出 undefined。' },
+  'null': { en: 'null', def: '「刻意表示沒有值」：由程式設計者自己放進去的空值。', example: '`user.avatar = null` 表示「確定沒有頭像」。' },
+});
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '說出 JavaScript 的七種原始值與物件',
+      '知道 `typeof` 的兩個怪癖：null 與陣列',
+      '寫出能正確判斷「這是一般物件」的條件',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1）在 Node.js 執行 `typeof document`，結果是？', options: [
+        { text: "`'undefined'`", correct: true, why: 'document 是瀏覽器的設備，Node.js 沒有；typeof 對不存在的名字不會報錯，回傳字串 undefined。' },
+        { text: "`'object'`", why: '那是在瀏覽器裡的結果。Node.js 沒有網頁，也就沒有 document。' },
+        { text: '拋出 ReferenceError', why: '直接讀 `document` 才會拋錯；`typeof` 是少數可以安全檢查不存在名字的寫法。' },
+        { text: "`'null'`", why: 'typeof 從來不會回傳 null 這個字串。' },
+      ] },
+    ],
+    analogy: {
+      text: ['超商的寄物：零錢、一張紙條這種小東西，店員直接收下、放在櫃檯（原始值）。一個大行李箱，店員給你一張號碼牌，箱子放到後面的倉庫（物件）；你手上拿的是號碼牌，不是箱子。'],
+      limit: ['真的零錢可以被你掰彎；JavaScript 的原始值完全不能被修改，只能換一個新的。號碼牌的部分要到 4-1 才完整展開：這一課只先分清「哪些是零錢、哪些是行李箱」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="值的分類樹：所有的值分成原始值與物件兩大類；原始值有七種：number、string、boolean、undefined、null、bigint、symbol；物件包含一般物件、陣列、函式、日期等">
+        <rect x="190" y="10" width="180" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="43" text-anchor="middle" font-size="22" font-weight="900">所有的值</text>
+        <rect x="10" y="110" width="320" height="200" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="170" y="145" text-anchor="middle" font-size="22" font-weight="900" class="on-color">原始值（7 種）</text>
+        <text x="30" y="185" font-size="18" class="on-color mono">number・string</text>
+        <text x="30" y="217" font-size="18" class="on-color mono">boolean・undefined</text>
+        <text x="30" y="249" font-size="18" class="on-color mono">null・bigint</text>
+        <text x="30" y="281" font-size="18" class="on-color mono">symbol</text>
+        <rect x="350" y="110" width="200" height="200" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="450" y="145" text-anchor="middle" font-size="22" font-weight="900" class="on-color">物件</text>
+        <text x="370" y="185" font-size="18" class="on-color">一般物件 {}</text>
+        <text x="370" y="217" font-size="18" class="on-color">陣列 []</text>
+        <text x="370" y="249" font-size="18" class="on-color">函式</text>
+        <text x="370" y="281" font-size="18" class="on-color">日期、Map…</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M240 60 V85 H170 V110 M320 60 V85 H450 V110"/></g>
+      </svg>`,
+      caption: '先分兩大類：原始值不能被修改，物件可以。這個區分會一路影響到複製、比較、傳參數（模組 4）。',
+      blocks: [
+        'JavaScript 的每個值，不是[[原始值]]就是[[物件]]。用 [[typeof]] 可以問一個值屬於哪一種，但它有兩個要記住的怪癖：`typeof null` 是 `"object"`（第一版 JavaScript 的錯誤，為了相容一直沒改），陣列的 typeof 也是 `"object"`。',
+        { type: 'table', caption: 'typeof 的結果（2026-10-14 在 Node.js 22.13 實測）', head: ['值', 'typeof', '備註'], rows: [
+          ['`42`、`3.14`、`NaN`', '`"number"`', 'NaN 也是 number'],
+          ['`"hi"`', '`"string"`', ''],
+          ['`true`', '`"boolean"`', ''],
+          ['`undefined`', '`"undefined"`', ''],
+          ['`null`', '`"object"`', '**歷史錯誤**'],
+          ['`10n`', '`"bigint"`', ''],
+          ['`Symbol("id")`', '`"symbol"`', ''],
+          ['`{}`、`[]`', '`"object"`', '陣列也是 object'],
+          ['`function () {}`', '`"function"`', '函式是物件，但 typeof 特別回傳 function'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '原始值', en: 'primitive', def: '七種基本值，一旦產生就不會改變。', example: '`"java".toUpperCase()` 回傳新字串 `"JAVA"`，原本的 `"java"` 沒變。' },
+      { term: '物件', en: 'object', def: '可以放屬性、可以被修改的值；原始值以外的全部都是物件。', example: '`const p = { name: "阿明" }; p.name = "小華";`' },
+      { term: 'typeof', en: 'typeof', def: '回傳型別名稱字串的運算子。', example: '`typeof []` 是 `"object"`，判斷陣列要用 `Array.isArray`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '判斷「這是不是一般物件」',
+        kind: '不完整 vs 完整',
+        code: true,
+        badLabel: '只看 typeof',
+        goodLabel: '排除 null 與陣列',
+        bad: "function isPlainObject(v) {\n  return {{1:typeof v === 'object'}};\n}\nisPlainObject(null); // true（錯）",
+        good: "function isPlainObject(v) {\n  return {{1:v !== null && typeof v === 'object' && !Array.isArray(v)}};\n}\nisPlainObject(null); // false",
+        badResult: 'null 與陣列都會通過，接著讀 `v.name` 就可能拋出 TypeError。',
+        goodResult: '三個條件一起用，才真的只剩一般物件。',
+        why: ['typeof 對 null、陣列都回傳 object，要另外排除'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "console.log(typeof null);\nconsole.log(typeof []);\nconsole.log(Array.isArray([]), Array.isArray({}));\nconsole.log(typeof function () {});",
+          predict: { q: '第一行 `typeof null` 會印出什麼？', options: ['null', 'object', 'undefined'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="判斷流程：先問是不是 null，是就不是一般物件；不是的話問 typeof 是不是 object；是的話再問是不是陣列；都通過才是一般物件">
+          <rect x="10" y="10" width="160" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="90" y="40" text-anchor="middle" font-size="18" font-weight="900">v !== null</text>
+          <text x="90" y="66" text-anchor="middle" font-size="15">先排除 null</text>
+          <rect x="200" y="10" width="160" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="280" y="40" text-anchor="middle" font-size="18" font-weight="900">typeof 是 object</text>
+          <text x="280" y="66" text-anchor="middle" font-size="15">留下物件類</text>
+          <rect x="390" y="10" width="160" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="470" y="40" text-anchor="middle" font-size="18" font-weight="900">不是陣列</text>
+          <text x="470" y="66" text-anchor="middle" font-size="15">Array.isArray</text>
+          <rect x="390" y="140" width="160" height="70" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="470" y="182" text-anchor="middle" font-size="18" font-weight="900" class="on-color">一般物件</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M170 45 H200 M360 45 H390 M470 80 V140"/></g>
+        </svg>`, caption: '三關都過才是一般物件。順序也有意義：先排除 null，後面讀屬性才安全。' },
+      ],
+      tryit: {
+        q: ['補完下面的判斷，讓它只在 `v` 是陣列時回傳 true：'],
+        draft: 'function isList(v) {\n  return ____;\n}',
+        answer: ['`Array.isArray(v)`。', '不要用 `typeof v === "object"`：一般物件和 null 也會通過。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `typeof x === "object"` 判斷 x 是一個物件，然後直接讀 `x.name`。', why: 'x 是 null 時也會通過，讀屬性就拋出 `TypeError: Cannot read properties of null`。', right: '加上 `x !== null`；要排除陣列再加 `!Array.isArray(x)`。' },
+      { wrong: '以為 `typeof []` 是 `"array"`。', why: 'typeof 沒有 array 這個結果，陣列是物件的一種。', right: '判斷陣列一律用 `Array.isArray`。' },
+      { wrong: '以為 TypeScript 型別寫了 `string`，執行時就一定是字串。', why: '型別在編譯後全部消失；從 API、JSON、表單來的資料，執行時是什麼都有可能。', right: '外部資料在執行時用 typeof、Array.isArray 再檢查一次（8-4 會完整示範）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下面哪一個「不是」原始值？', options: [
+        { text: '`[1, 2]`', correct: true, why: '陣列是物件，可以被修改，typeof 是 object。' },
+        { text: '`null`', why: '雖然 typeof null 是 object，null 仍是七種原始值之一，這是 typeof 的歷史錯誤。' },
+        { text: '`10n`', why: 'BigInt 是原始值，typeof 是 bigint。' },
+        { text: '`Symbol("id")`', why: 'Symbol 是原始值，typeof 是 symbol。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`const data = JSON.parse(text)`，你想確認 data 是一般物件才讀 `data.theme`。哪個條件最正確？', options: [
+        { text: "`typeof data === 'object'`", why: 'text 是 `"null"` 或 `"[]"` 時也會通過，讀 theme 可能拋錯或讀到 undefined。' },
+        { text: "`data !== null && typeof data === 'object' && !Array.isArray(data)`", correct: true, why: '同時排除 null 與陣列，只剩一般物件。' },
+        { text: "`data instanceof Array === false`", why: 'null、數字、字串也都不是陣列，這個條件幾乎什麼都放行。' },
+        { text: "`data != undefined`", why: '只排除了 null 和 undefined，陣列、字串、數字都會通過。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說：「我們用 TypeScript，`data` 的型別寫成 `Settings`，所以不用檢查。」你會怎麼說服他在讀設定檔時加上執行期檢查？'], answer: [
+        'TypeScript 的型別只在編譯時存在，`JSON.parse` 的結果在執行時可能是任何東西：使用者改壞的檔案、舊版格式、null。',
+        '型別註記等於「我保證它長這樣」，但保證不了外部資料。所以在資料進門的地方（讀檔、API 回應）用 typeof、Array.isArray 檢查一次，後面的程式才能放心相信型別。',
+      ] },
+    ],
+    keypoints: [
+      '值分成七種原始值和物件；原始值不能被修改，陣列與函式都是物件。',
+      'typeof null 與 typeof [] 都是 "object"；判斷陣列用 Array.isArray，判斷 null 用 === null。',
+      'TypeScript 的型別在執行時不存在，外部資料要在執行期再檢查。',
+    ],
+    sources: ['mdn-types'],
+  },
+
+  '1-2': {
+    goals: [
+      '解釋為什麼 `0.1 + 0.2 !== 0.3`',
+      '說出安全整數的上限，以及超過時會發生什麼',
+      '處理金額時，用整數或容許誤差的比較',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-1）`typeof NaN` 是什麼？', options: [
+        { text: "`'number'`", correct: true, why: 'NaN 是浮點數規格裡「無效的計算結果」，仍屬於 number。' },
+        { text: "`'NaN'`", why: 'typeof 沒有 NaN 這個結果。' },
+        { text: "`'undefined'`", why: 'NaN 是一個有值的 number，不是「沒有值」。' },
+        { text: "`'object'`", why: '只有 null 有這個怪癖。' },
+      ] },
+    ],
+    analogy: {
+      text: ['記帳本每一格只寫得下小數點後四位。你想記「三分之一」，只好寫 0.3333；三筆加起來得到 0.9999，不是 1。每一筆只差一點點，加起來就看得出來了。改成用「分」記整數，就沒有這個問題。'],
+      limit: ['十進位裡 0.1 寫得完、三分之一寫不完；電腦用二進位，剛好相反的地方很多：0.5、0.25 寫得完，0.1、0.2 寫不完。哪些數字會有誤差，取決於進位制，而不是數字看起來簡不簡單。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="64 位元浮點數的三段：第 1 位是符號，接著 11 位是指數，最後 52 位是尾數。一個數字等於符號乘上 1 點尾數再乘上 2 的指數次方">
+        <rect x="10" y="20" width="40" height="70" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="62" text-anchor="middle" font-size="18" font-weight="900" class="on-color">1</text>
+        <rect x="50" y="20" width="140" height="70" style="fill:var(--info)" class="stroke-ink" stroke-width="4"/>
+        <text x="120" y="62" text-anchor="middle" font-size="18" font-weight="900" class="on-color">11 位</text>
+        <rect x="190" y="20" width="360" height="70" style="fill:var(--highlight)" class="stroke-ink" stroke-width="4"/>
+        <text x="370" y="62" text-anchor="middle" font-size="18" font-weight="900" class="on-color">52 位</text>
+        <text x="30" y="125" text-anchor="middle" font-size="16">符號</text>
+        <text x="120" y="125" text-anchor="middle" font-size="16">指數（多大）</text>
+        <text x="370" y="125" text-anchor="middle" font-size="16">尾數（有效數字，約 15–17 位十進位）</text>
+        <rect x="10" y="160" width="540" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="203" text-anchor="middle" font-size="18" class="mono">值 = ±1.尾數 × 2^指數</text>
+      </svg>`,
+      caption: '每個 number 都是這 64 個位元。尾數只有 52 位，寫不完的部分只能捨去，誤差就從這裡來。',
+      blocks: [
+        'JavaScript 只有一種數字：64 位元[[浮點數]]。沒有獨立的「整數型別」，`7 / 2` 是 `3.5`，要整數商要自己用 `Math.trunc`。整數在 ±(2⁵³ − 1) 以內都能精確表示，這個範圍叫[[安全整數]]；超過之後，相鄰的整數開始無法全部表示。',
+        { type: 'widget', name: 'floatbits', props: { start: '0.1', presets: ['0.1', '0.5', '0.30000000000000004', '9007199254740993'] } },
+      ],
+    },
+    define: [
+      { term: '浮點數', en: 'floating-point', def: '用固定位元數存的近似值；寫不完的小數會被捨去到最接近的可表示值。', example: '`0.1 + 0.2` 是 `0.30000000000000004`。' },
+      { term: '安全整數', en: 'safe integer', def: '±(2⁵³ − 1) 以內的整數，加減一定精確。', example: '`9007199254740993` 印出來是 `9007199254740992`，已經超出範圍。' },
+      { term: 'BigInt', en: 'BigInt', def: '任意大小的整數型別，結尾加 n。', example: '`1n + 1` 會拋出 `TypeError: Cannot mix BigInt and other types`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '購物車的金額加總',
+        kind: '直接相加 vs 換成整數',
+        code: true,
+        badLabel: '直接加小數',
+        goodLabel: '先換成「分」',
+        bad: "let total = 0;\nfor (const p of [0.1, 0.2, 0.3, 0.29]) total += p;\nconsole.log(total); // {{1:0.8900000000000001}}",
+        good: "let cents = 0;\nfor (const p of [0.1, 0.2, 0.3, 0.29]) cents += {{1:Math.round(p * 100)}};\nconsole.log(cents / 100); // 0.89",
+        badResult: '每一筆的微小誤差累積起來，顯示時就露餡了。',
+        goodResult: '整數加法在安全範圍內沒有誤差；`Math.round` 消掉 `0.29 * 100 = 28.999999999999996` 這種乘法誤差。',
+        why: ['金額先轉成整數最小單位，最後才轉回去顯示'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "console.log(0.1 + 0.2, 0.1 + 0.2 === 0.3);\nconsole.log(9007199254740993);\nconsole.log(1.005.toFixed(2));\nconsole.log(Math.abs(0.1 + 0.2 - 0.3) < Number.EPSILON);",
+          predict: { q: '`1.005.toFixed(2)` 會印出什麼？', options: ['1.01', '1.00', '1.005'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="三種處理方式對照：金額用整數的分；比較小數用容許誤差；大整數 ID 用字串或 BigInt">
+          <rect x="10" y="10" width="170" height="190" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="48" text-anchor="middle" font-size="20" font-weight="900" class="on-color">金額</text>
+          <text x="95" y="96" text-anchor="middle" font-size="16" class="on-color">存整數的分</text>
+          <text x="95" y="130" text-anchor="middle" font-size="16" class="on-color">顯示時再除</text>
+          <rect x="195" y="10" width="170" height="190" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="48" text-anchor="middle" font-size="20" font-weight="900" class="on-color">比較小數</text>
+          <text x="280" y="96" text-anchor="middle" font-size="16" class="on-color">差值小於</text>
+          <text x="280" y="130" text-anchor="middle" font-size="16" class="on-color">容許誤差</text>
+          <rect x="380" y="10" width="170" height="190" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="48" text-anchor="middle" font-size="20" font-weight="900" class="on-color">大整數 ID</text>
+          <text x="465" y="96" text-anchor="middle" font-size="16" class="on-color">用字串傳</text>
+          <text x="465" y="130" text-anchor="middle" font-size="16" class="on-color">要計算用 BigInt</text>
+        </svg>`, caption: '三種最常見的情境，各有固定的處理方式。' },
+      ],
+      tryit: {
+        q: ['補完 `isClose(a, b)`，讓 `isClose(0.1 + 0.2, 0.3)` 回傳 true：'],
+        draft: 'const TOLERANCE = 1e-9;\nfunction isClose(a, b) {\n  return ____ < TOLERANCE;\n}',
+        answer: ['`Math.abs(a - b)`。', '比較兩數之差的絕對值，而不是直接用 `===`。容許誤差的大小依情境決定；`Number.EPSILON` 只適合比較 1 附近的數。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `===` 比較兩個計算出來的小數。', why: '兩邊可能各差一點點，明明「應該相等」卻得到 false。', right: '比較差值的絕對值是否小於容許誤差。' },
+      { wrong: '用 `toFixed(2)` 做金額的四捨五入。', why: '`1.005` 實際存的值比 1.005 小一點，`toFixed(2)` 得到 `"1.00"`；而且它回傳字串。', right: '金額從一開始就存整數；`toFixed` 只用在最後顯示。' },
+      { wrong: '把資料庫的 64 位元 ID 用 number 傳給前端。', why: '超過安全整數後會失準，兩個不同的 ID 可能變成同一個數字。', right: 'API 用字串傳 ID；真的要計算時用 BigInt。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '為什麼 `0.1 + 0.2` 不等於 `0.3`？', options: [
+        { text: '0.1 和 0.2 在二進位都寫不完，存進去就各有誤差', correct: true, why: '捨去後的誤差在相加時累積，大到顯示出來。' },
+        { text: 'JavaScript 的加法有 bug，其他語言不會', why: 'Python、C# 的 double 也一樣，這是 IEEE 754 浮點數的特性。' },
+        { text: '因為 number 只能存 15 位小數', why: '問題不是位數不夠顯示，而是二進位根本寫不完 0.1。' },
+        { text: '要先用 parseFloat 轉換才會精確', why: 'parseFloat 得到的還是同一個浮點數，誤差一樣在。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`Number.isSafeInteger(2 ** 53)` 的結果是？', options: [
+        { text: 'true，因為 2 的 53 次方能被精確表示', why: '它本身能被表示，但 2⁵³ 與 2⁵³ + 1 會變成同一個值，所以不算安全。' },
+        { text: 'false，安全範圍只到 2⁵³ − 1', correct: true, why: 'Node.js 22.13 實測：false。安全整數的上限是 9007199254740991。' },
+        { text: '拋出 RangeError', why: '這只是一個判斷函式，不會拋錯。' },
+        { text: 'true，因為它是整數', why: '是整數不代表是安全整數。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做一個匯率換算：台幣金額乘上 0.031 換成美元，再加總很多筆。用「換成分」的方法夠嗎？要注意什麼？'], answer: [
+        '不夠。乘上匯率之後會出現很多位小數，四捨五入到分會在每一筆遺失資訊，加總後的誤差可能比直接用浮點數還大。',
+        '做法：先加總原始的台幣（整數），最後才換算一次並四捨五入；或使用專門的十進位運算函式庫。重點是「只在最後捨入一次」。',
+      ] },
+    ],
+    keypoints: [
+      'JavaScript 只有一種 number：64 位元浮點數，0.1 這類小數存進去就有微小誤差。',
+      '整數在 ±(2⁵³ − 1) 以內才精確；超過要用字串或 BigInt。',
+      '金額存整數最小單位、小數用容許誤差比較，toFixed 只用在顯示。',
+    ],
+    sources: ['mdn-number'],
+  },
+
+  '1-3': {
+    goals: [
+      '說明字串為什麼「不能被修改」，以及方法為什麼回傳新字串',
+      '用樣板字串組合文字',
+      '知道 `length` 算的不一定是「看到的字數」',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-2）購物車要加總 `[19.9, 0.29]`，下列哪個做法最可靠？', options: [
+        { text: '每筆先換成整數的分再加總', correct: true, why: '換成整數的分再加，最後只轉換一次。' },
+        { text: '直接相加，最後再用 `toFixed(2)` 修成兩位小數', why: 'toFixed 只修飾顯示，而且有 1.005 這類捨入陷阱，也會回傳字串。' },
+        { text: '每筆 `p * 100` 加總，不用 Math.round', why: '`0.29 * 100` 是 28.999999999999996，不捨入會把誤差帶進整數。' },
+        { text: '用 BigInt 存小數', why: 'BigInt 只能存整數，不能直接存 19.9。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-3）錯誤訊息 `TypeError: Cannot read properties of undefined` 代表什麼？', options: [
+        { text: '對 undefined 讀了屬性', correct: true, why: '點的左邊是 undefined，任何屬性都讀不到。' },
+        { text: '要讀的屬性名稱拼錯了', why: '拼錯只會讀到 undefined，不會拋錯；拋錯的是「對 undefined 再往下讀」。' },
+        { text: '用到的變數沒有先宣告', why: '沒宣告的名字會是 ReferenceError。' },
+        { text: '語法寫錯', why: '語法錯誤是 SyntaxError，而且在執行前就擋下。' },
+      ] },
+    ],
+    analogy: {
+      text: ['字串像刻在石碑上的字：你不能把其中一個字挖掉換掉，只能另外刻一塊新的石碑。「把 java 改成大寫」其實是照著舊碑刻一塊寫著 JAVA 的新碑，舊的那塊原封不動。'],
+      limit: ['刻石碑很貴，JavaScript 產生新字串很便宜，所以不用擔心「每次都產生新字串」的成本。另外，變數可以改成指向新石碑（`s = s.toUpperCase()`），這和「石碑本身不能改」是兩回事。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="字串方法回傳新字串：變數 s 指向 java；呼叫 toUpperCase 產生新的 JAVA，原本的 java 不變；如果把結果指定回 s，s 改指向 JAVA">
+        <rect x="10" y="20" width="110" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="65" y="56" text-anchor="middle" font-size="20" font-weight="900" class="mono">s</text>
+        <rect x="200" y="20" width="160" height="56" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="56" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">"java"</text>
+        <rect x="200" y="160" width="160" height="56" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="196" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">"JAVA"</text>
+        <rect x="390" y="160" width="160" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="470" y="186" text-anchor="middle" font-size="15">新產生的值</text>
+        <text x="470" y="206" text-anchor="middle" font-size="15">原本的沒變</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M120 48 H200 M280 76 V160 M360 188 H390"/></g>
+        <text x="300" y="124" font-size="16" class="mono">.toUpperCase()</text>
+      </svg>`,
+      caption: '方法不會改原本的字串，而是產生一個新的。想保留結果，就要把它存到變數裡。',
+      blocks: [
+        '字串是原始值，所以不能被修改。在[[嚴格模式]]（例如 `.mjs` 與本站的「試試看」）裡，`s[0] = "J"` 會直接拋出 TypeError；在舊的非嚴格模式裡，它會**安靜地失敗**：不報錯，但也沒改到。',
+        { type: 'table', caption: '最常用的字串方法（都回傳新值）', head: ['方法', '例子', '結果'], rows: [
+          ['`toUpperCase()`', '`"java".toUpperCase()`', '`"JAVA"`'],
+          ['`trim()`', '`"  hi  ".trim()`', '`"hi"`'],
+          ['`includes()`', '`"Hello".includes("ell")`', '`true`'],
+          ['`split()`', '`"a-b-c".split("-")`', '`["a", "b", "c"]`'],
+          ['`replaceAll()`', '`"Hello".replaceAll("l", "L")`', '`"HeLLo"`'],
+          ['`at()`', '`"abc".at(-1)`', '`"c"`'],
+          ['`padStart()`', '`"hi".padStart(5, "*")`', '`"***hi"`'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '樣板字串', en: 'template literal', def: '用反引號（鍵盤左上角 Esc 下方那個鍵）包住的字串，`${運算式}` 會被換成運算結果。', example: '`第 ${n} 課` 在 n 是 3 時得到「第 3 課」。' },
+      { term: 'UTF-16', en: 'UTF-16', def: '字串內部的編碼；`length` 算的是編碼單位數，不一定是看到的字數。', example: '`"😀".length` 是 2，`[..."😀"].length` 是 1。' },
+      { term: '嚴格模式', en: 'strict mode', def: '把安靜失敗改成拋錯的執行規則；模組預設開啟。', example: '`.mjs` 檔、`script type="module"`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '組合一段提示文字',
+        kind: '加號拼接 vs 樣板字串',
+        code: true,
+        badLabel: '用 + 拼',
+        goodLabel: '樣板字串',
+        bad: "const msg = '第 ' + n + ' 課，共 ' + {{1:n * 2}} + ' 頁';",
+        good: "const msg = `第 ${n} 課，共 {{1:${n * 2}}} 頁`;",
+        badResult: '引號和加號很多，容易漏空白；某一段如果是數字，還會碰到轉型（3-3）。',
+        goodResult: '整句一眼看完，`${}` 裡可以放任何運算式。',
+        why: ['`${}` 裡面是運算式，會先算出結果再嵌進去'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "const word = 'java';\nconst upper = word.toUpperCase();\nconsole.log(word, upper);\nconsole.log('😀'.length, [...'😀'].length, '台灣'.length);\nconst n = 3;\nconsole.log(`第 ${n} 課，共 ${n * 2} 頁`);",
+          predict: { q: '`"😀".length` 會印出多少？', options: ['1', '2', '4'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="length 與實際字數對照：台灣 length 2、看到 2 個字；emoji 笑臉 length 2、看到 1 個字；用展開運算子算出 1">
+          <rect x="10" y="10" width="540" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="40" y="45" font-size="18" font-weight="900">字串</text>
+          <text x="240" y="45" font-size="18" font-weight="900">.length</text>
+          <text x="410" y="45" font-size="18" font-weight="900">看到幾個字</text>
+          <rect x="10" y="76" width="540" height="56" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="40" y="111" font-size="18" class="on-color">「台灣」</text>
+          <text x="260" y="111" font-size="18" class="mono on-color">2</text>
+          <text x="440" y="111" font-size="18" class="on-color">2</text>
+          <rect x="10" y="142" width="540" height="56" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="40" y="177" font-size="18" class="on-color">一個 emoji</text>
+          <text x="260" y="177" font-size="18" class="mono on-color">2</text>
+          <text x="440" y="177" font-size="18" class="on-color">1</text>
+        </svg>`, caption: '中文字大多是一個單位，emoji 要兩個。要算「看到的字數」，用 `[...s].length`。' },
+      ],
+      tryit: {
+        q: ['補完 `shout(text)`：回傳去掉前後空白、轉大寫、加上驚嘆號的新字串。`shout("  hi ")` 要得到 `"HI!"`。'],
+        draft: 'function shout(text) {\n  return ____;\n}',
+        answer: ['`text.trim().toUpperCase() + "!"`（也可以用樣板字串寫）。', '每個方法都回傳新字串，所以可以一路串下去；原本的 text 完全沒變。'],
+      },
+    },
+    mistakes: [
+      { wrong: '呼叫 `name.trim()` 後，以為 name 已經沒有空白了。', why: '方法回傳新字串，name 本身不會變。', right: '寫成 `name = name.trim()`，或把結果存到新變數。' },
+      { wrong: '用 `s.length` 限制「最多 10 個字」，結果使用者打 emoji 就超過。', why: 'length 算的是 UTF-16 單位，一個 emoji 算 2。', right: '要算看到的字數用 `[...s].length`。' },
+      { wrong: '在樣板字串裡用單引號或雙引號。', why: '`${}` 只在反引號裡有作用；在單引號裡會原樣印出 ${n} 這四個字。', right: '確認字串外面是反引號，不是單引號或雙引號。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`const s = "abc"; s.toUpperCase(); console.log(s);` 印出什麼？', options: [
+        { text: '`abc`', correct: true, why: '字串不能被修改，toUpperCase 的結果沒有被接住。' },
+        { text: '`ABC`，已經被轉成大寫', why: '這是把結果存起來才會得到的值。' },
+        { text: '拋出 TypeError', why: '呼叫方法本身是合法的，只是結果被丟掉了。' },
+        { text: '`undefined`', why: 's 仍然指向原本的字串 "abc"。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`"a,b,,c".split(",")` 的結果是？', options: [
+        { text: "`['a', 'b', '', 'c']`", correct: true, why: '兩個逗號中間是空字串，也會變成一個元素。' },
+        { text: "`['a', 'b', 'c']`，空的片段被略過", why: 'split 不會自動略過空的片段。' },
+        { text: "`'abc'`", why: 'split 一定回傳陣列。' },
+        { text: "`['a,b,,c']`", why: '那是找不到分隔符號時的結果；這裡有逗號。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['暱稱欄位規定「最多 8 個字」。目前用 `nickname.length <= 8` 檢查，有使用者回報打了 5 個 emoji 就被擋。說明原因，並寫出修正後的條件。'], answer: [
+        '每個 emoji 在 UTF-16 裡佔 2 個單位，5 個 emoji 的 length 是 10，所以超過 8。',
+        '修正：`[...nickname].length <= 8`，展開運算子會依「字元」切開。（少數組合 emoji，例如家庭、國旗，由好幾個字元組成，要更精確可以用 `Intl.Segmenter`，屬於進階用法。）',
+      ] },
+    ],
+    keypoints: [
+      '字串不能被修改，所有方法都回傳新字串；要保留結果就存進變數。',
+      '樣板字串用反引號，`${}` 裡可以放任何運算式。',
+      'length 算的是 UTF-16 單位，emoji 算 2；要算看到的字數用 `[...s].length`。',
+    ],
+    sources: ['mdn-string'],
+  },
+
+  '1-4': {
+    goals: [
+      '說出 undefined 會從哪四個地方出現',
+      '分清 undefined 與 null 的用途',
+      '知道預設參數只對 undefined 生效',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-3）`"  hi ".trim().toUpperCase()` 的結果是？', options: [
+        { text: "`'HI'`", correct: true, why: '先去掉前後空白，再轉大寫；每一步都回傳新字串。' },
+        { text: "`'  HI '`", why: 'trim 會去掉前後空白。' },
+        { text: "`'hi'`", why: '後面還有 toUpperCase。' },
+        { text: '拋出 TypeError，因為字串不能被修改', why: '方法不修改原字串，而是回傳新的，所以完全合法。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）`typeof null` 是？', options: [
+        { text: "`'object'`", correct: true, why: '第一版 JavaScript 的錯誤，為了相容保留至今。' },
+        { text: "`'null'`", why: 'typeof 沒有這個結果。' },
+        { text: "`'undefined'`", why: 'null 與 undefined 的 typeof 不同。' },
+        { text: '拋出錯誤', why: 'typeof 對任何值都不會拋錯。' },
+      ] },
+    ],
+    analogy: {
+      text: ['問卷上的一題，留白沒填和寫上「無」是兩件事：留白可能是忘了、還沒填、或這題根本沒發給你（undefined）；寫「無」是填的人明確告訴你答案就是沒有（null）。'],
+      limit: ['問卷的「無」是寫給人看的；JavaScript 不會強迫你區分，兩者在 `==` 下還相等。很多團隊乾脆只用其中一個，重點是整個專案規則一致。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 320" role="img" aria-label="undefined 的四個來源：宣告了沒給值、讀不存在的屬性、讀超出範圍的陣列元素、函式沒有 return；null 只有一個來源：程式設計者自己放進去">
+        <rect x="10" y="10" width="330" height="300" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+        <text x="175" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">undefined：還沒有值</text>
+        <text x="30" y="96" font-size="17" class="on-color mono">let x;</text>
+        <text x="30" y="150" font-size="17" class="on-color mono">obj.missing</text>
+        <text x="30" y="204" font-size="17" class="on-color mono">[1, 2][5]</text>
+        <text x="30" y="258" font-size="17" class="on-color mono">function f() {}; f()</text>
+        <rect x="360" y="10" width="190" height="300" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="455" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">null</text>
+        <text x="455" y="96" text-anchor="middle" font-size="17" class="on-color">刻意的空值</text>
+        <text x="455" y="150" text-anchor="middle" font-size="17" class="on-color mono">avatar = null</text>
+        <text x="455" y="204" text-anchor="middle" font-size="17" class="on-color">只有你放</text>
+        <text x="455" y="236" text-anchor="middle" font-size="17" class="on-color">才會出現</text>
+      </svg>`,
+      caption: 'undefined 多半是語言自己給的；null 只會在你（或 API、JSON）明確放進去時出現。',
+      blocks: [
+        '[[undefined]] 代表「還沒有值」，[[null]] 代表「刻意沒有值」。它們在 `==` 下相等，`===` 下不相等；轉成數字時一個是 `NaN`、一個是 `0`。JSON 也不一樣：`JSON.stringify({ a: undefined, b: null })` 只會留下 `{"b":null}`，undefined 的屬性直接消失。',
+        { type: 'table', caption: '兩者的差異（2026-10-14 在 Node.js 22.13 實測）', head: ['', 'undefined', 'null'], rows: [
+          ['typeof', '`"undefined"`', '`"object"`'],
+          ['`Number(…)`', '`NaN`', '`0`'],
+          ['放進 JSON', '屬性消失', '保留為 `null`'],
+          ['觸發預設參數', '會', '**不會**'],
+          ['`?? "預設"`', '換成預設', '換成預設'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'undefined', en: 'undefined', def: '語言給的「還沒有值」。', example: '函式沒有 return 時回傳 undefined。' },
+      { term: 'null', en: 'null', def: '程式設計者放的「確定沒有值」。', example: '`user.avatar = null`。' },
+      { term: '預設參數', en: 'default parameter', def: '參數是 undefined 時改用的值；null 不會觸發。', example: '`function g(v = "預設")`：`g(null)` 得到 null。' },
+    ],
+    examples: {
+      compare: [{
+        title: '預設參數遇到 null',
+        kind: 'undefined vs null',
+        code: true,
+        badLabel: '傳 null',
+        goodLabel: '傳 undefined（或不傳）',
+        bad: "function greet(name = '朋友') {\n  return `嗨，${name}`;\n}\ngreet({{1:null}}); // '嗨，null'",
+        good: "function greet(name = '朋友') {\n  return `嗨，${name}`;\n}\ngreet({{1:undefined}}); // '嗨，朋友'",
+        badResult: 'null 是一個「有給的值」，預設參數不會介入。',
+        goodResult: '只有 undefined（或沒傳）才用預設值。',
+        why: ['預設參數只看 undefined'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "function greet(name = '朋友') {\n  return `嗨，${name}`;\n}\nconsole.log(greet(), greet(undefined), greet(null));\nconsole.log(JSON.stringify({ a: undefined, b: null }));\nconsole.log(null == undefined, null === undefined);",
+          predict: { q: '`greet(null)` 回傳什麼？', options: ['嗨，朋友', '嗨，null', '拋出 TypeError'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="處理沒有值的三種寫法：?. 安全地往下讀；?? 換成預設值；=== null 或 === undefined 精確判斷">
+          <rect x="10" y="10" width="170" height="170" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="22" font-weight="900" class="mono on-color">?.</text>
+          <text x="95" y="100" text-anchor="middle" font-size="16" class="on-color">安全往下讀</text>
+          <text x="95" y="130" text-anchor="middle" font-size="16" class="on-color">不會拋錯</text>
+          <rect x="195" y="10" width="170" height="170" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="22" font-weight="900" class="mono on-color">??</text>
+          <text x="280" y="100" text-anchor="middle" font-size="16" class="on-color">沒有值就</text>
+          <text x="280" y="130" text-anchor="middle" font-size="16" class="on-color">用預設</text>
+          <rect x="380" y="10" width="170" height="170" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="22" font-weight="900" class="mono on-color">=== null</text>
+          <text x="465" y="100" text-anchor="middle" font-size="16" class="on-color">要分清楚時</text>
+          <text x="465" y="130" text-anchor="middle" font-size="16" class="on-color">精確判斷</text>
+        </svg>`, caption: '三個工具：`?.` 與 `??` 把 null 和 undefined 一起處理；要分開就用 `===`。3-2 會詳細介紹前兩個。' },
+      ],
+      tryit: {
+        q: ['`user` 可能沒有 `profile`。補完下面這行，讓它在沒有 profile 時得到 `"匿名"`，而且不會拋錯：'],
+        draft: "const nickname = user.profile____nickname ____ '匿名';",
+        answer: ["`const nickname = user.profile?.nickname ?? '匿名';`", '`?.` 讓 profile 不存在時直接得到 undefined 而不拋錯；`??` 把 undefined 換成「匿名」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為傳 null 會觸發預設參數。', why: '預設參數只在值是 undefined 時生效；null 是「有給的值」。', right: '呼叫端不要傳 null；或在函式裡用 `name ?? "朋友"` 同時處理兩者。' },
+      { wrong: '把物件存成 JSON 後，發現某些屬性不見了。', why: '`JSON.stringify` 會丟掉值是 undefined 的屬性。', right: '需要保留「沒有值」時，存成 null。' },
+      { wrong: '寫 `if (user.profile.name)` 檢查有沒有名字。', why: 'profile 本身是 undefined 時，讀 `.name` 就拋出 TypeError。', right: '用 `user.profile?.name`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下列哪一個「不會」得到 undefined？', options: [
+        { text: '`JSON.parse("null")`', correct: true, why: '這會得到 null，是 JSON 裡明確寫的值。' },
+        { text: '`let x; x`', why: '宣告了沒給值，是 undefined。' },
+        { text: '`[1, 2][5]`', why: '超出範圍的元素是 undefined。' },
+        { text: '沒有 return 的函式的回傳值', why: '函式沒有 return 時回傳 undefined。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`JSON.stringify({ name: "阿明", age: undefined, team: null })` 的結果是？', options: [
+        { text: '`{"name":"阿明","team":null}`', correct: true, why: 'undefined 的屬性被丟掉，null 保留。' },
+        { text: '`{"name":"阿明","age":undefined,"team":null}`', why: 'JSON 沒有 undefined 這個值，不能這樣寫。' },
+        { text: '`{"name":"阿明","age":null,"team":null}`', why: 'undefined 不會被轉成 null，而是整個屬性消失。' },
+        { text: '`{"name":"阿明"}`', why: 'null 是合法的 JSON 值，會被保留。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['API 回傳的使用者資料裡，`avatar` 有時是 null、有時整個沒有這個欄位。你的團隊要決定前端怎麼表示「沒有頭像」，你會建議什麼規則？為什麼？'], answer: [
+        '建議：在資料進門的地方統一成一種，例如 `avatar: data.avatar ?? null`，之後整個前端只用 null 表示「沒有頭像」。',
+        '理由：兩種混用時，到處都要寫兩種判斷，很容易漏；統一後只要 `avatar === null` 就夠了，存回 JSON 時也不會讓欄位消失。',
+      ] },
+    ],
+    keypoints: [
+      'undefined 是「還沒有值」，多半由語言自動產生；null 是「刻意沒有值」，由人放進去。',
+      '預設參數只對 undefined 生效；JSON 會丟掉 undefined 的屬性、保留 null。',
+      '讀可能不存在的東西用 `?.`，給預設值用 `??`，要分開判斷才用 `===`。',
+    ],
+    sources: ['mdn-types', 'mdn-nullish'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
+   模組 2：變數與作用域
+   ========================================================================== */
+defineTerms({
+  '作用域': { en: 'scope', def: '一個名字「看得到」的範圍。在範圍外面讀它，會得到 ReferenceError。', example: '函式裡宣告的變數，函式外面看不到。' },
+  '區塊作用域': { en: 'block scope', def: '以一對大括號 `{}` 為範圍。`let`、`const`、`class` 都是區塊作用域。', example: '`if (x) { let a = 1; }` 之後就讀不到 a。' },
+  '提升': { en: 'hoisting', def: '進入一個作用域時，裡面的宣告會先被登記；所以「名字存在」早於「宣告那一行被執行」。', example: '函式宣告可以先呼叫、後定義。' },
+  '暫時性死區': { en: 'temporal dead zone, TDZ', def: '`let`／`const` 從作用域開始到宣告那一行之間：名字已經登記，但還不能使用。', example: '在 `let b = 2` 之前讀 b，拋出 `Cannot access \'b\' before initialization`。' },
+  '遮蔽': { en: 'shadowing', def: '內層宣告了和外層同名的變數，內層看到的是自己那一個，外層的被「擋住」。', example: '外層 `level = 1`，區塊裡 `let level = 2`。' },
+  '重新指定': { en: 'reassignment', def: '讓一個變數改指向另一個值（用 `=`）。const 禁止的是這件事，不是修改物件內容。', example: '`score = 90` 是重新指定；`team.wins = 4` 是修改物件內容。' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出 let、const、var 三者的差別',
+      '分清「重新指定」與「修改物件內容」',
+      '照實務規則選擇宣告方式：預設 const、需要時 let、不用 var',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）下列哪一個是物件，而不是原始值？', options: [
+        { text: '`[80, 90]`', correct: true, why: '陣列是物件，可以被修改。' },
+        { text: '`"80, 90"`', why: '這是字串，原始值。' },
+        { text: '`80`', why: '這是 number，原始值。' },
+        { text: '`null`', why: 'typeof null 雖然是 object，但 null 是原始值。' },
+      ] },
+    ],
+    analogy: {
+      text: ['置物櫃上的名牌：用 `const` 掛的名牌是用螺絲鎖死的，這個名牌永遠指向同一格；但那一格「裡面放什麼」可以換。用 `let` 掛的名牌是磁鐵，可以撕下來貼到別格。`var` 是舊式的公告欄便條，貼在整層樓的入口，誰都看得到。'],
+      limit: ['如果那一格放的是原始值（數字、字串），它本來就不能被改，所以 const 加上原始值，看起來就像「完全不能動」；這也是很多人誤會 const 是「常數」的原因。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="三種宣告比較：var 是函式作用域、可以重新指定、宣告前讀到 undefined；let 是區塊作用域、可以重新指定、宣告前讀會報錯；const 是區塊作用域、不能重新指定、宣告前讀會報錯">
+        <rect x="10" y="10" width="170" height="280" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="50" text-anchor="middle" font-size="24" font-weight="900" class="mono on-color">var</text>
+        <text x="95" y="100" text-anchor="middle" font-size="16" class="on-color">看整個函式</text>
+        <text x="95" y="150" text-anchor="middle" font-size="16" class="on-color">可以重新指定</text>
+        <text x="95" y="200" text-anchor="middle" font-size="16" class="on-color">宣告前：</text>
+        <text x="95" y="226" text-anchor="middle" font-size="16" class="on-color">undefined</text>
+        <rect x="195" y="10" width="170" height="280" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="50" text-anchor="middle" font-size="24" font-weight="900" class="mono on-color">let</text>
+        <text x="280" y="100" text-anchor="middle" font-size="16" class="on-color">看大括號</text>
+        <text x="280" y="150" text-anchor="middle" font-size="16" class="on-color">可以重新指定</text>
+        <text x="280" y="200" text-anchor="middle" font-size="16" class="on-color">宣告前：</text>
+        <text x="280" y="226" text-anchor="middle" font-size="16" class="on-color">ReferenceError</text>
+        <rect x="380" y="10" width="170" height="280" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="50" text-anchor="middle" font-size="24" font-weight="900" class="mono on-color">const</text>
+        <text x="465" y="100" text-anchor="middle" font-size="16" class="on-color">看大括號</text>
+        <text x="465" y="150" text-anchor="middle" font-size="16" class="on-color">不能重新指定</text>
+        <text x="465" y="200" text-anchor="middle" font-size="16" class="on-color">宣告前：</text>
+        <text x="465" y="226" text-anchor="middle" font-size="16" class="on-color">ReferenceError</text>
+      </svg>`,
+      caption: '三個欄位各比一件事：看得到的範圍、能不能重新指定、宣告前讀會怎樣。',
+      blocks: [
+        '`const` 禁止的是[[重新指定]]：讓這個名字改指向別的值。如果它指向的是物件或陣列，物件「裡面的東西」照樣可以改。這是 JavaScript 和很多語言的「常數」最大的不同。',
+        { type: 'code', lang: 'javascript', title: '實務規則', code: "const name = '阿明';     // 預設一律用 const\nlet count = 0;           // 之後要重新指定（計數器、累加器）才用 let\ncount += 1;\n// var 不再使用：它的作用域規則容易出錯（2-3 會看到）" },
+      ],
+    },
+    define: [
+      { term: 'const', en: 'const declaration', def: '宣告一個不能重新指定的變數；作用域是區塊。', example: '`const team = {}` 之後 `team.wins = 1` 合法，`team = {}` 拋出 TypeError。' },
+      { term: 'let', en: 'let declaration', def: '宣告一個可以重新指定的變數；作用域是區塊。', example: '`for (let i = 0; …)` 的 i 每圈都會更新。' },
+      { term: 'var', en: 'var declaration', def: '舊式宣告；作用域是整個函式，會「漏出」if、for 的大括號。', example: '`if (true) { var a = 1 }` 之後外面也讀得到 a。' },
+    ],
+    examples: {
+      compare: [{
+        title: 'const 的物件能不能改？',
+        kind: '修改內容 vs 重新指定',
+        code: true,
+        badLabel: '重新指定（不行）',
+        goodLabel: '修改內容（可以）',
+        bad: "const team = { wins: 3 };\n{{1:team = { wins: 4 }}};\n// TypeError: Assignment to constant variable.",
+        good: "const team = { wins: 3 };\n{{1:team.wins += 1}};\nconsole.log(team); // { wins: 4 }",
+        badResult: '讓 team 改指向一個新物件，違反 const。',
+        goodResult: 'team 還是指向同一個物件，只是物件裡的 wins 變了。',
+        why: ['等號左邊是名字本身才算重新指定；左邊是「名字.屬性」只是改內容'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "const team = { wins: 3 };\nteam.wins += 1;\nconsole.log(team);\ntry {\n  team = { wins: 0 };\n} catch (e) {\n  console.log(`${e.name}: ${e.message}`);\n}",
+          predict: { q: '`team.wins += 1` 這一行會報錯嗎？', options: ['會，const 不能改', '不會，印出 { wins: 4 }'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="const 鎖住的是名字到物件的箭頭：team 指向物件；改物件內容時箭頭不變，所以合法；讓 team 指向新物件會換箭頭，所以不合法">
+          <rect x="10" y="70" width="120" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="70" y="108" text-anchor="middle" font-size="20" font-weight="900" class="mono">team</text>
+          <rect x="230" y="70" width="190" height="60" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="325" y="108" text-anchor="middle" font-size="18" class="mono on-color">{ wins: 4 }</text>
+          <rect x="230" y="10" width="190" height="44" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="325" y="39" text-anchor="middle" font-size="15">裡面可以改</text>
+          <rect x="230" y="150" width="190" height="44" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="325" y="179" text-anchor="middle" font-size="15" class="on-color">箭頭不能換</text>
+          <rect x="440" y="70" width="110" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="495" y="108" text-anchor="middle" font-size="18" font-weight="900" class="on-color">const</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M130 100 H230 M325 54 V70 M325 130 V150 M420 100 H440"/></g>
+        </svg>`, caption: 'const 鎖住的是「這個名字指向哪裡」的箭頭；被指向的物件內容不受保護。4-1 會完整介紹這個箭頭。' },
+      ],
+      tryit: {
+        q: ['把下面的 `var` 改成 `const` 或 `let`（各選一個最合適的）：'],
+        draft: 'var names = ["阿明", "小華"];\nvar total = 0;\nfor (var i = 0; i < names.length; i++) total += 1;',
+        answer: ['`const names`（陣列不會被重新指定）、`let total`（會 +1）、`for (let i …)`（每圈要更新）。', '判斷方法只有一個問題：這個名字之後會被 `=` 重新指定嗎？會就 let，不會就 const。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 `const` 宣告的陣列不能 push。', why: 'push 改的是陣列內容，不是讓名字改指向別的陣列。', right: '要內容也不能改，用 `Object.freeze`（只凍結第一層）或不可變的寫法（4-2）。' },
+      { wrong: '所有變數都用 let，「以防萬一之後要改」。', why: '讀程式的人看到 let，會以為它等一下會被改，得一路追下去確認。', right: '預設 const；真的需要重新指定才改成 let。' },
+      { wrong: '在新程式裡繼續用 var。', why: 'var 會漏出區塊，也能在宣告前讀到 undefined，兩者都會藏 bug。', right: '新程式只用 const 和 let。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`const scores = [80]; scores.push(90);` 會發生什麼？', options: [
+        { text: '正常執行，scores 變成 [80, 90]', correct: true, why: 'push 修改陣列內容，scores 仍指向同一個陣列。' },
+        { text: '拋出 TypeError，因為 const 不能修改', why: 'const 只禁止重新指定，不保護內容。' },
+        { text: 'scores 被複製成新陣列再 push', why: 'push 直接改原陣列，不會複製。' },
+        { text: '靜默失敗，scores 還是 [80]', why: '沒有任何規則阻止 push，它真的會改到。' },
+      ] },
+      { level: '應用', type: 'mc', q: '哪一個宣告最適合「迴圈裡累加的總分」？', options: [
+        { text: '`let total = 0`', correct: true, why: '每一圈都要 `total += …`，需要重新指定。' },
+        { text: '`const total = 0`', why: '`total += 1` 就是重新指定，會拋出 TypeError。' },
+        { text: '`var total = 0`', why: '能用，但 var 會漏出區塊，新程式不建議。' },
+        { text: '不用宣告，直接寫 `total = 0`', why: '模組（嚴格模式）裡會拋出 ReferenceError：total is not defined。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['TypeScript 有 `readonly` 和 `as const`。它們和 JavaScript 的 `const` 有什麼不同？為什麼用了 `as const`，執行時還是改得動？'], answer: [
+        'JavaScript 的 const 只管「名字能不能重新指定」，在執行時真的會擋（拋 TypeError）。',
+        'TypeScript 的 readonly、as const 管的是「內容能不能改」，但只在編譯時檢查；編譯後型別消失，執行時物件照樣改得動。要執行時也擋，得用 `Object.freeze`。',
+      ] },
+    ],
+    keypoints: [
+      'const 禁止重新指定，但不保護物件內容；let 可以重新指定；兩者都是區塊作用域。',
+      '「名字 = 新值」是重新指定，「名字.屬性 = 新值」是修改內容。',
+      '預設用 const，需要重新指定才用 let，新程式不用 var。',
+    ],
+    sources: ['mdn-let'],
+  },
+
+  '2-2': {
+    goals: [
+      '解釋「提升」：名字為什麼在宣告那一行之前就存在',
+      '預測在宣告前讀取 var、let、函式宣告分別會怎樣',
+      '看懂 `Cannot access … before initialization` 的意思',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-1）`const list = []; list = [1];` 會怎樣？', options: [
+        { text: '拋出 TypeError：Assignment to constant variable.', correct: true, why: '`list = [1]` 是重新指定，const 不允許。' },
+        { text: '正常執行，list 變成 [1]', why: '這不是修改內容，而是換掉整個陣列。' },
+        { text: '拋出 ReferenceError', why: 'list 已經宣告過，名字存在。' },
+        { text: '只有在嚴格模式才會報錯', why: '對 const 重新指定，任何模式都會拋錯。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-4）`let x;` 之後讀 x，得到什麼？', options: [
+        { text: '`undefined`', correct: true, why: '宣告了但沒給值，就是 undefined。' },
+        { text: '`null`', why: 'null 只有在你主動放進去時才會出現。' },
+        { text: '拋出 ReferenceError', why: '宣告那一行已經執行過了，可以讀。' },
+        { text: '`0`', why: 'JavaScript 不會自動給 0。' },
+      ] },
+    ],
+    analogy: {
+      text: ['尾牙的圓桌：主辦人一開始就把名牌全部擺好了。你坐下就知道這桌有阿明，但他還沒到，你對著空位講話沒人回（let、const 的暫時性死區）。有一張老式的桌子規則不同：名牌擺好的同時，座位上先放一個「空氣人」，你跟他講話會得到「（沒有）」（var 的 undefined）。'],
+      limit: ['尾牙的人最後一定會到；變數如果那一行宣告永遠沒被執行（例如在沒進去的 if 裡），它就會一直待在死區。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="時間軸：進入作用域時所有宣告先登記；var 的值先設成 undefined；let 和 const 從登記到宣告那一行之間是暫時性死區，讀取會報錯；宣告那一行執行後才能使用">
+        <rect x="10" y="20" width="160" height="60" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+        <text x="90" y="56" text-anchor="middle" font-size="18" font-weight="900" class="on-color">進入作用域</text>
+        <rect x="200" y="20" width="160" height="60" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">暫時性死區</text>
+        <text x="280" y="70" text-anchor="middle" font-size="14" class="on-color">let、const 不能讀</text>
+        <rect x="390" y="20" width="160" height="60" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="56" text-anchor="middle" font-size="18" font-weight="900" class="on-color">宣告那一行之後</text>
+        <rect x="10" y="130" width="540" height="150" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="170" font-size="17" class="mono">var a</text>
+        <text x="200" y="170" font-size="17">讀得到 undefined</text>
+        <text x="30" y="210" font-size="17" class="mono">let b</text>
+        <text x="200" y="210" font-size="17">ReferenceError（死區）</text>
+        <text x="30" y="250" font-size="17" class="mono">function f(){}</text>
+        <text x="200" y="250" font-size="17">整個函式都可以用</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M170 50 H200 M360 50 H390"/></g>
+      </svg>`,
+      caption: '所有宣告一開始就登記；差別在「登記到宣告那一行之間」能不能用。',
+      blocks: [
+        '[[提升]]不是「把程式碼搬到最上面」，而是引擎在執行一個作用域之前，先掃一遍、把所有宣告的名字登記起來。`let`／`const` 登記了但不能讀，這段期間叫[[暫時性死區]]；錯誤訊息是 `Cannot access … before initialization`，而不是 `is not defined`，正是因為名字已經存在。',
+      ],
+    },
+    define: [
+      { term: '提升', en: 'hoisting', def: '宣告在作用域開始時就被登記。', example: '函式宣告可以先呼叫後定義。' },
+      { term: '暫時性死區', en: 'temporal dead zone', def: 'let／const 從作用域開始到宣告那一行之間不能使用。', example: '`console.log(b); let b = 2;` 拋出 ReferenceError。' },
+      { term: '函式宣告', en: 'function declaration', def: '`function 名字() {}` 這種寫法，連同函式本體一起提升。', example: '`const f = () => {}` 不是函式宣告，不會整個提升。' },
+    ],
+    examples: {
+      compare: [{
+        title: '先呼叫、後定義',
+        kind: '函式宣告 vs 箭頭函式',
+        code: true,
+        badLabel: '箭頭函式（const）',
+        goodLabel: '函式宣告',
+        bad: "greet();\n{{1:const greet = () => '嗨'}};\n// ReferenceError: Cannot access 'greet' before initialization",
+        good: "greet();\n{{1:function greet() { return '嗨'; }}}\n// 正常執行",
+        badResult: 'greet 是 const 變數，呼叫時還在暫時性死區。',
+        goodResult: '函式宣告連同本體一起提升，整個作用域都能用。',
+        why: ['兩種寫法看起來都是「定義函式」，提升規則完全不同'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "console.log(typeof a);\nvar a = 1;\ntry {\n  console.log(b);\n} catch (e) {\n  console.log(`${e.name}: ${e.message}`);\n}\nlet b = 2;\nconsole.log(f());\nfunction f() { return 'ok'; }",
+          predict: { q: '第 4 行讀 b 會怎樣？', options: ['印出 undefined', '拋出 ReferenceError', '印出 2'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="兩種錯誤訊息對照：not defined 代表名字根本不存在，通常是打錯字或沒宣告；before initialization 代表名字存在但還在暫時性死區，通常是順序寫錯">
+          <rect x="10" y="10" width="260" height="210" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="48" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">is not defined</text>
+          <text x="140" y="98" text-anchor="middle" font-size="16" class="on-color">名字根本不存在</text>
+          <text x="140" y="140" text-anchor="middle" font-size="16" class="on-color">打錯字、沒宣告</text>
+          <text x="140" y="182" text-anchor="middle" font-size="16" class="on-color">或環境沒有它</text>
+          <rect x="290" y="10" width="260" height="210" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="48" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">before initialization</text>
+          <text x="420" y="98" text-anchor="middle" font-size="16" class="on-color">名字存在</text>
+          <text x="420" y="140" text-anchor="middle" font-size="16" class="on-color">但還在死區</text>
+          <text x="420" y="182" text-anchor="middle" font-size="16" class="on-color">順序寫錯了</text>
+        </svg>`, caption: '同樣是 ReferenceError，說明不同，修法也不同：一個要找拼字，一個要調整順序。' },
+      ],
+      tryit: {
+        q: ['下面的程式哪一行會出錯？把它改好（只能調整順序）：'],
+        draft: "const price = applyTax(100);\nconst TAX = 0.05;\nfunction applyTax(n) { return n * (1 + TAX); }",
+        answer: ['第 1 行呼叫 applyTax 時，函式本身已經提升可以用，但它裡面讀的 TAX 還在死區，拋出 ReferenceError。', '把 `const TAX = 0.05;` 移到第 1 行之前。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為提升就是「把宣告搬到檔案最上面」。', why: '只有名字被登記；let／const 的值要等那一行執行才有。', right: '記成「名字先登記，值後到」。' },
+      { wrong: '看到 `before initialization` 就去找拼字錯誤。', why: '這個訊息代表名字存在，問題在順序，不是拼字。', right: '找出宣告那一行，確認使用它的程式在它之後執行。' },
+      { wrong: '依賴 var 在宣告前是 undefined 的行為寫程式。', why: '讀程式的人很難發現這種隱性依賴，改順序就壞。', right: '用 let／const，讓順序錯誤直接報錯。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`console.log(x); var x = 5;` 印出什麼？', options: [
+        { text: '`undefined`', correct: true, why: 'var 提升時值先設成 undefined。' },
+        { text: '`5`', why: '值要等 `x = 5` 那一行執行才有。' },
+        { text: '拋出 ReferenceError', why: '那是 let／const 的行為。' },
+        { text: '`null`', why: '提升不會放 null。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`run(); const run = () => 1;` 的錯誤訊息最可能是？', options: [
+        { text: "`Cannot access 'run' before initialization`", correct: true, why: 'run 是 const，呼叫時名字存在但在死區。' },
+        { text: '`run is not defined`', why: '名字已經登記，所以不是 not defined。' },
+        { text: '`run is not a function`', why: '還沒走到「拿到值再呼叫」那一步，讀取就先失敗了。' },
+        { text: '不會出錯，回傳 1', why: '只有函式宣告會整個提升，箭頭函式不會。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼語言設計者要讓 let／const 在宣告前「報錯」，而不是像 var 一樣給 undefined？從除錯的角度說說看。'], answer: [
+        '給 undefined 的話，錯誤會「安靜地」往下傳：程式拿著 undefined 繼續跑，可能很多行之後才在別的地方爆掉，離真正的原因很遠。',
+        '直接報錯會讓問題停在發生的那一行，錯誤訊息還會說出變數名稱，一眼就知道是順序問題。這和嚴格模式「讓錯誤大聲說出來」是同一種設計理念。',
+      ] },
+    ],
+    keypoints: [
+      '提升是「名字先登記」：進入作用域時所有宣告就存在了。',
+      'var 宣告前讀到 undefined；let／const 在宣告前是暫時性死區，讀取拋出 ReferenceError；函式宣告整個提升。',
+      '`before initialization` 是順序問題，`is not defined` 才是名字不存在。',
+    ],
+    sources: ['mdn-hoisting', 'mdn-let'],
+  },
+
+  '2-3': {
+    goals: [
+      '畫出巢狀作用域，說出變數是「由內往外」找的',
+      '預測遮蔽發生時，內外層各讀到哪個值',
+      '找出 var 漏出區塊造成的 bug',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-2）`console.log(n); let n = 1;` 的錯誤種類是？', options: [
+        { text: 'ReferenceError（before initialization）', correct: true, why: 'n 已經登記但還在暫時性死區。' },
+        { text: 'TypeError', why: 'TypeError 是對錯的型別做事；這裡是名字還不能用。' },
+        { text: 'SyntaxError', why: '語法完全正確。' },
+        { text: '沒有錯，印出 undefined', why: '那是 var 的行為。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-3）`"Hi".toUpperCase()` 之後，原本的 "Hi" 變成什麼？', options: [
+        { text: '還是 "Hi"', correct: true, why: '字串不能被修改，方法回傳的是新字串。' },
+        { text: '變成 "HI"', why: '原本的字串不會被改。' },
+        { text: '被刪除', why: '原值不會因為呼叫方法而消失。' },
+        { text: '變成 undefined', why: '原本的值完全沒受影響。' },
+      ] },
+    ],
+    analogy: {
+      text: ['一棟公司大樓：你在會議室裡找「釘書機」，先找會議室桌上；沒有就去樓層的公用區找；再沒有就去一樓總務處。你只會往「外面」找，不會跑去別的會議室翻。'],
+      limit: ['大樓的找法可能因人而異；JavaScript 的查找規則完全固定，而且是由程式碼「寫在哪裡」決定的，跟「從哪裡被呼叫」無關（這叫詞法作用域，5-2 的閉包會用到）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 320" role="img" aria-label="巢狀作用域：最外層是模組，裡面是函式 outer，再裡面是 if 區塊。在最內層讀變數時，先找區塊，找不到再找函式，再找模組，最後找不到就是 ReferenceError">
+        <rect x="10" y="10" width="540" height="300" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="44" font-size="18" font-weight="900" class="on-color">模組：const site = '練球'</text>
+        <rect x="40" y="70" width="480" height="220" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="60" y="104" font-size="18" font-weight="900" class="on-color">函式 outer：const msg = '外'</text>
+        <rect x="70" y="130" width="420" height="140" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="90" y="164" font-size="18" font-weight="900" class="on-color">if 區塊：let level = 2</text>
+        <text x="90" y="204" font-size="16" class="on-color">讀 level → 這層就有</text>
+        <text x="90" y="234" font-size="16" class="on-color">讀 msg → 往外一層找到</text>
+        <text x="90" y="262" font-size="16" class="on-color">讀 site → 往外兩層找到</text>
+      </svg>`,
+      caption: '查找方向永遠是由內往外；外層看不到內層的變數。',
+      blocks: [
+        '[[作用域]]一層包一層。讀一個名字時，從目前這一層開始往外找，找到第一個就停；一路找到最外層都沒有，就拋出 ReferenceError。內層如果宣告了和外層同名的變數，外層的會被[[遮蔽]]。`let`／`const` 的作用域是[[區塊作用域]]；`var` 只認函式，會穿過 `if`、`for` 的大括號。',
+      ],
+    },
+    define: [
+      { term: '作用域鏈', en: 'scope chain', def: '由內往外一層層找名字的順序。', example: '區塊 → 函式 → 模組 → 全域。' },
+      { term: '遮蔽', en: 'shadowing', def: '內層同名變數擋住外層。', example: '內層 `let level = 2` 時，內層讀到 2，外層仍是 1。' },
+      { term: '詞法作用域', en: 'lexical scope', def: '看得到哪些變數，由程式碼寫的位置決定。', example: '函式在哪裡被呼叫，不影響它看得到什麼（5-2）。' },
+    ],
+    examples: {
+      compare: [{
+        title: 'var 漏出區塊造成的 bug',
+        kind: 'var vs let',
+        code: true,
+        badLabel: '用 var',
+        goodLabel: '用 let',
+        bad: "var total = 100;\nfunction discount(isVip) {\n  if (isVip) { {{1:var}} total = 80; }\n  return total;\n}\ndiscount(false); // undefined",
+        good: "const total = 100;\nfunction discount(isVip) {\n  if (isVip) { {{1:return 80}}; }\n  return total;\n}\ndiscount(false); // 100",
+        badResult: 'if 裡的 var total 被提升到整個函式，遮蔽了外面的 total，而且一開始是 undefined。',
+        goodResult: '不在區塊裡偷宣告同名變數，就不會發生遮蔽。',
+        why: ['var 不認 if 的大括號，宣告會影響整個函式'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "let level = 1;\n{\n  let level = 2;\n  console.log('內', level);\n}\nconsole.log('外', level);\nif (true) {\n  var leak = 'var 跑出來了';\n  let stay = 'let 留在裡面';\n}\nconsole.log(leak, typeof stay);",
+          predict: { q: '最後一行的 `typeof stay` 是？', options: ['string', 'undefined', '拋出 ReferenceError'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="遮蔽示意：外層 level 等於 1；內層區塊宣告 level 等於 2，擋住外層；離開區塊後，外層 level 仍然是 1">
+          <rect x="10" y="10" width="540" height="190" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="46" font-size="18" font-weight="900" class="on-color mono">let level = 1</text>
+          <rect x="40" y="70" width="300" height="110" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="60" y="106" font-size="18" font-weight="900" class="on-color mono">let level = 2</text>
+          <text x="60" y="146" font-size="16" class="on-color">內層讀到 2</text>
+          <rect x="370" y="70" width="160" height="110" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="450" y="114" text-anchor="middle" font-size="16">外層仍是 1</text>
+          <text x="450" y="146" text-anchor="middle" font-size="16">沒被改到</text>
+        </svg>`, caption: '內層宣告同名變數，只是擋住，不是修改；離開區塊，外層的值原封不動。' },
+      ],
+      tryit: {
+        q: ['在下面的程式補一個字，讓內層的 `level = 2` 改到外層的 level（最後印出 2）：'],
+        draft: 'let level = 1;\n{\n  ____ level = 2;\n}\nconsole.log(level);',
+        answer: ['什麼都不寫，直接 `level = 2;`。', '加了 let 就是在內層宣告一個新的變數（遮蔽）；不加才是對外層那個變數重新指定。所以空格要留白：答案是「不要寫宣告關鍵字」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在區塊裡想改外層變數，卻寫成 `let x = …`。', why: '加了 let 就是宣告一個新的內層變數，外層的完全沒變。', right: '要改外層就直接 `x = …`；要新變數就換個名字，避免混淆。' },
+      { wrong: '在 if 或 for 裡用 var 宣告暫存變數。', why: 'var 會漏到整個函式，可能遮蔽或覆蓋同名變數。', right: '一律用 let／const。' },
+      { wrong: '以為外層可以讀到內層函式裡的變數。', why: '查找只會由內往外，不會往內。', right: '需要外面用到的值，用 return 傳出來。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在函式內讀一個變數，引擎找的順序是？', options: [
+        { text: '目前的區塊 → 外層函式 → 模組', correct: true, why: '由內往外，找到第一個就停。' },
+        { text: '模組 → 外層函式 → 目前的區塊', why: '方向反了；從最近的那一層開始找。' },
+        { text: '呼叫這個函式的那段程式', why: '查找由程式碼寫的位置決定，與呼叫的位置無關。' },
+        { text: '全部同時找，取最後宣告的', why: '是依序找、找到就停。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`var total = 100; function d(v) { if (v) { var total = 80; } return total; }`，`d(false)` 的結果是？', options: [
+        { text: '`undefined`', correct: true, why: '函式內的 var total 被提升到整個函式，遮蔽外面的 total，沒進 if 就還是 undefined。（Node.js 22.13 實測）' },
+        { text: '`100`', why: '外面的 total 被函式內提升的 var total 遮蔽了。' },
+        { text: '`80`', why: '沒有進入 if，所以沒被設成 80。' },
+        { text: '拋出 ReferenceError', why: 'var 宣告前讀取不會報錯，只會得到 undefined。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['用作用域鏈解釋：為什麼在函式裡不小心少寫 let，寫成 `count = 0`，在模組裡會報錯，但在舊式的非模組 script 裡卻「安靜地」成功？'], answer: [
+        '`count = 0` 會沿著作用域鏈往外找名字 count。都找不到時：嚴格模式（模組）直接拋出 `ReferenceError: count is not defined`。',
+        '非嚴格模式則會偷偷在全域物件（window）上建立一個 count，看起來成功了，其實製造了一個全域變數，可能和別的程式衝突。這又是嚴格模式讓錯誤大聲說出來的例子。',
+      ] },
+    ],
+    keypoints: [
+      '作用域一層包一層，讀名字時由內往外找，找到第一個就停。',
+      '內層宣告同名變數會遮蔽外層，不會修改外層；要改外層就不要加宣告關鍵字。',
+      'var 只認函式，會漏出 if 與 for 的區塊；let／const 只活在自己的大括號裡。',
+    ],
+    sources: ['mdn-let', 'mdn-closures'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
+   模組 3：比較與轉型
+   ========================================================================== */
+defineTerms({
+  '型別轉換': { en: 'type coercion', def: '運算時，JavaScript 自動把一個型別的值轉成另一個型別。', example: '`"5" * "2"` 先把兩個字串轉成數字，得到 10。' },
+  '寬鬆相等': { en: 'loose equality', def: '`==`：型別不同時先依規則轉型，再比較。', example: '`0 == ""` 是 true。' },
+  '嚴格相等': { en: 'strict equality', def: '`===`：不轉型，型別和值都相同才是 true。', example: '`0 === ""` 是 false。' },
+  'NaN': { en: 'Not a Number', def: '無效的數字計算結果，例如把 "abc" 轉成數字。它是唯一不等於自己的值。', example: '`NaN === NaN` 是 false，要用 `Number.isNaN`。' },
+  'truthy': { en: 'truthy', def: '放在 if、||、&& 這類需要真假的地方時，會被當成 true 的值。', example: '`"0"`、`[]`、`{}` 都是 truthy。' },
+  'falsy': { en: 'falsy', def: '會被當成 false 的值，只有八個：false、0、-0、0n、""、null、undefined、NaN。', example: '`if (0)` 不會進去。' },
+  '空值合併': { en: 'nullish coalescing', def: '`??`：左邊是 null 或 undefined 才用右邊。', example: '`0 ?? 50` 是 0。' },
+  '可選串連': { en: 'optional chaining', def: '`?.`：左邊是 null 或 undefined 時直接得到 undefined，不拋錯。', example: '`user.profile?.name`。' },
+  '短路求值': { en: 'short-circuit evaluation', def: '`||`、`&&`、`??` 一旦能決定結果就停止，並回傳最後看到的那個值，而不一定是 true／false。', example: '`0 || "x"` 回傳 "x"；`1 && 2 && 3` 回傳 3。' },
+});
+
+const COERCE_EQUALITY = [
+  { expr: "1 == '1'", steps: ['左邊是 number，右邊是 string：**把字串轉成數字**。', "`Number('1')` 是 `1`。", '變成 `1 == 1`。'], result: 'true' },
+  { expr: "0 == ''", steps: ['number 遇到 string：把字串轉成數字。', "`Number('')` 是 `0`（空字串轉成 0）。", '變成 `0 == 0`。'], result: 'true' },
+  { expr: "'' == '0'", steps: ['兩邊**都是字串**：不轉型，直接比內容。', "空字串和 `'0'` 內容不同。"], result: 'false' },
+  { expr: 'null == 0', steps: ['`null` 在 `==` 下有特別規則：**只等於 null 和 undefined**。', '不會被轉成數字 0。'], result: 'false' },
+  { expr: 'null == undefined', steps: ['特別規則：null 與 undefined 在 `==` 下互相相等。'], result: 'true' },
+  { expr: 'NaN == NaN', steps: ['NaN 不等於任何值，**包括自己**。', '判斷 NaN 要用 `Number.isNaN(x)` 或 `Object.is(x, NaN)`。'], result: 'false' },
+  { expr: '[] == false', steps: ['有一邊是 boolean：先把 `false` 轉成數字 `0`，變成 `[] == 0`。', '物件遇到數字：把 `[]` 轉成原始值，得到空字串 `\'\'`，變成 `\'\' == 0`。', '字串遇到數字：`Number(\'\')` 是 0，變成 `0 == 0`。'], result: 'true' },
+];
+
+const COERCE_PLUS = [
+  { expr: "'5' + 2", steps: ['`+` 只要有一邊是**字串**，就變成字串相接。', '`2` 轉成 `\'2\'`，相接得到 `\'52\'`。'], result: "'52'" },
+  { expr: "'5' * '2'", steps: ['`*`、`-`、`/` 一律把兩邊**轉成數字**。', '`5 * 2`。'], result: '10' },
+  { expr: "5 + 2 + '3'", steps: ['由左往右：先算 `5 + 2`，兩邊都是數字，得到 `7`。', '再算 `7 + \'3\'`，有字串，相接得到 `\'73\'`。'], result: "'73'" },
+  { expr: "'3' + 5 + 2", steps: ['由左往右：`\'3\' + 5` 有字串，得到 `\'35\'`。', '`\'35\' + 2` 還是字串相接，得到 `\'352\'`。'], result: "'352'" },
+  { expr: "'10' - 3", steps: ['`-` 把兩邊轉成數字：`10 - 3`。'], result: '7' },
+  { expr: 'true + 1', steps: ['`true` 轉成數字是 `1`。', '`1 + 1`。'], result: '2' },
+  { expr: "'3' * 'a'", steps: ['`Number(\'a\')` 是 `NaN`。', '任何數字和 NaN 運算，結果都是 NaN。'], result: 'NaN' },
+];
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出 `==` 與 `===` 的差別',
+      '解釋 `0 == ""`、`null == 0` 這類結果',
+      '判斷 NaN 時用對工具',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-3）區塊裡寫 `let level = 2`，外層原本的 `level = 1` 會變嗎？', options: [
+        { text: '不會，內層宣告的是新變數（遮蔽）', correct: true, why: '加了 let 就是在內層宣告新變數，外層不受影響。' },
+        { text: '會，同名變數會被覆蓋', why: '覆蓋要不加宣告關鍵字（直接 `level = 2`）。' },
+        { text: '會拋出 SyntaxError：重複宣告', why: '不同作用域可以有同名變數；同一個作用域才不行。' },
+        { text: '外層會變成 undefined', why: '外層的值完全沒被碰到。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）`typeof NaN` 是？', options: [
+        { text: "`'number'`", correct: true, why: 'NaN 是 number 型別裡「無效的結果」。' },
+        { text: "`'NaN'`", why: 'typeof 沒有這個結果。' },
+        { text: "`'undefined'`", why: 'NaN 是一個值，不是「沒有值」。' },
+        { text: "`'object'`", why: '只有 null 有這個怪癖。' },
+      ] },
+    ],
+    analogy: {
+      text: ['手搖飲店點餐：隨和的店員聽到「大冰奶」「冰奶茶大杯」「L 的冰奶」都會先在腦中翻成同一個品項再比對（`==`）；收銀機掃的是條碼，一個字元都不能差（`===`）。隨和很方便，但偶爾會翻錯：有人說「去冰」，她聽成「微冰」，覺得差不多就做成同一杯。'],
+      limit: ['店員的翻譯靠經驗、因人而異；JavaScript 的轉型規則是寫死在規格裡的，完全可以預測，只是規則多到沒人想背。這也是實務上直接用 `===` 的原因：不是 `==` 不可預測，而是預測它的成本太高。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="比較流程：用三個等號時，型別不同直接是 false；用兩個等號時，型別不同要先轉型：數字遇到字串把字串轉成數字，遇到布林把布林轉成數字，null 和 undefined 只等於彼此">
+        <rect x="10" y="10" width="250" height="280" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="50" text-anchor="middle" font-size="24" font-weight="900" class="mono on-color">===</text>
+        <text x="135" y="110" text-anchor="middle" font-size="17" class="on-color">型別不同？</text>
+        <text x="135" y="140" text-anchor="middle" font-size="17" class="on-color">直接 false</text>
+        <text x="135" y="200" text-anchor="middle" font-size="17" class="on-color">型別相同？</text>
+        <text x="135" y="230" text-anchor="middle" font-size="17" class="on-color">比較值</text>
+        <rect x="290" y="10" width="260" height="280" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+        <text x="420" y="50" text-anchor="middle" font-size="24" font-weight="900" class="mono on-color">==</text>
+        <text x="310" y="100" font-size="16" class="on-color">數字 vs 字串</text>
+        <text x="310" y="124" font-size="16" class="on-color">→ 字串轉數字</text>
+        <text x="310" y="164" font-size="16" class="on-color">有布林</text>
+        <text x="310" y="188" font-size="16" class="on-color">→ 布林轉數字</text>
+        <text x="310" y="228" font-size="16" class="on-color">null、undefined</text>
+        <text x="310" y="252" font-size="16" class="on-color">→ 只等於彼此</text>
+      </svg>`,
+      caption: '`===` 只有一條規則；`==` 有一串規則，而且還有例外。',
+      blocks: [
+        '[[嚴格相等]] `===` 不做任何[[型別轉換]]；[[寬鬆相等]] `==` 會在型別不同時先轉型。另外 [[NaN]] 是唯一不等於自己的值，`===` 也判斷不了它；用 `Number.isNaN(x)`。`Object.is` 和 `===` 幾乎一樣，只差兩點：`Object.is(NaN, NaN)` 是 true、`Object.is(0, -0)` 是 false。',
+        { type: 'widget', name: 'coerce', props: { presets: COERCE_EQUALITY } },
+      ],
+    },
+    define: [
+      { term: '嚴格相等', en: 'strict equality', def: '`===` 與 `!==`，不轉型。', example: '`1 === "1"` 是 false。' },
+      { term: '寬鬆相等', en: 'loose equality', def: '`==` 與 `!=`，型別不同時先轉型。', example: '`1 == "1"` 是 true。' },
+      { term: 'Number.isNaN', en: 'Number.isNaN', def: '只在值真的是 NaN 時回傳 true。', example: "`Number.isNaN('abc')` 是 false；舊的 `isNaN('abc')` 會先轉型而得到 true。" },
+    ],
+    examples: {
+      compare: [{
+        title: '檢查使用者有沒有輸入數量',
+        kind: '== vs ===',
+        code: true,
+        badLabel: '用 ==',
+        goodLabel: '用 ===',
+        bad: "const qty = input.value; // 使用者沒填：''\nif (qty {{1:==}} 0) {\n  alert('數量不能是 0');\n}",
+        good: "const qty = input.value;\nif (qty === '') alert('請輸入數量');\nelse if (Number(qty) {{1:===}} 0) alert('數量不能是 0');",
+        badResult: '沒填（空字串）也被當成 0，提示訊息講錯了。',
+        goodResult: '「沒填」和「填了 0」分開處理。',
+        why: ['`\'\' == 0` 是 true：空字串會被轉成 0'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "console.log(1 == '1', 1 === '1');\nconsole.log(0 == '', 0 === '');\nconsole.log(NaN === NaN, Number.isNaN(NaN));\nconsole.log(Number.isNaN('abc'), isNaN('abc'));",
+          predict: { q: "最後一行 `Number.isNaN('abc')` 和 `isNaN('abc')` 各是？", options: ['true true', 'false true', 'false false'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="實務規則：比較一律用三個等號；唯一常見例外是 x 雙等號 null，它剛好等於 x 是 null 或 undefined；判斷 NaN 用 Number.isNaN">
+          <rect x="10" y="10" width="170" height="200" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="22" font-weight="900" class="mono on-color">===</text>
+          <text x="95" y="110" text-anchor="middle" font-size="16" class="on-color">一律用這個</text>
+          <rect x="195" y="10" width="170" height="200" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">x == null</text>
+          <text x="280" y="110" text-anchor="middle" font-size="16" class="on-color">唯一常見例外</text>
+          <text x="280" y="140" text-anchor="middle" font-size="16" class="on-color">null 或 undefined</text>
+          <rect x="380" y="10" width="170" height="200" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="18" font-weight="900" class="mono on-color">Number.isNaN</text>
+          <text x="465" y="110" text-anchor="middle" font-size="16" class="on-color">判斷 NaN</text>
+        </svg>`, caption: '三條實務規則。很多團隊用 lint 規則（例如 ESLint 的 eqeqeq）強制只用 `===`。' },
+      ],
+      tryit: {
+        q: ['補完 `isMissing(v)`：v 是 null 或 undefined 時回傳 true，其他（包括 0、空字串）都回傳 false。'],
+        draft: 'function isMissing(v) {\n  return ____;\n}',
+        answer: ['`v === null || v === undefined`，或簡寫成 `v == null`。', '`v == null` 是 `==` 少數被廣泛接受的用法，因為它剛好只等於 null 和 undefined。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `x === NaN` 檢查計算失敗。', why: 'NaN 不等於任何值，這個條件永遠是 false。', right: '用 `Number.isNaN(x)`。' },
+      { wrong: '用舊的 `isNaN("abc")` 判斷是不是數字。', why: '`isNaN` 會先把參數轉成數字，非數字字串都會得到 true，語意混亂。', right: '先 `Number(x)` 再 `Number.isNaN`，意圖清楚。' },
+      { wrong: '覺得 `==` 比較寬容、比較方便。', why: '它的例外（例如 `null == 0` 是 false、`"" == 0` 是 true）會在你沒想到的地方出錯。', right: '一律 `===`；只有 `x == null` 這個慣用寫法例外。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`null == 0` 的結果是？', options: [
+        { text: 'false', correct: true, why: '`==` 對 null 有特別規則：只等於 null 和 undefined，不會被轉成 0。' },
+        { text: 'true，因為 Number(null) 是 0', why: 'Number(null) 確實是 0，但 `==` 比較時不會對 null 做這個轉換。' },
+        { text: '拋出 TypeError', why: '比較運算不會因為 null 拋錯。' },
+        { text: 'undefined', why: '比較運算一定回傳 true 或 false。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`[] == false` 的結果與原因是？', options: [
+        { text: 'true：false 轉成 0、[] 轉成空字串再轉成 0', correct: true, why: '一連串轉型後變成 `0 == 0`（Node.js 22.13 實測 true）。' },
+        { text: 'false：空陣列是 truthy，不可能等於 false', why: '`==` 不看 truthy／falsy，而是照轉型規則轉成數字比較，兩件事規則不同。' },
+        { text: 'true：空陣列沒有元素，所以等於 false', why: '結果對了但理由錯了：`==` 不會去看陣列有沒有元素。' },
+        { text: '拋出 TypeError：不能比較物件與布林', why: 'JavaScript 允許任何型別互相比較。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['React 判斷 state 有沒有變化，用的是 `Object.is` 而不是 `===`。舉出一個這兩者結果不同、而且對 React 有意義的例子。'], answer: [
+        '`NaN`：如果 state 是 NaN、又設成 NaN，`===` 會說「不相等」（NaN !== NaN），React 就會白白重新渲染；`Object.is(NaN, NaN)` 是 true，正確地判斷「沒變」。',
+        '另一個差異是 `0` 與 `-0`：`Object.is` 認為不同，`===` 認為相同；實務上很少遇到。',
+      ] },
+    ],
+    keypoints: [
+      '`===` 不轉型、型別不同就是 false；`==` 會先依一串規則轉型，實務上一律用 `===`。',
+      'null 在 `==` 下只等於 null 與 undefined；`x == null` 是唯一常見的 `==` 用法。',
+      'NaN 不等於自己，判斷要用 `Number.isNaN`。',
+    ],
+    sources: ['mdn-equality'],
+  },
+
+  '3-2': {
+    goals: [
+      '說出八個 falsy 值',
+      '分清 `||` 與 `??` 在 0、空字串時的差別',
+      '用 `?.` 安全地讀可能不存在的屬性',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: "（回顧 3-1）`0 == ''` 是 true 的原因是？", options: [
+        { text: '空字串被轉成數字 0', correct: true, why: 'number 遇到 string 時，字串轉成數字，`Number(\'\')` 是 0。' },
+        { text: '0 被轉成空字串', why: '方向反了：是字串轉成數字。' },
+        { text: '兩者都是 falsy', why: '`==` 不是比 truthy／falsy，是照轉型規則轉成數字。' },
+        { text: '兩者的 typeof 相同', why: 'typeof 分別是 number 與 string，不同。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-4）預設參數 `function f(v = 10)`，呼叫 `f(null)` 時 v 是？', options: [
+        { text: '`null`', correct: true, why: '預設參數只對 undefined 生效。' },
+        { text: '`10`', why: '那是 `f()` 或 `f(undefined)` 的結果。' },
+        { text: '`0`', why: 'null 不會被轉成數字。' },
+        { text: '拋出 TypeError', why: '傳 null 是合法的。' },
+      ] },
+    ],
+    analogy: {
+      text: ['門口的保全有兩種：一種只要你「看起來不像客人」就攔下來，包括拿著空購物袋、口袋裡零元的人（`||` 把所有 falsy 都當成「沒有」）；另一種只攔「根本沒人」的情況（`??` 只把 null、undefined 當成「沒有」）。'],
+      limit: ['保全會看情況放行，運算子不會：`||` 遇到 0 一定換成右邊，就算 0 是使用者故意設定的值。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="八個 falsy 值：false、0、負 0、0n、空字串、null、undefined、NaN；其他全部是 truthy，包括字串 0、字串 false、空陣列、空物件">
+        <rect x="10" y="10" width="270" height="280" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="145" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">falsy（只有 8 個）</text>
+        <text x="30" y="92" font-size="18" class="mono on-color">false　0　-0</text>
+        <text x="30" y="136" font-size="18" class="mono on-color">0n　''</text>
+        <text x="30" y="180" font-size="18" class="mono on-color">null</text>
+        <text x="30" y="224" font-size="18" class="mono on-color">undefined</text>
+        <text x="30" y="268" font-size="18" class="mono on-color">NaN</text>
+        <rect x="300" y="10" width="250" height="280" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="425" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">其他都是 truthy</text>
+        <text x="320" y="92" font-size="18" class="mono on-color">'0'　'false'</text>
+        <text x="320" y="136" font-size="18" class="mono on-color">[]　{}</text>
+        <text x="320" y="180" font-size="18" class="mono on-color">-1　Infinity</text>
+        <text x="320" y="224" font-size="17" class="on-color">所有物件</text>
+        <text x="320" y="268" font-size="17" class="on-color">所有非空字串</text>
+      </svg>`,
+      caption: '[[falsy]] 的清單很短，背下來比背 [[truthy]] 容易：不在左邊的都是 truthy。',
+      blocks: [
+        '`||` 會在左邊是**任何 falsy** 時改用右邊；[[空值合併]] `??` 只在左邊是 null 或 undefined 時才換。兩者都是[[短路求值]]：回傳的是「最後看到的那個值」，不一定是 true／false。[[可選串連]] `?.` 則讓你安全地往下讀：左邊是 null 或 undefined 時，直接得到 undefined，不拋錯。',
+      ],
+    },
+    define: [
+      { term: 'falsy', en: 'falsy', def: '在需要真假的地方被當成 false 的值，只有八個。', example: '`if (0)`、`if ("")` 都不會進去。' },
+      { term: '空值合併', en: 'nullish coalescing', def: '`a ?? b`：a 是 null 或 undefined 才回傳 b。', example: '`0 ?? 50` 是 0。' },
+      { term: '可選串連', en: 'optional chaining', def: '`a?.b`、`a?.()`：a 是 null 或 undefined 時得到 undefined。', example: '`user.profile?.name`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '使用者把音量設成 0',
+        kind: '|| vs ??',
+        code: true,
+        badLabel: '用 ||',
+        goodLabel: '用 ??',
+        bad: "const volume = settings.volume {{1:||}} 50;\n// 設定是 0 → 得到 50（錯）",
+        good: "const volume = settings.volume {{1:??}} 50;\n// 設定是 0 → 得到 0；沒設定 → 50",
+        badResult: '0 是 falsy，`||` 把「刻意設成 0」當成「沒有設定」。',
+        goodResult: '`??` 只在真的沒有值時才用預設。',
+        why: ['合法值可能是 0、空字串、false 時，一律用 ??'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "const volume = 0;\nconsole.log(volume || 50, volume ?? 50);\nconsole.log(Boolean(''), Boolean('0'), Boolean([]));\nconst user = { profile: null };\nconsole.log(user.profile?.name, user.settings?.theme ?? 'light');\nconsole.log(0 || null || 'x', 1 && 2 && 3);",
+          predict: { q: '第二行 `volume || 50` 和 `volume ?? 50` 各是？', options: ['0 0', '50 0', '50 50'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="三個運算子對照表：左邊是 0 時，或運算回傳右邊，空值合併回傳 0；左邊是空字串時，或運算回傳右邊，空值合併回傳空字串；左邊是 null 時，兩者都回傳右邊">
+          <rect x="10" y="10" width="540" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="40" y="43" font-size="18" font-weight="900">左邊是</text>
+          <text x="250" y="43" font-size="18" font-weight="900" class="mono">a || b</text>
+          <text x="420" y="43" font-size="18" font-weight="900" class="mono">a ?? b</text>
+          <rect x="10" y="70" width="540" height="50" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="40" y="103" font-size="18" class="mono on-color">0</text>
+          <text x="250" y="103" font-size="18" class="mono on-color">b</text>
+          <text x="420" y="103" font-size="18" class="mono on-color">0</text>
+          <rect x="10" y="130" width="540" height="50" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="40" y="163" font-size="18" class="mono on-color">''</text>
+          <text x="250" y="163" font-size="18" class="mono on-color">b</text>
+          <text x="420" y="163" font-size="18" class="mono on-color">''</text>
+          <rect x="10" y="190" width="540" height="40" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="40" y="217" font-size="18" class="mono">null</text>
+          <text x="250" y="217" font-size="18" class="mono">b</text>
+          <text x="420" y="217" font-size="18" class="mono">b</text>
+        </svg>`, caption: '差別只發生在「左邊是 falsy 但不是 null／undefined」的時候：0、空字串、false、NaN。' },
+      ],
+      tryit: {
+        q: ['補完下面這行：讀 `order.coupon.code`，coupon 可能不存在；沒有時要得到 `"無"`，code 是空字串時要保留空字串。'],
+        draft: "const code = order.coupon____code ____ '無';",
+        answer: ["`order.coupon?.code ?? '無'`。", '`?.` 處理 coupon 不存在，`??` 只換掉 undefined，空字串會被保留（用 `||` 就會被換成「無」）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '寫 `if (count)` 檢查有沒有值。', why: 'count 合法地等於 0 時也進不去。', right: '寫 `if (count != null)`，或明確寫 `count !== undefined`。' },
+      { wrong: '寫 `if (list)` 判斷陣列是不是空的。', why: '空陣列是物件，是 truthy，這個條件永遠成立。', right: '寫 `if (list.length > 0)`。' },
+      { wrong: '以為 `a || b` 一定回傳 true 或 false。', why: '它回傳的是其中一個運算元本身。', right: '要布林值就用 `Boolean(a || b)` 或 `!!(a || b)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: "`Boolean('false')` 是？", options: [
+        { text: 'true', correct: true, why: '非空字串都是 truthy，內容寫什麼不重要。' },
+        { text: 'false', why: '這是最常見的誤會：字串內容不會被解讀成布林。' },
+        { text: '拋出 TypeError', why: 'Boolean 可以接受任何值。' },
+        { text: "`'false'`", why: 'Boolean() 一定回傳布林值。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`0 || null || "x"` 的結果是？', options: [
+        { text: "`'x'`", correct: true, why: '`||` 由左往右，回傳第一個 truthy；前兩個都是 falsy，所以是 "x"。' },
+        { text: '`true`', why: '`||` 回傳的是運算元本身，不是 true。' },
+        { text: '`0`', why: '0 是 falsy，會繼續往右找。' },
+        { text: '`null`', why: 'null 也是 falsy，還會繼續往右。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['表單有一欄「備註」（可以留空）和一欄「數量」（可以填 0）。後端說「沒填就傳 undefined，有填就照填的值傳」。寫出把兩欄轉成要傳的值的程式，並說明為什麼不能用 `||`。'], answer: [
+        "參考：`const note = form.note === '' ? undefined : form.note;`、`const qty = form.qty === '' ? undefined : Number(form.qty);`",
+        '不能用 `form.note || undefined`：使用者真的填了內容就沒事，但數量填 0 時，`Number(form.qty) || undefined` 會把合法的 0 變成 undefined。判斷「沒填」要明確比較空字串，而不是靠 falsy。',
+      ] },
+    ],
+    keypoints: [
+      'falsy 只有八個：false、0、-0、0n、空字串、null、undefined、NaN；其他都是 truthy，包括 "0"、[]、{}。',
+      '`||` 把所有 falsy 換成預設，`??` 只換 null 與 undefined；合法值可能是 0 或空字串時用 `??`。',
+      '`?.` 讓讀取可能不存在的屬性時不拋錯；`||`、`&&`、`??` 回傳的是運算元本身。',
+    ],
+    sources: ['mdn-nullish'],
+  },
+
+  '3-3': {
+    goals: [
+      '預測 `+` 遇到字串與數字混合時的結果',
+      '分清 `Number()` 與 `parseInt()` 的差別',
+      '把表單輸入正確地轉成數字',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-2）`settings.volume ?? 50`，volume 是 0 時得到？', options: [
+        { text: '`0`', correct: true, why: '`??` 只換 null 與 undefined。' },
+        { text: '`50`', why: '那是 `||` 的結果。' },
+        { text: '`undefined`', why: 'volume 有值，就是 0。' },
+        { text: '`false`', why: '`??` 回傳運算元本身，不會變成布林。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-2）`0.29 * 100` 的結果為什麼不是 29？', options: [
+        { text: '0.29 在二進位寫不完，存進去就有誤差', correct: true, why: '實際結果是 28.999999999999996。' },
+        { text: '乘法會自動四捨五入', why: 'JavaScript 不會自動捨入。' },
+        { text: '因為 0.29 是字串', why: '這裡兩邊都是 number。' },
+        { text: '超過安全整數範圍', why: '29 遠小於安全整數上限。' },
+      ] },
+    ],
+    analogy: {
+      text: ['把「5 顆蘋果」和「2」交給一個只會照規則做事的店員：如果其中一個是寫在紙上的字，她就把它們貼在一起變成「52」；如果你明確說「乘」，她就先把兩個都當數字算出 10。她不會猜你想要哪個，只看「有沒有字」和「是什麼運算」。'],
+      limit: ['真的店員會問你「你是要加起來還是寫在一起？」；JavaScript 不會問，`+` 遇到字串一律相接，所以從表單讀進來的數字一定要先轉型。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="加號的判斷：先看兩邊有沒有字串，有就字串相接，沒有就數字相加；其他算術運算子減乘除一律把兩邊轉成數字。運算由左往右逐步決定">
+        <rect x="10" y="10" width="250" height="260" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="50" text-anchor="middle" font-size="26" font-weight="900" class="mono on-color">+</text>
+        <text x="135" y="100" text-anchor="middle" font-size="17" class="on-color">有一邊是字串？</text>
+        <text x="135" y="134" text-anchor="middle" font-size="17" class="on-color">→ 字串相接</text>
+        <text x="135" y="184" text-anchor="middle" font-size="17" class="on-color">都不是字串？</text>
+        <text x="135" y="218" text-anchor="middle" font-size="17" class="on-color">→ 數字相加</text>
+        <rect x="290" y="10" width="260" height="260" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="420" y="50" text-anchor="middle" font-size="26" font-weight="900" class="mono on-color">-  *  /</text>
+        <text x="420" y="110" text-anchor="middle" font-size="17" class="on-color">一律轉成數字</text>
+        <text x="420" y="150" text-anchor="middle" font-size="17" class="on-color">轉不成功</text>
+        <text x="420" y="180" text-anchor="middle" font-size="17" class="on-color">就是 NaN</text>
+      </svg>`,
+      caption: '`+` 是唯一「看到字串就改做別的事」的算術運算子；而且運算由左往右，一步一步決定。',
+      blocks: [
+        { type: 'widget', name: 'coerce', props: { presets: COERCE_PLUS } },
+        { type: 'table', caption: '三種把字串轉成數字的方法（2026-10-14 在 Node.js 22.13 實測）', head: ['輸入', '`Number(x)`', '`parseInt(x, 10)`', '`parseFloat(x)`'], rows: [
+          ["`'42'`", '42', '42', '42'],
+          ["`''`", '**0**', 'NaN', 'NaN'],
+          ["`' 42 '`", '42', '42', '42'],
+          ["`'42px'`", 'NaN', '42', '42'],
+          ["`'3.14abc'`", 'NaN', '3', '3.14'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'Number()', en: 'Number()', def: '把整個值轉成數字；有任何不是數字的字元就是 NaN；空字串是 0。', example: "`Number('42px')` 是 NaN。" },
+      { term: 'parseInt()', en: 'parseInt()', def: '從頭讀到不是數字為止，取整數部分；第二個參數是進位制，一律寫 10。', example: "`parseInt('42px', 10)` 是 42。" },
+      { term: '一元加號', en: 'unary plus', def: '`+x` 等於 `Number(x)`，寫法短但不好讀。', example: "`+'7'` 是 7。" },
+    ],
+    examples: {
+      compare: [{
+        title: '表單年齡判斷',
+        kind: '沒轉型 vs 先轉型',
+        code: true,
+        badLabel: '直接用 input.value',
+        goodLabel: '先 Number()',
+        bad: "const age = input.value;      // '17'\nif ({{1:age + 1}} > 18) { /* 通過 */ }\n// '17' + 1 是 '171'，171 > 18",
+        good: "const age = Number(input.value);\nif ({{1:age + 1}} > 18) { /* 不通過 */ }\n// 17 + 1 是 18",
+        badResult: '`input.value` 一定是字串，`+ 1` 變成字串相接，17 歲也通過了。',
+        goodResult: '先轉成數字，`+` 才是加法。',
+        why: ['表單、網址參數、localStorage 讀出來的都是字串'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "const age = '17';\nconsole.log(age + 1, age + 1 > 18);\nconsole.log(Number(age) + 1 > 18);\nconsole.log('10' > '9', 10 > '9');",
+          predict: { q: "最後一行 `'10' > '9'` 是？", options: ['true', 'false'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="字串比較是字典順序：比較 10 和 9 兩個字串時，先比第一個字元 1 和 9，1 排在 9 前面，所以 10 小於 9">
+          <rect x="10" y="10" width="250" height="180" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="135" y="50" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">'10' &gt; '9'</text>
+          <text x="135" y="100" text-anchor="middle" font-size="16" class="on-color">比第一個字元</text>
+          <text x="135" y="130" text-anchor="middle" font-size="16" class="on-color">'1' 排在 '9' 前</text>
+          <text x="135" y="164" text-anchor="middle" font-size="18" font-weight="900" class="on-color">false</text>
+          <rect x="300" y="10" width="250" height="180" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="425" y="50" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">10 &gt; '9'</text>
+          <text x="425" y="100" text-anchor="middle" font-size="16" class="on-color">有一邊是數字</text>
+          <text x="425" y="130" text-anchor="middle" font-size="16" class="on-color">'9' 轉成 9</text>
+          <text x="425" y="164" text-anchor="middle" font-size="18" font-weight="900" class="on-color">true</text>
+        </svg>`, caption: '兩邊都是字串時比的是字典順序；有一邊是數字才轉成數字比大小。4-4 的 `sort()` 也會遇到同一件事。' },
+      ],
+      tryit: {
+        q: ['補完 `toQty(raw)`：把表單的字串轉成數量；空字串或不是數字時回傳 `null`。'],
+        draft: "function toQty(raw) {\n  if (raw.trim() === '') return null;\n  const n = ____;\n  return Number.isNaN(n) ? null : n;\n}",
+        answer: ['`Number(raw)`。', '先單獨處理空字串，因為 `Number(\'\')` 是 0 而不是 NaN；接著 `Number` 會把 "12px" 這種不完整的輸入變成 NaN，比 parseInt 嚴格，適合驗證輸入。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 `input.value` 直接拿來做加法。', why: '它永遠是字串，`+` 會變成相接。', right: '先 `Number(input.value)`，再檢查是不是 NaN。' },
+      { wrong: '用 `parseInt` 驗證使用者輸入是不是數字。', why: "`parseInt('12abc', 10)` 會得到 12，看起來合法，其實輸入有錯。", right: '驗證用 `Number()`；從「12px」這種已知格式取數字才用 parseInt。' },
+      { wrong: '寫 `parseInt(x)` 不給進位制。', why: '現代引擎多半當成十進位，但意圖不明確，lint 也會警告。', right: '一律寫 `parseInt(x, 10)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: "`5 + 2 + '3'` 的結果是？", options: [
+        { text: "`'73'`", correct: true, why: '由左往右：5 + 2 = 7，7 + "3" 是字串相接。' },
+        { text: "`'523'`", why: '那要從一開始就是字串；這裡前兩個是數字，先相加。' },
+        { text: '`10`', why: '"3" 是字串，最後一步是相接，不是相加。' },
+        { text: '`NaN`', why: '`+` 遇到字串會相接，不會產生 NaN。' },
+      ] },
+      { level: '應用', type: 'mc', q: "`Number('')` 與 `parseInt('', 10)` 各是？", options: [
+        { text: '0 與 NaN', correct: true, why: 'Number 把空字串當成 0；parseInt 讀不到任何數字就是 NaN。' },
+        { text: 'NaN 與 NaN', why: 'Number 對空字串是特例，結果是 0。' },
+        { text: '0 與 0', why: 'parseInt 找不到數字時是 NaN。' },
+        { text: '兩者都拋出錯誤', why: '轉型函式不會拋錯，失敗就給 NaN。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ["網址 `?page=2` 讀進來後，程式寫 `const next = params.get('page') + 1`，結果下一頁連結變成 `page=21`。說明原因並修正；再想想：如果網址沒有 page 參數，你的修正版會得到什麼？"], answer: [
+        "`params.get` 回傳字串 \"2\"，`+ 1` 是字串相接得到 \"21\"。修正：`const page = Number(params.get('page') ?? 1); const next = page + 1;`",
+        '沒有 page 參數時 `params.get` 回傳 null，`?? 1` 讓它變成 1，下一頁是 2。如果寫成 `Number(params.get(\'page\'))` 沒有預設值，`Number(null)` 是 0，下一頁會變成 1，看起來正常其實是 bug。',
+      ] },
+    ],
+    keypoints: [
+      '`+` 只要有一邊是字串就相接，`-`、`*`、`/` 一律轉成數字；運算由左往右逐步決定。',
+      '`Number()` 嚴格（"42px" 是 NaN、空字串是 0），`parseInt(x, 10)` 從頭讀到不是數字為止。',
+      '表單、網址、localStorage 讀出來的都是字串，計算前先轉型並檢查 NaN。',
+    ],
+    sources: ['mdn-equality', 'mdn-number'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
    App：狀態、路由、版面
    ========================================================================== */
 (() => {
@@ -3292,8 +4577,11 @@ Widgets.runner = {
     let frame = $('.run-frame', el);
     let lineCount = 0;
     let token = '';
+    let placeholder = null;
     const add = (kind, text) => {
       if (lineCount >= RUN_MAX_LINES) return;
+      // 輸出比等待時間晚到時，拿掉「沒有任何輸出」
+      if (placeholder) { placeholder.remove(); placeholder = null; }
       lineCount += 1;
       const span = document.createElement('span');
       span.className = `ln${kind === 'err' ? ' err' : ''}`;
@@ -3317,6 +4605,7 @@ Widgets.runner = {
       runSeq += 1;
       token = `run-${runSeq}`;
       lineCount = 0;
+      placeholder = null;
       out.textContent = '';
       verdict.className = 'run-verdict';
       verdict.textContent = '';
@@ -3333,7 +4622,12 @@ Widgets.runner = {
       if (old) old.replaceWith(frame); else out.before(frame);
       window.setTimeout(() => {
         if (!document.body.contains(el)) return;
-        if (!lineCount) add('log', '（沒有任何輸出）');
+        if (!lineCount) {
+          placeholder = document.createElement('span');
+          placeholder.className = 'ln dim';
+          placeholder.textContent = '（目前沒有輸出）';
+          out.appendChild(placeholder);
+        }
         judge();
       }, props.wait || RUN_WAIT_MS);
     }
@@ -3823,9 +5117,9 @@ Sections.reference = (c, lesson) => `<div class="blocks" style="--chip:var(--m${
 
 /* ---------- 元件樣式表 ---------- */
 Views.styleguide = () => {
-  const sampleQuiz = { type: 'mc', level: '應用', q: '`ls -la` 裡的 `-la` 是哪一種零件？', options: [
-    { text: '參數，代表要列出的資料夾', why: '參數通常是要處理的對象；-開頭的是選項。' },
-    { text: '兩個短選項合併寫成一個', correct: true, why: '`-la` 等於 `-l -a`：詳細格式＋包含隱藏檔。' },
+  const sampleQuiz = { type: 'mc', level: '應用', q: '`typeof []` 的結果是？', options: [
+    { text: "`'array'`", why: 'typeof 沒有 array 這個結果；陣列是物件。' },
+    { text: "`'object'`", correct: true, why: '陣列是物件的一種；判斷陣列要用 `Array.isArray`。' },
   ] };
   return `<div class="content">
     <header class="lesson-head" style="--chip:var(--neutral)"><span class="lid-big">SG</span><h1>元件樣式表</h1></header>
@@ -3871,7 +5165,7 @@ Views.styleguide = () => {
         ${['analogy', 'limit', 'define', 'mistake', 'keypoints', 'legacy', 'tip', 'danger'].map((v) => renderBlock({ type: 'callout', variant: v, title: v, body: ['提示框內文，可以放 `程式碼`、==螢光標記== 和 [連結](https://developer.mozilla.org/zh-TW/docs/Web/JavaScript)。'] })).join('')}
         ${renderBlock({ type: 'unverified', body: ['這是未確認的項目。'] })}
         ${renderBlock({ type: 'timely', body: ['這是會過期的資訊。'] })}
-        ${renderBlock({ type: 'legacy', rows: [['`/cost`', '`/usage`（`/cost` 是別名）'], ['參考站固定寬度側欄', '可拖曳側欄']] })}
+        ${renderBlock({ type: 'legacy', rows: [['`var`', '`const`／`let`'], ['`arr.sort()`（改原陣列）', '`arr.toSorted()`']] })}
       </div>
     </section>
 
@@ -3888,7 +5182,7 @@ Views.styleguide = () => {
     </section>
 
     <section class="sg-block"><h2>分頁</h2>
-      ${tabsBlock({ label: '作業系統', tabs: [{ label: 'macOS', blocks: ['Seatbelt 沙箱'] }, { label: 'Linux／WSL2', blocks: ['bubblewrap ＋ socat'] }, { label: 'Windows', blocks: ['原生不支援，改用 WSL2'] }] })}
+      ${tabsBlock({ label: '執行環境', tabs: [{ label: '瀏覽器', blocks: ['有 `document`、`localStorage`'] }, { label: 'Node.js', blocks: ['有 `fs`、`process`'] }, { label: '兩邊都有', blocks: ['`setTimeout`、`fetch`'] }] })}
     </section>
 
     <section class="sg-block"><h2>摺疊與測驗</h2>
@@ -3899,7 +5193,7 @@ Views.styleguide = () => {
     </section>
 
     <section class="sg-block"><h2>表格</h2>
-      ${tableBlock({ head: ['模式', '不經詢問', '適用'], rows: [['`default`', '只有讀取', '敏感工作'], ['`auto`', '全部＋分類器審查', '長任務'], ['`bypassPermissions`', '全部', '只限隔離環境']] })}
+      ${tableBlock({ head: ['宣告', '作用域', '重新指定'], rows: [['`var`', '函式', '可以'], ['`let`', '區塊', '可以'], ['`const`', '區塊', '不行']] })}
     </section>
 
     <section class="sg-block"><h2>檢查清單</h2>

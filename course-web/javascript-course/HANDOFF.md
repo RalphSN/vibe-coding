@@ -1,7 +1,7 @@
 # 交接文件：JavaScript 著作（互動課程網站）
 
 > 更新：2026-10-14
-> 一句話現況：**骨架、互動元件與模組 0（3 課）完成並在 Chrome 驗證；模組 1–9（35 課）待寫。**
+> 一句話現況：**骨架、互動元件、模組 0–3（13 課）完成並在 Chrome 驗證，已上書櫃（顯示 13/38 製作中）；模組 4–9（25 課）待寫。**
 
 ## 0. 新 session 的開場 prompt（直接貼）
 
@@ -45,11 +45,14 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - [x] 骨架：站名、品牌、儲存 key、`--m9`、首頁三個問題、`COURSES`（38 課）、參考資料
 - [x] 互動元件 11 個（f-widgets.js、b-widgets.css）
 - [x] 模組 0（0-1～0-3）
-- [ ] 模組 1～8 內容（每 2–3 個模組自我檢查一次）
+- [x] 模組 1（1-1～1-4）
+- [x] 模組 2（2-1～2-3）、模組 3（3-1～3-3，含 coerce）
+- [x] 書櫃入口（3D `index.html` 與 2D `index-2d.html`；`readyLessons` 每完成一批就更新）
+- [ ] 模組 4～8 內容（每 2–3 個模組自我檢查一次）
 - [ ] 模組 9：9-1 期末實作、9-2～9-4 reference 版型
 - [ ] 第 4 階段驗證（verification.md 全部）
 - [ ] 得獎等級自我檢查迴圈
-- [ ] 加進書櫃（`index.html`、`index-2d.html` 的 `SITES`）
+- [ ] 全部完成後把兩個書櫃的 `readyLessons` 改成 38
 
 ## 3. 資料格式（本課新增）
 
@@ -81,7 +84,7 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - **audit.mjs 沒跑**：需要 Playwright，這台電腦沒有安裝（全域安裝要先問使用者）。改用內建瀏覽器手動檢查。
 - Chrome（內建瀏覽器，新分頁）：0 個 console 錯誤；0-1～0-3 每課 2 張 SVG、0 個缺漏術語、無水平溢出；樣式表頁 6 個元件都初始化。
 - 實際操作：runner（0-3 印出「開始」「92」再拋 TypeError，預測判定正確；0-1 印出 object／undefined／9）、mutator（sort 改原陣列、toSorted 不改）、floatbits（0.1 實際存 0.1000000000000000055511151）、thisfinder、bubble（含 stopPropagation，修過一次 bug）。
-- 尚未實際操作：refviz、coerce、protochain、loopsim、racer、classify（等用到的模組再測）。
+- coerce 已在 3-1、3-3 實際操作。尚未實際操作：refviz、protochain、loopsim、racer（等用到的模組再測）。
 
 ## 5. 已知問題
 
@@ -90,4 +93,11 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 
 ## 6. 下一步
 
-寫 `src/m1.html`（模組 1：值與型別，含 floatbits），接著 m2、m3，三個模組做完跑一次自我檢查並回報。
+寫 `src/m4.html`（模組 4：物件與陣列，5 課，用 refviz、mutator），接著 `src/m5.html`（模組 5：函式與物件模型，用 thisfinder、protochain）。做完更新兩個書櫃的 `readyLessons`、跑第 4 節的檢查並回報。
+
+### 每批的檢查流程（2026-10-15 實際使用）
+
+1. build 後用 `vm.Script` 檢查每個 `<script>`：0 個語法錯誤。
+2. 在內建瀏覽器打開課程，對新課逐一：數 SVG（≥ 2）、找 `.term-missing`（0）、檢查水平溢出、按每個 runner 的「執行」並把輸出和 `predict.answer` 對照。
+3. 全站算「正確答案是最長選項」的比例（≤ 35%；2026-10-15 為 13/43）。
+4. 360px 寬再跑一次溢出檢查。
