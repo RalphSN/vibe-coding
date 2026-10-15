@@ -1,0 +1,406 @@
+<script>
+/* ==========================================================================
+   模組 3：比較與轉型
+   ========================================================================== */
+defineTerms({
+  '型別轉換': { en: 'type coercion', def: '運算時，JavaScript 自動把一個型別的值轉成另一個型別。', example: '`"5" * "2"` 先把兩個字串轉成數字，得到 10。' },
+  '寬鬆相等': { en: 'loose equality', def: '`==`：型別不同時先依規則轉型，再比較。', example: '`0 == ""` 是 true。' },
+  '嚴格相等': { en: 'strict equality', def: '`===`：不轉型，型別和值都相同才是 true。', example: '`0 === ""` 是 false。' },
+  'NaN': { en: 'Not a Number', def: '無效的數字計算結果，例如把 "abc" 轉成數字。它是唯一不等於自己的值。', example: '`NaN === NaN` 是 false，要用 `Number.isNaN`。' },
+  'truthy': { en: 'truthy', def: '放在 if、||、&& 這類需要真假的地方時，會被當成 true 的值。', example: '`"0"`、`[]`、`{}` 都是 truthy。' },
+  'falsy': { en: 'falsy', def: '會被當成 false 的值，只有八個：false、0、-0、0n、""、null、undefined、NaN。', example: '`if (0)` 不會進去。' },
+  '空值合併': { en: 'nullish coalescing', def: '`??`：左邊是 null 或 undefined 才用右邊。', example: '`0 ?? 50` 是 0。' },
+  '可選串連': { en: 'optional chaining', def: '`?.`：左邊是 null 或 undefined 時直接得到 undefined，不拋錯。', example: '`user.profile?.name`。' },
+  '短路求值': { en: 'short-circuit evaluation', def: '`||`、`&&`、`??` 一旦能決定結果就停止，並回傳最後看到的那個值，而不一定是 true／false。', example: '`0 || "x"` 回傳 "x"；`1 && 2 && 3` 回傳 3。' },
+});
+
+const COERCE_EQUALITY = [
+  { expr: "1 == '1'", steps: ['左邊是 number，右邊是 string：**把字串轉成數字**。', "`Number('1')` 是 `1`。", '變成 `1 == 1`。'], result: 'true' },
+  { expr: "0 == ''", steps: ['number 遇到 string：把字串轉成數字。', "`Number('')` 是 `0`（空字串轉成 0）。", '變成 `0 == 0`。'], result: 'true' },
+  { expr: "'' == '0'", steps: ['兩邊**都是字串**：不轉型，直接比內容。', "空字串和 `'0'` 內容不同。"], result: 'false' },
+  { expr: 'null == 0', steps: ['`null` 在 `==` 下有特別規則：**只等於 null 和 undefined**。', '不會被轉成數字 0。'], result: 'false' },
+  { expr: 'null == undefined', steps: ['特別規則：null 與 undefined 在 `==` 下互相相等。'], result: 'true' },
+  { expr: 'NaN == NaN', steps: ['NaN 不等於任何值，**包括自己**。', '判斷 NaN 要用 `Number.isNaN(x)` 或 `Object.is(x, NaN)`。'], result: 'false' },
+  { expr: '[] == false', steps: ['有一邊是 boolean：先把 `false` 轉成數字 `0`，變成 `[] == 0`。', '物件遇到數字：把 `[]` 轉成原始值，得到空字串 `\'\'`，變成 `\'\' == 0`。', '字串遇到數字：`Number(\'\')` 是 0，變成 `0 == 0`。'], result: 'true' },
+];
+
+const COERCE_PLUS = [
+  { expr: "'5' + 2", steps: ['`+` 只要有一邊是**字串**，就變成字串相接。', '`2` 轉成 `\'2\'`，相接得到 `\'52\'`。'], result: "'52'" },
+  { expr: "'5' * '2'", steps: ['`*`、`-`、`/` 一律把兩邊**轉成數字**。', '`5 * 2`。'], result: '10' },
+  { expr: "5 + 2 + '3'", steps: ['由左往右：先算 `5 + 2`，兩邊都是數字，得到 `7`。', '再算 `7 + \'3\'`，有字串，相接得到 `\'73\'`。'], result: "'73'" },
+  { expr: "'3' + 5 + 2", steps: ['由左往右：`\'3\' + 5` 有字串，得到 `\'35\'`。', '`\'35\' + 2` 還是字串相接，得到 `\'352\'`。'], result: "'352'" },
+  { expr: "'10' - 3", steps: ['`-` 把兩邊轉成數字：`10 - 3`。'], result: '7' },
+  { expr: 'true + 1', steps: ['`true` 轉成數字是 `1`。', '`1 + 1`。'], result: '2' },
+  { expr: "'3' * 'a'", steps: ['`Number(\'a\')` 是 `NaN`。', '任何數字和 NaN 運算，結果都是 NaN。'], result: 'NaN' },
+];
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出 `==` 與 `===` 的差別',
+      '解釋 `0 == ""`、`null == 0` 這類結果',
+      '判斷 NaN 時用對工具',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-3）區塊裡寫 `let level = 2`，外層原本的 `level = 1` 會變嗎？', options: [
+        { text: '不會，內層宣告的是新變數（遮蔽）', correct: true, why: '加了 let 就是在內層宣告新變數，外層不受影響。' },
+        { text: '會，同名變數會被覆蓋', why: '覆蓋要不加宣告關鍵字（直接 `level = 2`）。' },
+        { text: '會拋出 SyntaxError：重複宣告', why: '不同作用域可以有同名變數；同一個作用域才不行。' },
+        { text: '外層會變成 undefined', why: '外層的值完全沒被碰到。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）`typeof NaN` 是？', options: [
+        { text: "`'number'`", correct: true, why: 'NaN 是 number 型別裡「無效的結果」。' },
+        { text: "`'NaN'`", why: 'typeof 沒有這個結果。' },
+        { text: "`'undefined'`", why: 'NaN 是一個值，不是「沒有值」。' },
+        { text: "`'object'`", why: '只有 null 有這個怪癖。' },
+      ] },
+    ],
+    analogy: {
+      text: ['手搖飲店點餐：隨和的店員聽到「大冰奶」「冰奶茶大杯」「L 的冰奶」都會先在腦中翻成同一個品項再比對（`==`）；收銀機掃的是條碼，一個字元都不能差（`===`）。隨和很方便，但偶爾會翻錯：有人說「去冰」，她聽成「微冰」，覺得差不多就做成同一杯。'],
+      limit: ['店員的翻譯靠經驗、因人而異；JavaScript 的轉型規則是寫死在規格裡的，完全可以預測，只是規則多到沒人想背。這也是實務上直接用 `===` 的原因：不是 `==` 不可預測，而是預測它的成本太高。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="比較流程：用三個等號時，型別不同直接是 false；用兩個等號時，型別不同要先轉型：數字遇到字串把字串轉成數字，遇到布林把布林轉成數字，null 和 undefined 只等於彼此">
+        <rect x="10" y="10" width="250" height="280" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="50" text-anchor="middle" font-size="24" font-weight="900" class="mono on-color">===</text>
+        <text x="135" y="110" text-anchor="middle" font-size="17" class="on-color">型別不同？</text>
+        <text x="135" y="140" text-anchor="middle" font-size="17" class="on-color">直接 false</text>
+        <text x="135" y="200" text-anchor="middle" font-size="17" class="on-color">型別相同？</text>
+        <text x="135" y="230" text-anchor="middle" font-size="17" class="on-color">比較值</text>
+        <rect x="290" y="10" width="260" height="280" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
+        <text x="420" y="50" text-anchor="middle" font-size="24" font-weight="900" class="mono on-color">==</text>
+        <text x="310" y="100" font-size="16" class="on-color">數字 vs 字串</text>
+        <text x="310" y="124" font-size="16" class="on-color">→ 字串轉數字</text>
+        <text x="310" y="164" font-size="16" class="on-color">有布林</text>
+        <text x="310" y="188" font-size="16" class="on-color">→ 布林轉數字</text>
+        <text x="310" y="228" font-size="16" class="on-color">null、undefined</text>
+        <text x="310" y="252" font-size="16" class="on-color">→ 只等於彼此</text>
+      </svg>`,
+      caption: '`===` 只有一條規則；`==` 有一串規則，而且還有例外。',
+      blocks: [
+        '[[嚴格相等]] `===` 不做任何[[型別轉換]]；[[寬鬆相等]] `==` 會在型別不同時先轉型。另外 [[NaN]] 是唯一不等於自己的值，`===` 也判斷不了它；用 `Number.isNaN(x)`。`Object.is` 和 `===` 幾乎一樣，只差兩點：`Object.is(NaN, NaN)` 是 true、`Object.is(0, -0)` 是 false。',
+        { type: 'widget', name: 'coerce', props: { presets: COERCE_EQUALITY } },
+      ],
+    },
+    define: [
+      { term: '嚴格相等', en: 'strict equality', def: '`===` 與 `!==`，不轉型。', example: '`1 === "1"` 是 false。' },
+      { term: '寬鬆相等', en: 'loose equality', def: '`==` 與 `!=`，型別不同時先轉型。', example: '`1 == "1"` 是 true。' },
+      { term: 'Number.isNaN', en: 'Number.isNaN', def: '只在值真的是 NaN 時回傳 true。', example: "`Number.isNaN('abc')` 是 false；舊的 `isNaN('abc')` 會先轉型而得到 true。" },
+    ],
+    examples: {
+      compare: [{
+        title: '檢查使用者有沒有輸入數量',
+        kind: '== vs ===',
+        code: true,
+        badLabel: '用 ==',
+        goodLabel: '用 ===',
+        bad: "const qty = input.value; // 使用者沒填：''\nif (qty {{1:==}} 0) {\n  alert('數量不能是 0');\n}",
+        good: "const qty = input.value;\nif (qty === '') alert('請輸入數量');\nelse if (Number(qty) {{1:===}} 0) alert('數量不能是 0');",
+        badResult: '沒填（空字串）也被當成 0，提示訊息講錯了。',
+        goodResult: '「沒填」和「填了 0」分開處理。',
+        why: ['`\'\' == 0` 是 true：空字串會被轉成 0'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "console.log(1 == '1', 1 === '1');\nconsole.log(0 == '', 0 === '');\nconsole.log(NaN === NaN, Number.isNaN(NaN));\nconsole.log(Number.isNaN('abc'), isNaN('abc'));",
+          predict: { q: "最後一行 `Number.isNaN('abc')` 和 `isNaN('abc')` 各是？", options: ['true true', 'false true', 'false false'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="實務規則：比較一律用三個等號；唯一常見例外是 x 雙等號 null，它剛好等於 x 是 null 或 undefined；判斷 NaN 用 Number.isNaN">
+          <rect x="10" y="10" width="170" height="200" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="22" font-weight="900" class="mono on-color">===</text>
+          <text x="95" y="110" text-anchor="middle" font-size="16" class="on-color">一律用這個</text>
+          <rect x="195" y="10" width="170" height="200" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">x == null</text>
+          <text x="280" y="110" text-anchor="middle" font-size="16" class="on-color">唯一常見例外</text>
+          <text x="280" y="140" text-anchor="middle" font-size="16" class="on-color">null 或 undefined</text>
+          <rect x="380" y="10" width="170" height="200" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="18" font-weight="900" class="mono on-color">Number.isNaN</text>
+          <text x="465" y="110" text-anchor="middle" font-size="16" class="on-color">判斷 NaN</text>
+        </svg>`, caption: '三條實務規則。很多團隊用 lint 規則（例如 ESLint 的 eqeqeq）強制只用 `===`。' },
+      ],
+      tryit: {
+        q: ['補完 `isMissing(v)`：v 是 null 或 undefined 時回傳 true，其他（包括 0、空字串）都回傳 false。'],
+        draft: 'function isMissing(v) {\n  return ____;\n}',
+        answer: ['`v === null || v === undefined`，或簡寫成 `v == null`。', '`v == null` 是 `==` 少數被廣泛接受的用法，因為它剛好只等於 null 和 undefined。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `x === NaN` 檢查計算失敗。', why: 'NaN 不等於任何值，這個條件永遠是 false。', right: '用 `Number.isNaN(x)`。' },
+      { wrong: '用舊的 `isNaN("abc")` 判斷是不是數字。', why: '`isNaN` 會先把參數轉成數字，非數字字串都會得到 true，語意混亂。', right: '先 `Number(x)` 再 `Number.isNaN`，意圖清楚。' },
+      { wrong: '覺得 `==` 比較寬容、比較方便。', why: '它的例外（例如 `null == 0` 是 false、`"" == 0` 是 true）會在你沒想到的地方出錯。', right: '一律 `===`；只有 `x == null` 這個慣用寫法例外。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`null == 0` 的結果是？', options: [
+        { text: 'false', correct: true, why: '`==` 對 null 有特別規則：只等於 null 和 undefined，不會被轉成 0。' },
+        { text: 'true，因為 Number(null) 是 0', why: 'Number(null) 確實是 0，但 `==` 比較時不會對 null 做這個轉換。' },
+        { text: '拋出 TypeError', why: '比較運算不會因為 null 拋錯。' },
+        { text: 'undefined', why: '比較運算一定回傳 true 或 false。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`[] == false` 的結果與原因是？', options: [
+        { text: 'true：false 轉成 0、[] 轉成空字串再轉成 0', correct: true, why: '一連串轉型後變成 `0 == 0`（Node.js 22.13 實測 true）。' },
+        { text: 'false：空陣列是 truthy，不可能等於 false', why: '`==` 不看 truthy／falsy，而是照轉型規則轉成數字比較，兩件事規則不同。' },
+        { text: 'true：空陣列沒有元素，所以等於 false', why: '結果對了但理由錯了：`==` 不會去看陣列有沒有元素。' },
+        { text: '拋出 TypeError：不能比較物件與布林', why: 'JavaScript 允許任何型別互相比較。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['React 判斷 state 有沒有變化，用的是 `Object.is` 而不是 `===`。舉出一個這兩者結果不同、而且對 React 有意義的例子。'], answer: [
+        '`NaN`：如果 state 是 NaN、又設成 NaN，`===` 會說「不相等」（NaN !== NaN），React 就會白白重新渲染；`Object.is(NaN, NaN)` 是 true，正確地判斷「沒變」。',
+        '另一個差異是 `0` 與 `-0`：`Object.is` 認為不同，`===` 認為相同；實務上很少遇到。',
+      ] },
+    ],
+    keypoints: [
+      '`===` 不轉型、型別不同就是 false；`==` 會先依一串規則轉型，實務上一律用 `===`。',
+      'null 在 `==` 下只等於 null 與 undefined；`x == null` 是唯一常見的 `==` 用法。',
+      'NaN 不等於自己，判斷要用 `Number.isNaN`。',
+    ],
+    sources: ['mdn-equality'],
+  },
+
+  '3-2': {
+    goals: [
+      '說出八個 falsy 值',
+      '分清 `||` 與 `??` 在 0、空字串時的差別',
+      '用 `?.` 安全地讀可能不存在的屬性',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: "（回顧 3-1）`0 == ''` 是 true 的原因是？", options: [
+        { text: '空字串被轉成數字 0', correct: true, why: 'number 遇到 string 時，字串轉成數字，`Number(\'\')` 是 0。' },
+        { text: '0 被轉成空字串', why: '方向反了：是字串轉成數字。' },
+        { text: '兩者都是 falsy', why: '`==` 不是比 truthy／falsy，是照轉型規則轉成數字。' },
+        { text: '兩者的 typeof 相同', why: 'typeof 分別是 number 與 string，不同。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-4）預設參數 `function f(v = 10)`，呼叫 `f(null)` 時 v 是？', options: [
+        { text: '`null`', correct: true, why: '預設參數只對 undefined 生效。' },
+        { text: '`10`', why: '那是 `f()` 或 `f(undefined)` 的結果。' },
+        { text: '`0`', why: 'null 不會被轉成數字。' },
+        { text: '拋出 TypeError', why: '傳 null 是合法的。' },
+      ] },
+    ],
+    analogy: {
+      text: ['門口的保全有兩種：一種只要你「看起來不像客人」就攔下來，包括拿著空購物袋、口袋裡零元的人（`||` 把所有 falsy 都當成「沒有」）；另一種只攔「根本沒人」的情況（`??` 只把 null、undefined 當成「沒有」）。'],
+      limit: ['保全會看情況放行，運算子不會：`||` 遇到 0 一定換成右邊，就算 0 是使用者故意設定的值。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="八個 falsy 值：false、0、負 0、0n、空字串、null、undefined、NaN；其他全部是 truthy，包括字串 0、字串 false、空陣列、空物件">
+        <rect x="10" y="10" width="270" height="280" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="145" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">falsy（只有 8 個）</text>
+        <text x="30" y="92" font-size="18" class="mono on-color">false　0　-0</text>
+        <text x="30" y="136" font-size="18" class="mono on-color">0n　''</text>
+        <text x="30" y="180" font-size="18" class="mono on-color">null</text>
+        <text x="30" y="224" font-size="18" class="mono on-color">undefined</text>
+        <text x="30" y="268" font-size="18" class="mono on-color">NaN</text>
+        <rect x="300" y="10" width="250" height="280" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="425" y="46" text-anchor="middle" font-size="22" font-weight="900" class="on-color">其他都是 truthy</text>
+        <text x="320" y="92" font-size="18" class="mono on-color">'0'　'false'</text>
+        <text x="320" y="136" font-size="18" class="mono on-color">[]　{}</text>
+        <text x="320" y="180" font-size="18" class="mono on-color">-1　Infinity</text>
+        <text x="320" y="224" font-size="17" class="on-color">所有物件</text>
+        <text x="320" y="268" font-size="17" class="on-color">所有非空字串</text>
+      </svg>`,
+      caption: '[[falsy]] 的清單很短，背下來比背 [[truthy]] 容易：不在左邊的都是 truthy。',
+      blocks: [
+        '`||` 會在左邊是**任何 falsy** 時改用右邊；[[空值合併]] `??` 只在左邊是 null 或 undefined 時才換。兩者都是[[短路求值]]：回傳的是「最後看到的那個值」，不一定是 true／false。[[可選串連]] `?.` 則讓你安全地往下讀：左邊是 null 或 undefined 時，直接得到 undefined，不拋錯。',
+      ],
+    },
+    define: [
+      { term: 'falsy', en: 'falsy', def: '在需要真假的地方被當成 false 的值，只有八個。', example: '`if (0)`、`if ("")` 都不會進去。' },
+      { term: '空值合併', en: 'nullish coalescing', def: '`a ?? b`：a 是 null 或 undefined 才回傳 b。', example: '`0 ?? 50` 是 0。' },
+      { term: '可選串連', en: 'optional chaining', def: '`a?.b`、`a?.()`：a 是 null 或 undefined 時得到 undefined。', example: '`user.profile?.name`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '使用者把音量設成 0',
+        kind: '|| vs ??',
+        code: true,
+        badLabel: '用 ||',
+        goodLabel: '用 ??',
+        bad: "const volume = settings.volume {{1:||}} 50;\n// 設定是 0 → 得到 50（錯）",
+        good: "const volume = settings.volume {{1:??}} 50;\n// 設定是 0 → 得到 0；沒設定 → 50",
+        badResult: '0 是 falsy，`||` 把「刻意設成 0」當成「沒有設定」。',
+        goodResult: '`??` 只在真的沒有值時才用預設。',
+        why: ['合法值可能是 0、空字串、false 時，一律用 ??'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "const volume = 0;\nconsole.log(volume || 50, volume ?? 50);\nconsole.log(Boolean(''), Boolean('0'), Boolean([]));\nconst user = { profile: null };\nconsole.log(user.profile?.name, user.settings?.theme ?? 'light');\nconsole.log(0 || null || 'x', 1 && 2 && 3);",
+          predict: { q: '第二行 `volume || 50` 和 `volume ?? 50` 各是？', options: ['0 0', '50 0', '50 50'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="三個運算子對照表：左邊是 0 時，或運算回傳右邊，空值合併回傳 0；左邊是空字串時，或運算回傳右邊，空值合併回傳空字串；左邊是 null 時，兩者都回傳右邊">
+          <rect x="10" y="10" width="540" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="40" y="43" font-size="18" font-weight="900">左邊是</text>
+          <text x="250" y="43" font-size="18" font-weight="900" class="mono">a || b</text>
+          <text x="420" y="43" font-size="18" font-weight="900" class="mono">a ?? b</text>
+          <rect x="10" y="70" width="540" height="50" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="40" y="103" font-size="18" class="mono on-color">0</text>
+          <text x="250" y="103" font-size="18" class="mono on-color">b</text>
+          <text x="420" y="103" font-size="18" class="mono on-color">0</text>
+          <rect x="10" y="130" width="540" height="50" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+          <text x="40" y="163" font-size="18" class="mono on-color">''</text>
+          <text x="250" y="163" font-size="18" class="mono on-color">b</text>
+          <text x="420" y="163" font-size="18" class="mono on-color">''</text>
+          <rect x="10" y="190" width="540" height="40" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="40" y="217" font-size="18" class="mono">null</text>
+          <text x="250" y="217" font-size="18" class="mono">b</text>
+          <text x="420" y="217" font-size="18" class="mono">b</text>
+        </svg>`, caption: '差別只發生在「左邊是 falsy 但不是 null／undefined」的時候：0、空字串、false、NaN。' },
+      ],
+      tryit: {
+        q: ['補完下面這行：讀 `order.coupon.code`，coupon 可能不存在；沒有時要得到 `"無"`，code 是空字串時要保留空字串。'],
+        draft: "const code = order.coupon____code ____ '無';",
+        answer: ["`order.coupon?.code ?? '無'`。", '`?.` 處理 coupon 不存在，`??` 只換掉 undefined，空字串會被保留（用 `||` 就會被換成「無」）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '寫 `if (count)` 檢查有沒有值。', why: 'count 合法地等於 0 時也進不去。', right: '寫 `if (count != null)`，或明確寫 `count !== undefined`。' },
+      { wrong: '寫 `if (list)` 判斷陣列是不是空的。', why: '空陣列是物件，是 truthy，這個條件永遠成立。', right: '寫 `if (list.length > 0)`。' },
+      { wrong: '以為 `a || b` 一定回傳 true 或 false。', why: '它回傳的是其中一個運算元本身。', right: '要布林值就用 `Boolean(a || b)` 或 `!!(a || b)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: "`Boolean('false')` 是？", options: [
+        { text: 'true', correct: true, why: '非空字串都是 truthy，內容寫什麼不重要。' },
+        { text: 'false', why: '這是最常見的誤會：字串內容不會被解讀成布林。' },
+        { text: '拋出 TypeError', why: 'Boolean 可以接受任何值。' },
+        { text: "`'false'`", why: 'Boolean() 一定回傳布林值。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`0 || null || "x"` 的結果是？', options: [
+        { text: "`'x'`", correct: true, why: '`||` 由左往右，回傳第一個 truthy；前兩個都是 falsy，所以是 "x"。' },
+        { text: '`true`', why: '`||` 回傳的是運算元本身，不是 true。' },
+        { text: '`0`', why: '0 是 falsy，會繼續往右找。' },
+        { text: '`null`', why: 'null 也是 falsy，還會繼續往右。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['表單有一欄「備註」（可以留空）和一欄「數量」（可以填 0）。後端說「沒填就傳 undefined，有填就照填的值傳」。寫出把兩欄轉成要傳的值的程式，並說明為什麼不能用 `||`。'], answer: [
+        "參考：`const note = form.note === '' ? undefined : form.note;`、`const qty = form.qty === '' ? undefined : Number(form.qty);`",
+        '不能用 `form.note || undefined`：使用者真的填了內容就沒事，但數量填 0 時，`Number(form.qty) || undefined` 會把合法的 0 變成 undefined。判斷「沒填」要明確比較空字串，而不是靠 falsy。',
+      ] },
+    ],
+    keypoints: [
+      'falsy 只有八個：false、0、-0、0n、空字串、null、undefined、NaN；其他都是 truthy，包括 "0"、[]、{}。',
+      '`||` 把所有 falsy 換成預設，`??` 只換 null 與 undefined；合法值可能是 0 或空字串時用 `??`。',
+      '`?.` 讓讀取可能不存在的屬性時不拋錯；`||`、`&&`、`??` 回傳的是運算元本身。',
+    ],
+    sources: ['mdn-nullish'],
+  },
+
+  '3-3': {
+    goals: [
+      '預測 `+` 遇到字串與數字混合時的結果',
+      '分清 `Number()` 與 `parseInt()` 的差別',
+      '把表單輸入正確地轉成數字',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-2）`settings.volume ?? 50`，volume 是 0 時得到？', options: [
+        { text: '`0`', correct: true, why: '`??` 只換 null 與 undefined。' },
+        { text: '`50`', why: '那是 `||` 的結果。' },
+        { text: '`undefined`', why: 'volume 有值，就是 0。' },
+        { text: '`false`', why: '`??` 回傳運算元本身，不會變成布林。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-2）`0.29 * 100` 的結果為什麼不是 29？', options: [
+        { text: '0.29 在二進位寫不完，存進去就有誤差', correct: true, why: '實際結果是 28.999999999999996。' },
+        { text: '乘法會自動四捨五入', why: 'JavaScript 不會自動捨入。' },
+        { text: '因為 0.29 是字串', why: '這裡兩邊都是 number。' },
+        { text: '超過安全整數範圍', why: '29 遠小於安全整數上限。' },
+      ] },
+    ],
+    analogy: {
+      text: ['把「5 顆蘋果」和「2」交給一個只會照規則做事的店員：如果其中一個是寫在紙上的字，她就把它們貼在一起變成「52」；如果你明確說「乘」，她就先把兩個都當數字算出 10。她不會猜你想要哪個，只看「有沒有字」和「是什麼運算」。'],
+      limit: ['真的店員會問你「你是要加起來還是寫在一起？」；JavaScript 不會問，`+` 遇到字串一律相接，所以從表單讀進來的數字一定要先轉型。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="加號的判斷：先看兩邊有沒有字串，有就字串相接，沒有就數字相加；其他算術運算子減乘除一律把兩邊轉成數字。運算由左往右逐步決定">
+        <rect x="10" y="10" width="250" height="260" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="50" text-anchor="middle" font-size="26" font-weight="900" class="mono on-color">+</text>
+        <text x="135" y="100" text-anchor="middle" font-size="17" class="on-color">有一邊是字串？</text>
+        <text x="135" y="134" text-anchor="middle" font-size="17" class="on-color">→ 字串相接</text>
+        <text x="135" y="184" text-anchor="middle" font-size="17" class="on-color">都不是字串？</text>
+        <text x="135" y="218" text-anchor="middle" font-size="17" class="on-color">→ 數字相加</text>
+        <rect x="290" y="10" width="260" height="260" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="420" y="50" text-anchor="middle" font-size="26" font-weight="900" class="mono on-color">-  *  /</text>
+        <text x="420" y="110" text-anchor="middle" font-size="17" class="on-color">一律轉成數字</text>
+        <text x="420" y="150" text-anchor="middle" font-size="17" class="on-color">轉不成功</text>
+        <text x="420" y="180" text-anchor="middle" font-size="17" class="on-color">就是 NaN</text>
+      </svg>`,
+      caption: '`+` 是唯一「看到字串就改做別的事」的算術運算子；而且運算由左往右，一步一步決定。',
+      blocks: [
+        { type: 'widget', name: 'coerce', props: { presets: COERCE_PLUS } },
+        { type: 'table', caption: '三種把字串轉成數字的方法（2026-10-14 在 Node.js 22.13 實測）', head: ['輸入', '`Number(x)`', '`parseInt(x, 10)`', '`parseFloat(x)`'], rows: [
+          ["`'42'`", '42', '42', '42'],
+          ["`''`", '**0**', 'NaN', 'NaN'],
+          ["`' 42 '`", '42', '42', '42'],
+          ["`'42px'`", 'NaN', '42', '42'],
+          ["`'3.14abc'`", 'NaN', '3', '3.14'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'Number()', en: 'Number()', def: '把整個值轉成數字；有任何不是數字的字元就是 NaN；空字串是 0。', example: "`Number('42px')` 是 NaN。" },
+      { term: 'parseInt()', en: 'parseInt()', def: '從頭讀到不是數字為止，取整數部分；第二個參數是進位制，一律寫 10。', example: "`parseInt('42px', 10)` 是 42。" },
+      { term: '一元加號', en: 'unary plus', def: '`+x` 等於 `Number(x)`，寫法短但不好讀。', example: "`+'7'` 是 7。" },
+    ],
+    examples: {
+      compare: [{
+        title: '表單年齡判斷',
+        kind: '沒轉型 vs 先轉型',
+        code: true,
+        badLabel: '直接用 input.value',
+        goodLabel: '先 Number()',
+        bad: "const age = input.value;      // '17'\nif ({{1:age + 1}} > 18) { /* 通過 */ }\n// '17' + 1 是 '171'，171 > 18",
+        good: "const age = Number(input.value);\nif ({{1:age + 1}} > 18) { /* 不通過 */ }\n// 17 + 1 是 18",
+        badResult: '`input.value` 一定是字串，`+ 1` 變成字串相接，17 歲也通過了。',
+        goodResult: '先轉成數字，`+` 才是加法。',
+        why: ['表單、網址參數、localStorage 讀出來的都是字串'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'runner', props: {
+          code: "const age = '17';\nconsole.log(age + 1, age + 1 > 18);\nconsole.log(Number(age) + 1 > 18);\nconsole.log('10' > '9', 10 > '9');",
+          predict: { q: "最後一行 `'10' > '9'` 是？", options: ['true', 'false'], answer: 1 },
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="字串比較是字典順序：比較 10 和 9 兩個字串時，先比第一個字元 1 和 9，1 排在 9 前面，所以 10 小於 9">
+          <rect x="10" y="10" width="250" height="180" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="135" y="50" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">'10' &gt; '9'</text>
+          <text x="135" y="100" text-anchor="middle" font-size="16" class="on-color">比第一個字元</text>
+          <text x="135" y="130" text-anchor="middle" font-size="16" class="on-color">'1' 排在 '9' 前</text>
+          <text x="135" y="164" text-anchor="middle" font-size="18" font-weight="900" class="on-color">false</text>
+          <rect x="300" y="10" width="250" height="180" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="425" y="50" text-anchor="middle" font-size="20" font-weight="900" class="mono on-color">10 &gt; '9'</text>
+          <text x="425" y="100" text-anchor="middle" font-size="16" class="on-color">有一邊是數字</text>
+          <text x="425" y="130" text-anchor="middle" font-size="16" class="on-color">'9' 轉成 9</text>
+          <text x="425" y="164" text-anchor="middle" font-size="18" font-weight="900" class="on-color">true</text>
+        </svg>`, caption: '兩邊都是字串時比的是字典順序；有一邊是數字才轉成數字比大小。4-4 的 `sort()` 也會遇到同一件事。' },
+      ],
+      tryit: {
+        q: ['補完 `toQty(raw)`：把表單的字串轉成數量；空字串或不是數字時回傳 `null`。'],
+        draft: "function toQty(raw) {\n  if (raw.trim() === '') return null;\n  const n = ____;\n  return Number.isNaN(n) ? null : n;\n}",
+        answer: ['`Number(raw)`。', '先單獨處理空字串，因為 `Number(\'\')` 是 0 而不是 NaN；接著 `Number` 會把 "12px" 這種不完整的輸入變成 NaN，比 parseInt 嚴格，適合驗證輸入。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 `input.value` 直接拿來做加法。', why: '它永遠是字串，`+` 會變成相接。', right: '先 `Number(input.value)`，再檢查是不是 NaN。' },
+      { wrong: '用 `parseInt` 驗證使用者輸入是不是數字。', why: "`parseInt('12abc', 10)` 會得到 12，看起來合法，其實輸入有錯。", right: '驗證用 `Number()`；從「12px」這種已知格式取數字才用 parseInt。' },
+      { wrong: '寫 `parseInt(x)` 不給進位制。', why: '現代引擎多半當成十進位，但意圖不明確，lint 也會警告。', right: '一律寫 `parseInt(x, 10)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: "`5 + 2 + '3'` 的結果是？", options: [
+        { text: "`'73'`", correct: true, why: '由左往右：5 + 2 = 7，7 + "3" 是字串相接。' },
+        { text: "`'523'`", why: '那要從一開始就是字串；這裡前兩個是數字，先相加。' },
+        { text: '`10`', why: '"3" 是字串，最後一步是相接，不是相加。' },
+        { text: '`NaN`', why: '`+` 遇到字串會相接，不會產生 NaN。' },
+      ] },
+      { level: '應用', type: 'mc', q: "`Number('')` 與 `parseInt('', 10)` 各是？", options: [
+        { text: '0 與 NaN', correct: true, why: 'Number 把空字串當成 0；parseInt 讀不到任何數字就是 NaN。' },
+        { text: 'NaN 與 NaN', why: 'Number 對空字串是特例，結果是 0。' },
+        { text: '0 與 0', why: 'parseInt 找不到數字時是 NaN。' },
+        { text: '兩者都拋出錯誤', why: '轉型函式不會拋錯，失敗就給 NaN。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ["網址 `?page=2` 讀進來後，程式寫 `const next = params.get('page') + 1`，結果下一頁連結變成 `page=21`。說明原因並修正；再想想：如果網址沒有 page 參數，你的修正版會得到什麼？"], answer: [
+        "`params.get` 回傳字串 \"2\"，`+ 1` 是字串相接得到 \"21\"。修正：`const page = Number(params.get('page') ?? 1); const next = page + 1;`",
+        '沒有 page 參數時 `params.get` 回傳 null，`?? 1` 讓它變成 1，下一頁是 2。如果寫成 `Number(params.get(\'page\'))` 沒有預設值，`Number(null)` 是 0，下一頁會變成 1，看起來正常其實是 bug。',
+      ] },
+    ],
+    keypoints: [
+      '`+` 只要有一邊是字串就相接，`-`、`*`、`/` 一律轉成數字；運算由左往右逐步決定。',
+      '`Number()` 嚴格（"42px" 是 NaN、空字串是 0），`parseInt(x, 10)` 從頭讀到不是數字為止。',
+      '表單、網址、localStorage 讀出來的都是字串，計算前先轉型並檢查 NaN。',
+    ],
+    sources: ['mdn-equality', 'mdn-number'],
+  },
+});
+</script>

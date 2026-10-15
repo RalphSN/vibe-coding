@@ -31,9 +31,9 @@ Sections.reference = (c, lesson) => `<div class="blocks" style="--chip:var(--m${
 
 /* ---------- 元件樣式表 ---------- */
 Views.styleguide = () => {
-  const sampleQuiz = { type: 'mc', level: '應用', q: '`ls -la` 裡的 `-la` 是哪一種零件？', options: [
-    { text: '參數，代表要列出的資料夾', why: '參數通常是要處理的對象；-開頭的是選項。' },
-    { text: '兩個短選項合併寫成一個', correct: true, why: '`-la` 等於 `-l -a`：詳細格式＋包含隱藏檔。' },
+  const sampleQuiz = { type: 'mc', level: '應用', q: '`typeof []` 的結果是？', options: [
+    { text: "`'array'`", why: 'typeof 沒有 array 這個結果；陣列是物件。' },
+    { text: "`'object'`", correct: true, why: '陣列是物件的一種；判斷陣列要用 `Array.isArray`。' },
   ] };
   return `<div class="content">
     <header class="lesson-head" style="--chip:var(--neutral)"><span class="lid-big">SG</span><h1>元件樣式表</h1></header>
@@ -79,7 +79,7 @@ Views.styleguide = () => {
         ${['analogy', 'limit', 'define', 'mistake', 'keypoints', 'legacy', 'tip', 'danger'].map((v) => renderBlock({ type: 'callout', variant: v, title: v, body: ['提示框內文，可以放 `程式碼`、==螢光標記== 和 [連結](https://developer.mozilla.org/zh-TW/docs/Web/JavaScript)。'] })).join('')}
         ${renderBlock({ type: 'unverified', body: ['這是未確認的項目。'] })}
         ${renderBlock({ type: 'timely', body: ['這是會過期的資訊。'] })}
-        ${renderBlock({ type: 'legacy', rows: [['`/cost`', '`/usage`（`/cost` 是別名）'], ['參考站固定寬度側欄', '可拖曳側欄']] })}
+        ${renderBlock({ type: 'legacy', rows: [['`var`', '`const`／`let`'], ['`arr.sort()`（改原陣列）', '`arr.toSorted()`']] })}
       </div>
     </section>
 
@@ -96,7 +96,7 @@ Views.styleguide = () => {
     </section>
 
     <section class="sg-block"><h2>分頁</h2>
-      ${tabsBlock({ label: '作業系統', tabs: [{ label: 'macOS', blocks: ['Seatbelt 沙箱'] }, { label: 'Linux／WSL2', blocks: ['bubblewrap ＋ socat'] }, { label: 'Windows', blocks: ['原生不支援，改用 WSL2'] }] })}
+      ${tabsBlock({ label: '執行環境', tabs: [{ label: '瀏覽器', blocks: ['有 `document`、`localStorage`'] }, { label: 'Node.js', blocks: ['有 `fs`、`process`'] }, { label: '兩邊都有', blocks: ['`setTimeout`、`fetch`'] }] })}
     </section>
 
     <section class="sg-block"><h2>摺疊與測驗</h2>
@@ -107,7 +107,7 @@ Views.styleguide = () => {
     </section>
 
     <section class="sg-block"><h2>表格</h2>
-      ${tableBlock({ head: ['模式', '不經詢問', '適用'], rows: [['`default`', '只有讀取', '敏感工作'], ['`auto`', '全部＋分類器審查', '長任務'], ['`bypassPermissions`', '全部', '只限隔離環境']] })}
+      ${tableBlock({ head: ['宣告', '作用域', '重新指定'], rows: [['`var`', '函式', '可以'], ['`let`', '區塊', '可以'], ['`const`', '區塊', '不行']] })}
     </section>
 
     <section class="sg-block"><h2>檢查清單</h2>
