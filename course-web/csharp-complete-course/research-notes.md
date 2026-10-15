@@ -24,3 +24,13 @@
 - `0.1 + 0.2 == 0.3` 為 False；decimal 版為 True
 
 ⚠️ 截至 2026-10 查證狀態：輸出未在本機執行確認。之後有 .NET 10 SDK 的機器，建議逐一 `dotnet run` 驗證。
+
+## 第 2 段補充（2026-10-16）
+
+| 項目 | 狀態 | 來源 |
+|---|---|---|
+| C# 15 union | `public union Pet(Cat, Dog, Bird);`，switch 需窮舉；部分規格尚未實作 | learn.microsoft.com What's new in C# 15（2026-09-11） |
+| C# 15 closed | `public closed record class GateState;`，隱含 abstract，同組件內才能直接繼承 | 同上 |
+| C# 15 集合運算式引數 | `[with(capacity: 10), ..values]` | 同上 |
+| CountBy、AggregateBy | .NET 9 新增 | Microsoft Learn Grouping data |
+| `ToDictionary()` 無參數（KeyValuePair 序列） | .NET 8 新增 | 未逐頁查證，依 .NET 8 API 變更記憶 ⚠️ |

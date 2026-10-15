@@ -1317,6 +1317,25 @@ const COURSES = [
     ["2-3", "陣列|與集合運算式"],
     ["2-4", "Span：|不複製地看一段資料"],
   ]},
+  { id: 3, title: "物件|導向", short: "物件", desc: "類別與物件、屬性與 field 關鍵字、繼承與多型、介面、實值型別與參考型別（struct、record）。", lessons: [
+    ["3-1", "類別|與物件"],
+    ["3-2", "屬性|與 field 關鍵字"],
+    ["3-3", "繼承|與多型"],
+    ["3-4", "介面：|約定能做什麼"],
+    ["3-5", "實值型別、|參考型別與 record"],
+  ]},
+  { id: 4, title: "型別系統|進階", short: "型別", desc: "泛型、可為 null 的參考型別、進階模式比對、列舉與 C# 15 的 union 型別預告。", lessons: [
+    ["4-1", "泛型：|一份程式碼、多種型別"],
+    ["4-2", "null 安全：|可為 null 的參考型別"],
+    ["4-3", "模式比對|進階"],
+    ["4-4", "列舉、|closed 與 union 預告"],
+  ]},
+  { id: 5, title: "集合|與 LINQ", short: "LINQ", desc: "List 與 Dictionary、LINQ 查詢、延遲執行、分組與彙總。", lessons: [
+    ["5-1", "List、Dictionary|與 HashSet"],
+    ["5-2", "LINQ：|用描述代替迴圈"],
+    ["5-3", "延遲執行：|LINQ 什麼時候真的跑"],
+    ["5-4", "分組|與彙總"],
+  ]},
 ];
 
 /** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
@@ -1399,6 +1418,24 @@ defineSources({
   'cs-collection-expr': { title: 'Microsoft Learn｜Collection expressions', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/collection-expressions' },
   'cs-ranges': { title: 'Microsoft Learn｜Indices and ranges', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/member-access-operators#range-operator-' },
   'span': { title: 'Microsoft Learn｜Memory and spans', url: 'https://learn.microsoft.com/en-us/dotnet/standard/memory-and-spans/' },
+  'cs-classes': { title: 'Microsoft Learn｜Classes, structs, and records', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/object-oriented/' },
+  'cs-properties': { title: 'Microsoft Learn｜Properties（含 field 關鍵字）', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/properties' },
+  'cs-primary-ctor': { title: 'Microsoft Learn｜Primary constructors', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/whats-new/tutorials/primary-constructors' },
+  'cs-inheritance': { title: 'Microsoft Learn｜Inheritance', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/object-oriented/inheritance' },
+  'cs-polymorphism': { title: 'Microsoft Learn｜Polymorphism', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/object-oriented/polymorphism' },
+  'cs-interfaces': { title: 'Microsoft Learn｜Interfaces', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/types/interfaces' },
+  'cs-value-types': { title: 'Microsoft Learn｜Value types', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/value-types' },
+  'cs-records': { title: 'Microsoft Learn｜Records', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/record' },
+  'cs-generics': { title: 'Microsoft Learn｜Generic type parameters and constraints', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/generics/constraints-on-type-parameters' },
+  'cs-nullable': { title: 'Microsoft Learn｜Nullable reference types', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/nullable-references' },
+  'cs-null-ops': { title: 'Microsoft Learn｜Member access operators（?. 與 ?.= ）', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/member-access-operators' },
+  'cs-patterns': { title: 'Microsoft Learn｜Patterns', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/patterns' },
+  'cs-enum': { title: 'Microsoft Learn｜Enumeration types', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/enum' },
+  'cs-union': { title: 'Microsoft Learn｜Union types（C# 15 預覽）', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/union' },
+  'collections': { title: 'Microsoft Learn｜Collections', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/collections' },
+  'linq': { title: 'Microsoft Learn｜LINQ overview', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/linq/' },
+  'linq-deferred': { title: 'Microsoft Learn｜Deferred execution and lazy evaluation', url: 'https://learn.microsoft.com/en-us/dotnet/standard/linq/deferred-execution-lazy-evaluation' },
+  'linq-grouping': { title: 'Microsoft Learn｜Grouping data（GroupBy、CountBy、AggregateBy）', url: 'https://learn.microsoft.com/en-us/dotnet/csharp/linq/standard-query-operators/grouping-data' },
 });
 </script>
 <script>
@@ -2885,6 +2922,1669 @@ defineLessons({
       '先寫清楚，量測到熱點再用 Span 優化。',
     ],
     sources: ['span', 'cs-whatsnew-14'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
+   模組 3：物件導向
+   ========================================================================== */
+defineTerms({
+  '類別': { en: 'class', def: '描述一種東西「有哪些資料、能做哪些事」的藍圖。類別是參考型別。', example: '`class Dog { public string Name = ""; }`' },
+  '物件': { en: 'object / instance', def: '依照類別建立出來的實體，也叫執行個體。用 `new` 建立。', example: '`var d = new Dog();`' },
+  '建構子': { en: 'constructor', def: '`new` 物件時自動執行的特殊方法，用來設定初始狀態。名稱和類別相同、沒有回傳型別。', example: '`public Dog(string name) { Name = name; }`' },
+  '主要建構子': { en: 'primary constructor', def: 'C# 12 起，在類別名稱後面直接寫參數，整個類別都能使用這些參數。', example: '`class Dog(string name) { public string Name => name; }`' },
+  '欄位': { en: 'field', def: '直接存在物件裡的變數；通常設為 private，外界透過屬性存取。', example: '`private int _age;`' },
+  '存取修飾詞': { en: 'access modifier', def: '控制誰能看到成員：public 大家都能用、private 只有類別自己、protected 自己與子類別、internal 同一個組件。', example: '`private`、`public`' },
+  '封裝': { en: 'encapsulation', def: '把資料藏起來，只開放安全的操作方式，避免外界把物件改成不合理的狀態。', example: '餘額不能直接改，只能透過 Deposit。' },
+  '屬性': { en: 'property', def: '看起來像欄位、實際上是 get／set 方法的成員，可以在讀寫時加上檢查。', example: '`public string Name { get; set; }`' },
+  '自動屬性': { en: 'auto-implemented property', def: '`{ get; set; }`：編譯器自動產生背後的欄位。', example: '`public int Age { get; set; }`' },
+  'field 關鍵字': { en: 'field keyword', def: 'C# 14 起，在屬性的 get／set 裡用 `field` 代表編譯器產生的背後欄位，不用自己宣告。', example: '`set => field = value.Trim();`' },
+  'init': { en: 'init accessor', def: '只能在建立物件時（物件初始設定式或建構子）設定的屬性，之後唯讀。', example: '`public string Id { get; init; }`' },
+  'required': { en: 'required member', def: 'C# 11 起，標示建立物件時一定要設定的屬性，漏掉就編譯錯誤。', example: '`public required string Name { get; init; }`' },
+  '繼承': { en: 'inheritance', def: '子類別自動擁有父類別的成員，再加上自己的。C# 一個類別只能繼承一個父類別。', example: '`class Cat : Animal`' },
+  '多型': { en: 'polymorphism', def: '同一個呼叫（例如 `animal.Speak()`），依物件實際的型別執行不同的實作。', example: '狗叫汪、貓叫喵。' },
+  'virtual': { en: 'virtual', def: '標示父類別的方法「允許子類別覆寫」。', example: '`public virtual string Speak() => "...";`' },
+  'override': { en: 'override', def: '子類別提供自己版本的 virtual 或 abstract 方法。', example: '`public override string Speak() => "汪";`' },
+  'abstract': { en: 'abstract', def: '抽象類別不能直接 new；抽象方法沒有實作，子類別一定要 override。', example: '`abstract class Shape { public abstract double Area(); }`' },
+  'sealed': { en: 'sealed', def: '禁止再被繼承的類別，或禁止再被覆寫的方法。', example: '`sealed class Config`' },
+  '介面': { en: 'interface', def: '只描述「能做什麼」的約定，不管怎麼做。一個類別可以實作多個介面。名稱慣例以 I 開頭。', example: '`interface IPrintable { void Print(); }`' },
+  '實值型別': { en: 'value type', def: '變數直接裝著值；指定或傳參數時整個複製。int、double、bool、struct、enum 都是。', example: '`int b = a;` 之後改 b 不影響 a。' },
+  '參考型別': { en: 'reference type', def: '變數裝的是「物件在哪裡」的參考；指定時只複製參考，兩個變數指向同一個物件。class、string、陣列都是。', example: '`var b = a;` 之後改 b.Name，a.Name 也變。' },
+  'struct': { en: 'struct', def: '自訂的實值型別，適合小而簡單、像「一個值」的資料，例如座標。', example: '`struct Point { public int X, Y; }`' },
+  'record': { en: 'record', def: '以資料為主的型別：自動產生依內容比較的 Equals、好讀的 ToString，以及 `with` 複製。預設是參考型別（record class），也有 record struct。', example: '`record Person(string Name, int Age);`' },
+  '值相等': { en: 'value equality', def: '兩個物件內容相同就算相等，不管是不是同一個實體。record 預設如此。', example: '`new P("A") == new P("A")` 為 true（record）。' },
+  'with 運算式': { en: 'with expression', def: '複製一個 record，只改其中幾個屬性，原本的不變。', example: '`var older = p with { Age = 31 };`' },
+});
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '寫一個有欄位、建構子、方法的類別',
+      '用 `new` 建立物件並呼叫它的方法',
+      '用 private 封裝資料，不讓外界改成不合理的狀態',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-3）`int[] b = a;` 之後 `b[0] = 9`，a[0] 會變嗎？', options: [
+        { text: '會，陣列是參考型別，a 和 b 指向同一個陣列', correct: true, why: '只複製了參考。' },
+        { text: '不會，C# 預設傳值會複製一份陣列', why: '傳值複製的是參考本身，不是陣列內容。' },
+        { text: '編譯錯誤，陣列不能直接指定給另一個變數', why: '這是合法的指定。' },
+        { text: '執行時拋出例外', why: '指定與修改都是合法操作。' },
+      ] },
+    ],
+    analogy: {
+      text: ['類別像手搖飲店的「標準作業手冊」：規定每杯飲料有甜度、冰塊、品項（資料），以及能做的動作（加料、封膜）。物件是照手冊做出來的「某一杯」：你的珍奶半糖，我的紅茶無糖，各自獨立。'],
+      limit: ['手冊改了，已經做好的飲料不會變；但類別定義改了，重新編譯後所有物件都照新規則。另外，物件可以一直被修改，飲料做好就不會再變。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="一個類別 BankAccount 是藍圖，包含欄位 balance 與方法 Deposit；用 new 建立兩個物件，阿明的帳戶餘額 100，小華的帳戶餘額 500，兩個物件各自獨立">
+        <rect x="160" y="15" width="240" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="48" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">class BankAccount</text>
+        <text x="185" y="82" font-size="16" class="on-color mono">- balance（欄位）</text>
+        <text x="185" y="108" font-size="16" class="on-color mono">+ Deposit()（方法）</text>
+        <rect x="20" y="180" width="220" height="90" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="130" y="215" text-anchor="middle" font-size="18" font-weight="900">阿明的帳戶</text>
+        <text x="130" y="248" text-anchor="middle" font-size="17" class="mono">balance = 100</text>
+        <rect x="320" y="180" width="220" height="90" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="430" y="215" text-anchor="middle" font-size="18" font-weight="900">小華的帳戶</text>
+        <text x="430" y="248" text-anchor="middle" font-size="17" class="mono">balance = 500</text>
+        <path d="M280 125 V150 H130 V180 M280 150 H430 V180" class="stroke-ink" stroke-width="4" fill="none"/>
+        <text x="280" y="172" text-anchor="middle" font-size="15" class="mono">new</text>
+      </svg>`,
+      caption: '一個類別、很多物件；每個物件有自己的一份欄位。',
+      blocks: [
+        '[[類別]]定義資料與行為，[[物件]]是用 `new` 建立的實體。[[建構子]]設定初始狀態；[[存取修飾詞]] `private` 讓欄位只能從類別內部改，這就是[[封裝]]。',
+        { type: 'code', lang: 'csharp', title: 'BankAccount.cs', code: 'var acc = new BankAccount("阿明", 100m);\nacc.Deposit(50m);\nConsole.WriteLine(acc.Describe());   // 阿明：150\n\nclass BankAccount\n{\n    private readonly string _owner;\n    private decimal _balance;\n\n    public BankAccount(string owner, decimal initial)\n    {\n        _owner = owner;\n        _balance = initial;\n    }\n\n    public void Deposit(decimal amount)\n    {\n        if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount));\n        _balance += amount;\n    }\n\n    public string Describe() => $"{_owner}：{_balance}";\n}' },
+      ],
+    },
+    define: [
+      { term: '類別', en: 'class', def: '參考型別的藍圖，包含欄位、屬性、方法、建構子等成員。', example: '`class Order { … }`' },
+      { term: '建構子', en: 'constructor', def: '和類別同名、沒有回傳型別的方法，`new` 時執行。', example: '`public Order(int id) { Id = id; }`' },
+      { term: '主要建構子', en: 'primary constructor', def: '`class 名稱(參數)`：參數在整個類別內可用，省去手寫欄位與指定。', example: '`class Greeter(string name) { public string Hi() => $"Hi {name}"; }`' },
+    ],
+    examples: {
+      compare: [{
+        title: '保護餘額',
+        kind: '沒有封裝 vs 有封裝',
+        code: true,
+        badLabel: 'public 欄位',
+        goodLabel: 'private 欄位 + 方法',
+        bad: 'class Account { {{1:public}} decimal Balance; }\n\nacc.Balance = -9999m;   // 沒人擋',
+        good: 'class Account\n{\n    {{1:private}} decimal _balance;\n    public void Withdraw(decimal amt)\n    {\n        if (amt > _balance) throw new InvalidOperationException("餘額不足");\n        _balance -= amt;\n    }\n}',
+        badResult: '任何程式碼都能把餘額改成負數。',
+        goodResult: '唯一能減少餘額的路徑會檢查規則。',
+        why: ['把規則放在資料旁邊，就不會有人「忘記檢查」'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var a = new Counter();\nvar b = new Counter();\na.Add();\na.Add();\nb.Add();\nConsole.WriteLine($"{a.Count} {b.Count}");\n\nclass Counter\n{\n    public int Count { get; private set; }\n    public void Add() => Count++;\n}',
+          predict: { q: '會印出什麼？', options: ['3 3', '2 1', '1 1'], answer: 1 },
+          output: '2 1',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'data', label: '資料（欄位／屬性）' }, { id: 'act', label: '行為（方法）' }],
+          items: [
+            { text: '購物車的「商品清單」', answer: 'data', why: '描述狀態，是資料。' },
+            { text: '購物車的「加入商品」', answer: 'act', why: '改變狀態的動作，是方法。' },
+            { text: '訂單的「建立時間」', answer: 'data', why: '一個值。' },
+            { text: '訂單的「計算總價」', answer: 'act', why: '根據資料算出結果，是方法（也可以是唯讀屬性）。' },
+            { text: '使用者的「Email」', answer: 'data', why: '一個值。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="主要建構子的寫法比較：傳統寫法需要欄位宣告、建構子、指定三段；主要建構子把參數寫在類別名稱後面，一行完成">
+          <rect x="10" y="20" width="260" height="130" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="52" text-anchor="middle" font-size="18" font-weight="900" class="on-color">傳統：三段</text>
+          <text x="30" y="88" font-size="15" class="on-color mono">private string _n;</text>
+          <text x="30" y="112" font-size="15" class="on-color mono">public G(string n)</text>
+          <text x="30" y="136" font-size="15" class="on-color mono">  { _n = n; }</text>
+          <rect x="290" y="20" width="260" height="130" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="52" text-anchor="middle" font-size="18" font-weight="900" class="on-color">主要建構子</text>
+          <text x="310" y="100" font-size="15" class="on-color mono">class G(string n)</text>
+          <text x="310" y="124" font-size="15" class="on-color mono">{ … 直接用 n … }</text>
+          <path d="M270 85 H290" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: '主要建構子（C# 12）適合只是把參數存起來的情況；需要驗證時仍可在成員初始化裡檢查。' },
+      ],
+      tryit: {
+        q: ['補完建構子，讓 `new Book("C# 入門", 320)` 能建立物件：'],
+        draft: 'class Book\n{\n    public string Title { get; }\n    public int Pages { get; }\n    public ____(string title, int pages)\n    {\n        ____ = title;\n        Pages = pages;\n    }\n}',
+        answer: ['`public Book(string title, int pages)`、`Title = title;`', '建構子名稱必須和類別相同、沒有回傳型別；只有 get 的屬性可以在建構子裡設定。也可以改寫成 `class Book(string title, int pages) { public string Title => title; … }`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '建構子寫成 `public void Book(...)`。', why: '加了 void 就變成一個普通方法，new 時不會執行。', right: '建構子沒有回傳型別：`public Book(...)`。' },
+      { wrong: '所有欄位都 public，方便存取。', why: '任何地方都能把物件改成不合理的狀態，出錯時很難追。', right: '欄位 private，對外用屬性或方法，並在裡面檢查規則。' },
+      { wrong: '宣告了 `Book b;` 就直接 `b.Title`。', why: '只宣告變數沒有建立物件，區域變數會是編譯錯誤 CS0165（未指定）；欄位則是 null，執行時拋 NullReferenceException。', right: '`var b = new Book(...);`' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下面哪個是建構子的正確宣告？（類別名稱是 Order）', options: [
+        { text: '`public Order(int id) { }`', correct: true, why: '同名、沒有回傳型別。' },
+        { text: '`public void Order(int id) { }`', why: '有回傳型別就是普通方法，而且和類別同名會編譯錯誤 CS0542。' },
+        { text: '`public new Order(int id) { }`', why: 'new 不是用在宣告建構子。' },
+        { text: '`public Order Create(int id) { }`', why: '這是回傳 Order 的工廠方法，不是建構子。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`Count { get; private set; }` 的效果是？', options: [
+        { text: '外界可以讀，只有類別自己能改', correct: true, why: 'set 加了 private，只在類別內部可用。' },
+        { text: '外界可以讀也可以改', why: 'private set 擋住了外界的寫入。' },
+        { text: '只能在建構子裡設定一次', why: '那是 `init` 或唯讀屬性的行為。' },
+        { text: '完全不能讀', why: 'get 是 public 的。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要設計一個「購物車」類別。哪些資料該是 private？對外該開放哪些方法？為什麼不直接開放 `List<Item> Items`？'], answer: [
+        '商品清單用 private 的 List，對外提供 `Add(item)`、`Remove(id)`、唯讀的 `Total`，以及 `IReadOnlyList<Item> Items` 給畫面顯示。',
+        '直接開放 List，外界可以 Add 數量為負的商品、繞過庫存檢查。把規則放進 Add 方法，才能保證購物車永遠是合理的狀態。',
+      ] },
+    ],
+    keypoints: [
+      '類別是藍圖，new 出來的物件各自擁有一份資料。',
+      '建構子和類別同名、沒有回傳型別；只存參數時可用主要建構子。',
+      '欄位設 private，透過方法改狀態，把規則放在資料旁邊。',
+    ],
+    sources: ['cs-classes', 'cs-primary-ctor'],
+  },
+
+  '3-2': {
+    goals: [
+      '分辨欄位與屬性，寫自動屬性',
+      '用 C# 14 的 `field` 關鍵字在屬性裡加檢查',
+      '用 init 與 required 讓物件建立後不可變',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-1）為什麼要把餘額欄位設成 private？', options: [
+        { text: '讓修改只能透過會檢查規則的方法', correct: true, why: '封裝：避免外界把物件改成不合理的狀態。' },
+        { text: 'private 欄位執行比較快', why: '存取修飾詞不影響效能。' },
+        { text: '這樣序列化成 JSON 時才會包含它', why: '剛好相反，預設序列化器只處理 public 屬性。' },
+        { text: '編譯器規定欄位一定要 private', why: '欄位可以是 public，只是不建議。' },
+      ] },
+    ],
+    analogy: {
+      text: ['屬性像銀行櫃檯：你說「我要存錢」（set），櫃員先檢查鈔票真偽才放進金庫（背後欄位）；你問「餘額多少」（get），櫃員去金庫看了再告訴你。你從頭到尾碰不到金庫。'],
+      limit: ['櫃員處理要時間；屬性的 get／set 通常非常快，被編譯器最佳化後幾乎等於直接讀欄位。所以屬性裡不該放耗時的動作（像查資料庫），呼叫的人會以為它很便宜。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="屬性的結構：外界呼叫 Name 的 get 或 set，set 先把值去除空白再存進背後欄位；C# 14 用 field 關鍵字代表這個背後欄位，不用自己宣告">
+        <rect x="20" y="80" width="140" height="90" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="90" y="120" text-anchor="middle" font-size="18" font-weight="900">外界</text>
+        <text x="90" y="150" text-anchor="middle" font-size="15" class="mono">p.Name = " A "</text>
+        <rect x="200" y="40" width="180" height="170" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="290" y="75" text-anchor="middle" font-size="18" font-weight="900" class="on-color">屬性 Name</text>
+        <text x="215" y="120" font-size="15" class="on-color mono">get =&gt; field</text>
+        <text x="215" y="150" font-size="15" class="on-color mono">set =&gt; field =</text>
+        <text x="215" y="174" font-size="15" class="on-color mono">  value.Trim()</text>
+        <rect x="420" y="80" width="120" height="90" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="480" y="118" text-anchor="middle" font-size="16" font-weight="900" class="on-color">背後欄位</text>
+        <text x="480" y="148" text-anchor="middle" font-size="16" class="on-color mono">"A"</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M160 125 H200"/><path d="M380 125 H420"/></g>
+      </svg>`,
+      caption: '屬性是外界與資料之間的關卡；`field` 讓你不用自己宣告背後欄位就能加關卡。',
+      blocks: [
+        '[[屬性]]對外看起來像欄位，實際是 get／set 方法。[[自動屬性]] `{ get; set; }` 最常見；要加檢查時，C# 14 的 [[field 關鍵字]]讓你只改需要的那一邊。[[init]] 與 [[required]] 讓物件只能在建立時設定。',
+        { type: 'code', lang: 'csharp', title: 'Person.cs', code: 'var p = new Person { Id = 1, Name = "  阿明 " };\nConsole.WriteLine($"[{p.Name}]");   // [阿明]\n\nclass Person\n{\n    public required int Id { get; init; }\n\n    public required string Name\n    {\n        get;\n        set => field = value.Trim();\n    }\n}' },
+      ],
+    },
+    define: [
+      { term: '屬性', en: 'property', def: '具有 get／set 存取子的成員；外觀像欄位，行為像方法。', example: '`public int Age { get; set; }`' },
+      { term: 'field 關鍵字', en: 'field', def: 'C# 14：屬性存取子裡代表編譯器產生的背後欄位。類別裡已經有名叫 field 的成員時，用 `@field` 或 `this.field` 區分。', example: '`get => field ??= Load();`' },
+      { term: 'required', en: 'required', def: '建立物件時必須在初始設定式中設定，否則 CS9035。', example: '`new Person { Id = 1 }` 漏了 Name → 編譯錯誤。' },
+    ],
+    examples: {
+      compare: [{
+        title: '名稱不能是空白',
+        kind: 'C# 13 以前 vs C# 14',
+        code: true,
+        badLabel: '手動宣告背後欄位',
+        goodLabel: 'field 關鍵字',
+        bad: 'private string _name = "";\npublic string Name\n{\n    get => _name;\n    set => _name = string.IsNullOrWhiteSpace(value)\n        ? throw new ArgumentException("必填")\n        : value;\n}',
+        good: 'public string Name\n{\n    get;\n    set => {{1:field}} = string.IsNullOrWhiteSpace(value)\n        ? throw new ArgumentException("必填")\n        : value;\n} = "";',
+        badResult: '多一個欄位，類別裡其他地方也可能繞過檢查直接改 _name。',
+        goodResult: '背後欄位只能透過屬性存取，連類別內部也繞不過。',
+        why: ['field 讓「加一點檢查」不必把整個自動屬性改寫'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var t = new Temperature();\nt.Celsius = 25;\nConsole.WriteLine(t.Fahrenheit);\nt.Celsius = -300;\n\nclass Temperature\n{\n    public double Celsius\n    {\n        get;\n        set => field = value < -273.15\n            ? throw new ArgumentOutOfRangeException(nameof(value))\n            : value;\n    }\n    public double Fahrenheit => Celsius * 9 / 5 + 32;\n}',
+          predict: { q: '`t.Celsius = -300;` 會怎樣？', options: ['存成 -300', '存成 -273.15', '拋出 ArgumentOutOfRangeException'], answer: 2 },
+          output: '77\n!Unhandled exception. System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values. (Parameter \'value\')',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="三種設定時機：set 隨時可以改；init 只能在建立物件時設定；required 加上 init 表示建立時一定要設定，而且之後不能改">
+          <rect x="10" y="20" width="170" height="160" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="60" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">set</text>
+          <text x="95" y="110" text-anchor="middle" font-size="16" class="on-color">隨時可改</text>
+          <rect x="195" y="20" width="170" height="160" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="60" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">init</text>
+          <text x="280" y="110" text-anchor="middle" font-size="16" class="on-color">只在建立時</text>
+          <text x="280" y="138" text-anchor="middle" font-size="16" class="on-color">可省略</text>
+          <rect x="380" y="20" width="170" height="160" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="60" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">required init</text>
+          <text x="465" y="110" text-anchor="middle" font-size="16" class="on-color">只在建立時</text>
+          <text x="465" y="138" text-anchor="middle" font-size="16" class="on-color">一定要給</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M180 100 H195"/><path d="M365 100 H380"/></g>
+        </svg>`, caption: '越往右越嚴格：資料建立後就不該變的（ID、建立時間），用 init 或 required init。' },
+      ],
+      tryit: {
+        q: ['讓 Email 屬性在存入時自動轉成小寫並去掉空白，用 field 關鍵字：'],
+        draft: 'public string Email\n{\n    get;\n    set => ____ = value.Trim().ToLowerInvariant();\n} = "";',
+        answer: ['`set => field = value.Trim().ToLowerInvariant();`', '`value` 是呼叫端給的新值，`field` 是背後欄位。最後的 `= "";` 是屬性初始值，確保不是 null。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`public string Name { get => Name; set => Name = value; }`', why: '屬性在自己的 get 裡讀自己，無限遞迴，執行時 StackOverflow 讓程式直接結束。', right: '用 `field`，或另外宣告背後欄位。' },
+      { wrong: '在 get 裡呼叫資料庫或網路。', why: '呼叫端以為讀屬性很便宜，可能在迴圈裡讀上千次。', right: '耗時的工作寫成方法，例如 `LoadAsync()`。' },
+      { wrong: '類別已經有一個叫 `field` 的欄位，升級到 C# 14 後屬性裡的 `field` 意思變了。', why: 'C# 14 起，屬性存取子內的 `field` 指背後欄位。', right: '改用 `@field` 或 `this.field`，或乾脆把舊欄位改名。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`public string Id { get; init; }` 的 Id 什麼時候可以設定？', options: [
+        { text: '只有建立物件時（建構子或物件初始設定式）', correct: true, why: 'init 存取子只在初始化階段可用。' },
+        { text: '任何時候都可以', why: '那是 set。' },
+        { text: '永遠不能設定，只能讀', why: '只有 get 的屬性才是這樣；init 可以在建立時設定。' },
+        { text: '只能在同一個類別內部設定', why: '那是 private set。' },
+      ] },
+      { level: '應用', type: 'mc', q: '有 `required string Name { get; init; }`，`var p = new Person();` 會怎樣？', options: [
+        { text: '編譯錯誤 CS9035：必須設定 Name', correct: true, why: 'required 成員一定要在物件初始設定式中設定。' },
+        { text: 'Name 會是 null', why: '編譯器不允許建立出缺少 required 成員的物件。' },
+        { text: 'Name 會是空字串', why: '不會給預設值，直接編譯錯誤。' },
+        { text: '執行時拋 InvalidOperationException', why: '這在編譯時就被擋下。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事問：「既然屬性只是包一層 get／set，為什麼不直接用 public 欄位？效能還比較好。」你怎麼回答？'], answer: [
+        '效能幾乎沒差，JIT 會把簡單屬性內聯（inline）。真正的差別是彈性：今天是自動屬性，明天要加檢查或通知，只改屬性內部，呼叫端完全不用動；欄位改成屬性則會破壞已編譯的呼叫端（二進位相容性）。',
+        '而且序列化、資料繫結、EF Core 這些框架預設都以屬性為對象。',
+      ] },
+    ],
+    keypoints: [
+      '對外公開用屬性，不用 public 欄位。',
+      'C# 14 的 `field` 讓你在自動屬性上加檢查，不用手寫背後欄位。',
+      '建立後不該改的資料用 init；一定要給的再加 required。',
+    ],
+    sources: ['cs-properties', 'cs-whatsnew-14'],
+  },
+
+  '3-3': {
+    goals: [
+      '用繼承讓子類別重用父類別',
+      '用 virtual／override 做出多型',
+      '知道什麼時候該用 abstract、什麼時候該 sealed',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）C# 14 的 `field` 關鍵字代表什麼？', options: [
+        { text: '屬性存取子裡，編譯器產生的背後欄位', correct: true, why: '不用自己宣告 private 欄位。' },
+        { text: '類別裡所有欄位的集合', why: 'field 只在屬性的 get／set 內有特殊意義。' },
+        { text: '宣告欄位用的關鍵字，取代 private', why: '它不是宣告用的修飾詞。' },
+        { text: '反射（reflection）用的 API', why: '這是語言關鍵字，和反射無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['繼承像連鎖店的分店：總店（父類別）規定了營業時間、收銀流程，分店（子類別）直接沿用，再加上自己的在地菜色。客人說「給我招牌菜」（呼叫 virtual 方法），每家分店端出的是自己版本（override），這就是多型。'],
+      limit: ['分店可以加盟好幾個品牌；C# 的類別只能繼承一個父類別。需要「同時具備多種能力」時用介面（3-4）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="繼承樹：抽象類別 Shape 有抽象方法 Area；Circle 和 Rect 繼承 Shape 並各自 override Area；呼叫 shape.Area() 時依實際物件型別執行對應版本">
+        <rect x="170" y="15" width="220" height="80" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="47" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">abstract Shape</text>
+        <text x="280" y="78" text-anchor="middle" font-size="16" class="on-color mono">abstract Area()</text>
+        <rect x="20" y="160" width="220" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="130" y="192" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">Circle</text>
+        <text x="130" y="222" text-anchor="middle" font-size="15" class="on-color mono">override: π × r²</text>
+        <rect x="320" y="160" width="220" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="430" y="192" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">Rect</text>
+        <text x="430" y="222" text-anchor="middle" font-size="15" class="on-color mono">override: w × h</text>
+        <path d="M280 95 V128 H130 V160 M280 128 H430 V160" class="stroke-ink" stroke-width="4" fill="none"/>
+        <text x="280" y="280" text-anchor="middle" font-size="16" class="mono">Shape s = new Circle(1); s.Area() → 3.14…</text>
+      </svg>`,
+      caption: '變數的型別是 Shape，但執行哪個 Area 由「實際的物件」決定。',
+      blocks: [
+        '[[繼承]]用 `class 子 : 父`。父類別把方法標成 [[virtual]]，子類別用 [[override]] 換掉實作；呼叫時依物件實際型別決定執行哪一版，這就是[[多型]]。[[abstract]] 類別不能 new，只當共同的父類別；[[sealed]] 禁止再被繼承。',
+      ],
+    },
+    define: [
+      { term: '繼承', en: 'inheritance', def: '`class B : A`，B 自動擁有 A 的成員（private 的看不到但存在）。單一繼承。', example: '`class Manager : Employee`' },
+      { term: '多型', en: 'polymorphism', def: '透過父型別的變數呼叫 virtual 成員，執行的是物件實際型別的覆寫版本。', example: '`foreach (Shape s in shapes) total += s.Area();`' },
+      { term: 'abstract', en: 'abstract', def: '抽象類別不能實例化；抽象成員沒有實作，非抽象子類別必須 override。', example: '`public abstract double Area();`' },
+    ],
+    examples: {
+      compare: [{
+        title: '算一堆形狀的總面積',
+        kind: '型別判斷 vs 多型',
+        code: true,
+        badLabel: '一個個判斷型別',
+        goodLabel: '交給每個物件自己算',
+        bad: 'foreach (var s in shapes)\n{\n    if (s is Circle c) total += Math.PI * c.R * c.R;\n    else if (s is Rect r) total += r.W * r.H;\n    // 新增三角形要回來改這裡\n}',
+        good: 'foreach (var s in shapes)\n{\n    total += {{1:s.Area()}};\n}\n// 新增三角形：只要寫 Triangle 類別',
+        badResult: '每加一種形狀，所有判斷的地方都要改。',
+        goodResult: '新增形狀不用改計算的程式。',
+        why: ['「對修改封閉、對擴充開放」：新功能用新增類別，而不是改舊程式'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'Animal[] zoo = [new Dog(), new Cat(), new Animal()];\nforeach (var a in zoo)\n    Console.WriteLine(a.Speak());\n\nclass Animal\n{\n    public virtual string Speak() => "……";\n}\nclass Dog : Animal\n{\n    public override string Speak() => "汪";\n}\nclass Cat : Animal\n{\n    public new string Speak() => "喵";\n}',
+          predict: { q: 'Cat 用的是 `new` 不是 `override`，第二行會印出什麼？', options: ['喵', '……', '編譯錯誤'], answer: 1 },
+          output: '汪\n……\n……',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="override 與 new 的差別：override 取代父類別的版本，透過父型別變數呼叫也會執行子類別的；new 只是隱藏，透過父型別變數呼叫仍執行父類別的版本">
+          <rect x="10" y="20" width="260" height="150" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="56" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">override</text>
+          <text x="140" y="100" text-anchor="middle" font-size="16" class="on-color">取代父類別的版本</text>
+          <text x="140" y="140" text-anchor="middle" font-size="16" class="on-color mono">Animal a → "汪"</text>
+          <rect x="290" y="20" width="260" height="150" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="56" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">new</text>
+          <text x="420" y="100" text-anchor="middle" font-size="16" class="on-color">只是隱藏，不是取代</text>
+          <text x="420" y="140" text-anchor="middle" font-size="16" class="on-color mono">Animal a → "……"</text>
+          <path d="M270 95 H290" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: '要多型就用 override；`new` 幾乎只在相容舊程式時才用。' },
+      ],
+      tryit: {
+        q: ['補完，讓 `Employee` 的 `Salary()` 可以被 `Manager` 覆寫成多加 10000：'],
+        draft: 'class Employee\n{\n    public ____ decimal Salary() => 40000m;\n}\nclass Manager : Employee\n{\n    public ____ decimal Salary() => base.Salary() + 10000m;\n}',
+        answer: ['`virtual`、`override`。', '`base.Salary()` 呼叫父類別的版本再加上去，避免把 40000 寫兩次。'],
+      },
+    },
+    mistakes: [
+      { wrong: '子類別寫了同名方法但沒加 override。', why: '變成隱藏（編譯器警告 CS0114），透過父型別呼叫時不會執行子類別的版本。', right: '父類別加 virtual，子類別加 override。' },
+      { wrong: '為了重用幾個方法就建立很深的繼承鏈（A : B : C : D）。', why: '改父類別會影響所有子孫，很難預測。', right: '「是一種」（Dog 是一種 Animal）才用繼承；只是想重用功能時，用組合（把另一個物件當欄位）或介面。' },
+      { wrong: '`new Shape()`，而 Shape 是 abstract。', why: '抽象類別不能實例化（CS0144）。', right: '`new Circle(…)`，用 Shape 當變數型別。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'C# 的類別可以同時繼承幾個父類別？', options: [
+        { text: '只能一個', correct: true, why: 'C# 是單一繼承；要多種能力用多個介面。' },
+        { text: '最多兩個', why: '沒有這個規則，就是一個。' },
+        { text: '不限，用逗號分隔', why: '逗號後面接的只能是介面。' },
+        { text: '零個，C# 不支援繼承', why: 'C# 支援類別繼承。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`Shape s = new Circle(2); s.Area();` 執行的是哪個 Area？（Area 在 Shape 是 abstract，Circle override 了它）', options: [
+        { text: 'Circle 的 Area', correct: true, why: 'virtual／abstract 呼叫依物件實際型別決定。' },
+        { text: 'Shape 的 Area', why: 'Shape 的 Area 是抽象的，沒有實作可以執行。' },
+        { text: '編譯錯誤：s 是 Shape 型別', why: '透過父型別呼叫正是多型的用法。' },
+        { text: '執行時拋出 NotImplementedException', why: 'Circle 已經提供了實作。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['遊戲裡有「會飛的」、「會游泳的」、「會跑的」動物，鴨子三種都會。用繼承設計會遇到什麼問題？'], answer: [
+        '單一繼承只能選一個父類別：Duck : FlyingAnimal 就不能同時是 SwimmingAnimal。硬做會變成 FlyingSwimmingRunningAnimal 這種組合爆炸。',
+        '比較好的做法是把能力拆成介面：`IFly`、`ISwim`、`IRun`，Duck 同時實作三個。下一課就是介面。',
+      ] },
+    ],
+    keypoints: [
+      '「是一種」的關係才用繼承；C# 只能單一繼承。',
+      '父類別 virtual、子類別 override，呼叫時看物件的實際型別。',
+      '共同父類別不該被直接建立時用 abstract；不讓人再繼承用 sealed。',
+    ],
+    sources: ['cs-inheritance', 'cs-polymorphism'],
+  },
+
+  '3-4': {
+    goals: [
+      '定義介面並讓類別實作它',
+      '寫一個只依賴介面、不依賴具體類別的方法',
+      '分辨介面和抽象類別的使用時機',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-3）子類別同名方法沒加 override，透過父型別變數呼叫時會執行？', options: [
+        { text: '父類別的版本（子類別只是隱藏）', correct: true, why: '沒有 override 就沒有多型。' },
+        { text: '子類別的版本', why: '只有 override 才會。' },
+        { text: '編譯錯誤', why: '只會有 CS0114 警告，仍可編譯。' },
+        { text: '兩個版本都執行', why: 'C# 不會同時執行兩個版本。' },
+      ] },
+    ],
+    analogy: {
+      text: ['介面像插座規格：只規定「兩孔、110V」，不管插上去的是吹風機、手機充電器還是檯燈。電器只要符合規格就能插；牆上的插座也不用知道插的是什麼。'],
+      limit: ['插座規格只有一種形狀；C# 的一個類別可以同時符合很多個介面。另外，介面從 C# 8 起可以有預設實作，但新手先把它當成「純約定」就好。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="介面 INotifier 規定 Send 方法；EmailNotifier 與 LineNotifier 各自實作；OrderService 只依賴 INotifier，不知道實際是哪一個">
+        <rect x="20" y="20" width="200" height="80" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="120" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">OrderService</text>
+        <text x="120" y="83" text-anchor="middle" font-size="14" class="on-color">只認得介面</text>
+        <rect x="300" y="20" width="240" height="80" style="fill:var(--m2)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+        <text x="420" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">interface INotifier</text>
+        <text x="420" y="83" text-anchor="middle" font-size="15" class="on-color mono">void Send(string)</text>
+        <path d="M220 60 H300" class="stroke-ink" stroke-width="4"/>
+        <rect x="230" y="180" width="150" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="305" y="222" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">EmailNotifier</text>
+        <rect x="395" y="180" width="150" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="470" y="222" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">LineNotifier</text>
+        <path d="M420 100 V140 H305 V180 M420 140 H470 V180" class="stroke-ink" stroke-width="4" fill="none"/>
+      </svg>`,
+      caption: 'OrderService 依賴的是「能 Send 的東西」，換通知方式不用改它；測試時也能換成假的。',
+      blocks: [
+        '[[介面]]只描述能力。類別用 `class X : I1, I2` 實作多個介面。方法參數寫介面型別，呼叫端就能傳任何符合約定的物件。.NET 本身大量使用介面：`IEnumerable<T>`、`IDisposable`、`IComparable<T>`。',
+        { type: 'table', caption: '介面 vs 抽象類別', head: ['', '介面', '抽象類別'], rows: [
+          ['一個類別可以有幾個', '多個', '一個'],
+          ['可以有欄位（狀態）', '不行', '可以'],
+          ['建構子', '沒有', '有'],
+          ['適合', '描述「能做什麼」', '共用實作與狀態的「是一種」'],
+        ] },
+      ],
+    },
+    define: [
+      { term: '介面', en: 'interface', def: '一組成員簽章的約定；實作的類別必須提供所有成員（除非介面有預設實作）。', example: '`interface IShape { double Area(); }`' },
+      { term: '依賴反轉', en: 'dependency inversion', def: '高層程式依賴抽象（介面），不依賴具體類別，讓實作可以替換。', example: '`OrderService(INotifier notifier)`' },
+      { term: 'IComparable', en: 'IComparable<T>', def: '.NET 的介面：實作 CompareTo，物件就能被 Sort 排序。', example: '`class Score : IComparable<Score>`' },
+    ],
+    examples: {
+      compare: [{
+        title: '訂單完成後通知客戶',
+        kind: '綁死 vs 可替換',
+        code: true,
+        badLabel: '直接 new 具體類別',
+        goodLabel: '依賴介面',
+        bad: 'class OrderService\n{\n    private readonly EmailNotifier _n = {{1:new EmailNotifier()}};\n    public void Complete() => _n.Send("完成");\n}',
+        good: 'class OrderService({{1:INotifier notifier}})\n{\n    public void Complete() => notifier.Send("完成");\n}',
+        badResult: '想改用 LINE 或在測試時不要真的寄信，都得改 OrderService。',
+        goodResult: '傳進什麼 INotifier 就用什麼；測試時傳假的。',
+        why: ['這是相依性注入（DI）的基礎，模組 9 的 ASP.NET Core 會大量使用'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'Notify(new Email(), "出貨了");\nNotify(new Sms(), "出貨了");\n\nvoid Notify(INotifier n, string msg) => n.Send(msg);\n\ninterface INotifier { void Send(string msg); }\nclass Email : INotifier\n{\n    public void Send(string msg) => Console.WriteLine($"[Email] {msg}");\n}\nclass Sms : INotifier\n{\n    public void Send(string msg) => Console.WriteLine($"[SMS] {msg}");\n}',
+          predict: { q: 'Notify 方法不知道實際型別，會印出什麼？', options: ['兩行都是 [Email]', '[Email] 與 [SMS] 各一行', '編譯錯誤'], answer: 1 },
+          output: '[Email] 出貨了\n[SMS] 出貨了',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'iface', label: '介面' }, { id: 'abs', label: '抽象類別' }],
+          items: [
+            { text: '「可以被儲存」：使用者、訂單、設定檔都要能存', answer: 'iface', why: '彼此不是同一種東西，只是有共同能力。' },
+            { text: '各種「報表」共用頁首頁尾與分頁邏輯，只有內容不同', answer: 'abs', why: '要共用實作與狀態，且都是「一種報表」。' },
+            { text: '測試時要換成假的「付款服務」', answer: 'iface', why: '介面最容易用假物件替換。' },
+            { text: '一個類別同時要「可比較」又「可複製」', answer: 'iface', why: '需要多個能力，只能用介面。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="一個類別實作多個介面：Duck 同時實作 IFly、ISwim、IRun 三個介面">
+          <rect x="20" y="20" width="150" height="56" style="fill:var(--m1)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/><text x="95" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">IFly</text>
+          <rect x="205" y="20" width="150" height="56" style="fill:var(--m3)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/><text x="280" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">ISwim</text>
+          <rect x="390" y="20" width="150" height="56" style="fill:var(--m4)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/><text x="465" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">IRun</text>
+          <rect x="180" y="110" width="200" height="50" class="fill-surface stroke-ink" stroke-width="4"/><text x="280" y="142" text-anchor="middle" font-size="18" font-weight="900" class="mono">Duck</text>
+          <path d="M95 76 V93 H465 V76 M280 76 V110" class="stroke-ink" stroke-width="4" fill="none"/>
+        </svg>`, caption: '`class Duck : IFly, ISwim, IRun`：解決上一課單一繼承的限制。' },
+      ],
+      tryit: {
+        q: ['讓 Score 可以用 `list.Sort()` 由小到大排序：'],
+        draft: 'class Score(int value) : ____<Score>\n{\n    public int Value => value;\n    public int CompareTo(Score? other) => Value.____(other?.Value ?? 0);\n}',
+        answer: ['`IComparable<Score>`、`Value.CompareTo(...)`。', 'CompareTo 回傳負數表示自己比較小、0 相等、正數比較大；int 已經實作了，直接借用。`Score?` 是可為 null 的參考型別，4-2 會講。'],
+      },
+    },
+    mistakes: [
+      { wrong: '每個類別都配一個介面（IUser、IOrder…），即使永遠只有一個實作。', why: '多一層間接，程式更難讀，卻沒換來替換的彈性。', right: '需要替換（外部服務、測試替身）或多個實作時才抽介面。' },
+      { wrong: '介面方法在類別裡寫成 private。', why: '實作介面的成員必須是 public（或用明確介面實作）。', right: '`public void Send(string msg)`。' },
+      { wrong: '介面加了一個新方法，結果所有實作都編譯失敗。', why: '介面是約定，改約定就要所有人一起改。', right: '公開函式庫的介面要謹慎擴充，必要時提供預設實作或新增另一個介面。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下列哪個是介面「做不到」的？', options: [
+        { text: '宣告實例欄位來保存狀態', correct: true, why: '介面不能有實例欄位；要狀態用抽象類別。' },
+        { text: '讓一個類別同時實作好幾個', why: '這正是介面的優勢。' },
+        { text: '當作方法參數的型別', why: '很常見的用法。' },
+        { text: '宣告屬性', why: '介面可以宣告屬性，例如 `string Name { get; }`。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`void Print(IEnumerable<int> items)` 可以傳入哪些？', options: [
+        { text: '陣列、List、HashSet 都可以', correct: true, why: '它們都實作了 IEnumerable<int>。' },
+        { text: '只能傳 IEnumerable 這個類別', why: 'IEnumerable 是介面，不能 new；可以傳任何實作它的物件。' },
+        { text: '只能傳 List<int>', why: '參數型別是介面，任何實作都行。' },
+        { text: '只能傳陣列', why: '陣列只是其中一種實作。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你寫的「匯率換算」類別直接呼叫外部 API，單元測試每次都要連網而且結果會變。怎麼用介面解決？'], answer: [
+        '定義 `interface IRateProvider { decimal GetRate(string from, string to); }`，換算類別在建構子收 IRateProvider。',
+        '正式環境傳呼叫 API 的實作；測試時傳一個固定回傳 31.5m 的假實作。測試就變得快、穩定、可離線。',
+      ] },
+    ],
+    keypoints: [
+      '介面描述能力，一個類別可以實作多個。',
+      '參數與欄位寫介面型別，實作就能替換（正式、測試）。',
+      '要共用狀態與實作用抽象類別；只描述能力用介面。',
+    ],
+    sources: ['cs-interfaces'],
+  },
+
+  '3-5': {
+    goals: [
+      '分辨實值型別與參考型別在指定時的差別',
+      '知道 struct 適合什麼資料',
+      '用 record 寫資料類別，並用 with 複製',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-4）測試時想把寄信服務換成假的，關鍵是？', options: [
+        { text: '讓使用端依賴介面，從外部傳入實作', correct: true, why: '依賴介面才能替換。' },
+        { text: '把寄信類別設成 sealed', why: 'sealed 讓它更難替換。' },
+        { text: '在寄信方法裡判斷是不是測試環境', why: '把測試邏輯混進正式程式，越來越難維護。' },
+        { text: '把寄信方法改成 static', why: 'static 方法無法透過介面替換。' },
+      ] },
+    ],
+    analogy: {
+      text: ['實值型別像影印：你把成績單影印一份給家人，他在影本上畫線，你的正本不變。參考型別像分享雲端文件的連結：你把連結傳給同事，他改了內容，你打開也看到改過的。'],
+      limit: ['雲端文件有權限控管，C# 的參考沒有：拿到參考的人都能改（除非型別設計成不可變）。string 是參考型別卻「表現得像值」，因為它不可變，沒人能改到同一份。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="左邊實值型別：Point a 指定給 b 時整份複製，改 b.X 不影響 a；右邊參考型別：Person a 指定給 b 時只複製參考，a 和 b 指向堆積上同一個物件，改 b.Name 後 a.Name 也變">
+        <rect x="10" y="15" width="260" height="270" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="140" y="48" text-anchor="middle" font-size="19" font-weight="900" class="on-color">實值型別（struct）</text>
+        <rect x="35" y="80" width="210" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="140" y="117" text-anchor="middle" font-size="17" class="mono">a: X=1</text>
+        <rect x="35" y="180" width="210" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="140" y="217" text-anchor="middle" font-size="17" class="mono">b: X=9（複本）</text>
+        <path d="M140 140 V180" class="stroke-ink" stroke-width="3" stroke-dasharray="6 5"/>
+        <text x="140" y="270" text-anchor="middle" font-size="15" class="on-color">各自一份</text>
+        <rect x="290" y="15" width="260" height="270" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="420" y="48" text-anchor="middle" font-size="19" font-weight="900" class="on-color">參考型別（class）</text>
+        <rect x="310" y="80" width="70" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="345" y="112" text-anchor="middle" font-size="17" class="mono">a</text>
+        <rect x="310" y="150" width="70" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="345" y="182" text-anchor="middle" font-size="17" class="mono">b</text>
+        <rect x="420" y="110" width="115" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="477" y="146" text-anchor="middle" font-size="16" class="mono">Name="B"</text>
+        <path d="M380 105 H400 V130 H420 M380 175 H400 V150 H420" class="stroke-ink" stroke-width="3" fill="none"/>
+        <text x="420" y="270" text-anchor="middle" font-size="15" class="on-color">共用同一個物件</text>
+      </svg>`,
+      caption: '`b = a`：實值型別複製整個值，參考型別只複製「地址」。',
+      blocks: [
+        '[[實值型別]]（int、double、bool、[[struct]]、enum）指定時整份複製；[[參考型別]]（class、string、陣列、[[record]]）只複製參考。[[record]] 提供[[值相等]]與 [[with 運算式]]，很適合「傳來傳去的資料」。',
+        { type: 'code', lang: 'csharp', title: 'records.cs', code: 'record Person(string Name, int Age);\n\nvar a = new Person("阿明", 30);\nvar b = new Person("阿明", 30);\nConsole.WriteLine(a == b);         // True（內容相同）\nConsole.WriteLine(ReferenceEquals(a, b)); // False（不同物件）\n\nvar older = a with { Age = 31 };\nConsole.WriteLine(a);              // Person { Name = 阿明, Age = 30 }\nConsole.WriteLine(older);          // Person { Name = 阿明, Age = 31 }' },
+      ],
+    },
+    define: [
+      { term: 'struct', en: 'struct', def: '自訂實值型別；建議小（約 16 位元組內）、不可變、像一個值。', example: '`readonly record struct Point(int X, int Y);`' },
+      { term: 'record', en: 'record class', def: '以位置參數宣告的資料型別，自動產生屬性（init）、值相等、ToString、Deconstruct、with 支援。', example: '`record Order(int Id, decimal Total);`' },
+      { term: '值相等', en: 'value equality', def: '比較內容而不是比較是不是同一個物件。class 預設比參考，record 與 struct 預設比內容。', example: '`new P(1) == new P(1)`：class 為 False、record 為 True。' },
+    ],
+    examples: {
+      compare: [{
+        title: '比較兩筆一樣的資料',
+        kind: 'class vs record',
+        code: true,
+        badLabel: '一般 class',
+        goodLabel: 'record',
+        bad: '{{1:class}} P(string n) { public string N => n; }\nConsole.WriteLine(new P("A") == new P("A"));',
+        good: '{{1:record}} P(string N);\nConsole.WriteLine(new P("A") == new P("A"));',
+        badResult: 'False：class 預設比較「是不是同一個物件」。',
+        goodResult: 'True：record 比較每個屬性的值。',
+        why: ['DTO、設定、查詢結果這類「純資料」用 record'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var p1 = new PointS { X = 1 };\nvar p2 = p1;\np2.X = 9;\n\nvar c1 = new PointC { X = 1 };\nvar c2 = c1;\nc2.X = 9;\n\nConsole.WriteLine($"{p1.X} {c1.X}");\n\nstruct PointS { public int X; }\nclass PointC { public int X; }',
+          predict: { q: '會印出什麼？', options: ['1 1', '1 9', '9 9'], answer: 1 },
+          output: '1 9',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'v', label: '實值型別' }, { id: 'r', label: '參考型別' }],
+          items: [
+            { text: '`int`、`double`、`bool`', answer: 'v', why: '內建數字與布林都是 struct。' },
+            { text: '`string`', answer: 'r', why: 'string 是 class，但不可變，所以用起來像值。' },
+            { text: '`int[]`', answer: 'r', why: '陣列一律是參考型別，即使元素是 int。' },
+            { text: '`DateTime`', answer: 'v', why: 'DateTime 是 struct。' },
+            { text: '`record Person(...)`', answer: 'r', why: '`record` 預設是 record class；要實值型別寫 `record struct`。' },
+            { text: '`List<int>`', answer: 'r', why: 'List 是 class。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="with 運算式：原本的 record a 年齡 30，a with Age 31 產生新的 record，a 不變">
+          <rect x="20" y="40" width="200" height="90" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="120" y="78" text-anchor="middle" font-size="18" font-weight="900" class="mono">a</text>
+          <text x="120" y="108" text-anchor="middle" font-size="16" class="mono">阿明, 30</text>
+          <rect x="340" y="40" width="200" height="90" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="440" y="78" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">older（新）</text>
+          <text x="440" y="108" text-anchor="middle" font-size="16" class="on-color mono">阿明, 31</text>
+          <path d="M220 85 H340" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="160" text-anchor="middle" font-size="16" class="mono">a with { Age = 31 }</text>
+        </svg>`, caption: 'with 複製出新的 record，只換指定的屬性；適合「不可變資料」的更新方式。' },
+      ],
+      tryit: {
+        q: ['把這個 class 改成一行 record，並用 with 做出價格打九折的新商品：'],
+        draft: 'class Product { public string Name { get; init; } = ""; public decimal Price { get; init; } }\n\n// 改成：\n____ Product(string Name, decimal Price);\nvar p = new Product("耳機", 1000m);\nvar sale = p ____ { Price = p.Price * 0.9m };',
+        answer: ['`record Product(string Name, decimal Price);`、`p with { Price = p.Price * 0.9m }`。', 'record 的位置參數會自動變成 init 屬性；with 產生新物件，p 保持 1000。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為把物件傳進方法、方法裡改屬性，外面不會變。', why: '參考型別傳的是參考的複本，指向同一個物件。', right: '需要保護時傳 record 並用 with 產生新的，或傳複本。' },
+      { wrong: '把很大、會一直修改的資料做成 struct。', why: '每次指定與傳參數都整份複製，而且改到的常常是複本（例如從 List 取出來的 struct）。', right: 'struct 只用於小而不可變的值；其他用 class 或 record。' },
+      { wrong: '用 `==` 比較兩個 class 物件的內容。', why: 'class 預設比較參考。', right: '用 record、覆寫 Equals，或比較特定屬性。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '哪一個是實值型別？', options: [
+        { text: '`DateTime`', correct: true, why: 'DateTime 是 struct。' },
+        { text: '`string`', why: 'string 是 class（參考型別），只是不可變。' },
+        { text: '`int[]`', why: '陣列都是參考型別。' },
+        { text: '`record Person(string Name)`', why: '`record` 預設是 record class。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`record R(int X); var a = new R(1); var b = a with { X = 2 };` 之後 a.X 是？', options: [
+        { text: '`1`', correct: true, why: 'with 產生新物件，a 不變。' },
+        { text: '`2`', why: 'with 不會修改原本的 record。' },
+        { text: '編譯錯誤：record 屬性不能改', why: 'with 不是修改，而是建立新物件，合法。' },
+        { text: '`0`', why: 'a 建立時 X 就是 1，之後沒被改。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['API 回傳的「訂單查詢結果」該用 class、struct 還是 record？為什麼？'], answer: [
+        'record（record class）。它是純資料、通常建立後不改、需要能比較與好讀的 ToString（記日誌時很方便），序列化框架也完整支援。',
+        '不用 struct：訂單有很多欄位，複製成本高。不用一般 class：要自己寫 Equals 與 ToString。',
+      ] },
+    ],
+    keypoints: [
+      '實值型別指定時整份複製；參考型別只複製參考，會共用同一個物件。',
+      'struct 只用在小而不可變的值，例如座標、金額組合。',
+      '純資料用 record：值相等、好讀的 ToString、用 with 產生修改後的新物件。',
+    ],
+    sources: ['cs-value-types', 'cs-records', 'cs-classes'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
+   模組 4：型別系統進階
+   ========================================================================== */
+defineTerms({
+  '泛型': { en: 'generics', def: '把型別當成參數的寫法：同一份程式碼可以用在不同型別上，同時保有型別安全。', example: '`List<int>`、`List<string>`' },
+  '型別參數': { en: 'type parameter', def: '泛型裡代表「某個型別」的名字，慣例寫成 T 或以 T 開頭。', example: '`T Max<T>(T a, T b)` 的 T。' },
+  '條件約束': { en: 'constraint', def: '用 `where` 限制型別參數必須符合的條件，才能在泛型程式碼裡使用那些能力。', example: '`where T : IComparable<T>`' },
+  'boxing': { en: 'boxing', def: '把實值型別包進一個物件放到堆積上，例如 int 轉成 object。會產生配置與複製。', example: '`object o = 42;`' },
+  '可為 null 的參考型別': { en: 'nullable reference types (NRT)', def: 'C# 8 起的功能（新專案預設開啟）：`string` 表示不會是 null，`string?` 表示可能是 null，編譯器據此給警告。', example: '`string? middleName = null;`' },
+  'null 條件運算子': { en: 'null-conditional operator', def: '`?.`：左邊是 null 就直接得到 null，不會拋例外。C# 14 起也能用在指定的左邊（`?.=`）。', example: '`user?.Address?.City`' },
+  'null 聯合運算子': { en: 'null-coalescing operator', def: '`??`：左邊是 null 就用右邊的值；`??=` 是左邊是 null 時才指定。', example: '`name ?? "匿名"`' },
+  'NullReferenceException': { en: 'NullReferenceException', def: '對 null 存取成員時拋出的例外，是 C# 最常見的執行時錯誤。', example: '`string s = null!; s.Length`' },
+  '型別模式': { en: 'type pattern', def: '檢查值是不是某個型別，是的話同時宣告一個該型別的變數。', example: '`if (shape is Circle c)`' },
+  '屬性模式': { en: 'property pattern', def: '用 `{ 屬性: 模式 }` 檢查物件的屬性值。', example: '`order is { Status: "已付款", Total: > 1000 }`' },
+  '清單模式': { en: 'list pattern', def: 'C# 11 起，用 `[…]` 比對陣列或清單的形狀與元素。', example: '`args is ["--help"]`' },
+  '列舉': { en: 'enum', def: '一組有名字的整數常數，讓「狀態」「種類」這類固定選項有意義的名字。', example: '`enum Status { Pending, Paid, Shipped }`' },
+  'closed': { en: 'closed modifier', def: 'C# 15（.NET 11）新增：只允許在同一個組件內被繼承的類別，編譯器因此知道所有子類別，switch 可以不寫 `_`。', example: '`public closed record class Shape;`' },
+  'union 型別': { en: 'union type', def: 'C# 15（.NET 11）新增：宣告一個值「只能是這幾種型別之一」，switch 必須全部處理。', example: '`public union Pet(Cat, Dog, Bird);`' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '使用泛型集合並說出它比 object 好在哪',
+      '寫一個泛型方法',
+      '用 where 條件約束讓泛型方法能比較大小',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-5）`record P(int X)`，`new P(1) == new P(1)` 的結果是？', options: [
+        { text: '`True`，record 比較內容', correct: true, why: 'record 預設是值相等。' },
+        { text: '`False`，兩個是不同物件', why: '一般 class 才會比參考。' },
+        { text: '編譯錯誤：record 不能用 ==', why: 'record 自動產生了 == 運算子。' },
+        { text: '執行時拋出例外', why: '比較是合法操作。' },
+      ] },
+    ],
+    analogy: {
+      text: ['泛型像有標籤欄的收納箱：箱子的設計只有一種，但貼上「襪子」的箱子就只能放襪子。`List<T>` 是箱子設計，`List<int>` 是貼了 int 標籤的那一個。'],
+      limit: ['真的箱子標籤寫錯還是塞得進去；C# 的 `List<int>` 放字串會直接編譯錯誤。而且 .NET 會為每種實值型別產生專門的機器碼，不只是貼標籤。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="一個泛型定義 List of T，填入不同型別參數得到 List of int、List of string、List of Person 三種具體型別，每種只能放對應的型別">
+        <rect x="170" y="15" width="220" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="58" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">List&lt;T&gt;</text>
+        <rect x="10" y="170" width="170" height="80" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="205" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">List&lt;int&gt;</text>
+        <text x="95" y="232" text-anchor="middle" font-size="15" class="on-color">只放整數</text>
+        <rect x="195" y="170" width="170" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="205" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">List&lt;string&gt;</text>
+        <text x="280" y="232" text-anchor="middle" font-size="15" class="on-color">只放字串</text>
+        <rect x="380" y="170" width="170" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="205" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">List&lt;Person&gt;</text>
+        <text x="465" y="232" text-anchor="middle" font-size="15" class="on-color">只放 Person</text>
+        <path d="M280 85 V125 H95 V170 M280 125 V170 M280 125 H465 V170" class="stroke-ink" stroke-width="4" fill="none"/>
+        <text x="300" y="118" font-size="15">T = ?</text>
+      </svg>`,
+      caption: '定義一次，用的時候填入型別；每個具體版本都是型別安全的。',
+      blocks: [
+        '[[泛型]]讓類別或方法帶[[型別參數]]。沒有泛型時只能用 object，取出時要轉型，實值型別還會 [[boxing]]。[[條件約束]] `where T : …` 告訴編譯器 T 一定具備某些能力。',
+        { type: 'code', lang: 'csharp', title: 'generic-max.cs', code: 'Console.WriteLine(Max(3, 9));          // 9\nConsole.WriteLine(Max("apple", "pear")); // pear\n\nT Max<T>(T a, T b) where T : IComparable<T>\n    => a.CompareTo(b) >= 0 ? a : b;' },
+      ],
+    },
+    define: [
+      { term: '泛型', en: 'generics', def: '以型別參數化的類別、介面、方法、委派。', example: '`Dictionary<string, int>`' },
+      { term: '條件約束', en: 'constraint', def: '`where T : class`、`struct`、`new()`、`notnull`、`基底類別`、`介面` 等。', example: '`where T : IComparable<T>`' },
+      { term: 'boxing', en: 'boxing', def: '實值型別轉成 object 或介面時，被包裝到堆積上的動作；取回來叫 unboxing。', example: '`ArrayList` 存 int 會 boxing。' },
+    ],
+    examples: {
+      compare: [{
+        title: '存一串整數',
+        kind: '舊寫法 vs 泛型',
+        code: true,
+        badLabel: 'ArrayList（.NET 1.0 時代）',
+        goodLabel: 'List<int>',
+        bad: 'var list = new ArrayList();\nlist.Add(1);\nlist.Add("二");   // 也放得進去\nint first = {{1:(int)}}list[0];',
+        good: 'var list = new List<int>();\nlist.Add(1);\n// list.Add("二");  // 編譯錯誤\nint first = list[0];',
+        badResult: '每個 int 都 boxing；放錯型別要到執行時轉型才爆。',
+        goodResult: '沒有 boxing、不用轉型，放錯型別編譯時就擋下。',
+        why: ['新程式不要用 System.Collections 裡的非泛型集合'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var box = new Box<int>(5);\nvar label = new Box<string>("hi");\nConsole.WriteLine(box.Value + 1);\nConsole.WriteLine(label.Value + 1);\nConsole.WriteLine(box.GetType().Name);\n\nclass Box<T>(T value)\n{\n    public T Value => value;\n}',
+          predict: { q: '`label.Value + 1` 會印出什麼？', options: ['hi1', '編譯錯誤', 'hi + 1'], answer: 0 },
+          output: '6\nhi1\nBox`1',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="條件約束讓編譯器知道 T 的能力：沒有約束時 T 只能當 object 用，不能呼叫 CompareTo；加上 where T : IComparable of T 後就能呼叫">
+          <rect x="10" y="20" width="260" height="140" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color">沒有約束</text>
+          <text x="30" y="98" font-size="16" class="on-color mono">a.CompareTo(b)</text>
+          <text x="30" y="132" font-size="16" class="on-color">✗ 編譯錯誤 CS1061</text>
+          <rect x="290" y="20" width="260" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color">where T : IComparable</text>
+          <text x="310" y="98" font-size="16" class="on-color mono">a.CompareTo(b)</text>
+          <text x="310" y="132" font-size="16" class="on-color">✓ 可以呼叫</text>
+          <path d="M270 90 H290" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: '約束是對呼叫端的要求，也是給方法內部的保證。' },
+      ],
+      tryit: {
+        q: ['寫一個泛型方法 `FirstOrFallback`：陣列有元素就回傳第一個，否則回傳 fallback。'],
+        draft: 'T FirstOrFallback____(T[] items, T fallback)\n    => items.Length > 0 ? ____ : fallback;',
+        answer: ['`T FirstOrFallback<T>(T[] items, T fallback) => items.Length > 0 ? items[0] : fallback;`', '方法名稱後面的 `<T>` 宣告型別參數；呼叫時通常不用寫，編譯器會從引數推斷：`FirstOrFallback(names, "無")`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `List<object>` 裝各種東西，取出時再判斷型別。', why: '失去型別安全，錯誤延到執行時。', right: '找出共同的介面或基底類別，用 `List<IShape>`。' },
+      { wrong: '泛型方法裡寫 `a > b`。', why: '編譯器不知道 T 能不能比較，`>` 不能用在任意 T 上。', right: '加約束 `where T : IComparable<T>` 用 CompareTo，或 .NET 7 起的泛型數學 `where T : INumber<T>`。' },
+      { wrong: '每個方法都加 `<T>`，即使只會用到一種型別。', why: '徒增閱讀負擔。', right: '真的有兩種以上型別要共用同一邏輯時才泛型化。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`List<int>` 比 `ArrayList` 好的地方「不包括」哪一項？', options: [
+        { text: '可以同時放 int 和 string', correct: true, why: '這是 ArrayList 的「特性」，正是泛型要避免的。' },
+        { text: '放錯型別時編譯錯誤', why: '這是泛型的優點。' },
+        { text: '存 int 不會 boxing', why: '這是泛型的優點。' },
+        { text: '取出時不用轉型', why: '這是泛型的優點。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`T Max<T>(T a, T b) where T : IComparable<T>`，哪個呼叫「不能」編譯？', options: [
+        { text: '`Max(new object(), new object())`', correct: true, why: 'object 沒有實作 IComparable<object>，不符合約束。' },
+        { text: '`Max(1, 2)`', why: 'int 實作了 IComparable<int>。' },
+        { text: '`Max("a", "b")`', why: 'string 實作了 IComparable<string>。' },
+        { text: '`Max(1.5, 2.5)`', why: 'double 實作了 IComparable<double>。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你寫了三個幾乎一樣的方法：`SaveUser(User u)`、`SaveOrder(Order o)`、`SaveProduct(Product p)`，都是轉成 JSON 寫進檔案。怎麼用泛型合併？需要約束嗎？'], answer: [
+        '`void Save<T>(T item, string path) => File.WriteAllText(path, JsonSerializer.Serialize(item));`',
+        '序列化對任何型別都能做，不一定需要約束。如果還要用 `item.Id` 當檔名，就定義 `interface IEntity { int Id { get; } }`，加 `where T : IEntity`。',
+      ] },
+    ],
+    keypoints: [
+      '泛型讓同一份程式碼用在多種型別上，同時保有型別安全。',
+      '泛型集合沒有 boxing，取出不用轉型。',
+      '要用 T 的某種能力，就用 where 約束說出來。',
+    ],
+    sources: ['cs-generics', 'collections'],
+  },
+
+  '4-2': {
+    goals: [
+      '讀懂 `string` 與 `string?` 的差別',
+      '用 `?.`、`??`、`??=` 處理可能是 null 的值',
+      '用 C# 14 的 null 條件指定 `?.=` 簡化程式',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-1）`where T : IComparable<T>` 的作用是？', options: [
+        { text: '只接受能比較的型別，方法內才能呼叫 CompareTo', correct: true, why: '約束同時限制呼叫端、保證方法內部能用。' },
+        { text: '讓 T 自動實作 IComparable', why: '約束不會幫型別加功能。' },
+        { text: '執行時檢查 T，不符合就拋例外', why: '約束在編譯時檢查。' },
+        { text: '讓方法回傳排序後的結果', why: '約束只限制型別，不改行為。' },
+      ] },
+    ],
+    analogy: {
+      text: ['`string?` 像貼了「可能是空盒」的包裹：拆之前要先搖一搖。`string` 是保證有東西的包裹。編譯器像物流人員，看到你想直接拆「可能是空盒」的包裹，就提醒你：先檢查。'],
+      limit: ['物流人員的提醒是警告，不是禁止：你還是能硬拆（用 `!`）。而且從外部來的資料（JSON、資料庫）編譯器看不到，標成 string 不代表執行時真的不會是 null。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="處理 null 的三個運算子：?. 遇到 null 就停下得到 null；?? 遇到 null 換成預設值；??= 是 null 時才指定。範例 user?.Name ?? 匿名">
+        <rect x="10" y="20" width="540" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="56" text-anchor="middle" font-size="20" class="mono">user?.Name ?? "匿名"</text>
+        <rect x="10" y="120" width="170" height="130" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="155" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">?.</text>
+        <text x="95" y="195" text-anchor="middle" font-size="15" class="on-color">null 就停下</text>
+        <text x="95" y="222" text-anchor="middle" font-size="15" class="on-color">得到 null</text>
+        <rect x="195" y="120" width="170" height="130" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="155" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">??</text>
+        <text x="280" y="195" text-anchor="middle" font-size="15" class="on-color">null 就換成</text>
+        <text x="280" y="222" text-anchor="middle" font-size="15" class="on-color">右邊的值</text>
+        <rect x="380" y="120" width="170" height="130" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="155" text-anchor="middle" font-size="22" font-weight="900" class="on-color mono">??=</text>
+        <text x="465" y="195" text-anchor="middle" font-size="15" class="on-color">是 null 時</text>
+        <text x="465" y="222" text-anchor="middle" font-size="15" class="on-color">才指定</text>
+        <g class="stroke-ink" stroke-width="3"><path d="M125 76 V120"/><path d="M280 76 V120"/></g>
+      </svg>`,
+      caption: '`?.` 防止拋例外，`??` 給預設值，兩者常一起用。',
+      blocks: [
+        '開啟[[可為 null 的參考型別]]（.NET 6 起的新專案範本預設 `<Nullable>enable</Nullable>`，檔案型程式也預設開啟）後，`string` 代表不會是 null，`string?` 代表可能是 null。對 `string?` 直接存取成員，編譯器給警告，避免執行時的 [[NullReferenceException]]。',
+        { type: 'code', lang: 'csharp', title: 'C# 14：null 條件指定', code: '// C# 13 以前\nif (customer is not null)\n    customer.LastSeen = DateTime.Now;\n\n// C# 14\ncustomer?.LastSeen = DateTime.Now;   // customer 是 null 時右邊不會執行' },
+      ],
+    },
+    define: [
+      { term: '可為 null 的參考型別', en: 'nullable reference types', def: '靜態分析功能：用 `?` 標示可能是 null 的參考型別，編譯器追蹤並警告（CS8602 等），不改變執行時行為。', example: '`string? FindName(int id)`' },
+      { term: 'null 條件運算子', en: '?. and ?[]', def: '左邊是 null 時整個運算式得到 null，不拋例外；C# 14 起可放在指定的左邊。', example: '`items?[0]`、`order?.Total += 10;`' },
+      { term: 'null 聯合運算子', en: '?? and ??=', def: '`a ?? b`：a 不是 null 用 a，否則用 b。`a ??= b`：a 是 null 才設成 b。', example: '`_cache ??= Load();`' },
+    ],
+    examples: {
+      compare: [{
+        title: '顯示使用者的城市',
+        kind: '危險 vs 安全',
+        code: true,
+        badLabel: '直接存取',
+        goodLabel: 'null 條件 + 預設值',
+        bad: 'string city = user.Address.City;',
+        good: 'string city = user{{1:?.}}Address{{1:?.}}City {{1:??}} "未填寫";',
+        badResult: '使用者沒填地址時拋 NullReferenceException。',
+        goodResult: '任何一層是 null 都得到「未填寫」。',
+        why: ['`?.` 只處理 null，不處理空字串；空字串要另外判斷'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'string? a = null;\nstring? b = "hi";\nConsole.WriteLine(a?.Length);\nConsole.WriteLine(b?.Length);\nConsole.WriteLine(a?.Length ?? -1);\na ??= "預設";\nConsole.WriteLine(a);',
+          predict: { q: '`Console.WriteLine(a?.Length);` 印出什麼？', options: ['0', '空白的一行', '拋出 NullReferenceException'], answer: 1 },
+          output: '\n2\n-1\n預設',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'warn', label: '編譯器會警告' }, { id: 'ok', label: '不會警告' }],
+          items: [
+            { text: '`string? s = Find(); Console.WriteLine(s.Length);`', answer: 'warn', why: 's 可能是 null，CS8602。' },
+            { text: '`string? s = Find(); if (s is null) return; Console.WriteLine(s.Length);`', answer: 'ok', why: '檢查過後編譯器知道 s 不是 null（流程分析）。' },
+            { text: '`string s = null;`', answer: 'warn', why: '把 null 放進不可為 null 的型別，CS8600。' },
+            { text: '`string? s = Find(); Console.WriteLine(s?.Length);`', answer: 'ok', why: '用了 `?.`，安全。' },
+            { text: '`string s = Find()!;`', answer: 'ok', why: '`!` 告訴編譯器「我保證不是 null」，警告消失，但你要負責。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="編譯器的流程分析：s 一開始是可能 null，經過 if s is null return 之後，後面的程式碼中 s 被視為不是 null">
+          <rect x="10" y="40" width="160" height="80" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="90" y="75" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">s: string?</text>
+          <text x="90" y="103" text-anchor="middle" font-size="15" class="on-color">可能是 null</text>
+          <rect x="200" y="40" width="160" height="80" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="280" y="75" text-anchor="middle" font-size="15" class="mono">if (s is null)</text>
+          <text x="280" y="100" text-anchor="middle" font-size="15" class="mono">  return;</text>
+          <rect x="390" y="40" width="160" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="470" y="75" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">s 不是 null</text>
+          <text x="470" y="103" text-anchor="middle" font-size="15" class="on-color">可以安心用</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M170 80 H200"/><path d="M360 80 H390"/></g>
+          <text x="280" y="155" text-anchor="middle" font-size="15">提早 return 是最清楚的 null 檢查</text>
+        </svg>`, caption: '編譯器會跟著 if、return 追蹤 null 狀態，檢查過一次後面就不再警告。' },
+      ],
+      tryit: {
+        q: ['用一行處理：settings 可能是 null、Theme 可能是 null，都 null 時用 "light"。'],
+        draft: 'string theme = settings____Theme ____ "light";',
+        answer: ['`string theme = settings?.Theme ?? "light";`', '`?.` 讓 settings 是 null 時不拋例外；`??` 把 null 換成預設值。'],
+      },
+    },
+    mistakes: [
+      { wrong: '警告太多，到處加 `!` 讓它閉嘴。', why: '`!` 只是消除警告，執行時遇到 null 一樣拋例外。', right: '在資料進來的地方檢查一次（提早 return 或拋 ArgumentNullException），之後用不可為 null 的型別。' },
+      { wrong: '以為開了 nullable 就不會有 NullReferenceException。', why: '它是編譯時的分析，JSON 反序列化、反射、舊程式庫都可能塞進 null。', right: '外部資料一律在邊界驗證，例如 `ArgumentNullException.ThrowIfNull(x)`。' },
+      { wrong: '用 `?.` 呼叫回傳 int 的成員，再指定給 int。', why: '`a?.Length` 的型別是 `int?`，不能直接放進 int。', right: '`int len = a?.Length ?? 0;`' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`string? s = null; var n = s?.Length;` 中 n 的型別是？', options: [
+        { text: '`int?`', correct: true, why: '`?.` 可能得到 null，所以結果是可為 null 的 int。' },
+        { text: '`int`', why: 'int 不能表示 null。' },
+        { text: '`string?`', why: 'Length 是 int，不是 string。' },
+        { text: '`object`', why: '編譯器推斷得出精確的 int?。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`customer?.Points += 10;`（C# 14）在 customer 是 null 時會？', options: [
+        { text: '什麼都不做，不拋例外', correct: true, why: '左邊是 null 時整個指定略過，右邊也不會計算。' },
+        { text: '拋出 NullReferenceException', why: '`?.` 就是為了避免這個。' },
+        { text: '建立一個新的 customer 再加 10', why: 'C# 不會自動建立物件。' },
+        { text: '編譯錯誤：?. 不能放在等號左邊', why: '那是 C# 13 以前；C# 14 起可以。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你接手一個舊專案，開啟 Nullable 後出現 800 個警告。怎麼循序漸進處理，而不是一次全加 `!`？'], answer: [
+        '先在專案層級設成 `<Nullable>warnings</Nullable>` 或逐檔用 `#nullable enable`，從新寫的檔案與核心模型開始開啟。',
+        '優先修「邊界」：讀檔、API 輸入、資料庫查詢，在那裡檢查 null 並轉成不可為 null 的型別；內部程式的警告會跟著大量消失。剩下真正可能為 null 的地方改成 `?` 並處理。',
+      ] },
+    ],
+    keypoints: [
+      '`string` 表示不會是 null，`string?` 表示可能是 null；編譯器據此警告。',
+      '`?.` 遇 null 停下，`??` 給預設值，`??=` 是 null 才指定。',
+      '`!` 只是讓警告閉嘴；外部資料要在邊界真的檢查。',
+    ],
+    sources: ['cs-nullable', 'cs-null-ops', 'cs-whatsnew-14'],
+  },
+
+  '4-3': {
+    goals: [
+      '用型別模式取代 `as` 加 null 檢查',
+      '用屬性模式一次檢查多個屬性',
+      '用清單模式比對陣列的形狀',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-2）`string? s = Get(); if (s is null) return;` 之後的 `s.Length` 會警告嗎？', options: [
+        { text: '不會，編譯器知道這裡 s 不是 null', correct: true, why: '流程分析：null 的情況已經 return 了。' },
+        { text: '會，因為 s 宣告成 string?', why: '編譯器會追蹤檢查後的狀態。' },
+        { text: '會，要寫成 s!.Length', why: '不需要 `!`，檢查已經足夠。' },
+        { text: '編譯錯誤', why: '這段完全合法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['模式比對像機場安檢：先看「這是行李箱還是背包」（型別），再看「重量是否超過 7 公斤、有沒有液體」（屬性），符合某個規則就分到對應的通道。'],
+      limit: ['安檢員會用常識判斷；C# 由上往下逐條比對，順序寫錯（範圍大的放前面），後面的分支永遠到不了，編譯器會報 CS8510。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="三種常用模式：型別模式 is Circle c 檢查型別並取出變數；屬性模式 { Total: > 1000 } 檢查屬性值；清單模式 [first, .., last] 比對陣列形狀">
+        <rect x="10" y="20" width="170" height="230" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color">型別模式</text>
+        <text x="95" y="110" text-anchor="middle" font-size="16" class="on-color mono">is Circle c</text>
+        <text x="95" y="170" text-anchor="middle" font-size="15" class="on-color">是什麼型別？</text>
+        <text x="95" y="196" text-anchor="middle" font-size="15" class="on-color">順便取出</text>
+        <rect x="195" y="20" width="170" height="230" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color">屬性模式</text>
+        <text x="280" y="110" text-anchor="middle" font-size="16" class="on-color mono">{ Total: &gt; 1000 }</text>
+        <text x="280" y="170" text-anchor="middle" font-size="15" class="on-color">屬性值</text>
+        <text x="280" y="196" text-anchor="middle" font-size="15" class="on-color">符合條件嗎？</text>
+        <rect x="380" y="20" width="170" height="230" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color">清單模式</text>
+        <text x="465" y="110" text-anchor="middle" font-size="16" class="on-color mono">[var f, .., var l]</text>
+        <text x="465" y="170" text-anchor="middle" font-size="15" class="on-color">陣列長什麼</text>
+        <text x="465" y="196" text-anchor="middle" font-size="15" class="on-color">樣子？</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M180 135 H195"/><path d="M365 135 H380"/></g>
+      </svg>`,
+      caption: '三種模式可以巢狀組合，再加上 and、or、not 與關係模式（> 1000）。',
+      blocks: [
+        '[[型別模式]]、[[屬性模式]]、[[清單模式]]都能用在 `is` 與 switch。它們讓「先檢查、再轉型、再取值」變成一個運算式。',
+        { type: 'code', lang: 'csharp', title: 'shipping.cs', code: 'decimal Shipping(Order o) => o switch\n{\n    { Total: >= 1000 } => 0m,\n    { Country: "TW", IsExpress: true } => 150m,\n    { Country: "TW" } => 60m,\n    { Country: "JP" or "KR" } => 300m,\n    _ => 500m,\n};\n\nrecord Order(decimal Total, string Country, bool IsExpress);' },
+      ],
+    },
+    define: [
+      { term: '型別模式', en: 'declaration pattern', def: '`x is T name`：x 是 T（且不是 null）時為 true，並宣告 name。', example: '`if (obj is string s) Console.WriteLine(s.Length);`' },
+      { term: '屬性模式', en: 'property pattern', def: '`{ 屬性: 模式, … }`，也隱含「不是 null」；可巢狀：`{ Address.City: "台北" }`。', example: '`p is { Age: >= 18 }`' },
+      { term: '清單模式', en: 'list pattern', def: '`[模式, 模式, ..]` 比對長度與元素；`..` 代表任意個元素，可搭配 `var` 取值。', example: '`args is [var cmd, ..]`' },
+    ],
+    examples: {
+      compare: [{
+        title: '判斷是不是有內容的字串',
+        kind: '舊寫法 vs 模式比對',
+        code: true,
+        badLabel: 'as 再檢查',
+        goodLabel: '型別 + 屬性模式',
+        bad: 'var s = obj as string;\nif (s != null && s.Length > 0)\n    Console.WriteLine(s);',
+        good: 'if (obj is string {{1:{ Length: > 0 }}} s)\n    Console.WriteLine(s);',
+        badResult: '三個步驟，s 在 if 外面也看得到。',
+        goodResult: '一個條件完成型別、null、長度檢查，s 只在需要的地方存在。',
+        why: ['模式比對的變數只在條件成立的範圍內被視為已指定'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'Console.WriteLine(Describe([]));\nConsole.WriteLine(Describe([7]));\nConsole.WriteLine(Describe([1, 2, 3, 4]));\n\nstring Describe(int[] a) => a switch\n{\n    [] => "空的",\n    [var only] => $"只有 {only}",\n    [var first, .., var last] => $"{first} 到 {last}",\n};',
+          predict: { q: '`Describe([1, 2, 3, 4])` 回傳什麼？', options: ['1 到 4', '只有 1', '空的'], answer: 0 },
+          output: '空的\n只有 7\n1 到 4',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'type', label: '型別模式' }, { id: 'prop', label: '屬性模式' }, { id: 'list', label: '清單模式' }],
+          items: [
+            { text: '`shape is Circle c`', answer: 'type', why: '檢查型別並宣告 c。' },
+            { text: '`user is { IsAdmin: true }`', answer: 'prop', why: '檢查屬性值。' },
+            { text: '`args is ["--version"]`', answer: 'list', why: '陣列剛好一個元素且等於 "--version"。' },
+            { text: '`order is { Items.Count: 0 }`', answer: 'prop', why: '延伸屬性模式，檢查巢狀屬性。' },
+            { text: '`path is [.., "bin", _]`', answer: 'list', why: '倒數第二個元素是 "bin"。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="switch 分支的順序：範圍小、條件具體的放前面；如果把 Total 大於 0 放在 Total 大於等於 1000 前面，後者永遠不會被比對到，編譯器報 CS8510">
+          <rect x="10" y="20" width="260" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="52" text-anchor="middle" font-size="17" font-weight="900" class="on-color">✓ 具體的在前</text>
+          <text x="30" y="95" font-size="15" class="on-color mono">&gt;= 1000 =&gt; 免運</text>
+          <text x="30" y="125" font-size="15" class="on-color mono">&gt; 0 =&gt; 運費</text>
+          <rect x="290" y="20" width="260" height="150" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="52" text-anchor="middle" font-size="17" font-weight="900" class="on-color">✗ 寬的在前</text>
+          <text x="310" y="95" font-size="15" class="on-color mono">&gt; 0 =&gt; 運費</text>
+          <text x="310" y="125" font-size="15" class="on-color mono">&gt;= 1000 =&gt; 到不了</text>
+          <text x="420" y="155" text-anchor="middle" font-size="14" class="on-color">CS8510</text>
+          <path d="M270 95 H290" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: 'switch 由上往下比對，第一個符合就停；把具體條件放前面。' },
+      ],
+      tryit: {
+        q: ['用清單模式判斷命令列參數：第一個是 "add" 且後面至少還有一個參數。'],
+        draft: 'if (args is [____, ____ rest])\n    Console.WriteLine($"要新增 {rest.Length} 個項目");',
+        answer: ['`args is ["add", .. var rest]` 會符合 0 個以上；要「至少一個」寫 `["add", _, ..]`，或先比對再檢查 `rest.Length > 0`。', '`.. var rest` 把剩下的部分取成一個新陣列（切片）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`if (x is Circle) { var c = (Circle)x; … }`', why: '檢查一次、轉型又檢查一次，寫兩遍型別。', right: '`if (x is Circle c) { … }`' },
+      { wrong: 'switch 把 `> 0` 放在 `>= 1000` 前面。', why: '後面的分支被前面的完全包含，永遠到不了（CS8510）。', right: '具體的條件放前面。' },
+      { wrong: '用 `obj is { }` 卻不知道它的意思。', why: '空的屬性模式代表「不是 null」，讀者容易看不懂。', right: '團隊不熟時寫 `obj is not null`，意思更直接。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`p is { Age: >= 18 }` 在 p 是 null 時的結果是？', options: [
+        { text: '`false`', correct: true, why: '屬性模式隱含不是 null 的檢查。' },
+        { text: '拋出 NullReferenceException', why: '模式比對不會對 null 存取屬性。' },
+        { text: '`true`', why: 'null 沒有 Age 屬性，不會符合。' },
+        { text: '編譯錯誤', why: '語法合法。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`int[] a = [5]; a is [_, ..]` 的結果是？', options: [
+        { text: '`true`', correct: true, why: '`_` 符合一個元素，`..` 可以是 0 個，所以至少一個元素就成立。' },
+        { text: '`false`，因為 `..` 至少要一個元素', why: '`..` 可以符合 0 個元素。' },
+        { text: '`false`，因為 `_` 只符合 null', why: '`_` 是捨棄模式，符合任何值。' },
+        { text: '編譯錯誤', why: '這是合法的清單模式。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在寫一個簡單的指令列工具，支援 `app add 名稱`、`app list`、`app remove 編號`。用清單模式設計一個 switch。'], answer: [
+        '`args switch { ["add", var name] => Add(name), ["list"] => List(), ["remove", var id] when int.TryParse(id, out var n) => Remove(n), _ => ShowHelp() }`',
+        '`when` 子句讓你在模式之外再加條件；最後的 `_` 處理所有錯誤用法，不會讓程式拋 SwitchExpressionException。',
+      ] },
+    ],
+    keypoints: [
+      '`is T name` 一步完成型別檢查與轉型。',
+      '屬性模式 `{ A: 條件 }` 一次檢查多個屬性，而且自動排除 null。',
+      '清單模式 `[first, .., last]` 比對陣列形狀；switch 分支具體的放前面。',
+    ],
+    sources: ['cs-patterns', 'cs-switch-expr'],
+  },
+
+  '4-4': {
+    goals: [
+      '用 enum 表示固定的選項',
+      '知道 enum 的陷阱：可以裝不在清單上的數字',
+      '了解 C# 15 的 closed 與 union 要解決什麼問題',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-3）switch 運算式沒有 `_`，而值沒有符合任何分支時會？', options: [
+        { text: '執行時拋出 SwitchExpressionException', correct: true, why: '1-5 學過；編譯器也會給 CS8509 警告。' },
+        { text: '回傳 default 值', why: 'switch 運算式不會默默回傳預設值。' },
+        { text: '編譯錯誤', why: '沒涵蓋全部情況只是警告。' },
+        { text: '回傳 null', why: '同樣不會默默回傳。' },
+      ] },
+    ],
+    analogy: {
+      text: ['enum 像飲料店的甜度按鈕：全糖、半糖、微糖、無糖，每個按鈕背後是一個數字（3、2、1、0）。union 則像「餐點」這個欄位：它可能是一杯飲料、一份炸雞或一碗麵，每種的內容完全不同。'],
+      limit: ['真的按鈕不能按出「甜度 7」；C# 的 enum 本質是整數，`(Sweetness)7` 是合法的，編譯器擋不住。union 是 C# 15 的新功能，2026-10 仍是 .NET 11 RC，正式版預計 2026-11。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="三種表示「幾種可能之一」的方式：enum 是幾個有名字的整數，不能帶資料；closed 類別階層每個子類別可以帶不同資料，子類別只能在同一個組件；union 型別可以把不相關的型別組合起來。後兩者是 C# 15 預覽">
+        <rect x="10" y="20" width="170" height="240" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">enum</text>
+        <text x="95" y="100" text-anchor="middle" font-size="15" class="on-color">有名字的整數</text>
+        <text x="95" y="128" text-anchor="middle" font-size="15" class="on-color">不能帶資料</text>
+        <text x="95" y="230" text-anchor="middle" font-size="15" font-weight="900" class="on-color">C# 一直都有</text>
+        <rect x="195" y="20" width="170" height="240" style="fill:var(--m3)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+        <text x="280" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">closed</text>
+        <text x="280" y="100" text-anchor="middle" font-size="15" class="on-color">子類別各帶資料</text>
+        <text x="280" y="128" text-anchor="middle" font-size="15" class="on-color">只在同組件繼承</text>
+        <text x="280" y="230" text-anchor="middle" font-size="15" font-weight="900" class="on-color">C# 15 預覽</text>
+        <rect x="380" y="20" width="170" height="240" style="fill:var(--m4)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+        <text x="465" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">union</text>
+        <text x="465" y="100" text-anchor="middle" font-size="15" class="on-color">組合不相關</text>
+        <text x="465" y="128" text-anchor="middle" font-size="15" class="on-color">的型別</text>
+        <text x="465" y="230" text-anchor="middle" font-size="15" font-weight="900" class="on-color">C# 15 預覽</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M180 160 H195"/><path d="M365 160 H380"/></g>
+      </svg>`,
+      caption: '虛線框是 2026-10 還在 .NET 11 RC 的功能；正式專案先用 enum 與一般類別階層。',
+      blocks: [
+        '[[列舉]]適合固定選項。它的兩個陷阱：可以轉型出不在清單上的值；switch 時編譯器無法保證你處理了全部。C# 15 的 [[closed]] 與 [[union 型別]]讓編譯器知道「全部可能」，switch 可以不寫 `_`，新增一種情況時所有沒處理的地方都會被抓出來。',
+        { type: 'code', lang: 'csharp', title: 'C# 15 預覽（.NET 11 RC1，語法以正式版為準）', code: 'public record class Cat(string Name);\npublic record class Dog(string Name);\npublic union Pet(Cat, Dog);\n\nPet pet = new Dog("Rex");\nstring name = pet switch\n{\n    Dog d => d.Name,\n    Cat c => c.Name,\n    // 不需要 _：編譯器知道只有這兩種\n};' },
+      ],
+    },
+    define: [
+      { term: '列舉', en: 'enum', def: '具名整數常數的集合；預設底層型別是 int、從 0 開始。加 `[Flags]` 可以用位元組合。', example: '`enum Level { Low, Mid, High }`' },
+      { term: 'closed', en: 'closed', def: 'C# 15：類別只能在宣告它的組件內被直接繼承，隱含 abstract；switch 涵蓋所有直接子類別即視為完整。', example: '`public closed record class GateState;`' },
+      { term: 'union 型別', en: 'union', def: 'C# 15：`union 名稱(型別1, 型別2, …)`，值只能是其中一種，各型別會自動轉換成 union，switch 必須涵蓋全部。', example: '`public union Pet(Cat, Dog, Bird);`' },
+    ],
+    examples: {
+      compare: [{
+        title: '訂單狀態',
+        kind: '字串 vs enum',
+        code: true,
+        badLabel: '用字串',
+        goodLabel: '用 enum',
+        bad: 'string status = "Paied";   // 拼錯也能編譯\nif (status == "Paid") Ship();',
+        good: 'enum Status { Pending, Paid, Shipped }\nvar status = Status.{{1:Paid}};\nif (status == Status.Paid) Ship();',
+        badResult: '拼錯字要到執行時才發現永遠不會出貨。',
+        goodResult: '拼錯是編譯錯誤，IDE 也能自動完成。',
+        why: ['固定選項不要用魔術字串'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var s = (Status)7;\nConsole.WriteLine(s);\nConsole.WriteLine(Enum.IsDefined(s));\nConsole.WriteLine((int)Status.Shipped);\n\nenum Status { Pending, Paid, Shipped }',
+          predict: { q: '`(Status)7` 印出來是什麼？', options: ['Shipped', '7', '拋出例外'], answer: 1 },
+          output: '7\nFalse\n2',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'enum', label: 'enum 就夠' }, { id: 'hier', label: '需要帶資料的型別' }],
+          items: [
+            { text: '星期一到星期日', answer: 'enum', why: '固定、不帶額外資料。' },
+            { text: '付款方式：信用卡要卡號末四碼、轉帳要帳號、現金什麼都不用', answer: 'hier', why: '每種情況帶的資料不同，用 record 階層（未來可用 union）。' },
+            { text: 'Log 等級：Debug、Info、Warning、Error', answer: 'enum', why: '單純的固定選項。' },
+            { text: 'API 結果：成功時有資料，失敗時有錯誤代碼與訊息', answer: 'hier', why: '成功與失敗帶不同資料，正是 union 想解決的問題。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="enum 的值其實是整數：Pending 對應 0、Paid 對應 1、Shipped 對應 2；轉型成 7 也合法，但沒有名字">
+          <g class="stroke-ink" stroke-width="4">
+            <rect x="10" y="30" width="125" height="60" style="fill:var(--m1)"/><rect x="145" y="30" width="125" height="60" style="fill:var(--m3)"/><rect x="280" y="30" width="125" height="60" style="fill:var(--m4)"/><rect x="415" y="30" width="135" height="60" class="fill-surface" stroke-dasharray="8 6"/>
+          </g>
+          <text x="72" y="67" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">Pending</text>
+          <text x="207" y="67" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">Paid</text>
+          <text x="342" y="67" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">Shipped</text>
+          <text x="482" y="67" text-anchor="middle" font-size="16" font-weight="900" class="mono">（沒有名字）</text>
+          <text x="72" y="130" text-anchor="middle" font-size="20" class="mono">0</text>
+          <text x="207" y="130" text-anchor="middle" font-size="20" class="mono">1</text>
+          <text x="342" y="130" text-anchor="middle" font-size="20" class="mono">2</text>
+          <text x="482" y="130" text-anchor="middle" font-size="20" class="mono">7</text>
+          <g class="stroke-ink" stroke-width="3"><path d="M72 90 V108"/><path d="M207 90 V108"/><path d="M342 90 V108"/><path d="M482 90 V108"/></g>
+        </svg>`, caption: '從資料庫或 API 讀進來的數字轉成 enum 前，用 `Enum.IsDefined` 檢查。' },
+      ],
+      tryit: {
+        q: ['用 enum 搭配 switch 運算式，把甜度轉成顯示文字：'],
+        draft: 'enum Sugar { None, Light, Half, Full }\n\nstring Label(Sugar s) => s switch\n{\n    Sugar.None => "無糖",\n    Sugar.____ => "微糖",\n    Sugar.Half => "半糖",\n    Sugar.Full => "全糖",\n    ____ => "未知",\n};',
+        answer: ['`Sugar.Light`、`_`。', '即使四個 enum 值都寫了，編譯器仍會警告沒涵蓋全部：因為 `(Sugar)99` 也是合法的值。所以 enum 的 switch 都要有 `_`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '從資料庫讀到 int 直接 `(Status)value`。', why: '不存在的數字也能轉，後面的 switch 會走到意料之外的分支。', right: '`Enum.IsDefined(typeof(Status), value)` 檢查，或用 `Enum.TryParse`。' },
+      { wrong: '在 enum 中間插入新值，舊資料全部錯位。', why: '沒指定數字時是依順序 0、1、2…，插入會改變後面所有值。', right: '存進資料庫或 API 的 enum 明確寫數字：`Paid = 1`，新值加在後面。' },
+      { wrong: '2026-10 就在正式專案大量使用 union。', why: '.NET 11 還是 RC，部分功能規格尚未完全實作。', right: '先用 record 類別階層加 `_` 分支；.NET 11 正式發布並評估後再遷移。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`enum Color { Red, Green, Blue }` 中 `(int)Color.Blue` 是？', options: [
+        { text: '`2`', correct: true, why: '預設從 0 開始依序遞增。' },
+        { text: '`3`', why: '從 0 開始，不是 1。' },
+        { text: '`"Blue"`', why: '轉成 int 得到的是數字。' },
+        { text: '編譯錯誤', why: 'enum 可以明確轉成底層整數型別。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'C# 15 的 union 與 closed 最主要解決什麼問題？', options: [
+        { text: '讓編譯器知道所有可能情況，switch 漏處理會被抓出來', correct: true, why: '這就是「窮舉檢查」（exhaustiveness）。' },
+        { text: '讓程式執行得比較快', why: '主要目的是正確性，不是效能。' },
+        { text: '取代所有的介面', why: '介面描述能力，用途不同。' },
+        { text: '讓 enum 可以帶字串值', why: 'enum 沒有改變；union 是另一種型別。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['在 .NET 10 上要表達「API 結果是成功（帶資料）或失敗（帶錯誤）」，不用 union 怎麼寫？之後升級 .NET 11 要怎麼改？'], answer: [
+        '.NET 10：`abstract record Result; record Ok(Data Value) : Result; record Fail(string Code, string Message) : Result;` 用 switch 處理，最後加 `_ => throw new UnreachableException()`。',
+        '.NET 11：把基底改成 `closed record Result`（或改成 union），移除 `_`；之後新增第三種結果時，所有沒處理的 switch 都會被編譯器指出來。',
+      ] },
+    ],
+    keypoints: [
+      'enum 是有名字的整數，固定選項用它，別用魔術字串。',
+      'enum 可以裝不在清單上的數字，外部資料要檢查，switch 要有 `_`。',
+      'C# 15 的 closed 與 union（2026-11 正式）讓 switch 可以窮舉檢查；現在先用 record 階層。',
+    ],
+    sources: ['cs-enum', 'cs-union', 'cs-whatsnew-15'],
+  },
+});
+</script>
+<script>
+/* ==========================================================================
+   模組 5：集合與 LINQ
+   ========================================================================== */
+defineTerms({
+  'List': { en: 'List<T>', def: '可以增減長度的有序集合，內部用陣列實作，空間不夠時自動換一個更大的陣列。', example: '`var names = new List<string>(); names.Add("A");`' },
+  'Dictionary': { en: 'Dictionary<TKey, TValue>', def: '用「鍵」快速找到「值」的集合，查詢時間幾乎不隨資料量增加。鍵不能重複。', example: '`var age = new Dictionary<string, int>();`' },
+  'HashSet': { en: 'HashSet<T>', def: '不重複元素的集合，判斷「有沒有」非常快。', example: '`var seen = new HashSet<int>();`' },
+  '雜湊': { en: 'hash', def: '把資料算成一個數字，用來決定放在哪一格。Dictionary 與 HashSet 靠它做到快速查詢。', example: '`"abc".GetHashCode()`' },
+  'IEnumerable': { en: 'IEnumerable<T>', def: '「可以一個一個走過」的介面。陣列、List、LINQ 查詢結果都實作它，foreach 就是靠它。', example: '`IEnumerable<int> nums = [1, 2, 3];`' },
+  'LINQ': { en: 'Language Integrated Query', def: '一組以 IEnumerable 為對象的擴充方法（Where、Select、OrderBy…），讓你描述「要什麼資料」而不是寫迴圈。', example: '`scores.Where(s => s >= 60).Count()`' },
+  'lambda': { en: 'lambda expression', def: '寫在行內的匿名函式：`參數 => 運算式`。LINQ 用它描述條件與轉換。', example: '`x => x * 2`' },
+  '擴充方法': { en: 'extension method', def: '看起來像某型別自己的方法，其實定義在別的靜態類別裡。LINQ 全部都是擴充方法；C# 14 起可用 extension 區塊定義擴充成員。', example: '`numbers.Where(…)`' },
+  '延遲執行': { en: 'deferred execution', def: 'LINQ 查詢在定義時不執行，等到被列舉（foreach、ToList、Count）時才真的跑，而且每次列舉都重跑一次。', example: '`var q = list.Where(…);` 這行還沒篩選。' },
+  '具體化': { en: 'materialization', def: '用 ToList、ToArray、ToDictionary 讓查詢立刻執行，把結果存成集合。', example: '`var result = query.ToList();`' },
+  'GroupBy': { en: 'GroupBy', def: '依某個鍵把元素分組，每組是一個 IGrouping，有 Key 與該組元素。', example: '`orders.GroupBy(o => o.Country)`' },
+  'CountBy': { en: 'CountBy', def: '.NET 9 起：依鍵計數，直接得到「鍵 → 數量」，不用先 GroupBy。', example: '`words.CountBy(w => w)`' },
+  'AggregateBy': { en: 'AggregateBy', def: '.NET 9 起：依鍵做累計（例如加總），不用先建立分組。', example: '`orders.AggregateBy(o => o.Country, 0m, (sum, o) => sum + o.Total)`' },
+});
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '選對集合：List、Dictionary、HashSet',
+      '用 TryGetValue 安全地查字典',
+      '說出為什麼「在 List 裡找東西」會隨資料變多而變慢',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-3）陣列和 List 最大的差別是？', options: [
+        { text: '陣列長度固定，List 可以增減', correct: true, why: '這就是 2-3 提到「需要 Add 就用 List」的原因。' },
+        { text: '陣列只能放數字，List 可以放任何型別', why: '陣列也可以放任何型別。' },
+        { text: '陣列是實值型別，List 是參考型別', why: '兩者都是參考型別。' },
+        { text: '陣列的索引從 1 開始', why: '都從 0 開始。' },
+      ] },
+    ],
+    analogy: {
+      text: ['List 像排隊的隊伍：可以一直有人加入，要找「穿紅衣服的人」得從頭看到尾。Dictionary 像寄物櫃：拿號碼牌（鍵）直接打開那一格，不管有幾百格都一樣快。HashSet 像門口的簽到名單：只關心「有沒有來過」。'],
+      limit: ['寄物櫃號碼是連續的；Dictionary 的鍵可以是任何型別（字串、record），靠雜湊算出放哪一格。如果鍵的雜湊寫得很差，所有東西擠在同一格，就會慢得像排隊。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="三種集合的用途：List 有順序、可重複，用索引存取，找值要從頭找；Dictionary 用鍵找值，鍵不重複，查詢很快；HashSet 不重複，判斷有沒有很快">
+        <rect x="10" y="20" width="170" height="240" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="95" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">List</text>
+        <text x="95" y="100" text-anchor="middle" font-size="15" class="on-color">有順序、可重複</text>
+        <text x="95" y="128" text-anchor="middle" font-size="15" class="on-color">用索引存取</text>
+        <text x="95" y="210" text-anchor="middle" font-size="15" class="on-color">找值：從頭找</text>
+        <rect x="195" y="20" width="170" height="240" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">Dictionary</text>
+        <text x="280" y="100" text-anchor="middle" font-size="15" class="on-color">鍵 → 值</text>
+        <text x="280" y="128" text-anchor="middle" font-size="15" class="on-color">鍵不重複</text>
+        <text x="280" y="210" text-anchor="middle" font-size="15" class="on-color">用鍵找：很快</text>
+        <rect x="380" y="20" width="170" height="240" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">HashSet</text>
+        <text x="465" y="100" text-anchor="middle" font-size="15" class="on-color">不重複</text>
+        <text x="465" y="128" text-anchor="middle" font-size="15" class="on-color">沒有鍵值對</text>
+        <text x="465" y="210" text-anchor="middle" font-size="15" class="on-color">有沒有：很快</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M180 160 H195"/><path d="M365 160 H380"/></g>
+      </svg>`,
+      caption: '先問：要照順序？要用某個值查另一個值？只要知道有沒有？',
+      blocks: [
+        '[[List]] 是最常用的集合；要用鍵查值用 [[Dictionary]]；要去除重複或快速判斷存在用 [[HashSet]]。後兩者靠[[雜湊]]做到查詢時間幾乎固定。',
+        { type: 'code', lang: 'csharp', title: 'collections.cs', code: 'List<string> todo = ["買菜", "繳費"];\ntodo.Add("運動");\n\nDictionary<string, decimal> prices = new()\n{\n    ["咖啡"] = 60m,\n    ["蛋糕"] = 90m,\n};\nif (prices.TryGetValue("咖啡", out var p))\n    Console.WriteLine(p);   // 60\n\nHashSet<string> tags = ["C#", "dotnet", "C#"];\nConsole.WriteLine(tags.Count);   // 2' },
+      ],
+    },
+    define: [
+      { term: 'List', en: 'List<T>', def: '動態陣列：Add、Insert、Remove、索引存取。`Contains` 要逐一比對。', example: '`list.Contains("A")`' },
+      { term: 'Dictionary', en: 'Dictionary<TKey,TValue>', def: '雜湊表：用索引子 `dict[key]` 讀寫；鍵不存在時讀取會拋 KeyNotFoundException。', example: '`dict.TryGetValue(key, out var v)`' },
+      { term: 'HashSet', en: 'HashSet<T>', def: '不重複集合；`Add` 回傳 bool 表示是否真的新增；支援交集、聯集。', example: '`if (!seen.Add(id)) Console.WriteLine("重複");`' },
+    ],
+    examples: {
+      compare: [{
+        title: '從 10 萬筆訂單裡找出某些編號',
+        kind: '慢 vs 快',
+        code: true,
+        badLabel: 'List.Contains',
+        goodLabel: 'HashSet.Contains',
+        bad: 'List<int> vip = LoadVipIds();   // 1 萬個\nforeach (var o in orders)        // 10 萬筆\n    if ({{1:vip.Contains}}(o.CustomerId)) …',
+        good: 'HashSet<int> vip = [..LoadVipIds()];\nforeach (var o in orders)\n    if ({{1:vip.Contains}}(o.CustomerId)) …',
+        badResult: '每次 Contains 最多比 1 萬次，總共可能上億次比較。',
+        goodResult: '每次 Contains 幾乎是固定時間，總共約 10 萬次。',
+        why: ['程式碼幾乎一樣，只是換了集合；資料量大時差距是數百倍'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var stock = new Dictionary<string, int> { ["蘋果"] = 3 };\nstock["香蕉"] = 5;\nstock["蘋果"] += 2;\nConsole.WriteLine(stock["蘋果"]);\nConsole.WriteLine(stock.TryGetValue("西瓜", out var n));\nConsole.WriteLine(stock["西瓜"]);',
+          predict: { q: '最後一行 `stock["西瓜"]` 會怎樣？', options: ['印出 0', '拋出 KeyNotFoundException', '印出空白'], answer: 1 },
+          output: '5\nFalse\n!Unhandled exception. System.Collections.Generic.KeyNotFoundException: The given key \'西瓜\' was not present in the dictionary.',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'list', label: 'List' }, { id: 'dict', label: 'Dictionary' }, { id: 'set', label: 'HashSet' }],
+          items: [
+            { text: '購物車裡的商品，要照加入順序顯示', answer: 'list', why: '有順序、可能重複（同商品兩次）。' },
+            { text: '用學號查學生資料', answer: 'dict', why: '鍵（學號）→ 值（學生）。' },
+            { text: '記錄已經寄過信的 Email，避免重複寄', answer: 'set', why: '只需要知道「有沒有」。' },
+            { text: '每個單字出現幾次', answer: 'dict', why: '單字 → 次數。' },
+            { text: '排行榜前 10 名', answer: 'list', why: '有順序。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="查詢次數隨資料量的變化：List 的 Contains 隨筆數線性增加，1 千筆比 1 千次、100 萬筆比 100 萬次；HashSet 幾乎固定">
+          <path d="M60 170 H540 M60 170 V20" class="stroke-ink" stroke-width="3" fill="none"/>
+          <path d="M60 170 L520 30" class="stroke-ink" stroke-width="5" fill="none" style="stroke:var(--m5)"/>
+          <path d="M60 155 H520" class="stroke-ink" stroke-width="5" fill="none" style="stroke:var(--m4)"/>
+          <text x="400" y="55" font-size="16" font-weight="900">List</text>
+          <text x="440" y="145" font-size="16" font-weight="900">HashSet</text>
+          <text x="300" y="195" text-anchor="middle" font-size="14">資料筆數 →</text>
+          <text x="40" y="95" text-anchor="middle" font-size="14" transform="rotate(-90 40 95)">比較次數</text>
+        </svg>`, caption: '示意圖：List 找值的成本和筆數成正比（O(n)），HashSet 與 Dictionary 平均是常數（O(1)）。' },
+      ],
+      tryit: {
+        q: ['用 Dictionary 統計每個字出現幾次：'],
+        draft: 'string[] words = ["a", "b", "a"];\nvar count = new Dictionary<string, int>();\nforeach (var w in words)\n    count[w] = count.____(w) + 1;',
+        answer: ['`count.GetValueOrDefault(w) + 1`。', '鍵不存在時 GetValueOrDefault 回傳 0，不會拋例外。下一課會看到用 LINQ 的 `CountBy` 一行完成。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`dict[key]` 讀一個可能不存在的鍵。', why: '不存在時拋 KeyNotFoundException。', right: '`TryGetValue` 或 `GetValueOrDefault`。' },
+      { wrong: '`dict.Add(key, v)` 加入一個已經存在的鍵。', why: 'Add 遇到重複鍵拋 ArgumentException。', right: '要覆蓋用 `dict[key] = v`；只想在不存在時加入用 `TryAdd`。' },
+      { wrong: '在大的 List 上反覆 Contains。', why: '每次都從頭比對。', right: '先轉成 HashSet 再查。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`HashSet<int> s = [1, 1, 2];` 的 Count 是？', options: [
+        { text: '`2`', correct: true, why: 'HashSet 不存重複元素。' },
+        { text: '`3`', why: '重複的 1 只會存一次。' },
+        { text: '編譯錯誤：不能有重複值', why: '可以寫，只是重複的會被忽略。' },
+        { text: '拋出 ArgumentException', why: 'HashSet 不會因重複而拋例外。' },
+      ] },
+      { level: '應用', type: 'mc', q: '要依商品編號快速查價格，資料有 50 萬筆，該用哪個？', options: [
+        { text: '`Dictionary<int, decimal>`', correct: true, why: '用鍵查值，平均常數時間。' },
+        { text: '`List<(int Id, decimal Price)>` 再用迴圈找', why: '每次查詢最多比對 50 萬次。' },
+        { text: '`HashSet<decimal>`', why: 'HashSet 只存值，沒有鍵值對應。' },
+        { text: '`decimal[]`，用編號當索引', why: '只有編號從 0 連續時才可行，而且可能浪費大量空間。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['用 record 當 Dictionary 的鍵可以嗎？用一般 class 當鍵會有什麼問題？'], answer: [
+        'record 可以：它自動依內容產生 Equals 與 GetHashCode，兩個內容相同的 record 會被視為同一個鍵。',
+        '一般 class 預設比參考：你用 `new Key(1, "A")` 存，再用另一個 `new Key(1, "A")` 查，會查不到。要嘛改用 record，要嘛覆寫 Equals 與 GetHashCode。',
+      ] },
+    ],
+    keypoints: [
+      '有順序用 List，用鍵查值用 Dictionary，只問有沒有用 HashSet。',
+      '查字典用 TryGetValue 或 GetValueOrDefault，避免 KeyNotFoundException。',
+      '大量查詢時不要對 List 反覆 Contains，換成 HashSet。',
+    ],
+    sources: ['collections'],
+  },
+
+  '5-2': {
+    goals: [
+      '用 Where、Select、OrderBy 寫出查詢',
+      '讀懂 lambda `x => …`',
+      '把一段 foreach 改寫成 LINQ',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-1）`dict["x"]` 在鍵不存在時會？', options: [
+        { text: '拋出 KeyNotFoundException', correct: true, why: '要安全讀取用 TryGetValue。' },
+        { text: '回傳 null', why: '索引子不會回傳 null，而是拋例外。' },
+        { text: '回傳型別的預設值', why: '那是 GetValueOrDefault 的行為。' },
+        { text: '自動新增這個鍵', why: '讀取不會新增；指定 `dict["x"] = v` 才會。' },
+      ] },
+    ],
+    analogy: {
+      text: ['LINQ 像點菜時對服務生說「我要不辣的、主菜類、照價格排序」，而不是自己走進廚房一盤一盤翻。你描述要什麼，怎麼找交給它。'],
+      limit: ['服務生聽一次就去做；LINQ 是「延遲」的：你描述完它還沒動，等你真的要拿結果時才去做，而且每次拿都重做一次（下一課）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="LINQ 管線：資料來源 scores 依序經過 Where 篩選及格、Select 轉成文字、OrderBy 排序，最後由 ToList 收集成結果">
+        <rect x="10" y="80" width="90" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="55" y="122" text-anchor="middle" font-size="16" font-weight="900" class="mono">scores</text>
+        <rect x="125" y="80" width="95" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="172" y="112" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">Where</text>
+        <text x="172" y="136" text-anchor="middle" font-size="13" class="on-color">篩選</text>
+        <rect x="245" y="80" width="95" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="292" y="112" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">OrderBy</text>
+        <text x="292" y="136" text-anchor="middle" font-size="13" class="on-color">排序</text>
+        <rect x="365" y="80" width="95" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="412" y="112" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">Select</text>
+        <text x="412" y="136" text-anchor="middle" font-size="13" class="on-color">轉換</text>
+        <rect x="480" y="80" width="70" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="515" y="122" text-anchor="middle" font-size="14" font-weight="900" class="mono">ToList</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M100 115 H125"/><path d="M220 115 H245"/><path d="M340 115 H365"/><path d="M460 115 H480"/></g>
+        <text x="280" y="190" text-anchor="middle" font-size="15" class="mono">scores.Where(s =&gt; s &gt;= 60).OrderBy(s =&gt; s)</text>
+        <text x="280" y="215" text-anchor="middle" font-size="15" class="mono">.Select(s =&gt; $"{s} 分").ToList()</text>
+      </svg>`,
+      caption: '每個方法接收上一步的結果、交出新的序列；原本的集合不會被修改。',
+      blocks: [
+        '[[LINQ]] 是一組作用在 [[IEnumerable]] 上的[[擴充方法]]，用 [[lambda]] 描述條件與轉換。最常用的五個：`Where` 篩選、`Select` 轉換、`OrderBy` 排序、`First／FirstOrDefault` 取一個、`Count／Sum／Any` 彙總。',
+        { type: 'table', caption: '常用 LINQ 方法', head: ['方法', '做什麼', '範例'], rows: [
+          ['`Where`', '留下符合條件的', '`.Where(p => p.Price > 100)`'],
+          ['`Select`', '每個元素轉成別的', '`.Select(p => p.Name)`'],
+          ['`OrderBy`／`OrderByDescending`', '排序', '`.OrderBy(p => p.Price)`'],
+          ['`Any`／`All`', '有沒有一個／是不是全部符合', '`.Any(p => p.Stock == 0)`'],
+          ['`FirstOrDefault`', '第一個符合的，沒有就 default', '`.FirstOrDefault(p => p.Id == 5)`'],
+          ['`Sum`／`Average`／`Max`', '彙總', '`.Sum(p => p.Price)`'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'LINQ', en: 'LINQ', def: '語言整合查詢；方法語法（`.Where(…)`）最常用，也有類似 SQL 的查詢語法（`from … where … select`）。', example: '`from p in products where p.Price > 100 select p.Name`' },
+      { term: 'lambda', en: 'lambda expression', def: '`(參數) => 運算式`；只有一個參數時可省略括號。編譯器從使用處推斷參數型別。', example: '`(a, b) => a + b`' },
+      { term: 'IEnumerable', en: 'IEnumerable<T>', def: '可列舉序列的介面；LINQ 的輸入與大部分輸出都是它。', example: '`IEnumerable<string> names = people.Select(p => p.Name);`' },
+    ],
+    examples: {
+      compare: [{
+        title: '找出庫存不足的商品名稱，依價格排序',
+        kind: '迴圈 vs LINQ',
+        code: true,
+        badLabel: 'foreach',
+        goodLabel: 'LINQ',
+        bad: 'var result = new List<Product>();\nforeach (var p in products)\n    if (p.Stock < 5) result.Add(p);\nresult.Sort((a, b) => a.Price.CompareTo(b.Price));\nvar names = new List<string>();\nforeach (var p in result) names.Add(p.Name);',
+        good: 'var names = products\n    {{1:.Where(p => p.Stock < 5)}}\n    {{1:.OrderBy(p => p.Price)}}\n    {{1:.Select(p => p.Name)}}\n    .ToList();',
+        badResult: '6 行，要讀完才知道在做什麼。',
+        goodResult: '每一行就是一個步驟，讀起來像需求描述。',
+        why: ['迴圈描述「怎麼做」，LINQ 描述「要什麼」'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'int[] n = [5, 3, 8, 1, 9, 2];\nvar q = n.Where(x => x > 2)\n         .OrderByDescending(x => x)\n         .Select(x => x * 10);\nConsole.WriteLine(string.Join(", ", q));\nConsole.WriteLine(n.Any(x => x > 8));\nConsole.WriteLine(n.FirstOrDefault(x => x > 100));',
+          predict: { q: '第一行會印出什麼？', options: ['90, 80, 50, 30', '50, 30, 80, 90', '30, 50, 80, 90'], answer: 0 },
+          output: '90, 80, 50, 30\nTrue\n0',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="Where 與 Select 的差別：Where 改變元素數量但不改內容，6 個變 4 個；Select 不改數量但改內容，每個數字乘以 10">
+          <rect x="10" y="20" width="260" height="150" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">Where</text>
+          <text x="140" y="95" text-anchor="middle" font-size="16" class="on-color">數量變少</text>
+          <text x="140" y="125" text-anchor="middle" font-size="16" class="on-color">內容不變</text>
+          <text x="140" y="155" text-anchor="middle" font-size="15" class="on-color mono">[5,3,8,1] → [5,3,8]</text>
+          <rect x="290" y="20" width="260" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color mono">Select</text>
+          <text x="420" y="95" text-anchor="middle" font-size="16" class="on-color">數量不變</text>
+          <text x="420" y="125" text-anchor="middle" font-size="16" class="on-color">內容變了</text>
+          <text x="420" y="155" text-anchor="middle" font-size="15" class="on-color mono">[5,3] → [50,30]</text>
+          <path d="M270 95 H290" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: '分不清時問自己：我要「少幾個」還是「變成別的」？' },
+      ],
+      tryit: {
+        q: ['把這段迴圈改成一行 LINQ：'],
+        draft: 'int total = 0;\nforeach (var o in orders)\n    if (o.IsPaid) total += o.Amount;\n\n// 改成：\nint total = orders.____(o => o.IsPaid).____(o => o.Amount);',
+        answer: ['`orders.Where(o => o.IsPaid).Sum(o => o.Amount);`', 'Sum 會立刻執行並回傳一個數字（不是序列）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`list.Where(x => x > 0);` 以為 list 被篩選了。', why: 'LINQ 不修改原集合，回傳新的序列；沒接住就什麼都沒發生。', right: '`var positive = list.Where(x => x > 0).ToList();`' },
+      { wrong: '`.First(p => p.Id == id)` 查一個可能不存在的 id。', why: '找不到時 First 拋 InvalidOperationException。', right: '`FirstOrDefault`，再檢查 null。' },
+      { wrong: '`.Count() > 0` 判斷有沒有元素。', why: '可能把整個序列數完。', right: '`.Any()`，找到一個就停。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '要把 `List<Person>` 變成只有名字的 `List<string>`，用哪個方法？', options: [
+        { text: '`Select`', correct: true, why: 'Select 把每個元素轉成別的東西。' },
+        { text: '`Where`', why: 'Where 只篩選，元素仍然是 Person。' },
+        { text: '`OrderBy`', why: 'OrderBy 只排序。' },
+        { text: '`Any`', why: 'Any 回傳 bool。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`int[] a = [1, 2, 3]; a.FirstOrDefault(x => x > 5)` 的結果是？', options: [
+        { text: '`0`', correct: true, why: '找不到時回傳 int 的預設值 0。' },
+        { text: '`null`', why: 'int 不能是 null；預設值是 0。' },
+        { text: '拋出 InvalidOperationException', why: '那是 First 的行為。' },
+        { text: '`-1`', why: 'LINQ 不用 -1 表示找不到。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['FirstOrDefault 找不到時回傳 0，但如果陣列裡真的有 0 呢？你怎麼分辨「找到 0」和「沒找到」？'], answer: [
+        '用 .NET 6 起的多載指定預設值：`a.FirstOrDefault(x => x > 5, -1)`，或先用 `Any` 判斷。',
+        '另一種寫法是把元素轉成可為 null：`a.Select(x => (int?)x).FirstOrDefault(x => x > 5)`，找不到時得到 null。',
+      ] },
+    ],
+    keypoints: [
+      'Where 篩選、Select 轉換、OrderBy 排序，串成管線。',
+      'LINQ 不修改原集合，要接住回傳值。',
+      '判斷有沒有用 Any；可能找不到用 FirstOrDefault。',
+    ],
+    sources: ['linq'],
+  },
+
+  '5-3': {
+    goals: [
+      '說出 LINQ 查詢「什麼時候真的執行」',
+      '辨認重複列舉造成的重複計算',
+      '知道什麼時候該用 ToList 具體化',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-2）`list.Where(x => x > 0);` 單獨一行，list 會怎樣？', options: [
+        { text: '完全不變，回傳的結果沒人接住', correct: true, why: 'LINQ 不修改原集合；這行甚至還沒執行篩選（這課的重點）。' },
+        { text: 'list 只剩正數', why: 'LINQ 從不修改來源。' },
+        { text: '編譯錯誤：沒有使用回傳值', why: '合法，最多有分析器提示。' },
+        { text: '拋出例外', why: '沒有任何會拋例外的操作。' },
+      ] },
+    ],
+    analogy: {
+      text: ['LINQ 查詢像一份食譜，不是一盤菜。`var q = list.Where(…)` 只是寫好食譜；每次 foreach，就照食譜煮一次。煮兩次就花兩倍時間，而且如果冰箱的食材（來源資料）變了，第二次煮出來的也不一樣。'],
+      limit: ['食譜不會自己改；但 LINQ 查詢的 lambda 如果讀了外部變數，變數改了，下次執行結果也跟著變。ToList 就是「煮好裝盒」，之後不再重煮。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="延遲執行的時間軸：第一步定義查詢 q 等於 Where，什麼都沒執行；第二步 foreach 時才逐一篩選；第三步再 foreach 一次又重新篩選一次；ToList 則立刻執行一次並保存結果">
+        <rect x="10" y="20" width="170" height="100" class="fill-surface stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+        <text x="95" y="58" text-anchor="middle" font-size="17" font-weight="900" class="mono">q = Where(…)</text>
+        <text x="95" y="92" text-anchor="middle" font-size="15">只寫好食譜</text>
+        <rect x="195" y="20" width="170" height="100" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="58" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">foreach q</text>
+        <text x="280" y="92" text-anchor="middle" font-size="15" class="on-color">執行第 1 次</text>
+        <rect x="380" y="20" width="170" height="100" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="58" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">q.Count()</text>
+        <text x="465" y="92" text-anchor="middle" font-size="15" class="on-color">再執行第 2 次</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M180 70 H195"/><path d="M365 70 H380"/></g>
+        <rect x="100" y="170" width="360" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="205" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">var list = q.ToList();</text>
+        <text x="280" y="235" text-anchor="middle" font-size="15" class="on-color">執行 1 次並保存，之後重複使用</text>
+        <path d="M95 120 V145 H280 V170" class="stroke-ink" stroke-width="3" fill="none"/>
+      </svg>`,
+      caption: 'Where、Select、OrderBy 都是延遲的；ToList、Count、Sum、First 會立刻執行。',
+      blocks: [
+        '[[延遲執行]]：查詢在被列舉時才執行，而且每次列舉都重新執行。需要重複使用結果，或來源資料之後會改變時，用 ToList／ToArray [[具體化]]。',
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'lazy', label: '延遲（還沒執行）' }, { id: 'now', label: '立刻執行' }],
+          items: [
+            { text: '`.Where(…)`', answer: 'lazy', why: '回傳 IEnumerable，等被列舉才篩選。' },
+            { text: '`.ToList()`', answer: 'now', why: '具體化：立刻跑完並存起來。' },
+            { text: '`.Select(…)`', answer: 'lazy', why: '回傳 IEnumerable。' },
+            { text: '`.Count()`', answer: 'now', why: '要回傳一個數字，必須跑完。' },
+            { text: '`.OrderBy(…)`', answer: 'lazy', why: '定義時不排序，第一次取元素時才排序。' },
+            { text: '`.First()`', answer: 'now', why: '立刻取出一個元素（取到就停）。' },
+          ],
+        } },
+      ],
+    },
+    define: [
+      { term: '延遲執行', en: 'deferred execution', def: '回傳 IEnumerable 的 LINQ 方法只建立查詢，列舉時才執行。', example: '`var q = data.Select(Expensive);` 這行不會呼叫 Expensive。' },
+      { term: '具體化', en: 'materialize', def: '用 ToList、ToArray、ToDictionary、ToHashSet 立刻執行並保存結果。', example: '`var cache = q.ToList();`' },
+      { term: '多次列舉', en: 'multiple enumeration', def: '同一個延遲查詢被 foreach 或彙總多次，每次都重跑；IDE 常有 CA1851 提示。', example: '`if (q.Any()) foreach (var x in q) …`' },
+    ],
+    examples: {
+      compare: [{
+        title: '昂貴的轉換被執行了幾次？',
+        kind: '重複執行 vs 執行一次',
+        code: true,
+        badLabel: '直接重複使用查詢',
+        goodLabel: '先具體化',
+        bad: 'var reports = ids.Select(id => LoadFromApi(id));\nConsole.WriteLine(reports.Count());\nforeach (var r in reports) Print(r);',
+        good: 'var reports = ids.Select(id => LoadFromApi(id)){{1:.ToList()}};\nConsole.WriteLine(reports.Count);\nforeach (var r in reports) Print(r);',
+        badResult: 'Count 呼叫一輪 API，foreach 又呼叫一輪：API 被打兩倍。',
+        goodResult: 'API 只被呼叫一輪。',
+        why: ['查詢裡有 I/O 或昂貴計算時，用 ToList 讓它只跑一次'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'var list = new List<int> { 1, 2, 3 };\nvar q = list.Where(x => x > 1);\nlist.Add(10);\nConsole.WriteLine(q.Count());\n\nvar snap = list.Where(x => x > 1).ToList();\nlist.Add(20);\nConsole.WriteLine(snap.Count);',
+          predict: { q: '第一個 `q.Count()` 印出什麼？（Add(10) 發生在定義查詢之後）', options: ['2', '3', '4'], answer: 1 },
+          output: '3\n3',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="延遲查詢看到的是列舉當下的資料：定義 q 時 list 是 1、2、3；Add 10 之後才 Count，所以篩出 2、3、10 共 3 個">
+          <rect x="10" y="30" width="160" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="90" y="72" text-anchor="middle" font-size="17" class="mono">[1, 2, 3]</text>
+          <rect x="200" y="30" width="160" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="280" y="72" text-anchor="middle" font-size="17" class="mono">[1, 2, 3, 10]</text>
+          <rect x="390" y="30" width="160" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="470" y="72" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">Count → 3</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M170 65 H200"/><path d="M360 65 H390"/></g>
+          <text x="90" y="135" text-anchor="middle" font-size="15">定義 q</text>
+          <text x="280" y="135" text-anchor="middle" font-size="15">Add(10)</text>
+          <text x="470" y="135" text-anchor="middle" font-size="15">這時才篩選</text>
+        </svg>`, caption: '延遲查詢看到的是「執行那一刻」的資料，不是「定義那一刻」的。' },
+      ],
+      tryit: {
+        q: ['這段程式會讀檔幾次？怎麼改成只讀一次？'],
+        draft: 'var lines = File.ReadLines("big.log")\n                .Where(l => l.Contains("ERROR"));\nConsole.WriteLine($"錯誤 {lines.Count()} 筆");\nforeach (var l in lines.Take(5)) Console.WriteLine(l);',
+        answer: ['兩次：Count 讀一遍，foreach 又從頭讀（ReadLines 本身也是延遲的）。', '改成 `var lines = File.ReadLines("big.log").Where(…).ToList();`。如果錯誤行非常多，只具體化需要的部分，或在同一個 foreach 裡同時計數與印出前 5 筆。'],
+      },
+    },
+    mistakes: [
+      { wrong: '方法回傳 `IEnumerable<T>` 的延遲查詢，呼叫端用了好幾次。', why: '每次使用都重跑，可能重複查資料庫或 API。', right: '確定只用一次才回傳延遲查詢；否則回傳 `List<T>` 或 `IReadOnlyList<T>`。' },
+      { wrong: '到處加 ToList「保險一點」。', why: '每次都配置新的 List，大資料時浪費記憶體，還失去「只處理需要的部分」的好處。', right: '只在要重複使用、或要固定當下快照時才具體化。' },
+      { wrong: '在查詢的 lambda 裡修改外部變數（例如計數器）。', why: '執行時機與次數不確定，計數結果會隨列舉次數翻倍。', right: 'lambda 保持無副作用；要計數就用 Count。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`var q = list.Select(x => Slow(x));` 這行執行時，Slow 被呼叫幾次？', options: [
+        { text: '0 次', correct: true, why: 'Select 是延遲的，列舉前不會呼叫 Slow。' },
+        { text: '每個元素一次', why: '那是列舉之後才會發生的事。' },
+        { text: '1 次', why: '沒有任何元素被處理。' },
+        { text: '取決於 list 的大小', why: '在這行，不管多大都是 0 次。' },
+      ] },
+      { level: '應用', type: 'mc', q: '承上，接著寫 `q.Count(); q.ToList();`，Slow 總共被呼叫幾次？（list 有 3 個元素）', options: [
+        { text: '6 次', correct: true, why: 'Count 列舉一次（3 次），ToList 再列舉一次（3 次）。' },
+        { text: '3 次', why: '延遲查詢不會記住上一次的結果。' },
+        { text: '0 次，Count 與 ToList 都不會觸發 Select', why: '兩者都要列舉整個序列，每個元素都會經過 Select。' },
+        { text: '9 次', why: '只列舉了兩次。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['EF Core 的 `db.Orders.Where(…)` 也是延遲的。如果在 foreach 裡又對每筆訂單查一次它的明細，會發生什麼？這和本課的關係是？'], answer: [
+        '外層 foreach 執行一次 SQL 取訂單，迴圈內每筆再發一次 SQL，100 筆訂單就是 101 次查詢（N+1 問題）。',
+        '延遲執行讓「查詢何時送出」不明顯。解法是一次查好：用 `Include` 或投影 `Select(o => new { o.Id, o.Items })`，最後 ToList，模組 9 的 EF Core 會再提到。',
+      ] },
+    ],
+    keypoints: [
+      'Where、Select、OrderBy 是延遲的，列舉時才執行，每次列舉都重跑。',
+      'ToList、Count、Sum、First 會立刻執行。',
+      '查詢昂貴或要重複使用時，ToList 一次；只用一次就別具體化。',
+    ],
+    sources: ['linq-deferred', 'linq'],
+  },
+
+  '5-4': {
+    goals: [
+      '用 GroupBy 分組並對每組彙總',
+      '用 .NET 9 起的 CountBy、AggregateBy 簡化常見統計',
+      '用 ToDictionary 把結果變成查詢表',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-3）哪一個方法會「立刻」執行查詢？', options: [
+        { text: '`Sum`', correct: true, why: '要回傳一個數字，必須跑完整個序列。' },
+        { text: '`Where`', why: '延遲。' },
+        { text: '`Select`', why: '延遲。' },
+        { text: '`OrderBy`', why: '延遲。' },
+      ] },
+    ],
+    analogy: {
+      text: ['GroupBy 像把一疊發票依「店家」分成好幾疊，再對每一疊算總金額。CountBy 像只數每家有幾張，不用真的分成好幾疊。'],
+      limit: ['實際分疊要把發票都拿起來移動；GroupBy 也會把所有元素放進分組結構（記憶體用量大）。只要統計數字時，CountBy、AggregateBy 不保留元素，省記憶體。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="GroupBy 流程：六筆訂單依國家分組成 TW 三筆、JP 兩筆、US 一筆，每組再算總金額">
+        <rect x="10" y="20" width="160" height="240" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="90" y="52" text-anchor="middle" font-size="17" font-weight="900">6 筆訂單</text>
+        <text x="30" y="90" font-size="15" class="mono">TW 100</text>
+        <text x="30" y="115" font-size="15" class="mono">JP 300</text>
+        <text x="30" y="140" font-size="15" class="mono">TW 200</text>
+        <text x="30" y="165" font-size="15" class="mono">US 500</text>
+        <text x="30" y="190" font-size="15" class="mono">TW 50</text>
+        <text x="30" y="215" font-size="15" class="mono">JP 100</text>
+        <rect x="250" y="20" width="140" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="320" y="62" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">TW ×3</text>
+        <rect x="250" y="105" width="140" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="320" y="147" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">JP ×2</text>
+        <rect x="250" y="190" width="140" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="320" y="232" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">US ×1</text>
+        <path d="M170 140 H210 V55 H250 M210 140 H250 M210 140 V225 H250" class="stroke-ink" stroke-width="4" fill="none"/>
+        <text x="475" y="62" text-anchor="middle" font-size="17" class="mono">350</text>
+        <text x="475" y="147" text-anchor="middle" font-size="17" class="mono">400</text>
+        <text x="475" y="232" text-anchor="middle" font-size="17" class="mono">500</text>
+        <g class="stroke-ink" stroke-width="4"><path d="M390 55 H440"/><path d="M390 140 H440"/><path d="M390 225 H440"/></g>
+      </svg>`,
+      caption: '先分組（Key = 國家），再對每組 Sum；結果是三個「國家 → 總額」。',
+      blocks: [
+        '[[GroupBy]] 回傳一組組的 `IGrouping<TKey, T>`，每組有 `Key` 與元素。只要「鍵 → 數量」或「鍵 → 加總」時，.NET 9 起的 [[CountBy]] 與 [[AggregateBy]] 更直接，結果是 `KeyValuePair` 序列。',
+        { type: 'code', lang: 'csharp', title: 'group.cs', code: 'var byCountry = orders\n    .GroupBy(o => o.Country)\n    .Select(g => new { Country = g.Key, Total = g.Sum(o => o.Amount), Count = g.Count() })\n    .OrderByDescending(x => x.Total);\n\n// .NET 9 起\nforeach (var (country, count) in orders.CountBy(o => o.Country))\n    Console.WriteLine($"{country}: {count} 筆");\n\nvar totals = orders\n    .AggregateBy(o => o.Country, 0m, (sum, o) => sum + o.Amount)\n    .ToDictionary();' },
+      ],
+    },
+    define: [
+      { term: 'GroupBy', en: 'GroupBy', def: '依鍵分組，回傳 `IEnumerable<IGrouping<TKey, TElement>>`；延遲執行。', example: '`g.Key`、`g.Count()`、`g.Sum(...)`' },
+      { term: 'CountBy', en: 'CountBy', def: '.NET 9：`IEnumerable<KeyValuePair<TKey, int>>`，每個鍵出現幾次。', example: '`words.CountBy(w => w.ToLower())`' },
+      { term: 'ToDictionary', en: 'ToDictionary', def: '把序列轉成 Dictionary；鍵重複時拋 ArgumentException。.NET 8 起 KeyValuePair 序列可直接 `.ToDictionary()`。', example: '`people.ToDictionary(p => p.Id)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '每個單字出現幾次',
+        kind: 'GroupBy vs CountBy',
+        code: true,
+        badLabel: 'GroupBy 再 Count',
+        goodLabel: 'CountBy（.NET 9 起）',
+        bad: 'var freq = words\n    .GroupBy(w => w)\n    .Select(g => new { Word = g.Key, Count = g.Count() });',
+        good: 'var freq = words.{{1:CountBy(w => w)}};',
+        badResult: '能用，但先把每個單字的所有出現都存進分組。',
+        goodResult: '一行，只保留計數，不保留元素。',
+        why: ['.NET 8 以前的專案沒有 CountBy，只能用左邊的寫法'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'string[] fruits = ["蘋果", "香蕉", "蘋果", "芒果", "蘋果", "香蕉"];\nvar top = fruits.CountBy(f => f)\n                .OrderByDescending(kv => kv.Value)\n                .First();\nConsole.WriteLine($"{top.Key} {top.Value}");\n\nvar groups = fruits.GroupBy(f => f.Length);\nConsole.WriteLine(groups.Count());',
+          predict: { q: '第一行輸出是？', options: ['蘋果 3', '香蕉 2', '蘋果 1'], answer: 0 },
+          output: '蘋果 3\n1',
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="選擇方法：要每組的元素清單用 GroupBy；只要每組的數量用 CountBy；只要每組的累計值（例如加總）用 AggregateBy">
+          <rect x="10" y="20" width="170" height="140" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="58" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">GroupBy</text>
+          <text x="95" y="100" text-anchor="middle" font-size="15" class="on-color">要每組的元素</text>
+          <rect x="195" y="20" width="170" height="140" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="58" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">CountBy</text>
+          <text x="280" y="100" text-anchor="middle" font-size="15" class="on-color">只要數量</text>
+          <rect x="380" y="20" width="170" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="58" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">AggregateBy</text>
+          <text x="465" y="100" text-anchor="middle" font-size="15" class="on-color">只要累計值</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M180 90 H195"/><path d="M365 90 H380"/></g>
+          <text x="280" y="145" text-anchor="middle" font-size="14" class="on-color">.NET 9 起</text>
+          <text x="465" y="145" text-anchor="middle" font-size="14" class="on-color">.NET 9 起</text>
+        </svg>`, caption: '需要元素本身時才 GroupBy；只要統計數字時用後兩個。' },
+      ],
+      tryit: {
+        q: ['把學生依班級分組，算出每班平均分數，並轉成 Dictionary：'],
+        draft: 'var avg = students\n    .GroupBy(s => s.____)\n    .ToDictionary(g => g.____, g => g.Average(s => s.Score));',
+        answer: ['`GroupBy(s => s.ClassName)`、`ToDictionary(g => g.Key, …)`。', '結果是 `Dictionary<string, double>`；之後 `avg["三年二班"]` 就能直接查。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`ToDictionary(p => p.Name)`，但名字有重複。', why: '鍵重複時拋 ArgumentException。', right: '用唯一的鍵（Id），或先 GroupBy；也可用 `ToLookup` 允許一鍵多值。' },
+      { wrong: '以為 GroupBy 的結果會照鍵排序。', why: '分組順序是「鍵第一次出現的順序」。', right: '需要排序就在後面加 OrderBy。' },
+      { wrong: '在 .NET 8 專案用 CountBy，編譯失敗。', why: 'CountBy、AggregateBy 是 .NET 9 新增的。', right: '升級到 .NET 10（建議），或改用 GroupBy 寫法。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`IGrouping<string, Order>` 的 `Key` 代表什麼？', options: [
+        { text: '這一組的分組依據值', correct: true, why: '例如 GroupBy(o => o.Country) 時，Key 就是國家。' },
+        { text: '這組第一筆訂單', why: '元素要列舉 IGrouping 本身才拿得到。' },
+        { text: '這組的筆數', why: '筆數要用 Count()。' },
+        { text: '這組在結果中的索引', why: 'Key 是分組值，不是位置。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`["a","b","a"].CountBy(x => x)` 的結果包含哪些項目？', options: [
+        { text: '`(a, 2)`、`(b, 1)`', correct: true, why: '每個鍵與它出現的次數。' },
+        { text: '`(a, 1)`、`(b, 1)`、`(a, 1)`', why: 'CountBy 會合併相同的鍵。' },
+        { text: '`2`', why: 'CountBy 回傳鍵值對序列，不是單一數字。' },
+        { text: '`(2, a)`、`(1, b)`', why: 'Key 是元素，Value 是次數。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做一份「每月每個商品類別的營收」報表。用 LINQ 怎麼分兩層？用匿名型別或 tuple 當鍵可以嗎？'], answer: [
+        '可以用複合鍵一次分組：`orders.GroupBy(o => (o.Date.Month, o.Category)).Select(g => new { g.Key.Month, g.Key.Category, Revenue = g.Sum(o => o.Amount) })`。',
+        'tuple 與匿名型別都依內容比較相等，所以適合當鍵。.NET 9 起也能寫 `AggregateBy(o => (o.Date.Month, o.Category), 0m, (s, o) => s + o.Amount)`。',
+      ] },
+    ],
+    keypoints: [
+      'GroupBy 依鍵分組，每組有 Key 與元素，可再 Sum、Count。',
+      '只要數量或累計值時，用 .NET 9 起的 CountBy、AggregateBy。',
+      'ToDictionary 的鍵不能重複；分組結果不會自動排序。',
+    ],
+    sources: ['linq-grouping', 'linq'],
   },
 });
 </script>
