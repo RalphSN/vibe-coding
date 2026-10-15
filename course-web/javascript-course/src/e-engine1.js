@@ -454,7 +454,7 @@ Views.home = () => {
         <span class="label tilt-r" style="--chip:var(--success)">每課都能動手</span>
         <span class="label tilt" style="--chip:var(--info)">ES2026・Node.js LTS</span>
       </div>
-      <h1><span class="phrase">看到程式，</span><br><span class="phrase">先猜對<span class="hl">它會印出什麼</span></span></h1>
+      <h1><span class="phrase">看到程式，</span><br><span class="phrase">先猜對</span><span class="phrase hl">它會印出什麼</span></h1>
       <p class="lead">型別都對、程式卻怪怪的？大多是 JavaScript 自己的執行期規則在作怪：浮點數、轉型、參考、this、事件迴圈。這門課每一課都讓你先預測、再在頁面裡執行，用結果修正直覺。</p>
       <div class="actions">
         ${resumeBtn}
@@ -792,7 +792,7 @@ function renderBlock(b) {
     case 'unverified': return `<div class="callout unverified"><span class="label">截至 2026-10 查證狀態：未確認</span><div class="body blocks">${renderBlocks(b.body)}</div></div>`;
     case 'timely': return `<div class="callout timely"><span class="label">時效提醒</span><div class="body blocks">${renderBlocks(b.body)}</div></div>`;
     case 'legacy': return legacyBlock(b);
-    case 'svg': return `<figure class="figure">${b.svg}${b.caption ? `<figcaption>${md(b.caption)}</figcaption>` : ''}</figure>`;
+    case 'svg': return `<figure class="figure">${b.svg}<button type="button" class="btn small nb-press fig-zoom" data-fig-zoom>放大看</button>${b.caption ? `<figcaption>${md(b.caption)}</figcaption>` : ''}</figure>`;
     case 'compare': return compareBlock(b);
     case 'tabs': return tabsBlock(b);
     case 'reveal': return `<details class="reveal"><summary>${esc(b.summary || '展開')}</summary><div class="reveal-body blocks">${renderBlocks(b.body)}</div></details>`;

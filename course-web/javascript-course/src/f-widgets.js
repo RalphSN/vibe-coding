@@ -638,3 +638,47 @@ Widgets.herodemo = {
   render(props, id) { return Widgets.runner.render(HERO_RUNNER, id); },
   hydrate(el) { Widgets.runner.hydrate(el, HERO_RUNNER); },
 };
+
+/* ---------- 圖片放大：手機上圖裡的字會縮到 8px 左右，點「放大看」用原尺寸檢視 ---------- */
+// 放大後最小字級至少 12.5px（content-rules：375px 時圖中文字要 ≥ 12px）
+const FIG_MIN_TEXT_PX = 12.5;
+const FigZoom = (() => {
+  let dialog = null;
+  let opener = null;
+  function ensureDialog() {
+    if (dialog) return dialog;
+    dialog = document.createElement('dialog');
+    dialog.className = 'fig-dialog';
+    dialog.setAttribute('aria-label', '放大檢視圖解');
+    dialog.innerHTML = '<div class="fig-dialog-bar"><span class="fig-dialog-hint">可以左右、上下捲動</span><button type="button" class="btn small nb-press" data-fig-close>關閉</button></div><div class="fig-dialog-body"><div class="figure fig-dialog-figure"></div></div>';
+    dialog.addEventListener('click', (e) => {
+      if (e.target.closest('[data-fig-close]') || e.target === dialog) dialog.close();
+    });
+    dialog.addEventListener('close', () => {
+      $('.fig-dialog-figure', dialog).textContent = '';
+      if (opener) opener.focus();
+    });
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+  function open(button) {
+    const svg = $('svg', button.closest('.figure'));
+    if (!svg) return;
+    const box = ensureDialog();
+    const clone = svg.cloneNode(true);
+    const fontSizes = [...clone.querySelectorAll('text')].map((t) => parseFloat(t.getAttribute('font-size'))).filter(Boolean);
+    const minFont = fontSizes.length ? Math.min(...fontSizes) : 16;
+    const scale = Math.max(1, FIG_MIN_TEXT_PX / minFont);
+    clone.style.width = `${Math.ceil(svg.viewBox.baseVal.width * scale)}px`;
+    clone.style.maxWidth = 'none';
+    $('.fig-dialog-figure', box).appendChild(clone);
+    opener = button;
+    box.showModal();
+    $('[data-fig-close]', box).focus();
+  }
+  document.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-fig-zoom]');
+    if (button) open(button);
+  });
+  return { open };
+})();

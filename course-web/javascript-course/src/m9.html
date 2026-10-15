@@ -221,7 +221,7 @@ defineLessons({
         { text: '讓它不依賴 DOM，可以在 Node.js 裡測試，也能換別的畫面', correct: true, why: '透過 onChange 回呼把狀態交出去，顯示的事交給 main.js。' },
         { text: '因為模組裡不能用 document', why: '瀏覽器的模組可以用 document。' },
         { text: '因為 textContent 很慢', why: '速度不是原因。' },
-        { text: '因為 querySelector 會回傳 null', why: '元素存在時不會。' },
+        { text: '因為 querySelector 在模組載入時一定回傳 null，計時器會壞掉', why: '元素存在時不會。' },
       ] },
       { level: '遷移', type: 'reveal', q: ['期末延伸：使用者想要「暖身 60 秒，然後才開始間歇」。在狀態機上要加什麼？程式要改哪幾個地方？'], answer: [
         '狀態機多一個 warmup 狀態：idle → warmup → work。設定多一個 warmup 秒數。',
@@ -446,7 +446,7 @@ defineLessons({
         { level: '4-3', type: 'mc', q: '`[{ p: 1 }, { p: 2 }].reduce((s, x) => s + x.p)`（沒給起始值）得到？', options: [
           { text: "`'[object Object]2'`", correct: true, why: '第一個元素物件被當成起始值，物件 + 數字變字串相接。' },
           { text: '`3`', why: '要給起始值 0 才是 3。' },
-          { text: '`NaN`', why: '物件轉字串後相接，不是數字運算。' },
+          { text: '`NaN`，因為物件轉不成數字，加法結果是 NaN', why: '物件轉字串後相接，不是數字運算。' },
           { text: '拋出 TypeError', why: '不會拋錯，所以更難發現。' },
         ] },
         { level: '4-4', type: 'mc', q: '`const sorted = list.sort()` 之後？', options: [
@@ -471,7 +471,7 @@ defineLessons({
           { text: 'undefined', correct: true, why: '呼叫時沒有點的左邊（嚴格模式）。' },
           { text: 'team', why: '函式寫在 team 裡不代表 this 是 team。' },
           { text: 'f', why: 'this 不會指向函式本身。' },
-          { text: 'window', why: '模組是嚴格模式，不是 window。' },
+          { text: 'window（沒有點的左邊時用全域物件）', why: '模組是嚴格模式，不是 window。' },
         ] },
         { level: '6-1', type: 'mc', q: '`setTimeout(A, 0); Promise.resolve().then(B); C();` 的執行順序？', options: [
           { text: 'C B A', correct: true, why: '同步 → 微任務 → 任務。' },
@@ -489,7 +489,7 @@ defineLessons({
           { text: 'fetch 成功，`res.ok` 是 false', correct: true, why: '有回應就算成功，要自己檢查 ok。' },
           { text: 'fetch 失敗，會進 catch', why: '只有網路錯誤、取消、逾時才會。' },
           { text: 'fetch 會自動重試', why: 'fetch 不會自動重試。' },
-          { text: 'res.json() 一定會成功', why: '錯誤頁面可能不是 JSON。' },
+          { text: 'res.json() 一定會成功，因為伺服器確實有回應內容', why: '錯誤頁面可能不是 JSON。' },
         ] },
         { level: '7-2', type: 'mc', q: '`try { bad(); } catch {}`，bad 是會失敗的 async 函式，catch 接得到嗎？', options: [
           { text: '接不到', correct: true, why: 'bad() 只回傳失敗的 Promise，不會同步拋錯。' },
