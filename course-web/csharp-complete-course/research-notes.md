@@ -34,3 +34,15 @@
 | C# 15 集合運算式引數 | `[with(capacity: 10), ..values]` | 同上 |
 | CountBy、AggregateBy | .NET 9 新增 | Microsoft Learn Grouping data |
 | `ToDictionary()` 無參數（KeyValuePair 序列） | .NET 8 新增 | 未逐頁查證，依 .NET 8 API 變更記憶 ⚠️ |
+
+## 第 3 段補充（2026-10-16）
+
+| 項目 | 狀態 | 來源 |
+|---|---|---|
+| `dotnet new sln` | .NET 10 起預設產生 .slnx；`--format sln` 可產生舊格式；`dotnet sln migrate` 轉換 | Microsoft Learn .NET 10 破壞性變更頁 |
+| xUnit v3 範本 | `dotnet new install xunit.v3.templates` 後 `dotnet new xunit3`；NuGet 穩定版 3.2.2 | nuget.org、xunit.net |
+| Minimal API 驗證 | .NET 10 `builder.Services.AddValidation()`，DataAnnotations，失敗回 400 ProblemDetails；record 參數要 `[property: …]` | Microsoft Learn Validation、第三方部落格 |
+| `ArgumentException.ThrowIfNullOrWhiteSpace`、`ArgumentOutOfRangeException.ThrowIfNegative／ThrowIfGreaterThan` | .NET 8 起 | 依 API 記憶，未逐頁查證 ⚠️ |
+| EF Core 與 Native AOT | 支援仍有限制 | 未逐頁查證 ⚠️ |
+
+9-2、9-3、9-4 的 csrun 輸出是「測試結果／HTTP 回應／產生的 SQL」示意，不是 Console 輸出；9-4 的 SQL 已標示為示意。

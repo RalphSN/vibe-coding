@@ -1,0 +1,377 @@
+<script>
+/* ==========================================================================
+   模組 7：例外與資源
+   ========================================================================== */
+defineTerms({
+  'try': { en: 'try block', def: '放「可能拋例外」的程式碼的區塊，後面接 catch 或 finally。', example: '`try { File.ReadAllText(p); }`' },
+  'catch': { en: 'catch clause', def: '抓住特定型別例外並處理的區塊；由上往下比對，第一個符合的執行。', example: '`catch (FileNotFoundException ex) { … }`' },
+  'finally': { en: 'finally block', def: '不管有沒有例外、有沒有 return，離開 try 時一定會執行的區塊，用來清理資源。', example: '`finally { conn.Close(); }`' },
+  '例外過濾器': { en: 'exception filter', def: '`catch (X ex) when (條件)`：條件成立才抓，不成立就讓例外繼續往外拋，堆疊不會被打斷。', example: '`catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)`' },
+  '重新拋出': { en: 'rethrow', def: '在 catch 裡寫 `throw;`，把同一個例外原封不動往外拋，保留原本的堆疊追蹤。', example: '`catch (Exception ex) { Log(ex); throw; }`' },
+  '內部例外': { en: 'inner exception', def: '包裝例外時把原本的例外放進新例外的 InnerException，保留根本原因。', example: '`throw new ImportException("第 5 行格式錯誤", ex);`' },
+  '防衛子句': { en: 'guard clause', def: '方法開頭檢查參數，不合法就立刻拋例外，讓錯誤在最接近來源的地方被發現。', example: '`ArgumentNullException.ThrowIfNull(name);`' },
+  'IDisposable': { en: 'IDisposable', def: '表示「用完要釋放資源」的介面，只有一個方法 Dispose。檔案、網路連線、資料庫連線都實作它。', example: '`stream.Dispose();`' },
+  'using 宣告': { en: 'using declaration', def: '`using var x = …;`：變數離開所在範圍時自動呼叫 Dispose。', example: '`using var file = File.OpenRead(path);`' },
+  '非受控資源': { en: 'unmanaged resource', def: '垃圾回收器不管的系統資源，例如檔案控制代碼、網路 socket。不釋放就會一直被佔用。', example: '檔案沒關，其他程式就無法刪除它。' },
+});
+
+defineLessons({
+  '7-1': {
+    goals: [
+      '用 try／catch 處理可預期的錯誤',
+      '依例外型別分別處理，順序由具體到一般',
+      '用 finally 確保清理一定會執行',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-3）例外和編譯錯誤最大的差別是？', options: [
+        { text: '例外是執行到一半才發生，編譯錯誤讓程式根本不會執行', correct: true, why: '0-3 的兩個時間點。' },
+        { text: '例外比較嚴重，編譯錯誤只是排版上的提醒', why: '嚴重程度不是區分依據。' },
+        { text: '例外只會在 Windows 發生', why: '跨平台都一樣。' },
+        { text: '編譯錯誤可以用 try/catch 處理', why: 'try/catch 處理的是執行時的例外。' },
+      ] },
+    ],
+    analogy: {
+      text: ['try／catch 像爬山時的安全繩：try 是爬的路段，catch 是「如果滑倒就由這條繩子接住」，finally 是「不管有沒有滑倒，下山後都要把裝備收好」。'],
+      limit: ['安全繩接住就沒事；catch 接住後程式不會自動「回到原地繼續爬」，而是從 catch 之後繼續。而且繩子要選對：只接得住「滑倒」的繩子，接不住「落石」（不同型別的例外）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="try catch finally 的流程：try 正常結束就跳過 catch 直接到 finally；try 中拋出例外時跳到符合型別的 catch，然後到 finally；沒有符合的 catch 時，先執行 finally 再把例外往外拋">
+        <rect x="190" y="15" width="180" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="52" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">try</text>
+        <rect x="20" y="120" width="200" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="120" y="157" text-anchor="middle" font-size="16">正常結束</text>
+        <rect x="340" y="120" width="200" height="60" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="440" y="157" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">catch (符合型別)</text>
+        <rect x="190" y="215" width="180" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="252" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">finally</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M240 75 V97 H120 V120"/><path d="M320 75 V97 H440 V120"/><path d="M120 180 V245 H190"/><path d="M440 180 V245 H370"/></g>
+        <text x="380" y="95" font-size="14">拋出例外</text>
+      </svg>`,
+      caption: '不管走哪條路，finally 都會執行；沒有符合的 catch 時，finally 執行完例外繼續往外拋。',
+      blocks: [
+        '[[try]] 放可能失敗的程式，[[catch]] 依例外型別處理，[[finally]] 放一定要做的清理。多個 catch 由上往下比對，所以具體的型別放前面，`Exception` 放最後。',
+        { type: 'code', lang: 'csharp', title: 'read-config.cs', code: 'string ReadConfig(string path)\n{\n    try\n    {\n        return File.ReadAllText(path);\n    }\n    catch (FileNotFoundException)\n    {\n        Console.WriteLine($"找不到 {path}，使用預設設定");\n        return "{}";\n    }\n    catch (UnauthorizedAccessException ex)\n    {\n        Console.WriteLine($"沒有權限讀取 {path}：{ex.Message}");\n        throw;\n    }\n}' },
+      ],
+    },
+    define: [
+      { term: 'catch', en: 'catch', def: '`catch (型別 變數)` 抓該型別及其子型別的例外；只寫 `catch` 抓全部。', example: '`catch (IOException ex)` 也會抓到 FileNotFoundException。' },
+      { term: 'finally', en: 'finally', def: '離開 try 時一定執行，包括 return 與例外的情況。', example: '`finally { timer.Stop(); }`' },
+      { term: '例外過濾器', en: 'when filter', def: '`catch (…) when (條件)`，條件不成立時例外原封不動往外傳。', example: '`catch (IOException) when (attempt < 3)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '讀檔失敗時',
+        kind: '吞掉 vs 處理',
+        code: true,
+        badLabel: '空的 catch',
+        goodLabel: '只抓能處理的',
+        bad: 'try\n{\n    data = File.ReadAllText(path);\n}\n{{1:catch { }}}',
+        good: 'try\n{\n    data = File.ReadAllText(path);\n}\n{{1:catch (FileNotFoundException)}}\n{\n    data = DefaultData;\n}',
+        badResult: '權限不足、磁碟壞掉也被默默吞掉，後面拿到空資料，問題變得很難追。',
+        goodResult: '只處理「檔案不存在」這個預期情況，其他錯誤照常往外拋。',
+        why: ['catch 裡至少要「處理、記錄，或重新拋出」其中一件事'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'Console.WriteLine(Test());\n\nstring Test()\n{\n    try\n    {\n        Console.WriteLine("A");\n        return "B";\n    }\n    finally\n    {\n        Console.WriteLine("C");\n    }\n}',
+          predict: { q: '印出的順序是？', options: ['A B C', 'A C B', 'A B'], answer: 1 },
+          output: 'A\nC\nB',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'catch', label: '該在這裡 catch' }, { id: 'let', label: '讓它往外拋' }],
+          items: [
+            { text: '讀使用者選的檔案，檔案不存在', answer: 'catch', why: '預期中的情況，可以提示使用者重選。' },
+            { text: '程式內部的 bug 造成 NullReferenceException', answer: 'let', why: '這是程式錯誤，抓了也不知道怎麼救，應該修程式。' },
+            { text: '呼叫外部 API 逾時，可以重試', answer: 'catch', why: '有明確的處理方式（重試或降級）。' },
+            { text: '資料庫連線字串設定錯誤', answer: 'let', why: '設定錯誤需要人修，讓程式在啟動時就明確失敗。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="catch 的順序：具體的 FileNotFoundException 要放在一般的 IOException 前面，再放 Exception；順序顛倒時後面的 catch 永遠不會被執行，編譯器報 CS0160">
+          <rect x="10" y="40" width="170" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="82" text-anchor="middle" font-size="14" font-weight="900" class="on-color mono">FileNotFound…</text>
+          <rect x="195" y="40" width="170" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="82" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">IOException</text>
+          <rect x="380" y="40" width="170" height="70" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="82" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">Exception</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M180 75 H195"/><path d="M365 75 H380"/></g>
+          <text x="280" y="150" text-anchor="middle" font-size="15">具體 → 一般；顛倒時編譯器報 CS0160</text>
+        </svg>`, caption: 'catch 由上往下比對，子類別放前面。' },
+      ],
+      tryit: {
+        q: ['讓這段只在 HTTP 404 時回傳 null，其他錯誤照常往外拋：'],
+        draft: 'try\n{\n    return await http.GetStringAsync(url);\n}\ncatch (HttpRequestException ex) ____ (ex.StatusCode == HttpStatusCode.NotFound)\n{\n    return null;\n}',
+        answer: ['`when`。', '例外過濾器在「決定要不要抓」時就判斷，不成立時例外直接往外傳，堆疊追蹤完整保留，比在 catch 裡 if 再 throw 乾淨。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`catch (Exception) { }` 包住整個方法。', why: '所有錯誤都消失，程式帶著錯誤狀態繼續執行。', right: '只抓能處理的型別；抓 Exception 時至少記錄日誌並重新拋出。' },
+      { wrong: 'catch 裡寫 `throw ex;`。', why: '堆疊追蹤被重設成這一行，看不到原本出錯的位置。', right: '`throw;`（不加變數）。' },
+      { wrong: '用例外控制一般流程，例如用 Parse 失敗來判斷輸入是不是數字。', why: '例外成本高，而且讓讀者以為發生了異常狀況。', right: '用 TryParse、TryGetValue 這類 TryXxx 方法。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'try 裡執行了 return，finally 會執行嗎？', options: [
+        { text: '會，在真正離開方法之前執行', correct: true, why: 'finally 在任何離開 try 的路徑上都會執行。' },
+        { text: '不會，return 直接離開方法', why: 'return 也要先經過 finally。' },
+        { text: '只有發生例外時才會', why: '沒有例外時也會執行。' },
+        { text: '編譯錯誤：try 裡不能 return', why: 'try 裡可以 return。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 catch 裡要記錄日誌後把例外往外拋，正確寫法是？', options: [
+        { text: '`Log(ex); throw;`', correct: true, why: '保留原本的堆疊追蹤。' },
+        { text: '`Log(ex); throw ex;`', why: '會重設堆疊追蹤，失去出錯位置。' },
+        { text: '`Log(ex); throw new Exception();`', why: '丟失原本的型別、訊息與堆疊。' },
+        { text: '`Log(ex); return;`', why: '這是吞掉例外，呼叫端不知道失敗了。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一支每晚執行的批次程式處理 1000 筆資料，第 37 筆格式錯誤就整支停掉。你會怎麼調整 try/catch 的位置？'], answer: [
+        '把 try/catch 放在「每一筆」的處理外面，而不是整個迴圈外面：單筆失敗時記錄筆號、原始資料與例外訊息，然後 continue。',
+        '最後回報「成功 999 筆、失敗 1 筆」並讓結束代碼非 0，讓排程系統知道要通知人。但像資料庫連不上這種「每一筆都會失敗」的錯誤，應該讓它直接中止，不要重試 1000 次。',
+      ] },
+    ],
+    keypoints: [
+      '只 catch 你能處理的例外型別，具體的放前面。',
+      'finally 一定會執行，適合放清理。',
+      '要往外拋用 `throw;`，不要 `throw ex;`，更不要空的 catch。',
+    ],
+    sources: ['cs-try', 'cs-exceptions'],
+  },
+
+  '7-2': {
+    goals: [
+      '判斷什麼情況該拋例外、什麼情況該回傳結果',
+      '用防衛子句檢查參數',
+      '包裝例外時保留內部例外',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 7-1）`catch (Exception ex) { throw ex; }` 的問題是？', options: [
+        { text: '堆疊追蹤被重設，看不到原本出錯的位置', correct: true, why: '要用 `throw;`。' },
+        { text: '例外型別會變成 Exception', why: '型別不變，問題是堆疊。' },
+        { text: '編譯錯誤', why: '語法合法，只有分析器警告 CA2200。' },
+        { text: '會造成無窮迴圈', why: '只是往外拋一次。' },
+      ] },
+    ],
+    analogy: {
+      text: ['例外像大樓的火警警報：只在真的出事時響。「電梯客滿」不該拉火警，告訴下一個人「請等下一班」（回傳結果）就好；「電梯纜線斷了」才拉警報（拋例外）。'],
+      limit: ['火警響了所有人都知道；例外則是一路往上找有沒有人 catch，沒人接才讓程式中止。如果每一層都隨便接住，警報就形同虛設。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="決策：方法無法完成它承諾的事時拋例外；失敗是常見、預期的結果時回傳 bool 或結果物件；參數不合法時在方法開頭用防衛子句拋 ArgumentException">
+        <rect x="170" y="15" width="220" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="52" text-anchor="middle" font-size="18" font-weight="900">這種失敗常見嗎？</text>
+        <rect x="10" y="140" width="250" height="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="175" text-anchor="middle" font-size="17" font-weight="900" class="on-color">常見、預期中</text>
+        <text x="135" y="208" text-anchor="middle" font-size="15" class="on-color mono">TryXxx / Result</text>
+        <text x="135" y="235" text-anchor="middle" font-size="14" class="on-color">例：使用者輸入錯誤</text>
+        <rect x="300" y="140" width="250" height="110" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="425" y="175" text-anchor="middle" font-size="17" font-weight="900" class="on-color">做不到承諾的事</text>
+        <text x="425" y="208" text-anchor="middle" font-size="15" class="on-color mono">throw</text>
+        <text x="425" y="235" text-anchor="middle" font-size="14" class="on-color">例：參數不合法、檔案壞掉</text>
+        <path d="M280 75 V107 H135 V140 M280 107 H425 V140" class="stroke-ink" stroke-width="4" fill="none"/>
+      </svg>`,
+      caption: '方法名稱就是承諾：`Load` 讀不到就拋例外；`TryLoad` 讀不到就回傳 false。',
+      blocks: [
+        '方法開頭用[[防衛子句]]擋掉不合法的參數。在低層抓到例外、要加上更高層的意義再拋出時，把原本的例外當[[內部例外]]傳進去。.NET 內建的 `ArgumentNullException.ThrowIfNull`、`ArgumentOutOfRangeException.ThrowIfNegative` 等方法讓防衛子句一行完成。',
+        { type: 'code', lang: 'csharp', title: 'guard.cs', code: 'decimal Discount(decimal price, decimal rate)\n{\n    ArgumentOutOfRangeException.ThrowIfNegative(price);\n    ArgumentOutOfRangeException.ThrowIfGreaterThan(rate, 1m);\n    return price * (1 - rate);\n}\n\ntry { Import("data.csv"); }\ncatch (FormatException ex)\n{\n    throw new ImportException("data.csv 第 5 行格式錯誤", ex);  // ex 成為 InnerException\n}\n\nclass ImportException(string message, Exception inner) : Exception(message, inner);' },
+      ],
+    },
+    define: [
+      { term: '防衛子句', en: 'guard clause', def: '在方法最前面驗證參數並立刻拋出 ArgumentException 系列例外。', example: '`ArgumentException.ThrowIfNullOrWhiteSpace(name);`' },
+      { term: '內部例外', en: 'InnerException', def: '新例外建構子的第二個參數；記錄根本原因，日誌會一路印出。', example: '`new AppException("匯入失敗", ex)`' },
+      { term: '自訂例外', en: 'custom exception', def: '繼承 Exception 的類別，名稱以 Exception 結尾，讓呼叫端可以針對它 catch。', example: '`class InsufficientFundsException : Exception`' },
+    ],
+    examples: {
+      compare: [{
+        title: '找使用者',
+        kind: '不一致 vs 名稱即承諾',
+        code: true,
+        badLabel: '有時回傳 null、有時拋例外',
+        goodLabel: '兩個方法、兩種承諾',
+        bad: 'User GetUser(int id)\n{\n    var u = db.Find(id);\n    return u;   // 找不到就是 null，呼叫端常忘記檢查\n}',
+        good: 'User {{1:GetUser}}(int id)\n    => db.Find(id) ?? throw new KeyNotFoundException($"使用者 {id} 不存在");\n\nUser? {{1:FindUser}}(int id) => db.Find(id);',
+        badResult: '型別寫 User，實際可能是 null，錯誤延後到別處才爆。',
+        goodResult: '要一定有就呼叫 Get，可能沒有就呼叫 Find 並處理 null。',
+        why: ['`?? throw` 讓「找不到就拋例外」一行完成'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'try\n{\n    Withdraw(100m, 500m);\n}\ncatch (InsufficientFundsException ex)\n{\n    Console.WriteLine($"{ex.Message}（差 {ex.Shortage}）");\n}\n\nvoid Withdraw(decimal balance, decimal amount)\n{\n    if (amount > balance)\n        throw new InsufficientFundsException(amount - balance);\n}\n\nclass InsufficientFundsException(decimal shortage)\n    : Exception("餘額不足")\n{\n    public decimal Shortage => shortage;\n}',
+          predict: { q: '會印出什麼？', options: ['餘額不足（差 400）', '餘額不足（差 -400）', '程式中止'], answer: 0 },
+          output: '餘額不足（差 400）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'throw', label: '拋例外' }, { id: 'result', label: '回傳結果（bool／null／Result）' }],
+          items: [
+            { text: '`Divide(a, b)` 收到 b = 0', answer: 'throw', why: '呼叫端違反了方法的前提，是程式錯誤。' },
+            { text: '登入時密碼錯誤', answer: 'result', why: '每天發生很多次，是預期的業務結果。' },
+            { text: '`LoadConfig()` 發現設定檔 JSON 損毀', answer: 'throw', why: '方法無法完成承諾，而且需要人介入。' },
+            { text: '搜尋商品沒有符合的結果', answer: 'result', why: '空結果是正常情況，回傳空清單即可。' },
+            { text: '建構子收到 null 的必要參數', answer: 'throw', why: '防衛子句：ArgumentNullException。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="例外包裝鏈：最外層 ImportException 說明匯入失敗，InnerException 是 FormatException 說明第 5 行不是數字，保留了完整的原因鏈">
+          <rect x="20" y="30" width="250" height="100" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="145" y="68" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">ImportException</text>
+          <text x="145" y="100" text-anchor="middle" font-size="15" class="on-color">「data.csv 匯入失敗」</text>
+          <rect x="300" y="30" width="250" height="100" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="425" y="68" text-anchor="middle" font-size="17" font-weight="900" class="mono">FormatException</text>
+          <text x="425" y="100" text-anchor="middle" font-size="15">「'abc' 不是數字」</text>
+          <path d="M270 80 H300" class="stroke-ink" stroke-width="4"/>
+          <text x="285" y="158" text-anchor="middle" font-size="15">外層說「做什麼失敗」，內層說「為什麼」</text>
+        </svg>`, caption: '日誌記錄 `ex.ToString()` 會連同 InnerException 一起印出。' },
+      ],
+      tryit: {
+        q: ['用一行防衛子句，讓 name 是 null、空字串或只有空白時拋例外：'],
+        draft: 'void Register(string name)\n{\n    ArgumentException.____(name);\n    // …\n}',
+        answer: ['`ArgumentException.ThrowIfNullOrWhiteSpace(name);`（.NET 8 起）。', '例外訊息會自動帶上參數名稱 name，因為這些方法用了 CallerArgumentExpression。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`throw new Exception("錯誤");`', why: '呼叫端只能 catch Exception，無法分辨是哪種錯誤；訊息也沒說是什麼失敗。', right: '用具體型別（ArgumentException、InvalidOperationException 或自訂例外），訊息寫出「什麼失敗、用了什麼輸入」。' },
+      { wrong: '包裝例外時沒傳入原本的例外。', why: '根本原因遺失，日誌只看到外層訊息。', right: '`throw new XxxException("…", ex);`' },
+      { wrong: '業務規則失敗（例如庫存不足）在高流量 API 裡一律拋例外。', why: '例外成本高，大量發生時拖慢效能，日誌也被淹沒。', right: '預期中的業務失敗回傳結果物件，例外留給真的異常。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '方法收到不合法的參數（例如負數的數量），最適合拋哪種例外？', options: [
+        { text: '`ArgumentOutOfRangeException`', correct: true, why: '明確指出是參數超出允許範圍。' },
+        { text: '`Exception`', why: '太籠統，呼叫端無法分辨。' },
+        { text: '`NullReferenceException`', why: '這個例外留給執行環境，不應該自己拋。' },
+        { text: '`InvalidCastException`', why: '和轉型無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`User Get(int id) => db.Find(id) ?? throw new KeyNotFoundException();` 找不到時會？', options: [
+        { text: '拋出 KeyNotFoundException', correct: true, why: '`?? throw` 在左邊是 null 時拋例外。' },
+        { text: '回傳 null', why: '`??` 右邊是 throw，不會回傳 null。' },
+        { text: '編譯錯誤：throw 不能放在 ?? 右邊', why: 'C# 7 起支援 throw 運算式。' },
+        { text: '回傳一個空的 User', why: '沒有任何程式碼建立空的 User。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在設計付款 API：卡片過期、餘額不足、網路逾時、程式 bug 四種失敗。哪些該用例外？API 回應又該怎麼對應？'], answer: [
+        '卡片過期、餘額不足是預期的業務結果：回傳結果物件，API 回應 422 與明確的錯誤代碼。',
+        '網路逾時是外部異常：可以拋例外後由上層重試，最終仍失敗就回應 503。程式 bug 讓它往外拋，由全域錯誤處理記錄並回應 500，不把堆疊追蹤送給客戶端。',
+      ] },
+    ],
+    keypoints: [
+      '方法做不到承諾的事才拋例外；常見的失敗回傳結果。',
+      '方法開頭用 ThrowIfNull 這類防衛子句擋掉不合法參數。',
+      '拋具體的例外型別；包裝時把原本的例外當 InnerException。',
+    ],
+    sources: ['exceptions-best', 'cs-exceptions'],
+  },
+
+  '7-3': {
+    goals: [
+      '說出為什麼檔案、連線用完要釋放',
+      '用 using 宣告自動呼叫 Dispose',
+      '分辨垃圾回收管的記憶體與需要 Dispose 的資源',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 7-1）try 裡拋了例外而且沒有 catch 抓到，finally 會執行嗎？', options: [
+        { text: '會，執行完例外才繼續往外拋', correct: true, why: '這正是 using 背後的機制。' },
+        { text: '不會，程式立刻中止', why: 'finally 會先執行。' },
+        { text: '只有在 Debug 模式才會', why: '和建置模式無關。' },
+        { text: '要看例外型別', why: '任何例外都一樣。' },
+      ] },
+    ],
+    analogy: {
+      text: ['IDisposable 像圖書館的書：借了一定要還，不然下一個人借不到。using 就像借書時設好的「自動歸還」：不管你看完、看到一半睡著、還是被叫走，離開座位時書就自動還回去。'],
+      limit: ['圖書館會催你還書；.NET 的垃圾回收器（GC）只回收記憶體，不會主動幫你關檔案。等 GC 哪天跑到可能很久以後，這段時間檔案一直被鎖住。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="using 宣告的生命週期：using var file 開啟檔案；中間讀寫；離開大括號範圍時自動呼叫 Dispose 關閉檔案，即使中間拋出例外也一樣">
+        <rect x="10" y="20" width="540" height="230" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="55" font-size="17" class="mono">{</text>
+        <rect x="50" y="70" width="460" height="50" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="70" y="102" font-size="16" class="on-color mono">using var file = File.OpenRead(p);</text>
+        <rect x="50" y="135" width="460" height="45" class="fill-surface stroke-ink" stroke-width="3" stroke-dasharray="6 5"/>
+        <text x="70" y="164" font-size="16" class="mono">… 讀取（可能拋例外）…</text>
+        <text x="30" y="225" font-size="17" class="mono">}</text>
+        <rect x="200" y="200" width="310" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="355" y="226" text-anchor="middle" font-size="15" font-weight="900" class="on-color">離開範圍 → 自動 Dispose</text>
+        <g class="stroke-ink" stroke-width="3"><path d="M280 120 V135"/><path d="M280 180 V200"/></g>
+      </svg>`,
+      caption: '編譯器把 using 轉成 try／finally，finally 裡呼叫 Dispose。',
+      blocks: [
+        '實作 [[IDisposable]] 的物件握著[[非受控資源]]（檔案、socket、資料庫連線）。用 [[using 宣告]]（C# 8 起）或 using 區塊，離開範圍時一定會呼叫 Dispose。非同步資源（IAsyncDisposable）用 `await using`。',
+        { type: 'code', lang: 'csharp', title: 'copy.cs', code: 'void Copy(string from, string to)\n{\n    using var input = File.OpenRead(from);\n    using var output = File.Create(to);\n    input.CopyTo(output);\n}   // 先 Dispose output，再 Dispose input（和宣告順序相反）' },
+      ],
+    },
+    define: [
+      { term: 'IDisposable', en: 'IDisposable', def: '`void Dispose()`：釋放資源的約定。Dispose 應該可以安全地被呼叫多次。', example: '`FileStream`、`HttpResponseMessage`、`DbConnection`' },
+      { term: 'using 宣告', en: 'using declaration', def: '`using var x = …;`，在所在區塊結束時 Dispose；舊寫法 `using (var x = …) { }` 在大括號結束時 Dispose。', example: '`using var reader = new StreamReader(path);`' },
+      { term: 'await using', en: 'await using', def: '用於 IAsyncDisposable，離開範圍時 `await DisposeAsync()`。', example: '`await using var conn = new SqlConnection(cs);`' },
+    ],
+    examples: {
+      compare: [{
+        title: '寫入日誌檔',
+        kind: '可能漏關 vs 一定會關',
+        code: true,
+        badLabel: '手動 Close',
+        goodLabel: 'using',
+        bad: 'var writer = new StreamWriter("log.txt");\nwriter.WriteLine(Format(entry));  // 這行拋例外…\nwriter.Close();                   // …就不會執行',
+        good: '{{1:using}} var writer = new StreamWriter("log.txt");\nwriter.WriteLine(Format(entry));',
+        badResult: '例外發生時檔案沒關，內容可能沒寫進磁碟，檔案也被鎖住。',
+        goodResult: '不管有沒有例外，離開時都會 Dispose（寫入並關閉）。',
+        why: ['看到 IDisposable 就用 using，不要自己記得 Close'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'using (var a = new Res("A"))\n{\n    using var b = new Res("B");\n    Console.WriteLine("工作中");\n}\nConsole.WriteLine("結束");\n\nclass Res(string name) : IDisposable\n{\n    public void Dispose() => Console.WriteLine($"釋放 {name}");\n}',
+          predict: { q: '「釋放 A」和「釋放 B」誰先印？', options: ['A 先', 'B 先', '只會印 A'], answer: 1 },
+          output: '工作中\n釋放 B\n釋放 A\n結束',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'using', label: '要 using' }, { id: 'gc', label: '交給 GC 就好' }],
+          items: [
+            { text: '`File.OpenRead(path)` 回傳的 FileStream', answer: 'using', why: '握著檔案控制代碼。' },
+            { text: '`new List<int>()`', answer: 'gc', why: '只有記憶體，沒有實作 IDisposable。' },
+            { text: '`new SqlConnection(cs)`', answer: 'using', why: '握著資料庫連線，不還會耗盡連線池。' },
+            { text: '`new StringBuilder()`', answer: 'gc', why: '純記憶體物件。' },
+            { text: '`new HttpClient()`', answer: 'gc', why: '例外：HttpClient 設計成長期重用，不該每次 using；用 IHttpClientFactory 或共用一個實例。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="GC 與 Dispose 分工：GC 回收受控記憶體，時間不確定；Dispose 立刻釋放檔案、連線等系統資源，由你決定時間">
+          <rect x="10" y="20" width="260" height="140" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="140" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color">GC</text>
+          <text x="140" y="95" text-anchor="middle" font-size="16" class="on-color">回收記憶體</text>
+          <text x="140" y="125" text-anchor="middle" font-size="16" class="on-color">時間不確定</text>
+          <rect x="290" y="20" width="260" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color">Dispose</text>
+          <text x="420" y="95" text-anchor="middle" font-size="16" class="on-color">釋放檔案、連線</text>
+          <text x="420" y="125" text-anchor="middle" font-size="16" class="on-color">你決定何時</text>
+          <path d="M270 90 H290" class="stroke-ink" stroke-width="4"/>
+        </svg>`, caption: '兩者分工：記憶體交給 GC，系統資源由你用 using 釋放。' },
+      ],
+      tryit: {
+        q: ['把下面改成 using 宣告，確保 reader 一定會被釋放：'],
+        draft: 'var reader = new StreamReader("data.txt");\nstring first = reader.ReadLine() ?? "";\nreader.Dispose();\n\n// 改成：\n____ var reader = new StreamReader("data.txt");\nstring first = reader.ReadLine() ?? "";',
+        answer: ['`using var reader = new StreamReader("data.txt");`，並刪掉最後的 Dispose。', '如果只是要讀全部文字，`File.ReadAllText` 或 `File.ReadLines` 內部已經處理好開關檔案。'],
+      },
+    },
+    mistakes: [
+      { wrong: '每個請求都 `using var client = new HttpClient();`。', why: '頻繁建立與釋放會讓 socket 卡在 TIME_WAIT，高流量時耗盡連接埠。', right: '共用一個 HttpClient，或在 ASP.NET Core 用 IHttpClientFactory。' },
+      { wrong: '從方法回傳一個在 using 裡建立的 Stream。', why: '方法結束時 Stream 已經被 Dispose，呼叫端拿到的是關閉的 Stream。', right: '把 Dispose 的責任交給呼叫端（不要 using），並在文件說明。' },
+      { wrong: '自己實作 IDisposable 時，寫一個解構函式（finalizer）。', why: '只有直接握著非受控控制代碼時才需要；多寫會拖慢 GC。', right: '一般類別只包裝其他 IDisposable，Dispose 裡呼叫它們的 Dispose 即可。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'using 宣告的物件在什麼時候 Dispose？', options: [
+        { text: '所在的程式區塊結束時', correct: true, why: 'using var 的範圍是包住它的大括號。' },
+        { text: 'GC 執行時', why: 'GC 不會呼叫 Dispose（除非有 finalizer）。' },
+        { text: '程式結束時', why: '會在區塊結束時就釋放。' },
+        { text: '下一行程式執行前', why: '整個區塊結束才釋放。' },
+      ] },
+      { level: '應用', type: 'mc', q: '哪個物件「不」需要 using？', options: [
+        { text: '`List<string>`', correct: true, why: '沒有實作 IDisposable，只有記憶體。' },
+        { text: '`FileStream`', why: '握著檔案控制代碼。' },
+        { text: '`StreamWriter`', why: '握著底層 Stream，且 Dispose 時才會把緩衝寫入。' },
+        { text: '`SqlConnection`', why: '握著資料庫連線。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個長時間執行的服務，跑了幾天後出現「too many open files」錯誤。你會從哪裡開始查？'], answer: [
+        '典型原因是某處建立了 IDisposable（FileStream、Process、HttpResponseMessage）卻沒有 Dispose，資源慢慢累積到系統上限。',
+        '搜尋所有 `new FileStream`、`File.Open*`、`Process.Start` 等呼叫，確認都有 using；開啟 CA2000 分析器規則（Dispose objects before losing scope）讓編譯器幫你找。',
+      ] },
+    ],
+    keypoints: [
+      'GC 只回收記憶體；檔案、連線要靠 Dispose 釋放。',
+      '看到 IDisposable 就用 `using var`，離開範圍自動釋放，有例外也一樣。',
+      'HttpClient 是例外：共用一個，不要每次 using。',
+    ],
+    sources: ['cs-using', 'cs-try'],
+  },
+});
+</script>
