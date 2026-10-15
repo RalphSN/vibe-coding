@@ -46,12 +46,12 @@ ai-dev-rules/skills/course-web-neo-brutalism/ 底下的 SKILL.md 與 references/
 - [x] 互動元件 11 個（f-widgets.js、b-widgets.css）
 - [x] 模組 0（0-1～0-3）
 - [x] 模組 1（1-1～1-4）
-- [x] 書櫃入口（3D 與 2D， 每完成一批就更新）
+- [x] 書櫃入口（3D `index.html` 與 2D `index-2d.html`；`readyLessons` 每完成一批就更新）
 - [ ] 模組 2～8 內容（每 2–3 個模組自我檢查一次）
 - [ ] 模組 9：9-1 期末實作、9-2～9-4 reference 版型
 - [ ] 第 4 階段驗證（verification.md 全部）
 - [ ] 得獎等級自我檢查迴圈
-- [ ] 加進書櫃（`index.html`、`index-2d.html` 的 `SITES`）
+- [ ] 全部完成後把兩個書櫃的 `readyLessons` 改成 38
 
 ## 3. 資料格式（本課新增）
 
