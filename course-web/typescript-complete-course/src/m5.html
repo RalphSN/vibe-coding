@@ -1,0 +1,434 @@
+<script>
+/* ==========================================================================
+   模組 5：類別與模組
+   ========================================================================== */
+defineTerms({
+  'class': { en: 'class', def: 'JavaScript 的類別語法；TypeScript 在上面加了屬性型別、存取修飾詞、implements 等檢查。', example: '`class Account { balance = 0 }`' },
+  '存取修飾詞': { en: 'access modifiers', def: 'TypeScript 的 public、private、protected，只在檢查時有效；JavaScript 的 `#私有欄位` 才是執行時真正的私有。', example: '`private balance = 0` vs `#balance = 0`' },
+  '#私有欄位': { en: 'private class field', def: 'JavaScript 原生的私有欄位，名稱以 # 開頭，類別外部在執行時也無法存取。', example: '`#secret = "x"`' },
+  '參數屬性': { en: 'parameter property', def: '在建構子參數前加 public／private，自動宣告並指定屬性。需要產生程式碼，Node 直接執行 .ts 時不支援。', example: '`constructor(private name: string) {}`' },
+  'implements': { en: 'implements', def: '宣告類別要符合某個介面；只做檢查，不會繼承任何實作。', example: '`class EmailSender implements Notifier`' },
+  '抽象類別': { en: 'abstract class', def: '不能直接 new 的類別，可以有實作，也可以有要求子類別實作的抽象方法。', example: '`abstract class Shape { abstract area(): number }`' },
+  '結構型別': { en: 'structural typing', def: 'TypeScript 依「形狀」判斷相容性：只要屬性與型別符合，不需要宣告 implements。', example: '有 send 方法的物件就能當 Notifier。' },
+  'ES 模組': { en: 'ES modules (ESM)', def: 'JavaScript 標準的模組系統：import／export。TypeScript 6 起預設 module 為 esnext。', example: '`import { sum } from "./math.ts";`' },
+  'import type': { en: 'type-only import', def: '只匯入型別，編譯後整行被刪除，不會在執行時載入那個模組。', example: '`import type { User } from "./types.ts";`' },
+  'verbatimModuleSyntax': { en: 'verbatimModuleSyntax', def: 'tsconfig 選項：沒標 type 的 import 一律保留，強迫你對「只用到型別」的匯入寫 import type，行為可預測。', example: '`"verbatimModuleSyntax": true`' },
+  '宣告檔': { en: 'declaration file (.d.ts)', def: '只有型別、沒有實作的檔案，描述 JavaScript 程式庫的型別。', example: '`index.d.ts`' },
+  '@types': { en: 'DefinitelyTyped', def: '社群維護的型別套件，給本身沒附型別的 JavaScript 套件使用。', example: '`npm i -D @types/node`' },
+  'declare': { en: 'declare', def: '告訴 TypeScript「這個東西在執行時存在，這是它的型別」，不產生任何程式碼。', example: '`declare const __APP_VERSION__: string;`' },
+});
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '為 class 的屬性與方法加上型別',
+      '分辨 TypeScript 的 private 與 JavaScript 的 #私有',
+      '用 readonly 屬性保護不該改的資料',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-1）class 和 interface 在型別空間與值空間的差別？', options: [
+        { text: 'class 兩邊都有，interface 只在型別空間', correct: true, why: 'class 會編譯成建構子。' },
+        { text: '兩者都只在型別空間，編譯後都會被擦除', why: 'class 執行時存在。' },
+        { text: '兩者都在值空間', why: 'interface 執行時不存在。' },
+        { text: 'interface 兩邊都有', why: '剛好相反。' },
+      ] },
+    ],
+    analogy: {
+      text: ['TypeScript 的 private 像門上貼「員工專用」：守規矩的人（檢查器）不會進去，但門其實沒鎖。JavaScript 的 #私有 是真的上鎖，執行時誰都打不開。'],
+      limit: ['大部分時候「貼標示」就夠了；但寫給別人用的函式庫、或資料真的不能被外部碰到時，要用 # 才算數。'],
+    },
+    model: {
+      svg: Fig.vs('兩種私有：TypeScript private 只在編譯時檢查，執行時其實可以存取，例如 (acc as any).balance；JavaScript #私有欄位在執行時也存取不到', { title: 'private balance', lines: ['只在檢查時', '執行時其實讀得到'], tone: 2 }, { title: '#balance', lines: ['執行時也鎖住', 'JavaScript 原生'], tone: 4 }),
+      caption: '新程式建議用 #；既有程式碼常見 private，兩者不要混用在同一個類別。',
+      blocks: [
+        '[[class]] 的屬性要宣告型別（或給初始值讓它推斷）。[[存取修飾詞]] public（預設）、private、protected 只在檢查時有效；[[#私有欄位]]在執行時也真的私有。[[參數屬性]]很方便，但 Node 直接執行 .ts 時不支援。',
+        { type: 'code', lang: 'typescript', title: 'account.ts', code: 'class Account {\n  readonly id: string;\n  #balance = 0;\n\n  constructor(id: string, initial = 0) {\n    this.id = id;\n    this.#balance = initial;\n  }\n\n  deposit(amount: number): void {\n    if (amount <= 0) throw new RangeError("存款金額要大於 0");\n    this.#balance += amount;\n  }\n\n  get balance(): number {\n    return this.#balance;\n  }\n}\n\nconst a = new Account("A1", 100);\na.deposit(50);\nconsole.log(a.balance);   // 150\n// a.#balance;           // 語法錯誤：類別外不能存取' },
+      ],
+    },
+    define: [
+      { term: '存取修飾詞', en: 'public / private / protected', def: 'protected：類別本身與子類別可用。三者都在編譯後消失。', example: '`protected log(msg: string) {}`' },
+      { term: '#私有欄位', en: '#field', def: 'ES2022 起的標準；子類別也存取不到；`#x in obj` 可以檢查物件是否有這個私有欄位。', example: '`static #count = 0`' },
+      { term: 'getter', en: 'get accessor', def: '`get name()` 讓讀取像屬性；沒有 setter 時就是唯讀。', example: '`account.balance`' },
+    ],
+    examples: {
+      compare: [{
+        title: '宣告建構子參數成為屬性',
+        kind: '參數屬性 vs 一般寫法',
+        code: true,
+        badLabel: '參數屬性（Node 直接執行不支援）',
+        goodLabel: '明確宣告',
+        bad: 'class User {\n  constructor({{1:public name: string}}, {{1:private age: number}}) {}\n}',
+        good: 'class User {\n  name: string;\n  #age: number;\n  constructor(name: string, age: number) {\n    this.name = name;\n    this.#age = age;\n  }\n}',
+        badResult: '寫法短，但需要產生程式碼；開 erasableSyntaxOnly 時會報錯。',
+        goodResult: '多幾行，但純粹是型別擦除就能執行。',
+        why: ['團隊若用 Node 直接執行 .ts，統一用明確宣告'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'class Box {\n  private secret = "TS 私有";\n  #real = "JS 私有";\n}\nconst b = new Box();\nconsole.log((b as any).secret);\nconsole.log(Object.keys(b));',
+          predict: { q: '`(b as any).secret` 執行時印出什麼？', options: ['TS 私有', 'undefined', '執行時錯誤'], answer: 0 },
+          output: "TS 私有\n[ 'secret' ]\n（#real 不會出現在 Object.keys 裡）",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ts', label: '只在檢查時有效' }, { id: 'js', label: '執行時也有效' }],
+          items: [
+            { text: '`private`', answer: 'ts', why: 'TypeScript 的修飾詞。' },
+            { text: '`#field`', answer: 'js', why: 'JavaScript 原生私有欄位。' },
+            { text: '`readonly`', answer: 'ts', why: '執行時仍可修改。' },
+            { text: '`Object.freeze(this)`', answer: 'js', why: '執行時凍結物件。' },
+            { text: '`protected`', answer: 'ts', why: 'TypeScript 的修飾詞。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.row('類別成員的型別寫法：屬性用名稱加型別或初始值；建構子設定初始狀態；方法寫參數與回傳型別；getter 提供唯讀存取', [
+          { title: '屬性', lines: ['`id: string`', '`#balance = 0`'], tone: 1 },
+          { title: '建構子', lines: ['設定初始值'], tone: 3 },
+          { title: '方法', lines: ['參數與回傳型別'], tone: 4 },
+          { title: 'getter', lines: ['唯讀存取'], tone: 2 },
+        ], { arrows: false }), caption: 'strict 下屬性必須在建構子裡指定，否則 TS2564。' },
+      ],
+      tryit: {
+        q: ['補完：計數器的 count 對外唯讀、只能透過 increment 增加：'],
+        draft: 'class Counter {\n  ____count = 0;\n  increment() { this.#count++; }\n  ____ count() { return this.#count; }\n}',
+        answer: ['`#count = 0`、`get count()`。', '外部只能讀 `c.count`，不能指定；`c.count = 5` 會報錯（沒有 setter）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 private 在執行時也保護資料。', why: '編譯後消失，`(obj as any).x` 照樣讀得到。', right: '真正需要私有時用 #。' },
+      { wrong: '屬性宣告了型別卻沒在建構子指定。', why: 'strict 下 TS2564：屬性沒有初始值。', right: '給初始值、在建構子指定，或確實知道時用 `!:`（少用）。' },
+      { wrong: '直接執行 .ts 時用參數屬性。', why: 'Node 不支援需要轉換的語法。', right: '明確宣告屬性並在建構子指定。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '哪一個在執行時真的無法從類別外部存取？', options: [
+        { text: '`#secret`', correct: true, why: 'JavaScript 原生私有。' },
+        { text: '`private secret`', why: '只在檢查時。' },
+        { text: '`protected secret`', why: '只在檢查時。' },
+        { text: '`readonly secret`', why: '可以讀，只是檢查時不能寫。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'strict 下 `class A { name: string; }` 沒有建構子，會？', options: [
+        { text: 'TS2564：屬性沒有初始值', correct: true, why: 'strictPropertyInitialization。' },
+        { text: '通過，name 是 undefined', why: 'strict 會檢查。' },
+        { text: 'name 自動是空字串', why: '不會自動給值。' },
+        { text: '執行時錯誤', why: '是編譯時錯誤。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在寫一個開源函式庫，裡面的快取資料絕對不能被使用者改。用 private 還是 #？為什麼？'], answer: [
+        '用 #。函式庫的使用者可能用 JavaScript，或用 `as any` 繞過型別檢查；private 擋不住這些情況。',
+        '# 欄位在執行時就無法從外部存取，也不會出現在 Object.keys、JSON.stringify 的結果中，是真正的封裝。',
+      ] },
+    ],
+    keypoints: [
+      'class 屬性要有型別或初始值，strict 下要在建構子指定。',
+      'private 只在檢查時有效，# 在執行時也私有。',
+      '直接執行 .ts 時避開參數屬性。',
+    ],
+    sources: ['ts-classes', 'node-ts'],
+  },
+
+  '5-2': {
+    goals: [
+      '用 implements 讓類別符合介面',
+      '用抽象類別共用實作',
+      '理解結構型別：不寫 implements 也能相容',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-1）`private` 與 `#` 哪個適合函式庫的內部資料？', options: [
+        { text: '`#`，執行時也無法從外部存取', correct: true, why: '真正的封裝。' },
+        { text: '`private`，比較快', why: '速度不是重點。' },
+        { text: '兩者完全一樣', why: '執行時行為不同。' },
+        { text: '都不用，寫在註解就好', why: '沒有任何保護。' },
+      ] },
+    ],
+    analogy: {
+      text: ['結構型別像應徵工作只看技能：會開堆高機、有證照，就能做這份工作，不管你畢業於哪間學校。implements 像履歷上主動寫「我符合這個職缺的要求」，讓面試官（檢查器）先對照一次。'],
+      limit: ['真實世界有學歷門檻；TypeScript 完全不看「出身」：兩個毫不相關的類別，只要形狀一樣就能互相代替，有時會讓不該相容的東西相容。'],
+    },
+    model: {
+      svg: Fig.tree('Notifier 介面規定 send 方法；EmailSender 用 implements 宣告並實作；FakeSender 沒寫 implements 但有 send 方法，結構符合，同樣可以傳給需要 Notifier 的地方', { title: 'interface Notifier', lines: ['`send(msg: string): void`'], tone: 2 }, [
+        { title: 'class EmailSender', lines: ['implements Notifier', '有 send'], tone: 3 },
+        { title: '{ send() {…} }', lines: ['沒寫 implements', '結構符合 ✓'], tone: 4 },
+      ]),
+      caption: 'implements 不是相容的必要條件，它是「在類別定義處就檢查」的保險。',
+      blocks: [
+        '[[implements]] 讓類別在定義時就被檢查是否符合介面。[[抽象類別]]可以提供共用實作並要求子類別實作抽象方法。TypeScript 用[[結構型別]]判斷相容性：形狀相同就能互換，這讓測試時可以直接傳一個普通物件當替身。',
+        { type: 'code', lang: 'typescript', title: 'notifier.ts', code: 'interface Notifier {\n  send(message: string): Promise<void>;\n}\n\nclass EmailSender implements Notifier {\n  async send(message: string) { /* 寄信 */ }\n}\n\nabstract class Report {\n  abstract body(): string;\n  render(): string {\n    return `=== 報表 ===\\n${this.body()}\\n============`;\n  }\n}\n\nclass SalesReport extends Report {\n  body() { return "本月銷售 120 萬"; }\n}\n\nasync function notifyAll(n: Notifier) { await n.send("完成"); }\n\n// 測試時：不需要類別，結構符合即可\nconst sent: string[] = [];\nawait notifyAll({ async send(m) { sent.push(m); } });' },
+      ],
+    },
+    define: [
+      { term: 'implements', en: 'implements', def: '`class C implements I1, I2`；只檢查，不提供任何實作，也不影響執行。', example: '可以同時 implements 多個介面。' },
+      { term: '抽象類別', en: 'abstract class', def: '`abstract class`；不能 new；`abstract` 方法沒有實作，子類別必須提供。', example: '`new Report()` → TS2511。' },
+      { term: '結構型別', en: 'structural typing', def: '相容性看成員結構而不是宣告的名稱；不同於 C#、Java 的名義型別。', example: '`type A = { x: number }` 與 `type B = { x: number }` 可以互相指定。' },
+    ],
+    examples: {
+      compare: [{
+        title: '在測試中替換寄信服務',
+        kind: '名義型別的習慣 vs 結構型別',
+        code: true,
+        badLabel: '另外寫一個類別',
+        goodLabel: '直接傳物件',
+        bad: 'class FakeNotifier implements Notifier {\n  sent: string[] = [];\n  async send(m: string) { this.sent.push(m); }\n}\nconst fake = new FakeNotifier();',
+        good: 'const sent: string[] = [];\nconst fake: Notifier = {{1:{ async send(m) { sent.push(m); } }}};',
+        badResult: '能用，但為了測試多寫一個類別。',
+        goodResult: '結構符合就行，一行建立替身。',
+        why: ['結構型別讓「依賴介面」的程式碼特別好測試'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'type Point2D = { x: number; y: number };\ntype Vector = { x: number; y: number };\n\nfunction len(p: Point2D) { return Math.hypot(p.x, p.y); }\n\nconst v: Vector = { x: 3, y: 4 };\nconsole.log(len(v));',
+          predict: { q: '把 Vector 傳給要 Point2D 的函式會？', options: ['通過，印出 5', '型別錯誤：名稱不同', '印出 NaN'], answer: 0 },
+          output: '5',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'iface', label: 'interface + implements' }, { id: 'abs', label: '抽象類別' }],
+          items: [
+            { text: '各種報表共用頁首頁尾，只有內容不同', answer: 'abs', why: '需要共用實作。' },
+            { text: '寄信、簡訊、推播都要有 send', answer: 'iface', why: '只約定能力，實作完全不同。' },
+            { text: '一個類別同時要「可比較」又「可序列化」', answer: 'iface', why: '可以 implements 多個介面，只能 extends 一個類別。' },
+            { text: '所有資料表存取類別共用連線與重試邏輯', answer: 'abs', why: '共用狀態與實作。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('結構型別與名義型別：TypeScript 依形狀判斷，名稱不同但結構相同就相容；C# 與 Java 依宣告的名稱判斷，必須明確實作介面才相容', { title: 'TypeScript（結構）', lines: ['形狀相同就相容', '不必宣告'], tone: 4 }, { title: 'C#、Java（名義）', lines: ['名稱必須相符', '要明確實作'], tone: 3 }), caption: '需要「同形狀但不能混用」（例如 UserId 和 OrderId）時，要用品牌型別等技巧。' },
+      ],
+      tryit: {
+        q: ['讓 Circle 符合 Shape 介面，並在定義時就被檢查：'],
+        draft: 'interface Shape { area(): number }\nclass Circle ____ Shape {\n  constructor(r: number) { this.r = r; }\n  r: number;\n  ____(): number { return Math.PI * this.r ** 2; }\n}',
+        answer: ['`implements Shape`、`area()`。', '如果方法名稱打錯（例如 aera），有 implements 時錯誤出現在 Circle 定義處；沒有時要等到傳給 Shape 參數那一刻才報錯。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 implements 會繼承介面的實作。', why: '介面沒有實作；implements 只檢查。', right: '要共用實作用 extends 抽象類別或組合。' },
+      { wrong: '用 instanceof 檢查一個介面型別。', why: '介面在執行時不存在。', right: '用型別守衛檢查屬性，或改用 class。' },
+      { wrong: '兩種 id 都是 string，傳錯了也沒報錯。', why: '結構相同就相容。', right: '用品牌型別：`type UserId = string & { readonly __brand: "UserId" }`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'TypeScript 判斷兩個型別是否相容，主要看？', options: [
+        { text: '結構（屬性與型別）', correct: true, why: '結構型別。' },
+        { text: '型別名稱', why: '那是名義型別。' },
+        { text: '有沒有寫 implements', why: '不是必要條件。' },
+        { text: '宣告在哪個檔案', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`abstract class A { abstract f(): void }`，`new A()` 會？', options: [
+        { text: 'TS2511：不能建立抽象類別的實例', correct: true, why: '抽象類別不能 new。' },
+        { text: '建立成功，只是呼叫 f 時才會出錯', why: '會報錯。' },
+        { text: '執行時錯誤', why: '是編譯時錯誤（執行時其實能 new）。' },
+        { text: 'f 自動變成空函式', why: '不會。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['C# 課程 3-4 說「依賴介面才能在測試時替換」。在 TypeScript 裡這件事變得更簡單還是更難？為什麼？'], answer: [
+        '更簡單。結構型別讓你不需要宣告新類別，直接傳一個形狀相同的物件字面值當替身；甚至不需要事先定義 interface，用 `Pick<RealService, "send">` 描述需要的部分即可。',
+        '代價是保護較弱：形狀剛好相同但語意不同的物件也會被接受，所以關鍵的 id 類型可以用品牌型別區分。',
+      ] },
+    ],
+    keypoints: [
+      'implements 只在定義處檢查，不提供實作。',
+      '共用實作用抽象類別；只約定能力用介面。',
+      '結構型別：形狀相同就相容，測試時可以直接傳物件當替身。',
+    ],
+    sources: ['ts-classes', 'ts-compat'],
+  },
+
+  '5-3': {
+    goals: [
+      '用 ES 模組的 import／export 組織程式',
+      '用 import type 匯入只在型別用到的東西',
+      '知道 verbatimModuleSyntax 解決的問題',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-2）interface 能用 instanceof 檢查嗎？', options: [
+        { text: '不能，介面在執行時不存在', correct: true, why: '型別會被擦除。' },
+        { text: '可以', why: 'instanceof 需要執行時的建構子。' },
+        { text: '要加 implements 才能', why: '仍然不行。' },
+        { text: '只有 abstract 介面可以', why: '沒有 abstract 介面這種東西。' },
+      ] },
+    ],
+    analogy: {
+      text: ['模組像公司的部門：每個部門（檔案）決定對外公開哪些服務（export），其他部門要用就提出申請（import）。import type 像只索取「部門的組織圖」：你只需要知道結構，不需要真的派人過來。'],
+      limit: ['部門間的申請一定會走流程；但如果 import 的東西只用在型別，舊的編譯設定會「自動省略」那行 import，可能讓有副作用的模組沒被載入，結果不可預測。'],
+    },
+    model: {
+      svg: Fig.vs('一般 import 與 import type：一般 import 編譯後保留，執行時會載入模組；import type 編譯後整行刪除，不會載入模組', { title: 'import { sum }', lines: ['編譯後保留', '執行時載入模組'], tone: 3 }, { title: 'import type { User }', lines: ['編譯後整行刪除', '不載入模組'], tone: 4 }),
+      caption: '開 verbatimModuleSyntax：用到型別就寫 import type，其他照原樣保留。',
+      blocks: [
+        '[[ES 模組]]用 `export` 公開、`import` 使用。只用在型別的東西用 [[import type]]（或在大括號內寫 `type User`）。開啟 [[verbatimModuleSyntax]] 後規則很單純：有 type 的刪掉、沒有的保留，和 Node、打包工具的單檔轉換一致。Node 直接執行時，相對路徑 import 要寫副檔名 `.ts`。',
+        { type: 'code', lang: 'typescript', title: 'src/main.ts', code: 'import { formatPrice } from "./format.ts";\nimport type { Product } from "./types.ts";\nimport { readFile, type Stats } from "node:fs/promises";\n\nexport function label(p: Product): string {\n  return `${p.title}：${formatPrice(p.price)}`;\n}\n\nexport default label;' },
+      ],
+    },
+    define: [
+      { term: 'ES 模組', en: 'ESM', def: '具名匯出 `export function f`、預設匯出 `export default`；package.json 的 `"type": "module"` 讓 .js 以 ESM 處理。', example: '`import { a, b as c } from "./m.ts";`' },
+      { term: 'import type', en: 'import type', def: '只匯入型別；可以整行 `import type { A }`，或單一名稱 `import { type A, b }`。', example: '`import type { Request } from "express";`' },
+      { term: 'verbatimModuleSyntax', en: 'verbatimModuleSyntax', def: '取代舊的 importsNotUsedAsValues／preserveValueImports；未標 type 的 import 一律原樣輸出。', example: '用型別卻沒寫 type 時報 TS1484。' },
+    ],
+    examples: {
+      compare: [{
+        title: '匯入只當型別用的東西',
+        kind: '不明確 vs 明確',
+        code: true,
+        badLabel: '一般 import',
+        goodLabel: 'import type',
+        bad: 'import { User } from "./types.ts";\nexport function greet(u: User) { return u.name; }',
+        good: 'import {{1:type}} { User } from "./types.ts";\nexport function greet(u: User) { return u.name; }',
+        badResult: '開 verbatimModuleSyntax 時 TS1484；Node 直接執行時，types.ts 若沒有對應的執行時匯出，會在載入時出錯。',
+        goodResult: '擦除後整行消失，執行時不碰 types.ts。',
+        why: ['型別匯入標上 type，執行時的行為才會和你看到的一致'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'app.ts（tsconfig 開了 verbatimModuleSyntax）',
+          code: 'import { User, createUser } from "./user.ts";\n// User 是 interface，createUser 是函式\n\nconst u: User = createUser("阿明");',
+          predict: { q: 'tsc 會怎樣？', options: ['報錯：User 要用 type 匯入', '通過', '報錯：createUser 要用 type 匯入'], answer: 0 },
+          output: "!app.ts:1:10 - error TS1484: 'User' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'type', label: '用 import type' }, { id: 'value', label: '一般 import' }],
+          items: [
+            { text: '`interface Product`（只拿來寫參數型別）', answer: 'type', why: '純型別。' },
+            { text: '`function formatPrice`', answer: 'value', why: '執行時要呼叫。' },
+            { text: '`class Account`，要 new 它', answer: 'value', why: '用到值（建構子）。' },
+            { text: '`class Account`，只拿來寫參數型別', answer: 'type', why: '只用到型別那一面。' },
+            { text: '`type Status = "a" | "b"`', answer: 'type', why: '純型別。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.stack('Node 直接執行 .ts 的模組規則：相對路徑要寫 .ts 副檔名；型別匯入用 import type；tsconfig 開 allowImportingTsExtensions 與 verbatimModuleSyntax，讓 tsc 檢查結果一致', [
+          { title: '相對路徑寫副檔名："./format.ts"', tone: 1 },
+          { title: '型別用 import type', tone: 3 },
+          { title: 'tsconfig：verbatimModuleSyntax、allowImportingTsExtensions', tone: 4 },
+        ], { arrows: false }), caption: '打包工具（Vite 等）通常可以省略副檔名；Node 直接執行時不行。' },
+      ],
+      tryit: {
+        q: ['同一行匯入函式 readFile 與型別 Stats：'],
+        draft: 'import { readFile, ____ Stats } from "node:fs/promises";',
+        answer: ['`import { readFile, type Stats } from "node:fs/promises";`', '行內的 type 修飾只刪掉 Stats，readFile 照常保留。'],
+      },
+    },
+    mistakes: [
+      { wrong: '型別與值混在一般 import 裡。', why: '執行時行為取決於編譯設定，不可預測。', right: '開 verbatimModuleSyntax，型別一律標 type。' },
+      { wrong: 'Node 直接執行時 `import "./format"` 省略副檔名。', why: 'Node 的 ESM 解析不會自動補副檔名，ERR_MODULE_NOT_FOUND。', right: '`import "./format.ts"`，並開 allowImportingTsExtensions。' },
+      { wrong: '到處 `export default`。', why: '匯入端可以任意取名，重新命名與搜尋都不方便。', right: '多數情況用具名匯出。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`import type { User } from "./u.ts"` 編譯後會？', options: [
+        { text: '整行被刪除', correct: true, why: '只匯入型別。' },
+        { text: '保留，執行時載入 u.ts', why: 'type-only 匯入會被刪除。' },
+        { text: '變成 require', why: '不會。' },
+        { text: '變成註解', why: '直接刪除。' },
+      ] },
+      { level: '應用', type: 'mc', q: '開了 verbatimModuleSyntax，一般 import 一個只用作型別的 interface 會？', options: [
+        { text: 'TS1484，要求改成 type-only import', correct: true, why: '這正是這個選項的目的。' },
+        { text: '自動刪除那行 import，執行時不會載入該模組', why: '開了這個選項後不會自動刪除。' },
+        { text: '沒有任何影響', why: '會報錯。' },
+        { text: '執行時錯誤', why: '在編譯時就報錯。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼「每個檔案能單獨被轉換」（isolatedModules 的概念）對 Vite、esbuild、Node 很重要？這和 import type 有什麼關係？'], answer: [
+        '這些工具為了快，一次只看一個檔案、只擦除型別，不知道別的檔案匯出的東西是型別還是值。',
+        '所以檔案本身必須說清楚：用 import type 標出型別匯入，工具才知道可以刪掉；verbatimModuleSyntax 讓 tsc 用同樣的規則檢查，避免「tsc 通過但打包後壞掉」。',
+      ] },
+    ],
+    keypoints: [
+      '只用作型別的匯入寫 `import type` 或行內 `type`。',
+      '開 verbatimModuleSyntax，讓輸出與你寫的一致。',
+      'Node 直接執行時，相對匯入要寫 `.ts` 副檔名。',
+    ],
+    sources: ['ts-modules', 'ts-tsconfig', 'node-ts'],
+  },
+
+  '5-4': {
+    goals: [
+      '說出 .d.ts 宣告檔的用途',
+      '為沒有型別的套件安裝 @types 或自己補宣告',
+      '用 declare 描述全域變數與模組',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-3）`import { readFile, type Stats }` 編譯後？', options: [
+        { text: '只保留 readFile', correct: true, why: '行內 type 只刪掉 Stats。' },
+        { text: '整行刪除，因為裡面有一個是型別', why: 'readFile 是值，要保留。' },
+        { text: '兩個都保留', why: 'Stats 被刪除。' },
+        { text: '語法錯誤', why: '合法寫法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['宣告檔像電器的使用說明書：機器（JavaScript 程式庫）已經做好了，說明書（.d.ts）告訴你每個按鈕是什麼、接受什麼。@types 是熱心網友幫沒有附說明書的機器寫的說明書。'],
+      limit: ['說明書可能寫錯或過時；宣告檔也是人寫的，和實際的 JavaScript 行為不一致時，TypeScript 會相信說明書，錯誤到執行時才出現。'],
+    },
+    model: {
+      svg: Fig.tree('套件型別的三種來源：套件自己附帶型別，例如用 TypeScript 寫的套件；安裝社群維護的 @types 套件；都沒有時自己寫 .d.ts 宣告', { title: '這個套件有型別嗎？' }, [
+        { title: '套件自帶', lines: ['package.json', '有 types 欄位'], tone: 4 },
+        { title: '@types/套件名', lines: ['DefinitelyTyped', '`npm i -D`'], tone: 3 },
+        { title: '自己寫 .d.ts', lines: ['`declare module`'], tone: 2 },
+      ]),
+      caption: '依序檢查：自帶 → @types → 自己寫。',
+      blocks: [
+        '[[宣告檔]]只有型別。很多 JavaScript 套件的型別在 [[@types]] 裡。全域變數（例如建置工具注入的常數）或沒有型別的模組，用 [[declare]] 自己補。注意 TypeScript 6 起 `types` 預設為空陣列，`@types/*` 不再自動全部載入，要在 tsconfig 列出需要的（例如 `"types": ["node"]`）。',
+        { type: 'code', lang: 'typescript', title: 'src/env.d.ts', code: '// 建置工具注入的常數\ndeclare const __APP_VERSION__: string;\n\n// 沒有型別的舊套件：先給最小可用的型別\ndeclare module "legacy-slugify" {\n  export default function slugify(input: string, sep?: string): string;\n}\n\n// 匯入 .svg 檔時拿到網址字串\ndeclare module "*.svg" {\n  const url: string;\n  export default url;\n}' },
+      ],
+    },
+    define: [
+      { term: '宣告檔', en: '.d.ts', def: '只能包含型別宣告與 declare；tsc 開 declaration 時會為你的程式自動產生。', example: '`"declaration": true`' },
+      { term: '@types', en: 'DefinitelyTyped', def: '`@types/套件名`；版本號主次版本通常對應原套件。', example: '`npm i -D @types/express`' },
+      { term: 'declare', en: 'ambient declaration', def: '描述「執行時已經存在」的東西；`declare module "x"` 描述一個模組，`declare global` 擴充全域。', example: '`declare global { interface Window { gtag: Function } }`' },
+    ],
+    examples: {
+      compare: [{
+        title: '使用沒有型別的套件',
+        kind: '全部變 any vs 補最小型別',
+        code: true,
+        badLabel: '忽略錯誤',
+        goodLabel: '補宣告',
+        bad: '// @ts-ignore\nimport slugify from "legacy-slugify";\nslugify(123);   // 不報錯',
+        good: '// env.d.ts\n{{1:declare module "legacy-slugify"}} {\n  export default function slugify(s: string): string;\n}\n// app.ts\nslugify(123);   // TS2345',
+        badResult: '整個套件都是 any，參數傳錯也不知道。',
+        goodResult: '只描述你真的有用到的部分，就能獲得檢查。',
+        why: ['先寫最小型別，用到更多再補'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'tsconfig 沒有設定 types（TypeScript 6 以後）',
+          code: '// 已安裝 @types/node\nimport { readFileSync } from "node:fs";\nconsole.log(process.env.HOME);',
+          predict: { q: '`process` 會被認得嗎？', options: ['不一定：要在 types 列出 "node" 才保證', '一定認得', '一定報錯'], answer: 0 },
+          output: '!app.ts:3:13 - error TS2591: Cannot find name \'process\'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add \'node\' to the types field in your tsconfig.\n（在 tsconfig 加 "types": ["node"] 後通過）',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'self', label: '套件自帶型別' }, { id: 'types', label: '要裝 @types' }, { id: 'declare', label: '自己 declare' }],
+          items: [
+            { text: 'Node.js 內建模組（fs、process）', answer: 'types', why: '`@types/node`。' },
+            { text: '用 TypeScript 寫、發布時附 .d.ts 的套件（如 zod）', answer: 'self', why: '不用另外裝。' },
+            { text: 'Vite 注入的 `__APP_VERSION__`', answer: 'declare', why: '只有你的專案知道。' },
+            { text: '公司內部沒有型別的舊 JS 模組', answer: 'declare', why: '寫 declare module。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('TypeScript 6 的 types 預設改變：以前自動載入所有 @types 套件；6.0 起預設空陣列，要在 tsconfig 的 types 列出需要的，例如 node', { title: '5.x 以前', lines: ['自動載入', '所有 @types'], tone: 2 }, { title: '6.0 起', lines: ['預設 []', '要列出 "node" 等'], tone: 4 }), caption: '升級後出現「找不到 process」時，先檢查 types 設定。' },
+      ],
+      tryit: {
+        q: ['讓 TypeScript 知道 `window.dataLayer` 存在（Google Analytics 會注入）：'],
+        draft: 'declare ____ {\n  interface ____ {\n    dataLayer: unknown[];\n  }\n}\nexport {};',
+        answer: ['`declare global { interface Window { dataLayer: unknown[] } }`。', '最後的 `export {}` 讓檔案成為模組，declare global 才能使用；這也是 1-3 提到的 interface 宣告合併。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `// @ts-ignore` 壓掉找不到型別的錯誤。', why: '整個匯入變 any，而且 ts-ignore 會壓掉那行所有錯誤。', right: '裝 @types 或寫最小宣告；真的要壓用 `@ts-expect-error` 並寫原因。' },
+      { wrong: '@types 版本和套件版本差很多。', why: '型別描述的 API 和實際不同。', right: '保持主要版本一致，更新套件時一起更新 @types。' },
+      { wrong: '升級 TS 6 後到處找不到 Node 全域變數。', why: 'types 預設改為 []。', right: 'tsconfig 加 `"types": ["node"]`（或 `["*"]` 恢復舊行為）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '.d.ts 檔裡可以有什麼？', options: [
+        { text: '只有型別宣告與 declare', correct: true, why: '沒有實作。' },
+        { text: '函式實作與執行時會用到的程式碼', why: '宣告檔不能有實作。' },
+        { text: '執行時的變數值', why: '只能宣告型別。' },
+        { text: '測試程式', why: '不是用途。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 TypeScript 6 以後找不到 `process`，最可能的原因是？', options: [
+        { text: 'tsconfig 沒把 "node" 放進 types', correct: true, why: '6.0 起預設 types 為空。' },
+        { text: 'Node.js 版本太舊，新版才內建 process 型別', why: '型別問題和 Node 版本無關。' },
+        { text: 'process 已被移除', why: '仍然存在。' },
+        { text: '要改用 window', why: 'window 是瀏覽器的。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要把公司內部的 JavaScript 工具函式庫發布給其他 TypeScript 專案用，但暫時不想改寫成 TypeScript。怎麼提供型別？'], answer: [
+        '方法一：手寫 index.d.ts 放在套件裡，package.json 加 `"types": "index.d.ts"`。',
+        '方法二：在 JS 檔用 JSDoc 寫型別註解，開 `allowJs`、`checkJs`、`declaration`，讓 tsc 自動從 JSDoc 產生 .d.ts。後者讓型別和實作放在一起，比較不會不同步。',
+      ] },
+    ],
+    keypoints: [
+      '套件型別依序找：自帶 → @types → 自己寫 .d.ts。',
+      'declare 描述執行時已存在的全域變數與模組。',
+      'TypeScript 6 起 types 預設為空，要列出 "node" 等。',
+    ],
+    sources: ['ts-dts', 'ts-60', 'ts-tsconfig'],
+  },
+});
+</script>
