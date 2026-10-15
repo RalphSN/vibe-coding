@@ -1,0 +1,155 @@
+<script>
+/* ==========================================================================
+   參考資料（皆於 2026-10-16 查證，詳見 research-notes.md）
+   ========================================================================== */
+defineSources({
+  'py-downloads': { title: 'Python.org｜Downloads（版本與支援狀態）', url: 'https://www.python.org/downloads/' },
+  'py-315': { title: 'Python docs｜What\'s New In Python 3.15', url: 'https://docs.python.org/3.15/whatsnew/3.15.html' },
+  'pep-790': { title: 'PEP 790｜Python 3.15 Release Schedule', url: 'https://peps.python.org/pep-0790/' },
+  'py-tutorial': { title: 'Python docs｜The Python Tutorial', url: 'https://docs.python.org/3/tutorial/' },
+  'py-errors': { title: 'Python docs｜Errors and Exceptions', url: 'https://docs.python.org/3/tutorial/errors.html' },
+  'py-datamodel': { title: 'Python docs｜Data model（物件、值與型別）', url: 'https://docs.python.org/3/reference/datamodel.html' },
+  'py-numbers': { title: 'Python docs｜Numeric Types', url: 'https://docs.python.org/3/library/stdtypes.html#numeric-types-int-float-complex' },
+  'py-fstring': { title: 'Python docs｜f-strings', url: 'https://docs.python.org/3/reference/lexical_analysis.html#f-strings' },
+  'py-control': { title: 'Python docs｜More Control Flow Tools（含 match）', url: 'https://docs.python.org/3/tutorial/controlflow.html' },
+  'py-ds': { title: 'Python docs｜Data Structures', url: 'https://docs.python.org/3/tutorial/datastructures.html' },
+  'py-stdtypes': { title: 'Python docs｜Built-in Types', url: 'https://docs.python.org/3/library/stdtypes.html' },
+  'py-classes': { title: 'Python docs｜Classes', url: 'https://docs.python.org/3/tutorial/classes.html' },
+  'py-dataclasses': { title: 'Python docs｜dataclasses', url: 'https://docs.python.org/3/library/dataclasses.html' },
+  'py-modules': { title: 'Python docs｜Modules', url: 'https://docs.python.org/3/tutorial/modules.html' },
+  'pep-810': { title: 'PEP 810｜Explicit lazy imports', url: 'https://peps.python.org/pep-0810/' },
+  'py-with': { title: 'Python docs｜The with statement', url: 'https://docs.python.org/3/reference/compound_stmts.html#the-with-statement' },
+  'py-iter': { title: 'Python docs｜Iterators and Generators', url: 'https://docs.python.org/3/tutorial/classes.html#iterators' },
+  'py-decorators': { title: 'Python docs｜functools.wraps', url: 'https://docs.python.org/3/library/functools.html#functools.wraps' },
+  'py-typing': { title: 'Python docs｜typing', url: 'https://docs.python.org/3/library/typing.html' },
+  'py-asyncio': { title: 'Python docs｜asyncio', url: 'https://docs.python.org/3/library/asyncio.html' },
+  'uv': { title: 'uv 官方文件', url: 'https://docs.astral.sh/uv/' },
+  'py-venv': { title: 'Python docs｜venv', url: 'https://docs.python.org/3/library/venv.html' },
+  'py-pathlib': { title: 'Python docs｜pathlib', url: 'https://docs.python.org/3/library/pathlib.html' },
+  'py-json': { title: 'Python docs｜json', url: 'https://docs.python.org/3/library/json.html' },
+  'pytest': { title: 'pytest 官方文件', url: 'https://docs.pytest.org/' },
+  'httpx': { title: 'HTTPX 官方文件', url: 'https://www.python-httpx.org/' },
+  'py-urllib': { title: 'Python docs｜urllib.request', url: 'https://docs.python.org/3/library/urllib.request.html' },
+  'py-re': { title: 'Python docs｜re', url: 'https://docs.python.org/3/library/re.html' },
+  'py-datetime': { title: 'Python docs｜datetime', url: 'https://docs.python.org/3/library/datetime.html' },
+  'py-zoneinfo': { title: 'Python docs｜zoneinfo', url: 'https://docs.python.org/3/library/zoneinfo.html' },
+  'py-collections': { title: 'Python docs｜collections', url: 'https://docs.python.org/3/library/collections.html' },
+  'py-itertools': { title: 'Python docs｜itertools', url: 'https://docs.python.org/3/library/itertools.html' },
+  'py-csv': { title: 'Python docs｜csv', url: 'https://docs.python.org/3/library/csv.html' },
+  'py-statistics': { title: 'Python docs｜statistics', url: 'https://docs.python.org/3/library/statistics.html' },
+  'py-argparse': { title: 'Python docs｜argparse', url: 'https://docs.python.org/3/library/argparse.html' },
+});
+
+/* ==========================================================================
+   Fig：產生課程圖解 SVG 的小工具。
+   座標與字級由程式計算，確保文字不壓框、連接線兩端都接在方塊上。
+   文字以 ` 開頭的行用等寬字。tone 用 1–5 對應 --m1…--m5，0 是白底。
+   ========================================================================== */
+const Fig = (() => {
+  const W = 560;
+  const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  /** 估計文字寬度（單位：字級倍數）：中日韓全形 1、等寬 0.6、其他 0.56 */
+  function units(text, mono) {
+    let u = 0;
+    for (const ch of String(text)) {
+      if (/[⺀-鿿豈-﫿＀-￯　-〿]/.test(ch)) u += 1;
+      else u += mono ? 0.6 : 0.56;
+    }
+    return u;
+  }
+  /** 在寬度 w 內放得下的字級，介於 min 與 max 之間 */
+  function fit(lines, w, max, min = 12) {
+    let fs = max;
+    lines.forEach((l) => {
+      const mono = String(l).startsWith('`');
+      const t = mono ? String(l).slice(1) : String(l);
+      const need = units(t, mono);
+      if (need > 0) fs = Math.min(fs, (w - 16) / need);
+    });
+    return Math.max(min, Math.floor(fs * 10) / 10);
+  }
+  function fillOf(tone) {
+    return tone ? { attr: `style="fill:var(--m${tone})"`, text: ' on-color' } : { attr: 'class="fill-surface"', text: '' };
+  }
+  function textLine(x, y, l, fs, extra = '', anchor = 'middle') {
+    const mono = String(l).startsWith('`');
+    const t = mono ? String(l).slice(1) : String(l);
+    return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${fs}" class="${(mono ? 'mono' : '') + extra}">${xmlEsc(t)}</text>`;
+  }
+  /** 一個方塊：標題粗體＋若干行內文，全部置中 */
+  function box(x, y, w, h, node, opts = {}) {
+    const f = fillOf(node.tone);
+    const dash = node.dashed ? ' stroke-dasharray="8 6"' : '';
+    const title = node.title || '';
+    const lines = node.lines || [];
+    const tfs = Math.min(opts.titleMax || 19, fit([title], w, opts.titleMax || 19));
+    const lfs = lines.length ? Math.min(tfs - 2, fit(lines, w, opts.lineMax || 16)) : 0;
+    const blockH = tfs + lines.length * (lfs + 9);
+    let ty = y + (h - blockH) / 2 + tfs * 0.85;
+    let out = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${f.attr} class="stroke-ink" stroke-width="4"${dash}/>`;
+    // fill-surface 與 stroke-ink 要在同一個 class 屬性裡
+    out = out.replace('class="fill-surface" class="stroke-ink"', 'class="fill-surface stroke-ink"');
+    if (title) { out += textLine(x + w / 2, Math.round(ty), title, tfs, f.text).replace('<text ', '<text font-weight="900" '); ty += lfs + 12; }
+    lines.forEach((l) => { out += textLine(x + w / 2, Math.round(ty), l, lfs, f.text); ty += lfs + 9; });
+    return out;
+  }
+  function wrap(label, h, body, caption) {
+    return `<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${xmlEsc(label)}">${body}</svg>`;
+  }
+  /** 橫向並排的方塊；arrows 為 true 時用線接起相鄰方塊 */
+  function row(label, nodes, opts = {}) {
+    const n = nodes.length;
+    const gap = opts.gap ?? (n > 3 ? 18 : 24);
+    const w = Math.floor((W - 20 - gap * (n - 1)) / n);
+    const maxLines = Math.max(...nodes.map((d) => (d.lines || []).length));
+    const h = opts.h || Math.max(90, 70 + maxLines * 26);
+    let body = '';
+    nodes.forEach((d, i) => { body += box(10 + i * (w + gap), 15, w, h, d); });
+    if (opts.arrows !== false) {
+      for (let i = 0; i < n - 1; i++) {
+        const x1 = 10 + i * (w + gap) + w; const x2 = x1 + gap; const y = 15 + h / 2;
+        body += `<path d="M${x1} ${y} H${x2}" class="stroke-ink" stroke-width="4"/>`;
+      }
+    }
+    let total = h + 30;
+    if (opts.note) { body += textLine(W / 2, h + 50, opts.note, fit([opts.note], W, 15)); total += 30; }
+    return wrap(label, total, body);
+  }
+  /** 上面一個根，下面一排子節點，用折線接起來 */
+  function tree(label, root, kids, opts = {}) {
+    const n = kids.length;
+    const gap = 18;
+    const w = Math.floor((W - 20 - gap * (n - 1)) / n);
+    const rw = Math.min(300, Math.max(200, units(root.title || '', false) * 20 + 40));
+    const rh = root.lines && root.lines.length ? 90 : 60;
+    let body = box((W - rw) / 2, 10, rw, rh, root);
+    const maxLines = Math.max(...kids.map((d) => (d.lines || []).length));
+    const kh = Math.max(80, 64 + maxLines * 26);
+    const ky = rh + 70;
+    const midY = rh + 10 + 30;
+    const cx = W / 2;
+    const centers = kids.map((_, i) => 10 + i * (w + gap) + w / 2);
+    body += `<path d="M${cx} ${rh + 10} V${midY} M${centers[0]} ${midY} H${centers[n - 1]}" class="stroke-ink" stroke-width="4" fill="none"/>`;
+    centers.forEach((c) => { body += `<path d="M${c} ${midY} V${ky}" class="stroke-ink" stroke-width="4"/>`; });
+    kids.forEach((d, i) => { body += box(10 + i * (w + gap), ky, w, kh, d); });
+    let total = ky + kh + 15;
+    if (opts.note) { body += textLine(W / 2, total + 15, opts.note, fit([opts.note], W, 15)); total += 35; }
+    return wrap(label, total, body);
+  }
+  /** 直向堆疊的橫條，適合流程或層級；arrows 為 true 時用線接起來 */
+  function stack(label, nodes, opts = {}) {
+    const h = opts.h || 54;
+    const gap = opts.arrows === false ? 12 : 26;
+    let body = '';
+    nodes.forEach((d, i) => {
+      const y = 10 + i * (h + gap);
+      body += box(20, y, W - 40, h, { ...d, lines: d.lines || [] }, { titleMax: 18, lineMax: 15 });
+      if (opts.arrows !== false && i < nodes.length - 1) body += `<path d="M${W / 2} ${y + h} V${y + h + gap}" class="stroke-ink" stroke-width="4"/>`;
+    });
+    return wrap(label, 20 + nodes.length * h + (nodes.length - 1) * gap, body);
+  }
+  /** 左右對照兩欄，中間一條線 */
+  function vs(label, left, right, opts = {}) { return row(label, [left, right], { ...opts, gap: 40 }); }
+  return { row, tree, stack, vs };
+})();
+</script>

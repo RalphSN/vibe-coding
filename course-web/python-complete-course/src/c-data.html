@@ -1,0 +1,104 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: "Python 完整入門：從第一行到 3.15",
+  updated: "2026 年 10 月",
+  verifiedOn: "2026-10-16",
+  version: "v1",
+};
+
+const COURSES = [
+  { id: 0, title: "認識|Python", short: "起點", desc: "Python 是什麼、版本怎麼選、安裝與執行第一支程式、讀懂 Traceback。", lessons: [
+    ["0-1", "Python 是什麼、|版本怎麼選"],
+    ["0-2", "執行你的|第一支程式"],
+    ["0-3", "讀懂|Traceback"],
+  ]},
+  { id: 1, title: "基礎|語法", short: "語法", desc: "名字與物件、數字與字串、條件與迴圈、函式。", lessons: [
+    ["1-1", "變數是名字，|不是盒子"],
+    ["1-2", "數字、字串|與 f-string"],
+    ["1-3", "條件、迴圈|與 match"],
+    ["1-4", "函式|與參數"],
+  ]},
+  { id: 2, title: "資料|結構", short: "資料", desc: "list 與 tuple、dict 與 set、可變與不可變、推導式。", lessons: [
+    ["2-1", "list|與 tuple"],
+    ["2-2", "dict、set|與 frozendict"],
+    ["2-3", "可變、不可變|與共用參考"],
+    ["2-4", "推導式：|一行建立集合"],
+  ]},
+  { id: 3, title: "物件|與模組", short: "物件", desc: "類別、dataclass、模組與 import、例外與 with。", lessons: [
+    ["3-1", "類別|與物件"],
+    ["3-2", "dataclass：|資料類別"],
+    ["3-3", "模組、import|與 lazy import"],
+    ["3-4", "例外|與 with"],
+  ]},
+  { id: 4, title: "進階|機制", short: "進階", desc: "迭代器與產生器、裝飾器、型別提示、asyncio。", lessons: [
+    ["4-1", "迭代器|與產生器"],
+    ["4-2", "裝飾器：|包住函式"],
+    ["4-3", "型別提示|與檢查器"],
+    ["4-4", "asyncio：|等待時不卡住"],
+  ]},
+  { id: 5, title: "實戰|工具", short: "實戰", desc: "uv 與虛擬環境、檔案與 JSON、pytest、HTTP 與 API、做一個命令列工具。", lessons: [
+    ["5-1", "uv、專案|與虛擬環境"],
+    ["5-2", "檔案、路徑|與 JSON"],
+    ["5-3", "用 pytest|寫測試"],
+    ["5-4", "HTTP|與 API"],
+    ["5-5", "做一個|命令列工具"],
+  ]},
+  { id: 6, title: "資料|處理", short: "資料", desc: "正規表示式、日期與時區、collections 與 itertools、CSV 與統計。", lessons: [
+    ["6-1", "正規表示式：|找出文字模式"],
+    ["6-2", "日期、時間|與時區"],
+    ["6-3", "collections|與 itertools"],
+    ["6-4", "CSV|與簡單統計"],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

@@ -1,0 +1,321 @@
+<script>
+/* ==========================================================================
+   模組 0：認識 Python
+   ========================================================================== */
+defineTerms({
+  'Python': { en: 'Python', def: '直譯式、動態型別的程式語言，以好讀著稱，廣泛用於自動化、資料分析、AI 與網站後端。', example: '`print("哈囉")` 就是一支完整的程式。' },
+  '直譯器': { en: 'interpreter', def: '讀取 Python 程式並執行的程式。最常用的是官方的 CPython。', example: '終端機輸入 `python` 就是啟動直譯器。' },
+  'CPython': { en: 'CPython', def: '官方用 C 寫的 Python 直譯器，python.org 下載的就是它。', example: '`python --version` 顯示的是 CPython 的版本。' },
+  '位元組碼': { en: 'bytecode', def: 'CPython 先把 .py 編譯成的中間碼，再由虛擬機一行行執行。快取在 `__pycache__` 資料夾。', example: '`__pycache__/app.cpython-315.pyc`' },
+  'REPL': { en: 'Read-Eval-Print Loop', def: '互動模式：輸入一行、立刻執行、印出結果，適合試小東西。', example: '終端機輸入 `python` 後出現 `>>>`。' },
+  'uv': { en: 'uv', def: 'Astral 公司開發的 Python 專案與套件管理工具，可以安裝 Python、建立虛擬環境、安裝套件，速度很快。', example: '`uv run app.py`' },
+  'Traceback': { en: 'traceback', def: '程式出錯時印出的「呼叫路徑」，最後一行是錯誤型別與訊息，往上是誰呼叫誰。', example: '`Traceback (most recent call last):`' },
+  '例外': { en: 'exception', def: '執行時發生的錯誤物件，例如 ZeroDivisionError；沒有處理就會讓程式中止。', example: '`1 / 0` 拋出 ZeroDivisionError。' },
+  'SyntaxError': { en: 'SyntaxError', def: '語法錯誤：程式寫法不合規則，整個檔案一行都不會執行。', example: '少了冒號：`if x > 0`' },
+});
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出 Python 程式怎麼被執行',
+      '分辨 3.15、3.14、3.13 該選哪個',
+      '知道 Python 2 已經停止支援',
+    ],
+    analogy: {
+      text: ['Python 像會說多國語言的口譯員：你用接近英文的句子下指令，口譯員（直譯器）當場翻成電腦聽得懂的動作，一句一句執行。'],
+      limit: ['口譯員邊聽邊翻；CPython 其實會先把整個檔案「編譯」成位元組碼，語法錯誤在這一步就被抓到，所以有語法錯誤時連第一行都不會執行。'],
+    },
+    model: {
+      svg: Fig.row('Python 程式的執行流程：app.py 原始碼先編譯成位元組碼，再由 CPython 虛擬機逐條執行', [
+        { title: 'app.py', lines: ['你寫的原始碼'] },
+        { title: '位元組碼', lines: ['編譯（自動）', '`__pycache__`'], tone: 3 },
+        { title: '虛擬機', lines: ['逐條執行', '印出結果'], tone: 4 },
+      ]),
+      caption: '你只要下 `python app.py`；編譯成位元組碼這一步是自動的。',
+      blocks: [
+        '[[Python]] 由[[直譯器]]執行，官方版本是 [[CPython]]：先把原始碼編譯成[[位元組碼]]，再交給虛擬機執行。每年 10 月發布一個新版，每版支援 5 年。',
+        { type: 'table', caption: '2026-10-16 查證的 Python 版本狀態', head: ['版本', '狀態', '支援到', '這門課'], rows: [
+          ['3.15', '最新（2026-10-09 發布）', '2031-10', '**主線**，新功能標出版本'],
+          ['3.14', '修補中', '2030-10', '大部分範例相容'],
+          ['3.13、3.12、3.11', '只修安全問題', '2029、2028、2027', '舊專案'],
+          ['3.10 以前', '已停止支援', '—', '要升級'],
+        ] },
+      ],
+    },
+    define: [
+      { term: 'CPython', en: 'CPython', def: '官方參考實作；還有 PyPy（JIT 加速）等其他實作。', example: '一般說「裝 Python」指的就是 CPython。' },
+      { term: '位元組碼', en: 'bytecode', def: '平台中立的中間指令，由 CPython 虛擬機執行；.pyc 是它的快取。', example: '`import dis; dis.dis(f)` 可以看到函式的位元組碼。' },
+      { term: '直譯器', en: 'interpreter', def: '執行 Python 程式的程式；不加檔名啟動時進入 REPL。', example: '`python3.15`' },
+    ],
+    examples: {
+      compare: [{
+        title: '印出一行文字',
+        kind: 'Python 2 vs Python 3',
+        code: true,
+        badLabel: 'Python 2（2020 年已停止支援）',
+        goodLabel: 'Python 3',
+        bad: '{{1:print "哈囉"}}',
+        good: '{{1:print("哈囉")}}',
+        badResult: 'Python 3 裡是 SyntaxError。網路上的舊教學還常看到這種寫法。',
+        goodResult: 'print 是函式，要加括號。',
+        why: ['看到 `print "..."` 的教學就代表它很舊了'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'now', label: '現在就用' }, { id: 'old', label: '舊專案才會碰到' }, { id: 'no', label: '不要用' }],
+          items: [
+            { text: 'Python 3.15', answer: 'now', why: '2026-10 最新的正式版。' },
+            { text: 'Python 3.14', answer: 'now', why: '仍在修補期，套件支援通常比剛發布的 3.15 完整。' },
+            { text: 'Python 3.11', answer: 'old', why: '只剩安全修補，2027-10 結束。' },
+            { text: 'Python 2.7', answer: 'no', why: '2020 年停止支援，很多套件已經不支援。' },
+            { text: 'Python 3.10', answer: 'no', why: '2026-10 已經停止支援。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.row('Python 每年 10 月發布新版：3.13 在 2024、3.14 在 2025、3.15 在 2026，3.16 預計 2027', [
+          { title: '3.13', lines: ['2024-10'] },
+          { title: '3.14', lines: ['2025-10'], tone: 3 },
+          { title: '3.15', lines: ['2026-10'], tone: 4 },
+          { title: '3.16', lines: ['2027-10 預計'], dashed: true },
+        ]), caption: '每年一版、支援 5 年；虛線框是還沒發布的版本。' },
+      ],
+      tryit: {
+        q: ['填空：要確認電腦上的 Python 版本，在終端機輸入什麼？'],
+        draft: 'python ____',
+        answer: ['`python --version`（macOS 有時要打 `python3 --version`）。', '看到 `Python 3.15.0` 或 `3.14.x` 就可以開始。'],
+      },
+    },
+    mistakes: [
+      { wrong: '跟著網路上的舊教學裝 Python 2。', why: 'Python 2 在 2020-01-01 停止支援。', right: '一律用 Python 3，2026-10 建議 3.14 或 3.15。' },
+      { wrong: '新版一發布就把正式專案升上去。', why: '有些套件（特別是 C 擴充套件）要幾週到幾個月才支援新版。', right: '新專案可以用最新版；正式專案先確認依賴套件都支援。' },
+      { wrong: '以為 Python 是「直譯」所以完全不編譯。', why: 'CPython 會先編譯成位元組碼，語法錯誤在這一步就擋下。', right: '記得：有語法錯誤時整個檔案都不會執行。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下面關於 CPython 的說法，哪一個正確？', options: [
+        { text: '先把原始碼編譯成位元組碼，再由虛擬機執行', correct: true, why: '這就是 `__pycache__` 裡 .pyc 檔的由來。' },
+        { text: '一行一行讀，完全不做任何編譯', why: '會先編譯成位元組碼，所以語法錯誤會在執行前就被抓到。' },
+        { text: '直接把程式編譯成 .exe 執行檔', why: 'CPython 不產生原生執行檔；那要用 PyInstaller 這類工具。' },
+        { text: '只能在 Windows 上執行', why: 'Python 跨 Windows、macOS、Linux。' },
+      ] },
+      { level: '應用', type: 'mc', q: '2026-10 開一個新的個人專案，最合理的選擇是？', options: [
+        { text: 'Python 3.14 或 3.15', correct: true, why: '都在修補期；3.15 最新，3.14 套件支援較成熟。' },
+        { text: 'Python 2.7，因為教學最多', why: '已停止支援 6 年。' },
+        { text: 'Python 3.10，因為最穩定', why: '2026-10 已經停止支援。' },
+        { text: 'Python 3.16，因為版本號最大', why: '還沒正式發布。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說「Python 很慢，因為它是直譯的」。用這課的模型，你會怎麼補充？'], answer: [
+        'CPython 也有編譯步驟（成位元組碼），慢主要是因為動態型別：每個運算執行時都要檢查型別。',
+        '實務上：大量計算交給 NumPy 這類 C 寫的套件；CPython 本身也在加速（3.13 起有實驗性 JIT 與無 GIL 版本）。',
+      ] },
+    ],
+    keypoints: [
+      'CPython 先編譯成位元組碼，再由虛擬機執行。',
+      '每年 10 月一版、支援 5 年；2026-10 最新是 3.15。',
+      'Python 2 已停止支援，看到 `print "..."` 的教學就跳過。',
+    ],
+    sources: ['py-downloads', 'pep-790', 'py-315'],
+  },
+
+  '0-2': {
+    goals: [
+      '安裝 Python（用 uv 或官網）',
+      '用 REPL 試一行程式，用檔案執行一支程式',
+      '分辨 `python` 與 `python3` 指令',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1）2026-10 最新的 Python 正式版是？', options: [
+        { text: '3.15', correct: true, why: '2026-10-09 發布。' },
+        { text: '3.16', why: '預計 2027-10。' },
+        { text: '3.12', why: '已經只剩安全修補。' },
+        { text: '2.7', why: '2020 年就停止支援了。' },
+      ] },
+    ],
+    analogy: {
+      text: ['REPL 像計算機：按一下就出答案，適合試算。檔案像寫在筆記本上的食譜：寫好存起來，之後每次照著做都一樣。'],
+      limit: ['計算機關掉就忘了；REPL 也是，離開後輸入過的程式都不會保留。要重複使用的程式一定要存成 .py 檔。'],
+    },
+    model: {
+      svg: Fig.vs('兩種執行方式：REPL 輸入一行立刻執行，適合試驗；檔案用 python app.py 執行整個檔案，適合要保存的程式',
+        { title: 'REPL', lines: ['`>>> 1 + 2`', '`3`', '試一行'], tone: 3 },
+        { title: '.py 檔', lines: ['`python app.py`', '整個檔案', '可以保存'], tone: 4 }),
+      caption: '試東西用 REPL，寫程式用檔案。',
+      blocks: [
+        '安裝方式有兩種：從 python.org 下載安裝程式，或用 [[uv]] 一行安裝（uv 也會負責之後的套件管理，5-1 會用到）。終端機輸入 `python` 進入 [[REPL]]，輸入 `exit()` 離開。',
+        { type: 'tabs', label: '安裝方式', tabs: [
+          { label: 'Windows', blocks: ['PowerShell：`winget install astral-sh.uv`，再 `uv python install 3.15`。也可以從 python.org 下載安裝程式，記得勾選「Add python.exe to PATH」。'] },
+          { label: 'macOS', blocks: ['終端機：`brew install uv`，再 `uv python install 3.15`。macOS 內建的 `python3` 可能是舊版，不要拿來開發。'] },
+        ] },
+        { type: 'code', lang: 'bash', title: '執行一支程式', code: 'python --version\npython app.py\n\n# 用 uv（不用先啟動虛擬環境）\nuv run app.py' },
+      ],
+    },
+    define: [
+      { term: 'REPL', en: 'REPL', def: '互動式直譯器；提示符號 `>>>`，運算式的結果會自動印出。', example: '`>>> "ab" * 3` 印出 `\'ababab\'`。' },
+      { term: 'uv', en: 'uv', def: '用 Rust 寫的 Python 管理工具：`uv python install` 裝 Python、`uv run` 執行、`uv add` 加套件。', example: '`uv run --python 3.15 app.py`' },
+      { term: 'PATH', en: 'PATH', def: '作業系統尋找指令的資料夾清單；Python 不在 PATH 裡時，輸入 python 會找不到。', example: 'Windows 安裝時勾選「Add to PATH」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '在 REPL 和檔案裡寫同一行',
+        kind: 'REPL vs 檔案',
+        code: true,
+        badLabel: '檔案裡只寫運算式',
+        goodLabel: '用 print',
+        bad: '# app.py\n{{1:1 + 2}}',
+        good: '# app.py\n{{1:print(1 + 2)}}',
+        badResult: '執行後什麼都沒印出：只有 REPL 會自動顯示運算式的結果。',
+        goodResult: '印出 3。',
+        why: ['檔案裡要看結果，一律用 print'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'print("哈囉，Python")\nprint(1 + 2)\nprint("1" + "2")\nprint("ab" * 3)',
+          predict: { q: '第三行 `"1" + "2"` 印出什麼？', options: ['3', '12', '錯誤'], answer: 1 },
+          output: '哈囉，Python\n3\n12\nababab',
+        } },
+        { type: 'svg', svg: Fig.stack('在終端機執行 python app.py 的步驟：作業系統在 PATH 中找到 python，python 讀取 app.py，編譯並執行，印出結果', [
+          { title: '1. 在 PATH 裡找到 python' },
+          { title: '2. 讀取並編譯 app.py', tone: 3 },
+          { title: '3. 執行、印出結果', tone: 4 },
+        ]), caption: '找不到指令時，通常是第 1 步：Python 沒加進 PATH。' },
+      ],
+      tryit: {
+        q: ['你在 REPL 輸入下面兩行，第二行會顯示什麼？'],
+        draft: '>>> name = "阿明"\n>>> name\n____',
+        answer: ['`\'阿明\'`（有引號）。', 'REPL 顯示的是值的 repr（給開發者看的形式），所以字串會帶引號；用 `print(name)` 才是不帶引號的 `阿明`。'],
+      },
+    },
+    mistakes: [
+      { wrong: 'Windows 輸入 python 卻打開 Microsoft Store。', why: 'Python 沒在 PATH 裡，Windows 用商店的捷徑代替。', right: '用 uv 安裝，或重裝時勾選「Add to PATH」；也可以用 `py` 啟動器。' },
+      { wrong: '在 REPL 裡寫了一大段程式，關掉後全部不見。', why: 'REPL 不會存檔。', right: '超過幾行就寫進 .py 檔。' },
+      { wrong: '把檔案命名成 `random.py` 或 `json.py`。', why: '會蓋過標準函式庫同名模組，`import random` 匯入的變成你的檔案。', right: '檔名避開標準函式庫的模組名稱。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在 .py 檔裡只寫 `1 + 2`，執行後會？', options: [
+        { text: '什麼都不顯示', correct: true, why: '只有 REPL 會自動印出運算式結果。' },
+        { text: '印出 3', why: '檔案模式不會自動印，要寫 print。' },
+        { text: 'SyntaxError', why: '這是合法的運算式陳述式。' },
+        { text: '印出 1 + 2', why: '不會印出任何東西。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`print("ab" * 3)` 印出什麼？', options: [
+        { text: '`ababab`', correct: true, why: '字串乘以整數 = 重複。' },
+        { text: '`ab3`', why: '不是串接，是重複。' },
+        { text: 'TypeError', why: 'str * int 是合法的。' },
+        { text: '`ab ab ab`', why: '重複時不會加空白。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你寫了 `random.py` 練習亂數，裡面 `import random` 再呼叫 `random.randint(1, 6)`，結果出現 AttributeError。為什麼？'], answer: [
+        'import 會先找目前資料夾，所以 `import random` 匯入的是你自己的 random.py，裡面沒有 randint。',
+        '把檔名改成 `dice.py`，並刪掉 `__pycache__` 裡的舊快取。',
+      ] },
+    ],
+    keypoints: [
+      '試一行用 REPL（`>>>`），要保存的程式寫成 .py 檔。',
+      '檔案裡要看結果一律用 print。',
+      '用 uv 安裝與執行最省事；檔名避開標準函式庫名稱。',
+    ],
+    sources: ['uv', 'py-tutorial'],
+  },
+
+  '0-3': {
+    goals: [
+      '從 Traceback 找出檔案、行號、錯誤型別',
+      '分辨 SyntaxError 與執行時的例外',
+      '讀懂 3.15 更詳細的錯誤提示',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 0-2）`print("1" + "2")` 印出什麼？', options: [
+        { text: '`12`', correct: true, why: '字串 + 字串是串接。' },
+        { text: '`3`', why: '兩邊都是字串，不會做數學加法。' },
+        { text: 'TypeError', why: '兩邊型別相同，可以串接。' },
+        { text: '`"12"`', why: 'print 不會印出引號。' },
+      ] },
+    ],
+    analogy: {
+      text: ['Traceback 像快遞的「配送紀錄」：從寄件、轉運到最後送不到，每一站都記下來。最後一行是「為什麼送不到」，往上是「經過了哪些站」。'],
+      limit: ['配送紀錄由上往下是時間順序；Traceback 也是「最早的呼叫在最上面」（most recent call last），所以最重要的錯誤原因在最下面，和很多語言相反。'],
+    },
+    model: {
+      svg: Fig.stack('Traceback 的結構由上到下：標頭 most recent call last、外層呼叫的檔案與行號、內層出錯的檔案與行號、最後一行錯誤型別與訊息', [
+        { title: 'Traceback (most recent call last):' },
+        { title: '外層：File "app.py", line 8', lines: ['誰呼叫的'] },
+        { title: '內層：File "app.py", line 3', lines: ['真正出錯的那行'], tone: 3 },
+        { title: 'ZeroDivisionError: division by zero', tone: 5 },
+      ]),
+      caption: '先看最後一行（什麼錯），再往上看最接近的那個自己的檔案（哪裡錯）。',
+      blocks: [
+        '[[SyntaxError]] 在執行前就發現，整個檔案不會跑；其他[[例外]]是執行到那一行才發生，前面的程式已經執行過了。執行時的錯誤會印出 [[Traceback]]。',
+        { type: 'code', lang: 'text', title: 'Python 3.15 的提示', code: '>>> [1, 2, 3].push(4)\nAttributeError: \'list\' object has no attribute \'push\'. Did you mean \'.append\'?' },
+      ],
+    },
+    define: [
+      { term: 'Traceback', en: 'traceback', def: '例外的呼叫堆疊；最下面是最後被呼叫、也就是出錯的地方。', example: '`File "app.py", line 3, in divide`' },
+      { term: 'SyntaxError', en: 'SyntaxError', def: '語法錯誤，在編譯成位元組碼時就發現；IndentationError 是它的子類別。', example: '`print("hi"`（少右括號）' },
+      { term: '例外', en: 'exception', def: '執行時錯誤的物件，有型別（類別名稱）與訊息。', example: '`ValueError: invalid literal for int() with base 10: \'abc\'`' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一個錯誤的兩種時間點',
+        kind: '執行前 vs 執行中',
+        code: true,
+        badLabel: '語法錯誤',
+        goodLabel: '執行時例外',
+        bad: 'print("開始")\nif True\n    print("A")',
+        good: 'print("開始")\nprint(1 / 0)',
+        badResult: '連「開始」都沒印出：SyntaxError: expected \':\'。',
+        goodResult: '先印出「開始」，第 2 行才拋出 ZeroDivisionError。',
+        why: ['看有沒有印出前面的東西，就知道錯在哪個階段'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'def average(nums):\n    return sum(nums) / len(nums)\n\nprint("開始")\nprint(average([]))',
+          predict: { q: '「開始」會印出來嗎？', options: ['會，然後才出錯', '不會，直接出錯', '程式正常結束'], answer: 0 },
+          output: '開始\n!Traceback (most recent call last):\n!  File "app.py", line 5, in <module>\n!    print(average([]))\n!  File "app.py", line 2, in average\n!    return sum(nums) / len(nums)\n!ZeroDivisionError: division by zero',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'syn', label: 'SyntaxError' }, { id: 'run', label: '執行時例外' }, { id: 'ok', label: '沒有錯' }],
+          items: [
+            { text: '`if x > 0` 後面少冒號', answer: 'syn', why: '語法不合規則，執行前就擋下。' },
+            { text: '`int("abc")`', answer: 'run', why: 'ValueError：要執行到才知道字串內容。' },
+            { text: '`print(undefined_name)`', answer: 'run', why: 'NameError：名字存不存在要執行時才查。' },
+            { text: '`print(7 // 2)`', answer: 'ok', why: '印出 3（整數除法）。' },
+            { text: '縮排混用空白與 Tab', answer: 'syn', why: 'TabError（IndentationError 的子類別），屬於 SyntaxError。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('SyntaxError 讓整個檔案都不執行；執行時例外會讓前面的程式已經跑完，在出錯那行中止', { title: 'SyntaxError', lines: ['一行都不執行', '編譯時發現'], tone: 1 }, { title: '執行時例外', lines: ['前面已經執行', '出錯那行中止'], tone: 5 }), caption: '注意：Python 連「名字打錯」都要執行到才發現（NameError），這點和 C#、TypeScript 不同。' },
+      ],
+      tryit: {
+        q: ['下面的 Traceback，要去改哪個檔案的第幾行？'],
+        draft: 'Traceback (most recent call last):\n  File "main.py", line 12, in <module>\n    total = parse(row)\n  File "utils.py", line 4, in parse\n    return int(text)\nValueError: invalid literal for int() with base 10: \'N/A\'\n\n檔案：____　行：____',
+        answer: ['`utils.py` 第 4 行出錯，但真正的原因可能是 main.py 第 12 行傳進了 \'N/A\'。', '先看最後一行：int 收到 \'N/A\'。往上第一個 File 是出錯位置；再往上是誰傳進這個值的。'],
+      },
+    },
+    mistakes: [
+      { wrong: '只看 Traceback 的第一行。', why: 'Python 的 Traceback 最重要的是最後一行。', right: '從最下面往上讀。' },
+      { wrong: '看到 NameError 就以為是語法錯誤。', why: 'NameError 是執行時例外，前面的程式已經執行過。', right: '檢查名字是否打錯、是否在使用前定義。' },
+      { wrong: '一直改出錯的那一行，卻沒看是誰傳了錯誤的值進來。', why: '錯誤常常在上游產生。', right: '沿著 Traceback 往上看呼叫端。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Python 的 Traceback 中，最重要的錯誤原因通常在？', options: [
+        { text: '最後一行', correct: true, why: '錯誤型別與訊息在最下面。' },
+        { text: '第一行', why: '第一行只是固定的標頭。' },
+        { text: '中間', why: '中間是呼叫路徑。' },
+        { text: '不一定，每次位置都不同', why: '格式固定，原因一定在最後一行。' },
+      ] },
+      { level: '應用', type: 'mc', q: '檔案第 1 行 `print("A")`、第 2 行 `print(x)`（x 沒定義）。執行結果？', options: [
+        { text: '印出 A，然後 NameError', correct: true, why: 'NameError 是執行時才發現的。' },
+        { text: '直接 NameError，什麼都沒印', why: '那是 SyntaxError 的行為。' },
+        { text: '印出 A 和 None', why: '未定義的名字不會變成 None。' },
+        { text: 'SyntaxError', why: '語法完全合法。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼說「Python 的 NameError 要執行到才知道」對大型專案是風險？怎麼降低？'], answer: [
+        '很少執行到的分支（例如錯誤處理）裡打錯字，可能上線好幾個月才被觸發。',
+        '用 linter（ruff）與型別檢查器（mypy、pyright）在執行前抓出未定義名字，並用測試覆蓋主要分支（模組 4、5）。',
+      ] },
+    ],
+    keypoints: [
+      'Traceback 從最後一行讀起：錯誤型別與訊息。',
+      'SyntaxError 讓整個檔案不執行；其他例外在執行到時才發生。',
+      '出錯的那行不一定是原因所在，沿著呼叫路徑往上找。',
+    ],
+    sources: ['py-errors', 'py-315'],
+  },
+});
+</script>

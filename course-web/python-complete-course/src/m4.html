@@ -1,0 +1,444 @@
+<script>
+/* ==========================================================================
+   模組 4：進階機制
+   ========================================================================== */
+defineTerms({
+  '可迭代物件': { en: 'iterable', def: '可以用 for 走過的物件：list、str、dict、檔案、產生器……它能交出一個迭代器。', example: '`iter([1, 2])`' },
+  '迭代器': { en: 'iterator', def: '記住「走到哪裡」的物件；每次呼叫 next() 交出下一個值，沒有了就拋 StopIteration。只能走一次。', example: '`it = iter([1, 2]); next(it)` 得到 1。' },
+  '產生器': { en: 'generator', def: '含有 yield 的函式；呼叫時不執行，而是回傳一個迭代器，每次 next 執行到下一個 yield 就暫停。', example: '`def count(): yield 1; yield 2`' },
+  'yield': { en: 'yield', def: '交出一個值並暫停函式，下次從暫停處繼續。', example: '`yield line`' },
+  '裝飾器': { en: 'decorator', def: '接收一個函式、回傳一個新函式的函式；用 `@名稱` 寫在定義上方，替函式加上額外行為。', example: '`@functools.cache`' },
+  '閉包': { en: 'closure', def: '內層函式記住外層函式的變數，即使外層已經結束。裝飾器靠它保存原本的函式。', example: '`def outer(x): def inner(): return x; return inner`' },
+  'functools.wraps': { en: 'functools.wraps', def: '寫裝飾器時用來把原函式的名稱、說明文件複製到新函式上，避免除錯時看到 wrapper。', example: '`@wraps(func)`' },
+  '型別提示': { en: 'type hints', def: '在參數、回傳值、變數上標註預期型別。Python 執行時不檢查，靠 mypy、pyright 等工具與編輯器在執行前找錯。', example: '`def area(r: float) -> float:`' },
+  '型別檢查器': { en: 'type checker', def: '讀型別提示、在不執行程式的情況下找出型別錯誤的工具，例如 mypy、pyright、ty。', example: '`uvx mypy app.py`' },
+  '協程': { en: 'coroutine', def: '`async def` 定義的函式，呼叫時回傳協程物件，要用 await 或交給事件迴圈才會執行。', example: '`async def fetch(): ...`' },
+  'await': { en: 'await', def: '等待一個可等待物件完成；等待期間事件迴圈可以去執行其他協程。', example: '`data = await fetch()`' },
+  '事件迴圈': { en: 'event loop', def: 'asyncio 的排程器：在單一執行緒裡輪流執行多個協程，誰在等待 I/O 就先換別人。', example: '`asyncio.run(main())` 建立並執行事件迴圈。' },
+  'TaskGroup': { en: 'asyncio.TaskGroup', def: 'Python 3.11 起，同時執行多個協程並一起等待；任一個失敗會取消其他並把例外往外拋。', example: '`async with asyncio.TaskGroup() as tg:`' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '說出可迭代物件與迭代器的差別',
+      '用 yield 寫一個產生器',
+      '用產生器處理大檔案而不爆記憶體',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-4）產生器運算式走完之後再走一次會得到什麼？', options: [
+        { text: '空的', correct: true, why: '產生器只能走一次。' },
+        { text: '從頭再來一次', why: '不會重頭開始。' },
+        { text: 'StopIteration 例外', why: 'for 與 list() 會自己處理 StopIteration，結果只是空的。' },
+        { text: '和第一次一樣', why: '已經走完了。' },
+      ] },
+    ],
+    analogy: {
+      text: ['可迭代物件像一本書，迭代器像夾在書裡的書籤：同一本書可以夾好幾張書籤，各自記住讀到哪一頁。產生器像一位說書人：你說「下一段」，他才講下一段，講完一段就停下來等你。'],
+      limit: ['說書人可以重講；產生器講完就結束，要重聽只能再呼叫一次產生器函式，得到一位新的說書人。'],
+    },
+    model: {
+      svg: Fig.row('產生器的執行：呼叫 numbers() 不執行任何程式，只得到產生器；第一次 next 執行到第一個 yield 交出 1 並暫停；第二次 next 從暫停處繼續到下一個 yield 交出 2', [
+        { title: 'g = numbers()', lines: ['還沒執行', '只得到產生器'] },
+        { title: 'next(g)', lines: ['跑到 yield 1', '暫停'], tone: 3 },
+        { title: 'next(g)', lines: ['繼續到 yield 2', '再暫停'], tone: 4 },
+      ]),
+      caption: 'for 迴圈就是在背後一直呼叫 next，直到 StopIteration。',
+      blocks: [
+        '[[可迭代物件]]能產生[[迭代器]]；迭代器記住目前位置、只能走一次。函式裡有 [[yield]] 就成了[[產生器]]：每次只產生一個值，不需要一次把全部結果放進記憶體。',
+        { type: 'code', lang: 'python', title: 'log_errors.py', code: 'def error_lines(path):\n    with open(path, encoding="utf-8") as f:\n        for line in f:\n            if "ERROR" in line:\n                yield line.rstrip()\n\nfor line in error_lines("server.log"):   # 10 GB 的檔案也只佔一行的記憶體\n    print(line)' },
+      ],
+    },
+    define: [
+      { term: '迭代器', en: 'iterator', def: '實作 `__next__` 與 `__iter__` 的物件；`iter(x)` 取得、`next(it)` 前進。', example: '檔案物件本身就是迭代器。' },
+      { term: '產生器', en: 'generator function', def: '有 yield 的函式；return 會結束產生器。也可以用 `yield from 子產生器` 轉交。', example: '`yield from range(3)`' },
+      { term: '可迭代物件', en: 'iterable', def: '有 `__iter__` 的物件；list 是可迭代物件但不是迭代器，可以走很多次。', example: '`for x in my_list` 每次都從頭開始。' },
+    ],
+    examples: {
+      compare: [{
+        title: '讀一個很大的檔案，挑出錯誤行',
+        kind: '全部載入 vs 產生器',
+        code: true,
+        badLabel: '回傳 list',
+        goodLabel: '用 yield',
+        bad: 'def error_lines(path):\n    result = []\n    for line in open(path, encoding="utf-8"):\n        if "ERROR" in line:\n            result.append(line)\n    {{1:return result}}',
+        good: 'def error_lines(path):\n    with open(path, encoding="utf-8") as f:\n        for line in f:\n            if "ERROR" in line:\n                {{1:yield line}}',
+        badResult: '錯誤行很多時全部堆在記憶體；要等整個檔案讀完才拿到第一筆。',
+        goodResult: '讀到一筆交一筆；呼叫端 break 時也不會讀完整個檔案。',
+        why: ['資料量大、或可能只需要前幾筆時用產生器'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'def countdown(n):\n    print("開始")\n    while n > 0:\n        yield n\n        n -= 1\n    print("結束")\n\ng = countdown(3)\nprint("建立了產生器")\nprint(next(g))\nprint(list(g))',
+          predict: { q: '「開始」在哪一行之後才印出？', options: ['g = countdown(3) 之後立刻', 'print("建立了產生器") 之後', '永遠不會印出'], answer: 1 },
+          output: '建立了產生器\n開始\n3\n結束\n[2, 1]',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'many', label: '可以走很多次' }, { id: 'once', label: '只能走一次' }],
+          items: [
+            { text: '`[1, 2, 3]`', answer: 'many', why: 'list 每次 for 都產生新的迭代器。' },
+            { text: '`(x for x in range(3))`', answer: 'once', why: '產生器運算式。' },
+            { text: '`range(3)`', answer: 'many', why: 'range 是可迭代物件，不是迭代器。' },
+            { text: '`open("a.txt")` 回傳的檔案物件', answer: 'once', why: '檔案物件本身就是迭代器，讀到結尾就沒了（除非 seek 回去）。' },
+            { text: '`map(str, nums)`', answer: 'once', why: 'map 回傳迭代器。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('回傳 list 與產生器的記憶體：回傳 list 時記憶體隨資料量成長；產生器一次只保留一筆，記憶體固定', { title: '回傳 list', lines: ['全部放進記憶體', '等全部完成'], tone: 5 }, { title: 'yield', lines: ['一次一筆', '記憶體固定'], tone: 4 }), caption: '產生器把「產生資料」和「處理資料」交錯進行。' },
+      ],
+      tryit: {
+        q: ['寫一個產生器，無限產生費氏數列，再用 itertools.islice 取前 6 個：'],
+        draft: 'from itertools import islice\n\ndef fib():\n    a, b = 0, 1\n    while True:\n        ____ a\n        a, b = b, a + b\n\nprint(list(islice(fib(), ____)))',
+        answer: ['`yield a`、`6` → `[0, 1, 1, 2, 3, 5]`。', '無限產生器沒問題，因為只在被要求時才計算；不要對它用 list()，會永遠跑不完。'],
+      },
+    },
+    mistakes: [
+      { wrong: '對同一個產生器 for 兩次，第二次沒資料。', why: '產生器只能走一次。', right: '需要多次使用就 `list(gen)`，或每次重新呼叫產生器函式。' },
+      { wrong: '產生器函式裡用 return 回傳清單。', why: '產生器裡的 return 只會結束迭代，值放在 StopIteration 裡，for 拿不到。', right: '用 yield 逐一交出，或改成一般函式。' },
+      { wrong: '以為呼叫產生器函式就會執行裡面的程式（例如檢查參數）。', why: '要等第一次 next 才開始執行。', right: '參數檢查放在外層一般函式，再回傳內部產生器。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '呼叫一個含有 yield 的函式時，會發生什麼？', options: [
+        { text: '回傳產生器物件，函式內容還沒執行', correct: true, why: '第一次 next 才開始執行。' },
+        { text: '執行到第一個 yield 並回傳那個值', why: '要 next 才會執行到 yield。' },
+        { text: '執行完整個函式並回傳 list', why: '那是一般函式的行為。' },
+        { text: 'SyntaxError：函式不能有 yield', why: '有 yield 就是產生器函式。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`it = iter([1, 2, 3]); next(it); print(list(it))` 印出？', options: [
+        { text: '`[2, 3]`', correct: true, why: '迭代器已經前進一格。' },
+        { text: '`[1, 2, 3]`', why: 'it 記住了目前位置。' },
+        { text: '`[3]`', why: '只呼叫了一次 next。' },
+        { text: '`[]`', why: '還有兩個元素。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要把一個 5 GB 的 CSV 轉成 JSON Lines，每行轉一筆。怎麼用產生器設計，讓記憶體用量固定？'], answer: [
+        '寫 `def rows(path): with open(...) as f: yield from csv.DictReader(f)`，再寫 `def to_json(rows): for r in rows: yield json.dumps(r, ensure_ascii=False)`。',
+        '最後 `with open(out, "w") as f: for line in to_json(rows(path)): f.write(line + "\\n")`。每一層都是產生器串接，任何時刻記憶體只有一筆資料（管線，pipeline）。',
+      ] },
+    ],
+    keypoints: [
+      '可迭代物件可以走很多次；迭代器與產生器只能走一次。',
+      '有 yield 的函式是產生器，呼叫時不執行，next 時才跑到下一個 yield。',
+      '大量資料用產生器串成管線，記憶體用量固定。',
+    ],
+    sources: ['py-iter'],
+  },
+
+  '4-2': {
+    goals: [
+      '說出裝飾器 `@deco` 等於 `f = deco(f)`',
+      '寫一個計時用的裝飾器',
+      '用 functools.wraps 保留原函式資訊',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-1）`g = gen()` 這行執行時，gen 函式內的 print 會執行嗎？', options: [
+        { text: '不會，第一次 next 才執行', correct: true, why: '產生器延遲執行。' },
+        { text: '會', why: '產生器函式被呼叫時只建立產生器。' },
+        { text: '會執行兩次', why: '根本還沒執行。' },
+        { text: '要看有沒有參數', why: '和參數無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['裝飾器像幫禮物加包裝紙：禮物（原函式）沒變，但包上一層之後，打開前會先看到卡片（例如記錄時間），打開後再看到禮物。'],
+      limit: ['包裝紙不會改變禮物；但裝飾器回傳的是「新函式」，如果寫得不好（忘了回傳結果、忘了 wraps），原函式的回傳值或名稱就會不見。'],
+    },
+    model: {
+      svg: Fig.row('裝飾器的展開：寫 @timer 在 def slow 上方，等同於 slow = timer(slow)；之後呼叫 slow 實際執行的是 wrapper，wrapper 內部再呼叫原本的 slow', [
+        { title: '@timer', lines: ['`def slow(): ...`'], tone: 2 },
+        { title: '等同於', lines: ['`slow = timer(slow)`'], tone: 3 },
+        { title: '呼叫 slow()', lines: ['先跑 wrapper', '再跑原函式'], tone: 4 },
+      ]),
+      caption: '@ 只是語法糖：把下面的函式交給裝飾器，再用回傳值取代原名字。',
+      blocks: [
+        '[[裝飾器]]是「收函式、回傳函式」的函式，靠[[閉包]]記住原本的函式。寫裝飾器時要用 [[functools.wraps]]，並記得把原函式的回傳值傳回去。標準函式庫常見的有 `functools.cache`、`property`、`staticmethod`、`dataclass`。',
+        { type: 'code', lang: 'python', title: 'timer.py', code: 'import time\nfrom functools import wraps\n\ndef timer(func):\n    @wraps(func)\n    def wrapper(*args, **kwargs):\n        start = time.perf_counter()\n        result = func(*args, **kwargs)\n        print(f"{func.__name__} 花了 {time.perf_counter() - start:.3f} 秒")\n        return result\n    return wrapper\n\n@timer\ndef slow_add(a, b):\n    time.sleep(0.5)\n    return a + b\n\nprint(slow_add(1, 2))' },
+      ],
+    },
+    define: [
+      { term: '裝飾器', en: 'decorator', def: '`@d` 放在 def 或 class 上方，等於定義後執行 `名字 = d(名字)`。', example: '`@functools.cache` 自動快取結果。' },
+      { term: '閉包', en: 'closure', def: '內層函式捕捉外層的變數；外層函式回傳後變數仍然存在。', example: 'wrapper 記住 func。' },
+      { term: 'functools.wraps', en: 'wraps', def: '把 `__name__`、`__doc__`、`__wrapped__` 等資訊從原函式複製到 wrapper。', example: '`@wraps(func)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '記錄函式呼叫的裝飾器',
+        kind: '少兩件事 vs 正確',
+        code: true,
+        badLabel: '忘了 return 與 wraps',
+        goodLabel: '完整寫法',
+        bad: 'def log(func):\n    def wrapper(*args, **kwargs):\n        print("呼叫", func.__name__)\n        func(*args, **kwargs)\n    return wrapper',
+        good: 'def log(func):\n    {{1:@wraps(func)}}\n    def wrapper(*args, **kwargs):\n        print("呼叫", func.__name__)\n        {{1:return}} func(*args, **kwargs)\n    return wrapper',
+        badResult: '被裝飾的函式全部回傳 None；`add.__name__` 變成 wrapper。',
+        goodResult: '回傳值與函式名稱都保留。',
+        why: ['wrapper 一定要 return 原函式的結果，並加 @wraps'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'from functools import cache\n\ncalls = 0\n\n@cache\ndef fib(n):\n    global calls\n    calls += 1\n    return n if n < 2 else fib(n - 1) + fib(n - 2)\n\nprint(fib(30))\nprint(calls)',
+          predict: { q: '加了 @cache，fib 實際被執行了幾次？', options: ['31 次', '約 130 萬次', '1 次'], answer: 0 },
+          output: '832040\n31',
+        } },
+        { type: 'svg', svg: Fig.stack('呼叫被裝飾的函式時的順序：先執行 wrapper 前段例如記錄開始時間；再呼叫原函式取得結果；再執行 wrapper 後段例如印出耗時；最後把結果回傳給呼叫端', [
+          { title: '1. wrapper 前段（記開始時間）', tone: 2 },
+          { title: '2. 呼叫原函式，拿到 result', tone: 3 },
+          { title: '3. wrapper 後段（印出耗時）', tone: 2 },
+          { title: '4. return result 給呼叫端', tone: 4 },
+        ]), caption: '原函式被「夾」在 wrapper 的前後段之間。' },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'yes', label: '適合用裝飾器' }, { id: 'no', label: '直接寫在函式裡就好' }],
+          items: [
+            { text: '幫 20 個 API 函式都加上「需要登入」的檢查', answer: 'yes', why: '橫跨很多函式的共同行為。' },
+            { text: '快取一個昂貴的計算結果', answer: 'yes', why: '`functools.cache` 一行完成。' },
+            { text: '只有一個函式需要的特殊格式轉換', answer: 'no', why: '只用一次，裝飾器反而增加間接層。' },
+            { text: '網路請求失敗時自動重試 3 次', answer: 'yes', why: '可重用的橫切關注點。' },
+          ],
+        } },
+      ],
+      tryit: {
+        q: ['補完一個「呼叫前印出參數」的裝飾器：'],
+        draft: 'from functools import wraps\n\ndef show_args(func):\n    @wraps(func)\n    def wrapper(*args, **kwargs):\n        print("參數：", args, kwargs)\n        return ____(*args, **kwargs)\n    return ____',
+        answer: ['`return func(*args, **kwargs)`、`return wrapper`。', '注意最後回傳的是 wrapper（函式本身），不是 wrapper()（呼叫結果）。'],
+      },
+    },
+    mistakes: [
+      { wrong: 'wrapper 裡呼叫了 func 卻沒 return。', why: '所有被裝飾的函式都變成回傳 None。', right: '`return func(*args, **kwargs)`。' },
+      { wrong: '`return wrapper()` 而不是 `return wrapper`。', why: '裝飾時就執行了一次，名字被換成執行結果。', right: '回傳函式本身。' },
+      { wrong: '對會修改外部狀態或回傳可變物件的函式用 @cache。', why: '快取回傳同一個物件，呼叫端修改後下次拿到的是被改過的。', right: '只快取純函式；回傳值要是不可變的。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`@deco` 寫在 `def f():` 上方，等同於？', options: [
+        { text: '`f = deco(f)`', correct: true, why: '裝飾器語法糖。' },
+        { text: '`deco = f(deco)`', why: '方向反了。' },
+        { text: '`f = deco()`', why: '會把 f 傳進去。' },
+        { text: '`f()` 時自動呼叫 deco()', why: '裝飾在定義時就發生了。' },
+      ] },
+      { level: '應用', type: 'mc', q: '沒有 @wraps 的裝飾器，`print(add.__name__)` 會印出？', options: [
+        { text: '`wrapper`', correct: true, why: 'add 已經被換成 wrapper。' },
+        { text: '`add`', why: '要 @wraps 才會保留名稱。' },
+        { text: '`deco`', why: '名字是內層函式的名字。' },
+        { text: 'AttributeError', why: '函式都有 __name__。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['FastAPI 寫 `@app.get("/items")`，為什麼 `app.get("/items")` 後面可以接 @？這是什麼樣的裝飾器？'], answer: [
+        '`app.get("/items")` 先被呼叫，回傳一個真正的裝飾器；這叫「帶參數的裝飾器」（裝飾器工廠）。',
+        '展開等於 `read_items = app.get("/items")(read_items)`：框架把函式登記到路由表後通常原樣回傳。和本課的 timer 相比多了一層外部函式來接收參數。',
+      ] },
+    ],
+    keypoints: [
+      '`@deco` 就是 `f = deco(f)`。',
+      'wrapper 要 return 原函式的結果，並加上 @wraps。',
+      '常用內建裝飾器：cache、property、dataclass。',
+    ],
+    sources: ['py-decorators'],
+  },
+
+  '4-3': {
+    goals: [
+      '為函式參數與回傳值加上型別提示',
+      '用 `X | None`、`list[int]`、`dict[str, int]` 描述常見型別',
+      '用型別檢查器在執行前找出錯誤',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-3）為什麼 Python 的 NameError 要執行到才發現？', options: [
+        { text: '名字在執行時才查找，編譯時不檢查', correct: true, why: '這正是型別提示加檢查器要補的洞。' },
+        { text: 'Python 沒有編譯步驟', why: '有編譯成位元組碼，只是不檢查名字是否存在。' },
+        { text: 'NameError 是語法錯誤', why: '是執行時例外。' },
+        { text: '因為 Python 太慢', why: '和速度無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['型別提示像包裹上的「易碎」「此面朝上」標籤：貨運公司（Python 執行時）完全不看，但倉庫的檢查員（型別檢查器）和搬運工（編輯器）會看，提早發現「把易碎品壓在最下面」這種錯。'],
+      limit: ['標籤寫錯不會被貨運拒收；型別提示寫錯，程式照樣會執行。型別提示只有在你真的跑檢查器時才有保護作用。'],
+    },
+    model: {
+      svg: Fig.row('型別提示的作用時機：寫程式時編輯器提示與自動完成；提交前型別檢查器找出錯誤；執行時 Python 完全忽略型別提示', [
+        { title: '寫程式時', lines: ['編輯器提示', '自動完成'], tone: 3 },
+        { title: '提交前', lines: ['mypy／pyright', '找出型別錯誤'], tone: 4 },
+        { title: '執行時', lines: ['Python 忽略', '不會擋錯'], tone: 5 },
+      ]),
+      caption: '型別提示是給人和工具看的，不是給 Python 執行時看的。',
+      blocks: [
+        '[[型別提示]]寫在參數後（`name: str`）與回傳值（`-> int`）。內建容器直接寫 `list[int]`、`dict[str, float]`；可能是 None 寫 `str | None`。用[[型別檢查器]]（mypy、pyright，或 Astral 的 ty）在執行前找錯。',
+        { type: 'code', lang: 'python', title: 'typed.py', code: 'from dataclasses import dataclass\n\n@dataclass\nclass User:\n    id: int\n    name: str\n    email: str | None = None\n\ndef find_user(users: list[User], user_id: int) -> User | None:\n    for u in users:\n        if u.id == user_id:\n            return u\n    return None\n\nuser = find_user([], 1)\nprint(user.name)   # 檢查器：user 可能是 None' },
+      ],
+    },
+    define: [
+      { term: '型別提示', en: 'type annotation', def: '對執行沒有影響的註記；存在 `__annotations__`，可被工具讀取。', example: '`def greet(name: str) -> str:`' },
+      { term: 'X | None', en: 'optional type', def: '3.10 起的聯合型別寫法，等同舊的 `Optional[X]`。', example: '`def find(id: int) -> User | None:`' },
+      { term: '型別檢查器', en: 'static type checker', def: '依型別提示做靜態分析；常見的有 mypy、pyright，Astral 也推出了 ty。', example: '`uvx mypy src/`' },
+    ],
+    examples: {
+      compare: [{
+        title: '可能找不到的查詢',
+        kind: '沒提示 vs 有提示',
+        code: true,
+        badLabel: '沒有型別提示',
+        goodLabel: '標明可能是 None',
+        bad: 'def find_price(menu, name):\n    return menu.get(name)\n\ntotal = find_price(menu, "茶") * 2',
+        good: 'def find_price(menu: dict[str, int], name: str) {{1:-> int | None}}:\n    return menu.get(name)\n\nprice = find_price(menu, "茶")\nif price is not None:\n    total = price * 2',
+        badResult: '找不到時 None * 2 → 執行時 TypeError。',
+        goodResult: '檢查器在執行前就提醒「可能是 None」，逼你處理。',
+        why: ['回傳型別寫出 `| None`，呼叫端就不會忘記檢查'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          file: 'app.py 與 mypy 的輸出',
+          title: '先預測，再看檢查結果',
+          code: 'def double(n: int) -> int:\n    return n * 2\n\nprint(double("ab"))\n\n# 終端機：\n# $ python app.py\n# $ mypy app.py',
+          predict: { q: '`python app.py` 執行時會怎樣？', options: ['印出 abab', 'TypeError：型別不符', '印出 None'], answer: 0 },
+          output: 'abab\n!app.py:4: error: Argument 1 to "double" has incompatible type "str"; expected "int"  [arg-type]\n!Found 1 error in 1 file (checked 1 source file)',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ok', label: '檢查器會通過' }, { id: 'err', label: '檢查器會報錯' }],
+          items: [
+            { text: '`x: list[int] = [1, 2]`', answer: 'ok', why: '型別相符。' },
+            { text: '`x: list[int] = ["a"]`', answer: 'err', why: '元素是 str。' },
+            { text: '`def f() -> str: return None`', answer: 'err', why: '回傳 None 但宣告是 str。' },
+            { text: '`def f() -> str | None: return None`', answer: 'ok', why: '有宣告可能是 None。' },
+            { text: '`n: int = 3.5`', answer: 'err', why: 'float 不能指定給 int。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.tree('常用型別寫法：基本型別 int、str、float、bool；容器 list[int]、dict[str, int]、tuple[int, str]；可能為空 str | None；不確定時用 object 而不是 Any', { title: '常用型別寫法' }, [
+          { title: '基本', lines: ['int、str', 'float、bool'], tone: 1 },
+          { title: '容器', lines: ['`list[int]`', '`dict[str, int]`'], tone: 3 },
+          { title: '可能為空', lines: ['`str | None`'], tone: 4 },
+        ]), caption: '`Any` 會關掉檢查；不確定型別時先用 `object`，用之前再收斂。' },
+      ],
+      tryit: {
+        q: ['為這個函式加上完整的型別提示：'],
+        draft: 'def average(scores____) ____:\n    if not scores:\n        return None\n    return sum(scores) / len(scores)',
+        answer: ['`def average(scores: list[float]) -> float | None:`。', '空清單時回傳 None，所以回傳型別要包含 None；傳入 list[int] 也會被接受（int 可以當 float 用）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為加了型別提示，Python 執行時就會擋錯。', why: '執行時完全忽略型別提示。', right: '在 CI 或提交前跑 mypy／pyright。' },
+      { wrong: '到處寫 `Any` 讓檢查器閉嘴。', why: 'Any 等於關掉那個地方的檢查。', right: '用具體型別；真的不知道時用 `object` 搭配 isinstance 收斂。' },
+      { wrong: '用舊寫法 `from typing import List, Optional`。', why: '3.9 起內建型別可直接用中括號，3.10 起可用 `|`。', right: '`list[int]`、`str | None`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`def f(x: int) -> int: return x`，執行 `f("a")` 會？', options: [
+        { text: '正常回傳 "a"', correct: true, why: 'Python 執行時不檢查型別提示。' },
+        { text: 'TypeError', why: '執行時不會檢查。' },
+        { text: 'SyntaxError', why: '語法合法。' },
+        { text: '自動轉成 int', why: 'Python 不會自動轉型。' },
+      ] },
+      { level: '應用', type: 'mc', q: '函式可能回傳 User 或 None，最新的寫法是？', options: [
+        { text: '`-> User | None`', correct: true, why: '3.10 起的聯合型別寫法。' },
+        { text: '`-> User`', why: '沒標出 None，呼叫端不知道要檢查。' },
+        { text: '`-> Any`', why: '關掉檢查。' },
+        { text: '`-> User or None`', why: '`or` 不是型別語法。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['團隊的 Python 專案沒有任何型別提示，有 5 萬行。怎麼漸進地導入？'], answer: [
+        '先在 CI 加上檢查器，用寬鬆設定只檢查有註記的函式；新寫的程式要求加型別提示。',
+        '優先替「邊界」加註記：公開 API、資料模型（dataclass）、讀外部資料的函式。這些地方的提示能讓呼叫端的錯誤大量浮現，投資報酬最高；再逐步提高嚴格度。',
+      ] },
+    ],
+    keypoints: [
+      '型別提示給人和工具看，Python 執行時忽略。',
+      '用 `list[int]`、`dict[str, int]`、`X | None` 這些新寫法。',
+      '一定要跑型別檢查器，型別提示才會真的保護你。',
+    ],
+    sources: ['py-typing'],
+  },
+
+  '4-4': {
+    goals: [
+      '說出 asyncio 適合什麼工作',
+      '用 async def、await、asyncio.run 寫出非同步程式',
+      '用 TaskGroup 同時等待多個工作',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-3）型別提示什麼時候會擋下錯誤？', options: [
+        { text: '執行型別檢查器（mypy 等）時', correct: true, why: '執行程式時不會。' },
+        { text: '執行程式時', why: 'Python 執行時忽略型別提示。' },
+        { text: '永遠不會', why: '檢查器會。' },
+        { text: 'import 模組時', why: 'import 也不檢查。' },
+      ] },
+    ],
+    analogy: {
+      text: ['asyncio 像一個很會分配時間的店員：烤吐司要等 3 分鐘，他不站著等，而是先去煮咖啡；咖啡在滴，他再去煎蛋。一個人（一條執行緒）同時照顧好幾件「大部分時間在等」的工作。'],
+      limit: ['如果某件事需要店員一直動手（例如切 1000 顆洋蔥），他就沒空照顧別的事；CPU 密集的計算會卡住整個事件迴圈，asyncio 幫不上忙。'],
+    },
+    model: {
+      svg: Fig.vs('依序與 asyncio 並行：依序等三個各 1 秒的網路請求要 3 秒；用 asyncio 同時發出，等待期間事件迴圈切換，總共約 1 秒', { title: '依序 await', lines: ['請求 1：1 秒', '請求 2：1 秒', '請求 3：1 秒', '共約 3 秒'], tone: 5 }, { title: 'TaskGroup 同時', lines: ['三個一起發出', '等待時切換', '共約 1 秒'], tone: 4 }),
+      caption: 'asyncio 不讓單一請求變快，而是讓「等待」重疊。',
+      blocks: [
+        '`async def` 定義[[協程]]，用 [[await]] 等待其他協程。`asyncio.run(main())` 啟動[[事件迴圈]]。要同時做多件事，用 3.11 起的 [[TaskGroup]]（或 `asyncio.gather`）。網路請求要用支援 async 的套件，例如 httpx 的 AsyncClient。',
+        { type: 'code', lang: 'python', title: 'fetch_all.py', code: 'import asyncio\n\nasync def fetch(name: str, seconds: float) -> str:\n    await asyncio.sleep(seconds)     # 模擬網路等待\n    return f"{name} 完成"\n\nasync def main():\n    async with asyncio.TaskGroup() as tg:\n        t1 = tg.create_task(fetch("天氣", 1))\n        t2 = tg.create_task(fetch("匯率", 1))\n        t3 = tg.create_task(fetch("新聞", 1))\n    print(t1.result(), t2.result(), t3.result())\n\nasyncio.run(main())   # 約 1 秒' },
+      ],
+    },
+    define: [
+      { term: '協程', en: 'coroutine', def: '`async def` 函式呼叫後得到的物件；不 await 就不會執行（會出現 never awaited 警告）。', example: '`coro = fetch(); await coro`' },
+      { term: '事件迴圈', en: 'event loop', def: '單執行緒排程器；遇到 await 時切換到其他就緒的協程。', example: '`asyncio.run()` 建立、執行、關閉事件迴圈。' },
+      { term: 'TaskGroup', en: 'TaskGroup', def: '結構化並行：離開 async with 時等待所有任務；任一失敗就取消其他並以 ExceptionGroup 拋出。', example: '`tg.create_task(coro)`' },
+    ],
+    examples: {
+      compare: [{
+        title: '在 async 函式裡等待',
+        kind: '卡住 vs 讓出',
+        code: true,
+        badLabel: 'time.sleep',
+        goodLabel: 'await asyncio.sleep',
+        bad: 'async def job():\n    {{1:time.sleep(1)}}   # 整個事件迴圈停住\n    return "ok"',
+        good: 'async def job():\n    {{1:await asyncio.sleep(1)}}   # 等待時讓別的協程跑\n    return "ok"',
+        badResult: '三個 job 同時跑也要 3 秒：time.sleep 讓整條執行緒睡著。',
+        goodResult: '三個 job 同時跑約 1 秒。',
+        why: ['async 函式裡不能呼叫會阻塞的函式（time.sleep、requests.get）'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'import asyncio\n\nasync def say(text, delay):\n    await asyncio.sleep(delay)\n    print(text)\n\nasync def main():\n    async with asyncio.TaskGroup() as tg:\n        tg.create_task(say("慢", 0.2))\n        tg.create_task(say("快", 0.1))\n    print("全部完成")\n\nasyncio.run(main())',
+          predict: { q: '「慢」和「快」誰先印出？', options: ['快', '慢', '同時印在同一行'], answer: 0 },
+          output: '快\n慢\n全部完成',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'async', label: '適合 asyncio' }, { id: 'cpu', label: 'CPU 密集，asyncio 沒幫助' }],
+          items: [
+            { text: '同時抓 100 個網頁', answer: 'async', why: '大部分時間在等網路。' },
+            { text: '把 1000 張照片縮圖', answer: 'cpu', why: '計算密集；用 multiprocessing 或 concurrent.futures。' },
+            { text: '聊天機器人同時服務很多連線', answer: 'async', why: '每個連線大部分時間在等訊息。' },
+            { text: '計算 1 億次迴圈的統計', answer: 'cpu', why: '純計算。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.stack('事件迴圈切換：任務 A 遇到 await 等待網路時，事件迴圈切換到任務 B；B 也在等待時切換到 C；A 的網路回應到了，再切回 A 繼續', [
+          { title: '任務 A：await 網路 → 讓出', tone: 1 },
+          { title: '任務 B：await 網路 → 讓出', tone: 3 },
+          { title: '任務 C：await 網路 → 讓出', tone: 4 },
+          { title: 'A 的回應到了 → 切回 A 繼續', tone: 2 },
+        ]), caption: '只有在 await 的地方才會切換；中間沒有 await 的程式會一路跑完。' },
+      ],
+      tryit: {
+        q: ['補完：同時執行兩個協程並取得結果（用 gather）：'],
+        draft: 'async def main():\n    a, b = ____ asyncio.____(fetch("A", 1), fetch("B", 1))\n    print(a, b)\n\nasyncio.run(main())',
+        answer: ['`a, b = await asyncio.gather(fetch("A", 1), fetch("B", 1))`。', 'gather 依參數順序回傳結果；新程式建議用 TaskGroup，例外處理與取消更可靠。'],
+      },
+    },
+    mistakes: [
+      { wrong: '呼叫 `fetch()` 卻忘了 await。', why: '只產生協程物件，什麼都沒執行（RuntimeWarning: coroutine was never awaited）。', right: '`await fetch()`。' },
+      { wrong: '在 async 函式裡用 requests 或 time.sleep。', why: '同步阻塞會卡住整個事件迴圈。', right: '用 httpx.AsyncClient、asyncio.sleep；不得不呼叫同步函式時用 `await asyncio.to_thread(func)`。' },
+      { wrong: '在已經執行中的事件迴圈裡再呼叫 asyncio.run（例如 Jupyter）。', why: 'RuntimeError: asyncio.run() cannot be called from a running event loop。', right: '在 Jupyter 直接 `await main()`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`async def f(): ...`，只寫 `f()` 不 await，會？', options: [
+        { text: '只建立協程物件，函式內容不執行', correct: true, why: '並出現 never awaited 警告。' },
+        { text: '在背景執行', why: '要 create_task 才會排進事件迴圈。' },
+        { text: '同步執行完', why: '協程不會自己執行。' },
+        { text: 'SyntaxError', why: '語法合法，只是沒效果。' },
+      ] },
+      { level: '應用', type: 'mc', q: '三個 `await asyncio.sleep(1)` 依序寫在同一個協程裡，總共約多久？', options: [
+        { text: '約 3 秒', correct: true, why: '依序 await 就是一個等完再等下一個。' },
+        { text: '約 1 秒', why: '要用 TaskGroup 或 gather 才會同時。' },
+        { text: '0 秒', why: 'sleep 會等待。' },
+        { text: '看 CPU 核心數', why: 'asyncio 是單執行緒，和核心數無關。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要寫一個爬蟲抓 1 萬個網址，用 TaskGroup 一次建立 1 萬個任務會有什麼問題？怎麼控制？'], answer: [
+        '一次發出 1 萬個連線，可能耗盡檔案描述符、被目標網站封鎖，記憶體也大增。',
+        '用 `asyncio.Semaphore(20)` 限制同時進行的數量：每個任務 `async with sem:` 才發請求；或把網址放進 asyncio.Queue，開固定數量的 worker 消化。',
+      ] },
+    ],
+    keypoints: [
+      'asyncio 讓 I/O 等待重疊，不會讓計算變快。',
+      '`async def` 定義協程，要 await 才會執行；用 asyncio.run 啟動。',
+      '同時多件事用 TaskGroup；async 函式裡不能呼叫阻塞函式。',
+    ],
+    sources: ['py-asyncio'],
+  },
+});
+</script>

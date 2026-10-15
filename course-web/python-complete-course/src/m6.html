@@ -1,0 +1,435 @@
+<script>
+/* ==========================================================================
+   模組 6：資料處理
+   ========================================================================== */
+defineTerms({
+  '正規表示式': { en: 'regular expression (regex)', def: '描述「文字模式」的小語言，用來搜尋、驗證、擷取、取代文字。', example: '`\\d{4}-\\d{2}-\\d{2}` 符合 2026-10-16。' },
+  '原始字串': { en: 'raw string', def: '`r"..."` 開頭的字串，反斜線不會被當成跳脫字元；寫正規表示式時一律用它。', example: '`r"\\d+"`' },
+  '群組': { en: 'group', def: '正規表示式中用括號圍起來的部分，可以單獨取出；`(?P<名稱>...)` 是具名群組。', example: '`(?P<year>\\d{4})`' },
+  '貪婪匹配': { en: 'greedy matching', def: '`*`、`+` 預設盡量多吃字元；後面加 `?` 改成盡量少吃。', example: '`<.+?>` 只吃一個標籤。' },
+  'datetime': { en: 'datetime', def: '標準函式庫的日期時間型別；有時區資訊的叫 aware，沒有的叫 naive。', example: '`datetime.now(ZoneInfo("Asia/Taipei"))`' },
+  'zoneinfo': { en: 'zoneinfo', def: '3.9 起的標準函式庫時區模組，使用 IANA 時區名稱。', example: '`ZoneInfo("Asia/Taipei")`' },
+  'timedelta': { en: 'timedelta', def: '兩個時間點之間的長度，可以加減到 datetime 上。', example: '`now + timedelta(days=7)`' },
+  'ISO 8601': { en: 'ISO 8601', def: '國際標準的日期時間文字格式，例如 2026-10-16T09:30:00+08:00；交換資料時用它最不會誤解。', example: '`dt.isoformat()`' },
+  'Counter': { en: 'collections.Counter', def: '計數用的 dict：`Counter(items)` 一次統計每個元素出現幾次，`most_common(n)` 取前幾名。', example: '`Counter("banana")`' },
+  'defaultdict': { en: 'collections.defaultdict', def: '鍵不存在時自動用工廠函式建立預設值的 dict，適合分組。', example: '`groups = defaultdict(list)`' },
+  'itertools': { en: 'itertools', def: '處理迭代器的標準工具集：chain 串接、islice 切片、groupby 連續分組、batched 分批（3.12 起）。', example: '`list(batched(range(7), 3))`' },
+  'CSV': { en: 'CSV', def: '以逗號分隔欄位的純文字表格格式；欄位內有逗號或換行時要用引號包住，所以要用 csv 模組而不是 split。', example: '`csv.DictReader(f)`' },
+  'statistics': { en: 'statistics', def: '標準函式庫的統計模組：mean、median、stdev、quantiles 等。', example: '`statistics.median([3, 1, 2])` 是 2。' },
+});
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '用 re.search、re.findall 找出文字模式',
+      '用群組擷取需要的部分',
+      '用原始字串寫正規表示式並避開貪婪陷阱',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）`f"{n:,}"` 對 1234567 的結果是？', options: [
+        { text: '`1,234,567`', correct: true, why: '`,` 加千分位。' },
+        { text: '`1234567,`', why: '逗號是格式，不是附加字元。' },
+        { text: '`1.234.567`', why: 'Python 的 `,` 格式固定用逗號。' },
+        { text: '錯誤', why: '合法的格式規格。' },
+      ] },
+    ],
+    analogy: {
+      text: ['正規表示式像在文件裡找「長得像電話號碼的東西」：你不知道確切號碼，但知道它是「09 開頭、後面 8 個數字」。正規表示式就是把這種「長相」寫成機器看得懂的描述。'],
+      limit: ['人看長相很有彈性；正規表示式完全照字面規則，寫得太寬會抓到不該抓的、太窄會漏掉。複雜的格式（Email、HTML）不要只靠正規表示式驗證。'],
+    },
+    model: {
+      svg: Fig.row('正規表示式的組成：字元類別 \\d 代表數字；數量 {4} 代表剛好四個；群組括號把要擷取的部分圍起來；組合成 (\\d{4})-(\\d{2}) 擷取年和月', [
+        { title: '字元類別', lines: ['`\\d` 數字', '`\\w` 字', '`\\s` 空白'], tone: 1 },
+        { title: '數量', lines: ['`+` 一個以上', '`*` 零個以上', '`{4}` 剛好 4'], tone: 3 },
+        { title: '群組', lines: ['`( … )` 擷取', '`(?P<y>…)` 具名'], tone: 4 },
+      ]),
+      caption: '`r"(\\d{4})-(\\d{2})"` = 四個數字、一個減號、兩個數字，並把兩段數字擷取出來。',
+      blocks: [
+        '寫[[正規表示式]]一律用[[原始字串]] `r"..."`。`re.search` 找第一個、`re.findall` 找全部、`re.sub` 取代、`re.fullmatch` 驗證整個字串。用[[群組]]擷取片段；注意[[貪婪匹配]]。',
+        { type: 'code', lang: 'python', title: 'regex.py', code: 'import re\n\nlog = "2026-10-16 09:30 ERROR 訂單 #1043 付款失敗；#1044 也失敗"\n\nm = re.search(r"(?P<date>\\d{4}-\\d{2}-\\d{2}) (?P<time>\\d{2}:\\d{2})", log)\nprint(m["date"], m["time"])          # 2026-10-16 09:30\n\nprint(re.findall(r"#(\\d+)", log))    # [\'1043\', \'1044\']\n\nphone = "0912-345-678"\nprint(bool(re.fullmatch(r"09\\d{2}-?\\d{3}-?\\d{3}", phone)))   # True\n\nprint(re.sub(r"\\d", "*", "卡號 1234"))   # 卡號 ****' },
+      ],
+    },
+    define: [
+      { term: '正規表示式', en: 're', def: '`re.search`、`re.match`（只從開頭）、`re.fullmatch`、`re.findall`、`re.finditer`、`re.sub`、`re.split`。', example: '`re.compile(pattern)` 重複使用時先編譯。' },
+      { term: '群組', en: 'group', def: '`m.group(1)` 或 `m[1]` 取第一個群組；具名群組用 `m["name"]`；findall 有群組時只回傳群組內容。', example: '`(?:...)` 是不擷取的群組。' },
+      { term: '貪婪匹配', en: 'greedy vs lazy', def: '`.+` 盡量多、`.+?` 盡量少。', example: '`re.findall(r"<.+?>", "<a><b>")` → `[\'<a>\', \'<b>\']`' },
+    ],
+    examples: {
+      compare: [{
+        title: '取出 HTML 標籤',
+        kind: '貪婪 vs 非貪婪',
+        code: true,
+        badLabel: '`.+`',
+        goodLabel: '`.+?`',
+        bad: 're.findall(r"<{{1:.+}}>", "<b>粗</b><i>斜</i>")',
+        good: 're.findall(r"<{{1:.+?}}>", "<b>粗</b><i>斜</i>")',
+        badResult: '只抓到一整段 `<b>粗</b><i>斜</i>`：.+ 一路吃到最後一個 >。',
+        goodResult: '`[\'<b>\', \'</b>\', \'<i>\', \'</i>\']`。',
+        why: ['真正要解析 HTML 時用 html.parser 或 BeautifulSoup，不要只靠正規表示式'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'import re\n\ntext = "價格：NT$1,200、NT$350、US$20"\nprint(re.findall(r"NT\\$([\\d,]+)", text))\nprint(re.match(r"\\d+", "abc123"))\nprint(re.search(r"\\d+", "abc123").group())\nprint(re.split(r"[、，,]\\s*", "蘋果、香蕉,芒果"))',
+          predict: { q: '`re.match(r"\\d+", "abc123")` 的結果是？', options: ['None', '123', 'abc'], answer: 0 },
+          output: "['1,200', '350']\nNone\n123\n['蘋果', '香蕉', '芒果']",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'search', label: 're.search' }, { id: 'full', label: 're.fullmatch' }, { id: 'all', label: 're.findall' }],
+          items: [
+            { text: '驗證使用者輸入的整串是不是郵遞區號（3 或 5 碼）', answer: 'full', why: '要確認「整個字串」都符合。' },
+            { text: '從一篇文章裡抓出所有網址', answer: 'all', why: '要全部。' },
+            { text: '找出日誌第一次出現的錯誤代碼', answer: 'search', why: '只要第一個。' },
+            { text: '抓出所有 #hashtag', answer: 'all', why: '要全部。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('re.match 只從字串開頭比對；re.search 在整個字串中找第一個符合的位置', { title: 're.match', lines: ['只從開頭比', '`"abc123"` → None'], tone: 5 }, { title: 're.search', lines: ['整串找第一個', '`"abc123"` → 123'], tone: 4 }), caption: '新手最常搞混的一對；驗證整串用 fullmatch。' },
+      ],
+      tryit: {
+        q: ['從「訂單 A-2026-0042 已出貨」取出年份與流水號：'],
+        draft: 'import re\nm = re.search(r"A-(\\d{____})-(\\d+)", "訂單 A-2026-0042 已出貨")\nprint(m[____], m[2])',
+        answer: ['`\\d{4}`、`m[1]` → `2026 0042`。', '群組從 1 開始編號；m[0] 是整個符合的字串「A-2026-0042」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '`re.search("\\d+", s)` 沒用原始字串。', why: '一般字串裡的反斜線可能被當成跳脫字元（3.12 起還會出 SyntaxWarning）。', right: '`r"\\d+"`。' },
+      { wrong: '用 `re.match` 驗證整個字串。', why: 'match 只檢查開頭，後面多了垃圾也會通過。', right: '`re.fullmatch`。' },
+      { wrong: 'm = re.search(...) 之後直接 `m.group()`。', why: '沒找到時 m 是 None，AttributeError。', right: '`if m := re.search(...):` 再取值。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`re.findall(r"\\d+", "a1b22c333")` 是？', options: [
+        { text: "`['1', '22', '333']`", correct: true, why: '每一段連續數字。' },
+        { text: "`['1', '2', '2', '3', '3', '3']`", why: '`+` 會把連續數字合成一段。' },
+        { text: '`[1, 22, 333]`', why: 'findall 回傳字串，不是 int。' },
+        { text: "`'122333'`", why: '回傳的是清單。' },
+      ] },
+      { level: '應用', type: 'mc', q: '要驗證整個輸入「只能是 4 位數字」，哪個寫法正確？', options: [
+        { text: '`re.fullmatch(r"\\d{4}", s)`', correct: true, why: '整個字串剛好 4 位數字。' },
+        { text: '`re.search(r"\\d{4}", s)`', why: '"abc12345" 也會通過。' },
+        { text: '`re.match(r"\\d{4}", s)`', why: '"12345" 也會通過（只看開頭）。' },
+        { text: '`re.findall(r"\\d", s) == 4`', why: '比較 list 和 int 永遠 False。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要從上千封信件內文抓出「台灣手機號碼」，格式可能是 0912345678、0912-345-678、+886 912 345 678。怎麼設計比較穩？'], answer: [
+        '分兩步：先用寬鬆的模式抓候選（例如 `r"(?:\\+886\\s?|0)9[\\d\\s-]{8,12}"`），再把候選去掉空白與減號、統一成 09 開頭的 10 碼，最後用 `fullmatch(r"09\\d{8}")` 驗證。',
+        '一個巨大的正規表示式很難讀也難維護；「抓候選 → 正規化 → 嚴格驗證」比較好測試。',
+      ] },
+    ],
+    keypoints: [
+      '正規表示式一律寫成 `r"..."` 原始字串。',
+      'search 找第一個、findall 找全部、fullmatch 驗證整串；match 只看開頭。',
+      '群組擷取片段；`.+?` 避免貪婪吃太多。',
+    ],
+    sources: ['py-re'],
+  },
+
+  '6-2': {
+    goals: [
+      '分辨有時區與沒有時區的 datetime',
+      '用 zoneinfo 處理台灣時間與 UTC',
+      '用 timedelta 計算時間差並用 ISO 8601 交換資料',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-1）`re.search` 沒找到時回傳什麼？', options: [
+        { text: '`None`', correct: true, why: '所以取值前要檢查。' },
+        { text: '空字串', why: '回傳的是 None。' },
+        { text: '拋出例外', why: 'search 不拋例外。' },
+        { text: '`False`', why: '是 None（雖然在 if 裡也算假）。' },
+      ] },
+    ],
+    analogy: {
+      text: ['沒有時區的時間像只寫「晚上 8 點見」的紙條：在台北和在倫敦的人會在不同時刻出現。有時區的時間像寫「台北時間晚上 8 點」，大家換算後是同一個瞬間。'],
+      limit: ['紙條上的人會問清楚；程式不會。兩個沒有時區的 datetime 相減，Python 照樣算給你，錯了也不會提醒。'],
+    },
+    model: {
+      svg: Fig.row('處理時間的建議流程：輸入時加上時區；內部儲存與計算用 UTC；顯示給使用者時轉成當地時區', [
+        { title: '輸入', lines: ['加上時區', '`Asia/Taipei`'], tone: 1 },
+        { title: '儲存、計算', lines: ['一律 UTC', '`astimezone(UTC)`'], tone: 3 },
+        { title: '顯示', lines: ['轉回使用者時區'], tone: 4 },
+      ]),
+      caption: '「存 UTC、顯示當地」是避免時區 bug 的原則。',
+      blocks: [
+        '[[datetime]] 有 naive（沒時區）與 aware（有時區）兩種，不能混用比較。用 [[zoneinfo]] 加時區，用 [[timedelta]] 計算差距，交換資料用 [[ISO 8601]] 字串。Windows 沒有內建 IANA 時區資料庫，要另外 `uv add tzdata`。',
+        { type: 'code', lang: 'python', title: 'times.py', code: 'from datetime import datetime, timedelta, UTC\nfrom zoneinfo import ZoneInfo\n\ntpe = ZoneInfo("Asia/Taipei")\nnow = datetime.now(tpe)\nprint(now.isoformat(timespec="minutes"))   # 2026-10-16T09:30+08:00\n\nmeeting = datetime(2026, 10, 20, 20, 0, tzinfo=tpe)\nprint(meeting.astimezone(ZoneInfo("Europe/London")))   # 倫敦時間\nprint(meeting.astimezone(UTC))\n\nleft = meeting - now\nprint(left.days, "天")\nprint((now + timedelta(weeks=2)).date())\n\nparsed = datetime.fromisoformat("2026-10-16T09:30:00+08:00")' },
+      ],
+    },
+    define: [
+      { term: 'datetime', en: 'aware vs naive', def: 'aware 有 tzinfo；naive 沒有。`datetime.now()` 是 naive，`datetime.now(tz)` 是 aware。', example: '`dt.tzinfo is None` 表示 naive。' },
+      { term: 'zoneinfo', en: 'ZoneInfo', def: 'IANA 時區（含夏令時間規則）；不要用固定 +8 小時代替有夏令時間的地區。', example: '`ZoneInfo("America/New_York")`' },
+      { term: 'ISO 8601', en: 'isoformat / fromisoformat', def: '`dt.isoformat()` 轉字串、`datetime.fromisoformat(s)` 解析（3.11 起支援大部分 ISO 格式，包括結尾 Z）。', example: '`"2026-10-16T01:30:00Z"`' },
+    ],
+    examples: {
+      compare: [{
+        title: '記錄訂單建立時間',
+        kind: '容易出錯 vs 正確',
+        code: true,
+        badLabel: 'naive 時間',
+        goodLabel: 'aware UTC',
+        bad: 'created = {{1:datetime.now()}}\n# 伺服器在美國，存進去的是美國時間，但沒寫時區',
+        good: 'created = {{1:datetime.now(UTC)}}\n# 顯示時：created.astimezone(ZoneInfo("Asia/Taipei"))',
+        badResult: '搬伺服器或跨時區比較時，時間差了好幾小時也看不出來。',
+        goodResult: '儲存的是明確的瞬間，任何地方都能正確換算。',
+        why: ['伺服器端一律存 aware 的 UTC 時間'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'from datetime import datetime, timedelta\nfrom zoneinfo import ZoneInfo\n\na = datetime(2026, 10, 16, 9, 0)\nb = datetime(2026, 10, 16, 9, 0, tzinfo=ZoneInfo("Asia/Taipei"))\nprint(b - timedelta(hours=1))\nprint(a < b)',
+          predict: { q: '`a < b`（naive 和 aware 比較）會怎樣？', options: ['True', 'False', 'TypeError'], answer: 2 },
+          output: '2026-10-16 08:00:00+08:00\n!TypeError: can\'t compare offset-naive and offset-aware datetimes',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'aware', label: 'aware（有時區）' }, { id: 'naive', label: 'naive（沒時區）' }],
+          items: [
+            { text: '`datetime.now()`', answer: 'naive', why: '沒給時區。' },
+            { text: '`datetime.now(UTC)`', answer: 'aware', why: '有時區。' },
+            { text: '`datetime.fromisoformat("2026-10-16T09:00+08:00")`', answer: 'aware', why: '字串裡有 +08:00。' },
+            { text: '`datetime(2026, 1, 1)`', answer: 'naive', why: '沒給 tzinfo。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.row('同一個瞬間在不同時區的表示：台北 2026-10-20 20:00 +08:00 等於 UTC 12:00，等於倫敦 13:00（英國夏令時間）', [
+          { title: '台北', lines: ['20:00', '+08:00'], tone: 1 },
+          { title: 'UTC', lines: ['12:00', '+00:00'], tone: 3 },
+          { title: '倫敦', lines: ['13:00', '+01:00 夏令'], tone: 4 },
+        ]), caption: '三個字串看起來不同，指的是同一個瞬間。' },
+      ],
+      tryit: {
+        q: ['算出從現在到 2027 年元旦（台北時間）還有幾天：'],
+        draft: 'from datetime import datetime\nfrom zoneinfo import ZoneInfo\n\ntpe = ZoneInfo("Asia/Taipei")\nnew_year = datetime(2027, 1, 1, tzinfo=____)\nprint((new_year - datetime.now(____)).____)',
+        answer: ['`tzinfo=tpe`、`datetime.now(tpe)`、`.days`。', '兩邊都要是 aware 才能相減；結果是 timedelta，`.days` 取天數。'],
+      },
+    },
+    mistakes: [
+      { wrong: '混用 naive 與 aware 比較或相減。', why: 'TypeError。', right: '統一成 aware；外部來的 naive 時間先確認它代表哪個時區再 `replace(tzinfo=…)`。' },
+      { wrong: '用 `+8 小時` 手動換算紐約、倫敦時間。', why: '這些地區有夏令時間，固定位移會在一年中的某段時間錯一小時。', right: 'ZoneInfo 加 astimezone。' },
+      { wrong: '用 `"10/11/2026"` 這種格式交換資料。', why: '美國讀成 10 月 11 日、歐洲讀成 11 月 10 日。', right: 'ISO 8601：`2026-10-11`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '伺服器儲存時間的建議做法是？', options: [
+        { text: 'aware 的 UTC 時間', correct: true, why: '明確、可換算到任何時區。' },
+        { text: 'naive 的伺服器當地時間', why: '搬機房或跨區就亂。' },
+        { text: '使用者瀏覽器傳來的字串原封不動', why: '格式與時區都不可控。' },
+        { text: '只存日期不存時間', why: '會遺失資訊。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`datetime(2026, 3, 1) - datetime(2026, 2, 1)` 的結果是？', options: [
+        { text: '`timedelta(days=28)`', correct: true, why: '2026 年 2 月有 28 天。' },
+        { text: '`1`（一個月）', why: 'timedelta 沒有「月」的單位。' },
+        { text: '`timedelta(days=30)`', why: '2 月不是 30 天。' },
+        { text: 'TypeError', why: '兩個都是 naive，可以相減。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要寫一個「每天台北時間早上 9 點寄報表」的排程，伺服器在 UTC 時區。怎麼避免時間錯亂？'], answer: [
+        '排程設定以 Asia/Taipei 表達「9:00」，計算下次執行時用 `datetime.now(ZoneInfo("Asia/Taipei"))`，再轉成 UTC 交給排程系統；不要寫死「UTC 01:00」以外的魔術數字而不加註解。',
+        '台灣沒有夏令時間所以固定是 UTC 01:00，但若要支援其他國家的使用者，就必須用 ZoneInfo 每次計算。',
+      ] },
+    ],
+    keypoints: [
+      'naive 與 aware 不能混用；伺服器一律存 aware UTC。',
+      '時區用 ZoneInfo，不要手動加減固定小時。',
+      '交換資料用 ISO 8601（isoformat／fromisoformat）。',
+    ],
+    sources: ['py-datetime', 'py-zoneinfo'],
+  },
+
+  '6-3': {
+    goals: [
+      '用 Counter 統計次數',
+      '用 defaultdict 分組',
+      '用 itertools 的 chain、batched、groupby 處理序列',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）統計字數時 `count[w] = count.get(w, 0) + 1` 的 get 作用是？', options: [
+        { text: '鍵不存在時回傳 0，避免 KeyError', correct: true, why: '這課的 Counter 讓這件事更簡單。' },
+        { text: '刪除鍵', why: 'get 只讀取。' },
+        { text: '把值轉成 int', why: '不做轉型。' },
+        { text: '排序 dict', why: '不排序。' },
+      ] },
+    ],
+    analogy: {
+      text: ['collections 與 itertools 像廚房裡的專用工具：可以用菜刀削皮，但削皮刀更快更安全。Counter 是計數器、defaultdict 是會自動長出空盒子的收納櫃、itertools 是一組處理輸送帶的機器。'],
+      limit: ['工具太多會找不到；這課只挑最常用的幾個，其他需要時再查文件。'],
+    },
+    model: {
+      svg: Fig.tree('常用工具：Counter 統計次數；defaultdict 分組或累加；itertools 處理序列，包括 chain 串接、batched 分批、groupby 連續分組', { title: '要做什麼？' }, [
+        { title: 'Counter', lines: ['數次數', '`most_common`'], tone: 1 },
+        { title: 'defaultdict', lines: ['分組、累加', '自動建預設值'], tone: 3 },
+        { title: 'itertools', lines: ['chain、batched', 'groupby'], tone: 4 },
+      ]),
+      caption: '看到「先檢查鍵在不在再加」的程式，就想到這幾個工具。',
+      blocks: [
+        '[[Counter]] 統計次數，`most_common(n)` 取前幾名，3.15 起還支援 `^` 對稱差。[[defaultdict]] 讓分組不用先檢查鍵。[[itertools]] 的函式都回傳迭代器，適合大量資料。',
+        { type: 'code', lang: 'python', title: 'tools.py', code: 'from collections import Counter, defaultdict\nfrom itertools import batched, chain\n\nwords = "the cat and the hat and the bat".split()\nprint(Counter(words).most_common(2))     # [(\'the\', 3), (\'and\', 2)]\n\norders = [("台北", 120), ("台中", 80), ("台北", 50)]\nby_city = defaultdict(list)\nfor city, amount in orders:\n    by_city[city].append(amount)\nprint(dict(by_city))                      # {\'台北\': [120, 50], \'台中\': [80]}\n\nfor batch in batched(range(7), 3):        # 3.12 起\n    print(batch)                           # (0, 1, 2) (3, 4, 5) (6,)\n\nprint(list(chain([1, 2], [3], [4, 5])))   # [1, 2, 3, 4, 5]' },
+      ],
+    },
+    define: [
+      { term: 'Counter', en: 'Counter', def: 'dict 的子類別；缺少的鍵視為 0；支援 +、-、&、|，3.15 起支援 ^。', example: '`Counter(a) + Counter(b)`' },
+      { term: 'defaultdict', en: 'defaultdict', def: '`defaultdict(工廠)`：讀取不存在的鍵時呼叫工廠建立值並存入。', example: '`defaultdict(int)` 適合累加。' },
+      { term: 'itertools', en: 'itertools', def: 'chain、islice、batched（3.12）、groupby（只合併相鄰的相同鍵）、pairwise、product、combinations。', example: '`pairwise([1, 2, 3])` → (1, 2), (2, 3)' },
+    ],
+    examples: {
+      compare: [{
+        title: '依城市分組訂單金額',
+        kind: '手動檢查 vs defaultdict',
+        code: true,
+        badLabel: '先檢查鍵',
+        goodLabel: 'defaultdict(list)',
+        bad: 'groups = {}\nfor city, amt in orders:\n    if city not in groups:\n        groups[city] = []\n    groups[city].append(amt)',
+        good: 'groups = {{1:defaultdict(list)}}\nfor city, amt in orders:\n    groups[city].append(amt)',
+        badResult: '每次都要寫一段檢查。',
+        goodResult: '不存在的城市自動得到空清單。',
+        why: ['累加數字用 defaultdict(int)，收集清單用 defaultdict(list)'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'from collections import Counter\nfrom itertools import groupby\n\nc = Counter("banana")\nprint(c["a"], c["z"])\nprint(c.most_common(1))\n\ndata = ["a", "a", "b", "a"]\nprint([(k, len(list(g))) for k, g in groupby(data)])',
+          predict: { q: 'groupby 的結果裡 "a" 出現幾組？', options: ['1 組（共 3 個）', '2 組', '3 組'], answer: 1 },
+          output: "3 0\n[('a', 3)]\n[('a', 2), ('b', 1), ('a', 1)]",
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'counter', label: 'Counter' }, { id: 'dd', label: 'defaultdict' }, { id: 'iter', label: 'itertools' }],
+          items: [
+            { text: '統計每個 IP 出現幾次，找出前 10 名', answer: 'counter', why: 'Counter + most_common(10)。' },
+            { text: '把 1 萬筆資料每 100 筆一批送出', answer: 'iter', why: '`batched(data, 100)`。' },
+            { text: '把學生依班級分成好幾個清單', answer: 'dd', why: '`defaultdict(list)`。' },
+            { text: '把三個清單串成一個走過', answer: 'iter', why: '`chain(a, b, c)`。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('itertools.groupby 只合併相鄰的相同鍵，所以要先依同一個鍵排序；要不管順序地分組請用 defaultdict', { title: 'groupby', lines: ['只合併相鄰的', '要先 sorted'], tone: 2 }, { title: 'defaultdict', lines: ['不管順序', '直接分組'], tone: 4 }), caption: '`groupby(sorted(data, key=k), key=k)` 才是完整分組。' },
+      ],
+      tryit: {
+        q: ['找出兩個購物清單合起來最常出現的 3 樣東西：'],
+        draft: 'from collections import Counter\na = ["蛋", "奶", "蛋"]\nb = ["奶", "麵包", "蛋"]\ntotal = Counter(a) ____ Counter(b)\nprint(total.____(3))',
+        answer: ['`Counter(a) + Counter(b)`、`.most_common(3)` → `[(\'蛋\', 3), (\'奶\', 2), (\'麵包\', 1)]`。', 'Counter 可以直接相加，次數會合併。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 groupby 分組卻沒先排序。', why: 'groupby 只合併相鄰的相同鍵，同一個鍵會出現好幾組。', right: '先 `sorted(data, key=…)`，或改用 defaultdict。' },
+      { wrong: 'groupby 的群組迭代器存起來之後再用。', why: '前進到下一組後，前一組的迭代器就失效了。', right: '在迴圈裡立刻 `list(g)`。' },
+      { wrong: '讀 defaultdict 的鍵「只是檢查」，結果鍵被建立了。', why: '`d[k]` 讀不存在的鍵會建立它。', right: '只檢查用 `k in d` 或 `d.get(k)`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`Counter("aab")["z"]` 的結果是？', options: [
+        { text: '`0`', correct: true, why: 'Counter 缺少的鍵視為 0，不拋 KeyError。' },
+        { text: 'KeyError', why: 'Counter 特別處理了缺少的鍵。' },
+        { text: '`None`', why: '是 0。' },
+        { text: '`1`', why: '"z" 沒出現過。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`list(batched([1, 2, 3, 4, 5], 2))` 是？', options: [
+        { text: '`[(1, 2), (3, 4), (5,)]`', correct: true, why: '最後一批可能不足。' },
+        { text: '`[[1, 2], [3, 4]]`', why: '不會丟掉最後一批，而且元素是 tuple。' },
+        { text: '`[(1, 2, 3), (4, 5)]`', why: '每批 2 個。' },
+        { text: 'TypeError', why: '3.12 起 batched 可用。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你有一份 50 萬行的網站存取日誌，要找出「每小時」最常被存取的前 3 個網址。用這課的工具怎麼組合？'], answer: [
+        '逐行讀（產生器，4-1），用正規表示式（6-1）擷取時間與網址，把時間截到小時。',
+        '`hourly = defaultdict(Counter)`，每行 `hourly[hour][url] += 1`；最後 `for hour, c in sorted(hourly.items()): print(hour, c.most_common(3))`。記憶體只存統計結果，不存原始行。',
+      ] },
+    ],
+    keypoints: [
+      '計數用 Counter，取前幾名用 most_common。',
+      '分組、累加用 defaultdict，不用先檢查鍵。',
+      'itertools：chain 串接、batched 分批、groupby 前要先排序。',
+    ],
+    sources: ['py-collections', 'py-itertools', 'py-315'],
+  },
+
+  '6-4': {
+    goals: [
+      '用 csv 模組正確讀寫 CSV',
+      '用 statistics 算平均、中位數、標準差',
+      '把整門課的工具組合成一個小型資料分析',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-3）統計每個類別的總金額，最適合哪個？', options: [
+        { text: '`defaultdict(float)` 累加', correct: true, why: '不存在的類別自動從 0.0 開始。' },
+        { text: '`Counter` 的 most_common', why: 'Counter 適合計次數；累加金額也行，但 defaultdict 意圖更清楚。' },
+        { text: 'itertools.chain', why: 'chain 只是串接。' },
+        { text: 'list.sort', why: '排序不會加總。' },
+      ] },
+    ],
+    analogy: {
+      text: ['CSV 像用逗號隔開的購物清單，看起來很簡單；但如果某一項是「牛奶, 低脂」，逗號就分不清了。csv 模組像懂規則的店員：知道引號裡的逗號不是分隔符號。'],
+      limit: ['csv 模組只負責「切欄位」，不知道欄位型別；讀進來的每個值都是字串，數字要自己轉。'],
+    },
+    model: {
+      svg: Fig.row('小型資料分析流程：csv.DictReader 讀檔，每列是 dict；轉型並清理，略過壞資料；用 defaultdict 分組；用 statistics 計算平均與中位數；輸出報表', [
+        { title: '讀', lines: ['`DictReader`'], tone: 1 },
+        { title: '清理', lines: ['轉型、略過', '壞資料'], tone: 2 },
+        { title: '分組', lines: ['`defaultdict`'], tone: 3 },
+        { title: '統計', lines: ['`statistics`'], tone: 4 },
+      ]),
+      caption: '這條管線用到了 5-2、3-4、6-3 的工具。',
+      blocks: [
+        '讀 [[CSV]] 用 `csv.DictReader`，每列是一個 dict；寫入用 `csv.DictWriter`。開檔要加 `newline=""`，避免 Windows 多出空行。[[statistics]] 提供 mean、median、stdev；資料量很大或需要表格運算時，再考慮 pandas、polars 這類套件。',
+        { type: 'code', lang: 'python', title: 'sales_report.py', code: 'import csv\nimport statistics\nfrom collections import defaultdict\nfrom pathlib import Path\n\nby_city: defaultdict[str, list[float]] = defaultdict(list)\nbad_rows = 0\n\nwith Path("sales.csv").open(encoding="utf-8", newline="") as f:\n    for row in csv.DictReader(f):\n        try:\n            by_city[row["city"]].append(float(row["amount"]))\n        except (KeyError, ValueError):\n            bad_rows += 1\n\nfor city, amounts in sorted(by_city.items()):\n    print(f"{city}\\t筆數 {len(amounts)}\\t平均 {statistics.mean(amounts):,.0f}\\t中位數 {statistics.median(amounts):,.0f}")\nprint(f"略過 {bad_rows} 筆格式錯誤的資料")' },
+      ],
+    },
+    define: [
+      { term: 'CSV', en: 'csv module', def: 'reader／writer 處理 list，DictReader／DictWriter 處理 dict；正確處理引號、逗號、換行。', example: '`csv.DictWriter(f, fieldnames=["name", "score"])`' },
+      { term: 'statistics', en: 'statistics', def: 'mean（平均）、median（中位數）、mode（眾數）、stdev（樣本標準差）、quantiles（分位數）。', example: '`statistics.quantiles(data, n=4)` 取四分位數。' },
+      { term: '中位數', en: 'median', def: '排序後位在中間的值；比平均更不受極端值影響。', example: '`median([1, 2, 100])` 是 2，平均是 34.3。' },
+    ],
+    examples: {
+      compare: [{
+        title: '讀一行 CSV',
+        kind: 'split vs csv 模組',
+        code: true,
+        badLabel: 'line.split(",")',
+        goodLabel: 'csv.reader',
+        bad: 'line = \'1,"台北市, 信義區",500\'\nprint({{1:line.split(",")}})',
+        good: 'import csv\nline = \'1,"台北市, 信義區",500\'\nprint(next({{1:csv.reader([line])}}))',
+        badResult: '`[\'1\', \'"台北市\', \' 信義區"\', \'500\']`：地址被切成兩欄。',
+        goodResult: '`[\'1\', \'台北市, 信義區\', \'500\']`：引號裡的逗號被正確保留。',
+        why: ['CSV 一律用 csv 模組，不要自己 split'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'csrun', props: {
+          code: 'import statistics as st\n\nsalaries = [32000, 35000, 36000, 38000, 250000]\nprint(round(st.mean(salaries)))\nprint(st.median(salaries))\nprint(st.quantiles(salaries, n=4))',
+          predict: { q: '平均與中位數，哪個比較能代表「一般人」的薪水？', options: ['中位數 36000', '平均 78200', '兩者一樣'], answer: 0 },
+          output: '78200\n36000\n[33500.0, 36000.0, 144000.0]',
+        } },
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'mean', label: '用平均' }, { id: 'median', label: '用中位數' }],
+          items: [
+            { text: '員工薪資（有少數高薪主管）', answer: 'median', why: '極端值會把平均拉高。' },
+            { text: '一批零件的平均重量（分布很集中）', answer: 'mean', why: '沒有極端值時平均很好用。' },
+            { text: '網頁載入時間（偶爾有幾秒的離群值）', answer: 'median', why: '也常看 p95、p99 分位數。' },
+            { text: '班上考試的平均分數', answer: 'mean', why: '慣例使用平均，也可以另外看分布。' },
+          ],
+        } },
+        { type: 'svg', svg: Fig.vs('平均與中位數：薪資 32000 到 38000 加上一個 250000，平均被拉到 78200，中位數仍是 36000', { title: '平均 mean', lines: ['78,200', '被極端值拉高'], tone: 5 }, { title: '中位數 median', lines: ['36,000', '不受極端值影響'], tone: 4 }), caption: '報告數字時，同時看平均、中位數與分布。' },
+      ],
+      tryit: {
+        q: ['把每個城市的平均金額寫進新的 CSV：'],
+        draft: 'with open("report.csv", "w", encoding="utf-8", newline="") as f:\n    w = csv.____(f, fieldnames=["city", "avg"])\n    w.writeheader()\n    for city, amounts in by_city.items():\n        w.____({"city": city, "avg": round(statistics.mean(amounts))})',
+        answer: ['`csv.DictWriter`、`w.writerow(...)`。', '要讓 Excel 正確顯示中文，可以用 `encoding="utf-8-sig"`（加上 BOM）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `line.split(",")` 解析 CSV。', why: '欄位裡有逗號或換行就切錯。', right: 'csv 模組。' },
+      { wrong: '開 CSV 檔沒加 `newline=""`。', why: 'Windows 上寫入時每行之間多出空行。', right: '`open(p, "w", encoding="utf-8", newline="")`。' },
+      { wrong: '只報告平均值。', why: '少數極端值讓平均失去代表性。', right: '同時看中位數與分位數。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '`csv.DictReader` 讀出的 "amount" 欄位是什麼型別？', options: [
+        { text: '`str`', correct: true, why: 'CSV 沒有型別，全部是字串，要自己轉。' },
+        { text: '`float`', why: '不會自動轉型。' },
+        { text: '`int`', why: '不會自動轉型。' },
+        { text: '依內容自動判斷', why: 'csv 模組不做型別推斷。' },
+      ] },
+      { level: '應用', type: 'mc', q: '`statistics.median([5, 1, 3, 2])` 是？', options: [
+        { text: '`2.5`', correct: true, why: '排序後 [1, 2, 3, 5]，中間兩個的平均。' },
+        { text: '`3`', why: '偶數個時取中間兩個的平均。' },
+        { text: '`2`', why: '同上。' },
+        { text: '`2.75`', why: '那是平均。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['老闆要你每週一早上自動產生上週的銷售報表 CSV。把整門課學過的東西串起來，你會怎麼設計這個工具？'], answer: [
+        '用 uv 建專案（5-1）；argparse 接收輸入檔與週次（5-5）；pathlib 處理路徑、明確 UTF-8（5-2）；用 zoneinfo 計算台北時間的上週範圍（6-2）；csv 讀資料、跳過壞列並記錄（3-4、6-4）；defaultdict 分組、statistics 計算（6-3、6-4）。',
+        '把每個步驟寫成有型別提示的小函式（4-3），用 pytest 測試統計邏輯（5-3）；失敗時寫 stderr 並回傳非 0（5-5），交給排程系統執行。',
+      ] },
+    ],
+    keypoints: [
+      'CSV 一律用 csv 模組，開檔加 `newline=""`，值都是字串要自己轉。',
+      'statistics：平均、中位數、分位數一起看。',
+      '讀 → 清理 → 分組 → 統計 → 輸出，是大部分資料任務的骨架。',
+    ],
+    sources: ['py-csv', 'py-statistics'],
+  },
+});
+</script>
