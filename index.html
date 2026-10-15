@@ -525,6 +525,13 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
   48% { background-color: rgba(50, 30, 8, 0.14); }
   62%, 100% { background-color: rgba(50, 30, 8, 0); }
 }
+/* 每頁的 --d 延遲期間也要停在第一格：沒有 fill 時 transform 是 none，頁面沒墊高到 --t，
+   會陷進書頁塊裡，剛開瀏覽器的前 0.5 秒看起來像破圖 */
+.lb-page, .lb-page .s .s, .lb-page .s::after { animation-fill-mode: both; }
+/* 剛開頁時主執行緒還在忙，動畫會掉格；先停在第一格（完整闔起的書），瀏覽器畫出兩格後才開始翻 */
+.lb-book:not(.is-ready) .lb-page,
+.lb-book:not(.is-ready) .lb-page .s .s,
+.lb-book:not(.is-ready) .lb-page .s::after { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .lb-page, .lb-page .s .s, .lb-page .s::after { animation: none; }
 }
@@ -616,6 +623,12 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
           </div>
         </div>
       </div>
+      <script>
+        // 兩次 requestAnimationFrame：確定瀏覽器已經畫出載入動畫的第一格，再開始翻頁
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          document.querySelector('.lb-book')?.classList.add('is-ready');
+        }));
+      </script>
       <div id="rows"></div>
       <div class="book-card" id="book-card" aria-live="polite"></div>
   </div>
@@ -1425,7 +1438,7 @@ function frame(now) {
     }
   });
   frameHooks.forEach((hook) => { if (hook(dt)) active = true; });
-  if (shelf) shelf.render();
+  if (shelf && isShelfWarm) shelf.render();
   if (stage) stage.render();
   if (active) kick();
   else lastFrame = 0;
@@ -2544,6 +2557,8 @@ function environmentTexture(renderer) {
 /* ---------- 3D 書櫃 ---------- */
 const FRAME = { cap: 14, side: 12 }; // 鋁框：上方燈槽高度、左右立柱寬度（畫面 px）
 let shelf = null;
+// warmUp 完成前不畫 3D：其他動畫先觸發 frame() 的話，第一次 render 會同步編譯 shader，卡住載入動畫
+let isShelfWarm = false;
 
 const CASE_THEME = {
   // 書櫃的材質參考 Apple Store 的陳列架：霧面牆、陽極鋁框、淺橡木層板、上方內嵌的暖白燈條
@@ -3102,6 +3117,33 @@ function createShelf() {
       return book;
     },
     render() { if (layout) renderer.render(scene, camera); },
+    /** 載入動畫還在播時先上傳貼圖、編譯 shader、畫第一格：否則第一次 render 一次做完，主執行緒與 GPU 卡住約 1 秒，載入動畫跟著掉格 */
+    async warmUp() {
+      if (!layout) return;
+      // 貼圖分段上傳到 GPU，每段最多 UPLOAD_BUDGET_MS 就讓出一次；一次全部上傳會讓 GPU 忙超過 1 秒，CSS 動畫也跟著停
+      const textures = new Set();
+      scene.traverse((obj) => {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach((mat) => {
+          if (!mat) return;
+          Object.values(mat).forEach((v) => { if (v && v.isTexture) textures.add(v); });
+        });
+      });
+      // 一張一張讓出太慢（118 張要 1.8 秒），所以用時間預算分段
+      const UPLOAD_BUDGET_MS = 10;
+      const yieldFrame = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+      let sliceStart = performance.now();
+      for (const tex of textures) {
+        renderer.initTexture(tex);
+        if (performance.now() - sliceStart > UPLOAD_BUDGET_MS) {
+          await yieldFrame();
+          sliceStart = performance.now();
+        }
+      }
+      // compileAsync 在支援 KHR_parallel_shader_compile 的瀏覽器會在背景編譯，不卡主執行緒
+      if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
+      renderer.render(scene, camera);
+    },
   };
 }
 
@@ -3497,6 +3539,15 @@ async function start3d() {
     pageEdgeY = canvasTexture(pageEdgeCanvas(false));
     shelf = createShelf();
     shelf.build();
+    // 最多等 WARMUP_WAIT_MS：瀏覽器不支援平行編譯或分頁在背景（requestAnimationFrame 不跑）時，載入畫面也不會卡住
+    const WARMUP_WAIT_MS = 4000;
+    const nextPaint = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await Promise.race([
+      shelf.warmUp().then(nextPaint).catch((err) => console.warn('3D 書櫃預先編譯失敗，改成第一次顯示時再編譯：', err)),
+      new Promise((resolve) => window.setTimeout(resolve, WARMUP_WAIT_MS)),
+    ]);
+    isShelfWarm = true;
+    kick();
   } catch (err) {
     console.warn('three.js 書櫃無法啟動，改用簡易書背：', err);
     shelf = null;
