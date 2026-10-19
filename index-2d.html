@@ -586,6 +586,21 @@ main { flex: 1; display: flex; flex-direction: column; justify-content: center; 
 <script>
 const SITES = [
   {
+    id: 'adhd-planning',
+    color: '#7a3048',
+    icon: 'play',
+    href: 'course-web/adhd-planning-course/index.html',
+    spineTitle: 'ADHD 規劃與啟動',
+    titlePhrases: ['先動起來', 'ADHD 的規劃', '與啟動系統'],
+    desc: '依據成人 ADHD 的認知行為治療研究：把第一步縮小、如果…就…計畫、看得見的時間、專案拆解、每週回顧、和 AI 協作。一課練一招，每課都有「今天就用」。',
+    modules: 9,
+    lessons: 29,
+    readyLessons: 29,
+    updated: '2026-10',
+    height: 0.9,
+    progressKey: 'adhd-planning-course.v1',
+  },
+  {
     id: 'react',
     color: '#1e5257',
     icon: 'atom',
@@ -754,6 +769,19 @@ const SITES = [
     height: 0.88,
     progressKey: 'the-great-gatsby.v1',
   },
+  {
+    id: 'papaya',
+    external: true,
+    color: '#7d4524',
+    icon: 'play',
+    href: 'https://www.youtube.com/@papayaclass',
+    spineTitle: 'PAPAYA 電腦教室',
+    titlePhrases: ['PAPAYA', '電腦教室'],
+    desc: 'YouTube 頻道：電腦軟體與工具的實用教學影片。',
+    spineWidth: 58,
+    updated: '2026-10',
+    height: 0.96,
+  },
 ];
 
 const THEME_KEY = 'vibe-coding-home.theme.v1';
@@ -773,6 +801,7 @@ const ICONS = {
   snake: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 4H10a3 3 0 0 0-3 3v3h7a3 3 0 0 1 3 3v4a3 3 0 0 1-3 3H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="7" r="1" fill="currentColor"/></svg>',
   hash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 7 20M17 4l-2 16M4.5 9h15M3.5 15h15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   braces: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4C6.5 4 6 5 6 6.5v3C6 11 5 12 3.5 12 5 12 6 13 6 14.5v3C6 19 6.5 20 8.5 20M15.5 4c2 0 2.5 1 2.5 2.5v3c0 1.5 1 2.5 2.5 2.5-1.5 0-2.5 1-2.5 2.5v3c0 1.5-.5 2.5-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 9.2v5.6l4.8-2.8Z" fill="currentColor"/></svg>',
   book: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 6.5 4.5 3 5v13.5c3.5-.5 7 0 9 1.5 2-1.5 5.5-2 9-1.5V5c-3.5-.5-7 0-9 1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.5V20" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
   steps: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h4v-4h4v-4h4V8h4V4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M3 20h18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
   terminal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 9.5 9.5 12l-3 2.5M11.5 15h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -808,8 +837,8 @@ function phrasesHtml(phrases) {
 
 function siteStats(site) {
   return {
-    done: Math.min(readDoneCount(site.progressKey), site.lessons),
-    isComplete: site.readyLessons >= site.lessons,
+    done: site.external ? 0 : Math.min(readDoneCount(site.progressKey), site.lessons),
+    isComplete: site.external || site.readyLessons >= site.lessons,
   };
 }
 
@@ -824,7 +853,7 @@ const unitOf = (site) => (site.kind === 'book' ? site.unit : '課');
 
 function spineHtml(site) {
   const { done, isComplete } = siteStats(site);
-  const foot = isComplete ? `${site.lessons} ${unitOf(site)}` : `${site.readyLessons}/${site.lessons}`;
+  const foot = site.external ? 'YouTube' : (isComplete ? `${site.lessons} ${unitOf(site)}` : `${site.readyLessons}/${site.lessons}`);
   return `
     <span class="spine">
       <span class="band"></span>
@@ -832,19 +861,19 @@ function spineHtml(site) {
       <span class="spine-label"><span class="spine-title">${escapeHtml(site.spineTitle)}</span></span>
       <span class="spine-foot">${foot}</span>
       <span class="band"></span>
-      <span class="spine-progress" aria-hidden="true"><span style="--ratio:${done / site.lessons}"></span></span>
+      <span class="spine-progress" aria-hidden="true"><span style="--ratio:${site.external ? 0 : done / site.lessons}"></span></span>
     </span>`;
 }
 
 function renderBook(site) {
   const { done } = siteStats(site);
-  const width = Math.round(SPINE_BASE_WIDTH + site.lessons * SPINE_WIDTH_PER_LESSON);
+  const width = site.spineWidth || Math.round(SPINE_BASE_WIDTH + site.lessons * SPINE_WIDTH_PER_LESSON);
   const fullTitle = site.titlePhrases.join(' ');
   return `
     <li>
       <a class="book" href="${escapeHtml(site.href)}" data-id="${site.id}"
          style="--accent:${site.color};--w:${width}px;--h:${site.height}"
-         aria-label="${escapeHtml(fullTitle)}，${site.lessons} ${site.kind === 'book' ? site.unit : '個單元'}，已讀 ${done} ${site.kind === 'book' ? site.unit : '個'}">
+         aria-label="${escapeHtml(site.external ? `${fullTitle}，YouTube 頻道（外部連結）` : `${fullTitle}，${site.lessons} ${site.kind === 'book' ? site.unit : '個單元'}，已讀 ${done} ${site.kind === 'book' ? site.unit : '個'}`)}">
         <span class="book-contact" aria-hidden="true"></span>
         ${spineHtml(site)}
       </a>
@@ -893,7 +922,7 @@ function renderShelf() {
   fitShelfWidth();
   fitSpineTitles();
   // 單元數與已讀只算課程；書的「回」單位不同，不混進來
-  const courses = SITES.filter((s) => s.kind !== 'book');
+  const courses = SITES.filter((s) => !s.external && s.kind !== 'book');
   const totalLessons = courses.reduce((sum, s) => sum + s.lessons, 0);
   const totalDone = courses.reduce((sum, s) => sum + siteStats(s).done, 0);
   document.getElementById('shelf-summary').textContent = `${SITES.length} 本 · ${totalLessons} 單元 · 已讀 ${totalDone}`;
@@ -908,6 +937,19 @@ function inspectorHtml(site) {
   if (!site) {
     const hint = window.matchMedia('(hover: hover)').matches ? '游標停在書背上看介紹，點一下打開。' : '點一下書背打開。';
     return `<p class="hint">${hint}</p>`;
+  }
+  if (site.external) {
+    return `
+    <div>
+      <h2>${phrasesHtml(site.titlePhrases)}</h2>
+      <p>${escapeHtml(site.desc)}</p>
+    </div>
+    <dl>
+      <dt>連結</dt><dd>${escapeHtml(site.href.replace('https://', ''))}</dd>
+      <dt>內容</dt><dd>YouTube 影音頻道</dd>
+      <dt>狀態</dt><dd>外部連結</dd>
+      <dt>查證</dt><dd>${escapeHtml(site.updated)}</dd>
+    </dl>`;
   }
   const { done, isComplete } = siteStats(site);
   const status = isComplete ? '已完成' : `製作中，${site.readyLessons} 個單元可讀`;
@@ -978,11 +1020,11 @@ function book3dHtml(site, spineRect) {
     </div>
     <div class="b3-leaf">
       <div class="b3 leaf-front paper gutter-left"><div><strong>${phrasesHtml(site.titlePhrases)}</strong><span>Vibe Coding</span></div></div>
-      <div class="b3 leaf-back paper gutter-right"><div><span>${site.kind === 'book' ? `全書 ${site.lessons} ${site.unit}` : `${site.modules} 模組 · ${site.lessons} 單元`}</span><span class="stamp">已讀 ${done} / ${site.lessons}</span></div></div>
+      <div class="b3 leaf-back paper gutter-right"><div><span>${site.external ? 'YouTube 影音頻道' : site.kind === 'book' ? `全書 ${site.lessons} ${site.unit}` : `${site.modules} 模組 · ${site.lessons} 單元`}</span><span class="stamp">${site.external ? '外部連結' : `已讀 ${done} / ${site.lessons}`}</span></div></div>
     </div>
     <div class="b3-cover">
       <div class="b3 cover-front cloth">
-        <div class="cover-head">${ICONS[site.icon]}<small>${site.lessons} ${site.kind === 'book' ? site.unit : '單元'}</small></div>
+        <div class="cover-head">${ICONS[site.icon]}<small>${site.external ? 'YouTube' : `${site.lessons} ${site.kind === 'book' ? site.unit : '單元'}`}</small></div>
         <div><h3>${phrasesHtml(site.titlePhrases)}</h3><small>VIBE CODING · ${escapeHtml(site.updated)}</small></div>
         
       </div>
@@ -1042,7 +1084,7 @@ async function openBook(book, site) {
     <div class="book3d" style="--accent:${site.color};--W:${W}px;--H:${H}px;--D:${D}px;--spine-scale:${H / spineRect.height}">${book3dHtml(site, spineRect)}</div>
     <span class="stage-skip">點一下直接打開</span>`;
   document.body.append(stage);
-  stage.addEventListener('click', () => { window.location.href = book.href; });
+  stage.addEventListener('click', () => goTo(book.href, site));
 
   const book3d = stage.querySelector('.book3d');
   stage.querySelector('.b3-spine .spine-title').style.fontSize = book.querySelector('.spine-title').style.fontSize;
@@ -1090,8 +1132,28 @@ async function openBook(book, site) {
 
   // 4. 讀取條跑完就跳轉
   await q('.bar span').animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 450, easing: EASE_OUT, fill: 'forwards' }).finished;
-  window.location.href = book.href;
+  goTo(book.href, site);
 }
+
+/* 跳轉集中在這裡：外部連結在手機上常會交給 App（例如 YouTube），原頁面不會卸載、會停在翻開的書。
+   記下「正在跳轉」，回到這一頁（重新可見）或外部連結幾秒後仍停在這裡，就收回書櫃（和 3D 版 index.html 相同） */
+let pendingNav = null;
+const EXTERNAL_RESET_MS = 3500;
+function goTo(href, site) {
+  pendingNav = { href, at: Date.now() };
+  if (site && site.external) {
+    window.setTimeout(() => { if (pendingNav && document.visibilityState === 'visible') backToShelf(); }, EXTERNAL_RESET_MS);
+  }
+  window.location.href = href;
+}
+function backToShelf() {
+  pendingNav = null;
+  resetOpening();
+  renderShelf();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && pendingNav) backToShelf();
+});
 
 function resetOpening() {
   document.querySelectorAll('.stage').forEach((stage) => stage.remove());
@@ -1112,7 +1174,7 @@ function setupOpening() {
     if (isOpening) return;
     openBook(book, site).catch((err) => {
       console.warn(`開書動畫失敗，直接前往「${book.href}」：`, err);
-      window.location.href = book.href;
+      goTo(book.href, site);
     });
   });
 }
