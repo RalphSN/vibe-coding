@@ -1,0 +1,111 @@
+/* ==========================================================================
+   ADHD 規劃課程專用互動元件
+   ========================================================================== */
+@keyframes tw-out { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.brand .play { display: inline-grid; place-items: center; width: 1.4em; height: 1.4em; margin-right: .35em; font-size: .8em; color: var(--on-color); background: var(--primary); border: 2px solid var(--ink); }
+
+/* ---------- 共用：元件外框與控制列 ---------- */
+.jw { display: grid; gap: var(--sp-3); padding: var(--sp-4); border: var(--bw-lg) solid var(--ink); background: var(--surface); box-shadow: var(--shadow-off) var(--shadow-off) 0 var(--ink); min-width: 0; }
+.jw > * { min-width: 0; }
+.jw-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-family: var(--font-ui); font-weight: 700; font-size: var(--fs-small); }
+.jw-head .grow { flex: 1; min-width: 0; }
+.jw-note { margin: 0; font-size: var(--fs-small); line-height: 1.7; }
+.jw-note:empty { display: none; }
+.tw-controls { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.jw-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.jw .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.mono { font-family: var(--font-mono); }
+
+/* ---------- classify ---------- */
+.cls { display: grid; gap: var(--sp-3); }
+.cls-head { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; justify-content: space-between; font-family: var(--font-ui); font-weight: 700; font-size: var(--fs-small); }
+.cls-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.cls-item { margin: 0; display: grid; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border: var(--bw-sm) solid var(--ink); background: var(--surface); transition: background-color var(--dur-comp), color var(--dur-comp); }
+.cls-item > * { min-width: 0; }
+.cls-item.is-right { background: var(--success); color: var(--on-color); }
+.cls-item.is-wrong { background: var(--danger-soft); color: var(--on-color); }
+.cls-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.cls-btns .btn { white-space: normal; text-align: left; }
+.cls-fb:empty { display: none; }
+.cls-fb { line-height: 1.7; animation: tw-out var(--dur-comp) var(--ease-mech) both; }
+
+
+/* ---------- 首頁 ---------- */
+.hero-grid { display: grid; gap: var(--sp-6); }
+@media (min-width: 1000px) { .hero-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: center; } }
+.three-q { display: grid; gap: var(--sp-2); margin: 0; padding-left: 1.4em; }
+
+
+/* 圖片放大（只在手機寬度顯示按鈕） */
+.figure { position: relative; }
+.fig-zoom { display: none; margin-top: var(--sp-3); }
+@media (max-width: 767px) { .fig-zoom { display: inline-flex; } }
+.fig-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; background: var(--bg); color: var(--ink); }
+.fig-dialog::backdrop { background: rgba(0, 0, 0, .6); }
+.fig-dialog-bar { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); background: var(--surface); border-bottom: var(--bw-lg) solid var(--ink); }
+.fig-dialog-hint { font-size: var(--fs-small); color: var(--ink-muted); }
+.fig-dialog-body { overflow: auto; height: calc(100dvh - 4rem); padding: var(--sp-4); }
+.fig-dialog-figure { display: inline-block; box-shadow: none; }
+.fig-dialog-figure svg { display: block; height: auto; }
+
+/* ---------- 共用：輸入框與欄位 ---------- */
+.jw label { font-weight: 700; font-size: var(--fs-small); }
+.fb-input { width: 100%; min-width: 0; padding: var(--sp-2) var(--sp-3); font: inherit; color: var(--ink); background: var(--bg); border: var(--bw-sm) solid var(--ink); border-radius: 0; }
+.fb-input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- stuckcheck ---------- */
+.sc-q { margin: 0; font-weight: 700; }
+.sc-result { margin: 0; }
+.sc-links a { white-space: nowrap; }
+
+/* ---------- levers ---------- */
+.lv-sliders { display: grid; gap: var(--sp-3); }
+.lv-row { display: grid; gap: var(--sp-1); }
+.lv-row input[type="range"] { width: 100%; accent-color: var(--ink); }
+.lv-ends { display: flex; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-label); color: var(--ink-muted); font-weight: 500; }
+.lv-meter { height: 28px; border: var(--bw-sm) solid var(--ink); background: var(--bg); overflow: hidden; }
+.lv-fill { display: block; height: 100%; background: var(--m0); transform-origin: left center; transition: transform var(--dur-comp) var(--ease-mech); }
+.lv-out { margin: 0; }
+
+/* ---------- shrinker ---------- */
+.sh-q { font-weight: 700; }
+.sh-ladder { margin: 0; padding-left: 1.4em; display: grid; gap: var(--sp-1); }
+.sh-ladder:empty { display: none; }
+.sh-ladder li:last-child { font-weight: 700; }
+
+/* ---------- ifthen ---------- */
+.it-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-1); font-size: var(--fs-small); }
+.it-checks .ok { color: var(--ink); }
+.it-checks .no { color: var(--ink-muted); }
+.it-preview { margin: 0; padding: var(--sp-3); border: var(--bw-sm) dashed var(--ink); }
+.it-preview:empty { display: none; }
+
+/* ---------- timebox（時間真的在流逝，長條用 transform 縮小） ---------- */
+.tb-track { height: 40px; border: var(--bw-lg) solid var(--ink); background: var(--bg); overflow: hidden; }
+.tb-fill { display: block; height: 100%; background: var(--m2); transform-origin: left center; transform: scaleX(1); transition: transform 250ms linear; }
+.tb-time { margin: 0; font-family: var(--font-mono); font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---------- estimator ---------- */
+.es-form { display: grid; gap: var(--sp-2); }
+@media (min-width: 640px) { .es-form { grid-template-columns: max-content minmax(0, 1fr); align-items: center; } }
+.es-ratio { margin: 0; }
+.es-list { margin: 0; padding-left: 1.4em; display: grid; gap: var(--sp-2); font-size: var(--fs-small); }
+.es-list:empty { display: none; }
+
+/* ---------- breakdown ---------- */
+.bd-tree { display: grid; gap: var(--sp-3); }
+.bd-ms { display: grid; gap: var(--sp-2); padding: var(--sp-3); border: var(--bw-sm) solid var(--ink); }
+.bd-ms ul { list-style: none; margin: 0; padding: 0 0 0 var(--sp-4); border-left: var(--bw-sm) solid var(--ink); display: grid; gap: var(--sp-2); }
+.bd-ms label { display: grid; gap: var(--sp-1); }
+
+/* ---------- promptkit ---------- */
+.pk-out { margin: 0; padding: var(--sp-3); white-space: pre-wrap; font-family: var(--font-mono); font-size: var(--fs-small); line-height: 1.7; background: var(--bg); border: var(--bw-sm) solid var(--ink); }
+
+/* ---------- 我的系統 ---------- */
+.sys-sec { margin-top: var(--sp-6); }
+.sys-list { display: grid; gap: var(--sp-2); padding-left: 1.2em; }
+.sys-empty { color: var(--ink-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-fill, .tb-fill { transition: none; }
+}

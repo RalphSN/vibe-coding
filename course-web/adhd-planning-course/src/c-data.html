@@ -1,0 +1,110 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: '先動起來：ADHD 的規劃與啟動系統',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-19',
+  version: 'v1',
+};
+
+const COURSES = [
+  { id: 0, title: '為什麼|不是你懶', short: '起點', desc: '卡住的不是知識而是時機；拖延是一道可以調的算式；這門課怎麼用、什麼時候找專業協助。', lessons: [
+    ['0-1', 'ADHD 卡住的|不是知識，是時機'],
+    ['0-2', '想不想做|是一道算式'],
+    ['0-3', '這門課|怎麼用最有效'],
+  ]},
+  { id: 1, title: '開始|動手', short: '啟動', desc: '把第一步縮到有點蠢、用「如果…就…」讓情境替你按開始、降低開始的摩擦、先動再等動機。', lessons: [
+    ['1-1', '第一步|要小到有點蠢'],
+    ['1-2', '如果…就…：|讓情境替你按開始'],
+    ['1-3', '把門打開：|降低開始的摩擦'],
+    ['1-4', '先動，|動機才會來'],
+  ]},
+  { id: 2, title: '讓時間|看得見', short: '時間', desc: '為什麼時間總是不夠；把時間放在看得見的地方；算出你自己的估時校正倍數。', lessons: [
+    ['2-1', '時間|為什麼總是不夠'],
+    ['2-2', '把時間|放在外面'],
+    ['2-3', '你的|估時校正倍數'],
+  ]},
+  { id: 3, title: '把模糊|拆成下一步', short: '拆解', desc: '「下一步」長什麼樣子；專案拆成三層；請 AI 幫你拆任務。', lessons: [
+    ['3-1', '「下一步」|長什麼樣子'],
+    ['3-2', '專案|拆成三層'],
+    ['3-3', '請 AI|幫你拆任務'],
+  ]},
+  { id: 4, title: '規劃|一天與一週', short: '規劃', desc: '一個收件匣把腦袋清空；每天只選三件；每週回顧讓系統活下來；先想好計畫會遇到的障礙。', lessons: [
+    ['4-1', '一個收件匣：|把腦袋清空'],
+    ['4-2', '每天|只選三件'],
+    ['4-3', '每週回顧：|讓系統活下來'],
+    ['4-4', '計畫|遇到現實'],
+  ]},
+  { id: 5, title: '做到一半，|回得來', short: '回來', desc: '分心時停一下的檢查點；離開前留下麵包屑；事先寫好「做完」的定義。', lessons: [
+    ['5-1', '停一下：|我現在在做什麼？'],
+    ['5-2', '留麵包屑：|中斷後接得回去'],
+    ['5-3', '做完|的定義'],
+  ]},
+  { id: 6, title: '情緒也是|任務的一部分', short: '情緒', desc: '討厭感與逃避循環；把「我很爛」改寫成「系統漏接」；大到嚇人的任務怎麼開始。', lessons: [
+    ['6-1', '討厭感|與逃避循環'],
+    ['6-2', '從「我很爛」|到「系統漏接」'],
+    ['6-3', '大到嚇人|的任務'],
+  ]},
+  { id: 7, title: '職場|與 AI 時代', short: '職場', desc: '會議後 5 分鐘讓待辦落地；專案啟動的第一天；把 AI 當外部執行功能，而不是替代品。', lessons: [
+    ['7-1', '會議後 5 分鐘：|讓待辦落地'],
+    ['7-2', '專案啟動|的第一天'],
+    ['7-3', 'AI 是外部執行功能，|不是替代品'],
+  ]},
+  { id: 8, title: '我的|系統', short: '系統', desc: '把各課做出來的東西組成一套系統並跑一週；卡住急救卡；20 題總複習。', lessons: [
+    ['8-1', '期末實作：|組裝你的系統'],
+    ['8-2', '卡住|急救卡'],
+    ['8-3', '總複習|測驗'],
+  ]},
+];
+
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>
