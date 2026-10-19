@@ -1,0 +1,372 @@
+<script>
+/* ==========================================================================
+   模組 6：情緒也是任務的一部分
+   ========================================================================== */
+defineTerms({
+  '逃避循環': { en: 'avoidance cycle', def: '碰到不舒服的任務 → 逃開，暫時鬆一口氣 → 任務還在、還更接近截止日 → 下次更不舒服、更想逃。', example: '報稅越拖越可怕，越可怕越拖。' },
+  '任務厭惡感': { en: 'task aversiveness', def: '一件事讓人不舒服、無聊或焦慮的程度；拖延最穩定的預測因子之一。', example: '一想到要打電話給客訴的客戶，胃就揪起來。' },
+  '認知重建': { en: 'cognitive restructuring', def: '認知行為治療的技巧：找出讓自己卡住的想法，換成同樣真實、但比較能行動的說法。', example: '「我又搞砸了」→「這次是沒有留麵包屑，下次離開前留三行」。' },
+  '系統漏接': { en: 'system gap', def: '這門課的說法：把「我做不到」看成「流程裡哪一環沒有接住」，問題就變成可以修的東西。', example: '忘了開會不是「我很糟」，是「會議前沒有提醒」。' },
+});
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '看懂逃避循環怎麼讓事情越拖越難',
+      '找出一件事讓你討厭的真正原因',
+      '用一個小動作打斷循環',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 5-3）簡報已經符合完成的定義，但還想再改。最好？', options: [
+        { text: '寄出，想法記進收件匣', correct: true, why: '符合定義就收尾。' },
+        { text: '再改一晚上，比較安心', why: '這是無限修改。' },
+        { text: '先不寄，等有空再修', why: '事情會繼續掛著。' },
+        { text: '重新定義一個更高的標準再做', why: '一直提高標準就沒有終點。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-2）拖延最穩定的預測因子不包括哪一個？', options: [
+        { text: '任務在一天中的哪個時段', correct: true, why: 'Steel（2007）的穩定預測因子是厭惡感、延遲、自我效能、衝動性。' },
+        { text: '任務讓人覺得討厭、不舒服的程度', why: '這是最穩定的預測因子之一。' },
+        { text: '自我效能', why: '這是穩定的預測因子之一。' },
+        { text: '衝動性', why: '這是穩定的預測因子之一。' },
+      ] },
+    ],
+    analogy: {
+      text: ['牙痛時不去看牙醫，今天確實不用面對鑽牙的聲音；但牙齒不會自己好，下次痛起來更嚴重，看牙醫也更可怕。[[逃避循環]]就是這樣：每次逃開都讓下一次更難。'],
+      limit: ['牙齒的問題是身體的；任務的不舒服常常一半來自想像。很多事真的開始後，沒有想像中那麼糟，這也是 1-4「先動」有效的原因之一。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="逃避循環四步：碰到不舒服的任務，逃開去做別的，暫時鬆一口氣，但任務還在而且更接近截止日，下次更不舒服；箭頭繞回第一步">
+        <rect x="10" y="10" width="250" height="100" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="52" text-anchor="middle" font-size="16" font-weight="900" class="on-color">① 碰到討厭的任務</text>
+        <text x="135" y="84" text-anchor="middle" font-size="14" class="on-color">胃揪起來</text>
+        <rect x="300" y="10" width="250" height="100" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="425" y="52" text-anchor="middle" font-size="16" font-weight="900">② 逃開</text>
+        <text x="425" y="84" text-anchor="middle" font-size="14">去回信、滑手機</text>
+        <rect x="300" y="150" width="250" height="100" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="425" y="192" text-anchor="middle" font-size="16" font-weight="900" class="on-color">③ 暫時鬆一口氣</text>
+        <text x="425" y="224" text-anchor="middle" font-size="14" class="on-color">逃開被「獎勵」了</text>
+        <rect x="10" y="150" width="250" height="100" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
+        <text x="135" y="192" text-anchor="middle" font-size="16" font-weight="900" class="on-color">④ 任務還在、更急</text>
+        <text x="135" y="224" text-anchor="middle" font-size="14" class="on-color">下次更不舒服</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M260 60 H300 M425 110 V150 M300 200 H260 M135 150 V110"/></g>
+      </svg>`,
+      caption: '第 ③ 步是關鍵：逃開讓人立刻舒服，所以大腦會一直想再逃。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究支持（拖延）／研究有限（羞愧循環）', body: ['[[任務厭惡感]]是拖延最穩定的預測因子之一（Steel 2007）；ADHD 症狀也和厭惡感、拖延相關（2023，相關研究）。「逃避 → 罪惡感 → 更想逃」的循環常被臨床文章描述，但直接驗證的研究還少。'] },
+        '打斷循環的地方通常在第 ① 步：不是靠意志力撐過去，而是**讓任務變得沒那麼討厭**。先找出討厭的到底是什麼。',
+      ],
+    },
+    define: [
+      { term: '逃避循環', en: 'avoidance cycle', def: '逃開 → 暫時鬆一口氣 → 任務更急 → 更想逃。', example: '越拖越可怕的報稅。' },
+      { term: '任務厭惡感', en: 'task aversiveness', def: '任務讓人不舒服的程度。', example: '無聊、怕被批評、不知道怎麼做。' },
+      { term: '厭惡感的來源', en: 'source of aversion', def: '討厭的真正原因：無聊、焦慮、不確定、怕失敗、身體不舒服。', example: '其實不是討厭報帳，是討厭找發票。' },
+    ],
+    examples: {
+      compare: [{
+        title: '拖了兩週沒回的 email',
+        kind: '硬撐 vs. 找出討厭的原因',
+        badLabel: '硬撐',
+        goodLabel: '找出原因，針對它',
+        bad: '「{{1:我今天一定要回}}！」然後又打開別的分頁。',
+        good: '「我怕的是{{1:對方會不高興}}。先寫一句道歉加一個時間點，其他明天補。」',
+        badResult: '討厭的感覺沒變，又多拖一天，下次更難寫。',
+        goodResult: '針對真正的焦慮處理，信變得寫得出來。',
+        why: ['先知道討厭什麼，才能讓它沒那麼討厭'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="厭惡感的五種來源和對策：無聊配回饋或陪伴；焦慮先處理最怕的那一點；不確定先找資訊；怕失敗先做草稿版；身體累先休息再做五分鐘">
+          <rect x="10" y="10" width="100" height="200" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="60" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">無聊</text>
+          <text x="60" y="120" text-anchor="middle" font-size="13" class="on-color">配回饋</text>
+          <rect x="120" y="10" width="100" height="200" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="170" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">焦慮</text>
+          <text x="170" y="120" text-anchor="middle" font-size="13" class="on-color">先處理最怕的</text>
+          <rect x="230" y="10" width="100" height="200" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">不確定</text>
+          <text x="280" y="120" text-anchor="middle" font-size="13" class="on-color">先找資訊</text>
+          <rect x="340" y="10" width="100" height="200" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="390" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">怕失敗</text>
+          <text x="390" y="120" text-anchor="middle" font-size="13" class="on-color">先做草稿版</text>
+          <rect x="450" y="10" width="100" height="200" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="500" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">很累</text>
+          <text x="500" y="120" text-anchor="middle" font-size="13" class="on-color">休息後試 5 分</text>
+        </svg>`, caption: '不同的討厭，要不同的對策。' },
+        { type: 'widget', name: 'levers', props: { start: { e: 5, v: 5, i: 6, d: 3 } } },
+      ],
+      tryit: {
+        q: ['挑一件你在逃的事，寫下它真正讓你討厭的是什麼，以及對應的一個小動作：'],
+        draft: '在逃的事：＿＿＿＿\n真正討厭的是：＿＿＿＿（無聊／焦慮／不確定／怕失敗／很累）\n對應的小動作：＿＿＿＿',
+        answer: ['例如：「報稅」；討厭的是「不確定要準備哪些文件」；小動作「打開國稅局網站，找到今年的申報說明，讀 5 分鐘」。', '對策要針對來源：不確定就先找資訊，不需要先「下定決心」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用「我今天一定要」對抗討厭的感覺。', why: '感覺沒有改變，壓力反而讓任務更討厭。', right: '先找出討厭的來源，針對它做一個小調整。' },
+      { wrong: '覺得逃開是「懶」或「沒用」。', why: '逃開是對不舒服的正常反應，責怪只會讓不舒服更多。', right: '把它看成循環的一部分，從第 ① 步打斷。' },
+      { wrong: '只用一招對付所有討厭的事。', why: '無聊和焦慮需要的對策完全不同。', right: '先分類，再選對策。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '逃避循環裡，讓大腦一直想再逃的是哪一步？', options: [
+        { text: '逃開後暫時鬆一口氣', correct: true, why: '立刻的舒服感就像獎勵。' },
+        { text: '碰到討厭的任務', why: '這是循環的起點，不是增強的那一步。' },
+        { text: '任務離截止日越來越近、變得更急', why: '這讓下次更難，但不是「想再逃」的原因。' },
+        { text: '截止日到了', why: '截止日到了通常會被迫面對。' },
+      ] },
+      { level: '應用', type: 'mc', q: '小林一直不敢打電話給客訴的客戶，因為怕被罵。最對症的小動作是？', options: [
+        { text: '先寫下第一句要說的話和要提供的方案', correct: true, why: '針對焦慮：先處理最怕的那一點（不知道怎麼回應）。' },
+        { text: '戴上耳機邊聽音樂邊打', why: '這比較適合無聊型的任務。' },
+        { text: '告訴自己一定要撐過去，打完就可以休息一整個下午', why: '感覺沒有改變。' },
+        { text: '先把其他所有事做完再打', why: '這就是逃避循環。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你一直拖著不更新履歷，已經三個月。分析可能的厭惡感來源（至少兩個），並各配一個對策。'], answer: [
+        '可能的來源：怕失敗（「寫出來好像很普通」）、不確定（「不知道現在的履歷該長什麼樣」）、焦慮（想到換工作就緊張）。',
+        '對策：怕失敗 → 先寫一版「只給自己看」的草稿；不確定 → 找兩份同職位的履歷範例看 10 分鐘；焦慮 → 只更新最近一份工作的三行，不碰其他部分。一次處理一個。',
+      ] },
+    ],
+    today: {
+      minutes: 3,
+      task: ['挑一件你在逃的事，寫下它真正讓你討厭的原因，配一個對應的小動作，現在做。'],
+    },
+    keypoints: [
+      '逃避循環：逃開讓人立刻舒服，所以下次更想逃，任務也越來越急。',
+      '打斷循環靠的是讓任務沒那麼討厭，不是靠意志力撐。',
+      '先找出討厭的來源（無聊、焦慮、不確定、怕失敗、很累），再選對策。',
+    ],
+    sources: ['steel-2007', 'tmt-adhd-2023'],
+  },
+
+  '6-2': {
+    goals: [
+      '分辨「自我批評」和「系統問題」',
+      '用三步把一句自我批評改寫成可以修的事',
+      '在每週回顧裡用「系統漏接」的語言',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-1）因為「不知道要準備哪些文件」而拖著報稅，對策是？', options: [
+        { text: '先找資訊：讀 5 分鐘申報說明', correct: true, why: '不確定型的厭惡感，用取得資訊來降低。' },
+        { text: '配一首喜歡的歌來做', why: '這比較適合無聊型。' },
+        { text: '等到截止前一天晚上，一次把全部文件準備完', why: '這會讓逃避循環更嚴重。' },
+        { text: '告訴自己不要怕', why: '問題不是怕，是不確定。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 4-3）每週回顧的第一步是？', options: [
+        { text: '記下這週做到的事', correct: true, why: '先看做到的，回顧才不會變成檢討大會。' },
+        { text: '列出這週所有的失敗', why: '一開始就自我批評，下週就不想回顧了。' },
+        { text: '清空收件匣', why: '這是第二步。' },
+        { text: '排下週的行事曆', why: '這是後面的步驟。' },
+      ] },
+    ],
+    analogy: {
+      text: ['工廠的產品出了問題，好的工程師不會說「工人很笨」，而是問「流程哪一步沒擋住？」然後加一個檢查站。你的生活系統也一樣：事情沒做到時，問「哪一環[[系統漏接]]」，比問「我怎麼這麼糟」更能讓下次不一樣。'],
+      limit: ['工廠的流程可以完全重設；人有真實的限制，有時候是真的太累、太忙。改寫不是假裝一切都好，而是把力氣放在可以改的那一環。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="兩種解釋的後果：我很爛，讓任務更討厭，下次更想逃；系統漏接，找到一個可以修的地方，下次多一個檢查站">
+        <rect x="10" y="10" width="265" height="210" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">「我很爛」</text>
+        <text x="142" y="110" text-anchor="middle" font-size="14" class="on-color">沒有可以修的地方</text>
+        <text x="142" y="140" text-anchor="middle" font-size="14" class="on-color">任務更討厭</text>
+        <text x="142" y="170" text-anchor="middle" font-size="14" class="on-color">下次更想逃</text>
+        <rect x="285" y="10" width="265" height="210" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">「系統漏接」</text>
+        <text x="417" y="110" text-anchor="middle" font-size="14" class="on-color">找到漏接的那一環</text>
+        <text x="417" y="140" text-anchor="middle" font-size="14" class="on-color">加一個檢查站</text>
+        <text x="417" y="170" text-anchor="middle" font-size="14" class="on-color">下次多一層保護</text>
+      </svg>`,
+      caption: '兩種說法可能一樣真實，但只有右邊那種能帶來下一步。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究支持（作為 CBT 的一部分）', body: ['[[認知重建]]（找出卡住的想法、換成比較能行動的說法）是成人 ADHD 認知行為治療的組成之一（Safren 2010 的療程即包含）。「系統漏接」是這門課為了好記而用的說法。'] },
+      ],
+    },
+    define: [
+      { term: '自我批評', en: 'self-criticism', def: '把事情沒做到解釋成自己的缺陷。', example: '「我就是沒救」。' },
+      { term: '系統漏接', en: 'system gap', def: '把事情沒做到解釋成流程中某一環沒接住。', example: '「會議前沒有提醒」。' },
+      { term: '改寫三步', en: 'reframe in three steps', def: '① 寫下那句話 ② 找出漏接的一環 ③ 加一個檢查站。', example: '「我又忘了」→ 沒有提醒 → 開會前 10 分鐘的提醒。' },
+    ],
+    examples: {
+      compare: [{
+        title: '忘了交週報',
+        kind: '自我批評 vs. 系統漏接',
+        badLabel: '自我批評',
+        goodLabel: '找漏接的一環',
+        bad: '「我{{1:又忘了，我真的很糟}}。」',
+        good: '「週五下午{{1:沒有任何提醒}}。加一條：如果週五午餐回座，我就打開週報範本。」',
+        badResult: '心情更差，下週還是一樣沒有提醒。',
+        goodResult: '多一個檢查站，下週被接住的機會變大。',
+        why: ['問「哪一環漏接」，答案就是下一步'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'critic', label: '自我批評' }, { id: 'system', label: '系統問題' }],
+          items: [
+            { text: '「我就是沒有毅力的人」', answer: 'critic', why: '描述自己，沒有可以修的地方。' },
+            { text: '「會議前沒有設提醒」', answer: 'system', why: '指出流程中的一環，可以加提醒。' },
+            { text: '「我怎麼連這種小事都做不好」', answer: 'critic', why: '只有評價，沒有原因。' },
+            { text: '「那個檔案放在找不到的資料夾」', answer: 'system', why: '摩擦太大，可以改放置位置。' },
+            { text: '「第一步太大，所以一直開不了頭」', answer: 'system', why: '可以用 1-1 把第一步縮小。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="改寫三步：一，寫下那句話；二，找出漏接的那一環，例如沒有提醒、第一步太大、沒有入口；三，加一個檢查站">
+          <rect x="10" y="10" width="170" height="190" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">① 寫下那句話</text>
+          <text x="95" y="120" text-anchor="middle" font-size="14" class="on-color">「我又忘了」</text>
+          <rect x="195" y="10" width="170" height="190" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">② 哪一環漏接</text>
+          <text x="280" y="120" text-anchor="middle" font-size="14" class="on-color">提醒？第一步？</text>
+          <text x="280" y="146" text-anchor="middle" font-size="14" class="on-color">入口？時間？</text>
+          <rect x="380" y="10" width="170" height="190" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">③ 加檢查站</text>
+          <text x="465" y="120" text-anchor="middle" font-size="14" class="on-color">一個具體的改動</text>
+        </svg>`, caption: '第 ② 步可以直接回去看前面各課：提醒（2-2）、第一步（1-1）、入口（1-3）、時間（2-3）。' },
+      ],
+      tryit: {
+        q: ['用三步改寫一句你最近對自己說過的話：'],
+        draft: '① 那句話：＿＿＿＿\n② 漏接的一環：＿＿＿＿\n③ 加的檢查站：＿＿＿＿',
+        answer: ['例如：①「我又拖到最後一刻」② 截止日太遠、沒有中間的小截止點 ③ 在行事曆加一個早三天的假截止日（2-3）。', '如果找不到漏接的一環，可以先回 0-1 用「卡在哪一段」診斷。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把改寫當成「說好話安慰自己」。', why: '只是換成正面的話，沒有找出可以修的地方，下次還是一樣。', right: '一定要走到第 ③ 步：加一個具體的檢查站。' },
+      { wrong: '每週回顧時從「這週的失敗」開始。', why: '一開始就批評，回顧會變成討厭的事。', right: '先寫做到的事，再用「系統漏接」看沒做到的。' },
+      { wrong: '找到漏接後一次加五個檢查站。', why: '系統變複雜，又會被丟掉。', right: '每次只加一個，用一週看看。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '改寫三步的最後一步是？', options: [
+        { text: '加一個具體的檢查站', correct: true, why: '沒有這一步，改寫只是換句話說。' },
+        { text: '對自己說「我已經很棒了」', why: '安慰可以有，但沒有改變系統。' },
+        { text: '把那句話刪掉不去想', why: '不去想，問題也不會被修。' },
+        { text: '找出是誰的錯', why: '重點是流程哪一環，不是誰的錯。' },
+      ] },
+      { level: '應用', type: 'mc', q: '「我總是遲到」最好改寫成？', options: [
+        { text: '出門時間沒算交通緩衝，下次加 15 分鐘', correct: true, why: '找到漏接的一環並加檢查站。' },
+        { text: '我是一個沒有時間觀念的人', why: '還是自我批評。' },
+        { text: '其實大家都會遲到，這沒什麼大不了的，不用在意', why: '安慰自己，但沒有改變任何事。' },
+        { text: '以後要更努力準時出門', why: '「更努力」不是具體的改動。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的伴侶或同事說：「你怎麼又忘了？」你很想回「我就是這樣」。用這一課的觀念，你可以怎麼回應，同時替下次加一個檢查站？'], answer: [
+        '例如：「對不起，這次是我沒有把它寫進收件匣。下次你跟我說的時候，我當下就記進手機，你也可以看我記了沒。」',
+        '這樣承認了結果，同時把對話從「你這個人」轉到「流程哪裡可以接住」，對方也知道下次可以怎麼幫你。',
+      ] },
+    ],
+    today: {
+      minutes: 3,
+      task: ['今天如果有一件事沒做到，用改寫三步寫下來，並且真的加上第 ③ 步的檢查站。沒有的話，就改寫一句你最近常對自己說的話。'],
+    },
+    keypoints: [
+      '「我很爛」沒有可以修的地方；「哪一環漏接」的答案就是下一步。',
+      '改寫三步：寫下那句話 → 找出漏接的一環 → 加一個檢查站。',
+      '改寫不是說好話安慰自己，一定要走到加檢查站；每次只加一個。',
+    ],
+    sources: ['safren-2010'],
+  },
+
+  '6-3': {
+    goals: [
+      '分辨「任務的大小」和「焦慮的大小」',
+      '從「整件事」退回到「眼前這一步」',
+      '在焦慮很大時，用更小的第一步開始',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-2）「我又拖到最後一刻」的漏接一環可能是？', options: [
+        { text: '沒有中間的小截止點', correct: true, why: '截止日太遠，缺少早一點的假截止日。' },
+        { text: '我天生就是拖延的人', why: '這是自我批評，不是一環。' },
+        { text: '這件事本來就不重要', why: '可能，但沒有指出流程的問題。' },
+        { text: '大家都這樣，不用改', why: '沒有找出可以修的地方。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）縮小第一步主要調的槓桿是？', options: [
+        { text: '自己做得到的感覺', correct: true, why: '越小越覺得做得到。' },
+        { text: '離截止日的距離', why: '縮小不改變截止日。' },
+        { text: '環境裡分心的拉力', why: '要靠調整環境。' },
+        { text: '這件任務的價值', why: '縮小不改變價值。' },
+      ] },
+    ],
+    analogy: {
+      text: ['從飛機上看一座山，覺得根本爬不上去；但登山的人眼前永遠只有腳下的路和下一個轉彎。大到嚇人的任務，常常是因為你在「飛機上」看它：一次看到整件事。'],
+      limit: ['山的大小是真的；任務的「大」常常一半是焦慮放大的。所以這一課先處理焦慮的大小，再處理任務的大小。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="任務放大鏡：焦慮讓整件事看起來比實際大；退回到眼前這一步後，任務回到原本的大小，第一步也變得看得見">
+        <rect x="10" y="10" width="265" height="210" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">透過焦慮看</text>
+        <text x="142" y="110" text-anchor="middle" font-size="14" class="on-color">整件事、所有後果</text>
+        <text x="142" y="140" text-anchor="middle" font-size="14" class="on-color">一次全部壓過來</text>
+        <rect x="285" y="10" width="265" height="210" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">退回眼前這一步</text>
+        <text x="417" y="110" text-anchor="middle" font-size="14" class="on-color">只看下一個動作</text>
+        <text x="417" y="140" text-anchor="middle" font-size="14" class="on-color">其他的先放著</text>
+      </svg>`,
+      caption: '焦慮會把「整件事＋所有可能的後果」一次放到眼前。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：治療手冊', body: ['把大任務切小、面對焦慮時一次只處理一步，是成人 ADHD 認知行為治療的常用做法（Safren 2010）；單獨效果沒有被分開測量。如果焦慮持續、影響睡眠或生活，請參考 0-3 的「什麼時候找專業協助」。'] },
+      ],
+    },
+    define: [
+      { term: '焦慮的放大', en: 'anxious magnification', def: '焦慮讓任務看起來比實際更大、更可怕。', example: '一封 email 被想成「搞砸就會丟工作」。' },
+      { term: '退回這一步', en: 'zoom in', def: '刻意把注意力從整件事拉回到眼前的一個動作。', example: '不想整份企劃，只想「打開檔案」。' },
+      { term: '可怕程度', en: 'dread level', def: '用 0–10 分替自己現在的焦慮打分數，看得出它有沒有在下降。', example: '開始前 8 分，寫了 5 分鐘後 5 分。' },
+    ],
+    examples: {
+      compare: [{
+        title: '第一次負責一個大專案',
+        kind: '看整座山 vs. 看腳下',
+        badLabel: '一次看整座山',
+        goodLabel: '只看下一步',
+        bad: '「這個專案{{1:要是做不好，大家都會覺得我不行}}。」',
+        good: '「今天只要{{1:列出三個要問主管的問題}}。」',
+        badResult: '焦慮到什麼都不敢碰，連開檔案都想逃。',
+        goodResult: '做完一個小步驟，焦慮通常會降下來一點。',
+        why: ['焦慮大的時候，第一步要比平常更小'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="從整件事退到這一步：整個專案，退到第一個里程碑，再退到今天的一個下一步，最後是現在的兩分鐘">
+          <rect x="10" y="10" width="540" height="44" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="30" y="38" font-size="15" font-weight="900">整個專案（焦慮 9 分）</text>
+          <rect x="60" y="64" width="490" height="44" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="80" y="92" font-size="15" font-weight="900">第一個里程碑</text>
+          <rect x="110" y="118" width="440" height="44" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="130" y="146" font-size="15" font-weight="900">今天的一個下一步</text>
+          <rect x="160" y="172" width="390" height="44" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="180" y="200" font-size="15" font-weight="900" class="on-color">現在的 2 分鐘（焦慮降到 5 分）</text>
+        </svg>`, caption: '每退一層，就問一次「我現在只需要做什麼？」' },
+        { type: 'widget', name: 'shrinker', props: { placeholder: '例如：負責年度大會' } },
+      ],
+      tryit: {
+        q: ['替一件讓你焦慮的事打分數，退到「現在的 2 分鐘」，做完再打一次分數：'],
+        draft: '這件事：＿＿＿＿　開始前焦慮：＿＿／10\n現在的 2 分鐘：＿＿＿＿\n做完後焦慮：＿＿／10',
+        answer: ['例如：「年度大會」開始前 8 分；2 分鐘「打開去年的流程表看一遍」；做完後 6 分。', '分數不一定會下降；重點是你看到自己在焦慮下也能做出一步。'],
+      },
+    },
+    mistakes: [
+      { wrong: '想等焦慮消失才開始。', why: '焦慮常常要等開始之後才會下降。', right: '在焦慮還在的時候，做一個更小的第一步。' },
+      { wrong: '一焦慮就把整個專案重新規劃一次。', why: '規劃整件事會讓你一直看著整座山。', right: '只退回到眼前這一步。' },
+      { wrong: '把持續的焦慮當成只是「規劃能力不好」。', why: '持續影響睡眠或生活的焦慮，可能需要專業協助。', right: '照 0-3 的建議，找專業人員評估。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '焦慮很大時，第一步應該？', options: [
+        { text: '比平常更小', correct: true, why: '焦慮讓「做得到的感覺」降低，要用更小的步驟補回來。' },
+        { text: '和平常一樣大', why: '焦慮時平常的大小可能也太大了。' },
+        { text: '等焦慮消失再決定', why: '焦慮常常要開始後才會下降。' },
+        { text: '一次把整件事規劃好', why: '會讓你一直看著整座山。' },
+      ] },
+      { level: '應用', type: 'mc', q: '小真要準備人生第一場面試，焦慮到一直不敢碰。最好的第一步是？', options: [
+        { text: '打開職缺頁面，讀一次職務說明', correct: true, why: '退回到眼前很小、做得到的一步。' },
+        { text: '把所有可能的面試問題都準備好', why: '太大，會讓焦慮更大。' },
+        { text: '等到面試前一天再一次準備', why: '這是逃避循環。' },
+        { text: '先想像面試失敗的各種情況', why: '只會放大焦慮。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在工作上犯了一個錯，要寫信向客戶說明，想到就胃痛，已經拖了兩天。結合 6-1、6-2、6-3，寫出你今天的處理方式。'], answer: [
+        '6-1：厭惡感來源是焦慮（怕客戶生氣）；6-2：把「我搞砸了」改寫成「哪一環漏接」，順便想好要補的檢查站，寫進信裡讓客戶知道下次怎麼避免；6-3：退到眼前這一步。',
+        '今天的 2 分鐘：「打開新信件，只寫第一句道歉和『今天下午 3 點前會補上說明』」。寄出這封短信後，焦慮通常會降一些，再寫完整的說明。',
+      ] },
+    ],
+    today: {
+      minutes: 3,
+      task: ['挑一件讓你焦慮的事，打分數，用上面的縮小器退到「現在的 2 分鐘」，做完再打一次分數。'],
+    },
+    keypoints: [
+      '焦慮會把整件事和所有後果一次放到眼前，讓任務看起來更大。',
+      '從整件事一層層退回到「現在的 2 分鐘」；焦慮大時第一步要更小。',
+      '不用等焦慮消失才開始；持續影響生活的焦慮，請找專業協助。',
+    ],
+    sources: ['safren-2010', 'steel-2007'],
+  },
+});
+</script>

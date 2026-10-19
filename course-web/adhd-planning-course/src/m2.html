@@ -1,0 +1,353 @@
+<script>
+/* ==========================================================================
+   模組 2：讓時間看得見
+   ========================================================================== */
+defineTerms({
+  '計畫謬誤': { en: 'planning fallacy', def: 'Kahneman 與 Tversky 提出：人預估自己完成一件事要多久時，常常估太少，即使過去經驗告訴他會更久。', example: '每次都覺得「報告兩小時寫完」，每次都寫了五小時。' },
+  '時間盲': { en: 'time blindness', def: '對時間流逝、未來的截止日不太有感覺的狀態。這是描述 ADHD 常見經驗的說法，不是正式診斷名詞。', example: '以為只滑了 5 分鐘手機，其實過了 40 分鐘。' },
+  '時間盒': { en: 'timeboxing', def: '先決定給一件事多少時間，用看得見的計時器框住，時間到就停下來檢查。', example: '「回 email：25 分鐘」。' },
+  '校正倍數': { en: 'correction factor', def: '用自己的紀錄算出「實際時間 ÷ 預估時間」的典型值，之後的預估都乘上它。', example: '倍數 ×1.8：覺得要 1 小時的事，排 1 小時 50 分。' },
+  '緩衝': { en: 'buffer', def: '刻意留在計畫裡、沒有排事情的時間，用來吸收延誤和意外。', example: '兩個會議之間留 15 分鐘。' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出為什麼預估的時間常常不夠',
+      '分清楚「所有人都會的低估」和 ADHD 多出來的那一部分',
+      '開始記錄自己的「預估 vs. 實際」',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 1-4）試做 5 分鐘時間到了，你還想繼續。該怎麼做？', options: [
+        { text: '繼續做，想停的時候再停', correct: true, why: '時間到是讓你選，想繼續就繼續。' },
+        { text: '一定要停，遵守規則', why: '規則是「時間到可以停」，不是「一定要停」。' },
+        { text: '承諾自己今天要做完全部', why: '加大承諾會讓下次更難開始。' },
+        { text: '重設 5 分鐘再強迫自己做', why: '想繼續就繼續就好，不需要強迫。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-2）截止日離現在越遠，會讓想做的程度？', options: [
+        { text: '變低', correct: true, why: '距離在分母，越遠越不想做。' },
+        { text: '變高', why: '方向相反。' },
+        { text: '沒有影響', why: '距離是拖延最穩定的預測因子之一。' },
+        { text: '先變高再變低', why: '理論上是單純越遠越低。' },
+      ] },
+    ],
+    analogy: {
+      text: ['開車時，路邊的里程牌讓你知道離目的地還有多遠。如果拿掉所有里程牌、儀表板也壞了，你只能憑感覺：常常以為「快到了」，其實還很遠。對時間沒感覺（[[時間盲]]）就像開在沒有里程牌的路上。'],
+      limit: ['開車可以裝一次導航就好；對時間的感覺沒辦法一次修好。所以接下來兩課要做的，是在需要的那一刻把「里程牌」放回去：看得見的計時器、你自己的估時倍數。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="預估與實際的落差：所有人都會低估，這是計畫謬誤；ADHD 的時間估計誤差再多一些；兩者加起來，預估的時間常常不夠">
+        <rect x="10" y="20" width="200" height="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="110" y="52" text-anchor="middle" font-size="16" font-weight="900" class="on-color">預估 1 小時</text>
+        <rect x="10" y="100" width="380" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="200" y="132" text-anchor="middle" font-size="16" font-weight="900">實際：所有人都會低估</text>
+        <rect x="10" y="180" width="540" height="50" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="212" text-anchor="middle" font-size="16" font-weight="900" class="on-color">再加上：ADHD 的時間估計誤差</text>
+      </svg>`,
+      caption: '示意圖，長度不是精確比例。重點是：預估不夠用，不是你一個人的問題，但你可能要多留一點。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究支持（時間知覺）／未查證（計畫謬誤在 ADHD 是否更嚴重）', body: ['2022 年的整合分析（55 篇）發現，ADHD 在時間估計上的誤差有小到中等程度的增加；成人的研究結果比較不一致。[[計畫謬誤]]是所有人都會有的低估。「ADHD 的計畫謬誤比一般人更嚴重」這次沒有查到直接研究，所以這門課不這樣說。'] },
+        '時間不夠用通常有兩個來源：**一開始就估太少**（計畫謬誤＋估計誤差），以及**做的過程中沒感覺時間在流逝**（時間盲）。2-2 處理後者，2-3 處理前者。',
+      ],
+    },
+    define: [
+      { term: '計畫謬誤', en: 'planning fallacy', def: '預估自己完成任務的時間時常常估太少。', example: '覺得週報 30 分鐘寫完，實際寫了 1 小時。' },
+      { term: '時間盲', en: 'time blindness', def: '對時間流逝和未來截止日沒什麼感覺（描述性說法）。', example: '以為才開始 10 分鐘，已經過了 1 小時。' },
+      { term: '預估 vs. 實際紀錄', en: 'estimate log', def: '每次做事前寫下預估、做完寫下實際，累積成你自己的資料。', example: '「回 email：預估 10 分、實際 25 分」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '排明天的行程',
+        kind: '憑感覺 vs. 看紀錄',
+        badLabel: '憑感覺排',
+        goodLabel: '先看過去的紀錄',
+        bad: '「寫提案{{1:應該 2 小時}}，下午 2 點到 4 點，4 點開會。」',
+        good: '「上次寫提案{{1:實際花了 3.5 小時}}，這次排 1 點到 4 點半，會議改 5 點。」',
+        badResult: '3 點半才寫到一半，帶著沒寫完的焦慮去開會。',
+        goodResult: '時間大致夠，就算還是超過，也只超過一點點。',
+        why: ['用自己的紀錄，不用感覺'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="現在和之後的距離感：今天的事感覺很近很清楚，下週的事感覺模糊，一個月後的事幾乎感覺不到">
+          <rect x="10" y="20" width="200" height="180" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="110" y="70" text-anchor="middle" font-size="18" font-weight="900" class="on-color">今天</text>
+          <text x="110" y="120" text-anchor="middle" font-size="15" class="on-color">很清楚、很急</text>
+          <rect x="230" y="50" width="150" height="150" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="305" y="100" text-anchor="middle" font-size="17" font-weight="900">下週</text>
+          <text x="305" y="140" text-anchor="middle" font-size="14">有點模糊</text>
+          <rect x="400" y="90" width="150" height="110" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="475" y="130" text-anchor="middle" font-size="17" font-weight="900">一個月後</text>
+          <text x="475" y="170" text-anchor="middle" font-size="14">幾乎沒感覺</text>
+        </svg>`, caption: '這就是 0-2 的「距離」槓桿：越遠的事，現在越感覺不到。' },
+        { type: 'widget', name: 'estimator', props: {} },
+      ],
+      tryit: {
+        q: ['想一件你最近做過的事，寫下你當時的預估和實際時間：'],
+        draft: '做了什麼：＿＿＿＿\n當時預估：＿＿分鐘\n實際花了：＿＿分鐘',
+        answer: ['例如「做月報：預估 60 分、實際 140 分」。', '把它記進上面的估時紀錄；累積 3 筆以上，2-3 就能算出你的校正倍數。'],
+      },
+    },
+    mistakes: [
+      { wrong: '每次超時都告訴自己「下次會更快」。', why: '這正是計畫謬誤：忽略過去的經驗。', right: '看紀錄，用過去實際花的時間來排。' },
+      { wrong: '只記「預估」，不記「實際」。', why: '沒有實際時間就沒辦法校正。', right: '做完當下花 10 秒記下實際時間。' },
+      { wrong: '把估太少當成「我能力不好」。', why: '所有人都會低估；這是要用工具補的，不是要自責的。', right: '把它當資料，用來算倍數（2-3）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '計畫謬誤是指？', options: [
+        { text: '所有人預估自己的時間時常常估太少', correct: true, why: '這是一般人普遍會有的偏誤。' },
+        { text: '只有 ADHD 的人才會把自己的時間估錯', why: '所有人都會；ADHD 的估計誤差可能再多一些。' },
+        { text: '計畫做得太詳細反而失敗', why: '這不是計畫謬誤的意思。' },
+        { text: '預估的時間常常太多', why: '方向相反，通常是估太少。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你過去 5 次寫週報，預估都是 30 分鐘，實際平均 70 分鐘。這週該怎麼排？', options: [
+        { text: '排 70 分鐘左右', correct: true, why: '用自己的實際紀錄，而不是感覺。' },
+        { text: '還是排 30 分鐘，這次會專心一點', why: '這正是計畫謬誤。' },
+        { text: '排 15 分鐘，逼自己快一點', why: '時間更少，更容易超時和焦慮。' },
+        { text: '不排時間，寫完再說', why: '沒有時間框，更容易一路拖下去。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['主管問你「這個功能幾天可以做完？」你直覺想說 3 天。用這一課的觀念，你可以怎麼回答，才不會又答應一個做不到的時間？'], answer: [
+        '先不要當場給數字：「我先看一下過去類似的任務花了多久，下午回覆你。」然後查自己的紀錄，用實際時間乘上校正倍數（2-3），再加緩衝。',
+        '如果一定要當場回答，可以給範圍：「大概 4 到 6 天，我下午再確認。」範圍比單一數字誠實，也比較不會變成壓力。',
+      ] },
+    ],
+    today: {
+      minutes: 2,
+      task: ['把今天做的一件事記進上面的估時紀錄：預估多久、實際多久。從今天起，每天記一筆就好。'],
+    },
+    keypoints: [
+      '所有人都會低估時間（計畫謬誤）；ADHD 的時間估計誤差可能再多一些。',
+      '時間不夠用有兩個來源：一開始估太少、做的時候沒感覺時間在流逝。',
+      '用自己的「預估 vs. 實際」紀錄排行程，不要用感覺。',
+    ],
+    sources: ['timeblind-2022', 'timeperc-2023'],
+  },
+
+  '2-2': {
+    goals: [
+      '用看得見的計時器把時間放在外面',
+      '用時間盒替一件事框出開始和結束',
+      '把提醒放在「要做的那一刻」',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）時間不夠用的兩個來源是？', options: [
+        { text: '一開始估太少、做的時候沒感覺時間在流逝', correct: true, why: '2-2 處理後者，2-3 處理前者。' },
+        { text: '太懶、太慢', why: '這是評價，不是可以修的原因。' },
+        { text: '工作量太多、主管太嚴格，所以時間永遠不夠', why: '可能是真的，但不是這一課在處理的。' },
+        { text: '手機、社群媒體', why: '分心是一部分，但不是全部。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-2）哪一條「如果…就…」最好用？', options: [
+        { text: '如果 10 點的會開完，就打開提案檔', correct: true, why: '情境明確，動作小。' },
+        { text: '如果下午的時間夠多，我就把整份提案寫完', why: '「時間夠」不是情境。' },
+        { text: '如果有靈感，我就寫提案', why: '靈感無法預期。' },
+        { text: '如果不忙，我就寫提案', why: '「不忙」很難偵測。' },
+      ] },
+    ],
+    analogy: {
+      text: ['煮泡麵時，你不會一直盯著時鐘算 3 分鐘，而是設一個計時器，然後放心去做別的。[[時間盒]]就是替每件事設一個看得見的計時器：時間交給它管，你只管做。'],
+      limit: ['泡麵 3 分鐘一到就一定要拿起來；工作的時間盒到了不一定要停，而是停下來看一下：做到哪了？要不要再給一盒？'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="看不見的時間和看得見的時間：時間在腦中時，只能憑感覺，常常不知不覺過了很久；時間放在外面，例如倒數的色塊，一眼就知道還剩多少">
+        <rect x="10" y="10" width="265" height="210" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="46" text-anchor="middle" font-size="18" font-weight="900" class="on-color">時間在腦中</text>
+        <text x="142" y="110" text-anchor="middle" font-size="15" class="on-color">憑感覺</text>
+        <text x="142" y="150" text-anchor="middle" font-size="14" class="on-color">不知不覺過了很久</text>
+        <rect x="285" y="10" width="265" height="210" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="46" text-anchor="middle" font-size="18" font-weight="900" class="on-color">時間在外面</text>
+        <rect x="315" y="90" width="205" height="34" class="fill-surface stroke-ink" stroke-width="3"/>
+        <rect x="317" y="92" width="120" height="30" style="fill:var(--m2)"/>
+        <text x="417" y="170" text-anchor="middle" font-size="14" class="on-color">一眼就知道還剩多少</text>
+      </svg>`,
+      caption: '[[外在化]]時間：把「還剩多少」從腦中搬到眼前。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：理論＋治療手冊', body: ['把時間放在外面，來自 Barkley 模型的推論（行為被「現在」主導，所以要把未來與時間帶到現在看得見的地方），也是 ADHD 認知行為治療常用的做法。單獨效果沒有被分開測量。'] },
+        { type: 'widget', name: 'timebox', props: {} },
+      ],
+    },
+    define: [
+      { term: '時間盒', en: 'timeboxing', def: '先決定給多少時間，用計時器框住，到點停下來檢查。', example: '「整理發票：10 分鐘」。' },
+      { term: '看得見的計時器', en: 'visual timer', def: '能看到「剩下多少」的計時器，例如會變小的色塊或指針。', example: '這一課上面的倒數。' },
+      { term: '在要做的那一刻提醒', en: 'point-of-performance cue', def: '提醒出現的時間和地點，就是要行動的那一刻。', example: '提醒內容寫「打開報告檔」，而不是「報告」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '提醒怎麼寫',
+        kind: '只有名稱 vs. 帶著第一步',
+        badLabel: '只有名稱',
+        goodLabel: '帶著第一步',
+        bad: '下午 3:00 提醒：「{{1:報告}}」',
+        good: '下午 3:00 提醒：「{{1:打開報告檔，寫第二段的三個數字}}」',
+        badResult: '看到「報告」兩個字，想到整件事，又滑掉提醒。',
+        goodResult: '提醒本身就是第一步，看到就能做。',
+        why: ['提醒要帶著第一步'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="一天的時間盒：上午九點到九點二十五回信，九點半到十一點寫提案，十一點到十一點十五留緩衝，下午固定一盒處理雜事">
+          <rect x="10" y="10" width="540" height="46" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="40" font-size="15" font-weight="900" class="on-color">09:00–09:25　回信（一盒）</text>
+          <rect x="10" y="66" width="540" height="46" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="96" font-size="15" font-weight="900" class="on-color">09:30–11:00　寫提案（三盒，中間站起來）</text>
+          <rect x="10" y="122" width="540" height="46" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="30" y="152" font-size="15" font-weight="900">11:00–11:15　緩衝（不排事）</text>
+          <rect x="10" y="178" width="540" height="46" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="208" font-size="15" font-weight="900" class="on-color">14:00–14:25　雜事集中一盒</text>
+        </svg>`, caption: '每一盒都有開始、有結束；盒子之間留一點空。' },
+      ],
+      tryit: {
+        q: ['把明天的一個提醒改寫成「帶著第一步」的版本：'],
+        draft: '原本的提醒：＿＿＿＿\n改寫後：＿＿＿＿',
+        answer: ['例如：「繳費」→「打開銀行 App，繳電話費」；「健身」→「換上運動服，打開 5 分鐘的影片」。', '提醒要能直接照著做，而不是提醒你「有一件事」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '設一個 3 小時的時間盒，打算一次做完。', why: '盒子太大，又變回看不見盡頭的時間。', right: '用 25–50 分鐘一盒，盒子之間站起來動一下。' },
+      { wrong: '計時器放在手機裡，螢幕是關的。', why: '看不見就沒有外在化的效果。', right: '放在視線裡：桌上的計時器、螢幕角落的倒數。' },
+      { wrong: '時間到就覺得「失敗了，還沒做完」。', why: '時間盒的目的是讓你停下來檢查，不是要求做完。', right: '時間到：留一行麵包屑，決定要不要再給一盒。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '時間盒到點時，該做什麼？', options: [
+        { text: '停下來看做到哪，決定要不要再給一盒', correct: true, why: '時間盒是檢查點，不是死線。' },
+        { text: '不管做到哪裡，都要立刻放下去做下一件事', why: '可以停也可以再給一盒。' },
+        { text: '一定要做完才能停', why: '這樣就失去時間盒的意義了。' },
+        { text: '把計時器重設，不用停', why: '跳過檢查，等於沒有時間盒。' },
+      ] },
+      { level: '應用', type: 'mc', q: '小凱的手機提醒寫「寫週報」，每次都被他滑掉。最好的修改是？', options: [
+        { text: '改成「打開週報範本，寫下三件做完的事」', correct: true, why: '提醒本身就是第一步。' },
+        { text: '把提醒改成每 10 分鐘響一次，直到寫完為止', why: '響越多次越容易習慣性滑掉。' },
+        { text: '把提醒的聲音調大', why: '問題不在聽不到，在不知道第一步。' },
+        { text: '刪掉提醒，改靠記憶', why: '記憶正是最容易漏的部分。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在家工作，常常一路做到晚上 8 點都沒吃飯，或是一下午都在回訊息。用時間盒設計你的下午。'], answer: [
+        '例如：13:30–14:20 專心做一件主要工作（一盒）；14:20–14:30 休息、看訊息；14:30–15:20 第二盒；15:20 集中回訊息 25 分鐘；18:00 設一個「收工」的時間盒。',
+        '重點是每一盒都有看得見的倒數，盒子之間留空檔。「收工」也是一個時間盒：到點就擺好明天的入口（1-3），然後離開。',
+      ] },
+    ],
+    today: {
+      minutes: 3,
+      task: ['把明天的一個提醒改寫成「帶著第一步」的版本，並替明天最重要的一件事排一個 25 分鐘的時間盒。現在就把它放進行事曆。'],
+    },
+    keypoints: [
+      '把時間放在外面：用看得見「還剩多少」的計時器。',
+      '時間盒有開始也有結束；到點是檢查點，不是死線。',
+      '提醒要帶著第一步，而且出現在要做的那一刻。',
+    ],
+    sources: ['barkley-1997', 'safren-2010'],
+  },
+
+  '2-3': {
+    goals: [
+      '用自己的紀錄算出估時校正倍數',
+      '把倍數用在下一次的預估',
+      '在計畫裡放進緩衝',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-2）時間盒最適合的長度大約是？', options: [
+        { text: '25–50 分鐘一盒', correct: true, why: '看得見盡頭，又有足夠時間做一點事。' },
+        { text: '3 小時一盒，一次做完比較有效率', why: '太大，又變回看不見盡頭的時間。' },
+        { text: '1 分鐘一盒', why: '太短，來不及進入狀況。' },
+        { text: '不用設長度', why: '沒有長度就不是時間盒。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 2-1）排行程時，應該依據什麼？', options: [
+        { text: '自己過去的實際時間紀錄', correct: true, why: '紀錄比感覺可靠。' },
+        { text: '當下的感覺，今天精神好就排多一點', why: '感覺正是會低估的那一部分。' },
+        { text: '別人花多少時間', why: '每個人不一樣，用自己的資料。' },
+        { text: '主管希望的時間', why: '那是期待，不是估計。' },
+      ] },
+    ],
+    analogy: {
+      text: ['如果你的體重計固定少 2 公斤，你不用換一台，只要每次看到數字加 2 就好。你的估時也是一台「固定偏差」的儀器：知道它通常差多少，就能每次自動修正。'],
+      limit: ['體重計的偏差是固定的；估時的偏差會因任務不同而不同。所以倍數要用同類型的任務算，而且要持續更新。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="校正倍數的算法：記錄每次的實際時間除以預估時間，取中位數，例如一點八；下次預估一小時的事，排一小時又五十分鐘">
+        <rect x="10" y="10" width="170" height="210" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="95" y="50" text-anchor="middle" font-size="16" font-weight="900">① 記錄</text>
+        <text x="95" y="110" text-anchor="middle" font-size="14">實際 ÷ 預估</text>
+        <text x="95" y="140" text-anchor="middle" font-size="14">至少 3 筆</text>
+        <rect x="195" y="10" width="170" height="210" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">② 取中位數</text>
+        <text x="280" y="120" text-anchor="middle" font-size="24" font-weight="900" class="on-color">×1.8</text>
+        <rect x="380" y="10" width="170" height="210" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="465" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">③ 下次乘上</text>
+        <text x="465" y="110" text-anchor="middle" font-size="14" class="on-color">覺得 60 分鐘</text>
+        <text x="465" y="140" text-anchor="middle" font-size="14" class="on-color">→ 排 110 分鐘</text>
+      </svg>`,
+      caption: '用中位數而不是平均：一次特別慘的紀錄不會把倍數拉得太誇張。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：依據計畫謬誤研究的推論', body: ['用過去實際時間校正預估，是針對[[計畫謬誤]]的常見建議（參考過去類似任務的實際結果）。在 ADHD 族群單獨測試這個方法的研究，這次沒有查到。'] },
+        { type: 'widget', name: 'estimator', props: {} },
+      ],
+    },
+    define: [
+      { term: '校正倍數', en: 'correction factor', def: '實際 ÷ 預估的中位數。', example: '×1.8 代表你通常需要預估的 1.8 倍。' },
+      { term: '中位數', en: 'median', def: '把數字排好後最中間的那一個，不容易被極端值拉走。', example: '1.2、1.8、4.0 的中位數是 1.8。' },
+      { term: '緩衝', en: 'buffer', def: '計畫裡刻意不排事的時間。', example: '兩件事之間留 15 分鐘。' },
+    ],
+    examples: {
+      compare: [{
+        title: '排下午的工作',
+        kind: '排滿 vs. 校正加緩衝',
+        badLabel: '照感覺排滿',
+        goodLabel: '乘上倍數，再留緩衝',
+        bad: '13:00 簡報（{{1:1 小時}}）、14:00 報表（1 小時）、15:00 開會',
+        good: '13:00 簡報（{{1:1 小時 50 分}}）、緩衝 10 分、15:00 開會、報表移到明天',
+        badResult: '簡報做到 14:40，報表沒做，開會遲到。',
+        goodResult: '做得完的事都做完了，沒做的事一開始就排到明天。',
+        why: ['乘上倍數後，排不下的事一開始就看得出來'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="緩衝放在哪裡：會議之間、截止日之前、一天的最後，三個地方各留一段空白">
+          <rect x="10" y="10" width="170" height="200" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">會議之間</text>
+          <text x="95" y="120" text-anchor="middle" font-size="14" class="on-color">10–15 分鐘</text>
+          <rect x="195" y="10" width="170" height="200" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">截止日之前</text>
+          <text x="280" y="120" text-anchor="middle" font-size="14" class="on-color">給自己早一天的</text>
+          <text x="280" y="146" text-anchor="middle" font-size="14" class="on-color">假截止日</text>
+          <rect x="380" y="10" width="170" height="200" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">一天的最後</text>
+          <text x="465" y="120" text-anchor="middle" font-size="14" class="on-color">30 分鐘不排事</text>
+        </svg>`, caption: '緩衝不是浪費，是讓計畫不會一碰就碎的地方。' },
+      ],
+      tryit: {
+        q: ['你的倍數是 ×1.5。明天想做三件事，預估各 40、60、30 分鐘，可用的時間是 3 小時。算算看排得下嗎？'],
+        draft: '校正後：＿＿＋＿＿＋＿＿＝＿＿分鐘\n排得下嗎？＿＿　要移走哪一件？＿＿',
+        answer: ['校正後：60＋90＋45＝195 分鐘，超過 180 分鐘，再加上緩衝更排不下。', '移走一件（例如 45 分鐘那件）到後天，留下約 30 分鐘緩衝。乘完倍數排不下，就是一開始就該拿掉一件的訊號。'],
+      },
+    },
+    mistakes: [
+      { wrong: '算出倍數後，覺得「太誇張了」，偷偷打折。', why: '打折就回到計畫謬誤。', right: '先照倍數排一週，看實際結果再調。' },
+      { wrong: '所有任務共用一個倍數。', why: '寫東西和回信的偏差可能差很多。', right: '常做的幾類任務各記各的，或至少分「創作型」和「例行型」。' },
+      { wrong: '行程排得滿滿的，一點空都不留。', why: '任何一個延誤都會推倒後面所有的事。', right: '在會議之間、截止日之前、一天最後留緩衝。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '校正倍數用什麼算？', options: [
+        { text: '實際時間 ÷ 預估時間的中位數', correct: true, why: '中位數不容易被一次特別慘的紀錄拉走。' },
+        { text: '預估 ÷ 實際的平均', why: '方向相反，而且平均容易被極端值影響。' },
+        { text: '別人的平均速度', why: '要用你自己的資料。' },
+        { text: '主管給的時間 ÷ 自己預估的時間的平均', why: '主管的期待不是你的實際時間。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你的倍數是 ×2。客戶問你提案什麼時候給，你直覺覺得 2 天。比較好的回答是？', options: [
+        { text: '「4 天後」，並設第 3 天為假截止日', correct: true, why: '乘上倍數，再加一層緩衝。' },
+        { text: '「2 天後給你」，這次會比過去更專心、加快速度', why: '這是計畫謬誤。' },
+        { text: '「1 天後給你」，讓客戶開心', why: '更容易延誤，壓力更大。' },
+        { text: '「做完再告訴你」', why: '沒有時間點，客戶沒辦法安排。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的團隊總是延誤。用這一課的觀念，提出一個不用責怪任何人、可以在下次專案就開始用的做法。'], answer: [
+        '每個人在任務卡上同時記「預估」和「實際」；每月回顧一次，算出團隊在不同類型任務的倍數。下次估時直接乘上倍數，再在里程碑之前留緩衝。',
+        '這把延誤從「誰不夠努力」變成「我們的估計工具需要校正」，比較容易得到大家配合。',
+      ] },
+    ],
+    today: {
+      minutes: 3,
+      task: ['補齊估時紀錄到 3 筆，算出你的第一個校正倍數。用它重排明天的一件事，並在那件事後面留 15 分鐘緩衝。'],
+    },
+    keypoints: [
+      '校正倍數＝實際 ÷ 預估的中位數，用你自己的紀錄算。',
+      '下次預估乘上倍數；乘完排不下，就一開始拿掉一件。',
+      '在會議之間、截止日之前、一天最後放緩衝。',
+    ],
+    sources: ['timeblind-2022', 'timeperc-2023'],
+  },
+});
+</script>

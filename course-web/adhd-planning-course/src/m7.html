@@ -1,0 +1,394 @@
+<script>
+/* ==========================================================================
+   模組 7：職場與 AI 時代
+   ========================================================================== */
+defineTerms({
+  '會議落地': { en: 'meeting capture', def: '會議一結束的 5 分鐘內，把自己的待辦變成下一步、時間與提醒。', example: '開完會先別回座位滑訊息，先把三個待辦寫成下一步。' },
+  '啟動清單': { en: 'kickoff checklist', def: '一個專案第一天固定要確認的幾件事：目標、完成的定義、第一個里程碑、第一步、回顧時間。', example: '新專案指派下來的當天下午花 20 分鐘填完。' },
+  '外部執行功能': { en: 'external executive function', def: '這門課的說法：用工具（清單、計時器、AI）在外面替你做一部分執行功能的工作，例如提醒、拆解、整理。', example: '請 AI 把會議逐字稿整理成待辦草稿。' },
+  '過度依賴': { en: 'overreliance', def: '把應該自己做的判斷、決定和開始也交給工具，結果離開工具就什麼都做不了，或接受了工具的錯誤。', example: 'AI 說什麼優先就做什麼，沒有自己檢查。' },
+});
+
+defineLessons({
+  '7-1': {
+    goals: [
+      '會議結束 5 分鐘內，讓自己的待辦落地',
+      '把會議待辦寫成下一步、時間和負責人',
+      '把不清楚的地方變成「要問的問題」',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 6-3）焦慮很大的任務，第一步應該？', options: [
+        { text: '比平常更小', correct: true, why: '用更小的步驟補回做得到的感覺。' },
+        { text: '等焦慮消失再開始', why: '焦慮常常開始後才會下降。' },
+        { text: '一次把整件事規劃完', why: '會讓你一直看著整座山。' },
+        { text: '和平常的第一步一樣大就好', why: '焦慮時平常的大小可能也太大了。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 4-1）會議中突然想到一件事，該怎麼做？', options: [
+        { text: '3 秒寫進收件匣，繼續開會', correct: true, why: '不打斷手上的事，也不會忘記。' },
+        { text: '馬上處理，以免忘記', why: '會打斷會議。' },
+        { text: '記在腦中，會後再說', why: '工作記憶很容易被打斷。' },
+        { text: '隨便寫在會議資料的空白處', why: '散在別處，之後容易找不到。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 3-1）「等主管回覆」為什麼不是下一步？', options: [
+        { text: '「等」不是你能做的動作', correct: true, why: '下一步應該是「去問」。' },
+        { text: '因為主管很忙', why: '和主管忙不忙無關。' },
+        { text: '因為它太小了', why: '問題是它不是一個動作。' },
+        { text: '因為沒有寫清楚主管要在哪一天回覆', why: '有截止日也還是「等」。' },
+      ] },
+    ],
+    analogy: {
+      text: ['煮完一大鍋菜，如果馬上分裝進保鮮盒、貼上日期，冰箱裡的食物都吃得完；如果整鍋放著想「晚點再弄」，明天大概就壞了。會議的待辦也是：結束那一刻最新鮮，5 分鐘內分裝好，就不會壞掉。'],
+      limit: ['菜放一晚會壞是肉眼看得到的；待辦「壞掉」是悄悄的：你忘了誰要做什麼、期限是哪天，等到別人來追才發現。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="會議待辦的流失：會議結束時記得的待辦最多，回到座位後被訊息打斷，半天後記得的只剩一部分，隔天常常只剩模糊的印象">
+        <rect x="10" y="10" width="125" height="210" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="72" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">會議結束</text>
+        <text x="72" y="120" text-anchor="middle" font-size="14" class="on-color">記得最多</text>
+        <rect x="145" y="50" width="125" height="170" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="207" y="90" text-anchor="middle" font-size="15" font-weight="900">回到座位</text>
+        <text x="207" y="150" text-anchor="middle" font-size="14">被訊息打斷</text>
+        <rect x="280" y="100" width="125" height="120" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="342" y="140" text-anchor="middle" font-size="15" font-weight="900">半天後</text>
+        <text x="342" y="180" text-anchor="middle" font-size="14">只剩一部分</text>
+        <rect x="415" y="150" width="135" height="70" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="482" y="190" text-anchor="middle" font-size="15" font-weight="900" class="on-color">隔天：模糊</text>
+      </svg>`,
+      caption: '示意圖：落地的最佳時機是會議剛結束的那 5 分鐘。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：前面各課的組合', body: ['這一課沒有新的技術，是把收件匣（4-1）、下一步（3-1）、「如果…就…」（1-2）組成一個會後流程。各技術的證據強度見對應的課。'] },
+      ],
+    },
+    define: [
+      { term: '會議落地', en: 'meeting capture', def: '會後 5 分鐘內把待辦變成下一步。', example: '「回覆 A 廠商報價：週三前，下一步打開上次的報價單」。' },
+      { term: '要問的問題', en: 'open question', def: '看不出負責人、期限或範圍的待辦，先寫成要問誰什麼。', example: '「問小王：報告要給哪些部門？」' },
+      { term: '確認信', en: 'recap message', def: '會後寄給相關的人的簡短摘要，寫下誰在什麼時候做什麼。', example: '三行的訊息，讓大家的理解一致。' },
+    ],
+    examples: {
+      compare: [{
+        title: '會議筆記裡的一行',
+        kind: '原始筆記 vs. 落地後',
+        badLabel: '原始筆記',
+        goodLabel: '落地後',
+        bad: '「{{1:報價的事}}」',
+        good: '「{{1:週三前回 A 廠商報價}}（我）。下一步：打開上次的報價單。要問：折扣上限問主管。」',
+        badResult: '兩天後看到「報價的事」，想不起來是哪家、誰要做、何時要。',
+        goodResult: '負責人、期限、下一步和要問的問題都寫清楚了。',
+        why: ['趁記憶最新鮮時寫完整'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="會後五分鐘的流程：第一分鐘留在座位或會議室不離開；接著把我的待辦寫成下一步加期限；不清楚的寫成要問的問題；最重要的一件寫一條如果就；必要時寄一封三行確認信">
+          <rect x="10" y="10" width="540" height="38" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="35" font-size="14" font-weight="900" class="on-color">① 先別離開座位，打開收件匣</text>
+          <rect x="10" y="54" width="540" height="38" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="79" font-size="14" font-weight="900" class="on-color">② 我的每個待辦：下一步＋期限</text>
+          <rect x="10" y="98" width="540" height="38" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="123" font-size="14" font-weight="900" class="on-color">③ 看不清楚的：寫成「要問誰什麼」</text>
+          <rect x="10" y="142" width="540" height="38" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="30" y="167" font-size="14" font-weight="900" class="on-color">④ 最重要的一件：寫一條「如果…就…」</text>
+          <rect x="10" y="186" width="540" height="38" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="30" y="211" font-size="14" font-weight="900">⑤（需要時）寄一封三行確認信</text>
+        </svg>`, caption: '5 分鐘不夠時，至少做完 ① 和 ②。' },
+      ],
+      tryit: {
+        q: ['把這段會議筆記落地：'],
+        draft: '筆記：「簡報要改、預算再看、下週跟客戶約」\n→ 我的待辦（下一步＋期限）：＿＿＿＿\n→ 要問的問題：＿＿＿＿',
+        answer: ['例如：「週四前改簡報第 3、5 頁（下一步：打開簡報檔，標出主管說要改的兩頁）」；「週五前寄信給客戶約下週時間（下一步：打開上次的往來信件）」。', '要問的問題：「預算再看是誰負責？要看到什麼程度？」不清楚的事先變成問題，不要猜。'],
+      },
+    },
+    mistakes: [
+      { wrong: '一開完會就去回訊息，「等一下再整理筆記」。', why: '回訊息會蓋掉會議的記憶，等一下常常變成明天。', right: '先留在座位 5 分鐘，做完落地再離開。' },
+      { wrong: '筆記只寫主題：「報價」「簡報」。', why: '之後看不出誰要做什麼、何時要。', right: '每一項寫成負責人＋期限＋下一步。' },
+      { wrong: '不確定的事就自己猜著做。', why: '可能做錯方向，浪費更多時間。', right: '寫成「要問誰什麼」，放進今天的三件。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '會議待辦落地的最佳時機是？', options: [
+        { text: '會議剛結束的 5 分鐘內', correct: true, why: '記憶最新鮮，也還沒被別的事打斷。' },
+        { text: '當天下班前一起整理', why: '中間的訊息和會議會蓋掉記憶。' },
+        { text: '每週回顧時再整理', why: '太晚，很多細節已經忘了。' },
+        { text: '等主管寄會議紀錄再說', why: '別人的紀錄不一定寫你的下一步。' },
+      ] },
+      { level: '應用', type: 'mc', q: '會議筆記寫著「預算再看」，但沒人說誰負責。你應該？', options: [
+        { text: '寫成「問主管：預算由誰負責、何時要」', correct: true, why: '不清楚的待辦先變成要問的問題。' },
+        { text: '自己先把整份預算從頭到尾重新算一次，再交給主管', why: '可能做了不是你負責的事。' },
+        { text: '當作沒聽到', why: '可能之後才發現其實是你的事。' },
+        { text: '寫成「預算」放進清單', why: '主題不是下一步，也沒有解決誰負責的問題。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你每天有 4–5 場線上會議，根本沒有 5 分鐘的空檔。用這一課的觀念，設計一個做得到的版本。'], answer: [
+        '把行事曆的會議改成 25 或 50 分鐘（很多行事曆有「縮短會議」的設定），讓每場會議後自動多出 5 分鐘落地時間。',
+        '真的沒空檔時，做最小版本：會議最後 1 分鐘在收件匣打「我：___，期限：___」一行；當天下班前，再把這幾行整理成下一步。',
+      ] },
+    ],
+    today: {
+      minutes: 5,
+      task: ['今天下一場會議結束時，先別離開座位，照上面的 5 步把自己的待辦落地。替最重要的一件寫一條「如果…就…」。'],
+      blocks: [{ type: 'widget', name: 'ifthen', props: { ifHint: '例如：週會結束、回到座位', thenHint: '例如：先在收件匣寫下我的三個待辦和期限' } }],
+    },
+    keypoints: [
+      '會議剛結束的 5 分鐘是讓待辦落地的最佳時機。',
+      '每個待辦寫成負責人＋期限＋下一步；不清楚的寫成「要問誰什麼」。',
+      '沒有空檔時，把會議縮短成 25／50 分鐘，或至少在最後 1 分鐘記一行。',
+    ],
+    sources: ['safren-2010', 'gollwitzer-2006'],
+  },
+
+  '7-2': {
+    goals: [
+      '用啟動清單替新專案打好第一天的基礎',
+      '在第一天就做完第一個下一步',
+      '排好這個專案的第一次回顧',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 7-1）會議筆記「簡報要改」落地後應該長怎樣？', options: [
+        { text: '「週四前改第 3、5 頁」，再附上下一步', correct: true, why: '有期限、範圍和下一步。' },
+        { text: '「簡報要改（重要！主管說的，這週一定要記得做）」', why: '還是主題，沒有下一步。' },
+        { text: '「改簡報」', why: '沒有期限和範圍。' },
+        { text: '「等主管告訴我怎麼改」', why: '「等」不是動作。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 5-3）好的完成的定義應該？', options: [
+        { text: '2–4 條、每條能回答是或不是', correct: true, why: '可以檢查，才知道什麼時候停。' },
+        { text: '「做到大家都滿意」', why: '沒辦法檢查。' },
+        { text: '越詳細越好，把所有可能的情況都寫成十幾條', why: '太多條會變成負擔。' },
+        { text: '做完再補寫', why: '開始前就要寫。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 3-2）專案拆解時，一開始要拆到多細？', options: [
+        { text: '只把第一個里程碑拆到下一步', correct: true, why: '其他的等做到再拆。' },
+        { text: '全部拆到最細', why: '清單會長到嚇人，而且後面會變。' },
+        { text: '只寫專案名稱就好', why: '沒有下一步就不知道從哪開始。' },
+        { text: '等主管給一份從頭到尾的完整計畫再開始拆', why: '自己先拆第一個里程碑就能開始。' },
+      ] },
+    ],
+    analogy: {
+      text: ['飛機起飛前，機長和副駕駛會照著一張檢查表一項一項確認。他們不是記不住，而是知道在壓力下最容易漏掉最基本的事。[[啟動清單]]就是專案的起飛前檢查表。'],
+      limit: ['飛機的檢查表每次都一樣；專案的情況每次不同。所以啟動清單只放每個專案都需要的五件事，其他的依專案補。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="啟動清單五項：目標一句話、完成的定義、第一個里程碑、今天的第一個下一步、第一次回顧的時間">
+        <rect x="10" y="10" width="540" height="42" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="37" font-size="15" font-weight="900" class="on-color">① 目標：一句話說出為什麼做這個專案</text>
+        <rect x="10" y="60" width="540" height="42" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="87" font-size="15" font-weight="900" class="on-color">② 完成的定義：2–4 條（5-3）</text>
+        <rect x="10" y="110" width="540" height="42" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="137" font-size="15" font-weight="900" class="on-color">③ 第一個里程碑（3-2）</text>
+        <rect x="10" y="160" width="540" height="42" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="187" font-size="15" font-weight="900" class="on-color">④ 今天就做完的第一個下一步（3-1）</text>
+        <rect x="10" y="210" width="540" height="42" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="237" font-size="15" font-weight="900" class="on-color">⑤ 第一次回顧的時間：排進行事曆（4-3）</text>
+      </svg>`,
+      caption: '第 ④ 項最重要：第一天就有進度，專案就不會一開始就卡住。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：前面各課的組合', body: ['啟動清單把完成的定義（5-3）、專案拆解（3-2）、下一步（3-1）、每週回顧（4-3）組在一起，這些都是成人 ADHD 認知行為治療中組織與規劃訓練的內容。'] },
+        { type: 'widget', name: 'breakdown', props: { placeholder: '例如：新客戶導入專案' } },
+      ],
+    },
+    define: [
+      { term: '啟動清單', en: 'kickoff checklist', def: '專案第一天要確認的五件事。', example: '目標、完成的定義、第一個里程碑、第一步、回顧時間。' },
+      { term: '第一天的進度', en: 'day-one progress', def: '專案指派當天就做完的一個小步驟。', example: '建好專案資料夾、寄出第一封確認信。' },
+      { term: '專案回顧', en: 'project check-in', def: '專案自己的定期檢查，可以併進每週回顧。', example: '每週五回顧時看一眼這個專案的下一步。' },
+    ],
+    examples: {
+      compare: [{
+        title: '主管交辦一個新專案',
+        kind: '先放著 vs. 第一天就啟動',
+        badLabel: '先放著',
+        goodLabel: '當天跑完啟動清單',
+        bad: '「{{1:這個比較大，等我有空再好好想}}。」',
+        good: '當天花 20 分鐘跑完啟動清單，{{1:並寄出第一封確認信}}。',
+        badResult: '一週後主管問進度，才發現連目標都還不清楚。',
+        goodResult: '第一天就有進度，目標和範圍也和主管確認過了。',
+        why: ['第一天最容易啟動，也最容易拖'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="第一天的時間軸：專案指派下來，當天找二十分鐘跑完啟動清單，做完第一個下一步，第一次回顧排在一週內">
+          <rect x="10" y="80" width="125" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="72" y="120" text-anchor="middle" font-size="14" font-weight="900">指派下來</text>
+          <rect x="155" y="80" width="125" height="70" style="fill:var(--m7)" class="stroke-ink" stroke-width="4"/>
+          <text x="217" y="110" text-anchor="middle" font-size="14" font-weight="900" class="on-color">當天 20 分</text>
+          <text x="217" y="134" text-anchor="middle" font-size="13" class="on-color">跑啟動清單</text>
+          <rect x="300" y="80" width="125" height="70" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="362" y="110" text-anchor="middle" font-size="14" font-weight="900" class="on-color">做完第一步</text>
+          <text x="362" y="134" text-anchor="middle" font-size="13" class="on-color">第一天就有進度</text>
+          <rect x="445" y="80" width="105" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="497" y="110" text-anchor="middle" font-size="14" font-weight="900" class="on-color">一週內</text>
+          <text x="497" y="134" text-anchor="middle" font-size="13" class="on-color">第一次回顧</text>
+          <g class="stroke-ink" stroke-width="4"><path d="M135 115 H155 M280 115 H300 M425 115 H445"/></g>
+        </svg>`, caption: '專案的第一天，比專案的第一個月更決定它會不會卡住。' },
+      ],
+      tryit: {
+        q: ['替一個你最近接到（或想開始）的專案填啟動清單：'],
+        draft: '① 目標：＿＿＿＿\n② 完成的定義：＿＿＿＿\n③ 第一個里程碑：＿＿＿＿\n④ 今天的第一個下一步：＿＿＿＿\n⑤ 第一次回顧：＿＿（日期時間）',
+        answer: ['例如「新客戶導入」：① 讓客戶兩週內能自己用系統；② 帳號開好、教學完成、客戶回報可以用；③ 帳號開好；④ 寄信請客戶提供使用者名單；⑤ 下週五回顧時。', '② 不清楚的話，第一個下一步就是「問主管完成的定義」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '大專案先放著，等「有完整的時間」再好好想。', why: '完整的時間很少出現，專案越放越可怕（6-1）。', right: '當天就花 20 分鐘跑完啟動清單。' },
+      { wrong: '啟動時只確認目標，沒有寫完成的定義。', why: '做到一半才發現大家期待的不一樣。', right: '第一天就和主管確認完成的定義。' },
+      { wrong: '跑完清單，但第一個下一步留到明天。', why: '明天可能又被別的事擠掉。', right: '第 ④ 項當天做完，讓專案第一天就有進度。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '啟動清單裡，哪一項最好當天就做完？', options: [
+        { text: '第一個下一步', correct: true, why: '第一天就有進度，專案不會一開始就卡住。' },
+        { text: '整個專案的完整計畫', why: '這太大，也不需要第一天就完成。' },
+        { text: '最後的成果報告', why: '那是專案結束時的事。' },
+        { text: '所有里程碑的下一步', why: '只需要第一個里程碑。' },
+      ] },
+      { level: '應用', type: 'mc', q: '主管交辦專案時說得很模糊。你在啟動清單第 ② 項卡住了，最好？', options: [
+        { text: '把「問主管完成的定義」當成第一個下一步', correct: true, why: '不清楚的事先變成要問的問題。' },
+        { text: '自己猜一個標準先做', why: '可能整個方向都錯。' },
+        { text: '先跳過，做完再說', why: '沒有完成線，容易做太多或太少。' },
+        { text: '等主管自己想清楚、主動來找你說明完成的定義', why: '主管可能以為你已經懂了。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你同時被交辦三個新專案，都覺得很大。用啟動清單和前面學過的方法，說明你今天會怎麼處理。'], answer: [
+        '三個專案各花 10–15 分鐘跑一次「精簡版」啟動清單：目標一句話、第一個里程碑、一個今天能做的下一步、回顧時間。完成的定義不清楚的，下一步就是去問。',
+        '今天的三件（4-2）就是這三個下一步；完整的拆解和完成的定義在這週的回顧時補齊。如果三個專案的期限衝突，回顧時和主管討論優先順序。',
+      ] },
+    ],
+    today: {
+      minutes: 5,
+      task: ['挑一個新的或卡住的專案，照下面的清單跑一次，並在今天做完第 ④ 項。'],
+      blocks: [{ type: 'widget', name: 'checklist', props: { key: 'kickoff', items: [
+        '① 目標：一句話寫下為什麼做這個專案',
+        '② 完成的定義：2–4 條（不清楚就去問）',
+        '③ 第一個里程碑',
+        '④ 今天就做完的第一個下一步',
+        '⑤ 把第一次回顧排進行事曆',
+      ] } }],
+    },
+    keypoints: [
+      '專案第一天就跑啟動清單：目標、完成的定義、第一個里程碑、第一步、回顧時間。',
+      '第一個下一步當天做完，讓專案第一天就有進度。',
+      '完成的定義不清楚時，第一個下一步就是去問。',
+    ],
+    sources: ['safren-2010', 'solanto-2010'],
+  },
+
+  '7-3': {
+    goals: [
+      '分清楚哪些事交給 AI、哪些要自己做',
+      '說出過度依賴 AI 的警訊',
+      '設計一個「AI 協助、自己決定」的工作流程',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 7-2）啟動清單第 ② 項卡住時，第一個下一步是？', options: [
+        { text: '去問主管完成的定義', correct: true, why: '不清楚的事先變成要問的問題。' },
+        { text: '自己猜一個標準', why: '可能方向錯。' },
+        { text: '跳過，做完再說', why: '沒有完成線。' },
+        { text: '等主管主動說明', why: '主管可能以為你懂了。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 3-3）AI 拆完任務後，你要做的三件事是？', options: [
+        { text: '把關、自己選第一步、查證事實', correct: true, why: 'AI 負責拆，你負責決定和開始。' },
+        { text: '照做、照做、照做', why: 'AI 的步驟可能太大或有錯。' },
+        { text: '存起來、分享、刪掉', why: '這些都不是確保品質的步驟。' },
+        { text: '再請另一個 AI 檢查一次，兩個都說對就照做', why: '最後的判斷要自己做。' },
+      ] },
+    ],
+    analogy: {
+      text: ['導航很好用：它幫你算路線、提醒轉彎。但如果你完全不看路，導航叫你開進河裡你也會開。AI 是一個很好的[[外部執行功能]]，前提是方向盤還在你手上。'],
+      limit: ['導航錯了通常很明顯；AI 錯了常常看起來很有道理。所以「查證」和「自己決定」這兩件事，比用導航時更重要。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="分工表：交給 AI 的是拆解任務、整理會議紀錄成待辦草稿、寫提醒和信件草稿、整理資料；自己做的是決定優先順序、檢查與查證、按下開始、判斷要不要寄出">
+        <rect x="10" y="10" width="265" height="230" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">交給 AI</text>
+        <text x="142" y="96" text-anchor="middle" font-size="14" class="on-color">拆解任務的草稿</text>
+        <text x="142" y="126" text-anchor="middle" font-size="14" class="on-color">會議紀錄 → 待辦草稿</text>
+        <text x="142" y="156" text-anchor="middle" font-size="14" class="on-color">信件、提醒的草稿</text>
+        <text x="142" y="186" text-anchor="middle" font-size="14" class="on-color">整理、摘要資料</text>
+        <rect x="285" y="10" width="265" height="230" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">自己做</text>
+        <text x="417" y="96" text-anchor="middle" font-size="14" class="on-color">決定優先順序</text>
+        <text x="417" y="126" text-anchor="middle" font-size="14" class="on-color">檢查與查證</text>
+        <text x="417" y="156" text-anchor="middle" font-size="14" class="on-color">按下開始</text>
+        <text x="417" y="186" text-anchor="middle" font-size="14" class="on-color">判斷要不要寄出</text>
+      </svg>`,
+      caption: 'AI 做草稿，你做決定。',
+      blocks: [
+        { type: 'callout', variant: 'danger', title: '證據：不足', body: ['目前沒有對照試驗證明生成式 AI 能改善 ADHD 成人的任務管理；已有的是小型探索研究與共同設計研究（CHI 2026），設計方向包括任務拆解的支架、執行時的反思與情緒調節。專家提醒：AI 工具不能取代治療，要注意[[過度依賴]]與隱私。'] },
+      ],
+    },
+    define: [
+      { term: '外部執行功能', en: 'external executive function', def: '用工具在外面替你做一部分執行功能的工作。', example: '清單、計時器、AI 拆解。' },
+      { term: '過度依賴', en: 'overreliance', def: '把判斷、決定、開始也交給工具。', example: '離開 AI 就不知道今天要做什麼。' },
+      { term: '人在迴路中', en: 'human in the loop', def: 'AI 產生的結果，一定經過人檢查和決定才會被使用。', example: 'AI 寫信件草稿，你看過、改過才寄出。' },
+    ],
+    examples: {
+      compare: [{
+        title: '用 AI 規劃這週',
+        kind: '全部交出去 vs. 草稿加決定',
+        badLabel: '全部交給 AI',
+        goodLabel: 'AI 草稿＋自己決定',
+        bad: '「{{1:幫我決定這週要做什麼}}」，然後照著做。',
+        good: '請 AI 把收件匣整理成下一步草稿，{{1:自己選這週的三件和優先順序}}。',
+        badResult: 'AI 不知道主管真正在意什麼，排出的優先順序和實際需要不同。',
+        goodResult: 'AI 省下整理的時間，重要的決定還是你自己做。',
+        why: ['草稿交給 AI，決定留給自己'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'ai', label: '可以交給 AI' }, { id: 'me', label: '自己做' }],
+          items: [
+            { text: '把會議逐字稿整理成待辦草稿（已去識別化）', answer: 'ai', why: '整理是 AI 擅長的事，你之後再檢查。' },
+            { text: '決定這週最重要的三件事', answer: 'me', why: '優先順序需要你知道的脈絡和判斷。' },
+            { text: '寫一封婉拒會議邀請的信件草稿', answer: 'ai', why: '草稿可以交給 AI，你看過再寄。' },
+            { text: '確認報告裡引用的數字是否正確', answer: 'me', why: '查證要自己做，AI 可能寫錯。' },
+            { text: '按下開始，做第一個下一步', answer: 'me', why: '啟動只有你自己能做。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="過度依賴的三個警訊：沒有 AI 就不知道今天要做什麼；AI 說的優先順序從來沒改過；常常沒檢查就直接寄出 AI 寫的內容">
+          <rect x="10" y="10" width="170" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">警訊 1</text>
+          <text x="95" y="110" text-anchor="middle" font-size="14" class="on-color">沒有 AI 就不知道</text>
+          <text x="95" y="136" text-anchor="middle" font-size="14" class="on-color">今天要做什麼</text>
+          <rect x="195" y="10" width="170" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">警訊 2</text>
+          <text x="280" y="110" text-anchor="middle" font-size="14" class="on-color">AI 排的順序</text>
+          <text x="280" y="136" text-anchor="middle" font-size="14" class="on-color">從來沒改過</text>
+          <rect x="380" y="10" width="170" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">警訊 3</text>
+          <text x="465" y="110" text-anchor="middle" font-size="14" class="on-color">沒檢查就寄出</text>
+          <text x="465" y="136" text-anchor="middle" font-size="14" class="on-color">AI 寫的內容</text>
+        </svg>`, caption: '出現警訊時，把「決定」和「檢查」收回自己手上。' },
+      ],
+      tryit: {
+        q: ['設計你自己的「AI 協助」流程：哪一步交給 AI、哪一步自己做？'],
+        draft: '情境：＿＿＿＿（例如每週回顧、會議後、寫報告）\n交給 AI：＿＿＿＿\n自己做：＿＿＿＿\n要提醒自己的事：＿＿＿＿（例如不貼個資）',
+        answer: ['例如「每週回顧」：交給 AI「把收件匣的 30 項整理成下一步草稿」；自己做「選下週三件、排時間、看哪些要問人」；提醒「客戶名稱換成代稱」。', '流程的關鍵是：每一個 AI 的輸出，下一步都是你的檢查或決定。'],
+      },
+    },
+    mistakes: [
+      { wrong: '請 AI「幫我決定」優先順序，然後照做。', why: 'AI 不知道你的主管、你的狀態和隱藏的期限。', right: 'AI 列出選項和理由，你自己決定。' },
+      { wrong: 'AI 寫的信沒看就寄出。', why: '可能有錯誤、語氣不對，或包含不該寫的內容。', right: '人在迴路中：每封都看過、改過才寄。' },
+      { wrong: '把公司資料、客戶個資直接貼進 AI。', why: '可能違反公司規定或隱私。', right: '先確認公司規定，去識別化後只給需要的內容。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下面哪一件最適合交給 AI？', options: [
+        { text: '把已去識別化的會議紀錄整理成待辦草稿', correct: true, why: '整理是 AI 擅長的事，你之後檢查。' },
+        { text: '決定要不要接下一個新專案', why: '這需要你的判斷和脈絡。' },
+        { text: '代替你按下開始', why: '啟動只有你自己能做。' },
+        { text: '確認這份合約裡每一條條款的內容和金額是否正確', why: '需要自己或專業人員查證。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你發現自己每天早上都先問 AI「今天要做什麼」，而且從沒改過它的答案。這代表？', options: [
+        { text: '可能過度依賴，要把決定收回來', correct: true, why: '這是過度依賴的警訊之一。' },
+        { text: '代表 AI 很懂你，繼續這樣就好', why: 'AI 不知道你的完整脈絡。' },
+        { text: '代表你的規劃能力已經很好', why: '決定都交給 AI，規劃能力沒有被練習。' },
+        { text: '應該換一個更好的 AI', why: '問題不在 AI 好不好，在分工。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說：「有了 AI，學這些規劃技巧沒用了，叫它幫你排就好。」用這一課和整門課的觀念回應他。'], answer: [
+        'AI 可以幫忙拆解和整理，但 ADHD 卡住的地方常常在「要做的那一刻」：開始、回到工作、在分心時拉回來，這些 AI 替你做不了。而且 AI 的建議要有人檢查和決定。',
+        '比較好的說法是：AI 是很好的外部執行功能，搭配這些技巧（下一步、如果…就…、每週回顧），可以讓你更快把它的草稿變成行動。目前也沒有研究證明只靠 AI 就能改善。',
+      ] },
+    ],
+    today: {
+      minutes: 4,
+      task: ['用上面的格式，替你最常用 AI 的一個情境寫下分工。下次使用時照著做，並且檢查一次有沒有出現三個警訊。'],
+      blocks: [{ type: 'widget', name: 'promptkit', props: {} }],
+    },
+    keypoints: [
+      'AI 是外部執行功能：交給它草稿、拆解、整理；決定、檢查、開始留給自己。',
+      '過度依賴的警訊：沒有 AI 不知道要做什麼、從不改它的順序、沒檢查就寄出。',
+      '不貼機密與個資；目前沒有研究證明只靠 AI 能改善 ADHD 的任務管理。',
+    ],
+    sources: ['ai-chi26', 'ai-expert-2024'],
+  },
+});
+</script>

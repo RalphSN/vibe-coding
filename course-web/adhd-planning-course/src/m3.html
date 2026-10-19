@@ -1,0 +1,363 @@
+<script>
+/* ==========================================================================
+   模組 3：把模糊拆成下一步
+   ========================================================================== */
+defineTerms({
+  '下一步': { en: 'next action', def: '動詞開頭、看得到、一次坐下就能做完的具體動作。只有它可以直接做，其他都只是「要拆的東西」。', example: '「打電話給 A 場地問 11/20 有沒有空」。' },
+  '里程碑': { en: 'milestone', def: '專案裡一個看得見的中間成果，做到了就代表專案往前一大步。', example: '「場地確定」「邀請函寄出」。' },
+  '專案': { en: 'project', def: '需要好幾個步驟、不會一次做完的事。', example: '「辦產品發表會」「換工作」。' },
+  'prompt': { en: 'prompt', def: '你給 AI 的指示文字。情境、目標、限制給得越清楚，AI 的回答越能直接用。', example: '「我有 ADHD，請只給我一個 2 分鐘內能開始的第一步。」' },
+});
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '分辨「下一步」和「還要再拆的東西」',
+      '用三個檢查替一行待辦把關',
+      '把清單上模糊的項目改寫成下一步',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 2-3）你的估時倍數是 ×1.5，覺得要 40 分鐘的事，該排多久？', options: [
+        { text: '約 60 分鐘', correct: true, why: '40 × 1.5 ＝ 60。' },
+        { text: '40 分鐘，這次專心一點就好', why: '這就是計畫謬誤。' },
+        { text: '約 27 分鐘', why: '這是除以 1.5，方向相反。' },
+        { text: '不用排，做完再說', why: '沒有時間框，更容易拖。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）第一步的三個檢查是？', options: [
+        { text: '動詞開頭、看得到、2 分鐘內能開始', correct: true, why: '三個都要成立。' },
+        { text: '重要、緊急、有截止日', why: '這是排優先順序的條件。' },
+        { text: '有趣、簡單、快速', why: '有趣不是必要條件。' },
+        { text: '寫得很詳細、很完整，連後面所有步驟都列出來', why: '詳細不等於能開始。' },
+      ] },
+    ],
+    analogy: {
+      text: ['去餐廳點餐，你不會跟服務生說「我想吃得健康一點」，而是說「一份烤雞沙拉，醬另外放」。待辦清單也一樣：「把身體顧好」是願望，「明早 7 點去公園走 15 分鐘」才是能下單的[[下一步]]。'],
+      limit: ['點餐時菜單已經幫你拆好了；生活裡的事沒有菜單，要自己拆。這一課就是在練習自己寫菜單。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="從模糊到下一步：處理客戶的事，先問具體要做什麼，變成回覆客戶的報價問題，再問第一個動作，變成打開上週的報價單，複製第三項的價格">
+        <rect x="10" y="10" width="540" height="56" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="44" font-size="16" font-weight="900" class="on-color">處理客戶的事</text>
+        <text x="530" y="44" text-anchor="end" font-size="14" class="on-color">模糊</text>
+        <rect x="10" y="88" width="540" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="30" y="122" font-size="16" font-weight="900">回覆客戶的報價問題</text>
+        <text x="530" y="122" text-anchor="end" font-size="14">清楚但還大</text>
+        <rect x="10" y="166" width="540" height="64" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="204" font-size="16" font-weight="900" class="on-color">打開上週的報價單，複製第三項的價格</text>
+      </svg>`,
+      caption: '每往下一層，就問一次：「具體要做什麼？第一個動作是什麼？」',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究支持（作為 CBT 的一部分）', body: ['把模糊的任務改寫成具體步驟，是成人 ADHD 認知行為治療中組織與規劃訓練的內容（Safren 2010、Solanto 2010）；單獨效果沒有被分開測量。'] },
+        '[[下一步]]和 1-1 的第一步很像，差別在範圍：第一步是「現在這件事怎麼開始」，下一步是「清單上每一行都要長成這樣」。**動詞開頭、看得到、一次坐下就能做完。**',
+      ],
+    },
+    define: [
+      { term: '下一步', en: 'next action', def: '動詞開頭、看得到、一次坐下就能做完。', example: '「寄 email 給小王，問簡報檔的最新版在哪」。' },
+      { term: '模糊待辦', en: 'vague to-do', def: '寫的是主題或願望，看不出第一個動作。', example: '「客戶」「健康」「年假的事」。' },
+      { term: '一次坐下', en: 'one sitting', def: '不用中途等別人、也不用分好幾天，現在坐下就能做完。', example: '「等小王回信」不是下一步，「寄信問小王」才是。' },
+    ],
+    examples: {
+      compare: [{
+        title: '同一張清單',
+        kind: '模糊待辦 vs. 下一步',
+        badLabel: '模糊待辦',
+        goodLabel: '下一步',
+        bad: '・客戶\n・{{1:年假的事}}\n・簡報',
+        good: '・回覆客戶報價：打開上週的報價單\n・{{1:在請假系統送出 11/3 的假單}}\n・簡報：把三個重點寫在第一頁',
+        badResult: '每一行都要先想「這是什麼意思」，想到一半就跳去滑手機。',
+        goodResult: '挑任何一行都能直接開始。',
+        why: ['清單上每一行都要能直接做'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: {
+          buckets: [{ id: 'next', label: '是下一步' }, { id: 'not', label: '還要再拆' }],
+          items: [
+            { text: '整理年度目標', answer: 'not', why: '「整理」看不出第一個動作。' },
+            { text: '打給牙醫診所，約下週的洗牙時間', answer: 'next', why: '動詞開頭、看得到、一次就能做完。' },
+            { text: '等主管回覆預算', answer: 'not', why: '「等」不是你能做的動作；下一步可能是「傳訊息問主管預算何時確定」。' },
+            { text: '在雲端資料夾新增「Q4 發表會」，放進上次的企劃書', answer: 'next', why: '具體、看得到、坐下就能做。' },
+            { text: '想一下要不要換工作', answer: 'not', why: '「想一下」沒有終點；下一步可能是「列出三個現在工作最不想要的地方」。' },
+          ],
+        } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="下一步的三個檢查：動詞開頭；看得到；一次坐下就能做完，不需要等別人">
+          <rect x="10" y="10" width="170" height="190" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="17" font-weight="900" class="on-color">動詞開頭</text>
+          <text x="95" y="120" text-anchor="middle" font-size="14" class="on-color">寄、打給、新增</text>
+          <rect x="195" y="10" width="170" height="190" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="17" font-weight="900" class="on-color">看得到</text>
+          <text x="280" y="120" text-anchor="middle" font-size="14" class="on-color">不是「想」「研究」</text>
+          <rect x="380" y="10" width="170" height="190" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="17" font-weight="900" class="on-color">一次坐下</text>
+          <text x="465" y="120" text-anchor="middle" font-size="14" class="on-color">不用等別人</text>
+        </svg>`, caption: '「等別人」不是你的下一步；你的下一步是「去問」。' },
+      ],
+      tryit: {
+        q: ['把清單上的「年度健檢」改寫成下一步：'],
+        draft: '「年度健檢」\n→ 下一步：＿＿＿＿',
+        answer: ['例如：「打開公司福利網頁，找到合作的健檢診所電話」或「打給 XX 診所，問 11 月的空檔」。', '如果不知道第一步，下一步就是「去找出第一步需要的資訊」，那也是一個具體動作。'],
+      },
+    },
+    mistakes: [
+      { wrong: '清單上寫主題：「客戶」「健康」。', why: '每次看都要重新想一次這是什麼意思，想的過程就是摩擦。', right: '寫成動詞開頭的動作。' },
+      { wrong: '把「等某人」放在自己的清單上。', why: '你沒辦法「做」等待，它會一直卡在清單上讓你焦慮。', right: '寫成「問某人」，並在旁邊註明「已問，週五再追」。' },
+      { wrong: '下一步寫得太大：「完成簡報」。', why: '一次坐下做不完，又變回要拆的東西。', right: '只寫現在坐下就能做完的那一塊。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '哪一個是下一步？', options: [
+        { text: '傳訊息給阿華，問活動的預算上限', correct: true, why: '動詞開頭、看得到、一次就能做完。' },
+        { text: '活動預算', why: '這是主題，不是動作。' },
+        { text: '想清楚活動到底要花多少錢', why: '「想清楚」沒有終點，也看不到。' },
+        { text: '等阿華告訴我預算再開始規劃整個活動', why: '「等」不是你能做的動作。' },
+      ] },
+      { level: '應用', type: 'mc', q: '清單上寫著「研究新的筆電」，三週都沒動。最好的改寫是？', options: [
+        { text: '打開比價網，列出三台兩萬五以下的筆電', correct: true, why: '把「研究」變成一個有終點、看得到的動作。' },
+        { text: '好好研究新的筆電，這週五之前一定要做出決定', why: '動作還是「研究」，只是加了壓力。' },
+        { text: '刪掉，反正不急', why: '可以刪，但如果需要買，問題還在。' },
+        { text: '研究筆電（重要！）', why: '加上「重要」不會讓它變得能開始。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的清單上有一行「搞定保險」，已經拖了兩個月。寫出它的下一步，並說明如果你連下一步是什麼都不知道，該怎麼辦。'], answer: [
+        '例如：「打開保險公司的 App，找到這份保單的到期日」或「打給業務員問我現在的保障有哪些」。',
+        '如果不知道第一步，下一步就是「取得資訊」：找文件、問一個人、查一個網頁。這本身就是具體的動作，不需要先想通全部。',
+      ] },
+    ],
+    today: {
+      minutes: 4,
+      task: ['打開你現在的待辦清單（紙本、App 都可以），挑三行最模糊的，改寫成下一步。改不出來的，就寫成「取得資訊」的動作：去找、去問、去查。'],
+      blocks: [{ type: 'widget', name: 'shrinker', props: { placeholder: '例如：搞定保險' } }],
+    },
+    keypoints: [
+      '下一步：動詞開頭、看得到、一次坐下就能做完。',
+      '清單上每一行都要能直接做；寫主題或「等某人」都不算。',
+      '不知道第一步時，下一步就是「去找出需要的資訊」。',
+    ],
+    sources: ['safren-2010', 'solanto-2010'],
+  },
+
+  '3-2': {
+    goals: [
+      '把一個專案拆成專案、里程碑、下一步三層',
+      '知道只有最底層需要具體',
+      '每個里程碑只維持一到三個下一步',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-1）「等主管回覆預算」應該怎麼改寫？', options: [
+        { text: '傳訊息問主管預算何時確定', correct: true, why: '把等待換成你能做的動作。' },
+        { text: '保持原樣，等就好', why: '你沒辦法「做」等待，它會一直卡著。' },
+        { text: '刪掉，主管會自己說', why: '如果你需要這個資訊，主動問比較快。' },
+        { text: '改成「預算」兩個字，比較簡潔', why: '變成主題，更看不出要做什麼。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-2）「如果…就…」裡，「就」後面要寫？', options: [
+        { text: '一個小而具體的第一步', correct: true, why: '動作要小到情境出現時能立刻做。' },
+        { text: '整件事最後要達成的目標', why: '太大，情境出現時還是開不了頭。' },
+        { text: '完成後的獎勵', why: '獎勵可以另外設計，不是「就」的內容。' },
+        { text: '截止日', why: '截止日不是動作。' },
+      ] },
+    ],
+    analogy: {
+      text: ['開車去一個沒去過的城市：你不需要現在就知道每一個路口，只需要知道「先上國道」「在哪個交流道下」，以及眼前這個路口要右轉。專案也一樣：大方向寫成[[里程碑]]，只有眼前的路口需要具體。'],
+      limit: ['導航會隨時重算路線；專案的拆解要自己更新。所以每週回顧（4-3）時，要把做完的下一步劃掉、補上新的下一步。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="專案拆成三層：最上面是專案，產品發表會；中間是里程碑，場地確定、邀請函寄出、簡報完成；只有最底層的下一步需要具體，例如打電話問 A 場地十一月二十日有沒有空">
+        <rect x="160" y="10" width="240" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="42" text-anchor="middle" font-size="16" font-weight="900" class="on-color">專案：產品發表會</text>
+        <rect x="10" y="100" width="170" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="95" y="132" text-anchor="middle" font-size="15" font-weight="900">場地確定</text>
+        <rect x="195" y="100" width="170" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="132" text-anchor="middle" font-size="15" font-weight="900">邀請函寄出</text>
+        <rect x="380" y="100" width="170" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="465" y="132" text-anchor="middle" font-size="15" font-weight="900">簡報完成</text>
+        <rect x="10" y="190" width="370" height="60" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="195" y="226" text-anchor="middle" font-size="15" font-weight="900" class="on-color">下一步：打電話問 A 場地 11/20 有沒有空</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M95 100 V80 H465 V100 M280 60 V100 M95 150 V190"/></g>
+      </svg>`,
+      caption: '只有綠色那一層需要具體；上面兩層只要讓你知道「為什麼做這一步」。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究支持（作為 CBT 與 MCT 的一部分）', body: ['把大任務拆成步驟、排出順序，是成人 ADHD 認知行為治療與後設認知治療（Solanto 2010）中組織與規劃訓練的核心；單獨效果沒有被分開測量。'] },
+        { type: 'widget', name: 'breakdown', props: {} },
+      ],
+    },
+    define: [
+      { term: '專案', en: 'project', def: '需要好幾步、不會一次做完的事。', example: '「換工作」「辦活動」。' },
+      { term: '里程碑', en: 'milestone', def: '看得見的中間成果。', example: '「履歷更新完」「場地確定」。' },
+      { term: '下一步', en: 'next action', def: '每個里程碑下面，現在就能做的動作（最多 1–3 個）。', example: '「打開舊履歷，把職稱改成現在的」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '拆「換工作」',
+        kind: '一次拆到底 vs. 三層',
+        badLabel: '一次拆到底',
+        goodLabel: '三層，只有底層具體',
+        bad: '列出 {{1:47 個步驟}}，從更新履歷到談薪水到離職交接。',
+        good: '3 個里程碑（履歷更新、投 5 間、準備面試），{{1:只有第一個里程碑寫了 2 個下一步}}。',
+        badResult: '清單長到嚇人，而且後面的步驟到時候大概都會變。',
+        goodResult: '看得到方向，眼前又只有兩件小事。',
+        why: ['只把眼前的里程碑拆到下一步'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="只看最底層：每天打開專案時，視線只放在最底層的下一步；里程碑和專案留著提醒方向">
+          <rect x="10" y="10" width="540" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="280" y="42" text-anchor="middle" font-size="15">專案、里程碑：提醒方向，不用每天看</text>
+          <rect x="10" y="80" width="540" height="120" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="126" text-anchor="middle" font-size="17" font-weight="900" class="on-color">每天只看這一層</text>
+          <text x="280" y="160" text-anchor="middle" font-size="15" class="on-color">下一步：挑一個，現在做</text>
+        </svg>`, caption: '每天要做決定的地方越少越好：只從下一步裡挑。' },
+      ],
+      tryit: {
+        q: ['拆一個你正在拖的專案，寫出 2–3 個里程碑，只替第一個里程碑寫下一步：'],
+        draft: '專案：＿＿＿＿\n里程碑：①＿＿　②＿＿　③＿＿\n① 的下一步：＿＿＿＿',
+        answer: ['例如「整理家裡」：① 書桌清空 ② 衣櫃換季 ③ 儲藏室分類。① 的下一步：「拿一個箱子，把書桌上不是今天要用的東西放進去」。', '② ③ 先不用拆，等 ① 做完再拆。'],
+      },
+    },
+    mistakes: [
+      { wrong: '一開始就把整個專案拆到最細。', why: '清單太長會嚇到自己，而且後面的步驟到時候常常會變。', right: '只拆眼前的里程碑。' },
+      { wrong: '里程碑寫成動作：「打電話給場地」。', why: '那是下一步；里程碑要寫成「做到什麼」。', right: '里程碑寫成果（「場地確定」），下一步寫動作。' },
+      { wrong: '做完一個下一步，就停在那裡不補新的。', why: '專案底下沒有下一步，就又回到「不知道從哪開始」。', right: '劃掉做完的，順手補上下一個（或在每週回顧時補）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '三層裡，哪一層一定要寫得具體？', options: [
+        { text: '下一步', correct: true, why: '只有它要直接拿來做。' },
+        { text: '專案', why: '專案只要說得出名字就好。' },
+        { text: '里程碑', why: '里程碑寫成果，不需要具體到動作。' },
+        { text: '三層都要一樣具體才行', why: '全部拆細會讓清單長到嚇人。' },
+      ] },
+      { level: '應用', type: 'mc', q: '「發表會」的里程碑「場地確定」底下，哪一個最適合當下一步？', options: [
+        { text: '查兩個場地 11/20 的空檔', correct: true, why: '具體、看得到、一次就能做完。' },
+        { text: '先把整場發表會從頭到尾的流程都規劃好', why: '這是整個專案，不是下一步。' },
+        { text: '找到一個完美又便宜的場地', why: '這是成果的期待，不是動作。' },
+        { text: '等老闆決定要不要辦再說', why: '「等」不是動作；可以改成「問老闆何時決定」。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事交給你一個「重新設計官網」的專案，你一看就覺得腦袋一片空白。用三層拆解，寫出你明天早上第一件會做的事。'], answer: [
+        '先寫 3 個里程碑，例如「現況盤點完」「新版架構確定」「首頁上線」。只替第一個寫下一步：「打開現在的官網，把每一頁的網址貼進一個表格」。',
+        '明天早上第一件事就是這個下一步；其他的里程碑等第一個做完再拆。腦袋空白通常是因為同時看到整個專案，只看最底層就會好很多。',
+      ] },
+    ],
+    today: {
+      minutes: 5,
+      task: ['用上面的拆解樹，替一個正在拖的專案寫出里程碑，只替第一個寫 1–2 個下一步，按「存進我的系統」。然後挑一個下一步，今天做。'],
+    },
+    keypoints: [
+      '專案 → 里程碑（成果）→ 下一步（動作）；只有下一步需要具體。',
+      '只拆眼前的里程碑，其他的等做到再拆。',
+      '每天只從下一步裡挑；做完一個就補上下一個。',
+    ],
+    sources: ['solanto-2010', 'safren-2010'],
+  },
+
+  '3-3': {
+    goals: [
+      '寫出讓 AI 能把任務拆好的 prompt',
+      '檢查 AI 拆出來的步驟是不是真的下一步',
+      '知道哪些資料不該貼給 AI',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-2）里程碑應該寫成什麼？', options: [
+        { text: '一個看得見的成果，例如「場地確定」', correct: true, why: '里程碑是成果，下一步才是動作。' },
+        { text: '一個具體的動作，例如「打電話給場地」', why: '這是下一步。' },
+        { text: '截止日期', why: '截止日可以標在旁邊，但不是里程碑本身。' },
+        { text: '整個專案的名稱', why: '那是最上面那一層。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 3-1）不知道第一步時，下一步是？', options: [
+        { text: '先去找出第一步需要的資訊', correct: true, why: '找、問、查本身就是具體動作。' },
+        { text: '先放著，等想到再說', why: '「想到」正是最容易漏掉的部分。' },
+        { text: '先把整件事從頭到尾想通', why: '想通全部沒有終點。' },
+        { text: '換一件比較簡單的事', why: '這件事會繼續拖著。' },
+      ] },
+    ],
+    analogy: {
+      text: ['請一位很能幹、但第一天上班的助理幫你拆工作：他很快，但不知道你的期限、資源和你容易卡在哪。你交代得越清楚，他拆得越能用。AI 也是這樣一位助理。'],
+      limit: ['真的助理會反問你；AI 常常不問就直接給一大串，而且可能有錯。所以 AI 拆完，你還要用 3-1 的三個檢查把關，並自己選第一步。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="好的 prompt 四個部分：我的狀況，例如我有 ADHD 開始比較難；要做的事；已知的情況，期限資源限制；要它怎麼回答，例如只給第一步、動詞開頭">
+        <rect x="10" y="10" width="265" height="105" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">① 我的狀況</text>
+        <text x="142" y="84" text-anchor="middle" font-size="14" class="on-color">開始比較難、容易卡在哪</text>
+        <rect x="285" y="10" width="265" height="105" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">② 要做的事</text>
+        <text x="417" y="84" text-anchor="middle" font-size="14" class="on-color">目標與完成的樣子</text>
+        <rect x="10" y="125" width="265" height="105" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="165" text-anchor="middle" font-size="16" font-weight="900" class="on-color">③ 已知的情況</text>
+        <text x="142" y="199" text-anchor="middle" font-size="14" class="on-color">期限、資源、限制</text>
+        <rect x="285" y="125" width="265" height="105" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="165" text-anchor="middle" font-size="16" font-weight="900" class="on-color">④ 要它怎麼回答</text>
+        <text x="417" y="199" text-anchor="middle" font-size="14" class="on-color">只給第一步、動詞開頭</text>
+      </svg>`,
+      caption: '第 ④ 部分最常被忘記：不說的話，AI 會給你一份完整到嚇人的計畫。',
+      blocks: [
+        { type: 'callout', variant: 'danger', title: '證據：不足', body: ['用生成式 AI 協助 ADHD 成人拆解任務，目前只有小型探索研究與設計研究（例如 CHI 2026 的共同設計研究），沒有對照試驗證明效果。專家也提醒：AI 工具不能取代治療，要注意過度依賴與隱私。這一課把 AI 當成**拆解的工具**，不是療效。'] },
+        { type: 'widget', name: 'promptkit', props: {} },
+      ],
+    },
+    define: [
+      { term: 'prompt', en: 'prompt', def: '給 AI 的指示文字。', example: '「請只給我一個 2 分鐘內能開始的第一步。」' },
+      { term: '回答格式', en: 'output format', def: '你要 AI 怎麼回答：條列、最多幾點、每點要動詞開頭。', example: '「最多 5 點，每點 30 分鐘內做得完。」' },
+      { term: '去識別化', en: 'de-identify', def: '把真實的人名、公司、客戶資料換成代稱再貼給 AI。', example: '「客戶 A」「我們公司」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '請 AI 幫忙寫季報',
+        kind: '一句話 vs. 四個部分',
+        badLabel: '只丟一句話',
+        goodLabel: '四個部分都給',
+        bad: '「{{1:幫我規劃季報}}」',
+        good: '「我有 ADHD，開頭最難。季報週五交，要有營收和三個專案進度。{{1:只給我一個 2 分鐘內能開始的第一步}}。」',
+        badResult: 'AI 回一份 12 點的完整計畫，看完更不想動。',
+        goodResult: 'AI 回一個具體動作，例如「打開上一季的季報，另存新檔」。',
+        why: ['告訴 AI 你要什麼樣的回答'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="AI 拆完之後你要做的三件事：用三個檢查把關，刪掉不是下一步的；自己選第一步；不確定的事實要查證">
+          <rect x="10" y="10" width="170" height="200" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="95" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">① 把關</text>
+          <text x="95" y="110" text-anchor="middle" font-size="14" class="on-color">用 3-1 的三個檢查</text>
+          <rect x="195" y="10" width="170" height="200" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="280" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">② 自己選</text>
+          <text x="280" y="110" text-anchor="middle" font-size="14" class="on-color">第一步由你決定</text>
+          <rect x="380" y="10" width="170" height="200" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+          <text x="465" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">③ 查證</text>
+          <text x="465" y="110" text-anchor="middle" font-size="14" class="on-color">事實、數字、規定</text>
+        </svg>`, caption: 'AI 負責拆，你負責決定和開始（7-3 會再談分工）。' },
+      ],
+      tryit: {
+        q: ['把這個 prompt 補上第 ④ 部分：'],
+        draft: '「我要在下週三前交一份 5 頁的市場分析，我容易卡在開頭找資料。＿＿＿＿」',
+        answer: ['例如：「請只給我今天能做的 3 個步驟，每個 25 分鐘內做得完、動詞開頭，並告訴我先做哪一個。」', '沒有這一句，AI 通常會給你一份完整到嚇人的大綱。'],
+      },
+    },
+    mistakes: [
+      { wrong: '直接把客戶名稱、合約內容、同事姓名貼給 AI。', why: '可能違反公司規定或隱私，資料也可能被保留。', right: '換成代稱（客戶 A、專案 X），只給拆任務需要的資訊。' },
+      { wrong: 'AI 給什麼就照做，不檢查。', why: 'AI 的步驟可能太大、太模糊，或包含錯誤的事實。', right: '用三個檢查把關，事實與規定自己查證。' },
+      { wrong: '只說「幫我規劃」，沒說要什麼格式。', why: 'AI 會給一份完整的長清單，反而讓人更不想開始。', right: '明說「只給第一步」或「最多 3 點，每點 25 分鐘內」。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '好的拆任務 prompt 最常被忘記的是哪一部分？', options: [
+        { text: '要 AI 怎麼回答', correct: true, why: '不說的話，AI 常常給一份完整到嚇人的計畫。' },
+        { text: '要做的事', why: '這通常大家都會寫。' },
+        { text: '說「請」和「謝謝」', why: '禮貌不影響拆得好不好。' },
+        { text: '把整份工作文件全部貼上去', why: '貼太多反而有隱私風險，也不一定拆得比較好。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'AI 給你的第一步是「全面分析市場趨勢」。你該怎麼做？', options: [
+        { text: '請它改成 25 分鐘內做得完的版本', correct: true, why: '這一步太大、太模糊，不符合三個檢查。' },
+        { text: '照做，AI 比較懂', why: '這不是能直接做的下一步。' },
+        { text: '放棄用 AI，自己從頭把整份市場分析想清楚', why: '補一句回答格式通常就能改善。' },
+        { text: '再問一次，期待它給不同答案', why: '不改 prompt，結果多半差不多。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你想用 AI 幫你整理一份客戶抱怨的回覆計畫，內容有客戶姓名和訂單編號。說出你會怎麼準備 prompt。'], answer: [
+        '先去識別化：把客戶姓名換成「客戶 A」、訂單編號拿掉，只留下抱怨的類型和你需要回覆的重點。也先確認公司是否允許把這類內容貼到外部 AI 服務。',
+        'prompt 用四個部分：我的狀況（開頭最難）、要做的事（回覆三位客戶的抱怨）、已知情況（今天下班前、要附退款政策）、回答格式（每封只給第一句和三個要點）。',
+      ] },
+    ],
+    today: {
+      minutes: 4,
+      task: ['用上面的工具組一段 prompt，貼給你常用的 AI，請它拆一件你正在拖的事。用三個檢查把關，挑一個下一步今天做。（記得不要貼公司機密或個資。）'],
+    },
+    keypoints: [
+      '好的 prompt 四個部分：我的狀況、要做的事、已知情況、要它怎麼回答。',
+      'AI 拆完，你要把關、自己選第一步、查證事實。',
+      '不要貼機密與個資；用 AI 拆任務目前證據不足，把它當工具。',
+    ],
+    sources: ['ai-chi26', 'ai-expert-2024'],
+  },
+});
+</script>

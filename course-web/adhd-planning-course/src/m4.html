@@ -1,0 +1,491 @@
+<script>
+/* ==========================================================================
+   模組 4：規劃一天與一週
+   ========================================================================== */
+defineTerms({
+  '收件匣': { en: 'inbox', def: '一個固定的地方，所有突然想到的事、別人交辦的事都先丟進去，之後再整理。', example: '手機裡一個固定的記事、桌上一本小筆記本。' },
+  '清空': { en: 'capture', def: '把腦中掛著的事全部寫下來，放進收件匣，讓工作記憶空出來。', example: '花 5 分鐘把想到的所有事寫在紙上。' },
+  '每週回顧': { en: 'weekly review', def: '每週固定一段時間，看看做到什麼、清空收件匣、更新下一步、排好下週。', example: '週五下午 4 點的 20 分鐘。' },
+  'WOOP': { en: 'wish, outcome, obstacle, plan', def: '心理對比加執行意圖的四步驟：願望、最好的結果、最可能的障礙、遇到障礙時的「如果…就…」。', example: '願望：寫完初稿；障礙：下午一直看訊息；計畫：如果想點開訊息，就把手機放抽屜。' },
+  '心理對比': { en: 'mental contrasting', def: '先想像達成目標的好結果，再想像擋在中間的障礙；比只想好結果更能啟動行動。', example: '想到週五準時下班很開心，接著想到下午會一直被訊息打斷。' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '建立一個收件匣，所有待辦都先進這裡',
+      '用 5 分鐘把腦袋清空',
+      '定時把收件匣整理成下一步',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 3-3）請 AI 拆任務時，哪一句最能避免它給你一份長到嚇人的計畫？', options: [
+        { text: '「只給我一個第一步」', correct: true, why: '明說回答格式。' },
+        { text: '「請幫我好好規劃這件事，越完整越好」', why: '沒有說要什麼格式，AI 常給完整長清單。' },
+        { text: '「我很急，越詳細越好」', why: '越詳細越長，更難開始。' },
+        { text: '「你是專業的專案經理」', why: '角色設定不會讓回答變短。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-1）工作記憶的特性是？', options: [
+        { text: '容量小，一被打斷就容易掉', correct: true, why: '所以要把要記的東西放到外面。' },
+        { text: '容量很大，專心時可以同時記住很多事', why: '工作記憶的容量很小。' },
+        { text: '只要專心就不會掉', why: '打斷和分心隨時都會發生。' },
+        { text: '和規劃沒有關係', why: '規劃時要同時記住很多事，正是工作記憶的工作。' },
+      ] },
+    ],
+    analogy: {
+      text: ['廚房只有一小塊料理台：上面堆滿了東西，就沒地方切菜。腦袋的[[工作記憶]]就是那塊料理台。[[收件匣]]是旁邊的大冰箱：東西先收進去，台面空出來，才有地方做事。'],
+      limit: ['冰箱放久了東西會壞；收件匣放久了也會變成一個不敢打開的地方。所以收件匣一定要配定時整理（4-3 的每週回顧），不然只是把雜亂搬到別處。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="收件匣到清單的流向：腦中想到的、別人交辦的、會議的待辦，都先進收件匣；整理時，每一項變成下一步、排進行事曆，或刪掉">
+        <rect x="10" y="10" width="150" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="85" y="46" text-anchor="middle" font-size="14" font-weight="900">腦中想到的</text>
+        <rect x="10" y="90" width="150" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="85" y="126" text-anchor="middle" font-size="14" font-weight="900">別人交辦的</text>
+        <rect x="10" y="170" width="150" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="85" y="206" text-anchor="middle" font-size="14" font-weight="900">會議的待辦</text>
+        <rect x="200" y="70" width="150" height="100" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="275" y="126" text-anchor="middle" font-size="17" font-weight="900" class="on-color">收件匣</text>
+        <rect x="390" y="10" width="160" height="60" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="470" y="46" text-anchor="middle" font-size="14" font-weight="900" class="on-color">下一步清單</text>
+        <rect x="390" y="90" width="160" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="470" y="126" text-anchor="middle" font-size="14" font-weight="900" class="on-color">排進行事曆</text>
+        <rect x="390" y="170" width="160" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="470" y="206" text-anchor="middle" font-size="14" font-weight="900">刪掉</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M160 40 H180 V200 H160 M160 120 H200 M350 120 H390 M390 40 H370 V200 H390"/></g>
+      </svg>`,
+      caption: '進收件匣不用想；整理時才決定它是下一步、行程，還是可以刪掉。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：理論＋治療手冊', body: ['把待辦集中在一個系統、而不是靠記憶，是成人 ADHD 認知行為治療組織訓練的內容，也對應 Barkley 模型裡「工作記憶要外在化」的推論；單獨效果沒有被分開測量。'] },
+      ],
+    },
+    define: [
+      { term: '收件匣', en: 'inbox', def: '所有待辦先進的一個固定地方。', example: '手機裡的一則固定記事。' },
+      { term: '清空', en: 'capture', def: '把腦中掛著的事全部寫下來。', example: '5 分鐘內想到什麼寫什麼，不分類。' },
+      { term: '整理', en: 'process', def: '把收件匣的每一項變成下一步、行程，或刪掉。', example: '「牙醫」→「打給診所約時間」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '突然想到一件事',
+        kind: '記在腦中 vs. 丟進收件匣',
+        badLabel: '記在腦中',
+        goodLabel: '丟進收件匣',
+        bad: '「我{{1:等一下要記得}}回小陳。」',
+        good: '{{1:3 秒內寫進手機的收件匣}}：「回小陳」，然後繼續手上的事。',
+        badResult: '一直掛在心上，手上的事做不專心，最後還是忘了。',
+        goodResult: '腦袋空出來，晚點整理時再變成下一步。',
+        why: ['腦袋是做事的地方，不是倉庫'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="工作記憶的容量：腦中同時掛著很多事時，能用來做眼前這件事的空間很小；清空到收件匣後，空間變大">
+          <rect x="10" y="10" width="265" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">掛著七件事</text>
+          <rect x="40" y="70" width="205" height="100" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="142" y="126" text-anchor="middle" font-size="14">做眼前的事：很擠</text>
+          <rect x="285" y="10" width="265" height="200" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">清空之後</text>
+          <rect x="315" y="70" width="205" height="100" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="417" y="126" text-anchor="middle" font-size="14">做眼前的事：有空間</text>
+        </svg>`, caption: '示意圖：清空的目的不是記錄，是讓腦袋有空間做眼前這件事。' },
+      ],
+      tryit: {
+        q: ['選一個你的收件匣：它要在哪裡？什麼時候整理？'],
+        draft: '我的收件匣在：＿＿＿＿（只能一個地方）\n我會在＿＿＿＿整理它',
+        answer: ['例如：「手機的『收件匣』記事，每天下班前和每週五回顧時整理」。', '只能一個地方：散在三個 App、兩本筆記本的待辦，等於沒有收件匣。'],
+      },
+    },
+    mistakes: [
+      { wrong: '待辦散在 LINE 記事、紙條、三個 App 裡。', why: '每個地方都要記得去看，等於又回到靠記憶。', right: '只用一個收件匣；其他地方看到的待辦，抄進來。' },
+      { wrong: '寫進收件匣時就想把它整理好。', why: '寫的當下要分類、排時間，會打斷手上的事。', right: '寫進去只要 3 秒；整理留到固定時間。' },
+      { wrong: '收件匣只進不出，堆了幾百項。', why: '收件匣變成不敢打開的地方，大家就不再用它。', right: '每天或每週固定整理一次（4-3）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '收件匣的主要目的是？', options: [
+        { text: '讓腦袋空出來做眼前的事', correct: true, why: '工作記憶容量小，掛著太多事就沒空間做事。' },
+        { text: '保存一份完整的工作紀錄給主管看', why: '紀錄不是收件匣的目的。' },
+        { text: '取代行事曆', why: '收件匣整理後，有時間的事才排進行事曆。' },
+        { text: '讓待辦看起來比較多', why: '目的不是數量。' },
+      ] },
+      { level: '應用', type: 'mc', q: '開會時突然想到要回覆廠商，你應該？', options: [
+        { text: '花 3 秒寫進收件匣，繼續開會', correct: true, why: '不打斷手上的事，也不會忘記。' },
+        { text: '馬上拿手機回覆廠商', why: '會打斷會議，也可能回得不完整。' },
+        { text: '告訴自己「等一下開完會要記得回覆」', why: '工作記憶很容易被打斷而忘記。' },
+        { text: '把它記在會議筆記的角落', why: '散在別的地方，之後容易找不到。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你已經有三個待辦 App、兩本筆記本，每個都用了一半。用這一課的方法，設計一個你這週就能開始的收件匣規則。'], answer: [
+        '選一個最常帶在身上的（通常是手機的一則記事），宣布它是唯一的收件匣。今天花 10 分鐘把其他地方還有效的待辦抄過來，舊的不刪但不再看。',
+        '規則：想到就 3 秒寫進去；每天下班前看一次，把能做的變成下一步；每週回顧時清空。',
+      ] },
+    ],
+    today: {
+      minutes: 5,
+      task: ['決定你唯一的收件匣在哪裡。然後計時 5 分鐘，把腦中掛著的所有事寫進去，不分類、不排序。寫完勾選下面的清單。'],
+      blocks: [{ type: 'widget', name: 'checklist', props: { key: 'inbox', items: [
+        '決定唯一的收件匣（寫下它在哪裡）',
+        '花 5 分鐘把腦中掛著的事全部寫進去',
+        '把收件匣放到手機主畫面或桌上看得到的地方',
+        '在行事曆排一個每天的「整理收件匣」5 分鐘',
+      ] } }],
+    },
+    keypoints: [
+      '只用一個收件匣：想到就 3 秒寫進去，不當下整理。',
+      '清空讓工作記憶空出來，腦袋才有空間做眼前的事。',
+      '收件匣一定要定時整理，變成下一步、行程，或刪掉。',
+    ],
+    sources: ['safren-2010', 'barkley-1997'],
+  },
+
+  '4-2': {
+    goals: [
+      '從清單裡每天只選三件',
+      '把三件事放進今天的時間盒',
+      '替第一件寫一條「如果…就…」',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-1）收件匣什麼時候整理？', options: [
+        { text: '固定時間，例如每天下班前', correct: true, why: '寫進去時不整理，固定時間才整理。' },
+        { text: '每寫進一項就馬上整理', why: '會打斷手上的事。' },
+        { text: '堆到一百項再一起整理', why: '收件匣會變成不敢打開的地方。' },
+        { text: '不用整理，放著就好', why: '只進不出，等於沒有收件匣。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 2-3）乘上倍數後發現排不下，該怎麼辦？', options: [
+        { text: '一開始就拿掉一件', correct: true, why: '排不下是訊號，不是要更努力。' },
+        { text: '少睡一點補回來', why: '會讓隔天更難開始。' },
+        { text: '假裝沒看到，照原本排', why: '這就是計畫謬誤。' },
+        { text: '把倍數改小一點', why: '打折就失去校正的意義。' },
+      ] },
+    ],
+    analogy: {
+      text: ['逛超市時，購物清單上有 30 樣東西，你不會一次全部塞進購物車就去結帳；你會先拿最需要的那幾樣。每天的待辦也一樣：清單是超市，今天只拿三件進購物車。'],
+      limit: ['超市的東西不會跑掉；工作清單上沒選到的事，可能明天變得更急。所以沒選到的不是放棄，是交給每週回顧（4-3）重新看。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="清單和今天的差別：清單上有很多事，今天只選三件，各放進一個時間盒，其他的留在清單上">
+        <rect x="10" y="10" width="220" height="220" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="120" y="46" text-anchor="middle" font-size="17" font-weight="900">清單：23 件</text>
+        <text x="120" y="100" text-anchor="middle" font-size="14">所有的下一步</text>
+        <text x="120" y="130" text-anchor="middle" font-size="14">不用今天全做</text>
+        <rect x="270" y="10" width="280" height="64" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="410" y="48" text-anchor="middle" font-size="15" font-weight="900" class="on-color">① 09:30　寫提案第一段</text>
+        <rect x="270" y="88" width="280" height="64" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="410" y="126" text-anchor="middle" font-size="15" font-weight="900" class="on-color">② 14:00　回覆三封客戶信</text>
+        <rect x="270" y="166" width="280" height="64" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="410" y="204" text-anchor="middle" font-size="15" font-weight="900" class="on-color">③ 16:00　送出請假單</text>
+        <g class="stroke-ink" stroke-width="4" fill="none"><path d="M270 42 H250 V198 H270 M230 120 H270"/></g>
+      </svg>`,
+      caption: '三件事，每件都有時間；做完三件，今天就算成功。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究支持（作為 CBT 的一部分）', body: ['每日規劃、排優先順序、把任務排進時間，是成人 ADHD 認知行為治療的組織與規劃內容（Safren 2010）。「三件」是這門課為了降低決策負擔選的數字，沒有研究指定一定要三件。'] },
+      ],
+    },
+    define: [
+      { term: '今天的三件', en: 'daily three', def: '從清單選出今天一定要推進的三件事。', example: '一件大的、兩件小的。' },
+      { term: '決策負擔', en: 'decision load', def: '一天要做的選擇越多，越容易累、越容易拖。', example: '每做完一件都要重新看 23 件挑下一件。' },
+      { term: '成功的定義', en: 'definition of a good day', def: '事先說好「今天怎樣算成功」，避免用沒做完的事打擊自己。', example: '「三件都推進了，今天就算成功」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '早上排今天',
+        kind: '全部列出 vs. 只選三件',
+        badLabel: '列出全部 12 件',
+        goodLabel: '只選三件',
+        bad: '今天要做：{{1:12 件}}，從第一件開始。',
+        good: '今天的三件：{{1:提案第一段、回三封信、送假單}}，各有時間。',
+        badResult: '到下午只做完 4 件，看著剩下 8 件覺得今天又失敗了。',
+        goodResult: '做完三件就算成功；有餘力再從清單拿。',
+        why: ['少選，才做得完'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="怎麼選三件：一件最重要的大事，放在精神最好的時段；兩件小事，放在精神比較差的時段">
+          <rect x="10" y="10" width="265" height="190" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="56" text-anchor="middle" font-size="17" font-weight="900" class="on-color">1 件大事</text>
+          <text x="142" y="110" text-anchor="middle" font-size="14" class="on-color">最重要、最需要專心</text>
+          <text x="142" y="140" text-anchor="middle" font-size="14" class="on-color">放在精神最好的時段</text>
+          <rect x="285" y="10" width="265" height="190" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="417" y="56" text-anchor="middle" font-size="17" font-weight="900">2 件小事</text>
+          <text x="417" y="110" text-anchor="middle" font-size="14">30 分鐘內做得完</text>
+          <text x="417" y="140" text-anchor="middle" font-size="14">放在精神比較差的時段</text>
+        </svg>`, caption: '你的「精神最好的時段」可以用一週的觀察找出來：記下哪個時段最容易專心。' },
+      ],
+      tryit: {
+        q: ['替明天選三件，並各排一個時間：'],
+        draft: '大事：＿＿＿＿（時間：＿＿）\n小事 1：＿＿＿＿（時間：＿＿）\n小事 2：＿＿＿＿（時間：＿＿）',
+        answer: ['例如：大事「寫提案第一段」9:30；小事「回三封客戶信」14:00、「送出請假單」16:00。', '每一件都要是下一步（3-1），時間乘過倍數（2-3）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '選了三件，但三件都是大事。', why: '三件大事加起來常常排不下，又變回做不完。', right: '一件大的、兩件小的。' },
+      { wrong: '只選事，不排時間。', why: '沒有時間，「要做」又變回模糊的意圖。', right: '每一件都給一個時間盒（2-2）。' },
+      { wrong: '做完三件還覺得不夠，硬要再塞五件。', why: '下次排三件時，你會不相信「三件就夠」。', right: '做完三件就是成功；有餘力可以從清單再拿一件，但不是義務。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '「今天的三件」比較好的組合是？', options: [
+        { text: '一件大事、兩件小事', correct: true, why: '排得下，而且至少推進一件重要的事。' },
+        { text: '三件都是最重要的大事', why: '常常排不下，又變回做不完。' },
+        { text: '三件最簡單、最快的小事', why: '做得完，但重要的事一直沒推進。' },
+        { text: '想到哪件就做哪件', why: '每次都要重新決定，決策負擔很大。' },
+      ] },
+      { level: '應用', type: 'mc', q: '下午 3 點你已經做完今天的三件。比較好的做法是？', options: [
+        { text: '肯定自己今天成功，有餘力再拿一件', correct: true, why: '先承認成功，再決定要不要多做。' },
+        { text: '覺得選太少了，明天選十件', why: '下次反而做不完，打擊信心。' },
+        { text: '立刻把清單上剩下的全部做完', why: '容易累垮，明天更難開始。' },
+        { text: '覺得今天太輕鬆，有點罪惡感', why: '做完計畫裡的事就是成功，不需要罪惡感。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你是主管，同時被三個部門要東西，每天的清單都有 20 件以上。用這一課的方法，說明你早上 10 分鐘會怎麼排今天。'], answer: [
+        '先花 3 分鐘整理收件匣（4-1），把新來的事變成下一步；再從全部的下一步選一件最重要的大事（例如審核預算），放在精神最好的時段；選兩件 30 分鐘內做得完的小事。',
+        '其他的事留在清單上，交給每週回顧重新排（4-3）。如果有人要求今天一定要做的事超過三件，這就是要協商期限或請人分擔的訊號。',
+      ] },
+    ],
+    today: {
+      minutes: 4,
+      task: ['替明天選三件（一大兩小），各排一個時間盒。替第一件寫一條「如果…就…」並存起來。'],
+      blocks: [{ type: 'widget', name: 'ifthen', props: { ifHint: '例如：明天早上 9:30 咖啡放到桌上', thenHint: '例如：打開提案檔，寫第一段的第一句' } }],
+    },
+    keypoints: [
+      '清單是超市，今天只拿三件：一件大事、兩件小事。',
+      '每一件都排進時間盒；做完三件就算成功。',
+      '沒選到的不是放棄，交給每週回顧重新看。',
+    ],
+    sources: ['safren-2010', 'solanto-2010'],
+  },
+
+  '4-3': {
+    goals: [
+      '在固定時間做每週回顧',
+      '照五個步驟走完一次回顧',
+      '先記下做到的事，再看沒做到的',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-2）今天做完三件後，下一步該怎麼想？', options: [
+        { text: '今天已經成功，有餘力再拿一件', correct: true, why: '先承認成功。' },
+        { text: '選太少了，明天要選更多', why: '容易變回做不完。' },
+        { text: '剩下的清單今天要趁有空全部清掉', why: '容易累垮。' },
+        { text: '做完三件不代表成功', why: '事先說好的成功就是成功。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 3-2）做完一個下一步之後，要記得？', options: [
+        { text: '補上下一個下一步', correct: true, why: '專案底下沒有下一步，就又不知道從哪開始。' },
+        { text: '把整個專案重新拆一次', why: '通常只需要補下一步。' },
+        { text: '等主管告訴你下一步', why: '下一步要自己補。' },
+        { text: '什麼都不用做', why: '不補的話，專案會停住。' },
+      ] },
+    ],
+    analogy: {
+      text: ['車子每隔一段時間要回廠保養：檢查輪胎、換機油。沒保養的車還是能開，只是越來越容易半路拋錨。前面各課做出來的系統也一樣，[[每週回顧]]就是它的定期保養。'],
+      limit: ['車子保養有技師幫你；每週回顧要自己做，而且最容易被「這週太忙」擠掉。所以它一定要有固定時間、固定步驟，而且短到忙的時候也做得完。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="每週回顧五步：一，記下這週做到的事；二，清空收件匣；三，替每個專案補上下一步；四，看下週的行事曆；五，選下週最重要的三件事">
+        <rect x="10" y="10" width="540" height="40" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="37" font-size="15" font-weight="900" class="on-color">① 記下這週做到的事（先看做到的）</text>
+        <rect x="10" y="60" width="540" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="87" font-size="15" font-weight="900" class="on-color">② 清空收件匣：每一項變成下一步、行程或刪掉</text>
+        <rect x="10" y="110" width="540" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="137" font-size="15" font-weight="900" class="on-color">③ 每個專案都有下一步嗎？沒有就補一個</text>
+        <rect x="10" y="160" width="540" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="187" font-size="15" font-weight="900" class="on-color">④ 看下週行事曆：會議前後留緩衝</text>
+        <rect x="10" y="210" width="540" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+        <text x="30" y="237" font-size="15" font-weight="900" class="on-color">⑤ 選下週最重要的三件事，排上時間</text>
+      </svg>`,
+      caption: '20 分鐘內走完。太忙的那一週，至少做 ① 和 ⑤。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究支持', body: ['Solanto 等（2010）的後設認知治療是 12 週的課程，每週練習時間管理、組織與規劃，並有回家練習；參與者回家練習做得越多，注意力不足症狀改善越多。每週回顧就是這門課的「回家練習」固定時段。'] },
+        '第 ① 步放在最前面，是因為自我批評會讓任務更討厭（0-2、6-2）。先看到自己做到了什麼，後面四步比較不會變成一場檢討大會。',
+      ],
+    },
+    define: [
+      { term: '每週回顧', en: 'weekly review', def: '每週固定 20 分鐘，照五步驟保養系統。', example: '週五下午 4 點。' },
+      { term: '最小版本', en: 'minimum version', def: '太忙時至少做的部分：記下做到的事、選下週三件。', example: '5 分鐘就能做完。' },
+      { term: '回顧紀錄', en: 'review log', def: '每次回顧留下的簡短紀錄，可以看出幾週下來的變化。', example: '「這週 3 次在 2 分鐘內開始」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '週五下午的回顧',
+        kind: '檢討大會 vs. 保養',
+        badLabel: '檢討大會',
+        goodLabel: '照五步驟保養',
+        bad: '一坐下就列出{{1:這週所有沒做到的事}}，越看越沮喪。',
+        good: '{{1:先寫下三件做到的事}}，再清收件匣、補下一步、選下週三件。',
+        badResult: '回顧變成討厭的事，下週就跳過了。',
+        goodResult: '20 分鐘後，下週一早上知道要做什麼。',
+        why: ['先看做到的，系統才活得下去'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="系統沒回顧會怎樣：第一週清單很清楚，第二週收件匣開始堆積，第三週下一步過期，第四週不再打開清單；有回顧的話每週都回到清楚的狀態">
+          <rect x="10" y="10" width="125" height="200" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="72" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">第 1 週</text>
+          <text x="72" y="120" text-anchor="middle" font-size="14" class="on-color">清單很清楚</text>
+          <rect x="145" y="10" width="125" height="200" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="207" y="56" text-anchor="middle" font-size="15" font-weight="900">第 2 週</text>
+          <text x="207" y="120" text-anchor="middle" font-size="14">收件匣堆積</text>
+          <rect x="280" y="10" width="125" height="200" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="342" y="56" text-anchor="middle" font-size="15" font-weight="900">第 3 週</text>
+          <text x="342" y="120" text-anchor="middle" font-size="14">下一步過期</text>
+          <rect x="415" y="10" width="135" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="482" y="56" text-anchor="middle" font-size="15" font-weight="900" class="on-color">第 4 週</text>
+          <text x="482" y="120" text-anchor="middle" font-size="14" class="on-color">不再打開清單</text>
+        </svg>`, caption: '沒有回顧時常見的走向：不是系統不好，是沒保養。' },
+      ],
+      tryit: {
+        q: ['替自己排每週回顧：'],
+        draft: '每週＿＿（星期幾）＿＿（幾點），地點＿＿＿＿\n如果那天太忙，最小版本是：＿＿＿＿',
+        answer: ['例如：「每週五 16:00，在辦公桌；太忙時只做 ① 記下做到的事、⑤ 選下週三件，5 分鐘」。', '選一個每週都會在、而且通常不會被會議占走的時段。'],
+      },
+    },
+    mistakes: [
+      { wrong: '回顧時間沒有固定，「有空再做」。', why: '回顧是最容易被擠掉的事。', right: '排進行事曆，像會議一樣重複每週。' },
+      { wrong: '回顧從「這週哪裡沒做好」開始。', why: '一開始就自我批評，回顧變成討厭的事，下週就跳過。', right: '第 ① 步永遠是記下做到的事。' },
+      { wrong: '回顧做得太完整，每次 90 分鐘。', why: '太長的回顧很難持續，忙的時候一定跳過。', right: '控制在 20 分鐘內，並準備 5 分鐘的最小版本。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '每週回顧的第一步是？', options: [
+        { text: '記下這週做到的事', correct: true, why: '先看做到的，回顧才不會變成檢討大會。' },
+        { text: '列出這週沒做到的事', why: '一開始就自我批評，回顧會變成討厭的事。' },
+        { text: '把下週的清單全部排好', why: '那是最後一步。' },
+        { text: '換一個新的待辦 App', why: '工具不是回顧的步驟。' },
+      ] },
+      { level: '應用', type: 'mc', q: '這週特別忙，週五只剩 5 分鐘。你應該？', options: [
+        { text: '做最小版本：記下做到的事、選下週三件', correct: true, why: '保留最重要的兩步，系統就不會斷掉。' },
+        { text: '跳過這週，下週做一次 90 分鐘的', why: '跳過容易變成連續跳過。' },
+        { text: '用 5 分鐘快速把五步都做完', why: '太趕會做得很草率，最小版本比較實際。' },
+        { text: '覺得這套系統不適合忙的人', why: '最小版本就是為了忙的時候設計的。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你已經連續三週跳過每週回顧，清單也很久沒打開。用這一課和前面各課的方法，寫一個「重新開始」的計畫。'], answer: [
+        '不要先補三週的進度。先做一次最小版本：寫下最近做到的三件事、選下週三件。接著替下週五的回顧寫一條「如果…就…」（例如「如果週五 16:00 行事曆跳出回顧，我就打開這份清單」）。',
+        '收件匣如果太多不敢看，就只處理最上面 10 項，其他的下次回顧再處理。目標是讓系統重新動起來，不是一次修好。',
+      ] },
+    ],
+    today: {
+      minutes: 3,
+      task: ['在行事曆排一個每週重複的 20 分鐘回顧。第一次回顧時，照著下面的清單走。'],
+      blocks: [{ type: 'widget', name: 'checklist', props: { key: 'weekly', items: [
+        '① 寫下這週做到的三件事',
+        '② 清空收件匣：每一項變成下一步、行程或刪掉',
+        '③ 每個專案都有一個下一步',
+        '④ 看下週行事曆，會議前後留緩衝',
+        '⑤ 選下週最重要的三件事，排上時間',
+      ] } }],
+    },
+    keypoints: [
+      '每週回顧是系統的保養：固定時間、五個步驟、20 分鐘內。',
+      '第一步永遠是記下做到的事，回顧才不會變成檢討大會。',
+      '太忙時做最小版本（記下做到的事＋選下週三件），不要整週跳過。',
+    ],
+    sources: ['solanto-2010', 'steel-2007'],
+  },
+
+  '4-4': {
+    goals: [
+      '用 WOOP 在計畫裡預先放進障礙',
+      '寫出針對障礙的「如果…就…」',
+      '知道 WOOP 的證據範圍',
+    ],
+    review: [
+      { level: '應用', type: 'mc', q: '（回顧 4-3）連續三週跳過回顧後，第一件事最好是？', options: [
+        { text: '先做一次最小版本的回顧', correct: true, why: '讓系統先動起來，不補進度。' },
+        { text: '把三週的進度一次補完', why: '工作量太大，容易又跳過。' },
+        { text: '換一套新的系統', why: '問題通常不在系統，在沒有保養。' },
+        { text: '等到下個月比較不忙，再重新認真開始', why: '「比較不忙」不會自己出現。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-2）「如果…就…」的情境線索可以是？', options: [
+        { text: '時間、地點或前一個動作', correct: true, why: '這三種都可以被明確偵測到。' },
+        { text: '心情或靈感', why: '心情和靈感沒辦法預測。' },
+        { text: '「有空的時候」', why: '「有空」不會自己出現。' },
+        { text: '主管或同事剛好提醒我的時候', why: '依賴別人提醒，不能自己啟動。' },
+      ] },
+    ],
+    analogy: {
+      text: ['登山前，你會先查天氣：如果下午可能下雨，就決定「如果 2 點還沒到山頂，我就折返」。[[WOOP]]就是替計畫查天氣：先想好最可能的障礙，事先決定遇到時怎麼做。'],
+      limit: ['天氣預報有資料；生活的障礙要靠你對自己的了解。所以障礙要寫「在你自己身上的」（例如「會一直看訊息」），而不是「老闆可能會臨時找我」這種你控制不了的事。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="只想好結果和想到障礙的差別：只想好結果時，障礙出現就措手不及；先想到障礙並寫好如果就計畫，障礙出現時照計畫做">
+        <rect x="10" y="10" width="265" height="210" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+        <text x="142" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">只想好結果</text>
+        <text x="142" y="110" text-anchor="middle" font-size="15" class="on-color">「這週一定會寫完」</text>
+        <text x="142" y="160" text-anchor="middle" font-size="14" class="on-color">障礙出現：措手不及</text>
+        <rect x="285" y="10" width="265" height="210" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+        <text x="417" y="46" text-anchor="middle" font-size="17" font-weight="900" class="on-color">先想到障礙</text>
+        <text x="417" y="110" text-anchor="middle" font-size="15" class="on-color">「如果想點開訊息，</text>
+        <text x="417" y="136" text-anchor="middle" font-size="15" class="on-color">就把手機放抽屜」</text>
+        <text x="417" y="180" text-anchor="middle" font-size="14" class="on-color">障礙出現：照計畫做</text>
+      </svg>`,
+      caption: '[[心理對比]]：先想像好結果，再想像障礙，比只想好結果更能啟動行動。',
+      blocks: [
+        { type: 'callout', variant: 'tip', title: '證據：研究有限（ADHD 只有青少年研究）', body: ['Gawrilow 等（2013）教有 ADHD 風險的國中生使用心理對比加執行意圖（WOOP 的研究名稱是 MCII），兩週後家長評估的自我調節進步較多，而且對 ADHD 風險組特別明顯。成人 ADHD 的研究這次沒有查到。'] },
+        { type: 'widget', name: 'woop', props: {} },
+      ],
+    },
+    define: [
+      { term: 'WOOP', en: 'wish, outcome, obstacle, plan', def: '願望 → 最好的結果 → 最可能的障礙 → 遇到障礙時的「如果…就…」。', example: '研究名稱是 MCII。' },
+      { term: '心理對比', en: 'mental contrasting', def: '先想好結果，再想擋在中間的障礙。', example: '想到準時下班的輕鬆，接著想到下午會被訊息打斷。' },
+      { term: '內在障礙', en: 'inner obstacle', def: '在你自己身上的障礙：習慣、情緒、分心。', example: '「我會一直想先把小事做完」。' },
+    ],
+    examples: {
+      compare: [{
+        title: '這週要寫完報告初稿',
+        kind: '只有目標 vs. WOOP',
+        badLabel: '只有目標',
+        goodLabel: 'WOOP',
+        bad: '「這週{{1:一定要寫完初稿}}！」',
+        good: '障礙：{{1:下午會一直看訊息}}。計畫：如果下午 2 點想點開訊息，我就把手機放抽屜，寫一段再看。',
+        badResult: '週三下午又被訊息拉走，週五才發現沒寫完。',
+        goodResult: '障礙出現時有一個現成的動作，不用當下靠意志力。',
+        why: ['先想到障礙，計畫才擋得住'],
+      }],
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="WOOP 四格：願望，這週想做到的一件事；結果，做到後最好的畫面；障礙，最可能擋住你的、在你自己身上的事；計畫，如果障礙出現，我就做一個動作">
+          <rect x="10" y="10" width="265" height="95" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="48" text-anchor="middle" font-size="16" font-weight="900" class="on-color">W 願望</text>
+          <text x="142" y="80" text-anchor="middle" font-size="14" class="on-color">這週想做到的一件事</text>
+          <rect x="285" y="10" width="265" height="95" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+          <text x="417" y="48" text-anchor="middle" font-size="16" font-weight="900" class="on-color">O 結果</text>
+          <text x="417" y="80" text-anchor="middle" font-size="14" class="on-color">做到後最好的畫面</text>
+          <rect x="10" y="115" width="265" height="95" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
+          <text x="142" y="153" text-anchor="middle" font-size="16" font-weight="900" class="on-color">O 障礙</text>
+          <text x="142" y="185" text-anchor="middle" font-size="14" class="on-color">在你自己身上的那一個</text>
+          <rect x="285" y="115" width="265" height="95" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
+          <text x="417" y="153" text-anchor="middle" font-size="16" font-weight="900" class="on-color">P 計畫</text>
+          <text x="417" y="185" text-anchor="middle" font-size="14" class="on-color">如果障礙出現，我就…</text>
+        </svg>`, caption: '順序很重要：先想結果，再想障礙，最後才寫計畫。' },
+      ],
+      tryit: {
+        q: ['替「明天準時下班」寫一份 WOOP：'],
+        draft: '願望：＿＿＿＿\n最好的結果：＿＿＿＿\n最可能的障礙（在自己身上）：＿＿＿＿\n計畫：如果＿＿＿＿，我就＿＿＿＿。',
+        answer: ['例如：願望「6 點準時下班」；結果「晚上可以去運動、不帶著工作焦慮」；障礙「5 點後總想再多做一件小事」；計畫「如果 5:30 我想開始新的一件事，我就把它寫進收件匣，開始擺明天的入口」。', '障礙要是你自己會做的事，計畫才控制得了。'],
+      },
+    },
+    mistakes: [
+      { wrong: '只想好結果：「想像自己做到的樣子」。', why: '只想好結果，障礙出現時就沒有準備；研究支持的是「結果加障礙」一起想的版本。', right: '想完結果，一定要接著想障礙。' },
+      { wrong: '障礙寫外在的事：「主管可能會臨時找我」。', why: '你控制不了，計畫也寫不出動作。', right: '寫在你自己身上的障礙，例如「被找之後很難回到原本的事」。' },
+      { wrong: '一次替五個目標寫 WOOP。', why: '太多計畫會互相干擾，也記不住。', right: '每週一個最重要的願望就好。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'WOOP 的四個步驟依序是？', options: [
+        { text: '願望、結果、障礙、計畫', correct: true, why: '先想結果，再想障礙，最後寫計畫。' },
+        { text: '計畫、障礙、結果、願望', why: '順序相反。' },
+        { text: '願望、計畫、結果、獎勵', why: '少了最關鍵的「障礙」。' },
+        { text: '目標、期限、資源、回顧', why: '這是一般的專案規劃，不是 WOOP。' },
+      ] },
+      { level: '應用', type: 'mc', q: '哪一個是好的「障礙」？', options: [
+        { text: '我寫到卡住時，會想先去回訊息', correct: true, why: '在自己身上、可以預期，計畫才寫得出動作。' },
+        { text: '同事可能會一直來座位旁邊問我問題', why: '外在的事你控制不了；可以改寫成自己的反應。' },
+        { text: '天氣可能不好', why: '外在、跟任務也不太相關。' },
+        { text: '我可能不夠努力', why: '太籠統，寫不出具體的「如果…就…」。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你下週要第一次在部門會議報告，最可能的障礙是「前一晚會焦慮到一直改投影片、拖到很晚睡」。替這件事寫一份完整的 WOOP。'], answer: [
+        '願望：「週三的報告順利講完」；結果：「講完後鬆一口氣、主管知道我的進度」；障礙：「前一晚焦慮到一直改投影片、很晚睡」。',
+        '計畫：「如果前一晚 10 點我還想改投影片，我就把想改的地方寫進收件匣，關掉電腦去洗澡」。另外可以提早一天把投影片定稿，讓前一晚沒有東西可以改。',
+      ] },
+    ],
+    today: {
+      minutes: 4,
+      task: ['替這週最重要的一件事寫一份 WOOP，存進我的系統。把「計畫」那一句抄在便利貼上，貼在障礙最可能出現的地方。'],
+    },
+    keypoints: [
+      'WOOP：願望 → 結果 → 障礙 → 計畫；先想結果，再想障礙。',
+      '障礙寫在自己身上的那一個，計畫寫成「如果障礙出現，我就…」。',
+      '證據來自有 ADHD 風險的青少年研究；成人研究有限，用一週看看效果。',
+    ],
+    sources: ['gawrilow-2013', 'gollwitzer-2006'],
+  },
+});
+</script>
