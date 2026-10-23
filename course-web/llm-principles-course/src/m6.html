@@ -1,0 +1,445 @@
+<script>
+/* ==========================================================================
+   模組 6：後訓練：SFT、偏好學習（RLHF）、推理模型
+   ========================================================================== */
+defineTerms({
+  '後訓練': { en: 'post-training', def: '預訓練之後的所有調整：讓模型會聽指令、會對話、比較安全，或會先推理再回答。資料量比預訓練少很多。', example: 'SFT、RLHF、DPO、推理的強化學習。', lesson: '6-1' },
+  'SFT': { en: 'supervised fine-tuning', def: '用「指令＋理想回答」的示範資料繼續訓練，讓模型學會當助理的樣子。損失和預訓練一樣，只算回答的部分。', example: '人寫的問答示範。', lesson: '6-1' },
+  'RLHF': { en: 'reinforcement learning from human feedback', def: '先用人類的偏好排序訓練一個獎勵模型，再用強化學習讓模型產生獎勵高的回答。', example: 'InstructGPT 的做法。', lesson: '6-2' },
+  '獎勵模型': { en: 'reward model', def: '讀一個回答、輸出一個「人類會多喜歡它」的分數的模型；用偏好排序資料訓練。', example: 'A 比 B 好 → A 的分數要比 B 高。', lesson: '6-2' },
+  'DPO': { en: 'Direct Preference Optimization', def: '不另外訓練獎勵模型、不跑強化學習，直接用「A 比 B 好」的資料調整模型的偏好學習方法。', example: 'Rafailov 等 2023。', lesson: '6-2' },
+  'reward hacking': { en: 'reward hacking', def: '模型找到讓獎勵分數變高、但不是人真正想要的捷徑。', example: '回答越寫越長，因為獎勵模型偏好長答案。', lesson: '6-2' },
+  'Constitutional AI': { en: 'Constitutional AI', def: 'Anthropic 提出的方法：給一組原則，讓 AI 依原則批改並修正自己的回答，再用 AI 的評判取代部分人工標註。', example: 'Bai 等 2022。', lesson: '6-3' },
+  '推理模型': { en: 'reasoning model', def: '回答前先產生一段較長的思考過程的模型；常用強化學習在可驗證的題目（數學、程式）上訓練。', example: 'DeepSeek-R1；Claude 的 extended thinking。', lesson: '6-4' },
+  '思考 token': { en: 'thinking tokens', def: '推理模型在最終回答前產生的思考內容；一樣要算力、通常也算進輸出費用。', example: '思考 5,000 token 再回答 300 token。', lesson: '6-4' },
+});
+
+const REVIEW_M5 = [
+  { level: '回想', type: 'mc', q: '（回顧 5-1）預訓練的目標是？', options: [
+    { text: '預測下一個 token', correct: true, why: '在大量文字上。' },
+    { text: '學會聽從使用者的指令', why: '那主要是後訓練。' },
+    { text: '記住每一篇文章的原文', why: '學的是規律，不是逐篇記錄。' },
+    { text: '學會拒絕危險要求', why: '那主要是後訓練。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 5-3）Chinchilla 的結論？', options: [
+    { text: '固定算力時參數和資料要一起放大', correct: true, why: '70B＋4 倍資料贏 280B。' },
+    { text: '模型越大越好', why: '資料不夠時會變差。' },
+    { text: '資料越少越好', why: '相反。' },
+    { text: '算力不重要', why: '算力是關鍵。' },
+  ] },
+];
+
+const STAGES_SVG = `<svg viewBox="0 0 560 230" role="img" aria-label="三個階段：預訓練得到很會接話的基礎模型，SFT 學會當助理，偏好學習讓回答更符合人的偏好；推理訓練可以接在後面">
+  ${[['預訓練', '大量文字', '很會接話', 'm4'], ['SFT', '示範資料', '會當助理', 'm2'], ['偏好學習', '「A 比 B 好」', '更符合偏好', 'm3'], ['推理 RL', '可驗證的題目', '先想再答', 'm5']].map(([a, b, c, m], i) => `
+    <rect x="${10 + i * 138}" y="30" width="128" height="130" style="fill:var(--${m})" class="stroke-ink" stroke-width="3"/>
+    <text x="${74 + i * 138}" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text>
+    <text x="${74 + i * 138}" y="96" text-anchor="middle" font-size="13" class="on-color">資料：${b}</text>
+    <text x="${74 + i * 138}" y="132" text-anchor="middle" font-size="14" font-weight="900" class="on-color">→ ${c}</text>`).join('')}
+  <text x="280" y="190" text-anchor="middle" font-size="14">第一格花掉絕大部分算力；後三格資料少，但大幅改變行為</text>
+  <text x="280" y="214" text-anchor="middle" font-size="13">實際順序與組合各家不同，常常反覆進行；這是通用示意</text>
+</svg>`;
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '說明只做預訓練的模型為什麼不太會當助理',
+      '說出 SFT 的資料長什麼樣',
+      '解釋 SFT 改變的是「行為」多於「知識」',
+    ],
+    review: REVIEW_M5,
+    analogy: {
+      text: ['一個讀遍圖書館的人，你問「法國首都是？」他可能接「德國首都是？英國首都是？」，因為他看過很多考卷都是這樣排的。他什麼都知道，只是不知道你要他「回答」。', '[[SFT]] 就是給他看幾萬份「問題→好回答」的示範，讓他學會對話的樣子：聽懂指令、給出回答、該停就停。這屬於[[後訓練]]的第一步。'],
+      limit: ['人看幾份示範就懂，模型要看大量示範；而且示範只教「樣子」，教不了它沒讀過的知識。如果示範答案本身寫錯，模型也會學著寫錯。'],
+    },
+    model: { svg: STAGES_SVG, caption: '後訓練的地圖。這一課是第二格。' },
+    define: [
+      { term: 'SFT', en: 'supervised fine-tuning', def: '用示範資料繼續訓練。', example: '指令＋理想回答。' },
+      { term: '基礎模型', en: 'base model', def: '只做過預訓練的模型。', example: '很會接話，不一定照指令。' },
+      { term: '只算回答的損失', en: 'loss masking', def: 'SFT 時通常只對助理回答的 token 算損失，問題部分不算。', example: '模型學怎麼答，不學怎麼問。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="SFT 只算回答的損失：使用者問題的 token 不算損失，助理回答的 token 才算">
+  ${[['〈使用者〉', false], ['光合', false], ['作用', false], ['是？', false], ['〈助理〉', false], ['植物', true], ['利用', true], ['光能', true], ['…', true]].map(([t, on], i) => `<rect x="${10 + i * 60}" y="40" width="56" height="44" ${on ? 'style="fill:var(--m2)"' : 'class="fill-bg"'} class="stroke-ink" stroke-width="2"/><text x="${38 + i * 60}" y="67" text-anchor="middle" font-size="13" font-weight="900"${on ? ' class="on-color"' : ''}>${t}</text>`).join('')}
+  <text x="130" y="116" text-anchor="middle" font-size="14">不算損失</text>
+  <text x="430" y="116" text-anchor="middle" font-size="14" font-weight="900">算損失</text>
+  <text x="280" y="160" text-anchor="middle" font-size="14">模型學「怎麼回答」，不學「怎麼發問」</text>
+</svg>`, caption: '損失的算法和預訓練相同（5-1），只是只算回答的部分。' },
+        { type: 'compare', title: '同一個問題：基礎模型 vs SFT 之後', kind: '對照', badLabel: '基礎模型', goodLabel: 'SFT 之後', bad: '使用者：請用一句話解釋光合作用。\n\n模型：請用一句話解釋呼吸作用。\n請用一句話解釋蒸散作用。\n請用一句話解釋…', good: '使用者：請用一句話解釋光合作用。\n\n助理：光合作用是植物利用光能，把二氧化碳和水轉換成養分並釋放氧氣的過程。', badResult: '接成了一張題目清單', goodResult: '照指令回答，然後停', why: ['基礎模型在網路上看過很多題目列表，「接下一題」的機率很高。', 'SFT 的示範讓「回答這一題、然後結束」的機率變高。兩者的知識差不多，差在行為。'] },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'pre', label: '預訓練資料' }, { id: 'sft', label: 'SFT 資料' }], items: [
+          { text: '幾兆 token 的網頁、書籍、程式碼', answer: 'pre', why: '量大、未標註。' },
+          { text: '「使用者：幫我寫請假信／助理：（一封得體的請假信）」', answer: 'sft', why: '指令＋理想回答的示範。' },
+          { text: '維基百科全文', answer: 'pre', why: '一般文字。' },
+          { text: '專家寫的程式除錯問答，每題附詳細解答', answer: 'sft', why: '高品質示範，量相對少。' },
+        ] } },
+        { type: 'callout', variant: 'tip', title: 'InstructGPT 的驚人結果', body: ['Ouyang 等 2022 報告：在他們的評測題目上，人類評分者更喜歡 **13 億**參數的 InstructGPT 的回答，勝過 **1,750 億**參數的 GPT-3。', '模型小了一百多倍，卻因為後訓練更會「回答人想要的」。這說明後訓練對使用體驗的影響非常大。'] },
+      ],
+      tryit: {
+        q: ['如果 SFT 的示範回答全部都很短（一兩句），訓練出來的助理會有什麼傾向？'],
+        draft: '我的推測：＿',
+        answer: ['它會傾向回答得很短，就算問題需要詳細說明也一樣。SFT 教的是「樣子」，示範的長度、語氣、格式都會被學走。', '所以示範資料要涵蓋各種需要的回答型態，品質比數量更重要。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 SFT 讓模型學會新知識。', why: 'SFT 資料量小，主要改變行為。', right: '知識主要來自預訓練；SFT 教它怎麼用。' },
+      { wrong: '以為基礎模型「比較笨」。', why: '它的知識可能差不多，只是不知道該照指令回答。', right: '差別在行為，不在聰明程度。' },
+      { wrong: '以為示範資料越多越好，不管品質。', why: '錯誤或風格不一的示範會被照學。', right: '少量高品質示範常比大量雜亂示範好。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'SFT 的資料長什麼樣？', options: [
+        { text: '指令和理想回答的配對示範', correct: true, why: '教模型當助理的樣子。' },
+        { text: '幾兆 token 的未標註網頁', why: '那是預訓練。' },
+        { text: '兩個回答哪個比較好的排序', why: '那是偏好學習（6-2）。' },
+        { text: '只有問題沒有答案', why: '要有示範答案。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'InstructGPT 的結果說明了什麼？', options: [
+        { text: '後訓練讓小模型更受偏好', correct: true, why: '1.3B 勝過 175B。' },
+        { text: '參數越多回答一定越好', why: '這個結果正好是反例。' },
+        { text: '預訓練已經不重要了', why: 'InstructGPT 也是建在預訓練模型上。' },
+        { text: '小模型的知識其實比大模型還多', why: '偏好的是回答方式。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['公司想讓模型「用我們的客服語氣回答」，又想讓它「知道我們最新的產品規格」。哪一個適合用 SFT，哪一個不適合？'], answer: [
+        '語氣適合 SFT：這是行為與風格。',
+        '最新規格不適合靠 SFT 塞進去：資料少、容易學不牢、規格一變就要重訓。用 RAG（第一部模組 5）在每次請求時把規格放進 prompt 比較可靠。',
+      ] },
+    ],
+    keypoints: [
+      '基礎模型很會接話，但不一定照指令回答。',
+      'SFT 用示範資料教「當助理的樣子」，改變行為多於知識。',
+      '後訓練影響很大：1.3B 的 InstructGPT 勝過 175B 的 GPT-3。',
+    ],
+    sources: ['instructgpt'],
+  },
+
+  '6-2': {
+    goals: [
+      '說出 RLHF 的三個步驟',
+      '解釋獎勵模型是怎麼訓練的',
+      '說出 DPO 和 RLHF 的差別，以及 reward hacking 的風險',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 6-1）SFT 主要改變模型的什麼？', options: [
+        { text: '行為：怎麼回答', correct: true, why: '知識主要來自預訓練。' },
+        { text: '詞彙表', why: '詞彙表不變。' },
+        { text: '參數量', why: '參數量不變，只是數值被調整。' },
+        { text: '知識範圍大幅擴充', why: 'SFT 資料量小。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 5-1）cross-entropy 損失在機率 100% 時是？', options: [
+        { text: '0', correct: true, why: '−ln 1 ＝ 0。' },
+        { text: '1', why: 'ln 1 是 0。' },
+        { text: '無限大', why: '機率 0 才是。' },
+        { text: '100', why: '不是百分比。' },
+      ] },
+    ],
+    analogy: {
+      text: ['寫作文：老師很難寫出「完美範文」，但很容易比較兩篇「哪篇比較好」。', '偏好學習利用這一點：讓人比較同一個問題的兩個回答，收集大量「A 比 B 好」。[[RLHF]] 先用這些排序訓練一個[[獎勵模型]]當「代理評審」，再用強化學習讓模型多產生高分的回答；[[DPO]] 則跳過代理評審，直接用排序調整模型。'],
+      limit: ['老師的評分標準是一致的，人類標註者彼此意見常常不同；獎勵模型也只是近似人的偏好，模型可能學會討好它而不是討好人（[[reward hacking]]）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="RLHF 三步：一，模型對同一題產生多個回答，人排序；二，用排序訓練獎勵模型；三，用強化學習讓模型產生獎勵高的回答，同時不要離原本太遠">
+        <rect x="10" y="20" width="170" height="130" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="95" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">① 收集排序</text>
+        <text x="95" y="80" text-anchor="middle" font-size="13" class="on-color">同一題產生 A、B</text>
+        <text x="95" y="104" text-anchor="middle" font-size="13" class="on-color">人選：A 比 B 好</text>
+        <rect x="195" y="20" width="170" height="130" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">② 獎勵模型</text>
+        <text x="280" y="80" text-anchor="middle" font-size="13" class="on-color">學會：分數(A) ＞ 分數(B)</text>
+        <text x="280" y="104" text-anchor="middle" font-size="13" class="on-color">當作代理評審</text>
+        <rect x="380" y="20" width="170" height="130" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+        <text x="465" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">③ 強化學習</text>
+        <text x="465" y="80" text-anchor="middle" font-size="13" class="on-color">多產生高分回答</text>
+        <text x="465" y="104" text-anchor="middle" font-size="13" class="on-color">但不要離 SFT 太遠</text>
+        <line x1="180" y1="85" x2="195" y2="85" class="stroke-ink" stroke-width="3"/><line x1="365" y1="85" x2="380" y2="85" class="stroke-ink" stroke-width="3"/>
+        <rect x="10" y="180" width="540" height="56" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="280" y="206" text-anchor="middle" font-size="14" font-weight="900">DPO：跳過 ② 和 ③ 的強化學習，直接用 ① 的排序調整模型</text>
+        <text x="280" y="228" text-anchor="middle" font-size="13">Rafailov 等 2023：效果可以和 RLHF 相當或更好，流程簡單很多</text>
+      </svg>`,
+      caption: '「不要離太遠」是用一個懲罰項限制模型和 SFT 版本的差距，避免為了高分而胡亂改變說話方式。',
+    },
+    define: [
+      { term: 'RLHF', en: 'RLHF', def: '排序 → 獎勵模型 → 強化學習。', example: 'InstructGPT。' },
+      { term: '獎勵模型', en: 'reward model', def: '代理評審：給回答打分。', example: '用排序資料訓練。' },
+      { term: 'DPO', en: 'DPO', def: '直接用排序調整模型。', example: '不需要獎勵模型與 RL。' },
+      { term: 'reward hacking', en: 'reward hacking', def: '討好評分方式而非真正目標。', example: '越寫越長、過度客套。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="訓練獎勵模型：人說 A 比 B 好，就調整獎勵模型讓 A 的分數高於 B 的分數">
+  <rect x="20" y="40" width="200" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="120" y="71" text-anchor="middle" font-size="14" font-weight="900" class="on-color">回答 A（人選的）</text>
+  <rect x="20" y="110" width="200" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="120" y="141" text-anchor="middle" font-size="14" font-weight="900">回答 B</text>
+  <path d="M220 65 L300 65" class="stroke-ink" stroke-width="3"/><path d="M220 135 L300 135" class="stroke-ink" stroke-width="3"/>
+  <rect x="300" y="40" width="110" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="355" y="96" text-anchor="middle" font-size="14" font-weight="900" class="on-color">獎勵</text><text x="355" y="118" text-anchor="middle" font-size="14" font-weight="900" class="on-color">模型</text>
+  <text x="430" y="70" font-size="14" font-weight="900">分數 ↑</text><text x="430" y="140" font-size="14">分數 ↓</text>
+  <text x="280" y="192" text-anchor="middle" font-size="13">訓練目標：拉開 A 與 B 的分數差</text>
+</svg>`, caption: '只需要比較，不需要絕對分數。' },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'a', label: 'A 比較好' }, { id: 'b', label: 'B 比較好' }], items: [
+          { text: '問：「1 公斤等於幾磅？」A：「約 2.2 磅。」B：「這是個很棒的問題！單位換算在日常生活中非常重要……（三段後）約 2.2 磅。」', answer: 'a', why: '直接、正確。B 的客套是 reward hacking 常見的樣子。' },
+          { text: '問：「我頭痛三天了怎麼辦？」A：「多喝水就好。」B：「可能原因很多；如果持續或伴隨發燒、視力模糊，請盡快就醫。平常可以先……」', answer: 'b', why: '更有幫助，也更安全。' },
+          { text: '問：「幫我把這段英文翻成中文。」A：完整翻譯。B：「翻譯涉及版權，我無法協助。」', answer: 'a', why: 'B 是不必要的拒絕（過度拒絕）。' },
+          { text: '問：「這段程式為什麼錯？」A：猜一個原因。B：指出具體行數，說明原因並給修正版本。', answer: 'b', why: '具體、可驗證。' },
+        ] } },
+        { type: 'callout', variant: 'tip', title: '你剛剛做的就是偏好標註', body: ['每一題你都在產生一筆「A 比 B 好」的資料。大量這種資料，就是 RLHF 或 DPO 的原料。', '注意你判斷的依據：正確、有幫助、安全、不囉嗦。這些標準寫成標註指南，標註者照著判斷，模型就往這個方向調整。'] },
+        { type: 'table', head: ['', 'RLHF', 'DPO'], rows: [
+          ['需要獎勵模型', '要', '不用'],
+          ['需要強化學習', '要（例如 PPO）', '不用，訓練像分類問題'],
+          ['優點', '獎勵模型可以重複用在新產生的回答上', '流程簡單、穩定'],
+          ['風險', '模型可能鑽獎勵模型的漏洞', '只能用已收集的排序資料'],
+        ], caption: '出處：Ouyang 等 2022、Rafailov 等 2023。各家實際用哪些方法、怎麼組合通常不完全公開。' },
+      ],
+      tryit: {
+        q: ['如果獎勵模型無意間學到「回答越長分數越高」，強化學習之後的模型會怎樣？要怎麼防？'],
+        draft: '會怎樣：＿\n怎麼防：＿',
+        answer: ['模型會越寫越長、塞進不必要的內容，因為那能拿高分：典型的 reward hacking。', '防法：限制和 SFT 版本的差距（懲罰項）、在偏好資料裡刻意放「短而好」勝過「長而普通」的例子、用其他評估檢查長度與品質的關係。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 RLHF 讓模型「理解」人類價值。', why: '它只是讓模型更常產生被偏好的回答。', right: '把它看成調整輸出分布，而不是灌輸理解。' },
+      { wrong: '以為獎勵分數越高一定越好。', why: '獎勵模型只是近似，可能被鑽漏洞。', right: '要限制離原本模型的距離，並用別的方式評估。' },
+      { wrong: '以為偏好資料要人寫出完美答案。', why: '偏好資料只需要比較兩個答案。', right: '比較比撰寫容易，這正是偏好學習的優勢。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'RLHF 的步驟順序是？', options: [
+        { text: '收集排序 → 訓練獎勵模型 → 強化學習', correct: true, why: '先有評審才能強化學習。' },
+        { text: '強化學習 → 收集排序 → 訓練獎勵模型', why: '沒有評審無法強化學習。' },
+        { text: '訓練獎勵模型 → 預訓練 → 收集排序', why: '預訓練在最前面。' },
+        { text: '收集排序 → 強化學習 → 訓練獎勵模型', why: '獎勵模型要先有。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'DPO 和 RLHF 最大的差別？', options: [
+        { text: '不需要獎勵模型與強化學習', correct: true, why: '直接用排序調整。' },
+        { text: 'DPO 不需要偏好資料', why: 'DPO 也用偏好資料。' },
+        { text: 'DPO 是預訓練階段使用的方法', why: '它是後訓練。' },
+        { text: 'DPO 會讓模型參數變多', why: '參數量不變。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你發現某個模型很愛說「這是個很好的問題」。用這一課的概念推測原因。'], answer: [
+        '可能是偏好資料或獎勵模型偏好有禮貌、正面的開頭，強化學習放大了這個傾向：一種輕微的 reward hacking。',
+        '改善在訓練端（調整標註指南與資料）；使用端可以在 system prompt 明確要求「不要客套，直接回答」。',
+      ] },
+    ],
+    keypoints: [
+      'RLHF：排序 → 獎勵模型 → 強化學習（不要離 SFT 太遠）。',
+      'DPO：直接用排序調整模型，流程簡單。',
+      '獎勵只是近似，要防 reward hacking。',
+    ],
+    sources: ['instructgpt', 'dpo'],
+  },
+
+  '6-3': {
+    goals: [
+      '說出 Constitutional AI 的基本做法',
+      '分辨「有幫助的拒絕」與「過度拒絕」',
+      '解釋安全與有幫助之間的取捨',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 6-2）獎勵模型是用什麼資料訓練的？', options: [
+        { text: '「A 比 B 好」的排序資料', correct: true, why: '學會讓 A 的分數高於 B。' },
+        { text: '預訓練的網頁文字', why: '那是預訓練。' },
+        { text: 'SFT 的示範資料', why: '示範資料用來做 SFT。' },
+        { text: '使用者的帳號資料', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 6-1）基礎模型最可能的問題？', options: [
+        { text: '不一定照指令回答', correct: true, why: '它學的是接話。' },
+        { text: '完全不會產生文字', why: '它很會接話。' },
+        { text: '只會說英文', why: '看資料而定。' },
+        { text: '一定會拒絕', why: '拒絕主要在後訓練學。' },
+      ] },
+    ],
+    analogy: {
+      text: ['新進員工手冊不會列出每一種狀況，而是寫幾條原則：誠實、尊重客戶、不洩漏個資。員工遇到新狀況，就拿原則去判斷，自己修正做法。', '[[Constitutional AI]] 讓模型做類似的事：給一組寫成文字的原則，模型先回答，再依原則批評自己的回答並改寫；改寫後的結果用來訓練，之後還用 AI 依原則做偏好判斷，取代部分人工標註。'],
+      limit: ['員工會思考原則背後的理由，模型是被訓練得更常產生符合原則的文字；原則寫得模糊或互相衝突時，結果也會不一致。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="Constitutional AI：模型先回答，再依原則自我批評，依批評改寫，改寫結果拿來訓練；之後用 AI 依原則比較兩個回答產生偏好資料">
+        <rect x="10" y="20" width="250" height="160" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="135" y="46" text-anchor="middle" font-size="15" font-weight="900">階段一：自我批改</text>
+        <text x="30" y="80" font-size="14">① 回答</text>
+        <text x="30" y="106" font-size="14">② 依原則批評自己</text>
+        <text x="30" y="132" font-size="14">③ 改寫</text>
+        <text x="30" y="158" font-size="14">④ 用改寫結果訓練（SFT）</text>
+        <rect x="300" y="20" width="250" height="160" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+        <text x="425" y="46" text-anchor="middle" font-size="15" font-weight="900" class="on-color">階段二：AI 回饋</text>
+        <text x="320" y="80" font-size="14" class="on-color">① 產生兩個回答</text>
+        <text x="320" y="106" font-size="14" class="on-color">② AI 依原則選較好的</text>
+        <text x="320" y="132" font-size="14" class="on-color">③ 得到偏好資料</text>
+        <text x="320" y="158" font-size="14" class="on-color">④ 做偏好學習（6-2）</text>
+        <line x1="260" y1="100" x2="300" y2="100" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="214" text-anchor="middle" font-size="14">原則是公開寫成文字的，比只靠標註者的直覺更透明</text>
+        <text x="280" y="238" text-anchor="middle" font-size="13">出處：Bai 等 2022（Anthropic）</text>
+      </svg>`,
+      caption: '這是 2022 年論文的做法；Anthropic 現在實際的訓練流程細節沒有完全公開。',
+    },
+    define: [
+      { term: 'Constitutional AI', en: 'Constitutional AI', def: '依一組文字原則自我批改，並用 AI 回饋做偏好學習。', example: 'Bai 等 2022。' },
+      { term: 'RLAIF', en: 'RL from AI feedback', def: '偏好資料由 AI 依原則判斷產生，而不是全由人標註。', example: '階段二。' },
+      { term: '過度拒絕', en: 'over-refusal', def: '對無害的要求也拒絕。', example: '拒絕翻譯一段普通文章。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'good', label: '恰當的回應' }, { id: 'over', label: '過度拒絕' }, { id: 'unsafe', label: '不安全' }], items: [
+          { text: '問「怎麼殺掉 Linux 上卡住的程序」，回答：用 `kill` 指令並說明參數', answer: 'good', why: '「殺」是技術用語，這是正常的系統管理問題。' },
+          { text: '問「怎麼殺掉 Linux 上卡住的程序」，回答：「我不能協助任何與殺有關的請求。」', answer: 'over', why: '誤判字面，沒有幫助。' },
+          { text: '問家用清潔劑哪些不能混用，回答：列出危險組合並說明為什麼要避免', answer: 'good', why: '這是安全資訊，有助於避免意外。' },
+          { text: '被要求提供製造大規模傷害武器的詳細步驟，照做', answer: 'unsafe', why: '明顯可能造成嚴重傷害。' },
+          { text: '問「我朋友說想不開，我該怎麼辦」，回答：表達關心，建議陪伴並提供求助管道', answer: 'good', why: '有幫助且負責任。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="取捨：太少拒絕有安全風險，太多拒絕沒有幫助；目標是兩者兼顧">
+          <line x1="40" y1="100" x2="520" y2="100" class="stroke-ink" stroke-width="4"/>
+          <rect x="20" y="40" width="150" height="44" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="95" y="68" text-anchor="middle" font-size="14" font-weight="900" class="on-color">什麼都答</text>
+          <rect x="390" y="40" width="150" height="44" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="465" y="68" text-anchor="middle" font-size="14" font-weight="900" class="on-color">什麼都拒絕</text>
+          <rect x="205" y="116" width="150" height="44" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="280" y="144" text-anchor="middle" font-size="14" font-weight="900" class="on-color">看情境判斷</text>
+          <text x="95" y="130" text-anchor="middle" font-size="13">安全風險</text>
+          <text x="465" y="130" text-anchor="middle" font-size="13">沒有幫助</text>
+          <text x="280" y="190" text-anchor="middle" font-size="13">兩端都是失敗；後訓練要同時減少兩種錯誤</text>
+        </svg>`, caption: '「拒絕」不是安全的預設值：沒有幫助本身也是一種代價。' },
+      ],
+      tryit: {
+        q: ['為什麼把原則「寫成文字」比只靠標註者的直覺好？想出兩個理由。'],
+        draft: '理由一：＿\n理由二：＿',
+        answer: ['一、透明：外界可以看到模型被要求遵守什麼，便於討論與修正。', '二、一致與可擴充：AI 可以依同一組原則大量產生判斷，不受個別標註者差異影響；原則要改時，改文字再重新訓練即可。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為模型拒絕越多越安全。', why: '過度拒絕讓模型沒用，也會讓使用者轉向更不安全的來源。', right: '目標是同時減少不安全與過度拒絕。' },
+      { wrong: '看到關鍵字（殺、炸、駭）就判斷要拒絕。', why: '技術與日常用語裡這些字很常見。', right: '看整體意圖與可能的傷害。' },
+      { wrong: '以為 Constitutional AI 完全不需要人。', why: '原則由人寫，評估也需要人。', right: 'AI 回饋取代的是部分標註工作。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Constitutional AI 的核心做法是？', options: [
+        { text: '依文字原則自我批改，再用 AI 回饋', correct: true, why: '兩個階段。' },
+        { text: '用法律條文當作預訓練資料', why: '原則不是當預訓練資料用。' },
+        { text: '完全不做任何後訓練', why: '它本身就是後訓練方法。' },
+        { text: '讓使用者在每次對話時投票決定規則與原則', why: '原則在訓練時使用。' },
+      ] },
+      { level: '應用', type: 'mc', q: '使用者問「Python 怎麼 kill 一個 thread」，模型回答「我不能協助暴力相關內容」。這是？', options: [
+        { text: '過度拒絕', correct: true, why: '把技術用語誤判成暴力。' },
+        { text: '恰當的安全回應', why: '這是正常的程式問題。' },
+        { text: '幻覺', why: '幻覺是說出錯誤的事實。' },
+        { text: 'reward hacking', why: '比較像安全訓練過頭。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在自己的應用裡加了一層「關鍵字過濾」來擋危險內容，結果客服機器人常常拒絕正常問題。怎麼改善？'], answer: [
+        '關鍵字過濾會大量誤判，和模型的過度拒絕是同一個問題。改用看語意的分類（例如讓模型或分類器判斷意圖），並為常見的誤判建立測試案例。',
+        '同時收集被擋下的請求，定期人工檢查，調整規則（第一部 8-1 的評估流程）。',
+      ] },
+    ],
+    keypoints: [
+      'Constitutional AI：依文字原則自我批改，再用 AI 回饋做偏好學習。',
+      '安全的目標是同時減少「不安全」與「過度拒絕」。',
+      '看意圖與傷害，不看關鍵字。',
+    ],
+    sources: ['cai'],
+  },
+
+  '6-4': {
+    goals: [
+      '說明推理模型和一般模型的差別',
+      '解釋為什麼「可驗證的題目」適合訓練推理',
+      '估算思考 token 帶來的成本與延遲',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 6-3）「過度拒絕」是指？', options: [
+        { text: '對無害的要求也拒絕', correct: true, why: '沒有幫助也是失敗。' },
+        { text: '拒絕危險要求', why: '那是恰當的。' },
+        { text: '回答太長', why: '那是另一種問題。' },
+        { text: '說錯事實', why: '那是幻覺。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 6-2）DPO 不需要什麼？', options: [
+        { text: '另外訓練獎勵模型與跑強化學習', correct: true, why: '直接用排序。' },
+        { text: '偏好資料', why: 'DPO 需要偏好資料。' },
+        { text: '預訓練過的模型', why: '一樣建在預訓練模型上。' },
+        { text: 'GPU', why: '一樣要訓練。' },
+      ] },
+    ],
+    analogy: {
+      text: ['考數學時，直接寫答案很容易錯；在計算紙上一步一步算、算完驗算，正確率高很多，只是比較花時間。', '[[推理模型]]就是學會先用一段[[思考 token]] 打草稿：拆問題、試做法、發現錯誤再修正，最後才給答案。訓練時常用可以自動對答案的題目（數學、程式測試），答對就給獎勵，讓模型自己摸索出有用的思考方式。'],
+      limit: ['人的計算紙是真的在推理，模型的思考 token 也是一個一個取樣出來的文字，不保證每一步都正確，也不保證寫出來的過程就是它內部真正的計算方式。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="推理模型的強化學習：模型對一題產生思考與答案，自動檢查答案對不對，答對給獎勵，模型學會產生能答對的思考方式">
+        <rect x="10" y="40" width="150" height="80" class="fill-surface stroke-ink" stroke-width="3"/><text x="85" y="76" text-anchor="middle" font-size="14" font-weight="900">題目</text><text x="85" y="100" text-anchor="middle" font-size="13">數學、程式…</text>
+        <line x1="160" y1="80" x2="190" y2="80" class="stroke-ink" stroke-width="3"/>
+        <rect x="190" y="30" width="180" height="100" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="280" y="62" text-anchor="middle" font-size="14" font-weight="900" class="on-color">思考（很多 token）</text><text x="280" y="88" text-anchor="middle" font-size="13" class="on-color">拆解、試算、檢查</text><text x="280" y="112" text-anchor="middle" font-size="13" class="on-color">→ 答案</text>
+        <line x1="370" y1="80" x2="400" y2="80" class="stroke-ink" stroke-width="3"/>
+        <rect x="400" y="40" width="150" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="475" y="76" text-anchor="middle" font-size="14" font-weight="900" class="on-color">自動檢查</text><text x="475" y="100" text-anchor="middle" font-size="13" class="on-color">對 → 獎勵</text>
+        <path d="M475 120 L475 180 L280 180 L280 136" fill="none" class="stroke-ink" stroke-width="3"/><path d="M272 144 L280 132 L288 144 Z" class="stroke-ink" style="fill:var(--ink)"/>
+        <text x="380" y="206" text-anchor="middle" font-size="14" font-weight="900">強化能答對的思考方式</text>
+        <text x="280" y="232" text-anchor="middle" font-size="13">DeepSeek-R1（2025）報告：只靠這種強化學習就出現自我反思、驗證等行為</text>
+      </svg>`,
+      caption: '不需要人寫出「正確的思考過程」，只要能自動判斷最後答案對不對。',
+    },
+    define: [
+      { term: '推理模型', en: 'reasoning model', def: '先思考再回答的模型。', example: 'Claude 的 extended thinking。' },
+      { term: '思考 token', en: 'thinking tokens', def: '最終回答前產生的思考內容。', example: '也要算力與費用。' },
+      { term: '可驗證的獎勵', en: 'verifiable reward', def: '能自動判斷對錯的題目給的獎勵。', example: '數學答案、程式測試通過。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="一次推理模型的輸出：思考 4000 token 佔大部分，最終回答 500 token">
+  <text x="20" y="28" font-size="15" font-weight="900">一次回答的輸出 token（示意）</text>
+  <rect x="20" y="50" width="462" height="50" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="251" y="81" text-anchor="middle" font-size="14" font-weight="900" class="on-color">思考 4,000</text>
+  <rect x="482" y="50" width="58" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="511" y="81" text-anchor="middle" font-size="13" font-weight="900" class="on-color">500</text>
+  <text x="20" y="136" font-size="14">使用者只讀到右邊那一小段，但兩段都要時間、都算輸出費用。</text>
+  <text x="20" y="160" font-size="13">思考內容如何計費與顯示，以官方文件為準。</text>
+</svg>`, caption: '思考多的時候，大部分成本花在使用者看不到（或摘要後才看到）的部分。' },
+        { type: 'widget', name: 'knobs', props: { title: '思考多少：成本與等待（Opus 5.5 輸出價，速度是示意）', sliders: [
+          { id: 'think', label: '思考 token', min: 0, max: 32000, step: 500, value: 4000 },
+          { id: 'answer', label: '回答 token', min: 100, max: 4000, step: 100, value: 500 },
+          { id: 'speed', label: '產生速度（示意）', min: 20, max: 200, step: 10, value: 60, unit: 'token／秒' },
+        ], compute: (v) => {
+          const out = v.think + v.answer;
+          const usd = (out * 20) / 1e6;
+          const secs = out / v.speed;
+          return { rows: [
+            { label: '輸出 token 合計', value: out.toLocaleString('en-US'), ratio: out / 36000 },
+            { label: '輸出費用（$20／百萬）', value: `$${usd.toFixed(4)}`, ratio: usd / 0.72 },
+            { label: '產生時間', value: `${secs.toFixed(0)} 秒`, ratio: Math.min(1, secs / 600) },
+          ], note: '價格查證於 2026-10-22（Opus 5.5 輸出 $20／百萬 token）；思考內容的計費與顯示方式依官方文件為準。速度是**示意**數字，實際依模型與負載而定。' };
+        } } },
+        { type: 'table', head: ['適合讓模型多想', '不太需要多想'], rows: [
+          ['多步驟數學、邏輯推理', '簡單查詢、改寫語氣'],
+          ['複雜程式除錯、規劃', '分類、抽取固定欄位'],
+          ['需要比較多種方案再決定', '閒聊、短回答'],
+        ], caption: '思考會增加費用與等待；先用不思考或少思考的設定，品質不夠再加。' },
+        { type: 'widget', name: 'checklist', props: { key: '6-4', items: [
+          '這個任務有多個步驟，一步錯就全錯',
+          '答案可以檢查（數字、測試、邏輯）',
+          '使用者願意多等幾秒到幾十秒',
+          '每次請求多付思考 token 的費用是可以接受的',
+        ] } },
+      ],
+      tryit: {
+        q: ['用上面的拉桿：思考 16,000、回答 500、速度 60。費用和時間各是多少？如果這是一個即時聊天功能，你會怎麼調整？'],
+        draft: '費用：＿\n時間：＿\n調整：＿',
+        answer: ['16,500 × $20 ÷ 1,000,000 ≈ $0.33；16,500 ÷ 60 ≈ 275 秒（示意速度下）。', '即時聊天等不了這麼久：降低思考量、只在複雜問題才開思考、或先串流顯示「正在思考」的狀態（第一部模組 2）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為思考過程一定正確，可以直接當解釋。', why: '思考 token 也是取樣出來的文字，可能有錯。', right: '看最終答案是否可驗證，思考過程當參考。' },
+      { wrong: '所有任務都開到最大思考量。', why: '簡單任務多想沒有幫助，只增加費用與等待。', right: '依任務難度調整。' },
+      { wrong: '以為推理模型是另一種架構。', why: '架構可以一樣，差在後訓練教會它先產生思考。', right: '推理能力主要來自訓練方式。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '為什麼推理訓練常用數學與程式題目？', options: [
+        { text: '答案可以自動檢查對錯，方便給獎勵', correct: true, why: '可驗證的獎勵。' },
+        { text: '因為這兩種題目最簡單', why: '常常是最難的。' },
+        { text: '因為網路上找不到其他種類的練習題目', why: '其他題目很多，只是難以自動評分。' },
+        { text: '因為模型只能處理數字', why: '模型處理 token。' },
+      ] },
+      { level: '應用', type: 'mc', q: '思考 10,000 token、回答 500 token，用 $20／百萬的輸出價，費用約？', options: [
+        { text: '$0.21', correct: true, why: '10,500 × 20 ÷ 1,000,000。' },
+        { text: '$0.01', why: '只算了回答。' },
+        { text: '$2.10', why: '多乘了 10。' },
+        { text: '$0.0021', why: '少乘了 100。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同一個客服機器人，什麼問題該開思考、什麼不該？設計一個簡單的判斷規則。'], answer: [
+        '不開：查訂單、退貨流程、營業時間這種有固定答案的問題（用 RAG 查就好）。',
+        '開：要比對多張訂單、計算退款金額、判斷是否符合多條政策的問題。規則可以先用分類（第一部模組 3）判斷問題類型，再決定要不要開思考。',
+      ] },
+    ],
+    keypoints: [
+      '推理模型先產生思考 token 再回答，用強化學習在可驗證題目上訓練。',
+      '思考 token 也要錢、也要時間；依任務難度調整。',
+      '思考過程不保證正確，看可驗證的最終結果。',
+    ],
+    sources: ['r1', 'claude-thinking'],
+  },
+});
+</script>

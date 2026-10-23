@@ -1,0 +1,436 @@
+<script>
+/* ==========================================================================
+   模組 1：Tokenization：文字怎麼被切成 token
+   ========================================================================== */
+defineTerms({
+  'tokenizer': { en: 'tokenizer', def: '把文字切成 token、再換成編號的程式；每個模型有自己的一套，和模型一起決定好、之後不變。', example: '同一句話在不同模型的 token 數不同。', lesson: '1-1' },
+  '詞彙表': { en: 'vocabulary', def: 'tokenizer 認得的所有 token 清單，每個 token 有一個固定編號。', example: '常見模型的詞彙表大約幾萬到幾十萬個。', lesson: '1-1' },
+  '子詞': { en: 'subword', def: '介於「字母」和「整個詞」之間的片段；常見詞是一整塊，罕見詞拆成幾塊。', example: 'tokenization → token ＋ ization。', lesson: '1-1' },
+  'UTF-8': { en: 'UTF-8', def: '把文字存成位元組的標準編碼；英文字母 1 個位元組，中文字通常 3 個。', example: '「台」在 UTF-8 是 3 個位元組。', lesson: '1-1' },
+  'BPE': { en: 'Byte Pair Encoding', def: '從單一字元開始，反覆把資料中最常一起出現的相鄰兩塊合併成新 token，直到詞彙表夠大。', example: 'e＋s → es，es＋t → est。', lesson: '1-2' },
+  '合併規則': { en: 'merge rule', def: 'BPE 訓練時記下的「哪兩塊要黏起來」清單，切新文字時照順序套用。', example: '第 1 條：e＋s；第 2 條：es＋t。', lesson: '1-2' },
+  '特殊 token': { en: 'special token', def: '不代表一般文字、用來標記結構的 token，例如開頭、結尾、誰在說話。', example: '「這一輪結束」的標記；模型產生它就停。', lesson: '1-4' },
+  '對話格式': { en: 'chat template', def: '把多輪對話（system、user、assistant）攤平成一條 token 序列的固定格式，中間用特殊 token 分隔。', example: 'API 的 messages 會先變成這種序列才進模型。', lesson: '1-4' },
+});
+
+const REVIEW_M0 = [
+  { level: '回想', type: 'mc', q: '（回顧 0-1）模型拿到文字後，第一件事是什麼？', options: [
+    { text: '切成 token 並換成編號', correct: true, why: '模型只處理數字。' },
+    { text: '直接把整句話送進 Transformer', why: 'Transformer 處理的是向量，不是文字。' },
+    { text: '先在資料庫裡找出最像的一句話', why: '模型裡沒有句子資料庫。' },
+    { text: '先算出下一個字的機率', why: '機率是最後一站。' },
+  ] },
+];
+
+const SPLIT_SVG = `<svg viewBox="0 0 560 250" role="img" aria-label="三種切法對照：用字母切太長，用整個詞切會遇到沒看過的詞，用子詞切兩邊折衷">
+  <text x="20" y="28" font-size="15" font-weight="900">同一個詞「unhappiness」</text>
+  <text x="20" y="72" font-size="14" font-weight="900">字母</text>
+  ${[...'unhappiness'].map((c, i) => `<rect x="${110 + i * 30}" y="52" width="26" height="30" class="fill-surface stroke-ink" stroke-width="2"/><text x="${123 + i * 30}" y="73" text-anchor="middle" font-size="14" class="mono">${c}</text>`).join('')}
+  <text x="450" y="73" font-size="13">11 段，太長</text>
+  <text x="20" y="132" font-size="14" font-weight="900">整個詞</text>
+  <rect x="110" y="112" width="200" height="30" class="fill-bg stroke-ink" stroke-width="2" stroke-dasharray="6 4"/><text x="210" y="133" text-anchor="middle" font-size="14" class="mono">unhappiness ?</text>
+  <text x="330" y="133" font-size="13">詞彙表沒有就無法表示</text>
+  <text x="20" y="192" font-size="14" font-weight="900">子詞</text>
+  <rect x="110" y="172" width="50" height="30" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><text x="135" y="193" text-anchor="middle" font-size="14" class="mono on-color">un</text>
+  <rect x="164" y="172" width="80" height="30" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="204" y="193" text-anchor="middle" font-size="14" class="mono on-color">happi</text>
+  <rect x="248" y="172" width="60" height="30" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="278" y="193" text-anchor="middle" font-size="14" class="mono on-color">ness</text>
+  <text x="330" y="193" font-size="13">3 段，而且每段都認得</text>
+  <text x="20" y="236" font-size="13">子詞的切點是示意；真正怎麼切由各模型的 tokenizer 決定</text>
+</svg>`;
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '說出「用字母切」和「用整個詞切」各自的問題',
+      '解釋子詞為什麼是折衷',
+      '知道為什麼現代 tokenizer 不會遇到「不認得的字」',
+    ],
+    review: REVIEW_M0,
+    analogy: {
+      text: ['寄東西用的箱子：全部用小盒子裝（字母），一台卡車要裝幾千盒，搬很久；全部用訂製大箱（整個詞），遇到形狀沒看過的東西就沒有箱子可裝。', '物流公司的做法是準備幾種常用尺寸：常寄的東西剛好一箱，奇怪的東西拆成幾箱。這就是[[子詞]]切法。'],
+      limit: ['箱子尺寸是人設計的，子詞是從資料統計出來的（1-2）。而且箱子只影響運費，token 切法還會影響模型「看到」的東西：切得怪，模型就比較難處理（1-3 的數字例子）。'],
+    },
+    model: { svg: SPLIT_SVG, caption: '字母切法序列太長，整詞切法會遇到沒看過的詞；子詞兩邊折衷。' },
+    define: [
+      { term: 'tokenizer', en: 'tokenizer', def: '切段＋換編號的程式。', example: '和模型一起訓練好，之後固定。' },
+      { term: '詞彙表', en: 'vocabulary', def: '所有 token 與編號的清單。', example: '幾萬到幾十萬個。' },
+      { term: '子詞', en: 'subword', def: '介於字母和整詞之間的片段。', example: 'un＋happi＋ness。' },
+      { term: 'UTF-8', en: 'UTF-8', def: '把文字存成位元組的標準。', example: '英文 1 位元組，中文通常 3 位元組。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['切法', '序列長度', '沒看過的詞', '詞彙表大小'], rows: [
+          ['字母（或位元組）', '很長，attention 計算量大', '不會有問題', '很小（幾十到 256）'],
+          ['整個詞', '短', '無法表示，只能用「未知」代替', '非常大，而且永遠不夠'],
+          ['子詞', '中等', '拆成認得的小塊', '幾萬到幾十萬'],
+        ] },
+        { type: 'widget', name: 'tokenmeter', props: { presets: [
+          { label: '常見英文', text: 'The weather is nice today.' },
+          { label: '罕見英文', text: 'Antidisestablishmentarianism' },
+          { label: '中文', text: '今天天氣很好。' },
+          { label: '混合', text: '用 Python 寫一個 fibonacci 函式' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="位元組當最後防線：中文字台在 UTF-8 是三個位元組，就算詞彙表沒有台，也能用三個位元組 token 表示">
+          <text x="20" y="28" font-size="15" font-weight="900">最後防線：位元組</text>
+          <rect x="20" y="50" width="90" height="60" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="65" y="90" text-anchor="middle" font-size="26" font-weight="900" class="on-color">台</text>
+          <line x1="110" y1="80" x2="150" y2="80" class="stroke-ink" stroke-width="3"/>
+          <rect x="150" y="50" width="100" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="200" y="86" text-anchor="middle" font-size="15" class="mono">E5</text>
+          <rect x="256" y="50" width="100" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="306" y="86" text-anchor="middle" font-size="15" class="mono">8F</text>
+          <rect x="362" y="50" width="100" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="412" y="86" text-anchor="middle" font-size="15" class="mono">B0</text>
+          <text x="20" y="146" font-size="14">「台」的 UTF-8 是 3 個位元組。詞彙表裡先放好全部 256 種位元組，</text>
+          <text x="20" y="170" font-size="14">任何文字最差也能拆成位元組，所以不會有「不認得的字」。</text>
+          <text x="20" y="192" font-size="13">常見的字會被合併成一整塊（1-2），罕見的字才會拆到位元組。</text>
+        </svg>`, caption: '在位元組上做子詞切分是許多現代 tokenizer 的通用做法；各家細節不同。' },
+      ],
+      tryit: {
+        q: ['在上面的示意器切到「罕見英文」與「常見英文」，比較兩者每個字元平均分到幾段，寫下你的觀察：'],
+        draft: '常見英文：＿ 字元 → ＿ 段\n罕見英文：＿ 字元 → ＿ 段\n觀察：＿',
+        answer: ['示意器是固定每 4 個字母切一段，所以兩者比例差不多；真正的 tokenizer 不是這樣。真正的 tokenizer 會把常見詞（The、weather）整個當一個 token，罕見長詞拆成很多塊，所以罕見詞「每字元花的 token」比較多。', '要看真實切法，用模型自己的 token 計數功能（第一部 1-4）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 token 就是一個字或一個單字。', why: 'token 是子詞：可能比一個詞小，也可能是一整個常見詞。', right: '把 token 想成「tokenizer 認得的片段」。' },
+      { wrong: '以為遇到罕見字、表情符號，模型就看不到。', why: '位元組當最後防線，任何文字都能表示。', right: '罕見的東西只是被切成更多塊，不是消失。' },
+      { wrong: '以為 tokenizer 會隨著使用慢慢學新詞。', why: 'tokenizer 和模型一起定好，之後固定。', right: '新名詞會被拆成舊的片段組合。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '用「整個詞」當 token，最大的問題是？', options: [
+        { text: '遇到詞彙表沒有的詞就無法表示', correct: true, why: '新詞、拼錯的詞、專有名詞都會卡住。' },
+        { text: '每個句子會切出太多段，運算太慢', why: '那是字母切法的問題。' },
+        { text: '中文和英文的字數不同', why: '這不是整詞切法特有的問題。' },
+        { text: '模型會因此不懂文法', why: '和文法無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '為什麼許多現代 tokenizer 不會出現「不認得的字」？', options: [
+        { text: '任何文字最差都能拆成位元組', correct: true, why: '最差情況就是一個位元組一個 token。' },
+        { text: '詞彙表收錄了世界上所有的文字與符號', why: '詞彙表只有幾萬到幾十萬個，收不完。' },
+        { text: '遇到不認得的字，模型會自動上網查詢', why: '模型推論時不會上網。' },
+        { text: '不認得的字會被直接刪掉', why: '不會刪掉；會拆成位元組。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的產品名稱是自創字「Zyntrova」。推測它會被怎麼切，以及這對模型有什麼影響。'], answer: [
+        '詞彙表裡不會有它，會被拆成幾個常見片段（例如 Z、yn、tro、va，切點是示意）。',
+        '影響：多花幾個 token；模型對這個詞沒有現成的「意思」，要靠上下文推斷。所以在 prompt 裡第一次出現時，最好說明它是什麼。',
+      ] },
+    ],
+    keypoints: [
+      '字母切太長，整詞切會卡住，子詞是折衷。',
+      '位元組是最後防線：任何文字都切得出來。',
+      'tokenizer 和模型一起定好，之後不變。',
+    ],
+    sources: ['bpe'],
+  },
+
+  '1-2': {
+    goals: [
+      '手算 BPE 的一次合併',
+      '說出「合併規則」怎麼用來切新的文字',
+      '解釋為什麼常見的詞最後會變成一整塊',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）子詞切法折衷了哪兩種切法？', options: [
+        { text: '字母切法與整詞切法', correct: true, why: '子詞介於兩者之間。' },
+        { text: '中文切法與英文切法', why: '子詞不是依語言分。' },
+        { text: '大寫字母切法與小寫字母切法', why: '和大小寫無關。' },
+        { text: '句子切法與段落切法', why: 'token 比詞還小或差不多大。' },
+      ] },
+    ],
+    analogy: {
+      text: ['打字常用縮寫：你發現自己老是打「謝謝你」，就設一個快捷鍵；之後又發現「謝謝你的幫忙」也很常出現，再設一個更長的。', '[[BPE]] 就是這樣自動找快捷鍵：一開始每個字元一塊，每一步把資料裡最常相鄰出現的兩塊黏成一塊新 token，記下這條[[合併規則]]，重複幾萬次。'],
+      limit: ['你設快捷鍵會考慮意思，BPE 只看次數：它可能把兩個沒有意義的片段黏在一起，只因為它們很常相鄰。所以 token 的切點常常不在字根上。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="BPE 一次合併：數出所有相鄰配對的次數，e 加 s 出現 9 次最多，把 e 和 s 合併成 es，記下規則，重複">
+        <rect x="10" y="20" width="250" height="90" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="26" y="48" font-size="14" font-weight="900">① 數相鄰配對</text>
+        <text x="26" y="74" font-size="14" class="mono">e+s 9・s+t 9・l+o 7</text>
+        <text x="26" y="96" font-size="14" class="mono">o+w 7・w+e 8 …</text>
+        <line x1="260" y1="65" x2="300" y2="65" class="stroke-ink" stroke-width="3"/>
+        <rect x="300" y="20" width="250" height="90" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="316" y="48" font-size="14" font-weight="900" class="on-color">② 合併最多的那對</text>
+        <text x="316" y="74" font-size="14" class="mono on-color">e + s → es</text>
+        <text x="316" y="96" font-size="13" class="on-color">同分時依固定順序挑</text>
+        <line x1="425" y1="110" x2="425" y2="140" class="stroke-ink" stroke-width="3"/>
+        <rect x="300" y="140" width="250" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="316" y="168" font-size="14" font-weight="900">③ 記下規則，詞彙表 +1</text>
+        <text x="316" y="194" font-size="13">規則 1：e+s</text>
+        <path d="M300 175 L135 175 L135 116" fill="none" class="stroke-ink" stroke-width="3"/><path d="M127 124 L135 112 L143 124 Z" class="stroke-ink" style="fill:var(--ink)"/>
+        <text x="150" y="200" font-size="14" font-weight="900">重複到詞彙表夠大</text>
+        <text x="20" y="240" font-size="13">次數來自下方互動的小語料；同分時互動元件依字母順序挑。</text>
+      </svg>`,
+      caption: '訓練 tokenizer 只做這三步，重複幾萬次。注意：這是訓練 tokenizer，不是訓練模型。',
+    },
+    define: [
+      { term: 'BPE', en: 'Byte Pair Encoding', def: '反覆合併最常相鄰的兩塊。', example: 'Sennrich 等 2015 用在翻譯模型處理罕見詞。' },
+      { term: '合併規則', en: 'merge rule', def: '依序記下的合併清單。', example: '切新文字時從第 1 條套到最後一條。' },
+      { term: '語料', en: 'corpus', def: '用來訓練的一大堆文字。', example: '下面互動用的是 4 個英文詞的小語料。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="用學到的規則切新詞 lowest：從字母開始，依序套用 e 加 s、es 加 t、est 加結尾、l 加 o、lo 加 w，最後得到 low 與 est 結尾">
+  <text x="20" y="26" font-size="15" font-weight="900">切新詞「lowest」：照規則順序套用</text>
+  ${[['開始', 'l o w e s t _'], ['規則 1：e＋s', 'l o w es t _'], ['規則 2：es＋t', 'l o w est _'], ['規則 3：est＋_', 'l o w est_'], ['規則 4、5：l＋o、lo＋w', 'low est_']].map(([a, b], i) => `<text x="20" y="${60 + i * 34}" font-size="14" font-weight="900">${a}</text><text x="250" y="${60 + i * 34}" font-size="15" class="mono">${b}</text>`).join('')}
+</svg>`, caption: '規則順序固定，同一個詞每次都切成一樣的結果。' },
+        { type: 'widget', name: 'bpe', props: { title: '小語料：low×5、lower×2、newest×6、widest×3', words: [{ w: 'low', n: 5 }, { w: 'lower', n: 2 }, { w: 'newest', n: 6 }, { w: 'widest', n: 3 }], steps: 8 } },
+        { type: 'callout', variant: 'tip', title: '看互動時注意三件事', body: ['一、最先合併的是 `e`＋`s`、`es`＋`t` 這種在很多詞裡都出現的片段，不是某一個詞。', '二、每合併一次，詞彙表多一個 token，整份資料切出來的段數變少。', '三、`_` 是詞尾標記：讓 `est_`（詞尾的 est）和詞中間的 est 分開，原論文的做法也類似。'] },
+        { type: 'code', lang: 'python', title: '用學到的規則切一個新詞（示意）', code: 'merges = [("e","s"), ("es","t"), ("est","_"), ("l","o"), ("lo","w")]\n\ndef tokenize(word):\n    parts = list(word) + ["_"]\n    for a, b in merges:          # 依學到的順序套用\n        i = 0\n        while i < len(parts) - 1:\n            if parts[i] == a and parts[i + 1] == b:\n                parts[i:i + 2] = [a + b]\n            else:\n                i += 1\n    return parts\n\nprint(tokenize("lowest"))   # [\'low\', \'est_\']' },
+      ],
+      tryit: {
+        q: ['語料只有「aaab ×4」與「ab ×3」。不看答案，手算第一次合併會合併哪一對、出現幾次？'],
+        draft: '相鄰配對與次數：＿\n第一次合併：＿',
+        answer: ['把每個詞拆成字元（先不管詞尾標記）：aaab 有 a+a 兩次、a+b 一次；乘上 ×4 → a+a 8 次、a+b 4 次。ab 有 a+b 一次，×3 → 3 次。', '合計 a+a 8 次、a+b 7 次，所以第一次合併 a+a → aa。注意要乘上每個詞出現的次數。'],
+      },
+    },
+    mistakes: [
+      { wrong: '數配對時忘了乘上詞出現的次數。', why: '一個詞出現 6 次，它裡面的配對也算 6 次。', right: '配對次數 ＝ 在詞裡出現幾次 × 詞出現幾次。' },
+      { wrong: '以為 BPE 會依意思切，例如切在字根。', why: 'BPE 只看次數。', right: '切點常常和字根不同，這很正常。' },
+      { wrong: '以為切新文字時是「找最長的 token 去配」。', why: 'BPE 是依學到的合併順序一條一條套用。', right: '照規則順序合併（上面的程式碼）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'BPE 每一步合併的是哪一對？', options: [
+        { text: '出現最多次的相鄰配對', correct: true, why: '只看次數。' },
+        { text: '意思最完整的那兩個字元', why: 'BPE 不看意思。' },
+        { text: '字母順序最前面的那一對', why: '字母順序只用在同分時。' },
+        { text: '最長那個詞的最後兩個字元', why: '和詞長無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'BPE 合併越多次，會發生什麼事？', options: [
+        { text: '詞彙表變大，同一段文字切出的 token 變少', correct: true, why: '每合併一次就多一個 token，序列變短。' },
+        { text: '詞彙表變小，同一段文字切出的 token 變多', why: '方向反了。' },
+        { text: '詞彙表大小不變，只有編號改變', why: '每次合併都會新增一個 token。' },
+        { text: '模型的參數會跟著重新訓練一次', why: '這裡在訓練 tokenizer，不是模型。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['如果訓練 tokenizer 的語料幾乎都是英文，用它切中文會怎樣？對使用者有什麼實際影響？'], answer: [
+        '中文的常見組合沒機會被合併，很多字會停在位元組或很小的片段，同樣意思要花更多 token。',
+        '影響：中文使用者同樣內容付更多錢、更快碰到 context 上限，而且模型處理起來也比較吃力。這就是為什麼 tokenizer 的訓練語料要涵蓋多種語言（1-3）。',
+      ] },
+    ],
+    keypoints: [
+      'BPE：數相鄰配對 → 合併最多的 → 記規則 → 重複。',
+      '只看次數，不看意思；同分依固定順序。',
+      '切新文字時，照規則順序一條一條套用。',
+    ],
+    sources: ['bpe'],
+  },
+
+  '1-3': {
+    goals: [
+      '說出詞彙表變大的好處與代價',
+      '用數字算出詞彙表大小對參數量的影響',
+      '解釋數字、程式碼、不同語言為什麼被切得不一樣',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）BPE 合併的依據是什麼？', options: [
+        { text: '相鄰配對在語料裡出現的次數', correct: true, why: '每次合併最多的那一對。' },
+        { text: '人工整理好的字根清單', why: 'BPE 不用字根清單。' },
+        { text: '每個詞的意思相近程度', why: 'BPE 不看意思。' },
+        { text: '字元在鍵盤上的位置', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 0-1）一次前向計算的結果是什麼？', options: [
+        { text: '下一個 token 的機率', correct: true, why: '每次只算下一個。' },
+        { text: '整段回答', why: '回答是很多次接出來的。' },
+        { text: '更新後的參數', why: '推論不更新參數。' },
+        { text: 'tokenizer 的合併規則', why: '那是訓練 tokenizer 的產物。' },
+      ] },
+    ],
+    analogy: {
+      text: ['字典越厚，查到整個詞的機會越高，句子拆得越少；但字典越厚越重，而且很少用到的詞條，你也不太記得意思。', '[[詞彙表]]也一樣：越大，序列越短；但每個 token 都要一個向量（2-1），輸出時也要對每個 token 打分，參數和計算都跟著變多，罕見 token 也練不熟。'],
+      limit: ['字典的頁數不影響你讀書的速度，詞彙表大小會直接影響模型輸入與輸出兩端的計算量。不過詞彙表在整個模型的參數裡佔多少，要看模型多大（下面的拉桿）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="蹺蹺板：詞彙表大，序列短但向量表和輸出層大；詞彙表小，表小但序列長">
+        <text x="280" y="28" text-anchor="middle" font-size="15" font-weight="900">詞彙表大小的取捨</text>
+        <rect x="20" y="50" width="250" height="140" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="145" y="78" text-anchor="middle" font-size="15" font-weight="900">詞彙表小</text>
+        <text x="40" y="108" font-size="14">＋ 向量表、輸出層小</text>
+        <text x="40" y="134" font-size="14">＋ 每個 token 練得熟</text>
+        <text x="40" y="160" font-size="14">－ 序列長，計算多</text>
+        <rect x="290" y="50" width="250" height="140" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="415" y="78" text-anchor="middle" font-size="15" font-weight="900" class="on-color">詞彙表大</text>
+        <text x="310" y="108" font-size="14" class="on-color">＋ 序列短，context 裝得多</text>
+        <text x="310" y="134" font-size="14" class="on-color">－ 向量表、輸出層大</text>
+        <text x="310" y="160" font-size="14" class="on-color">－ 罕見 token 練不熟</text>
+        <text x="280" y="212" text-anchor="middle" font-size="13">實際模型大約幾萬到幾十萬，各家不同</text>
+      </svg>`,
+      caption: '沒有最好的大小，只有對目標語言與模型大小最划算的大小。',
+    },
+    define: [
+      { term: '詞彙表大小', en: 'vocabulary size', def: '詞彙表裡 token 的數量，常寫成 V。', example: 'V ＝ 50,000。' },
+      { term: '向量維度', en: 'embedding dimension', def: '每個 token 的向量有幾個數字，常寫成 d。', example: 'd ＝ 4,096。' },
+      { term: '輸出層', en: 'output layer', def: '把最後的向量變成「每個 token 一個分數」的那一層，大小也是 V × d。', example: '有些模型和向量表共用同一份數字。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="詞彙表大小影響模型兩端：輸入端的向量表 V 乘 d，輸出端的輸出層 d 乘 V，中間的 Transformer 層和 V 無關">
+  <rect x="20" y="170" width="520" height="44" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="198" text-anchor="middle" font-size="14" font-weight="900" class="on-color">輸入端：向量表 V × d</text>
+  <rect x="20" y="100" width="520" height="56" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="134" text-anchor="middle" font-size="14" font-weight="900">中間：Transformer 層（大小和 V 無關）</text>
+  <rect x="20" y="30" width="520" height="56" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="280" y="56" text-anchor="middle" font-size="14" font-weight="900" class="on-color">輸出端：輸出層 d × V</text><text x="280" y="76" text-anchor="middle" font-size="13" class="on-color">每個 token 一個分數，每一步都要算 V 個</text>
+</svg>`, caption: '詞彙表只影響頭尾兩端；模型越大，兩端佔的比例越小。' },
+        { type: 'widget', name: 'knobs', props: { title: '詞彙表與向量表的大小（實際計算）', sliders: [
+          { id: 'v', label: '詞彙表大小 V', min: 8, max: 256, step: 8, value: 64, unit: '千個 token' },
+          { id: 'd', label: '向量維度 d', min: 512, max: 8192, step: 512, value: 4096 },
+          { id: 'total', label: '整個模型的參數', min: 1, max: 100, step: 1, value: 8, unit: '十億' },
+        ], compute: (v) => {
+          const table = v.v * 1000 * v.d;
+          const both = table * 2;
+          const total = v.total * 1e9;
+          const fmt = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(2)} 十億` : `${Math.round(n / 1e6)} 百萬`);
+          return { rows: [
+            { label: '向量表 V×d', value: fmt(table), ratio: Math.min(1, table / total) },
+            { label: '向量表＋輸出層（不共用）', value: fmt(both), ratio: Math.min(1, both / total) },
+            { label: '佔整個模型', value: `${Math.min(100, (both / total) * 100).toFixed(1)}%`, ratio: Math.min(1, both / total) },
+          ], note: '小模型的詞彙表佔比很高，大模型佔比很低：這是小模型通常不用太大詞彙表的原因之一。' };
+        } } },
+        { type: 'table', head: ['內容', '常見的切法現象', '影響'], rows: [
+          ['英文常見詞', '常常一個詞一個 token', '最省'],
+          ['中文', '常見字詞可能是一塊，罕見字拆成位元組；依 tokenizer 而定', '要實際量'],
+          ['數字', '可能被切成不規則的幾段（例如 1234 → 12＋34）', '做直式計算時比較吃力'],
+          ['程式碼', '空白、縮排、符號都佔 token', '縮排多的檔案比想像中貴'],
+        ], caption: '現象是通則；每個模型的實際切法不同，要用該模型的 token 計數量。' },
+        { type: 'widget', name: 'tokenmeter', props: { presets: [
+          { label: '數字', text: '12345 + 67890 = 80235' },
+          { label: '程式碼縮排', text: '        if (x) {\n            return y;\n        }' },
+          { label: '中英混合', text: '請把 README 翻成中文' },
+        ] } },
+      ],
+      tryit: {
+        q: ['把拉桿設成 V＝256 千、d＝4096、整個模型 1 十億。向量表＋輸出層佔多少？這個設計合理嗎？'],
+        draft: '佔比：＿\n合理嗎：＿',
+        answer: ['256,000 × 4,096 × 2 ≈ 21 億，超過整個模型的 10 億，拉桿會頂到 100%。代表這個組合不合理：參數幾乎全花在詞彙上，沒有剩給中間的 Transformer 層。', '小模型要用比較小的詞彙表或比較小的 d，或讓向量表和輸出層共用同一份數字。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為詞彙表越大越好。', why: '向量表和輸出層會跟著變大，罕見 token 也練不熟。', right: '依語言、模型大小選一個划算的大小。' },
+      { wrong: '用英文的 token 比例去估中文的成本。', why: '不同語言的切法差很多。', right: '用該模型的 token 計數量你的實際內容。' },
+      { wrong: '以為模型算錯數學只是因為「不會算」。', why: '數字被切成不規則的片段，也是原因之一。', right: '需要精確計算時，讓模型呼叫工具（第一部 4-1）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '詞彙表變大，下面哪一項會跟著變大？', options: [
+        { text: '向量表與輸出層的參數', correct: true, why: '兩者都是 V × d。' },
+        { text: '同一段文字切出的 token 數', why: '詞彙表大，序列反而變短。' },
+        { text: 'Transformer 中間層的層數', why: '層數和詞彙表無關。' },
+        { text: '每個 token 的位元組數', why: '位元組是文字本身決定的。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'V＝100,000、d＝2,048，向量表有多少個數字？', options: [
+        { text: '約 2.05 億', correct: true, why: '100,000 × 2,048 ＝ 204,800,000。' },
+        { text: '約 2,050 萬', why: '少乘了一個 10。' },
+        { text: '約 20.5 億', why: '多乘了一個 10。' },
+        { text: '102,048 個', why: '要相乘，不是相加。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做一個只處理繁體中文客服對話的小模型。詞彙表要怎麼設計？說出兩個考量。'], answer: [
+        '一、用大量繁體中文語料訓練 tokenizer，讓常見的中文詞被合併成一塊，序列才不會太長。',
+        '二、模型小，詞彙表不能太大，否則參數都花在向量表上；可以讓向量表與輸出層共用，或選中等大小的 V。',
+      ] },
+    ],
+    keypoints: [
+      '詞彙表大：序列短，但向量表與輸出層大、罕見 token 練不熟。',
+      '向量表＝V × d 個數字；小模型裡佔比很高。',
+      '數字、程式碼、不同語言的切法差很多，要實際量。',
+    ],
+    sources: ['bpe', 'claude-token-counting'],
+  },
+
+  '1-4': {
+    goals: [
+      '說出特殊 token 的用途',
+      '解釋 API 的 messages 怎麼變成一條 token 序列',
+      '知道模型為什麼會「自己停下來」',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-3）V＝50,000、d＝1,000，向量表有幾個數字？', options: [
+        { text: '5,000 萬', correct: true, why: '50,000 × 1,000。' },
+        { text: '500 萬', why: '少乘一個 10。' },
+        { text: '51,000', why: '要相乘。' },
+        { text: '5 億', why: '多乘一個 10。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-1）模型遇到從沒看過的自創字，會怎樣？', options: [
+        { text: '拆成幾個認得的小片段', correct: true, why: '最差拆到位元組。' },
+        { text: '整個字被刪掉不處理', why: '不會刪。' },
+        { text: '回傳錯誤訊息', why: '不會報錯。' },
+        { text: '自動把這個新字加進詞彙表裡', why: '詞彙表是固定的。' },
+      ] },
+    ],
+    analogy: {
+      text: ['劇本不只有台詞，還有「（小明）」「（燈暗）」「（第一幕完）」這種標記。演員看到標記，就知道誰在說話、什麼時候結束。', '[[特殊 token]] 就是模型的劇本標記：標出對話從哪裡開始、這段是誰說的、這一輪什麼時候結束。多輪對話照固定的[[對話格式]]攤平成一條序列。'],
+      limit: ['劇本標記是寫給人看的，特殊 token 只是詞彙表裡的幾個編號；它們的「意思」是模型在訓練時從大量照格式排好的資料學會的。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="對話攤平成一條序列：開頭標記、system 內容、使用者標記與問題、助理標記，模型從這裡開始接話，產生回答後產生結束標記就停">
+        <text x="20" y="28" font-size="15" font-weight="900">messages 攤平成一條 token 序列（示意，不是任何模型的真實格式）</text>
+        ${[['〈開始〉', 'm0'], ['system 內容', ''], ['〈使用者〉', 'm1'], ['問題', ''], ['〈助理〉', 'm2']].map(([t, c], i) => `<rect x="${10 + i * 108}" y="50" width="102" height="44" ${c ? `style="fill:var(--${c})"` : 'class="fill-surface"'} class="stroke-ink" stroke-width="3"/><text x="${61 + i * 108}" y="78" text-anchor="middle" font-size="13" font-weight="900"${c ? ' class="on-color"' : ''}>${t}</text>`).join('')}
+        <path d="M497 94 L497 126" class="stroke-ink" stroke-width="3"/>
+        <rect x="200" y="126" width="230" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="315" y="154" text-anchor="middle" font-size="13" font-weight="900" class="on-color">模型從這裡開始接：回答…</text>
+        <rect x="440" y="126" width="110" height="44" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="495" y="154" text-anchor="middle" font-size="13" font-weight="900" class="on-color">〈結束〉</text>
+        <text x="20" y="200" font-size="14">模型產生〈結束〉時，程式就停止生成；</text>
+        <text x="20" y="222" font-size="14">這就是 API 回應裡 stop_reason 為 end_turn 的來源（第一部 1-3）。</text>
+      </svg>`,
+      caption: '〈 〉裡的是特殊 token，名稱是示意。各家模型的實際格式不同，Claude 的格式沒有公開。',
+    },
+    define: [
+      { term: '特殊 token', en: 'special token', def: '標記結構用的 token。', example: '開始、結束、角色標記。' },
+      { term: '對話格式', en: 'chat template', def: '把對話攤平成序列的固定規則。', example: 'API 的 messages 會先轉成這種格式。' },
+      { term: '結束 token', en: 'end-of-turn token', def: '代表「這一輪說完了」的特殊 token。', example: '產生它就停。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="兩種停法：選到結束 token，stop_reason 是 end_turn；碰到 max_tokens 上限，stop_reason 是 max_tokens，回答被截斷">
+  <rect x="10" y="30" width="260" height="120" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+  <text x="140" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">選到〈結束〉</text>
+  <text x="140" y="94" text-anchor="middle" font-size="14" class="mono on-color">end_turn</text>
+  <text x="140" y="124" text-anchor="middle" font-size="13" class="on-color">說完了，正常顯示</text>
+  <rect x="290" y="30" width="260" height="120" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+  <text x="420" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">碰到上限</text>
+  <text x="420" y="94" text-anchor="middle" font-size="14" class="mono on-color">max_tokens</text>
+  <text x="420" y="124" text-anchor="middle" font-size="13" class="on-color">被截斷，要提示或調高</text>
+  <text x="280" y="186" text-anchor="middle" font-size="13">stop_reason 的完整清單見第一部 1-3</text>
+</svg>`, caption: '程式要分開處理這兩種情況。' },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'sp', label: '特殊 token 的工作' }, { id: 'tx', label: '一般文字 token 的工作' }], items: [
+          { text: '標出「接下來是使用者說的話」', answer: 'sp', why: '角色標記是結構，不是內容。' },
+          { text: '表示「台北」這個地名', answer: 'tx', why: '這是內容。' },
+          { text: '讓模型知道回答可以停了', answer: 'sp', why: '結束 token。' },
+          { text: '表示程式碼裡的 `return`', answer: 'tx', why: '程式碼也是一般文字。' },
+          { text: '分隔 system 指示和對話內容', answer: 'sp', why: '格式標記。' },
+        ] } },
+        { type: 'table', head: ['你在 API 裡寫的', '進模型前大概變成'], rows: [
+          ['`system: "你是客服"`', '〈開始〉你是客服'],
+          ['`{ role: "user", content: "退貨要幾天？" }`', '〈使用者〉退貨要幾天？'],
+          ['（API 自動加）', '〈助理〉← 模型從這裡開始接話'],
+          ['模型產生', '退貨約 7 天…〈結束〉'],
+        ], caption: '示意。重點是：API 的結構化欄位，最後都會變成同一條 token 序列。' },
+        { type: 'callout', variant: 'tip', title: '這和 prompt injection 有什麼關係？', body: ['一般的做法是：使用者輸入的文字只會被切成一般 token，就算有人打出「〈系統〉」這幾個字，也只是普通文字，不會變成真正的角色標記。', '但模型讀到這些字，仍可能被內容本身影響。所以第一部 8-4 的防護不能只靠格式，還要靠程式端的檢查。'] },
+      ],
+      tryit: {
+        q: ['如果訓練資料裡，助理的回答後面從來沒有〈結束〉，模型推論時會怎樣？'],
+        draft: '我的推測：＿',
+        answer: ['模型學不會「什麼時候該停」，會一直接下去，直到碰到 `max_tokens` 上限被截斷，甚至開始自己扮演使用者繼續對話。', '這也是為什麼後訓練（模組 6）的資料都要照對話格式排好、每一輪都有結束標記。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 system prompt 是另外一個通道，模型「分開」處理。', why: '最後都會被攤平成同一條序列，只是用特殊 token 標出位置。', right: '把 system 想成序列開頭、有特別標記的一段文字。' },
+      { wrong: '以為在訊息裡打出「〈結束〉」就能讓模型停。', why: '使用者打的字通常只會切成一般 token。', right: '要控制長度，用 `max_tokens` 或 stop sequences。' },
+      { wrong: '以為模型停下來是因為「想說的說完了」這種意圖。', why: '它只是在某一步選到了結束 token。', right: '停止也是一次取樣的結果。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '模型為什麼會在回答完自己停下來？', options: [
+        { text: '它在某一步選到了結束 token', correct: true, why: '程式看到結束 token 就停止生成。' },
+        { text: 'API 會依照字數幫它自動截斷', why: '那是 max_tokens 的情況，不是正常結束。' },
+        { text: '模型會判斷使用者是否滿意', why: '模型沒有這種回饋。' },
+        { text: 'GPU 算完事先設定的固定次數就會自動停下', why: '次數不是固定的。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'API 回應的 `stop_reason` 是 `max_tokens`，代表什麼？', options: [
+        { text: '還沒產生結束 token，就碰到長度上限', correct: true, why: '回答被截斷了。' },
+        { text: '模型自然地說完了', why: '那是 end_turn。' },
+        { text: '輸入超過了 context window', why: '那會是請求錯誤。' },
+        { text: 'tokenizer 切不出這段文字', why: 'tokenizer 一定切得出來。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你把同一段對話分別送到兩家公司的模型，兩邊都用了 1,000 個輸入 token 嗎？為什麼？'], answer: [
+        '不一定。兩家的 tokenizer 不同，內容切出的 token 數不同；對話格式不同，加進去的特殊 token 數也不同。',
+        '要算成本，用各家自己的 token 計數功能。',
+      ] },
+    ],
+    keypoints: [
+      '特殊 token 標記結構：開始、角色、結束。',
+      'messages 最後都會攤平成同一條 token 序列。',
+      '模型選到結束 token 才會正常停；沒選到就會碰到長度上限。',
+    ],
+    sources: ['claude-token-counting'],
+  },
+});
+</script>

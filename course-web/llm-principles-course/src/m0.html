@@ -1,0 +1,107 @@
+<script>
+/* ==========================================================================
+   模組 0：一段文字在模型裡的路
+   ========================================================================== */
+defineTerms({
+  'token': { en: 'token', def: '模型讀寫文字的最小單位：可能是一個字、半個詞或一個標點。模型只看得到 token 的編號。', example: '「unbelievable」可能切成 un、believ、able 三個 token。', lesson: '1-1' },
+  '前向計算': { en: 'forward pass', def: '輸入從第一層一路算到最後一層、得到輸出的一次計算。產生一個 token 就要一次。', example: '回答有 300 個 token，就有約 300 次前向計算。', lesson: '0-1' },
+  'logit': { en: 'logit', def: '模型對每個候選 token 打的原始分數，還不是機率；經過 softmax 才變成加起來是 1 的機率。', example: '玉 4.2、雪 1.6、合 0.9。', lesson: '0-1' },
+  'softmax': { en: 'softmax', def: '把一串任意分數變成「全部是正數、加起來等於 1」的機率；分數越高分到越多。', example: '[2, 1, 0] → 約 [67%, 24%, 9%]。', lesson: '3-3' },
+  '參數': { en: 'parameter', def: '模型裡訓練時會被調整的數字；推論時固定不變。', example: '原版 Transformer base 約 6,500 萬個參數。', lesson: '4-4' },
+});
+
+const PIPELINE_SVG = `<svg viewBox="0 0 560 300" role="img" aria-label="六站：文字、token 編號、向量、Transformer 區塊、下一個 token 的機率、取樣與輸出；取樣出的 token 接回文字最後面">
+  <rect x="10" y="20" width="170" height="70" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="95" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">① 文字</text><text x="95" y="74" text-anchor="middle" font-size="13" class="on-color">台灣最高的山是</text>
+  <rect x="195" y="20" width="170" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">② token 編號</text><text x="280" y="74" text-anchor="middle" font-size="13" class="on-color">模組 1</text>
+  <rect x="380" y="20" width="170" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="465" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">③ 向量</text><text x="465" y="74" text-anchor="middle" font-size="13" class="on-color">模組 2</text>
+  <rect x="380" y="130" width="170" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="465" y="160" text-anchor="middle" font-size="15" font-weight="900" class="on-color">④ Transformer</text><text x="465" y="184" text-anchor="middle" font-size="13" class="on-color">模組 3、4</text>
+  <rect x="195" y="130" width="170" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="280" y="160" text-anchor="middle" font-size="15" font-weight="900" class="on-color">⑤ 機率</text><text x="280" y="184" text-anchor="middle" font-size="13" class="on-color">模組 5</text>
+  <rect x="10" y="130" width="170" height="70" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="95" y="160" text-anchor="middle" font-size="15" font-weight="900" class="on-color">⑥ 取樣與輸出</text><text x="95" y="184" text-anchor="middle" font-size="13" class="on-color">模組 7</text>
+  <line x1="180" y1="55" x2="195" y2="55" class="stroke-ink" stroke-width="3"/><line x1="365" y1="55" x2="380" y2="55" class="stroke-ink" stroke-width="3"/>
+  <line x1="465" y1="90" x2="465" y2="130" class="stroke-ink" stroke-width="3"/>
+  <line x1="380" y1="165" x2="365" y2="165" class="stroke-ink" stroke-width="3"/><line x1="195" y1="165" x2="180" y2="165" class="stroke-ink" stroke-width="3"/>
+  <path d="M95 130 L95 96" class="stroke-ink" stroke-width="3"/><path d="M87 104 L95 92 L103 104 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="104" y="118" font-size="13" font-weight="900">接回去</text>
+  <text x="280" y="240" text-anchor="middle" font-size="14" font-weight="900">②～⑥ 是一次前向計算；每產生一個 token 就重來一次</text>
+  <text x="280" y="266" text-anchor="middle" font-size="13">模組 5、6 講這些數字（參數）怎麼訓練出來</text>
+  <text x="280" y="290" text-anchor="middle" font-size="13">模組 7 講實際產生回答時的取捨</text>
+</svg>`;
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出一段文字在模型裡經過的六站',
+      '分清「推論時發生的事」與「訓練時發生的事」',
+      '知道每一站在這一卷的哪個模組',
+    ],
+    analogy: {
+      text: ['工廠的生產線：原料（文字）先切成標準零件（[[token]]），每個零件貼上規格卡（向量），經過好幾道加工站（Transformer 區塊），最後品管給每個可能的成品打分（[[logit]]），挑一個出貨（取樣）。', '序章 2-3 說模型是「一大堆數字」。這一卷就是把那堆數字拆開：它們放在哪幾站、每一站在算什麼。'],
+      limit: ['生產線的每一站都有工人在「理解」零件；模型的每一站只是固定的計算，沒有誰在理解。另外生產線做完一件就結束，LLM 每出貨一個 token 就要把整條線重跑一次（自迴歸）。'],
+    },
+    model: { svg: PIPELINE_SVG, caption: '這一卷的主軸。每一課標題上方的小標籤，就是在標這六站中的哪幾站。' },
+    define: [
+      { term: 'token', en: 'token', def: '模型處理文字的單位。', example: '模組 1。' },
+      { term: '前向計算', en: 'forward pass', def: '從 ② 算到 ⑤ 的一次計算。', example: '產生一個 token 一次。' },
+      { term: 'logit', en: 'logit', def: '每個候選 token 的原始分數。', example: 'softmax 後才是機率。' },
+      { term: '參數', en: 'parameter', def: '訓練時調整、推論時固定的數字。', example: '向量表、attention、前饋網路裡都有。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'ragtrace', props: { chip: '逐站追蹤', title: '「台灣最高的山是」怎麼接出下一個字', scenarios: [{ label: '一次前向計算', stages: [
+          { title: '① 文字', body: ['輸入是一串文字。模型完全看不懂文字，第一件事是把它換成數字。'] },
+          { title: '② token 編號', body: ['tokenizer 把文字切成小段，每段查一個編號，例如 `[台灣][最高][的][山][是]` → `[1832, 9021, 13, 4410, 318]`（編號是示意）。切法在模組 1。'] },
+          { title: '③ 向量', body: ['每個編號去一張大表查出一串數字（向量），例如 4,096 個數字。意思相近的 token，向量也相近；位置資訊也在這裡加進去（模組 2）。'] },
+          { title: '④ Transformer 區塊', body: ['向量經過很多層 block。每層先做 attention（每個 token 參考其他 token），再做前饋網路（每個 token 自己加工）（模組 3、4）。'] },
+          { title: '⑤ 下一個 token 的機率', body: ['最後一個位置的向量乘上輸出層，得到詞彙表裡每個 token 一個分數（logit），softmax 變成機率：玉 85%、雪 6%…（模組 5）。'] },
+          { title: '⑥ 取樣與輸出', body: ['依機率選一個 token，例如「玉」，接到輸入後面，再跑一次 ②～⑤ 算下一個（模組 7）。'] },
+        ] }] } },
+        { type: 'table', head: ['', '訓練（模組 5、6）', '推論（模組 7）'], rows: [
+          ['參數', '一直在調整', '固定不變'],
+          ['走過六站幾次', '每份資料一次前向＋反向計算', '每產生一個 token 一次前向計算'],
+          ['誰在做', '模型公司，在大量 GPU 上做幾週到幾個月', '每次你呼叫 API 時'],
+          ['目標', '讓預測下一個 token 越來越準', '產生一段回答'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="這一卷的模組對應：模組 1 切字，模組 2 向量，模組 3 與 4 Transformer，模組 5 預訓練，模組 6 後訓練，模組 7 推論">
+          <text x="20" y="28" font-size="15" font-weight="900">這一卷的路線</text>
+          ${[['1', '切字', 'm1'], ['2', '向量', 'm2'], ['3', 'attention', 'm3'], ['4', '結構', 'm3'], ['5', '預訓練', 'm4'], ['6', '後訓練', 'm4'], ['7', '推論', 'm5']].map(([n, t, c], i) => `<rect x="${10 + i * 78}" y="50" width="70" height="90" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${45 + i * 78}" y="86" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${n}</text><text x="${45 + i * 78}" y="116" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+          <text x="20" y="176" font-size="13">1–4：模型長什麼樣・5–6：數字怎麼訓練出來・7：怎麼用它產生回答</text>
+        </svg>`, caption: '顏色對應上面六站：同色的模組在講同一站。' },
+      ],
+      tryit: {
+        q: ['不看上面的圖，寫出六站的順序，並在你最不懂的那一站畫星號：'],
+        draft: '① ＿ → ② ＿ → ③ ＿ → ④ ＿ → ⑤ ＿ → ⑥ ＿\n最不懂的：＿',
+        answer: ['文字 → token 編號 → 向量 → Transformer 區塊 → 下一個 token 的機率 → 取樣與輸出。', '標星號的那一站，就是你讀這一卷時要放慢的模組。多數人會標 ④，那是模組 3、4。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為模型一次產生整段回答。', why: '每一次前向計算只算出下一個 token 的機率。', right: '回答是 ②～⑥ 重複很多次接出來的。' },
+      { wrong: '以為推論時模型還在學習、參數會變。', why: '推論時參數固定；學習只發生在訓練。', right: '同一個模型版本，參數在你使用時不會變。' },
+      { wrong: '以為「知道 Claude 內部長怎樣」才能懂這一卷。', why: 'Claude 的細節沒有公開，但公開論文的通用做法已經足以理解原理。', right: '這一卷講通用架構；遇到 Claude 特有的事，只用官方文件寫過的。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下面哪一個順序是對的？', options: [
+        { text: 'token 編號 → 向量 → Transformer → 機率', correct: true, why: '先換成數字，再查向量、加工、打分。' },
+        { text: '向量 → token 編號 → 機率 → Transformer 區塊', why: '要先有編號才能查向量。' },
+        { text: '機率 → Transformer 區塊 → 向量 → token 編號', why: '整個倒過來了。' },
+        { text: 'Transformer 區塊 → token 編號 → 向量 → 機率', why: 'Transformer 處理的是向量，不是文字。' },
+      ] },
+      { level: '應用', type: 'mc', q: '一段 200 個 token 的回答，⑤「下一個 token 的機率」這一站大約被算了幾次？', options: [
+        { text: '約 200 次', correct: true, why: '每產生一個 token 一次前向計算。' },
+        { text: '只算 1 次，整段回答一起產生', why: '模型一次只算下一個 token。' },
+        { text: '看輸入有幾個 token 就算幾次', why: '次數跟著輸出長度。' },
+        { text: '訓練時算好存起來，推論時不用算', why: '每次推論都要現算。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同事說：「模型裡有一個資料庫，存著所有它看過的句子，回答時去找最像的。」用這一課的六站指出哪裡錯了。'], answer: [
+        '六站裡沒有任何一站是「查句子」：③ 查的是 token 的向量表，不是句子；④ 是固定的計算；⑤ 算出每個 token 的分數。',
+        '它看過的資料，只以「參數的數值」的形式留下來（模組 5），不是一句一句存著。',
+      ] },
+    ],
+    keypoints: [
+      '六站：文字 → token 編號 → 向量 → Transformer → 機率 → 取樣。',
+      '每產生一個 token，②～⑤ 就要完整算一次。',
+      '訓練調參數，推論時參數固定。',
+    ],
+    sources: ['transformer', 'gpt3'],
+  },
+});
+</script>
