@@ -1,0 +1,126 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'AI 系列・第五部｜硬體與運算',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-23',
+  version: 'v1',
+};
+
+/* AI 系列七本書：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: 'AI 系列',
+  current: 'ai-hw',
+  volumes: [
+    { id: 'ai-map', vol: '序章', title: 'AI 全景地圖', href: '../ai-series-0-map-course/index.html' },
+    { id: 'ai-app', vol: '第一部', title: 'AI 應用工程', href: '../ai-app-engineering-course/index.html' },
+    { id: 'ai-llm', vol: '第二部', title: '大型語言模型原理', href: '../llm-principles-course/index.html' },
+    { id: 'ai-ml', vol: '第三部', title: '機器學習基礎', href: '../ml-foundations-course/index.html' },
+    { id: 'ai-dl', vol: '第四部', title: '深度學習', href: '../deep-learning-course/index.html' },
+    { id: 'ai-hw', vol: '第五部', title: '硬體與運算', href: '../ai-hardware-course/index.html' },
+    { id: 'ai-math', vol: '隨身卷', title: '數學直覺', href: '../ai-math-pocket-course/index.html' },
+  ],
+};
+
+/* 全書主軸：從晶圓到你的回答，一路經過的六層；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '晶圓與封裝', note: '晶片怎麼做出來', color: 'var(--m0)' },
+    { label: 'GPU 晶片', note: '大量平行的乘加', color: 'var(--m1)' },
+    { label: '記憶體', note: 'VRAM、HBM、頻寬', color: 'var(--m2)' },
+    { label: '伺服器與互連', note: '很多張 GPU 一起算', color: 'var(--m3)' },
+    { label: '資料中心', note: '電力與散熱', color: 'var(--m4)' },
+    { label: '推論服務', note: '雲端 API 或你的電腦', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [1], 2: [2], 3: [1, 2, 3], 4: [2, 5], 5: [0, 3, 4, 5] },
+  byLesson: { '1-3': [1, 2], '2-4': [2, 5], '3-3': [3, 5], '5-1': [2, 5], '5-2': [0], '5-3': [4] },
+};
+
+/* 首頁主視覺：一疊硬體層（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="六層硬體：最下面是晶圓與封裝，往上是 GPU 晶片、記憶體、伺服器與互連、資料中心，最上面是推論服務">
+  ${[['推論服務：雲端 API 或你的電腦', 'm5'], ['資料中心：電力、散熱', 'm4'], ['伺服器與互連：很多張 GPU 一起算', 'm3'], ['記憶體：HBM、VRAM、頻寬', 'm2'], ['GPU 晶片：上萬個核心同時乘加', 'm1'], ['晶圓與封裝：台灣在這一層很關鍵', 'm0']].map(([t, c], i) => `<rect x="${40 + i * 6}" y="${20 + i * 64}" width="${480 - i * 12}" height="54" style="fill:var(--${c})" class="stroke-ink" stroke-width="4"/><text x="280" y="${54 + i * 64}" text-anchor="middle" font-size="18" font-weight="900" class="on-color">${t}</text>`).join('')}
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '一個 token|背後的硬體', short: '起點', desc: '你按下送出之後，是哪些硬體在替你算：從晶圓一路到資料中心。', lessons: [
+    ['0-1', '一個 token|背後的硬體'],
+  ]},
+  { id: 1, title: 'CPU vs GPU：|平行運算與矩陣乘法', short: 'GPU', desc: '少數強核心 vs 大量小核心、矩陣乘法的運算量、Tensor Core 與低精度。', lessons: [
+    ['1-1', '少數強核心|vs 大量小核心'],
+    ['1-2', '算一次|矩陣乘法要多少運算'],
+    ['1-3', 'Tensor Core|與低精度'],
+  ]},
+  { id: 2, title: '記憶體瓶頸：|VRAM、頻寬', short: '記憶體', desc: '模型放得下嗎、資料搬得夠快嗎：容量、頻寬、算術強度與 KV cache。', lessons: [
+    ['2-1', 'VRAM：|模型放不放得下'],
+    ['2-2', '頻寬：|搬資料比算還慢'],
+    ['2-3', '為什麼產生文字|被頻寬卡住'],
+    ['2-4', 'KV cache|與長 context'],
+  ]},
+  { id: 3, title: '訓練 vs 推論：|資源需求差在哪', short: '訓練推論', desc: '訓練要存的東西多好幾倍、怎麼用很多張 GPU 一起訓練、推論怎麼省錢。', lessons: [
+    ['3-1', '訓練要存|什麼'],
+    ['3-2', '很多張 GPU|一起訓練'],
+    ['3-3', '推論：|批次與成本'],
+  ]},
+  { id: 4, title: '量化、蒸餾、|小模型', short: '變小', desc: '用更少的位元存參數、讓小模型向大模型學、什麼時候選小模型。', lessons: [
+    ['4-1', '量化：|用更少的位元'],
+    ['4-2', '蒸餾：|小模型向大模型學'],
+    ['4-3', '選一個|夠用的小模型'],
+  ]},
+  { id: 5, title: '本地部署，|晶片與資料中心產業', short: '產業', desc: '在自己的電腦跑模型；晶片從設計、製造、封裝到資料中心；台灣在其中的位置。', lessons: [
+    ['5-1', '在自己的電腦|跑模型'],
+    ['5-2', '一顆 AI 晶片|的供應鏈'],
+    ['5-3', '資料中心：|電力與散熱'],
+    ['5-4', '台灣的位置|＋總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

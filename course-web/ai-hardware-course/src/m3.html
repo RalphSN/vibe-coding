@@ -1,0 +1,329 @@
+<script>
+/* ==========================================================================
+   模組 3：訓練 vs 推論：資源需求差在哪
+   ========================================================================== */
+defineTerms({
+  '混合精度訓練': { en: 'mixed-precision training', def: '計算用 BF16、主權重與優化器狀態用 FP32 的訓練方式；用 Adam 時每個參數約 16 位元組。', example: '7B 模型約 112 GB。', lesson: '3-1' },
+  'activation': { en: 'activation', def: '前向傳播時每一層算出的中間值；訓練時要留著給反向傳播用。', example: '批次與序列越長越多。', lesson: '3-1' },
+  '資料平行': { en: 'data parallelism', def: '每張 GPU 都有完整的模型，各自算不同的資料，再把梯度平均。', example: '8 張卡各算 1/8 的批次。', lesson: '3-2' },
+  '模型平行': { en: 'model parallelism', def: '把模型切開放到好幾張 GPU 上，例如按層切（管線平行）或把一個矩陣切開（張量平行）。', example: '一張放不下時使用。', lesson: '3-2' },
+  'GPU 小時': { en: 'GPU-hours', def: '用了幾張 GPU × 幾小時，是估算訓練成本的常用單位。', example: '1,000 張跑 24 小時＝24,000 GPU 小時。', lesson: '3-2' },
+  '批次推論': { en: 'batched inference', def: '把很多請求合在一起算，讓權重搬一次給大家用，提高吞吐量。', example: 'API 服務的標準做法。', lesson: '3-3' },
+});
+
+const REVIEW_M2 = [
+  { level: '回想', type: 'mc', q: '（回顧 2-3）單人 decode 的速度上限？', options: [
+    { text: '頻寬 ÷ 權重大小', correct: true, why: '每 token 讀一次權重。' },
+    { text: '算力 ÷ 參數', why: '那是 compute-bound。' },
+    { text: '頻寬 × 參數', why: '是相除。' },
+    { text: '與硬體無關，只看模型寫得好不好', why: '直接相關。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 2-4）長度與人數都加倍，KV cache？', options: [
+    { text: '4 倍', correct: true, why: '兩個乘數。' },
+    { text: '2 倍', why: '兩個都加倍。' },
+    { text: '不變', why: '會變大。' },
+    { text: '減半', why: '相反。' },
+  ] },
+];
+
+const TRAIN_MEM_SVG = `<svg viewBox="0 0 560 230" role="img" aria-label="每個參數在混合精度 Adam 訓練時要存的東西：BF16 權重 2 位元組，BF16 梯度 2 位元組，FP32 主權重 4，Adam 的 m 4，Adam 的 v 4，共 16 位元組，推論只需要 2">
+  <text x="20" y="28" font-size="15" font-weight="900">每個參數要存幾位元組</text>
+  ${[['BF16 權重', 2, 'm3'], ['BF16 梯度', 2, 'm4'], ['FP32 主權重', 4, 'm7'], ['Adam m', 4, 'm2'], ['Adam v', 4, 'm5']].reduce((acc, [t, b, c]) => { acc.s += `<rect x="${acc.x}" y="50" width="${b * 30}" height="56" style="fill:var(--${c})" class="stroke-ink" stroke-width="2"/><text x="${acc.x + b * 15}" y="84" text-anchor="middle" font-size="12" font-weight="900" class="on-color">${b}</text><text x="${acc.x + b * 15}" y="126" text-anchor="middle" font-size="12">${t}</text>`; acc.x += b * 30; return acc; }, { x: 20, s: '' }).s}
+  <text x="520" y="84" text-anchor="end" font-size="15" font-weight="900">訓練 16</text>
+  <rect x="20" y="150" width="60" height="40" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="50" y="176" text-anchor="middle" font-size="12" font-weight="900" class="on-color">2</text>
+  <text x="100" y="176" font-size="15" font-weight="900">推論 2（BF16）</text>
+  <text x="280" y="220" text-anchor="middle" font-size="13">還沒算 activation：訓練時另外要很多</text>
+</svg>`;
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出訓練時每個參數要存哪些東西',
+      '估算訓練一個模型至少需要多少記憶體',
+      '說明 activation 為什麼也很佔空間',
+    ],
+    review: REVIEW_M2,
+    analogy: {
+      text: ['看食譜做菜（推論）只需要食譜本身；研發新食譜（訓練）還要記錄每次嘗試的結果、改了什麼、改的方向對不對，桌上的筆記多好幾倍。', '訓練時每個參數除了權重，還要存梯度、FP32 的主權重、Adam 的兩個狀態（第四部 4-3），用[[混合精度訓練]]時加起來約 16 位元組，是推論（BF16 2 位元組）的 8 倍。前向的中間值（[[activation]]）也要留著給反向傳播。'],
+      limit: ['研發筆記可以丟掉舊的，訓練的這些狀態每一步都要用；有一些技巧能少存（重算 activation、把狀態分散到很多張卡），但總量的量級不會變。'],
+    },
+    model: { svg: TRAIN_MEM_SVG, caption: '2＋2＋4＋4＋4＝16 位元組／參數（混合精度＋Adam 的常見估算；ZeRO 論文的分析）。' },
+    define: [
+      { term: '混合精度訓練', en: 'mixed precision', def: 'BF16 計算＋FP32 主權重。', example: '16 位元組／參數。' },
+      { term: 'activation', en: 'activation', def: '前向的中間值。', example: '反向傳播要用。' },
+      { term: 'activation 重算', en: 'activation checkpointing', def: '只存部分中間值，反向時再重算，用時間換記憶體。', example: '大模型訓練常用。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'memfit', props: { title: '訓練放得下嗎？（只算權重、梯度、優化器）', gpus: [{ name: '消費級 24 GB', gb: 24, note: '消費級顯示卡常見上限等級（示意）。' }, { name: 'H100 80 GB', gb: 80, note: 'H100 SXM：80 GB。' }, { name: 'Rubin 288 GB', gb: 288, note: 'Rubin：每顆最多 288 GB（NVIDIA 2026-07）。' }], params: 7, mode: 'train', other: 20 } },
+        { type: 'table', head: ['模型', '推論 BF16', '訓練（16 位元組／參數）'], rows: [
+          ['1B', '2 GB', '16 GB'],
+          ['7B', '14 GB', '112 GB'],
+          ['70B', '140 GB', '1,120 GB'],
+        ], caption: '還沒加 activation。7B 模型推論一張卡就夠，訓練卻至少要兩張 80 GB。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="activation 與批次：批次越大、序列越長，每一層要存的中間值越多；推論時算完就丟，訓練時要留到反向傳播">
+          <rect x="20" y="40" width="250" height="100" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="72" text-anchor="middle" font-size="15" font-weight="900" class="on-color">推論</text>
+          <text x="145" y="100" text-anchor="middle" font-size="13" class="on-color">每層算完就可以丟</text>
+          <text x="145" y="122" text-anchor="middle" font-size="13" class="on-color">（除了 KV cache）</text>
+          <rect x="290" y="40" width="250" height="100" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="72" text-anchor="middle" font-size="15" font-weight="900" class="on-color">訓練</text>
+          <text x="415" y="100" text-anchor="middle" font-size="13" class="on-color">每層都要留到反向傳播</text>
+          <text x="415" y="122" text-anchor="middle" font-size="13" class="on-color">批次 × 長度 × 層數</text>
+          <text x="280" y="168" text-anchor="middle" font-size="13">第四部 2-2：「前向的值要記住」的硬體代價</text>
+        </svg>`, caption: 'activation 的量和批次、長度、層數一起成長。' },
+      ],
+      tryit: {
+        q: ['13B 模型用混合精度＋Adam 訓練，權重、梯度、優化器狀態共要多少？需要幾張 80 GB 的卡（只看這部分）？'],
+        draft: '總量：＿ GB\n至少：＿ 張',
+        answer: ['13 × 16 ＝ 208 GB。', '208 ÷ 80 → 至少 3 張；再加上 activation 會更多。而推論只要 26 GB（BF16），一張就夠。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用推論的記憶體估訓練。', why: '訓練每個參數要約 8 倍。', right: '訓練用 16 位元組／參數起算。' },
+      { wrong: '忘了 activation。', why: '批次大、序列長時非常可觀。', right: '預留空間，或用 activation 重算。' },
+      { wrong: '以為微調一定和預訓練一樣貴。', why: '可以只訓練一小部分參數（例如 LoRA）。', right: '依方法估算；QLoRA 能在單張 48 GB 卡微調 65B（4-1）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '混合精度＋Adam 訓練，每個參數約幾位元組？', options: [
+        { text: '16', correct: true, why: '2＋2＋4＋4＋4。' },
+        { text: '2，和推論一樣', why: '那是推論。' },
+        { text: '4，FP32 權重', why: '少算了梯度與狀態。' },
+        { text: '32', why: '多算了。' },
+      ] },
+      { level: '應用', type: 'mc', q: '訓練比推論多存的東西不包括？', options: [
+        { text: 'tokenizer 的詞彙表', correct: true, why: '兩者都一樣，而且很小。' },
+        { text: '梯度', why: '訓練才需要。' },
+        { text: 'Adam 的狀態', why: '訓練才需要。' },
+        { text: '前向的 activation', why: '訓練要留。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你只有一張 24 GB 的卡，想讓 7B 模型學會公司的語氣。全參數訓練放不下，有什麼方向？'], answer: [
+        '一、參數高效微調（例如 LoRA）：只訓練少量額外參數，梯度與優化器狀態大幅減少。二、搭配 4 位元量化的基底模型（QLoRA 的做法）。',
+        '三、先評估是不是一定要微調：很多語氣需求用 prompt 與範例就能達到（第一部模組 3）。',
+      ] },
+    ],
+    keypoints: [
+      '訓練每參數約 16 位元組（混合精度＋Adam），推論 BF16 只要 2。',
+      'activation 要留到反向傳播，也很佔空間。',
+      '放不下時：多張卡、activation 重算、參數高效微調。',
+    ],
+    sources: ['zero', 'qlora'],
+  },
+
+  '3-2': {
+    goals: [
+      '分辨資料平行與模型平行',
+      '用 6ND 估算訓練要多少 GPU 小時',
+      '說明 GPU 之間的通訊為什麼重要',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-1）7B 模型訓練（16 位元組／參數）？', options: [
+        { text: '112 GB', correct: true, why: '7 × 16。' },
+        { text: '14 GB，和推論時一樣', why: '那是推論。' },
+        { text: '56 GB', why: '少算一半。' },
+        { text: '7 GB', why: '那是 1 位元組。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-2）估算時間要用？', options: [
+        { text: '不含稀疏的峰值 × 利用率', correct: true, why: '實際達不到峰值。' },
+        { text: '含稀疏的峰值', why: '高估。' },
+        { text: '頻寬', why: '訓練通常算力卡住。' },
+        { text: '參數量', why: '要換成 FLOPs。' },
+      ] },
+    ],
+    analogy: {
+      text: ['出版一本百科全書：可以請 8 個編輯每人校對不同的章節，最後彙整修改意見（[[資料平行]]）；書太大一個人搬不動時，就把書拆成幾冊，每人負責一冊（[[模型平行]]）。', '兩種做法都要開會溝通：資料平行要把梯度平均，模型平行要把中間結果傳給下一個人。溝通太慢，人再多也沒用：這是 GPU 之間要用高速互連的原因。'],
+      limit: ['編輯開會可以等，GPU 每一步都要同步；通訊時間佔太多，GPU 就在等。大規模訓練最難的工程問題之一，就是讓上萬張卡溝通得夠快。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="兩種平行：資料平行每張卡有完整模型、處理不同資料、平均梯度；模型平行把模型切開，每張卡負責一部分">
+        <text x="140" y="26" text-anchor="middle" font-size="15" font-weight="900">資料平行</text>
+        ${[0, 1, 2, 3].map((i) => `<rect x="${20 + i * 60}" y="44" width="52" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="${46 + i * 60}" y="80" text-anchor="middle" font-size="12" font-weight="900" class="on-color">完整</text><text x="${46 + i * 60}" y="100" text-anchor="middle" font-size="12" font-weight="900" class="on-color">模型</text><text x="${46 + i * 60}" y="146" text-anchor="middle" font-size="12">資料 ${i + 1}</text>`).join('')}
+        <text x="140" y="180" text-anchor="middle" font-size="13">每步：平均大家的梯度</text>
+        <text x="420" y="26" text-anchor="middle" font-size="15" font-weight="900">模型平行</text>
+        ${[0, 1, 2, 3].map((i) => `<rect x="${300 + i * 60}" y="44" width="52" height="80" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="${326 + i * 60}" y="90" text-anchor="middle" font-size="12" font-weight="900" class="on-color">第 ${i + 1} 段</text>${i < 3 ? `<path d="M${352 + i * 60} 84 L${360 + i * 60} 84" class="stroke-ink" stroke-width="3"/>` : ''}`).join('')}
+        <text x="420" y="180" text-anchor="middle" font-size="13">每步：中間結果傳給下一段</text>
+        <text x="280" y="226" text-anchor="middle" font-size="13">大模型通常兩種一起用，還會把優化器狀態分散存（ZeRO）</text>
+      </svg>`,
+      caption: '兩種都需要卡與卡之間大量通訊。',
+    },
+    define: [
+      { term: '資料平行', en: 'data parallel', def: '每張卡完整模型、不同資料。', example: '平均梯度。' },
+      { term: '模型平行', en: 'model parallel', def: '把模型切開。', example: '管線平行、張量平行。' },
+      { term: 'GPU 小時', en: 'GPU-hours', def: '張數 × 小時。', example: '估算成本。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '訓練要多少 GPU 小時（實際計算：6 × 參數 × token ÷ 有效算力）', sliders: [
+          { id: 'n', label: '參數量', min: 1, max: 1000, step: 1, value: 7, unit: '十億' },
+          { id: 'd', label: '訓練 token 數', min: 0.1, max: 30, step: 0.1, value: 2, unit: '兆' },
+          { id: 'u', label: '利用率', min: 10, max: 70, step: 5, value: 40, unit: '%' },
+          { id: 'g', label: 'GPU 張數', min: 8, max: 20000, step: 8, value: 1024 },
+        ], compute: (v) => {
+          const flops = 6 * v.n * 1e9 * v.d * 1e12;
+          const eff = 989e12 * (v.u / 100);
+          const gpuHours = flops / eff / 3600;
+          const days = gpuHours / v.g / 24;
+          return { rows: [
+            { label: '總運算量', value: `${flops.toExponential(2)} FLOPs`, ratio: Math.min(1, Math.log10(flops) / 26) },
+            { label: 'H100 GPU 小時（BF16 不含稀疏 989 TFLOPS）', value: Math.round(gpuHours).toLocaleString('en-US'), ratio: Math.min(1, gpuHours / 5e7) },
+            { label: `${v.g} 張卡要幾天`, value: days.toFixed(1), ratio: Math.min(1, days / 120) },
+          ], note: '預設：7B、2 兆 token、利用率 40%：約 5.9 萬 GPU 小時，1,024 張卡約 2.4 天。這是理想估算：沒算通訊、失敗重啟、實驗與調參。' };
+        } } },
+        { type: 'table', head: ['互連', '用在哪裡', '為什麼重要'], rows: [
+          ['伺服器內（例如 NVLink）', '同一台裡的 8 張卡', '模型平行需要非常快的交換'],
+          ['伺服器之間（高速網路）', '上千台伺服器', '資料平行要每步平均梯度'],
+        ], caption: '名稱與速度依廠商與世代而異；這裡只講角色。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="時間分配：每一步分成計算時間與通訊時間，通訊佔太多時 GPU 就在等">
+          <rect x="20" y="40" width="360" height="40" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="200" y="66" text-anchor="middle" font-size="14" font-weight="900" class="on-color">計算</text>
+          <rect x="380" y="40" width="160" height="40" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="460" y="66" text-anchor="middle" font-size="14" font-weight="900" class="on-color">通訊（等待）</text>
+          <text x="280" y="118" text-anchor="middle" font-size="14">張數加倍，計算時間減半，但通訊不一定跟著減少</text>
+          <text x="280" y="146" text-anchor="middle" font-size="13">這是利用率無法接近 100% 的主因之一</text>
+        </svg>`, caption: '示意比例。大規模訓練的工程重點之一，就是讓計算與通訊重疊。' },
+      ],
+      tryit: {
+        q: ['用拉桿：70B、15 兆 token、利用率 40%。要多少 GPU 小時？用 8,192 張卡要幾天？'],
+        draft: 'GPU 小時：＿\n天數：＿',
+        answer: ['6 × 7×10¹⁰ × 1.5×10¹³ ＝ 6.3×10²⁴ FLOPs；÷（989×10¹² × 0.4）÷ 3,600 ≈ 442 萬 GPU 小時。', '÷ 8,192 ÷ 24 ≈ 22.5 天。這只是一次完整訓練；實際專案還有大量實驗。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 GPU 加倍，時間就剛好減半。', why: '通訊開銷不會等比例減少。', right: '要考慮擴展效率。' },
+      { wrong: '只算一次訓練的成本。', why: '真實專案有大量實驗與失敗重跑。', right: '預算要乘上好幾倍。' },
+      { wrong: '以為資料平行能解決「一張放不下」。', why: '資料平行每張卡都要放完整模型。', right: '放不下要模型平行或分散存放狀態。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '一張卡放不下模型時，要用哪種平行？', options: [
+        { text: '模型平行', correct: true, why: '把模型切開。' },
+        { text: '資料平行', why: '每張卡仍要完整模型。' },
+        { text: '只要換更快的 CPU', why: '不是 CPU 問題。' },
+        { text: '減少訓練資料', why: '和模型大小無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '1,000 張卡跑 30 天，約多少 GPU 小時？', options: [
+        { text: '72 萬', correct: true, why: '1,000 × 30 × 24。' },
+        { text: '3 萬', why: '忘了乘 24。' },
+        { text: '720 萬', why: '多一個 0。' },
+        { text: '1,000', why: '要乘時間。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼大型訓練叢集要花很多錢在網路設備上，而不只是買 GPU？'], answer: [
+        '資料平行每一步都要在所有卡之間平均梯度，模型平行每一層都要傳中間結果。網路慢，昂貴的 GPU 就在等。',
+        '花在互連上的錢，是在提高 GPU 的利用率；利用率從 30% 提到 50%，等於多出很多張卡。',
+      ] },
+    ],
+    keypoints: [
+      '資料平行：完整模型、不同資料；模型平行：切開模型。',
+      '訓練 GPU 小時 ≈ 6ND ÷ 有效算力 ÷ 3,600。',
+      '通訊是擴展的瓶頸，互連和 GPU 一樣重要。',
+    ],
+    sources: ['kaplan', 'zero', 'nvidia-h100'],
+  },
+
+  '3-3': {
+    goals: [
+      '分辨延遲與吞吐量',
+      '說明批次推論怎麼降低每個 token 的成本',
+      '把訓練成本與推論成本放在一起比較',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）訓練運算量的估算？', options: [
+        { text: '6 × 參數 × token', correct: true, why: 'Kaplan 通則。' },
+        { text: '2 × 參數', why: '那是推論每 token。' },
+        { text: '參數 × 層數 × 批次大小', why: '不是。' },
+        { text: '參數²', why: '不是。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-2）把請求合成批次的好處？', options: [
+        { text: '提高算術強度，算力用得更滿', correct: true, why: '權重搬一次大家用。' },
+        { text: '讓每個人的回答更準', why: '和品質無關。' },
+        { text: '減少權重大小', why: '權重不變。' },
+        { text: '不需要 KV cache', why: '一樣需要。' },
+      ] },
+    ],
+    analogy: {
+      text: ['公車與計程車：計程車只載你一個人，出發快、到得快（延遲低），但每人成本高；公車等人坐滿才走，每個人慢一點，但每人成本低很多（吞吐量高）。', 'API 服務就像公車：把很多人的請求合成一批（[[批次推論]]），權重搬一次給大家用，每個 token 的成本大幅下降。代價是每個人可能要多等一點。'],
+      limit: ['公車班次固定，推論系統可以動態地把新請求插進正在跑的批次（連續批次）；細節各家不同，但「批次越大越省、延遲可能越長」的取捨不變。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="批次大小的取捨：批次越大，整台機器的吞吐量越高、每個 token 越便宜，但單一請求的延遲可能變長">
+        <line x1="60" y1="180" x2="530" y2="180" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="180" class="stroke-ink" stroke-width="2"/>
+        <path d="M70 160 C150 80 300 50 520 40" fill="none" style="stroke:var(--m3)" stroke-width="5"/>
+        <path d="M70 150 C200 148 350 120 520 60" fill="none" style="stroke:var(--m7)" stroke-width="5"/>
+        <text x="510" y="34" text-anchor="end" font-size="13" font-weight="900">吞吐量</text>
+        <text x="510" y="84" text-anchor="end" font-size="13" font-weight="900">每人延遲</text>
+        <text x="295" y="206" text-anchor="middle" font-size="14">批次大小 →（示意趨勢）</text>
+      </svg>`,
+      caption: '服務商要在「每個人等多久」和「機器用得多滿」之間取捨。',
+    },
+    define: [
+      { term: '延遲', en: 'latency', def: '一個請求等多久。', example: 'TTFT、每個 token 的間隔。' },
+      { term: '吞吐量', en: 'throughput', def: '整台機器每秒產生多少 token。', example: '批次越大越高。' },
+      { term: '批次推論', en: 'batched inference', def: '合併請求一起算。', example: 'API 服務。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '批次大小對吞吐量的影響（實際計算，H100、70B 等級權重 140 GB 切兩張卡、忽略 KV cache 讀取）', sliders: [
+          { id: 'b', label: '同時服務的請求數', min: 1, max: 512, step: 1, value: 1 },
+        ], compute: (v) => {
+          const bw = 3.35e12 * 2; const weights = 140e9; const flopsTok = 2 * 70e9; const peak = 989e12 * 2 * 0.5;
+          const tMem = weights / bw;
+          const tComp = (flopsTok * v.b) / peak;
+          const t = Math.max(tMem, tComp);
+          const thr = v.b / t;
+          return { rows: [
+            { label: '每一步的時間（毫秒）', value: (t * 1000).toFixed(1), ratio: Math.min(1, t / 0.1) },
+            { label: '每個請求 tokens／秒', value: (1 / t).toFixed(1), ratio: Math.min(1, 1 / t / 50) },
+            { label: '整台吞吐量 tokens／秒', value: Math.round(thr).toLocaleString('en-US'), ratio: Math.min(1, thr / 8000) },
+            { label: '瓶頸', value: tMem >= tComp ? '頻寬' : '算力', ratio: tMem >= tComp ? 0.3 : 1 },
+          ], note: '簡化模型：每一步要搬一次權重（頻寬時間），也要做 批次×2N 的運算（算力時間，假設利用率 50%），取較大者。批次 1 時每人約 48 token/s；批次加到約 150 之前，每步時間幾乎不變，吞吐量直接乘上去。' };
+        } } },
+        { type: 'table', head: ['', '訓練', '推論'], rows: [
+          ['次數', '一次（加上實驗）', '每天、每個請求都在發生'],
+          ['每參數記憶體', '約 16 位元組＋activation', '約 2 位元組（BF16）＋KV cache'],
+          ['瓶頸', '多半是算力與通訊', 'decode 多半是頻寬'],
+          ['規模', '一次性的大投資', '使用量越大，總成本越高'],
+        ], caption: '模型用的人越多，推論的總成本越可能超過訓練（🟡 產業普遍觀察）。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="成本結構：訓練是一次的大筆投入，推論是隨使用量持續增加的成本，兩條線在某個使用量交叉">
+          <line x1="60" y1="140" x2="530" y2="140" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="140" class="stroke-ink" stroke-width="2"/>
+          <line x1="60" y1="70" x2="520" y2="70" style="stroke:var(--m7)" stroke-width="4"/>
+          <path d="M60 140 L520 30" style="stroke:var(--m3)" stroke-width="4"/>
+          <text x="520" y="64" text-anchor="end" font-size="13" font-weight="900">訓練（一次）</text>
+          <text x="420" y="40" text-anchor="end" font-size="13" font-weight="900">推論累積</text>
+          <text x="295" y="162" text-anchor="middle" font-size="13">使用量 →（示意）</text>
+        </svg>`, caption: '這是為什麼量化、小模型、批次推論這些「省推論錢」的技術這麼重要。' },
+      ],
+      tryit: {
+        q: ['用拉桿：批次從 1 拉到 64，整台吞吐量變幾倍？每個請求的速度變慢多少？'],
+        draft: '吞吐量：＿ 倍\n每人速度：＿',
+        answer: ['在這個簡化模型裡，批次 64 時每一步還是被頻寬卡住，時間幾乎不變：吞吐量約變 64 倍，每人速度幾乎不變。', '要到批次約 150 以上才會被算力卡住、每人開始變慢。真實系統還要讀 KV cache，轉折會更早出現。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用單人速度估算服務成本。', why: '服務商用批次，每個 token 便宜很多。', right: '看吞吐量。' },
+      { wrong: '以為批次越大越好。', why: '超過轉折點後每人變慢，KV cache 也放不下。', right: '在延遲與吞吐量之間取捨。' },
+      { wrong: '以為訓練完就沒有硬體成本了。', why: '推論每天都在花。', right: '長期看推論成本。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '吞吐量指的是？', options: [
+        { text: '整台機器每秒產生的 token 總數', correct: true, why: '所有請求加總。' },
+        { text: '一個請求從送出到收到完整回答要等多久', why: '那是延遲。' },
+        { text: 'GPU 的頻寬', why: '那是硬體規格。' },
+        { text: '模型的參數量', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在 decode 被頻寬卡住的範圍內，批次加倍，吞吐量大約？', options: [
+        { text: '加倍', correct: true, why: '每步時間幾乎不變。' },
+        { text: '不變', why: '每步多服務一倍的人。' },
+        { text: '減半', why: '相反。' },
+        { text: '變 4 倍', why: '是線性。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['第一部 8-2 提到 Batch API 打 5 折。用這一課說明服務商為什麼願意給折扣。'], answer: [
+        'Batch API 不要求即時回應，服務商可以把請求排到機器空閒時、合成很大的批次一起算，吞吐量高、每個 token 的成本低。',
+        '使用者用「等比較久」換便宜，正是延遲與吞吐量的取捨。',
+      ] },
+    ],
+    keypoints: [
+      '延遲是一個人等多久，吞吐量是整台機器的產量。',
+      '在頻寬卡住的範圍內，批次加大幾乎免費地提高吞吐量。',
+      '推論成本隨使用量累積，長期可能超過訓練。',
+    ],
+    sources: ['nvidia-h100', 'kaplan'],
+  },
+});
+</script>
