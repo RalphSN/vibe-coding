@@ -101,6 +101,18 @@
 | 思考區塊預設 `display: "omitted"`，串流時會看到一段沒有文字的等待；要顯示摘要設 `display: "summarized"` | claude-api skill | ✅ |
 | 長輸出（大 `max_tokens`）建議一律串流，避免 HTTP 逾時 | claude-api skill | ✅ |
 
+### 2.1 TypeScript SDK 串流細節（2026-10-22 讀 anthropic-sdk-typescript helpers.md）
+
+| 事實 | 來源 | 可信度 |
+|------|------|--------|
+| `stream.abort()` 中止串流與進行中的網路請求，等於 `stream.controller.abort()`；也可以在 `for await` 裡 `break` | https://github.com/anthropics/anthropic-sdk-typescript/blob/main/helpers.md | ✅ |
+| MessageStream 事件：`connect`、`streamEvent`、`text`、`inputJson`、`message`、`contentBlock`、`finalMessage`、`error`、`abort`、`end` | 同上 | ✅ |
+| `await stream.finalMessage()`、`await stream.finalText()` | 同上 | ✅ |
+| 請求的第二個參數可帶 `{ signal }`（toolRunner 有範例；`messages.stream()` 頁面未直接示範） | 同上 | 🟡 課程用 `stream.abort()` |
+| `npm install @anthropic-ai/sdk`；不帶參數的 `new Anthropic()` 從 `ANTHROPIC_API_KEY` 讀金鑰 | claude-api skill typescript README | ✅ |
+| `client.messages.countTokens({ model, messages })` → `.input_tokens`；端點 `POST /v1/messages/count_tokens` | claude-api skill token-counting.md | ✅ |
+| Opus 5.5 思考一律開啟，回應 `content` 可能先有 `thinking` 區塊（預設 `display: "omitted"`，文字是空的），讀取時要篩 `type === "text"` | claude-api skill | ✅ |
+
 ---
 
 ## 3. Prompt 工程與結構化輸出（模組 3）
@@ -112,6 +124,19 @@
 | Citations 與 `output_config.format` 不能同時用（400） | 同上 | ✅ 6-4 會提到 |
 | prompt 建議：清楚直接、給背景與目的、用範例、用 XML 標籤分隔資料與指示；新模型對過度強硬的語氣（全大寫、「一定要」）反應過度 | https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview；claude-api skill（prompt-audit） | ✅ |
 | 寫給舊模型的 prompt 在新模型上常「太規定」反而降低品質 | claude-api skill（Fable 5.1 遷移說明） | ✅ |
+
+### 3.1 結構化輸出與快取、批次細節（2026-10-22 讀 claude-api skill）
+
+| 事實 | 來源 | 可信度 |
+|------|------|--------|
+| 結構化輸出支援的模型：Fable 5／5.1、Opus 5.5／5／4.8、Sonnet 5.5／5、Haiku 5.5／4.5 等 | claude-api skill tool-use-concepts.md | ✅ |
+| JSON Schema 支援：基本型別、`enum`、`const`、`anyOf`、`allOf`、`$ref`；字串格式 `date-time`、`date`、`email`、`uri`、`uuid` 等；**每個物件都要 `additionalProperties: false`** | 同上 | ✅ |
+| 不支援：遞迴 schema、數值限制（`minimum`、`maximum`）、字串長度限制（`minLength`、`maxLength`）、複雜陣列限制；TS／Python SDK 會自動移除這些限制、改在用戶端驗證 | 同上 | ✅ |
+| Citations 與 `output_config.format` 不能同時用（400） | claude-api skill | ✅ |
+| 快取最小前綴依模型而不同：最新一代約 512 token（skill 註明使用前查官方文件），Opus 4.6／Haiku 4.5 為 4096；不到最小值不會報錯，只是不快取 | claude-api skill prompt-caching.md | 🟡 課程寫「依模型不同，太短不會快取」 |
+| 快取是前綴比對，順序 tools → system → messages；最多 4 個斷點；快取依 workspace 隔離 | 同上 | ✅ |
+| Batch：多數一小時內完成，最長 24 小時；每批最多 100,000 筆 | claude-api skill batches.md；rate limits 頁 | ✅ |
+| Tool Runner（beta）：`client.beta.messages.toolRunner(...)`＋`betaZodTool` | claude-api skill | ✅ |
 
 ## 4. Tool use（模組 4）
 

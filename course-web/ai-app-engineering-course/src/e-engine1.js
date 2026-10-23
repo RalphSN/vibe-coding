@@ -511,7 +511,7 @@ Views.home = () => {
     <div class="content" style="margin:0">
       <ul>
         <li>每個單元的結構都一樣：3 件事 → 暖身回顧 → 比喻 → 心智模型 → 定義 → 範例 → 常見錯誤 → 練習 → 三個重點；需要自己在電腦上跑的課，最後多一段「動手做」。</li>
-        <li>全書主軸是<strong>一個請求的旅程</strong>：<ol class="journey"><li style="--c:var(--m0)">你的程式</li><li style="--c:var(--m1)">請求</li><li style="--c:var(--m2)">模型</li><li style="--c:var(--m3)">回應</li><li style="--c:var(--m4)">你的程式</li></ol>每一課都會標出自己在旅程的哪一段。</li>
+        <li>全書主軸是<strong>一個請求的旅程</strong>：${journeyHtml(null)}「送出前」和「收到後」都是你的程式。每一課的標題上方都會標出自己在旅程的哪幾站。</li>
         <li>程式碼用 <strong>TypeScript（Node.js）</strong>與 Claude API；OpenAI、Gemini 只放概念對照。需要先補 TypeScript 的話，書櫃上有《TypeScript 完整入門》。</li>
         <li>頁面裡<strong>沒有 API 金鑰、不會真的呼叫 API</strong>：串流、工具迴圈、檢索都是預錄或模擬的，可以放心按。</li>
         <li>模型、價格、規格會變：每課頁尾都寫了查證日期與來源，標「未確認」的以官方文件為準。</li>
@@ -553,6 +553,13 @@ Views.module = ({ id }) => {
     <nav class="lesson-nav" aria-label="開始本模組"><a class="next nb-press" href="#/l/${mod.lessons[0].id}"><span class="dir">從這裡開始</span><span class="ttl">${renderPhrases(`${mod.lessons[0].id} ${mod.lessons[0].title}`)}</span></a></nav>
   </div>`;
 };
+
+/* ---------- 一個請求的旅程：首頁顯示全部，單元頁只點亮所在的站 ---------- */
+function journeyHtml(moduleId) {
+  const active = moduleId == null ? JOURNEY.stages.map((st, i) => i) : JOURNEY.byModule[moduleId] || [];
+  const label = moduleId == null ? '一個請求的旅程' : `這一課在請求旅程的位置：${active.map((i) => JOURNEY.stages[i].label).join('、')}`;
+  return `<ol class="journey${moduleId == null ? '' : ' is-lesson'}" aria-label="${esc(label)}">${JOURNEY.stages.map((st, i) => `<li style="--c:${st.color}" title="${esc(st.note)}"${active.includes(i) ? ' data-on="1"' : ''}>${esc(st.label)}</li>`).join('')}</ol>`;
+}
 
 /* ---------- 單元頁 ---------- */
 const SECTION_DEFS = [
@@ -631,7 +638,7 @@ Views.lesson = ({ id }) => {
         <span class="meta-group"><span class="progress" style="--p:${(modP.done) / modP.total};--fill:var(--m${mod.id})" role="progressbar" aria-label="本模組進度" aria-valuemin="0" aria-valuemax="${modP.total}" aria-valuenow="${modP.done}"><span></span></span>已完成 ${modP.done} / ${modP.total}</span>
         ${min ? `<span class="meta-group">閱讀約 ${min} 分鐘</span>` : ''}
       </div>
-      <span class="lid-big">${lesson.id}</span>
+      ${journeyHtml(lesson.moduleId)}<span class="lid-big">${lesson.id}</span>
       <h1>${renderPhrases(lesson.title)}</h1>
     </header>
     ${body}
