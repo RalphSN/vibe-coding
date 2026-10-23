@@ -1,0 +1,332 @@
+<script>
+/* ==========================================================================
+   模組 5：預訓練：預測下一個 token，以及規模定律
+   ========================================================================== */
+defineTerms({
+  '預訓練': { en: 'pre-training', def: '用大量文字訓練模型預測下一個 token；這一步花掉絕大部分算力，學到語言與世界知識的規律。', example: 'GPT-3 預訓練了約 3,000 億個 token。', lesson: '5-1' },
+  '損失': { en: 'loss', def: '衡量預測有多差的數字，越小越好；訓練就是一直調參數讓它變小。', example: '正確答案只給 1% 機率，損失就很大。', lesson: '5-1' },
+  'cross-entropy': { en: 'cross-entropy loss', def: '預測下一個 token 用的損失：−log(給正確 token 的機率)。給 100% 時是 0，機率越低越大。', example: '−ln(0.5) ≈ 0.69。', lesson: '5-1' },
+  '梯度下降': { en: 'gradient descent', def: '算出「每個參數往哪個方向動一點，損失會變小」，然後動一小步；重複幾十萬次。', example: '第三部 3、第四部 3、4 細講。', lesson: '5-1' },
+  '去重': { en: 'deduplication', def: '刪掉重複或幾乎重複的文件，避免模型過度記住某些內容。', example: '同一篇新聞被轉載上千次，只留一份。', lesson: '5-2' },
+  '規模定律': { en: 'scaling laws', def: '損失隨模型大小、資料量、算力增加而以冪律方式穩定下降的經驗規律。', example: 'Kaplan 等 2020、Hoffmann 等 2022。', lesson: '5-3' },
+  'FLOPs': { en: 'floating point operations', def: '浮點運算的次數，用來衡量訓練要花多少算力。', example: '訓練算力常用「約 6 × 參數 × token 數」估算。', lesson: '5-3' },
+});
+
+const REVIEW_M4 = [
+  { level: '回想', type: 'mc', q: '（回顧 4-4）一層 Transformer 的參數大約是？', options: [
+    { text: '12 × d²', correct: true, why: 'attention 4d² ＋ 前饋網路 8d²。' },
+    { text: '12 × d', why: '少了平方。' },
+    { text: '4 × d²', why: '只有 attention。' },
+    { text: 'V × d', why: '那是向量表。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 3-4）訓練時忘了因果遮罩，會發生什麼？', options: [
+    { text: '偷看答案：訓練好看、生成很差', correct: true, why: '學會抄下一格。' },
+    { text: '程式會直接報錯，訓練根本無法開始', why: '程式照樣能跑。' },
+    { text: '模型會變得更聰明', why: '剛好相反。' },
+    { text: '只影響速度', why: '影響的是學到什麼。' },
+  ] },
+];
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '說出預訓練的目標是什麼',
+      '用 −log(p) 算出一個 token 的損失',
+      '解釋為什麼一段文字能同時提供很多個訓練題目',
+    ],
+    review: REVIEW_M4,
+    analogy: {
+      text: ['克漏字考試：把一本書的每個字都當成一題「下一個字是什麼」，模型作答時給每個選項一個機率。答對的字給的機率越高，扣分越少。', '[[預訓練]]就是用整個網路規模的文字做這種考試幾千億題。扣分的方式叫 [[cross-entropy]]：[[損失]]＝−log(給正確答案的機率)。每考一批，就用[[梯度下降]]把所有參數往「扣分變少」的方向調一點。'],
+      limit: ['人考完試會記得哪些題目，模型沒有逐題記錄，只有參數被調整的總結果。另外「答對」不代表「真的」：模型學的是「網路上的文字通常怎麼接」，網路上常見的錯誤它也會學到（7-4）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="一段文字同時提供很多題：台灣最高的山是玉山，每個位置都要預測下一個 token，每個位置各算一個損失，再取平均">
+        <text x="20" y="28" font-size="15" font-weight="900">一句話＝好幾題（因果遮罩讓它們可以同時算）</text>
+        ${['台灣', '最高', '的', '山', '是', '玉山'].map((t, i) => `<rect x="${20 + i * 88}" y="50" width="80" height="40" class="fill-surface stroke-ink" stroke-width="3"/><text x="${60 + i * 88}" y="76" text-anchor="middle" font-size="14" font-weight="900">${t}</text>`).join('')}
+        ${['最高', '的', '山', '是', '玉山'].map((t, i) => `<path d="M${60 + i * 88} 90 L${60 + i * 88} 118" class="stroke-ink" stroke-width="2"/><rect x="${20 + i * 88}" y="118" width="80" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${60 + i * 88}" y="138" text-anchor="middle" font-size="13" class="on-color">猜：${t}</text><text x="${60 + i * 88}" y="156" text-anchor="middle" font-size="13" class="mono on-color">${['0.21', '0.70', '0.05', '0.40', '0.85'][i]}</text>`).join('')}
+        <text x="20" y="196" font-size="14">每格下面是模型給「正確答案」的機率（示意），損失 ＝ −log(機率)，</text>
+        <text x="20" y="220" font-size="14">5 個損失取平均就是這句話的損失。一次前向計算就得到全部 5 題。</text>
+        <text x="20" y="246" font-size="13">推論時一次只能產生一個（因為後面還不存在）；訓練時答案都已知，所以能同時算。</text>
+      </svg>`,
+      caption: '訓練的效率來自這裡：一段 1,000 個 token 的文字，一次就提供約 1,000 題。',
+    },
+    define: [
+      { term: '預訓練', en: 'pre-training', def: '大量文字上的下一個 token 預測。', example: '花掉絕大部分算力。' },
+      { term: 'cross-entropy', en: 'cross-entropy', def: '−log(正確答案的機率)。', example: 'p＝1 → 0；p＝0.01 → 4.6。' },
+      { term: '梯度下降', en: 'gradient descent', def: '往損失變小的方向一小步一小步調參數。', example: '第四部手寫一次。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="損失曲線：機率越接近 1 損失越接近 0，機率接近 0 時損失急速變大">
+  <line x1="60" y1="190" x2="530" y2="190" class="stroke-ink" stroke-width="3"/><line x1="60" y1="20" x2="60" y2="190" class="stroke-ink" stroke-width="3"/>
+  <path d="${[...Array(50).keys()].map((i) => { const p = 0.02 + i * 0.02; const loss = -Math.log(p); return `${i ? 'L' : 'M'}${Math.round(60 + p * 460)} ${Math.round(190 - loss * 40)}`; }).join(' ')}" fill="none" style="stroke:var(--m4)" stroke-width="5"/>
+  <text x="300" y="218" text-anchor="middle" font-size="14">給正確答案的機率（0 → 1）</text>
+  <text x="30" y="100" text-anchor="middle" font-size="14" transform="rotate(-90 30 100)">損失</text>
+  <text x="520" y="180" text-anchor="end" font-size="13">p＝1 → 0</text>
+  <text x="80" y="36" font-size="13">p 很小 → 損失很大</text>
+</svg>`, caption: '−log(p) 的形狀：完全猜錯的懲罰最重。' },
+        { type: 'widget', name: 'knobs', props: { title: '給正確答案的機率 → 損失（實際計算，自然對數）', sliders: [
+          { id: 'p', label: '模型給正確 token 的機率', min: 1, max: 100, step: 1, value: 25, unit: '%' },
+        ], compute: (v) => {
+          const loss = -Math.log(v.p / 100);
+          return { rows: [
+            { label: '損失 −ln(p)', value: loss.toFixed(3), ratio: Math.min(1, loss / 4.61) },
+            { label: '等於在幾個選項中亂猜', value: `${(100 / v.p).toFixed(1)} 個`, ratio: Math.min(1, (100 / v.p) / 100) },
+          ], note: '第二列是 perplexity（困惑度）＝e^損失＝1/p：損失 1.39 相當於在 4 個選項裡亂猜。機率越低，損失增加得越快（p＝1% 時是 4.61）。' };
+        } } },
+        { type: 'widget', name: 'sampler', props: { title: '同一題，看模型給每個候選多少機率', temperature: false, steps: [
+          { context: '台灣最高的山是', candidates: [{ t: '玉山', logit: 3.6 }, { t: '雪山', logit: 2.1 }, { t: '合歡山', logit: 1.2 }, { t: '阿里山', logit: 1.0 }] },
+        ], note: '如果正確答案是「玉山」，這題的損失就是 −ln(玉山的機率)。訓練會把玉山的分數往上推、其他的往下壓。機率是**示意**。' } },
+        { type: 'code', lang: 'python', title: '一句話的平均損失（示意）', code: 'import numpy as np\np_correct = np.array([0.21, 0.70, 0.05, 0.40, 0.85])   # 上圖 5 題\nlosses = -np.log(p_correct)\nprint(losses.round(2))      # [1.56 0.36 3.   0.92 0.16]\nprint(losses.mean().round(2))  # 1.2' },
+      ],
+      tryit: {
+        q: ['用上面的拉桿：機率從 50% 變 25%，損失增加多少？從 2% 變 1% 呢？為什麼兩者的增加量一樣？'],
+        draft: '50→25：＿\n2→1：＿\n為什麼：＿',
+        answer: ['兩者都增加約 0.69（＝ln 2）。', '因為 −log 只看比例：機率減半，損失就增加 ln 2，不管原本是多少。這讓模型在「完全猜錯」的題目上受到很重的懲罰。數學直覺見隨身卷 5。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為預訓練是在教模型「正確的事實」。', why: '目標只是預測網路文字的下一個 token。', right: '事實是副產品；常見的錯誤一樣會學到。' },
+      { wrong: '以為訓練一段文字要像推論一樣一個一個 token 算。', why: '訓練時答案已知，因果遮罩讓所有位置同時算。', right: '一次前向計算得到每個位置的損失。' },
+      { wrong: '以為損失是「答錯幾題」。', why: '損失看的是給正確答案多少機率，連續的數字。', right: '同樣答對，機率 90% 和 51% 的損失不同。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '模型給正確 token 100% 的機率，cross-entropy 損失是？', options: [
+        { text: '0', correct: true, why: '−ln(1)＝0。' },
+        { text: '1', why: 'ln(1) 是 0 不是 1。' },
+        { text: '無限大', why: '機率 0 時才是無限大。' },
+        { text: '100', why: '損失不是百分比。' },
+      ] },
+      { level: '應用', type: 'mc', q: '一段 2,000 個 token 的文字，訓練時大約提供幾題「預測下一個 token」？', options: [
+        { text: '約 2,000 題', correct: true, why: '每個位置都預測下一個。' },
+        { text: '只有 1 題', why: '每個位置都是一題。' },
+        { text: '2,000 的平方題', why: '那是 attention 權重表的大小。' },
+        { text: '看詞彙表大小決定', why: '題數看文字長度。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼「只學預測下一個字」能讓模型學會翻譯、摘要、寫程式？'], answer: [
+        '因為網路上本來就有大量翻譯、摘要、程式碼。要把這些文字的下一個字猜準，模型必須學會其中的規律，例如「這是一段英文，下一句是它的中文翻譯」。',
+        '這也是 GPT-3 論文的觀察：夠大的模型只靠 prompt 裡的幾個範例就能做新任務。',
+      ] },
+    ],
+    keypoints: [
+      '預訓練：預測下一個 token，損失＝−log(正確答案的機率)。',
+      '訓練時一段文字的每個位置同時當題目。',
+      '學的是文字的規律，不保證是事實。',
+    ],
+    sources: ['gpt3', 'transformer'],
+  },
+
+  '5-2': {
+    goals: [
+      '說出預訓練資料的主要來源',
+      '列出常見的資料清理步驟與目的',
+      '解釋資料組成為什麼會影響模型行為',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-1）機率從 50% 降到 25%，損失增加多少？', options: [
+        { text: '約 0.69（ln 2）', correct: true, why: '機率減半，損失加 ln 2。' },
+        { text: '0.25', why: '損失不是機率的差。' },
+        { text: '加倍', why: '是加上固定值，不是加倍。' },
+        { text: '不變', why: '機率變低損失一定變大。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 4-2）殘差連接的式子？', options: [
+        { text: 'x ＋ 子層(x)', correct: true, why: '直通路加修正。' },
+        { text: 'x × 子層(x)', why: '是加。' },
+        { text: '子層(x)', why: '少了直通路。' },
+        { text: 'LN(x)', why: '那是 layer norm。' },
+      ] },
+    ],
+    analogy: {
+      text: ['煮高湯：材料的品質決定湯頭。撈掉浮沫（過濾低品質內容）、同一塊骨頭不要放十次（[[去重]]）、肉和蔬菜的比例要調（資料配比）。', '預訓練資料也是：網路爬來的原始文字很髒，清理和配比做得好壞，直接決定模型會什麼、說話像誰。'],
+      limit: ['煮湯的人知道每樣材料是什麼，幾兆 token 的資料沒有人能逐篇看過，清理只能靠自動規則與分類器，一定有漏網之魚。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="資料管線：網頁爬取、語言辨識、品質過濾、去重、移除個資與有害內容、依來源配比，最後切成 token">
+        ${[['爬取', '網頁、書、程式碼…', 'm0'], ['過濾', '語言、品質', 'm4'], ['去重', '重複的只留一份', 'm3'], ['清除', '個資、有害內容', 'm7'], ['配比', '各來源佔多少', 'm2'], ['切 token', '模組 1', 'm1']].map(([a, b, c], i) => `
+          <rect x="${10 + (i % 3) * 185}" y="${30 + Math.floor(i / 3) * 110}" width="170" height="80" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/>
+          <text x="${95 + (i % 3) * 185}" y="${64 + Math.floor(i / 3) * 110}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${i + 1}. ${a}</text>
+          <text x="${95 + (i % 3) * 185}" y="${90 + Math.floor(i / 3) * 110}" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="240" text-anchor="middle" font-size="13">常見做法的通則；各家實際流程細節多半不公開</text>
+      </svg>`,
+      caption: '每一步都在丟掉資料：最後留下的往往只是原始爬取的一小部分。',
+    },
+    define: [
+      { term: '去重', en: 'deduplication', def: '刪掉重複與近似重複的文件。', example: '轉載上千次的新聞只留一份。' },
+      { term: '資料配比', en: 'data mixture', def: '各來源在訓練中被抽到的比例。', example: '高品質來源可能被重複看好幾次。' },
+      { term: '資料污染', en: 'contamination', def: '評測題目混進訓練資料，讓分數虛高。', example: '考古題剛好被背過。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['GPT-3 的資料來源', 'token 數', '訓練中的比例'], rows: [
+          ['Common Crawl（過濾後）', '4,100 億', '60%'],
+          ['WebText2', '190 億', '22%'],
+          ['Books1', '120 億', '8%'],
+          ['Books2', '550 億', '8%'],
+          ['Wikipedia', '30 億', '3%'],
+        ], caption: '出處：Brown 等 2020 表 2.2。注意 WebText2 只有 190 億 token 卻佔 22%：高品質來源被多看了幾遍，Common Crawl 反而沒看完。' },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'filter', label: '品質過濾' }, { id: 'dedup', label: '去重' }, { id: 'safety', label: '清除個資／有害內容' }, { id: 'mix', label: '配比' }], items: [
+          { text: '同一份服務條款出現在 5 萬個網站，只保留一份', answer: 'dedup', why: '重複內容會讓模型過度記住。' },
+          { text: '刪掉只有導覽列、廣告、亂碼的網頁', answer: 'filter', why: '低品質內容。' },
+          { text: '把電話號碼、身分證字號遮掉', answer: 'safety', why: '個資。' },
+          { text: '程式碼資料只佔 5%，決定提高到 15%', answer: 'mix', why: '調整各來源比例。' },
+          { text: '把評測考題從訓練資料中移除', answer: 'dedup', why: '避免污染：和評測集做重複比對。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="資料決定行為：資料裡程式碼多，模型寫程式強；資料裡某種語言少，那種語言就弱；資料有偏見，模型也會有">
+          ${[['程式碼多', '寫程式變強'], ['某語言少', '那個語言變弱'], ['資料有偏見', '模型也有偏見']].map(([a, b], i) => `
+            <rect x="${10 + i * 185}" y="30" width="170" height="54" class="fill-surface stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="63" text-anchor="middle" font-size="14" font-weight="900">${a}</text>
+            <path d="M${95 + i * 185} 84 L${95 + i * 185} 112" class="stroke-ink" stroke-width="3"/><path d="M${87 + i * 185} 104 L${95 + i * 185} 116 L${103 + i * 185} 104 Z" class="stroke-ink" style="fill:var(--ink)"/>
+            <rect x="${10 + i * 185}" y="118" width="170" height="54" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="151" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="194" text-anchor="middle" font-size="13">模型只能學到資料裡有的規律</text>
+        </svg>`, caption: '後訓練（模組 6）可以調整行為，但補不回預訓練沒看過的知識。' },
+      ],
+      tryit: {
+        q: ['如果某個評測的考題被大量貼在網路上、混進了訓練資料，模型在這個評測拿到高分代表什麼？'],
+        draft: '我的判斷：＿',
+        answer: ['不一定代表能力強，可能只是「背過考古題」。這叫資料污染。', '所以看模型評測時要問：考題有沒有公開很久？評測方有沒有做污染檢查？用自己的資料評估（第一部 8-1）最可靠。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為資料越多越好，不用清理。', why: '重複與低品質內容會浪費算力、讓模型學到壞習慣。', right: '清理與去重和數量一樣重要。' },
+      { wrong: '以為每份資料在訓練中都只看一次。', why: '配比會讓高品質來源被看好幾次，低品質來源沒看完。', right: '看的是「訓練中的比例」，不只是原始大小。' },
+      { wrong: '以為後訓練可以補上預訓練沒有的知識。', why: '後訓練主要調整行為，資料量少很多。', right: '知識主要來自預訓練。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '去重的主要目的是？', options: [
+        { text: '避免模型過度記住重複出現的內容', correct: true, why: '也省下算力。' },
+        { text: '讓 tokenizer 切得更快', why: '和 tokenizer 無關。' },
+        { text: '讓資料變多', why: '去重會讓資料變少。' },
+        { text: '把英文翻成中文', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'GPT-3 的 WebText2 只有 190 億 token 卻佔訓練的 22%，代表？', options: [
+        { text: '高品質來源被重複看了好幾遍', correct: true, why: '配比高於原始佔比。' },
+        { text: 'WebText2 的 token 比較大', why: 'token 大小一樣。' },
+        { text: '統計錯了', why: '這是刻意的配比。' },
+        { text: 'Common Crawl 被重複看了很多遍', why: '剛好相反，Common Crawl 沒看完。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你發現某個模型的繁體中文常常夾雜簡體用語。從資料的角度推測原因，並說一個改善方向。'], answer: [
+        '預訓練資料裡簡體中文遠多於繁體，模型學到的中文規律以簡體為主。',
+        '改善：提高繁體中文資料的配比、在後訓練加入繁體示範；使用時在 system prompt 明確要求台灣用語，並在程式端檢查。',
+      ] },
+    ],
+    keypoints: [
+      '資料管線：爬取 → 過濾 → 去重 → 清除個資與有害內容 → 配比 → 切 token。',
+      '配比讓高品質來源被多看幾遍。',
+      '模型只能學到資料裡有的規律，包括偏見與錯誤。',
+    ],
+    sources: ['gpt3'],
+  },
+
+  '5-3': {
+    goals: [
+      '說出規模定律的意思',
+      '用 6 × 參數 × token 估算訓練算力',
+      '解釋 Chinchilla 為什麼說「參數和資料要一起放大」',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-2）資料污染是指？', options: [
+        { text: '評測考題混進訓練資料', correct: true, why: '分數虛高。' },
+        { text: '資料裡有病毒', why: '不是資安問題。' },
+        { text: '資料重複太多', why: '那是去重處理的事。' },
+        { text: '資料用錯語言', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 5-1）一段 1,000 token 的文字提供幾題？', options: [
+        { text: '約 1,000', correct: true, why: '每個位置一題。' },
+        { text: '1', why: '每個位置都是一題。' },
+        { text: '100 萬', why: '不是平方。' },
+        { text: '看模型大小', why: '看文字長度。' },
+      ] },
+    ],
+    analogy: {
+      text: ['準備考試：多讀書（資料）、腦容量大（參數）、花更多時間（算力），成績都會變好；但如果只有腦容量很大、書只讀一點點，效果有限。', '[[規模定律]]發現，損失會隨模型大小、資料量、算力以很穩定的冪律下降。Chinchilla 的研究進一步指出：固定算力時，參數和資料要等比例放大，很多早期大模型其實是「腦很大、書讀太少」。'],
+      limit: ['考試成績有上限，損失的下降也會趨緩、接近一個無法消除的底線。而且「損失低」不等於「每種能力都好」；某些能力看起來是突然出現的，研究上仍有爭論。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="規模定律示意：橫軸是算力取對數，縱軸是損失，點大致落在一條往下的直線上，越往右越平緩">
+        <line x1="60" y1="210" x2="540" y2="210" class="stroke-ink" stroke-width="3"/>
+        <line x1="60" y1="30" x2="60" y2="210" class="stroke-ink" stroke-width="3"/>
+        <text x="300" y="240" text-anchor="middle" font-size="14">算力（對數刻度，每格 ×10）</text>
+        <text x="30" y="120" text-anchor="middle" font-size="14" transform="rotate(-90 30 120)">損失</text>
+        <path d="M80 50 L200 92 L320 132 L440 166 L520 184" fill="none" style="stroke:var(--m4)" stroke-width="5"/>
+        ${[[80, 50], [200, 92], [320, 132], [440, 166], [520, 184]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="8" class="fill-surface stroke-ink" stroke-width="3"/>`).join('')}
+        <text x="300" y="30" text-anchor="middle" font-size="14" font-weight="900">在對數座標上接近一條直線（冪律）</text>
+        <text x="440" y="140" font-size="13">越往右越平緩</text>
+      </svg>`,
+      caption: '示意圖，不是任何論文的數據。重點是「可以預測」：小模型的趨勢能用來估大模型的結果。',
+    },
+    define: [
+      { term: '規模定律', en: 'scaling laws', def: '損失隨規模以冪律下降。', example: 'Kaplan 等 2020。' },
+      { term: '計算最佳', en: 'compute-optimal', def: '固定算力下，損失最低的參數與資料組合。', example: 'Chinchilla：參數與資料等比例放大。' },
+      { term: 'FLOPs', en: 'FLOPs', def: '浮點運算次數。', example: '訓練 ≈ 6 × N × D。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['研究', '主要結論'], rows: [
+          ['Kaplan 等 2020', '損失隨模型大小、資料量、算力以冪律下降；當時建議大模型、相對少的資料'],
+          ['Hoffmann 等 2022（Chinchilla）', '同樣算力下，70B 參數、約 4 倍資料的 Chinchilla 贏過 280B 的 Gopher；參數與 token 要等比例放大'],
+        ], caption: '「每個參數約 20 個 token」是 Chinchilla 之後常被引用的經驗法則（🟡 第三方整理）。' },
+        { type: 'widget', name: 'knobs', props: { title: '固定算力，參數和資料怎麼分（示意計算）', sliders: [
+          { id: 'logC', label: '算力（10 的幾次方 FLOPs）', min: 21, max: 25, step: 0.5, value: 23.5 },
+          { id: 'logN', label: '參數量（10 的幾次方）', min: 9, max: 12, step: 0.1, value: 10.8 },
+        ], compute: (v) => {
+          const C = 10 ** v.logC;
+          const N = 10 ** v.logN;
+          const D = C / (6 * N);
+          const loss = 1.69 + 406.4 / N ** 0.34 + 410.7 / D ** 0.28;
+          const fmt = (x) => (x >= 1e12 ? `${(x / 1e12).toFixed(1)} 兆` : x >= 1e9 ? `${(x / 1e9).toFixed(1)} 十億` : `${(x / 1e6).toFixed(0)} 百萬`);
+          return { rows: [
+            { label: '參數 N', value: fmt(N), ratio: (v.logN - 9) / 3 },
+            { label: '資料 D ＝ C ÷ 6N（token）', value: fmt(D), ratio: Math.min(1, Math.max(0, (Math.log10(D) - 9) / 5)) },
+            { label: '每個參數分到的 token', value: (D / N).toFixed(1), ratio: Math.min(1, D / N / 100) },
+            { label: '估計損失（越低越好）', value: loss.toFixed(3), ratio: Math.min(1, (loss - 1.69) / 2) },
+          ], note: '損失用 Hoffmann 等 2022 的擬合式 E＋A/N^α＋B/D^β 畫形狀（常數為記憶值，後續研究有重新擬合的爭議）。**只用來看趨勢**：固定算力時拉動參數，損失會在中間某處最低，太大或太小都變差。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="同算力比較：Gopher 280B 參數、資料少；Chinchilla 70B 參數、資料約 4 倍，表現更好">
+          <rect x="20" y="30" width="250" height="130" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="145" y="60" text-anchor="middle" font-size="15" font-weight="900">Gopher</text>
+          <rect x="40" y="76" width="200" height="22" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="250" y="93" font-size="13">參數 280B</text>
+          <rect x="40" y="110" width="50" height="22" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="100" y="127" font-size="13">資料 1×</text>
+          <rect x="290" y="30" width="250" height="130" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="60" text-anchor="middle" font-size="15" font-weight="900" class="on-color">Chinchilla（勝出）</text>
+          <rect x="310" y="76" width="50" height="22" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="370" y="93" font-size="13" class="on-color">參數 70B</text>
+          <rect x="310" y="110" width="200" height="22" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="520" y="127" text-anchor="end" font-size="13" class="on-color">資料約 4×</text>
+          <text x="280" y="190" text-anchor="middle" font-size="13">同樣的算力預算；出處 Hoffmann 等 2022</text>
+        </svg>`, caption: '小一點的模型多讀一點書，結果更好，推論時也更便宜。' },
+      ],
+      tryit: {
+        q: ['用 6 × N × D 估算：700 億參數、1.4 兆 token 要多少訓練 FLOPs？'],
+        draft: '6 × 7×10¹⁰ × 1.4×10¹² ＝ ＿',
+        answer: ['6 × 7×10¹⁰ × 1.4×10¹² ＝ 58.8 × 10²² ≈ 5.9×10²³ FLOPs。', '這是 Chinchilla 等級的算力。第五部會把它換算成「幾張 GPU 跑幾天」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為規模定律保證模型越大越好。', why: '固定算力時，太大的模型資料不夠，反而變差。', right: '參數、資料、算力要一起看。' },
+      { wrong: '把擬合式的數字拿去精確預測某個模型的表現。', why: '常數依資料與做法不同，研究上也有爭議。', right: '只用它理解趨勢與取捨。' },
+      { wrong: '以為損失下降就等於所有能力都變好。', why: '損失是平均值，個別能力的變化不一定平滑。', right: '還要用具體任務評估。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Chinchilla 的主要發現是？', options: [
+        { text: '參數與資料要一起放大', correct: true, why: '70B＋4 倍資料贏過 280B。' },
+        { text: '模型越大越好，資料量不重要', why: '這是它要修正的觀點。' },
+        { text: '資料越少越好，避免過擬合', why: '剛好相反。' },
+        { text: '算力不影響損失', why: '算力是三大因素之一。' },
+      ] },
+      { level: '應用', type: 'mc', q: '用 6ND 估算：10 億參數、200 億 token 的訓練算力？', options: [
+        { text: '1.2×10²⁰ FLOPs', correct: true, why: '6 × 10⁹ × 2×10¹⁰。' },
+        { text: '2×10¹⁹ FLOPs', why: '忘了乘 6。' },
+        { text: '1.2×10¹⁹ FLOPs', why: '指數算錯一位。' },
+        { text: '6×10²⁹ FLOPs', why: '指數要相加：9＋10＝19，再乘 12。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼「小一點、讀更多資料」的模型對使用者也是好事？'], answer: [
+        '推論成本主要跟參數量走：小模型每產生一個 token 的計算與記憶體都比較少，所以更便宜、更快。',
+        '如果能用更多資料把小模型練到一樣好，使用時就同時得到品質與成本。這也是模型公司推出不同大小模型的原因之一。',
+      ] },
+    ],
+    keypoints: [
+      '損失隨參數、資料、算力以冪律穩定下降。',
+      '訓練算力 ≈ 6 × 參數 × token。',
+      'Chinchilla：固定算力，參數與資料要等比例放大。',
+    ],
+    sources: ['kaplan', 'chinchilla'],
+  },
+});
+</script>

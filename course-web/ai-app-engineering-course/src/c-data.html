@@ -1,0 +1,146 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'AI 系列・第一部｜AI 應用工程',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-22',
+  version: 'v1',
+};
+
+/* AI 系列七本書：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: 'AI 系列',
+  current: 'ai-app',
+  volumes: [
+    { id: 'ai-map', vol: '序章', title: 'AI 全景地圖', href: '../ai-series-0-map-course/index.html' },
+    { id: 'ai-app', vol: '第一部', title: 'AI 應用工程', href: '../ai-app-engineering-course/index.html' },
+    { id: 'ai-llm', vol: '第二部', title: '大型語言模型原理', href: '../llm-principles-course/index.html' },
+    { id: 'ai-ml', vol: '第三部', title: '機器學習基礎', href: '../ml-foundations-course/index.html' },
+    { id: 'ai-dl', vol: '第四部', title: '深度學習', href: '../deep-learning-course/index.html' },
+    { id: 'ai-hw', vol: '第五部', title: '硬體與運算', href: '../ai-hardware-course/index.html' },
+    { id: 'ai-math', vol: '隨身卷', title: '數學直覺', href: '../ai-math-pocket-course/index.html' },
+  ],
+};
+
+/* 全書主軸「一個請求的旅程」：每個模組標出自己在哪幾站（索引對應 stages） */
+const JOURNEY = {
+  stages: [
+    { label: '送出前', note: '你的程式組請求：歷史、資料、工具定義', color: 'var(--m0)' },
+    { label: '請求', note: 'HTTP＋JSON 送到 API', color: 'var(--m1)' },
+    { label: '模型', note: '讀文字、寫文字', color: 'var(--m2)' },
+    { label: '回應', note: 'content、stop_reason、usage', color: 'var(--m3)' },
+    { label: '收到後', note: '你的程式處理：顯示、驗證、執行工具', color: 'var(--m4)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4], 1: [1, 3], 2: [3, 4], 3: [0, 1, 3], 4: [0, 3, 4], 5: [0], 6: [0, 4], 7: [0, 3, 4], 8: [0, 1, 2, 3, 4] },
+};
+
+const COURSES = [
+  { id: 0, title: '開始|之前', short: '起點', desc: '分清模型、API、應用三層；準備 API 金鑰與 SDK，送出第一個請求。', lessons: [
+    ['0-1', 'AI 應用工程|在做什麼'],
+    ['0-2', '準備環境：|金鑰、SDK、|第一次呼叫'],
+  ]},
+  { id: 1, title: 'LLM API|基礎', short: 'API 基礎', desc: '一次 API 呼叫的解剖、messages 與角色、控制輸出、token 與計費、速率限制與重試。', lessons: [
+    ['1-1', '一次 API 呼叫|的解剖'],
+    ['1-2', 'messages|與三種角色'],
+    ['1-3', '控制輸出：|max_tokens、|stop_reason、effort'],
+    ['1-4', 'token：|模型的計量單位'],
+    ['1-5', '計費、速率限制|與重試'],
+  ]},
+  { id: 2, title: '串流回應|與前端 UI', short: '串流', desc: '為什麼要串流、SSE 的格式、後端代理與前端逐字顯示、中斷生成與錯誤處理。', lessons: [
+    ['2-1', '為什麼要串流：|等待的體感'],
+    ['2-2', 'SSE：|一行一行的事件'],
+    ['2-3', '前端逐字顯示：|後端代理|與 ReadableStream'],
+    ['2-4', '中斷生成、|斷線與錯誤'],
+  ]},
+  { id: 3, title: 'Prompt 工程|與結構化輸出', short: 'Prompt', desc: '系統 prompt 的結構、範例與資料隔離、讓模型思考、JSON Schema 結構化輸出、驗證與失敗處理。', lessons: [
+    ['3-1', '系統 prompt|的結構'],
+    ['3-2', '範例、XML 標籤|與資料隔離'],
+    ['3-3', '讓模型思考：|effort 與|思考區塊'],
+    ['3-4', '結構化輸出：|JSON Schema'],
+    ['3-5', '驗證、重試|與失敗處理'],
+  ]},
+  { id: 4, title: 'Tool use／|function calling', short: '工具', desc: '模型只出主意、你的程式執行：定義工具、跑工具迴圈、設計安全的工具。', lessons: [
+    ['4-1', '工具是什麼：|模型只出主意'],
+    ['4-2', '定義工具：|名稱、描述、schema'],
+    ['4-3', '工具迴圈：|tool_use|到 tool_result'],
+    ['4-4', '工具設計原則|與安全'],
+  ]},
+  { id: 5, title: 'Embedding|與向量搜尋', short: '向量', desc: '把意思變成座標、相似度怎麼算、向量資料庫與近似搜尋、選 embedding 模型。', lessons: [
+    ['5-1', 'Embedding：|把意思變成座標'],
+    ['5-2', '相似度：|cosine 與點積'],
+    ['5-3', '向量搜尋|與向量資料庫'],
+    ['5-4', '選 embedding 模型：|維度、用途、成本'],
+  ]},
+  { id: 6, title: 'RAG：|切塊、檢索、引用', short: 'RAG', desc: '索引與查詢兩個階段、切塊、混合搜尋與 rerank、附上引用來源，以及什麼時候不需要 RAG。', lessons: [
+    ['6-1', 'RAG 的兩個階段：|索引與查詢'],
+    ['6-2', '切塊：|大小、重疊、|依結構切'],
+    ['6-3', '檢索品質：|混合搜尋、rerank、|脈絡化切塊'],
+    ['6-4', '生成與引用：|讓答案有出處'],
+    ['6-5', '什麼時候|不需要 RAG'],
+  ]},
+  { id: 7, title: 'Agent|與 MCP', short: 'Agent', desc: 'workflow 與 agent 的差別、agent 迴圈與預算、五種常見模式、MCP 的角色與 2026-07-28 規格。', lessons: [
+    ['7-1', 'workflow 與 agent：|誰決定下一步'],
+    ['7-2', 'Agent 迴圈：|觀察、行動、停止'],
+    ['7-3', '五種|常見模式'],
+    ['7-4', 'MCP：|工具的通用插頭'],
+    ['7-5', 'MCP 的傳輸|與 2026-07-28 規格'],
+  ]},
+  { id: 8, title: '上線|現實', short: '上線', desc: '評估、成本、延遲、prompt injection 與分層防護，最後是上線清單與總複習。', lessons: [
+    ['8-1', '評估：|沒有量就沒有改進'],
+    ['8-2', '成本：|先拿免費的'],
+    ['8-3', '延遲：|使用者等多久'],
+    ['8-4', 'Prompt injection：|攻擊從哪裡來'],
+    ['8-5', '防護與上線清單|＋總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

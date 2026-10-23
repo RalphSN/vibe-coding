@@ -1,0 +1,484 @@
+<script>
+/* ==========================================================================
+   模組 5：Embedding 與向量搜尋
+   ========================================================================== */
+defineTerms({
+  'embedding': { en: 'embedding', def: '把一段文字變成一串數字（向量），意思相近的文字，數字也相近。', example: '「退款多久到帳」和「錢什麼時候退回來」的向量很接近。', lesson: '5-1' },
+  '向量': { en: 'vector', def: '一串有順序的數字，可以想成高維空間裡的一個點或一支箭頭。', example: '`[-0.013, 0.019, …]`，Voyage 預設 1024 個數字。', lesson: '5-1' },
+  '維度': { en: 'dimension', def: '向量有幾個數字。維度越高能記的細節越多，儲存與計算也越貴。', example: 'voyage-4 可選 256、512、1024、2048 維。', lesson: '5-1' },
+  'cosine 相似度': { en: 'cosine similarity', def: '看兩支向量的夾角：方向越一致，值越接近 1。只看方向，不看長度。', example: '同義句的 cosine 常在 0.8 以上（依模型而定）。', lesson: '5-2' },
+  '點積': { en: 'dot product', def: '兩個向量對應位置相乘再加總。向量長度都是 1（正規化）時，點積就等於 cosine。', example: 'Voyage 的向量已經正規化，用點積就好。', lesson: '5-2' },
+  '正規化': { en: 'normalization', def: '把向量縮放成長度 1，只留下方向。', example: '`v / ‖v‖`。', lesson: '5-2' },
+  '向量資料庫': { en: 'vector database', def: '專門存向量、並能快速找出「最接近的 k 筆」的資料庫或擴充功能。', example: 'PostgreSQL 的 pgvector 擴充。', lesson: '5-3' },
+  '近似最近鄰': { en: 'approximate nearest neighbor, ANN', def: '不逐一比對全部資料，用索引結構快速找出「幾乎是」最接近的幾筆；犧牲一點準確換大量速度。', example: 'HNSW 是常見的 ANN 索引。', lesson: '5-3' },
+  'HNSW': { en: 'Hierarchical Navigable Small World', def: '一種多層圖的 ANN 索引：上層像高速公路快速接近目標，下層像巷弄精細找鄰居。', example: 'pgvector 支援 HNSW 與 IVFFlat 兩種索引。', lesson: '5-3' },
+  'input_type': { en: 'input_type', def: 'Voyage 的參數：查詢用 `query`、文件用 `document`，模型會加不同的前綴，讓檢索更準。', example: '建索引時 `document`，使用者提問時 `query`。', lesson: '5-4' },
+  '量化': { en: 'quantization', def: '用較少的位元存每個數字：int8 省 4 倍、binary 省 32 倍空間，精確度稍降。', example: 'Voyage 的 `output_dtype: "int8"`。', lesson: '5-4' },
+});
+
+const POINTS_FAQ = [
+  { label: '退貨流程', x: 0.86, y: 0.22, group: 'faq' },
+  { label: '退款多久到帳', x: 0.62, y: 0.58, group: 'faq' },
+  { label: '運費怎麼算', x: 0.22, y: 0.86, group: 'faq' },
+  { label: '員工請假規定', x: -0.66, y: 0.56, group: 'hr' },
+  { label: '年終獎金', x: -0.86, y: 0.08, group: 'hr' },
+  { label: '密碼重設', x: -0.42, y: -0.78, group: 'it' },
+  { label: 'VPN 連不上', x: 0.40, y: -0.72, group: 'it' },
+];
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '說出 embedding 是什麼、和聊天模型有什麼不同',
+      '理解「意思相近 → 座標相近」這件事為什麼能拿來搜尋',
+      '知道 Claude 沒有自己的 embedding 模型，要搭配其他廠商',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-4）哪一種工具需要人工確認？', options: [
+        { text: '寄信給客戶', correct: true, why: '對外、不可撤銷。' },
+        { text: '搜尋常見問題', why: '只讀。' },
+        { text: '查一筆訂單', why: '只讀，程式把關權限即可。' },
+        { text: '加內部備註', why: '可撤銷，記錄即可。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 2-3）瀏覽器端解碼串流文字時，`TextDecoder` 要加什麼？', options: [
+        { text: '`{ stream: true }`', correct: true, why: '避免中文字被切開變亂碼。' },
+        { text: '`{ fatal: true }`', why: '那會在遇到錯誤位元組時丟例外。' },
+        { text: '`{ charset: "big5" }`', why: 'SSE 一律 UTF-8。' },
+        { text: '不用加任何東西', why: '中文會被切壞。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[embedding]] 像替每段文字在地圖上釘一根大頭針：意思相近的文字，針就釘得很近。「退款多久到帳」和「錢什麼時候退回來」用字幾乎不同，針卻釘在隔壁。', '搜尋就是：把問題也釘上地圖，再看附近有哪些針。'],
+      limit: ['真的地圖只有兩個維度（經度、緯度）；embedding 的地圖有上千個[[維度]]，我們畫出來的平面圖只是示意。而且「近」的標準是模型訓練出來的，不一定符合你的業務定義：模型可能覺得「退款」和「退貨」很近，但你的客服流程裡它們是兩件事。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="文字變成向量再放到空間裡：一段文字經過 embedding 模型變成一串數字，例如一千零二十四個；把它想成空間裡的一個點，意思相近的點靠在一起">
+        <rect x="10" y="30" width="150" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="85" y="60" text-anchor="middle" font-size="15" font-weight="900">文字</text>
+        <text x="85" y="84" text-anchor="middle" font-size="14">「退款多久到帳」</text>
+        <line x1="160" y1="65" x2="200" y2="65" class="stroke-ink" stroke-width="4"/>
+        <rect x="200" y="30" width="150" height="70" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <text x="275" y="60" text-anchor="middle" font-size="15" font-weight="900" class="on-color">embedding</text>
+        <text x="275" y="84" text-anchor="middle" font-size="14" class="on-color">模型</text>
+        <line x1="350" y1="65" x2="390" y2="65" class="stroke-ink" stroke-width="4"/>
+        <rect x="390" y="30" width="160" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="470" y="60" text-anchor="middle" font-size="15" font-weight="900">向量</text>
+        <text x="470" y="84" text-anchor="middle" font-size="13" class="mono">[-0.013, 0.019, …]</text>
+        <rect x="10" y="130" width="540" height="100" class="fill-bg stroke-ink" stroke-width="2" stroke-dasharray="8 5"/>
+        <circle cx="380" cy="168" r="9" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <text x="396" y="173" font-size="14">退款多久到帳</text>
+        <circle cx="370" cy="200" r="9" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <text x="386" y="205" font-size="14">錢什麼時候退回來</text>
+        <circle cx="110" cy="185" r="9" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="126" y="190" font-size="14">員工請假規定</text>
+      </svg>`,
+      caption: '下面的平面是示意：真正的空間有上千維，但「相近的靠在一起」這件事是一樣的。',
+    },
+    define: [
+      { term: 'embedding', en: 'embedding', def: '把文字轉成固定長度的向量。輸出是數字，不是文字；它不會回答問題，只負責表示意思。', example: 'Voyage 的 `embed()`、OpenAI 的 embeddings API。' },
+      { term: '向量', en: 'vector', def: '一串數字。同一個 embedding 模型產生的向量，長度都一樣。', example: '1024 維就是 1024 個數字。' },
+      { term: 'embedding 模型 vs 聊天模型', en: 'embedding model vs chat model', def: '聊天模型讀文字寫文字；embedding 模型讀文字吐數字。兩者常常來自不同廠商，可以混搭。', example: '用 Claude 回答，用 Voyage 做 embedding。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'vecplot', props: { points: POINTS_FAQ, query: { label: '錢什麼時候退回來', x: 0.70, y: 0.42 }, k: 3 } },
+        '拖動黃色的「問」：它靠近哪一群，最接近的三筆就換成那一群。這就是語意搜尋：比的是**意思的位置**，不是有沒有出現同一個字。',
+        { type: 'table', head: ['', 'Voyage AI（Anthropic 文件推薦）', 'OpenAI'], rows: [
+          ['一般用途', '`voyage-4-large`（品質最好）、`voyage-4`、`voyage-4-lite`（最快最便宜）', '`text-embedding-3-small`、`-large`'],
+          ['預設維度', '1024（可選 256、512、2048）', 'small 是 1536（可用 `dimensions` 縮短）'],
+          ['程式碼專用', '`voyage-code-4`', '—'],
+          ['可自己架設', '`voyage-4-nano`（Apache 2.0 開放權重）', '—'],
+          ['價格', '⚠️ 未查證，見 MongoDB 價格頁', '`3-small` $0.02／百萬 token'],
+        ], caption: '查證於 2026-10-22。Anthropic 沒有自己的 embedding 模型。' },
+        { type: 'code', lang: 'typescript', title: 'embed.ts：用 HTTP 呼叫 Voyage（Atlas Embedding API）', code: 'type EmbeddingResponse = { data: { embedding: number[]; index: number }[]; usage: { total_tokens: number } };\n\nexport async function embed(texts: string[], inputType: "query" | "document"): Promise<number[][]> {\n  const res = await fetch("https://ai.mongodb.com/v1/embeddings", {\n    method: "POST",\n    headers: {\n      "content-type": "application/json",\n      authorization: `Bearer ${process.env.VOYAGE_API_KEY}`, // 另一把金鑰，一樣放環境變數\n    },\n    body: JSON.stringify({ input: texts, model: "voyage-4", input_type: inputType }),\n  });\n  if (!res.ok) throw new Error(`embedding 失敗：HTTP ${res.status}`);\n  const body = (await res.json()) as EmbeddingResponse;\n  return body.data.map((d) => d.embedding); // 每段文字一個 1024 維向量\n}' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="關鍵字搜尋和語意搜尋的差別：使用者問錢什麼時候退回來；關鍵字搜尋找不到含有退款二字的文件；語意搜尋用 embedding 找到退款多久到帳這一篇">
+          <rect x="10" y="10" width="540" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="280" y="38" text-anchor="middle" font-size="15">問題：「錢什麼時候退回來？」</text>
+          <line x1="140" y1="54" x2="140" y2="84" class="stroke-ink" stroke-width="3"/>
+          <line x1="420" y1="54" x2="420" y2="84" class="stroke-ink" stroke-width="3"/>
+          <rect x="10" y="84" width="260" height="106" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="3"/>
+          <text x="140" y="114" text-anchor="middle" font-size="15" font-weight="900" class="on-color">關鍵字搜尋</text>
+          <text x="140" y="144" text-anchor="middle" font-size="14" class="on-color">文件寫的是「退款」</text>
+          <text x="140" y="168" text-anchor="middle" font-size="14" class="on-color">沒有共同的字 → 找不到</text>
+          <rect x="290" y="84" width="260" height="106" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+          <text x="420" y="114" text-anchor="middle" font-size="15" font-weight="900" class="on-color">語意搜尋</text>
+          <text x="420" y="144" text-anchor="middle" font-size="14" class="on-color">意思相近 → 向量相近</text>
+          <text x="420" y="168" text-anchor="middle" font-size="14" class="on-color">找到「退款多久到帳」</text>
+        </svg>`, caption: '反過來，查訂單編號、產品型號這種「字要完全一樣」的，關鍵字搜尋比較準（6-3 會把兩者合起來）。' },
+      ],
+      tryit: {
+        q: ['下面哪兩句的 embedding 最可能靠在一起？說出你的理由，再想一個 embedding 可能「判斷錯」的例子：'],
+        draft: 'A. 我的包裹還沒到\nB. 物流顯示配送中已經三天\nC. 包裹的英文怎麼說\n最接近的兩句：＿＿\n可能判斷錯的例子：＿＿',
+        answer: ['A 和 B 最接近：都在說「貨還沒收到」。C 雖然也有「包裹」，意思卻是語言問題。', '可能判斷錯：「我要退貨」和「我不要退貨」用字幾乎一樣，向量可能很近，但意思相反；所以檢索之後還要讓模型（或 reranker，6-3）讀內容判斷。'],
+      },
+    },
+    mistakes: [
+      { wrong: '想用 Claude 的 API 產生 embedding。', why: 'Anthropic 沒有提供 embedding 模型。', right: '用 Voyage AI、OpenAI 等 embedding 服務；回答仍然交給 Claude。' },
+      { wrong: '把不同 embedding 模型產生的向量放在一起比較。', why: '每個模型的空間不一樣，向量之間的距離沒有意義。', right: '同一個索引裡的文件與查詢，都用同一個模型產生。' },
+      { wrong: '以為向量相近就代表答案一定對。', why: '相近只代表「話題像」；否定句、數字、條件可能完全不同。', right: '檢索只負責找候選，答案要讓模型讀內容判斷，並附上出處（6-4）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'embedding 模型的輸出是什麼？', options: [
+        { text: '一串固定長度的數字', correct: true, why: '它表示意思，不產生文字。' },
+        { text: '一段摘要文字', why: '那是聊天模型的工作。' },
+        { text: '文字的 token 編號清單', why: '那是 tokenizer 的輸出。' },
+        { text: '一個相似度分數', why: '分數是拿兩個向量去比才算出來的。' },
+      ] },
+      { level: '應用', type: 'mc', q: '使用者搜「筆電無法開機」，你的 FAQ 標題寫的是「電腦按電源沒反應怎麼辦」。關鍵字搜尋找不到。改用什麼最可能找到？', options: [
+        { text: '用 embedding 做語意搜尋', correct: true, why: '兩句意思相近，向量會靠在一起。' },
+        { text: '把 FAQ 標題改成跟使用者一樣的說法', why: '使用者的說法有無限多種，改不完。' },
+        { text: '請 Claude 直接回答，不用搜尋', why: '模型不知道你 FAQ 的內容。' },
+        { text: '把關鍵字搜尋改成不分大小寫', why: '問題不在大小寫，在用字完全不同。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做「找出內容重複的客服工單」功能。說說 embedding 怎麼幫上忙，以及你會設計什麼門檻或人工步驟來避免誤判。'], answer: [
+        '每張工單產生 embedding，找出彼此相似度很高的組合，當作「可能重複」的候選。',
+        '門檻要用一批人工標好的工單來調（相似度多少以上算重複），並把候選交給客服人員確認後才合併；否定句、不同訂單編號的工單可能很像卻不是同一件事。',
+      ] },
+    ],
+    keypoints: [
+      'embedding 把文字變成向量，意思相近的向量靠在一起。',
+      '語意搜尋找得到用字不同但意思相同的內容；精確字串則是關鍵字搜尋比較準。',
+      'Anthropic 不做 embedding：用 Voyage 等服務，同一個索引只用同一個模型。',
+    ],
+    sources: ['claude-embeddings', 'openai-embedding-small'],
+  },
+
+  '5-2': {
+    goals: [
+      '說出 cosine 相似度、點積、歐氏距離各量的是什麼',
+      '知道向量正規化之後，三種算法的排名為什麼一樣',
+      '用程式算出兩個向量的相似度',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-1）同一個索引裡的文件與查詢，應該用幾個 embedding 模型？', options: [
+        { text: '同一個', correct: true, why: '不同模型的空間無法比較。' },
+        { text: '文件用大模型、查詢用小模型', why: '不同模型的向量空間不同，混用就無法比較。' },
+        { text: '越多越好，取平均', why: '平均不同空間的向量沒有意義。' },
+        { text: '無所謂，向量都是數字', why: '數字的意義由模型決定。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 4-2）工具定義裡，模型最依賴哪個欄位決定要不要用？', options: [
+        { text: 'description', correct: true, why: '寫清楚使用時機。' },
+        { text: 'name', why: '只是識別。' },
+        { text: 'strict', why: '那是保證參數格式。' },
+        { text: 'tool_choice', why: '那是請求層級的設定。' },
+      ] },
+    ],
+    analogy: {
+      text: ['兩支手電筒照向天空：[[cosine 相似度]]只看**照的方向**有多一致，不管光有多強。[[點積]]同時看方向和亮度：方向一致、又都很亮，分數才高。歐氏距離則是量兩個光點落在牆上**隔多遠**。', '如果把每支手電筒都調成一樣亮（[[正規化]]），三種量法排出來的「最像的是誰」就一樣了。'],
+      limit: ['手電筒在三維空間；embedding 有上千維，夾角與距離是同樣的公式，只是畫不出來。另外「亮度」（向量長度）在某些模型裡帶有資訊，正規化會丟掉它，不過 Voyage 的向量本來就已經正規化。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="兩支向量從原點出發，夾角越小 cosine 越接近 1；兩支向量終點之間的直線長度是歐氏距離">
+        <line x1="60" y1="220" x2="520" y2="220" class="stroke-ink" stroke-width="2" stroke-dasharray="6 6"/>
+        <line x1="60" y1="220" x2="60" y2="20" class="stroke-ink" stroke-width="2" stroke-dasharray="6 6"/>
+        <line x1="60" y1="220" x2="420" y2="70" class="stroke-ink" stroke-width="5"/>
+        <circle cx="420" cy="70" r="9" style="fill:var(--primary)" class="stroke-ink" stroke-width="3"/>
+        <text x="434" y="66" font-size="15" font-weight="900">問題 q</text>
+        <line x1="60" y1="220" x2="460" y2="150" class="stroke-ink" stroke-width="5"/>
+        <circle cx="460" cy="150" r="9" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <text x="474" y="155" font-size="15" font-weight="900">文件 d</text>
+        <line x1="420" y1="79" x2="455" y2="142" class="stroke-ink" stroke-width="3" stroke-dasharray="5 4"/>
+        <text x="300" y="112" font-size="14">歐氏距離：兩點隔多遠</text>
+        <text x="140" y="196" font-size="14">夾角 θ：cosine ＝ cos θ</text>
+      </svg>`,
+      caption: '夾角越小越像；正規化後，夾角小的距離也一定近。',
+    },
+    define: [
+      { term: 'cosine 相似度', en: 'cosine similarity', def: '`(a·b) / (‖a‖‖b‖)`，範圍 -1 到 1，越大越像。', example: '最常用的文字相似度。' },
+      { term: '點積', en: 'dot product', def: '`a·b = Σ aᵢbᵢ`。向量都正規化時等於 cosine，而且算得更快。', example: 'Voyage 文件建議直接用點積。' },
+      { term: '歐氏距離', en: 'Euclidean distance', def: '兩點之間的直線距離，越小越像。正規化後排名與 cosine 相同。', example: '`‖a − b‖`。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'vecplot', props: { points: POINTS_FAQ, query: { label: '錢什麼時候退回來', x: 0.45, y: 0.30 }, k: 3, metrics: ['cosine', 'dot', 'euclid'] } },
+        '在平面上試試：把「問」往原點拉近，**點積**的分數全部變小（長度變短），**cosine** 的排名卻不變（方向沒變）。這就是為什麼要先正規化：長度不該影響「像不像」。',
+        { type: 'code', lang: 'typescript', title: 'similarity.ts', code: 'export function dot(a: number[], b: number[]): number {\n  return a.reduce((sum, value, i) => sum + value * b[i], 0);\n}\n\nexport function cosine(a: number[], b: number[]): number {\n  return dot(a, b) / (Math.hypot(...a) * Math.hypot(...b));\n}\n\n// Voyage 的向量長度已經是 1，cosine 和 dot 結果相同，用 dot 就好\nexport function topK(query: number[], docs: { id: string; vector: number[] }[], k: number) {\n  return docs\n    .map((doc) => ({ id: doc.id, score: dot(query, doc.vector) }))\n    .sort((x, y) => y.score - x.score)\n    .slice(0, k);\n}' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="正規化前後：正規化前兩支向量長度不同，點積會偏向長的那支；正規化後都縮成長度 1，只比方向">
+          <text x="140" y="24" text-anchor="middle" font-size="15" font-weight="900">正規化前</text>
+          <line x1="40" y1="180" x2="250" y2="60" class="stroke-ink" stroke-width="5"/>
+          <line x1="40" y1="180" x2="140" y2="150" class="stroke-ink" stroke-width="5"/>
+          <text x="140" y="204" text-anchor="middle" font-size="13">長的向量點積比較大</text>
+          <text x="420" y="24" text-anchor="middle" font-size="15" font-weight="900">正規化後（長度都是 1）</text>
+          <line x1="320" y1="180" x2="420" y2="122" class="stroke-ink" stroke-width="5"/>
+          <line x1="320" y1="180" x2="430" y2="146" class="stroke-ink" stroke-width="5"/>
+          <text x="420" y="204" text-anchor="middle" font-size="13">只剩方向：點積＝cosine</text>
+        </svg>`, caption: '把向量除以自己的長度，就是正規化。' },
+      ],
+      tryit: {
+        q: ['手算兩組二維向量的點積與 cosine（都已正規化成長度約 1）：'],
+        code: true,
+        draft: 'q = [0.8, 0.6]\nd1 = [0.6, 0.8]\nd2 = [-0.6, 0.8]\n\nq·d1 = ＿＿\nq·d2 = ＿＿\n哪一個比較像 q？＿＿',
+        answer: ['`q·d1 = 0.8×0.6 + 0.6×0.8 = 0.96`；`q·d2 = 0.8×(-0.6) + 0.6×0.8 = 0`。', '向量長度都是 1，所以點積就是 cosine：d1 很像（0.96），d2 跟 q 垂直（0），意思無關。隨身卷第 1 課會從頭講點積。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用點積比較沒有正規化的向量，結果長文件總是排前面。', why: '向量長度影響點積；長度可能只反映文字長短，不代表比較像。', right: '先正規化，或改用 cosine；確認你的 embedding 模型輸出是否已正規化。' },
+      { wrong: '把 cosine 的絕對值當成「正確率」，例如 0.8 以上就一定相關。', why: '分數的分布依模型與語言而不同，沒有通用門檻。', right: '用自己的資料標一批「相關／不相關」，再找出合適的門檻。' },
+      { wrong: '歐氏距離排序時用由大到小。', why: '距離越小越像，和相似度相反。', right: '距離由小到大排；相似度由大到小排。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '向量都已正規化成長度 1 時，哪個說法正確？', options: [
+        { text: '點積等於 cosine 相似度', correct: true, why: '分母兩個長度都是 1。' },
+        { text: '點積永遠等於 0', why: '只有垂直時才是 0。' },
+        { text: '歐氏距離永遠等於 1', why: '距離依方向而變。' },
+        { text: 'cosine 會變成負的', why: '正規化不改變正負。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你的檢索結果總是把最長的文件排第一，即使內容不太相關。最可能的原因是？', options: [
+        { text: '用點積比較未正規化的向量', correct: true, why: '長度影響了分數。' },
+        { text: 'embedding 模型的維度太低', why: '維度不會讓長文件固定排第一。' },
+        { text: '用了 cosine 相似度', why: 'cosine 不受長度影響。' },
+        { text: '查詢的 input_type 設錯', why: '那會影響品質，但不會專門偏向長文件。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的產品推薦想做「和這件商品相似的商品」。商品描述長短差很多。你會選哪種相似度？要不要正規化？為什麼？'], answer: [
+        '用 cosine（或先正規化再用點積）：只比描述的意思方向，不讓描述長短影響排名。',
+        '如果使用的 embedding 模型已經輸出正規化向量（例如 Voyage），直接用點積最快；換模型時記得確認這一點。',
+      ] },
+    ],
+    keypoints: [
+      'cosine 看方向、點積看方向加長度、歐氏距離看兩點多遠。',
+      '向量正規化後，三種算法排出來的名次一樣；Voyage 的向量已經正規化。',
+      '分數門檻沒有通用值，要用自己的資料找。',
+    ],
+    sources: ['claude-embeddings'],
+  },
+
+  '5-3': {
+    goals: [
+      '說出暴力比對和近似最近鄰（ANN）的取捨',
+      '理解 HNSW 為什麼快：分層找、越來越細',
+      '用 metadata 過濾，避免搜到不該搜的資料',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-2）歐氏距離排序時，最像的應該排？', options: [
+        { text: '距離最小的在前面', correct: true, why: '距離越小越像。' },
+        { text: '距離最大的在前面', why: '那是最不像的。' },
+        { text: '距離等於 1 的在前面', why: '沒有這種規則。' },
+        { text: '距離是負數的在前面', why: '距離不會是負數。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-5）每月花費上限到了，API 會回什麼？', options: [
+        { text: '429，沒有 retry-after', correct: true, why: '重試沒用。' },
+        { text: '429，有 retry-after', why: '那是一般速率限制。' },
+        { text: '402', why: '402 是付款資訊問題。' },
+        { text: '503', why: 'Claude API 用 529 表示過載。' },
+      ] },
+    ],
+    analogy: {
+      text: ['在一千萬本書的圖書館找「最像的那本」：暴力比對是**每一本都翻開比較**，保證找到，但要翻一千萬次。', '[[近似最近鄰]]像先看樓層指引（上層）走到對的樓，再看書架編號（中層）走到對的排，最後在那一排細找（下層）。這就是 [[HNSW]] 的分層：越往下越細，只翻一小部分書。'],
+      limit: ['圖書館的分類是人排的、很穩定；HNSW 的「樓層」是演算法自己連出來的鄰居關係，偶爾會在中途走錯路，找到的是第二像而不是最像。所以叫「近似」：用一點點準確度換大量速度，參數可以調。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="HNSW 分層搜尋示意：最上層只有幾個點，大步跳到接近目標的區域；中層點比較多，再靠近一點；最下層有全部的點，在附近細找最接近的幾個">
+        <text x="10" y="40" font-size="14" font-weight="900">上層：少數點，大步跳</text>
+        <rect x="200" y="15" width="350" height="50" class="fill-bg stroke-ink" stroke-width="2"/>
+        <circle cx="240" cy="40" r="7" class="fill-surface stroke-ink" stroke-width="3"/>
+        <circle cx="390" cy="40" r="7" class="fill-surface stroke-ink" stroke-width="3"/>
+        <circle cx="500" cy="40" r="7" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <line x1="247" y1="40" x2="383" y2="40" class="stroke-ink" stroke-width="3"/>
+        <line x1="397" y1="40" x2="493" y2="40" class="stroke-ink" stroke-width="3"/>
+        <text x="10" y="125" font-size="14" font-weight="900">中層：點變多，再靠近</text>
+        <rect x="200" y="100" width="350" height="50" class="fill-bg stroke-ink" stroke-width="2"/>
+        <circle cx="430" cy="125" r="7" class="fill-surface stroke-ink" stroke-width="3"/>
+        <circle cx="470" cy="125" r="7" class="fill-surface stroke-ink" stroke-width="3"/>
+        <circle cx="500" cy="125" r="7" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <circle cx="525" cy="125" r="7" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <line x1="437" y1="125" x2="463" y2="125" class="stroke-ink" stroke-width="3"/>
+        <line x1="477" y1="125" x2="493" y2="125" class="stroke-ink" stroke-width="3"/>
+        <line x1="500" y1="47" x2="500" y2="118" class="stroke-ink" stroke-width="3" stroke-dasharray="5 4"/>
+        <text x="10" y="210" font-size="14" font-weight="900">下層：全部的點，細找</text>
+        <rect x="200" y="185" width="350" height="50" class="fill-bg stroke-ink" stroke-width="2"/>
+        <circle cx="490" cy="210" r="7" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <circle cx="508" cy="210" r="7" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <circle cx="526" cy="210" r="7" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <circle cx="470" cy="210" r="7" class="fill-surface stroke-ink" stroke-width="3"/>
+        <line x1="500" y1="132" x2="500" y2="203" class="stroke-ink" stroke-width="3" stroke-dasharray="5 4"/>
+        <text x="280" y="262" text-anchor="middle" font-size="13">紫色：越來越接近查詢的點（示意，真實是上千維）</text>
+      </svg>`,
+      caption: '每一層都只看鄰居，不看全部；所以一千萬筆也能在毫秒級找到。',
+    },
+    define: [
+      { term: '暴力比對', en: 'brute-force / exact search', def: '查詢和每一筆都算一次相似度，再排序。保證最準，資料一多就慢。', example: '幾千筆以內通常夠快，不需要索引。' },
+      { term: '近似最近鄰', en: 'ANN', def: '用索引只比對一小部分資料，找到「幾乎是」最接近的幾筆。', example: 'HNSW、IVFFlat。' },
+      { term: '向量資料庫', en: 'vector database', def: '存向量、建 ANN 索引、支援 metadata 過濾的資料庫或擴充。', example: 'PostgreSQL 加 pgvector；也有專用的向量資料庫。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'vecplot', props: { points: POINTS_FAQ, query: { label: '帳號登不進去', x: 0.05, y: -0.55 }, k: 2, filters: [{ id: 'faq', label: '客服 FAQ' }, { id: 'it', label: 'IT 文件' }, { id: 'hr', label: '人資規定' }] } },
+        '按「只看客服 FAQ」：同一個問題，最接近的結果完全不同。過濾決定了「可以被搜到的範圍」，這也是權限控制的地方：員工 A 不該搜到人資的薪資文件。',
+        { type: 'code', lang: 'sql', title: 'pgvector：建表、建索引、帶過濾的查詢', code: '-- 啟用擴充（需要資料庫管理權限）\nCREATE EXTENSION IF NOT EXISTS vector;\n\nCREATE TABLE chunks (\n  id bigserial PRIMARY KEY,\n  source text NOT NULL,          -- 例如 faq、it、hr，用來過濾\n  content text NOT NULL,\n  embedding vector(1024) NOT NULL -- 維度要和 embedding 模型一致\n);\n\n-- HNSW 索引，用 cosine 距離\nCREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);\n\n-- 只在 faq 裡找最接近的 5 筆；$1 是查詢向量（參數化，不要拼字串）\nSELECT id, content, embedding <=> $1 AS distance\nFROM chunks\nWHERE source = \'faq\'\nORDER BY embedding <=> $1\nLIMIT 5;' },
+        { type: 'table', head: ['資料量', '建議做法'], rows: [
+          ['幾百到幾千筆', '直接暴力比對（5-2 的 topK），放記憶體就好'],
+          ['幾萬到幾百萬筆', '已經在用 PostgreSQL → pgvector ＋ HNSW'],
+          ['更大、或需要專門功能', '評估專用向量資料庫；先量自己的延遲與召回率'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="暴力比對與近似最近鄰的取捨：暴力比對準確度最高但比對次數等於資料筆數；近似最近鄰只比對一小部分，速度快很多，準確度略低">
+          <rect x="10" y="10" width="265" height="170" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="142" y="42" text-anchor="middle" font-size="16" font-weight="900">暴力比對</text>
+          <text x="142" y="82" text-anchor="middle" font-size="14">比對次數＝資料筆數</text>
+          <text x="142" y="110" text-anchor="middle" font-size="14">保證找到最接近的</text>
+          <text x="142" y="138" text-anchor="middle" font-size="14">資料一多就變慢</text>
+          <rect x="285" y="10" width="265" height="170" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+          <text x="417" y="42" text-anchor="middle" font-size="16" font-weight="900" class="on-color">近似最近鄰（HNSW）</text>
+          <text x="417" y="82" text-anchor="middle" font-size="14" class="on-color">只比對一小部分</text>
+          <text x="417" y="110" text-anchor="middle" font-size="14" class="on-color">偶爾漏掉真正第一名</text>
+          <text x="417" y="138" text-anchor="middle" font-size="14" class="on-color">建索引要時間與記憶體</text>
+        </svg>`, caption: '「近似」的代價可以用召回率量：抽一批查詢，比較 ANN 和暴力比對的前 k 名有幾個一樣。' },
+      ],
+      tryit: {
+        q: ['公司的內部問答系統有「全員公開」「主管限定」兩種文件。寫出查詢時的過濾條件邏輯：'],
+        draft: '使用者是一般員工：WHERE ＿＿＿＿\n使用者是主管：WHERE ＿＿＿＿\n這個條件應該由誰決定？＿＿',
+        answer: ['一般員工：`WHERE visibility = \'public\'`；主管：`WHERE visibility IN (\'public\', \'manager\')`。', '由後端依登入身分決定，不能讓模型或前端傳進來；否則搜尋就成了越權讀取的漏洞（4-4、8-5）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '資料只有兩千筆，也急著架專用向量資料庫。', why: '暴力比對在這個量通常就夠快，多一個系統多一份維運。', right: '先量延遲；資料大了、或已經用 PostgreSQL，再加 pgvector。' },
+      { wrong: '先找出前 5 筆，再在程式裡過濾掉沒權限的。', why: '可能 5 筆全被過濾掉，使用者什麼都搜不到；權限也不該靠事後過濾。', right: '把權限條件放進查詢本身（WHERE），在範圍內找前 k 筆。' },
+      { wrong: '換了 embedding 模型，只重算新文件的向量。', why: '新舊模型的空間不同，混在同一個索引裡比較沒有意義。', right: '換模型就重算全部文件的向量，並重建索引（5-4）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'HNSW 這類 ANN 索引用什麼換到速度？', options: [
+        { text: '一點點準確度：偶爾找不到真正的第一名', correct: true, why: '所以叫近似最近鄰。' },
+        { text: '更高的 embedding 維度，讓每次比對更精準', why: '索引不改變維度。' },
+        { text: '只能存文字，不能存數字', why: '向量本來就是數字。' },
+        { text: '每次查詢都要重建索引', why: '索引建一次，查詢重複使用。' },
+      ] },
+      { level: '應用', type: 'mc', q: '內部文件搜尋讓實習生搜到了主管限定的文件。最根本的修法是？', options: [
+        { text: '把權限條件放進向量查詢的過濾條件', correct: true, why: '不該被搜到的資料，連候選都不應該出現。' },
+        { text: '在 system prompt 寫「不要透露主管文件」', why: 'prompt 不是安全邊界，資料已經送進模型了。' },
+        { text: '提高相似度門檻，減少搜到的筆數', why: '門檻和權限無關。' },
+        { text: '換一個更大的 embedding 模型', why: '模型大小和權限無關。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的商品搜尋有 200 萬筆商品，使用者常加上「價格 1,000 元以下」「有現貨」的條件。說說你會怎麼把這些條件和向量搜尋結合？'], answer: [
+        '把價格、庫存存成一般欄位，查詢時在同一個 SQL 裡用 WHERE 過濾，再依向量距離排序取前 k 筆（pgvector 支援把一般條件和向量排序寫在一起）。',
+        '要注意過濾條件很嚴時 ANN 索引可能回傳不夠筆數，需要調整索引參數或改用其他策略；上線前用真實查詢量測。',
+      ] },
+    ],
+    keypoints: [
+      '資料少就暴力比對；資料多用 ANN 索引（例如 HNSW），用一點準確度換速度。',
+      '權限與篩選放進查詢條件，在範圍內找前 k 筆。',
+      'pgvector 讓你在既有的 PostgreSQL 裡做向量搜尋。',
+    ],
+    sources: ['hnsw', 'pgvector', 'claude-embeddings'],
+  },
+
+  '5-4': {
+    goals: [
+      '正確使用 `input_type`：建索引用 document、查詢用 query',
+      '用維度與量化取捨儲存成本與品質',
+      '知道換 embedding 模型的代價',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-3）權限過濾應該放在哪裡？', options: [
+        { text: '向量查詢的條件裡', correct: true, why: '在範圍內找前 k 筆。' },
+        { text: '找出結果後再在程式裡過濾', why: '可能全部被濾掉，而且順序不對。' },
+        { text: 'system prompt', why: 'prompt 不是安全邊界。' },
+        { text: '前端畫面隱藏', why: '資料已經外流。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-4）同一段文字，換模型後 token 數會？', options: [
+        { text: '可能不同，要重新量', correct: true, why: 'tokenizer 不同。' },
+        { text: '一定一樣', why: 'tokenizer 可能換了。' },
+        { text: '一定變少', why: '新 tokenizer 甚至可能變多。' },
+        { text: '只和字數有關', why: '和切法有關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[input_type]] 像圖書館的兩種卡片：書本身用「書目卡」登記（document），讀者的問題寫在「借閱單」上（query）。館員知道哪張是問題、哪張是書，配對就更準。', '[[維度]]與[[量化]]像照片的解析度與壓縮：存小一點省空間，細節少一點；大部分時候看不出差別，但放大到很細時會。'],
+      limit: ['照片壓縮可以一張一張決定；向量的維度和量化方式要整個索引一致，不能混著用。而且換 embedding 模型不像換相機：舊照片還能看，舊向量卻和新向量無法比較，要全部重拍。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="input_type 的兩條路：建索引時文件用 document，模型會在前面加上代表文件的提示；使用者查詢時用 query，模型加上代表查詢的提示；兩邊的向量在同一個空間裡比較">
+        <rect x="10" y="10" width="250" height="80" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="135" y="40" text-anchor="middle" font-size="15" font-weight="900">建索引（事先）</text>
+        <text x="135" y="68" text-anchor="middle" font-size="14" class="mono">input_type: "document"</text>
+        <rect x="300" y="10" width="250" height="80" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="425" y="40" text-anchor="middle" font-size="15" font-weight="900">使用者提問（即時）</text>
+        <text x="425" y="68" text-anchor="middle" font-size="14" class="mono">input_type: "query"</text>
+        <line x1="135" y1="90" x2="135" y2="130" class="stroke-ink" stroke-width="3"/>
+        <line x1="425" y1="90" x2="425" y2="130" class="stroke-ink" stroke-width="3"/>
+        <rect x="10" y="130" width="540" height="90" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="166" text-anchor="middle" font-size="15" font-weight="900" class="on-color">同一個模型、同一個空間</text>
+        <text x="280" y="196" text-anchor="middle" font-size="14" class="on-color">模型會依 input_type 在文字前加上不同的提示，再產生向量</text>
+      </svg>`,
+      caption: 'Voyage 官方建議檢索時一定要設 input_type，不要省略。',
+    },
+    define: [
+      { term: 'input_type', en: 'input_type', def: '`document` 用在要被搜尋的內容，`query` 用在使用者的問題；Voyage 會在前面加上不同的提示語。', example: '查詢前綴是「Represent the query for retrieving supporting documents:」。' },
+      { term: 'Matryoshka 維度', en: 'Matryoshka embeddings', def: '向量的前幾個數字就是一個較短但有效的版本；可以只取前 N 維再重新正規化。', example: '1024 維取前 256 維，儲存省 4 倍。' },
+      { term: '量化', en: 'quantization', def: '每個數字用較少的位元存：float32 每維 4 bytes，int8 1 byte，binary 1/8 byte。', example: 'Voyage 的 `output_dtype`。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '向量要占多少空間（只算向量本身，不含索引）', sliders: [
+          { id: 'docs', label: '切塊數量', min: 4, max: 8, value: 6, format: (v) => (10 ** v).toLocaleString('en-US'), ends: ['一萬', '一億'] },
+          { id: 'dim', label: '維度', min: 0, max: 3, value: 2, format: (v) => [256, 512, 1024, 2048][v] },
+          { id: 'dtype', label: '資料型別', min: 0, max: 2, value: 0, format: (v) => ['float32（4 bytes）', 'int8（1 byte）', 'binary（1 bit）'][v] },
+        ], compute: (v) => {
+          const docs = 10 ** v.docs;
+          const dim = [256, 512, 1024, 2048][v.dim];
+          const bytesPerDim = [4, 1, 1 / 8][v.dtype];
+          const bytes = docs * dim * bytesPerDim;
+          const fmt = (b) => (b >= 1e12 ? `${(b / 1e12).toFixed(1)} TB` : b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${(b / 1e6).toFixed(1)} MB`);
+          const maxBytes = 1e8 * 2048 * 4;
+          return { rows: [
+            { label: '向量大小', value: fmt(bytes), ratio: Math.log10(bytes / 1e6 + 1) / Math.log10(maxBytes / 1e6 + 1) },
+            { label: '比 float32＋1024 維', value: `${((dim * bytesPerDim) / (1024 * 4)).toFixed(3)} 倍`, ratio: (dim * bytesPerDim) / (2048 * 4) },
+          ], note: '維度越低、位元越少，空間越省；品質會降多少，要用自己的評估量（8-1）。' };
+        } } },
+        { type: 'table', head: ['選擇', '影響', '什麼時候考慮'], rows: [
+          ['`voyage-4-large`／`voyage-4`／`voyage-4-lite`', '品質 vs. 延遲與成本', '先用中間的，評估後再調'],
+          ['程式碼專用 `voyage-code-4`', '程式碼檢索更準', '搜尋的是程式碼或技術文件'],
+          ['降低維度（例如 256）', '儲存與計算省 4 倍', '資料量大、品質評估可接受'],
+          ['int8／binary 量化', '省 4 倍／32 倍空間', '資料量非常大；搭配 rerank 補回品質（6-3）'],
+          ['換模型', '**全部重算**、重建索引', '新模型評估明顯較好時才換'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="換 embedding 模型的代價：舊模型的向量和新模型的向量在不同空間，不能混在同一個索引；要把所有文件重新產生向量、重建索引，期間要並行兩套索引">
+          <rect x="10" y="20" width="220" height="110" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="120" y="54" text-anchor="middle" font-size="15" font-weight="900">舊模型的索引</text>
+          <text x="120" y="86" text-anchor="middle" font-size="14">一百萬筆向量</text>
+          <rect x="330" y="20" width="220" height="110" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+          <text x="440" y="54" text-anchor="middle" font-size="15" font-weight="900" class="on-color">新模型的索引</text>
+          <text x="440" y="86" text-anchor="middle" font-size="14" class="on-color">全部重新產生</text>
+          <line x1="230" y1="75" x2="330" y2="75" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/>
+          <text x="280" y="66" text-anchor="middle" font-size="13">不能混用</text>
+          <text x="280" y="168" text-anchor="middle" font-size="14">重算期間兩套並行；切換前用同一批問題比較品質</text>
+        </svg>`, caption: '所以一開始就把「原始文字」也存起來，不要只存向量。' },
+      ],
+      tryit: {
+        q: ['你有 500 萬個切塊，用 1024 維 float32。算出向量大約多大，再算改成 256 維 int8 後的大小：'],
+        draft: '1024 維 float32：5,000,000 × 1024 × 4 bytes ＝ ＿＿\n256 維 int8：5,000,000 × 256 × 1 byte ＝ ＿＿',
+        answer: ['1024 維 float32：約 20.5 GB（20,480,000,000 bytes）。', '256 維 int8：約 1.3 GB，是原本的 1/16。', '省下的空間很大，但品質要用評估確認；常見做法是用較小的向量先找前 100 筆，再用 reranker 精排（6-3）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '建索引和查詢都不設 input_type，或都設成 document。', why: '模型分不出哪個是問題，檢索品質下降。', right: '文件用 `document`，使用者問題用 `query`。' },
+      { wrong: '只存向量，沒有存原始文字。', why: '換模型時沒辦法重算；檢索到向量也拿不回內容給模型讀。', right: '原始文字、來源、更新時間和向量一起存。' },
+      { wrong: '自己截短向量後沒有重新正規化，直接用點積。', why: '截短後長度不再是 1，點積不等於 cosine。', right: '用 API 的 `output_dimension` 直接取得短向量，或截短後重新正規化。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '使用者輸入的問題要用哪個 input_type？', options: [
+        { text: '`query`', correct: true, why: '問題用 query，文件用 document。' },
+        { text: '`document`', why: '那是給要被搜尋的內容。' },
+        { text: '不用設定', why: '官方建議一定要設。' },
+        { text: '`question`', why: 'Voyage 用的是 query。' },
+      ] },
+      { level: '應用', type: 'mc', q: '向量索引已經 80 GB，主機記憶體不夠。哪個做法最先值得評估？', options: [
+        { text: '降低維度或改用 int8，並用評估確認品質', correct: true, why: '空間可以省 4 倍以上；品質要量。' },
+        { text: '換一個維度更高、品質更好的 embedding 模型', why: '會更大。' },
+        { text: '把一半的文件刪掉', why: '使用者會搜不到東西。' },
+        { text: '只存向量、刪掉原始文字', why: '原始文字通常不是大頭，而且刪了就無法重算。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['新版 embedding 模型推出，宣稱檢索品質好很多。你要怎麼決定要不要換？說出至少三個步驟。'], answer: [
+        '1. 準備一份評估集：真實問題＋人工標記的正確文件（8-1）。',
+        '2. 用新模型對一部分資料建一個實驗索引，和舊索引跑同一批問題，比較命中率與延遲。',
+        '3. 值得換才全部重算、重建索引；重算期間兩套並行，切換後保留舊索引一段時間以便退回。',
+      ] },
+    ],
+    keypoints: [
+      '文件用 `document`、問題用 `query`；同一個索引只用同一個模型。',
+      '維度與量化決定儲存成本；品質影響用評估量，不要猜。',
+      '換模型要全部重算，所以一定要保留原始文字。',
+    ],
+    sources: ['claude-embeddings', 'pgvector'],
+  },
+});
+</script>
+

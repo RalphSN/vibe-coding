@@ -1,0 +1,314 @@
+<script>
+/* ==========================================================================
+   模組 1：神經元與激活函數
+   ========================================================================== */
+defineTerms({
+  '神經元': { en: 'neuron', def: '計算 z＝Σ wᵢxᵢ＋b，再輸出 a＝激活(z) 的單位。', example: 'x＝[1, 2]、w＝[0.5, −1]、b＝1 → z＝−0.5。', lesson: '1-1' },
+  '激活函數': { en: 'activation function', def: '神經元在加權加總之後套用的非線性函式，讓網路能表示彎曲的關係。', example: 'ReLU、sigmoid、tanh、GELU。', lesson: '1-2' },
+  'ReLU': { en: 'rectified linear unit', def: 'ReLU(z)＝max(0, z)：負數變 0，正數照抄。計算簡單、梯度不容易消失，是最常用的激活之一。', example: 'ReLU(−3)＝0，ReLU(2)＝2。', lesson: '1-2' },
+  'tanh': { en: 'hyperbolic tangent', def: '把數字壓到 −1～1 的 S 形函式，0 對應 0。', example: 'tanh(0)＝0，tanh(2) ≈ 0.96。', lesson: '1-2' },
+  'GELU': { en: 'Gaussian Error Linear Unit', def: 'GELU(x)＝x·Φ(x)：像比較平滑的 ReLU，負數附近不是直接變 0。GPT、BERT 等 Transformer 常用。', example: 'Hendrycks、Gimpel 2016。', lesson: '1-2' },
+  'XOR': { en: 'exclusive or', def: '兩個輸入「剛好一個是 1」時輸出 1，否則 0。一條直線分不開，是說明非線性必要性的經典例子。', example: '(0,1)→1、(1,1)→0。', lesson: '1-3' },
+});
+
+const REVIEW_M0 = [
+  { level: '回想', type: 'mc', q: '（回顧 0-1）隱藏層的值是哪裡來的？', options: [
+    { text: '網路自己算出來的中間特徵', correct: true, why: '不是資料直接給的。' },
+    { text: '資料表裡另外一欄的標籤', why: '標籤是答案。' },
+    { text: '使用者在推論時手動輸入', why: '不是手動。' },
+    { text: '隨機產生，每次都不一樣', why: '固定參數下是確定的。' },
+  ] },
+];
+
+const SIGMA = (z) => 1 / (1 + Math.exp(-z));
+const GELU = (z) => 0.5 * z * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (z + 0.044715 * z ** 3)));
+const XOR_PTS = [[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]];
+
+const NEURON_SVG = `<svg viewBox="0 0 560 230" role="img" aria-label="一個神經元：輸入 x1、x2 各乘上權重 w1、w2，加總再加上偏差 b 得到 z，z 經過激活函數得到輸出 a">
+  <circle cx="60" cy="70" r="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="60" y="76" text-anchor="middle" font-size="16" font-weight="900" class="on-color">x₁</text>
+  <circle cx="60" cy="170" r="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="60" y="176" text-anchor="middle" font-size="16" font-weight="900" class="on-color">x₂</text>
+  <line x1="88" y1="74" x2="230" y2="112" class="stroke-ink" stroke-width="3"/><text x="150" y="80" font-size="14" font-weight="900">× w₁</text>
+  <line x1="88" y1="166" x2="230" y2="128" class="stroke-ink" stroke-width="3"/><text x="150" y="172" font-size="14" font-weight="900">× w₂</text>
+  <circle cx="265" cy="120" r="38" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="265" y="116" text-anchor="middle" font-size="16" font-weight="900" class="on-color">Σ ＋ b</text><text x="265" y="138" text-anchor="middle" font-size="13" class="on-color">＝ z</text>
+  <line x1="303" y1="120" x2="350" y2="120" class="stroke-ink" stroke-width="3"/>
+  <rect x="350" y="90" width="100" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="400" y="126" text-anchor="middle" font-size="15" font-weight="900" class="on-color">激活(z)</text>
+  <line x1="450" y1="120" x2="490" y2="120" class="stroke-ink" stroke-width="3"/>
+  <circle cx="515" cy="120" r="25" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="515" y="126" text-anchor="middle" font-size="16" font-weight="900" class="on-color">a</text>
+  <text x="280" y="214" text-anchor="middle" font-size="14">z ＝ w₁x₁ ＋ w₂x₂ ＋ b，a ＝ 激活(z)</text>
+</svg>`;
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '寫出一個神經元的計算式',
+      '手算一個神經元的輸出',
+      '說出權重與偏差各自的作用',
+    ],
+    review: REVIEW_M0,
+    analogy: {
+      text: ['要不要出門跑步：天氣好加分、昨晚睡得少扣分、今天有約會扣很多分。每個因素有不同的重要性，加起來超過某個門檻，你就出門。', '一個[[神經元]]就是這樣：每個輸入乘上[[權重]]（重要性），加總後加上[[偏差]]（門檻往哪移），再交給[[激活函數]]決定要輸出多少。'],
+      limit: ['你的決定是是或否，神經元的輸出通常是連續的數字；而且它的權重不是你想好的，是訓練時從資料調出來的。'],
+    },
+    model: { svg: NEURON_SVG, caption: '一個神經元：加權加總、加偏差、過激活函數。' },
+    define: [
+      { term: '神經元', en: 'neuron', def: 'a＝激活(Σwx＋b)。', example: '網路的基本單位。' },
+      { term: '權重', en: 'weight', def: '每個輸入的重要性。', example: '負的權重代表「越大越扣分」。' },
+      { term: '偏差', en: 'bias', def: '門檻的位置。', example: 'b 越大，越容易被激活。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '一個神經元（實際計算）', sliders: [
+          { id: 'x1', label: 'x₁', min: -2, max: 2, step: 0.5, value: 1 },
+          { id: 'x2', label: 'x₂', min: -2, max: 2, step: 0.5, value: 2 },
+          { id: 'w1', label: 'w₁', min: -2, max: 2, step: 0.5, value: 0.5 },
+          { id: 'w2', label: 'w₂', min: -2, max: 2, step: 0.5, value: -1 },
+          { id: 'b', label: 'b', min: -3, max: 3, step: 0.5, value: 1 },
+        ], compute: (v) => {
+          const z = v.w1 * v.x1 + v.w2 * v.x2 + v.b;
+          return { rows: [
+            { label: `z ＝ ${v.w1}×${v.x1} ＋ ${v.w2}×${v.x2} ＋ ${v.b}`, value: z.toFixed(2), ratio: Math.min(1, Math.abs(z) / 8) },
+            { label: 'ReLU(z)', value: Math.max(0, z).toFixed(2), ratio: Math.min(1, Math.max(0, z) / 8) },
+            { label: 'σ(z)', value: SIGMA(z).toFixed(3), ratio: SIGMA(z) },
+          ], note: '預設值：z＝0.5×1＋(−1)×2＋1＝−0.5，ReLU 輸出 0，sigmoid 輸出約 0.378。把 b 拉到 2：z 變成 0.5，ReLU 開始有輸出。' };
+        } } },
+        { type: 'code', lang: 'python', title: '同樣的計算（示意）', code: 'x = [1.0, 2.0]\nw = [0.5, -1.0]\nb = 1.0\nz = sum(wi * xi for wi, xi in zip(w, x)) + b   # -0.5\nrelu = max(0.0, z)                             # 0.0' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="偏差的作用：同樣的權重，偏差越大，越早被激活；偏差把 ReLU 的轉折點往左右移">
+          <line x1="40" y1="140" x2="520" y2="140" class="stroke-ink" stroke-width="2"/>
+          ${[[-1, 'm7', 'b＝−1'], [0, 'm2', 'b＝0'], [1, 'm3', 'b＝1']].map(([b, c, t], i) => { const x0 = 280 - b * 60; return `<path d="M40 ${140 - i * 2} L${x0} ${140 - i * 2} L${x0 + 120} 40" fill="none" style="stroke:var(--${c})" stroke-width="4"/><text x="${x0 + 124}" y="${46 + i * 16}" font-size="13" font-weight="900">${t}</text>`; }).join('')}
+          <text x="280" y="168" text-anchor="middle" font-size="13">ReLU(x ＋ b)：b 越大，轉折點越往左（越早開始輸出）</text>
+        </svg>`, caption: '權重決定斜率，偏差決定從哪裡開始。' },
+      ],
+      tryit: {
+        q: ['x＝[2, 1]、w＝[1, −3]、b＝0.5。算 z 和 ReLU(z)。'],
+        draft: 'z ＝ ＿\nReLU(z) ＝ ＿',
+        answer: ['z ＝ 1×2 ＋ (−3)×1 ＋ 0.5 ＝ −0.5。', 'ReLU(−0.5) ＝ 0：這個神經元「沒被激活」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '忘了加偏差。', why: '沒有偏差，所有轉折點都卡在原點。', right: 'z＝Σwx＋b。' },
+      { wrong: '以為權重一定是正的。', why: '負權重代表「這個輸入越大越扣分」。', right: '權重可正可負。' },
+      { wrong: '把 z 當成神經元的輸出。', why: '輸出是激活之後的 a。', right: 'a＝激活(z)。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '神經元的計算順序？', options: [
+        { text: '加權加總 → 加偏差 → 激活', correct: true, why: 'z＝Σwx＋b，a＝激活(z)。' },
+        { text: '激活 → 加權加總 → 加偏差', why: '激活在最後。' },
+        { text: '加偏差 → 激活 → 加權加總', why: '順序錯了。' },
+        { text: '只做加權加總，不需要其他步驟', why: '少了偏差與激活。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'x＝[1, 1]、w＝[2, −1]、b＝−2，ReLU 輸出？', options: [
+        { text: '0', correct: true, why: 'z＝2−1−2＝−1，ReLU→0。' },
+        { text: '−1，就是 z', why: 'ReLU 把負數變 0。' },
+        { text: '1，因為 2 減 1', why: '少算了偏差。' },
+        { text: '3，因為全部取絕對值相加', why: '不是這樣算。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個神經元的權重全部是 0、偏差也是 0。不管輸入是什麼，輸出都一樣嗎？這對訓練有什麼啟示？'], answer: [
+        '一樣：z 永遠是 0，輸出永遠是激活(0)。',
+        '如果一整層所有神經元都從同樣的值開始，它們會算出一樣的輸出、拿到一樣的梯度，永遠學一樣的東西。所以權重要用隨機的小數字初始化（4-4）。',
+      ] },
+    ],
+    keypoints: [
+      '神經元：z＝Σwx＋b，a＝激活(z)。',
+      '權重決定每個輸入的重要性（可正可負），偏差移動門檻。',
+      '輸出是激活之後的值，不是 z。',
+    ],
+    sources: ['rumelhart-1986'],
+  },
+
+  '1-2': {
+    goals: [
+      '說出 ReLU、sigmoid、tanh、GELU 的形狀',
+      '算出它們在幾個點的值',
+      '知道各自常用在哪裡',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）z＝−2 時 ReLU 輸出？', options: [
+        { text: '0', correct: true, why: '負數變 0。' },
+        { text: '−2，ReLU 不改變數字', why: '負數會被截掉。' },
+        { text: '2，取絕對值', why: '不是絕對值。' },
+        { text: '0.5，就是 sigmoid 的中點', why: '那是 σ(0)。' },
+      ] },
+    ],
+    analogy: {
+      text: ['電燈開關有很多種：一般開關（關或開）、調光器（慢慢變亮、到頂就停）、有夜燈功能的開關（關的時候還亮一點點）。', '[[激活函數]]就是神經元的「開關樣式」：[[ReLU]] 負數直接關掉、正數照抄；sigmoid 與 [[tanh]] 是兩端會飽和的調光器；[[GELU]] 像 ReLU 但在 0 附近比較平滑，負數不會一刀切掉。'],
+      limit: ['開關的選擇看喜好，激活函數的選擇會影響訓練：兩端飽和的函式，梯度在兩端幾乎是 0，深網路會學不動（4-4）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="四種激活函數的曲線：ReLU 在 0 轉折，sigmoid 在 0 到 1 之間的 S 形，tanh 在負 1 到 1 之間的 S 形，GELU 像平滑的 ReLU">
+        <line x1="40" y1="160" x2="530" y2="160" class="stroke-ink" stroke-width="2"/><line x1="285" y1="20" x2="285" y2="230" class="stroke-ink" stroke-width="2"/>
+        ${[['ReLU', (z) => Math.max(0, z), 'm7'], ['sigmoid', (z) => 1 / (1 + Math.exp(-z)), 'm2'], ['tanh', (z) => Math.tanh(z), 'm3'], ['GELU', (z) => 0.5 * z * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (z + 0.044715 * z ** 3))), 'm4']].map(([n, f, c], k) => `<path d="${[...Array(81).keys()].map((i) => { const z = -4 + i * 0.1; const y = Math.max(-1.6, Math.min(3, f(z))); return `${i ? 'L' : 'M'}${(285 + z * 60).toFixed(1)} ${(160 - y * 45).toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--${c})" stroke-width="4"/><text x="${60 + k * 120}" y="244" font-size="14" font-weight="900" style="fill:var(--${c})">■</text><text x="${76 + k * 120}" y="244" font-size="14" font-weight="900">${n}</text>`).join('')}
+        <text x="520" y="152" text-anchor="end" font-size="13">z</text>
+      </svg>`,
+      caption: 'z 從 −4 到 4。ReLU 與 GELU 在正數一路往上；sigmoid 與 tanh 兩端變平。',
+    },
+    define: [
+      { term: 'ReLU', en: 'ReLU', def: 'max(0, z)。', example: '最常用於隱藏層。' },
+      { term: 'sigmoid', en: 'sigmoid', def: '1÷(1＋e^−z)，0～1。', example: '二元分類的輸出層。' },
+      { term: 'tanh', en: 'tanh', def: '−1～1 的 S 形。', example: 'RNN 常用。' },
+      { term: 'GELU', en: 'GELU', def: 'x·Φ(x)。', example: 'Transformer 常用。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '同一個 z，四種激活的輸出（實際計算）', sliders: [
+          { id: 'z', label: 'z', min: -4, max: 4, step: 0.25, value: -1 },
+        ], compute: (v) => {
+          const vals = [['ReLU', Math.max(0, v.z)], ['sigmoid', SIGMA(v.z)], ['tanh', Math.tanh(v.z)], ['GELU（近似公式）', GELU(v.z)]];
+          return { rows: vals.map(([n, x]) => ({ label: n, value: x.toFixed(3), ratio: Math.min(1, (x + 1) / 5) })), note: 'z＝−1：ReLU 是 0，GELU 約 −0.159（還有一點點負值通過）。把 z 拉到 4：sigmoid 約 0.982、tanh 約 0.999，已經接近飽和。GELU 用的是論文中的 tanh 近似公式。' };
+        } } },
+        { type: 'table', head: ['激活', '輸出範圍', '常用在哪'], rows: [
+          ['ReLU', '0 ～ ∞', '隱藏層（CNN、一般網路）'],
+          ['GELU', '約 −0.17 ～ ∞', 'Transformer 的前饋網路（GPT、BERT 等）'],
+          ['sigmoid', '0 ～ 1', '二元分類或多標籤的輸出層'],
+          ['tanh', '−1 ～ 1', '傳統 RNN、需要正負對稱的地方'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="飽和的問題：sigmoid 在 z 很大或很小時曲線變平，斜率接近 0；ReLU 在正數時斜率固定是 1">
+          <rect x="10" y="20" width="260" height="130" class="fill-surface stroke-ink" stroke-width="3"/>
+          <path d="M30 120 C110 120 120 60 140 60 S170 40 250 40" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+          <text x="140" y="170" text-anchor="middle" font-size="14">sigmoid：兩端斜率 ≈ 0</text>
+          <rect x="290" y="20" width="260" height="130" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <path d="M310 120 L420 120 L530 40" fill="none" class="stroke-ink" stroke-width="4"/>
+          <text x="420" y="170" text-anchor="middle" font-size="14">ReLU：正數斜率固定 1</text>
+        </svg>`, caption: '斜率就是反向傳播要乘上的數；斜率接近 0，梯度就傳不回去（4-4）。' },
+      ],
+      tryit: {
+        q: ['z＝0 時，四種激活各輸出多少？'],
+        draft: 'ReLU：＿　sigmoid：＿　tanh：＿　GELU：＿',
+        answer: ['ReLU 0、sigmoid 0.5、tanh 0、GELU 0。', 'sigmoid 在 0 輸出 0.5，其他三個都是 0：這是 sigmoid 用在「機率」的原因。'],
+      },
+    },
+    mistakes: [
+      { wrong: '隱藏層也全部用 sigmoid。', why: '兩端飽和，深網路梯度會消失。', right: '隱藏層常用 ReLU 或 GELU。' },
+      { wrong: '輸出層也用 ReLU 來輸出機率。', why: 'ReLU 沒有上限，不是機率。', right: '機率用 sigmoid 或 softmax。' },
+      { wrong: '以為激活函數只是讓數字變小。', why: '它的作用是加入非線性（1-3）。', right: '沒有非線性，疊再多層也等於一層。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Transformer 的前饋網路常用哪個激活？', options: [
+        { text: 'GELU', correct: true, why: 'GPT、BERT 等常用。' },
+        { text: 'sigmoid，因為輸出在 0 到 1', why: '隱藏層少用。' },
+        { text: '不用任何激活，直接線性', why: '一定要非線性。' },
+        { text: 'softmax，因為要算機率', why: 'softmax 用在輸出或 attention。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'tanh(0) 等於？', options: [
+        { text: '0', correct: true, why: '對稱於原點。' },
+        { text: '0.5，和 sigmoid 一樣', why: 'tanh 的中點是 0。' },
+        { text: '1，因為 e⁰＝1', why: '要代入公式。' },
+        { text: '−1，最小值', why: '−1 是極限。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['ReLU 在負數時輸出 0、斜率也是 0。如果某個神經元的 z 永遠是負的，會發生什麼事？'], answer: [
+        '它永遠輸出 0，反向傳播時梯度也是 0，權重永遠不會被更新，等於「死掉了」（常叫 dying ReLU）。',
+        '常見的緩解：好的初始化、不要太大的學習率，或改用負數仍有一點斜率的變體（例如 GELU、Leaky ReLU）。',
+      ] },
+    ],
+    keypoints: [
+      'ReLU 負數變 0；sigmoid 0～1；tanh −1～1；GELU 像平滑的 ReLU。',
+      '隱藏層常用 ReLU／GELU；機率輸出用 sigmoid／softmax。',
+      '飽和的地方斜率接近 0，梯度傳不回去。',
+    ],
+    sources: ['gelu'],
+  },
+
+  '1-3': {
+    goals: [
+      '說明為什麼一條直線分不開 XOR',
+      '驗證一個有隱藏層的小網路能解 XOR',
+      '解釋「沒有非線性，疊再多層也等於一層」',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）ReLU(3) 等於？', options: [
+        { text: '3', correct: true, why: '正數照抄。' },
+        { text: '0，ReLU 會把數字歸零', why: '只有負數歸零。' },
+        { text: '1，正數一律輸出 1', why: '那是階梯函數。' },
+        { text: '0.95，接近 1', why: '那是 sigmoid。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-1）x＝[1, 0]、w＝[1, 1]、b＝−0.5 的 z？', options: [
+        { text: '0.5', correct: true, why: '1＋0−0.5。' },
+        { text: '1.5，忘了偏差是負的', why: 'b 要減。' },
+        { text: '−0.5，忘了 x₁', why: 'x₁ 是 1。' },
+        { text: '2，兩個權重相加', why: 'x₂ 是 0。' },
+      ] },
+    ],
+    analogy: {
+      text: ['桌上擺四個杯子，左上和右下是咖啡，右上和左下是茶（對角線同一種）。你要用一根筷子（直線）把咖啡和茶分開：怎麼擺都做不到。', '這就是 [[XOR]]。一個神經元的決策邊界是一條直線，所以它學不會 XOR。加一個隱藏層，先把四個點「搬」到新的位置，再用直線就分得開了。'],
+      limit: ['杯子的例子只有四個點；真實資料是幾千維空間裡的點雲，但道理一樣：隱藏層把資料轉換到更好分的樣子。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="XOR 四個點：(0,0) 與 (1,1) 是 0，(0,1) 與 (1,0) 是 1，任何一條直線都無法把兩類分開">
+        <line x1="60" y1="190" x2="280" y2="190" class="stroke-ink" stroke-width="2"/><line x1="60" y1="190" x2="60" y2="20" class="stroke-ink" stroke-width="2"/>
+        ${[[0, 0, 0], [0, 1, 1], [1, 0, 1], [1, 1, 0]].map(([a, b, y]) => y ? `<circle cx="${90 + a * 160}" cy="${170 - b * 130}" r="14" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>` : `<rect x="${76 + a * 160}" y="${156 - b * 130}" width="28" height="28" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>`).join('')}
+        <line x1="40" y1="60" x2="300" y2="150" class="stroke-ink" stroke-width="3" stroke-dasharray="7 5"/>
+        <text x="170" y="216" text-anchor="middle" font-size="13">任何直線都會切錯至少一個</text>
+        <text x="420" y="60" text-anchor="middle" font-size="15" font-weight="900">XOR 真值表</text>
+        ${[['x₁', 'x₂', 'y'], ['0', '0', '0'], ['0', '1', '1'], ['1', '0', '1'], ['1', '1', '0']].map((r, i) => r.map((c, j) => `<text x="${370 + j * 50}" y="${92 + i * 26}" text-anchor="middle" font-size="14"${i === 0 ? ' font-weight="900"' : ''}>${c}</text>`).join('')).join('')}
+      </svg>`,
+      caption: '方塊是 0、圓點是 1。Minsky 與 Papert 在 1969 年的書中指出單層感知器做不到這類問題，是 AI 史上著名的例子（🟡 通史）。',
+    },
+    define: [
+      { term: 'XOR', en: 'exclusive or', def: '剛好一個是 1 才輸出 1。', example: '(1,1)→0。' },
+      { term: '線性可分', en: 'linearly separable', def: '能用一條直線（或平面）分開。', example: 'AND、OR 是；XOR 不是。' },
+      { term: '非線性', en: 'non-linearity', def: '激活函數提供的彎曲。', example: 'ReLU 的轉折。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '只用一個神經元（閾值 0.5）試試看能不能做出 XOR（實際計算）', sliders: [
+          { id: 'w1', label: 'w₁', min: -3, max: 3, step: 0.5, value: 1 },
+          { id: 'w2', label: 'w₂', min: -3, max: 3, step: 0.5, value: 1 },
+          { id: 'b', label: 'b', min: -3, max: 3, step: 0.5, value: -0.5 },
+        ], compute: (v) => {
+          let right = 0;
+          const rows = XOR_PTS.map(([a, b, y]) => { const p = SIGMA(v.w1 * a + v.w2 * b + v.b); const pred = p >= 0.5 ? 1 : 0; if (pred === y) right += 1; return { label: `(${a},${b}) 答案 ${y}：預測 ${pred}`, value: p.toFixed(2), ratio: p }; });
+          rows.push({ label: '判對', value: `${right} / 4`, ratio: right / 4 });
+          return { rows, note: '怎麼調都最多 3 / 4：一個神經元的邊界是一條直線，分不開 XOR。' };
+        } } },
+        { type: 'table', head: ['輸入', 'h₁＝ReLU(x₁＋x₂)', 'h₂＝ReLU(x₁＋x₂−1)', 'y＝h₁ − 2h₂'], rows: [
+          ['(0, 0)', '0', '0', '0'],
+          ['(0, 1)', '1', '0', '1'],
+          ['(1, 0)', '1', '0', '1'],
+          ['(1, 1)', '2', '1', '0'],
+        ], caption: '兩個 ReLU 隱藏神經元就能做出 XOR。權重是手選的，訓練也能學到類似的解。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="沒有激活函數時，兩層線性變換相乘還是一個線性變換：W2 乘 W1 乘 x 等於 W 乘 x">
+          <rect x="20" y="50" width="140" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="90" y="92" text-anchor="middle" font-size="15" font-weight="900" class="on-color">× W₁</text>
+          <rect x="190" y="50" width="140" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="260" y="92" text-anchor="middle" font-size="15" font-weight="900" class="on-color">× W₂</text>
+          <text x="355" y="92" font-size="22" font-weight="900">＝</text>
+          <rect x="390" y="50" width="150" height="70" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="465" y="92" text-anchor="middle" font-size="15" font-weight="900" class="on-color">× (W₂W₁)</text>
+          <text x="280" y="160" text-anchor="middle" font-size="14">沒有激活函數：兩層等於一層，還是一條直線</text>
+          <text x="280" y="186" text-anchor="middle" font-size="13">中間夾一個 ReLU，就不能合併了</text>
+        </svg>`, caption: '這是第二部 4-1 說「前饋網路中間要有非線性」的原因。' },
+      ],
+      tryit: {
+        q: ['用上表的網路，驗算 (1, 1) 的輸出。如果把 ReLU 拿掉（h 直接等於括號裡的數），(1, 1) 會輸出多少？'],
+        draft: '有 ReLU：＿\n沒有 ReLU：＿',
+        answer: ['有 ReLU：h₁＝2、h₂＝1，y＝2 − 2 ＝ 0 ✓。', '沒有 ReLU：(0, 0) 時 h₂＝−1，y＝0 − 2×(−1) ＝ 2，已經錯了；整個網路變成 y＝−(x₁＋x₂)＋2，是一條直線，不可能做出 XOR。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為多疊幾層線性層就能解 XOR。', why: '線性疊線性還是線性。', right: '層與層之間要有非線性激活。' },
+      { wrong: '以為 XOR 只是玩具問題、不重要。', why: '它代表「需要組合多個特徵」的一大類問題。', right: '真實問題大多不是線性可分的。' },
+      { wrong: '以為隱藏層的權重必須手選。', why: '上表是為了示範；實際上由訓練學出來。', right: '模組 3、4 講怎麼學。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '為什麼一個神經元學不會 XOR？', options: [
+        { text: '它的邊界是一條直線', correct: true, why: 'XOR 不是線性可分。' },
+        { text: '因為 XOR 的資料只有四筆', why: '資料量不是問題。' },
+        { text: '因為學習率設得太小', why: '再怎麼訓練都分不開。' },
+        { text: '因為輸入只有 0 和 1', why: '和數值範圍無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '兩層線性層之間沒有激活函數，整體等於？', options: [
+        { text: '一層線性層', correct: true, why: 'W₂W₁ 可以合併。' },
+        { text: '兩層非線性網路', why: '沒有非線性。' },
+        { text: '一個 sigmoid 神經元', why: '沒有 sigmoid。' },
+        { text: '無法計算', why: '可以算。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['「客戶會流失，如果他最近很少登入，或者他最近客訴很多，但兩者同時發生時反而是因為他在積極處理問題、不會流失」。這種規則一個神經元學得會嗎？'], answer: [
+        '學不會：這是類似 XOR 的關係（兩個因素各自出現時是一種結果，同時出現時相反），不是線性可分。',
+        '需要隱藏層讓模型先組合出「只有一個因素」「兩個都有」這種中間特徵，再判斷。',
+      ] },
+    ],
+    keypoints: [
+      'XOR 不是線性可分，一個神經元做不到。',
+      '一個隱藏層＋ReLU 就能解 XOR。',
+      '沒有非線性，疊再多層也等於一層。',
+    ],
+    sources: ['rumelhart-1986'],
+  },
+});
+</script>

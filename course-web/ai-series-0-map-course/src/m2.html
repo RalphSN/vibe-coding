@@ -1,0 +1,565 @@
+<script>
+/* ==========================================================================
+   模組 2：從按下送出到出現回答
+   ========================================================================== */
+defineTerms({
+  '後端': { en: 'backend', def: '你看不到、跑在伺服器上的程式；負責保管金鑰、整理資料、呼叫模型 API。', example: '網頁送 /api/chat 給後端，後端再去呼叫 Claude API。', lesson: '2-1' },
+  'API': { en: 'Application Programming Interface', def: '程式和程式之間約定好的溝通方式；模型 API 就是「送一段 JSON，拿回一段回答」的入口。', example: 'Claude 的 Messages API。', lesson: '2-1' },
+  'tokenizer': { en: 'tokenizer', def: '把文字切成 token、再換成編號的程式；每個模型有自己的 tokenizer。', example: '同一句話在不同模型的 token 數不同。', lesson: '2-2' },
+  '矩陣乘法': { en: 'matrix multiplication', def: '一大批「相乘再相加」的運算；神經網路的計算大部分是這個。', example: '每一層都把輸入向量乘上一個很大的參數矩陣。', lesson: '2-3' },
+  '自迴歸': { en: 'autoregressive', def: '每產生一個 token，就把它接回輸入，再預測下一個。', example: 'LLM 一個字一個字長出回答。', lesson: '2-4' },
+  'KV cache': { en: 'key-value cache', def: '把前面 token 算過的中間結果存起來，下一步不必重算；所以第一個字慢、之後快。', example: '第二部 7 與第五部細講。', lesson: '2-4' },
+  '串流': { en: 'streaming', def: '回答一邊產生一邊送回來，不等全部完成。', example: '聊天畫面逐字出現。', lesson: '2-5' },
+  'SSE': { en: 'Server-Sent Events', def: '伺服器一行一行推事件給瀏覽器的格式；Claude 的串流用它。', example: '`event: content_block_delta`。', lesson: '2-5' },
+  'TTFT': { en: 'Time To First Token', def: '從送出到第一個字出現的時間；使用者感受到的「等待」主要是它。', example: '總共 8 秒的回答，TTFT 可能不到 1 秒。', lesson: '2-5' },
+});
+
+const SIX_STOPS_SVG = `<svg viewBox="0 0 560 260" role="img" aria-label="六站：你的電腦送出問題，後端加上金鑰與資料，API 收下請求，tokenizer 把文字切成 token，GPU 上的模型一個一個算出新 token，回到螢幕逐字顯示">
+  <rect x="10" y="20" width="170" height="64" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="95" y="48" text-anchor="middle" font-size="15" font-weight="900" class="on-color">① 你的電腦</text><text x="95" y="70" text-anchor="middle" font-size="13" class="on-color">打字、按送出</text>
+  <rect x="195" y="20" width="170" height="64" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="48" text-anchor="middle" font-size="15" font-weight="900" class="on-color">② 後端</text><text x="280" y="70" text-anchor="middle" font-size="13" class="on-color">加金鑰、加資料</text>
+  <rect x="380" y="20" width="170" height="64" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="465" y="48" text-anchor="middle" font-size="15" font-weight="900" class="on-color">③ API</text><text x="465" y="70" text-anchor="middle" font-size="13" class="on-color">驗證、排隊</text>
+  <path d="M465 84 L465 118" class="stroke-ink" stroke-width="3"/><path d="M457 112 L465 124 L473 112 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <rect x="380" y="126" width="170" height="64" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="465" y="154" text-anchor="middle" font-size="15" font-weight="900" class="on-color">④ tokenizer</text><text x="465" y="176" text-anchor="middle" font-size="13" class="on-color">文字 → 編號</text>
+  <rect x="195" y="126" width="170" height="64" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="280" y="154" text-anchor="middle" font-size="15" font-weight="900" class="on-color">⑤ GPU 上的模型</text><text x="280" y="176" text-anchor="middle" font-size="13" class="on-color">一次算一個 token</text>
+  <rect x="10" y="126" width="170" height="64" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="95" y="154" text-anchor="middle" font-size="15" font-weight="900" class="on-color">⑥ 回到螢幕</text><text x="95" y="176" text-anchor="middle" font-size="13" class="on-color">逐字顯示</text>
+  <line x1="180" y1="52" x2="195" y2="52" class="stroke-ink" stroke-width="3"/><line x1="365" y1="52" x2="380" y2="52" class="stroke-ink" stroke-width="3"/>
+  <line x1="380" y1="158" x2="365" y2="158" class="stroke-ink" stroke-width="3"/><line x1="195" y1="158" x2="180" y2="158" class="stroke-ink" stroke-width="3"/>
+  <text x="280" y="224" text-anchor="middle" font-size="14" font-weight="900">①②③ 在送出前與請求途中・④⑤ 在模型那一端・⑥ 回到你面前</text>
+  <text x="280" y="248" text-anchor="middle" font-size="13">⑤ 會一直重複，直到回答結束（2-4）</text>
+</svg>`;
+
+const REVIEW_1 = [
+  { level: '回想', type: 'mc', q: '（回顧 1-4）LLM 每一步在做什麼？', options: [
+    { text: '算出下一個 token 的機率，再選一個', correct: true, why: '一直重複就是一段回答。' },
+    { text: '從資料庫裡找出一段現成的回答', why: 'LLM 不查答案資料庫。' },
+    { text: '一次同時產生整段回答的所有字', why: '是一個 token 一個 token 產生。' },
+    { text: '把問題轉成規則再一條一條比對', why: '那比較像規則式系統。' },
+  ] },
+];
+
+/* 2-3：CPU 與 GPU 做同一批乘加的示意時間（數字是示意，不是任何真實晶片的規格） */
+const CPU_CORES = 16;
+const GPU_CORES = 10000;
+const MS_PER_ROUND = 1;
+function parallelDemo(v) {
+  const ops = v.ops * 1000;
+  const cpuMs = Math.ceil(ops / CPU_CORES) * MS_PER_ROUND;
+  const gpuMs = Math.ceil(ops / GPU_CORES) * MS_PER_ROUND * v.gpuSlow;
+  const worst = Math.max(cpuMs, gpuMs);
+  const fmt = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)} 秒` : `${ms} 毫秒`);
+  return {
+    rows: [
+      { label: `CPU（${CPU_CORES} 個強核心）`, value: fmt(cpuMs), ratio: cpuMs / worst },
+      { label: `GPU（${GPU_CORES.toLocaleString('en-US')} 個小核心）`, value: fmt(gpuMs), ratio: gpuMs / worst },
+    ],
+    note: `一共 **${ops.toLocaleString('en-US')}** 個互相獨立的乘加。GPU 每個核心比較慢（第二根拉桿），但數量多太多，總時間仍然短很多。數字是**示意**。`,
+  };
+}
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出一個問題從送出到回答經過的六站',
+      '每一站各用一句話說出它負責什麼',
+      '知道每一站的細節在系列的哪一卷',
+    ],
+    review: REVIEW_1,
+    analogy: {
+      text: ['寄一個包裹：你打包（你的電腦）→ 超商收件、貼單（後端）→ 物流中心驗收分揀（API）→ 拆成標準箱（tokenizer）→ 工廠加工（GPU 上的模型）→ 一箱一箱送回你家（回到螢幕）。', '每一站都有人在做事、都可能變慢或出錯。知道有哪幾站，遇到「AI 回答很慢」「很貴」就知道要去哪一站找原因。'],
+      limit: ['包裹是送過去再送回來的兩趟，請求比較像一通電話：線一直接著，回答在同一條線上一段一段傳回來。另外第 ⑤ 站不是加工一次，是一個字一個字重複很多次。'],
+    },
+    model: { svg: SIX_STOPS_SVG, caption: '本書的主軸：每一課標題上方的小標籤，就是在標這六站中的哪幾站。' },
+    define: [
+      { term: '後端', en: 'backend', def: '跑在伺服器、使用者看不到的程式。', example: '保管 API 金鑰。' },
+      { term: 'API', en: 'API', def: '程式之間約定好的溝通方式。', example: '送 JSON 給 Messages API。' },
+      { term: 'tokenizer', en: 'tokenizer', def: '把文字切成 token 編號的程式。', example: '2-2。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'ragtrace', props: { chip: '逐站追蹤', title: '「台灣最高的山是哪一座？」走一遍六站', scenarios: [{ label: '一個問題', stages: [
+          { title: '① 你的電腦', body: ['你在聊天畫面打字、按送出。瀏覽器把文字包成一個請求，送到**這個網站自己的後端**，不是直接送給模型公司。'] },
+          { title: '② 後端', body: ['後端加上只有它知道的 API 金鑰、選好模型、把前面的對話紀錄一起附上，必要時先去查資料放進去。', { type: 'code', lang: 'json', title: '後端送出的請求（簡化）', code: '{\n  "model": "claude-opus-5-5",\n  "max_tokens": 1024,\n  "messages": [\n    { "role": "user", "content": "台灣最高的山是哪一座？" }\n  ]\n}' }] },
+          { title: '③ API', body: ['模型公司的 API 檢查金鑰、確認格式、看你有沒有超過用量，然後把請求排進隊伍等 GPU。格式錯會在這裡直接被退回（第一部 1-1）。'] },
+          { title: '④ tokenizer', body: ['整段文字被切成 token、換成一串編號。模型看不到文字，只看得到編號。token 數也決定了這次要付多少錢（2-2）。'] },
+          { title: '⑤ GPU 上的模型', body: ['編號送進 GPU 上的模型，做一大堆矩陣乘法，算出「下一個 token」的機率，選一個；再把它接回去算下一個，一直重複（2-3、2-4）。'] },
+          { title: '⑥ 回到螢幕', body: ['每產生一小段，就沿著同一條連線串流回後端、再回瀏覽器，你看到字一個一個冒出來（2-5）。最後附上這次用了多少 token。'] },
+        ] }] } },
+        { type: 'table', head: ['站', '負責', '細節在哪一卷'], rows: [
+          ['① 你的電腦', '介面、送出、顯示', '第一部 模組 2'],
+          ['② 後端', '金鑰、組請求、查資料', '第一部 模組 0、5'],
+          ['③ API', '驗證、計量、排隊', '第一部 模組 1'],
+          ['④ tokenizer', '文字 ↔ 編號', '第二部'],
+          ['⑤ GPU 上的模型', '算機率、取樣', '第二、四、五部'],
+          ['⑥ 回到螢幕', '串流、計費', '第一部 模組 1、2'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="一條連線：瀏覽器到後端、後端到 API 各有一段連線；請求往右走一次，回應沿同一條連線分成很多小段往左流回來">
+          <rect x="10" y="70" width="130" height="70" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="75" y="110" text-anchor="middle" font-size="15" font-weight="900" class="on-color">瀏覽器</text>
+          <rect x="215" y="70" width="130" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="110" text-anchor="middle" font-size="15" font-weight="900" class="on-color">後端</text>
+          <rect x="420" y="70" width="130" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="485" y="110" text-anchor="middle" font-size="15" font-weight="900" class="on-color">模型 API</text>
+          <line x1="140" y1="88" x2="215" y2="88" class="stroke-ink" stroke-width="3"/><line x1="345" y1="88" x2="420" y2="88" class="stroke-ink" stroke-width="3"/>
+          <text x="280" y="40" text-anchor="middle" font-size="14" font-weight="900">請求：往右走一次 →</text>
+          ${[0, 1, 2, 3, 4].map((i) => `<rect x="${150 + i * 12}" y="116" width="8" height="12" class="fill-surface stroke-ink" stroke-width="2"/><rect x="${355 + i * 12}" y="116" width="8" height="12" class="fill-surface stroke-ink" stroke-width="2"/>`).join('')}
+          <text x="280" y="180" text-anchor="middle" font-size="14" font-weight="900">← 回應：沿同一條連線，一小段一小段流回來</text>
+          <text x="280" y="206" text-anchor="middle" font-size="13">所以「停止生成」要把兩段連線都切斷（第一部 2-4）</text>
+        </svg>`, caption: '請求像打一通電話：線接通後，回答在同一條線上陸續傳回。' },
+        { type: 'callout', variant: 'tip', title: '慢、貴、錯，各去哪一站找', body: ['**慢**：先分清是「等第一個字」慢還是「整段」慢。前者看 ③ 排隊與 ⑤ 讀輸入，後者看 ⑤ 產生的長度（2-4、2-5）。', '**貴**：看 ④ 切出多少 token、⑤ 產生多少 token（2-2）。**錯**：先看 ② 有沒有把需要的資料放進請求，再看 ⑤ 的模型有沒有用上。'] },
+        { type: 'callout', variant: 'tip', title: '每一課標題上方的小標籤', body: ['從這一課開始，每一課標題上方都會亮起六站中的某幾站。看到「tokenizer」亮著，就知道這一課在講請求旅程的第 ④ 站。', '讀到後面的卷時，也可以回來這張圖對照：第二部大多在 ④⑤，第一部大多在 ②③⑥，第五部在 ⑤ 的硬體底下。'] },
+      ],
+      tryit: {
+        q: ['用你自己的話，把六站濃縮成一句話（可以用箭頭）：'],
+        draft: '＿＿ → ＿＿ → ＿＿ → ＿＿ → ＿＿ → ＿＿',
+        answer: ['範例：瀏覽器 → 後端加金鑰 → API 驗證排隊 → 切成 token → GPU 一個一個算 → 串流回螢幕。只要六站都在、順序對就好。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為瀏覽器直接和模型講話。', why: '正式產品中間有後端；金鑰放在瀏覽器會被偷（第一部 0-2）。', right: '瀏覽器 → 自己的後端 → 模型 API。' },
+      { wrong: '以為模型「看得懂文字」。', why: '模型只處理 token 編號。', right: 'tokenizer 先把文字換成編號。' },
+      { wrong: '以為整個回答是一次算出來再傳回來。', why: '第 ⑤ 站會重複很多次，每次一個 token。', right: '一個 token 一個 token 產生，邊產生邊送回。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'API 金鑰應該在哪一站加上去？', options: [
+        { text: '② 後端', correct: true, why: '只有後端能安全地保管金鑰。' },
+        { text: '① 你的電腦（瀏覽器）', why: '放在瀏覽器等於公開給所有訪客。' },
+        { text: '④ tokenizer', why: 'tokenizer 只處理文字，和金鑰無關。' },
+        { text: '⑥ 回到螢幕', why: '那時候請求早就送出去了。' },
+      ] },
+      { level: '應用', type: 'mc', q: '使用者反映「格式錯誤，請求馬上被拒絕」，問題最可能出在哪一站被擋下？', options: [
+        { text: '③ API 驗證請求格式時', correct: true, why: '格式不對時 API 會直接退回，不會進到模型。' },
+        { text: '⑤ GPU 上的模型算到一半', why: '格式錯不會進到模型這一站。' },
+        { text: '④ tokenizer 切 token 時', why: '格式驗證在 tokenizer 之前。' },
+        { text: '⑥ 回到螢幕顯示文字時', why: '已經被退回，沒有東西可以顯示。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的 AI 功能「有時候回答完全沒提到公司資料」。用六站推測可能出問題的地方。'], answer: [
+        '最可能在 ② 後端：查資料那一步沒查到、或查到了沒放進請求。模型只能看到請求裡有的東西。',
+        '其次是 ⑤：資料有放進去，但模型沒用上（prompt 寫法問題，第一部模組 3、5）。',
+      ] },
+    ],
+    keypoints: [
+      '六站：你的電腦 → 後端 → API → tokenizer → GPU 上的模型 → 回到螢幕。',
+      '金鑰在後端；模型只看得到 token 編號。',
+      '第 ⑤ 站會重複很多次，回答邊產生邊送回。',
+    ],
+    sources: ['claude-messages'],
+  },
+
+  '2-2': {
+    goals: [
+      '說出 tokenizer 做的兩件事：切段、換編號',
+      '解釋為什麼 AI 服務用 token 計費',
+      '知道要算真的 token 數該用什麼工具',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）六站的順序，哪一個是對的？', options: [
+        { text: '後端 → API → tokenizer → GPU 上的模型', correct: true, why: '先組請求、再驗證、再切 token、再運算。' },
+        { text: 'tokenizer → 後端 → API → GPU 上的模型', why: 'tokenizer 在模型公司那端，排在 API 之後。' },
+        { text: '後端 → GPU 上的模型 → tokenizer → API', why: '模型看不懂文字，要先過 tokenizer。' },
+        { text: 'API → 後端 → GPU 上的模型 → tokenizer', why: '後端先組請求，才送到 API。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-2）你用 Claude 聊天時，模型在做訓練還是推論？', options: [
+        { text: '推論：參數固定，用來產生回答', correct: true, why: '你的對話不會即時改變參數。' },
+        { text: '訓練：每一句話都會即時調整參數', why: '推論時參數不變。' },
+        { text: '兩個同時在做，所以回答比較慢', why: '使用時只有推論。' },
+        { text: '都不是，聊天時模型處於待機狀態', why: '產生回答就是推論。' },
+      ] },
+    ],
+    analogy: {
+      text: ['樂高說明書不會寫「蓋一座城堡」，它把城堡拆成一個個標準積木，每種積木有編號。', '[[tokenizer]] 對文字做同樣的事：把一句話切成模型認得的標準小段（[[token]]），每段換成一個編號。模型只看編號，就像機器手臂只認積木編號。'],
+      limit: ['樂高積木大小固定，token 長短不一：常見的詞可能整個是一個 token，罕見的字可能被拆成好幾段。而且每個模型的「積木組」不一樣，同一句話在不同模型切出來的數量不同。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="tokenizer 的兩步：文字 I love Taipei 先切成 I、 love、 Taip、ei 四段，再換成四個編號">
+        <rect x="10" y="20" width="540" height="50" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="280" y="52" text-anchor="middle" font-size="16" class="mono">I love Taipei</text>
+        <text x="20" y="98" font-size="14" font-weight="900">① 切段</text>
+        <rect x="90" y="80" width="80" height="36" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="130" y="104" text-anchor="middle" font-size="14" class="mono on-color">I</text>
+        <rect x="180" y="80" width="100" height="36" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="230" y="104" text-anchor="middle" font-size="14" class="mono on-color">·love</text>
+        <rect x="290" y="80" width="100" height="36" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="340" y="104" text-anchor="middle" font-size="14" class="mono on-color">·Taip</text>
+        <rect x="400" y="80" width="80" height="36" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="440" y="104" text-anchor="middle" font-size="14" class="mono on-color">ei</text>
+        <text x="20" y="158" font-size="14" font-weight="900">② 換編號</text>
+        <text x="130" y="158" text-anchor="middle" font-size="14" class="mono">40</text>
+        <text x="230" y="158" text-anchor="middle" font-size="14" class="mono">1842</text>
+        <text x="340" y="158" text-anchor="middle" font-size="14" class="mono">30215</text>
+        <text x="440" y="158" text-anchor="middle" font-size="14" class="mono">72</text>
+        <text x="280" y="196" text-anchor="middle" font-size="14">模型只看到 [40, 1842, 30215, 72]</text>
+        <text x="280" y="218" text-anchor="middle" font-size="13">切法與編號都是示意；· 代表前面的空格</text>
+      </svg>`,
+      caption: 'tokenizer 做兩件事：切段、換編號。編號就是模型唯一看得到的東西。',
+    },
+    define: [
+      { term: 'token', en: 'token', def: '模型讀寫文字的單位。', example: '可能是一個字、半個詞、一個標點。' },
+      { term: 'tokenizer', en: 'tokenizer', def: '切段＋換編號的程式。', example: 'Claude 的 tokenizer 不公開，但可以用 API 量。' },
+      { term: 'count_tokens', en: 'token counting endpoint', def: 'Claude API 提供的「量 token 數」功能，不產生回答。', example: '送出前先算這次要花多少。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'tokenmeter', props: { presets: [
+          { label: '英文', text: 'I love Taipei and bubble tea.' },
+          { label: '中文', text: '我喜歡台北和珍珠奶茶。' },
+          { label: '程式碼', text: 'const total = items.reduce((a, b) => a + b, 0);' },
+          { label: '罕見字', text: 'Pneumonoultramicroscopicsilicovolcanoconiosis' },
+        ] } },
+        { type: 'table', head: ['為什麼用 token 計費', '說明'], rows: [
+          ['模型的工作量跟著 token 數走', '每多一個 token，⑤ 站就多算一輪'],
+          ['輸入和輸出分開算', '輸出通常比輸入貴好幾倍（第一部 1-5）'],
+          ['不同語言 token 數不同', '同樣意思，換個語言 token 數可能差很多'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="一次請求的帳單：輸入 token 乘輸入單價加上輸出 token 乘輸出單價">
+          <text x="280" y="30" text-anchor="middle" font-size="15" font-weight="900">一次請求的費用</text>
+          <rect x="10" y="50" width="250" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="135" y="80" text-anchor="middle" font-size="14" font-weight="900" class="on-color">輸入 token × 輸入單價</text>
+          <text x="135" y="104" text-anchor="middle" font-size="13" class="on-color">你送的問題＋對話紀錄</text>
+          <text x="280" y="92" text-anchor="middle" font-size="20" font-weight="900">＋</text>
+          <rect x="300" y="50" width="250" height="70" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <text x="425" y="80" text-anchor="middle" font-size="14" font-weight="900" class="on-color">輸出 token × 輸出單價</text>
+          <text x="425" y="104" text-anchor="middle" font-size="13" class="on-color">模型寫出來的回答</text>
+          <text x="280" y="158" text-anchor="middle" font-size="14">Opus 5.5：輸入 $4、輸出 $20（每百萬 token，查證於 2026-10-22）</text>
+        </svg>`, caption: '2-5 會把這張帳單和時間放在一起看。' },
+      ],
+      tryit: {
+        q: ['在上面的 token 示意器切到「罕見字」，再切回「英文」。為什麼罕見的長單字會被切成很多段？'],
+        draft: '我的推測：＿＿',
+        answer: ['tokenizer 的「積木組」是從大量文字統計出來的：常見的詞值得給一整塊，罕見的詞沒有自己的積木，只能用好幾個小塊拼起來。所以罕見字、新名詞、某些語言會花比較多 token。真正的切法要用模型自己的 tokenizer 量。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 token 當成「字數」或「單字數」。', why: '一個 token 可能是半個詞，也可能是一整個常見詞。', right: '要知道 token 數就量，不要用字數估。' },
+      { wrong: '上網找「中文一個字等於幾個 token」的固定比例來算錢。', why: '不同模型的 tokenizer 不同，第三方估計差很多。', right: '用 API 的 `count_tokens` 量你自己的文字。' },
+      { wrong: '以為換模型 token 數一定一樣。', why: '每個模型有自己的 tokenizer。', right: '換模型時重新量一次。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'tokenizer 做哪兩件事？', options: [
+        { text: '把文字切成小段，再把每段換成編號', correct: true, why: '模型只看得到編號。' },
+        { text: '把文字翻譯成英文，再修正錯字', why: 'tokenizer 不翻譯也不改錯字。' },
+        { text: '檢查 API 金鑰，再把請求排進隊伍', why: '那是 ③ API 這一站的事。' },
+        { text: '把模型的回答壓縮後再傳回瀏覽器', why: '那和串流有關，不是 tokenizer。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你要估一份 3 萬字中文文件丟給 Claude 摘要要花多少錢，最可靠的做法是？', options: [
+        { text: '用 `count_tokens` 量實際 token 數再乘單價', correct: true, why: '只有模型自己的 tokenizer 量出來的才準。' },
+        { text: '假設一個中文字固定等於一個 token', why: '沒有這種固定比例。' },
+        { text: '用英文單字數的平均比例來推算', why: '中英文的切法差很多。' },
+        { text: '先把文件翻譯成英文再估算費用', why: '翻譯本身也要花錢，而且估出來的是另一份文字。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同一份產品說明，英文版和中文版送去摘要，帳單差了一截。為什麼？'], answer: [
+        '兩個語言被 tokenizer 切出來的 token 數不同；token 數不同，費用就不同。',
+        '要比較，就用 `count_tokens` 各量一次。第二部會講 tokenizer 怎麼從資料統計出「積木組」。',
+      ] },
+    ],
+    keypoints: [
+      'tokenizer：切段、換編號；模型只看得到編號。',
+      '費用＝輸入 token × 單價＋輸出 token × 單價。',
+      '不用字數估 token，用 `count_tokens` 量。',
+    ],
+    sources: ['claude-token-counting', 'claude-pricing'],
+  },
+
+  '2-3': {
+    goals: [
+      '說出「模型」實際上是一大堆數字',
+      '說明一次計算主要是大量矩陣乘法',
+      '解釋為什麼這種計算適合 GPU',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）模型實際上看到的是什麼？', options: [
+        { text: '一串 token 編號', correct: true, why: 'tokenizer 已經把文字換成編號。' },
+        { text: '你打的原始文字和標點符號', why: '文字在 tokenizer 已經被換掉了。' },
+        { text: '你的螢幕截圖', why: '一般文字請求不會傳截圖。' },
+        { text: '你的 API 金鑰和帳號資料', why: '金鑰在 API 那站就用完了。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-3）為什麼 AlexNet 在 2012 年被當成轉捩點？', options: [
+        { text: '大幅領先第二名，而且用 GPU 讓深層網路訓練得動', correct: true, why: '15.3% 對 26.2%。' },
+        { text: '它是第一個被發明出來的神經網路', why: '神經網路早了幾十年。' },
+        { text: '它是第一個會用文字聊天的程式', why: '它做的是影像辨識。' },
+        { text: '它證明規則式系統已經完全沒用', why: '它比的是影像辨識方法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['改 1 萬份選擇題考卷：一位資深教授（CPU）很聰明但只有一個人；1 萬個工讀生（GPU）每人只會對答案，但同時開工。', '[[神經網路]]的計算就像改選擇題：大量簡單、互相不影響的「相乘再相加」。這種工作人多就贏，所以 [[GPU]] 快很多。'],
+      limit: ['工讀生之間不用溝通，但 GPU 要從記憶體搬資料給每個核心，搬資料常常比算還慢（第五部的「記憶體頻寬」）。另外遇到一步接一步、不能拆開的工作，教授反而比較快。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="一次前向計算：token 編號先變成向量，經過很多層，每一層都是向量乘上大矩陣，最後得到每個候選 token 的機率">
+        <rect x="10" y="80" width="100" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="60" y="110" text-anchor="middle" font-size="14" font-weight="900">編號</text><text x="60" y="132" text-anchor="middle" font-size="13">→ 向量</text>
+        <rect x="130" y="60" width="300" height="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="92" text-anchor="middle" font-size="15" font-weight="900" class="on-color">很多層，每層：</text>
+        <text x="280" y="118" text-anchor="middle" font-size="14" class="mono on-color">向量 × 參數矩陣</text>
+        <text x="280" y="144" text-anchor="middle" font-size="13" class="on-color">＝ 大量相乘再相加</text>
+        <rect x="450" y="80" width="100" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="500" y="110" text-anchor="middle" font-size="14" font-weight="900">機率</text><text x="500" y="132" text-anchor="middle" font-size="13">下一個 token</text>
+        <line x1="110" y1="115" x2="130" y2="115" class="stroke-ink" stroke-width="3"/><line x1="430" y1="115" x2="450" y2="115" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="36" text-anchor="middle" font-size="15" font-weight="900">⑤ 站裡的一次計算（前向計算）</text>
+        <text x="280" y="206" text-anchor="middle" font-size="14">參數矩陣就是訓練好的那幾十億個數字</text>
+        <text x="280" y="228" text-anchor="middle" font-size="13">要放在 GPU 的記憶體裡，所以大模型需要很多張 GPU（第五部）</text>
+      </svg>`,
+      caption: '模型＝參數矩陣；一次計算＝把輸入一層層乘過這些矩陣。細節在第二部（架構）與隨身卷（矩陣）。',
+    },
+    define: [
+      { term: '矩陣乘法', en: 'matrix multiplication', def: '大量相乘再相加的運算。', example: '神經網路每一層的主要工作。' },
+      { term: '前向計算', en: 'forward pass', def: '輸入從第一層一路算到輸出的一次過程。', example: '產生一個 token 就要一次前向計算。' },
+      { term: 'GPU', en: 'GPU', def: '有大量小核心、擅長平行運算的晶片。', example: '台灣的晶圓代工在第五部登場。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: 'CPU 與 GPU 做同一批乘加（示意）', sliders: [
+          { id: 'ops', label: '要做的乘加數量', min: 10, max: 1000, step: 10, value: 200, unit: '千個', ends: ['小模型', '大模型'] },
+          { id: 'gpuSlow', label: 'GPU 每個核心比 CPU 慢幾倍', min: 1, max: 20, step: 1, value: 10, unit: '倍' },
+        ], compute: parallelDemo } },
+        { type: 'table', head: ['', 'CPU', 'GPU'], rows: [
+          ['核心', '少，但每個都很強', '非常多，每個都很簡單'],
+          ['擅長', '一步接一步、有很多判斷的工作', '大量相同、互相獨立的運算'],
+          ['在 AI 裡負責', '後端程式、tokenizer、排程', '模型的矩陣乘法'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="同樣十二件工作：CPU 四個核心要做三輪，GPU 十二個核心一輪做完">
+          <text x="20" y="28" font-size="15" font-weight="900">12 件互相獨立的乘加</text>
+          <text x="20" y="66" font-size="14" font-weight="900">CPU 4 核心</text>
+          ${[0, 1, 2].map((r) => [0, 1, 2, 3].map((c) => `<rect x="${130 + r * 140 + c * 32}" y="48" width="26" height="26" class="fill-surface stroke-ink" stroke-width="2"/>`).join('')).join('')}
+          <text x="130" y="96" font-size="13">第 1 輪</text><text x="270" y="96" font-size="13">第 2 輪</text><text x="410" y="96" font-size="13">第 3 輪</text>
+          <text x="20" y="146" font-size="14" font-weight="900">GPU 12 核心</text>
+          ${[...Array(12).keys()].map((c) => `<rect x="${130 + c * 32}" y="128" width="26" height="26" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/>`).join('')}
+          <text x="130" y="178" font-size="13">1 輪做完</text>
+        </svg>`, caption: '真實 GPU 有上萬個核心，模型一次計算的乘加數以十億計。' },
+      ],
+      tryit: {
+        q: ['把 knobs 的「GPU 每個核心慢幾倍」拉到最大，GPU 還是比較快嗎？寫下你看到的結果和原因：'],
+        draft: '結果：＿＿\n原因：＿＿',
+        answer: ['在示意數字下仍然快很多：一萬個核心就算每個慢 20 倍，同時做的數量還是遠遠多過 16 個核心。這就是平行運算的威力。', '但真實世界還要算「把參數搬到核心」的時間，常常才是瓶頸，這在第五部講。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 GPU 每個核心都比 CPU 強。', why: '剛好相反，GPU 每個核心很簡單。', right: 'GPU 贏在數量，適合大量相同的簡單運算。' },
+      { wrong: '以為模型是一個會思考的程式邏輯。', why: '模型主要是一大堆數字（參數），計算是矩陣乘法。', right: '「行為」來自訓練好的數字，不是人寫的規則。' },
+      { wrong: '以為 AI 服務完全不用 CPU。', why: '後端、tokenizer、排程都在 CPU 上跑。', right: 'CPU 管流程，GPU 做大量運算。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '模型在 ⑤ 站的計算，主要是哪一種運算？', options: [
+        { text: '大量的矩陣乘法（相乘再相加）', correct: true, why: '每一層都是向量乘上參數矩陣。' },
+        { text: '大量的 if／else 判斷式', why: '那比較像規則式程式。' },
+        { text: '在資料庫裡搜尋文字', why: '模型不查資料庫。' },
+        { text: '把文字切成 token', why: '那是 ④ tokenizer。' },
+      ] },
+      { level: '應用', type: 'mc', q: '為什麼大模型需要很多張 GPU？最主要的原因是？', options: [
+        { text: '參數太多，要放進 GPU 記憶體並平行計算', correct: true, why: '幾十億以上的參數一張放不下（第五部）。' },
+        { text: '每一張 GPU 只能處理一種語言', why: '沒有這種限制。' },
+        { text: '每個使用者都需要分到一張專屬的 GPU', why: '多個請求可以共用 GPU。' },
+        { text: '因為 GPU 的單一核心速度比 CPU 快很多', why: 'GPU 單核心其實比較簡單、比較慢。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['有人說「我買一顆最頂級的 CPU，跑大模型就會跟 GPU 一樣快」。你怎麼回應？'], answer: [
+        'CPU 核心再強，數量也只有幾十個；模型的計算是幾十億個可以同時做的乘加，需要的是數量。',
+        '另外參數要放在高頻寬的記憶體裡快速搬運，這也是 GPU 的設計重點（第五部）。',
+      ] },
+    ],
+    keypoints: [
+      '模型＝一大堆參數；一次計算＝一層層矩陣乘法。',
+      'GPU 贏在核心數量，適合大量互相獨立的乘加。',
+      '大模型需要很多 GPU，因為參數要放進記憶體並平行計算。',
+    ],
+    sources: ['alexnet', 'transformer'],
+  },
+
+  '2-4': {
+    goals: [
+      '說明自迴歸：每次產生一個 token，再接回去',
+      '說出取樣與 temperature 的作用',
+      '解釋為什麼第一個字最慢、之後比較快',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-3）為什麼模型的計算適合 GPU？', options: [
+        { text: '大量互相獨立的乘加，可以同時做', correct: true, why: 'GPU 贏在核心數量。' },
+        { text: 'GPU 的每個核心都比 CPU 聰明', why: 'GPU 單核心比較簡單。' },
+        { text: '模型要畫很多圖片', why: '和畫圖無關，是因為運算型態。' },
+        { text: 'GPU 可以直接讀懂中文', why: '晶片只處理數字。' },
+      ] },
+    ],
+    analogy: {
+      text: ['玩文字接龍：每個人只看到目前為止的句子，接一個字，再傳給下一個人。整句話就是這樣一個字一個字長出來的。', 'LLM 也是：算出下一個 [[token]]，接到後面，帶著整句再算下一個。這叫[[自迴歸]]。每一步都要跑一次 2-3 的前向計算。'],
+      limit: ['接龍每次換人，LLM 從頭到尾是同一個模型。另外接龍的人每次要重讀整句，LLM 會把前面算過的結果存起來（[[KV cache]]），不必每次從頭算，所以後面的字比第一個字快。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="自迴歸迴圈：輸入加上已產生的字送進模型，算出機率，取樣一個 token，接回輸入，重複，直到遇到結束">
+        <rect x="10" y="30" width="210" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="115" y="56" text-anchor="middle" font-size="14" font-weight="900">目前的句子</text><text x="115" y="78" text-anchor="middle" font-size="13">問題＋已經產生的字</text>
+        <line x1="220" y1="60" x2="250" y2="60" class="stroke-ink" stroke-width="3"/>
+        <rect x="250" y="30" width="140" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="320" y="56" text-anchor="middle" font-size="14" font-weight="900" class="on-color">模型</text><text x="320" y="78" text-anchor="middle" font-size="13" class="on-color">一次前向計算</text>
+        <line x1="390" y1="60" x2="420" y2="60" class="stroke-ink" stroke-width="3"/>
+        <rect x="420" y="30" width="130" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="485" y="56" text-anchor="middle" font-size="14" font-weight="900">機率</text><text x="485" y="78" text-anchor="middle" font-size="13">每個候選</text>
+        <line x1="485" y1="90" x2="485" y2="130" class="stroke-ink" stroke-width="3"/>
+        <rect x="400" y="130" width="150" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="475" y="156" text-anchor="middle" font-size="14" font-weight="900" class="on-color">取樣</text><text x="475" y="178" text-anchor="middle" font-size="13" class="on-color">選一個 token</text>
+        <path d="M400 160 L115 160 L115 96" fill="none" class="stroke-ink" stroke-width="3"/><path d="M107 104 L115 92 L123 104 Z" class="stroke-ink" style="fill:var(--ink)"/>
+        <text x="250" y="152" text-anchor="middle" font-size="14" font-weight="900">接回去，再來一次</text>
+        <text x="280" y="224" text-anchor="middle" font-size="14">選到「結束」或到達 max_tokens 上限就停</text>
+      </svg>`,
+      caption: '回答有 500 個 token，這個圈就繞 500 次。',
+    },
+    define: [
+      { term: '自迴歸', en: 'autoregressive', def: '產生一個、接回去、再產生下一個。', example: 'LLM 產生回答的方式。' },
+      { term: '取樣', en: 'sampling', def: '依機率抽一個 token，而不是永遠挑最高的。', example: '同一個問題問兩次，回答可能不同。' },
+      { term: 'KV cache', en: 'KV cache', def: '存下前面算過的中間結果，下一步不必重算。', example: '第一個字最慢的原因之一。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'sampler', props: { title: '一步一步接出一句話', topP: true, steps: [
+          { context: '今天天氣', candidates: [{ t: '很', logit: 3.2 }, { t: '真', logit: 2.6 }, { t: '不', logit: 2.0 }, { t: '有點', logit: 1.5 }, { t: '超', logit: 0.8 }] },
+          { candidates: [{ t: '好', logit: 3.5 }, { t: '熱', logit: 3.0 }, { t: '冷', logit: 2.2 }, { t: '悶', logit: 1.0 }] },
+          { candidates: [{ t: '，', logit: 3.0 }, { t: '。', logit: 2.9 }, { t: '！', logit: 1.8 }] },
+          { candidates: [{ t: '適合', logit: 2.8 }, { t: '我們', logit: 2.4 }, { t: '出門', logit: 1.9 }, { t: '記得', logit: 1.6 }] },
+        ], note: '第一個字抽到不同的，後面每一步的候選其實也應該跟著變；這裡為了示意固定候選。機率都是**示意**。' } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="時間長條：第一個 token 要先讀完整段輸入所以最長，之後每個 token 時間短而且差不多">
+          <text x="20" y="28" font-size="15" font-weight="900">產生一段回答的時間（示意）</text>
+          <rect x="20" y="50" width="200" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="120" y="76" text-anchor="middle" font-size="14" font-weight="900" class="on-color">第 1 個 token</text>
+          ${[...Array(9).keys()].map((i) => `<rect x="${224 + i * 36}" y="50" width="32" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>`).join('')}
+          <text x="120" y="120" text-anchor="middle" font-size="13">讀完整段輸入＋算出第一個</text>
+          <text x="388" y="120" text-anchor="middle" font-size="13">之後每個都很短（用到 KV cache）</text>
+          <text x="20" y="168" font-size="14">輸入越長，第一個 token 等越久；輸出越長，總時間越長。</text>
+          <text x="20" y="190" font-size="13">2-5 把這叫做 TTFT 與總時間。</text>
+        </svg>`, caption: '這就是為什麼聊天畫面常常「停頓一下，然後字開始流出來」。' },
+        { type: 'table', head: ['', '挑最高的（貪婪）', '依機率取樣'], rows: [
+          ['同一個問題問兩次', '回答幾乎一樣', '回答可能不同'],
+          ['好處', '穩定、好重現', '自然、有變化'],
+          ['壞處', '容易重複、很死板', '偶爾抽到怪字'],
+        ] },
+        { type: 'callout', variant: 'tip', title: '迴圈什麼時候停？', body: ['兩種情況：模型選到一個代表「說完了」的特殊 token，或產生的數量碰到你在請求裡設的 `max_tokens` 上限。', '第二種情況回答會在半句話停住。API 的回應會告訴你是哪一種（`stop_reason`），程式要分開處理：前者正常顯示，後者提示使用者回答被截斷，或調高上限再試（第一部 1-3）。'] },
+      ],
+      tryit: {
+        q: ['在上面的 sampler 把 top-p 拉到 0.5，再按幾次「抽一個」。哪些字被劃掉了？為什麼這樣可以減少怪字？'],
+        draft: '被劃掉的：＿＿\n為什麼：＿＿',
+        answer: ['top-p 0.5 只保留「累積機率先到 50% 的前幾名」，後面的冷門候選直接不參加抽籤。這樣保留了變化，又不會抽到太離譜的字。', 'Claude 最新的 API 版本把 temperature、top-p 都移除了，由模型端決定；但機制本身仍是這樣運作（第二部細講）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為模型先想好整句話，再一次輸出。', why: '它是一個 token 一個 token 決定的，前面的字會影響後面。', right: '自迴歸：每一步只決定下一個。' },
+      { wrong: '以為同一個問題回答不一樣代表模型壞了。', why: '取樣本來就有隨機性。', right: '需要穩定結果時，用結構化輸出與驗證（第一部模組 3）。' },
+      { wrong: '以為回答越長，第一個字出現得越慢。', why: '第一個字主要受「輸入長度」影響；輸出長度影響的是總時間。', right: '輸入長 → 等第一個字久；輸出長 → 總時間久。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '一段 300 個 token 的回答，⑤ 站大約要做幾次前向計算？', options: [
+        { text: '大約 300 次，每產生一個 token 一次', correct: true, why: '自迴歸：每個 token 一次。' },
+        { text: '只要 1 次，整段一起算出來', why: '不是一次算完整段。' },
+        { text: '3 次，每 100 個 token 算一次', why: '沒有這種分批方式。' },
+        { text: '看輸入有幾個字就算幾次', why: '次數跟著輸出長度，不是輸入長度。' },
+      ] },
+      { level: '應用', type: 'mc', q: '同一個問題，把附上的參考文件從 1 頁加到 50 頁。最可能發生什麼？', options: [
+        { text: '第一個字出現前要等比較久', correct: true, why: '模型要先讀完更長的輸入。' },
+        { text: '回答之後每個字都會出現得更快', why: '之後每個字的速度差不多，甚至稍慢。' },
+        { text: '費用不變，因為回答長度沒有改變', why: '輸入 token 也要計費。' },
+        { text: '模型會自動略過多出來的那些頁數', why: '放進去的都會被讀（在上限內）。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的 AI 摘要功能「按下去要等 4 秒才開始出字」，但出字後很快。用這一課的知識推測原因與一個改善方向。'], answer: [
+        '「開始出字前」慢，多半是輸入太長（第一個 token 要先讀完全部輸入），或在後端排隊。',
+        '改善：減少不必要的輸入、把固定不變的開頭用 prompt caching（第一部 8-2），並確認有開串流。',
+      ] },
+    ],
+    keypoints: [
+      '自迴歸：算一個、接回去、再算下一個。',
+      '依機率取樣，所以同一個問題回答可能不同。',
+      '第一個字慢（要讀完輸入），之後快（KV cache）。',
+    ],
+    sources: ['transformer', 'gpt3'],
+  },
+
+  '2-5': {
+    goals: [
+      '分清 TTFT 與總時間',
+      '說明串流為什麼讓等待感覺比較短',
+      '把六站的時間與錢串成一張帳單',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-4）把參考文件從 1 頁加到 50 頁，最明顯的變化是？', options: [
+        { text: '第一個字出現前要等比較久', correct: true, why: '要先讀完較長的輸入。' },
+        { text: '回答一定變得比較短', why: '輸入長短不決定輸出長短。' },
+        { text: '不會有任何影響', why: '輸入越長越慢也越貴。' },
+        { text: '模型會改用 CPU 來計算', why: '不會換硬體。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-2）一次請求的費用怎麼算？', options: [
+        { text: '輸入 token × 輸入單價＋輸出 token × 輸出單價', correct: true, why: '兩邊分開算。' },
+        { text: '依照你打字的時間長短來計算', why: '和打字時間無關。' },
+        { text: '每次請求固定收一樣的費用', why: '費用跟著 token 數。' },
+        { text: '只算模型寫出來的那些字', why: '輸入也要計費。' },
+      ] },
+    ],
+    analogy: {
+      text: ['餐廳上菜有兩種：一種等全部菜都好了一次端上桌；一種好一道上一道。總時間一樣，但第二種你很快就有東西吃，不會覺得等很久。', '[[串流]]就是第二種：模型每產生一小段就送回來，使用者在 [[TTFT]] 之後就開始讀，不用等整段完成。'],
+      limit: ['餐廳先上的是完整的一道菜，串流先送的是半句話，可能還沒說到重點。另外串流不會讓總時間變短，也不會讓帳單變便宜，它改善的是「感覺」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="時間組成：網路與排隊很短，讀輸入到第一個字是 TTFT，之後逐字產生直到結束是總時間">
+        <text x="20" y="28" font-size="15" font-weight="900">一次請求的時間（示意）</text>
+        <rect x="20" y="50" width="50" height="44" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <rect x="70" y="50" width="130" height="44" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <rect x="200" y="50" width="340" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="45" y="78" text-anchor="middle" font-size="13" class="on-color">網路</text>
+        <text x="135" y="78" text-anchor="middle" font-size="13" class="on-color">讀輸入</text>
+        <text x="370" y="78" text-anchor="middle" font-size="13" class="on-color">一個一個產生輸出 token</text>
+        <path d="M20 112 L200 112" class="stroke-ink" stroke-width="3"/><path d="M200 104 L200 120" class="stroke-ink" stroke-width="3"/>
+        <text x="110" y="138" text-anchor="middle" font-size="14" font-weight="900">TTFT</text>
+        <path d="M20 160 L540 160" class="stroke-ink" stroke-width="3"/><path d="M540 152 L540 168" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="186" text-anchor="middle" font-size="14" font-weight="900">總時間</text>
+        <text x="280" y="216" text-anchor="middle" font-size="13">開串流：TTFT 之後就看得到字・不開：要等到總時間結束</text>
+      </svg>`,
+      caption: '使用者的「等待感」主要來自 TTFT；總時間由輸出長度決定。',
+    },
+    define: [
+      { term: '串流', en: 'streaming', def: '邊產生邊送回。', example: '聊天畫面逐字出現。' },
+      { term: 'SSE', en: 'Server-Sent Events', def: 'Claude 串流用的事件格式。', example: '第一部 2-2 一行一行拆解。' },
+      { term: 'TTFT', en: 'Time To First Token', def: '送出到第一個字出現的時間。', example: '感覺「快不快」的關鍵。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'ssestream', props: { view: 'compare', title: '同一個回答，串流與不串流', text: '台灣最高的山是玉山，主峰海拔約三千九百多公尺，位在南投、嘉義、高雄、花蓮的交界附近。', ttft: 900, gap: 120 } },
+        { type: 'widget', name: 'costcalc', props: { model: 'claude-opus-5-5', requestsPerDay: 1000, input: 2000, output: 500 } },
+        { type: 'table', head: ['站', '花時間', '花錢'], rows: [
+          ['① 你的電腦', '幾乎不花', '不花'],
+          ['② 後端', '查資料可能要一點時間', '你自己的伺服器費用'],
+          ['③ API', '尖峰時可能排隊', '不另外收'],
+          ['④ tokenizer', '很快', '決定 token 數 → 決定費用'],
+          ['⑤ GPU 上的模型', '最多：讀輸入＋逐字產生', '輸入＋輸出 token 費用'],
+          ['⑥ 回到螢幕', '串流讓等待感變短', '不另外收'],
+        ], caption: '六站的帳單。⑤ 站同時是最慢和最貴的地方。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="一次請求的花費組成：輸入 2000 token 花 0.8 美分，輸出 500 token 花 1 美分；輸出 token 少但單價高，所以花費比輸入多">
+          <text x="20" y="28" font-size="15" font-weight="900">一次請求（Opus 5.5，輸入 2,000、輸出 500 token）</text>
+          <text x="20" y="72" font-size="14">token 數</text>
+          <rect x="110" y="52" width="320" height="32" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><rect x="430" y="52" width="80" height="32" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <text x="270" y="74" text-anchor="middle" font-size="13" class="on-color">輸入 2,000</text><text x="470" y="74" text-anchor="middle" font-size="13" class="on-color">500</text>
+          <text x="20" y="132" font-size="14">花費</text>
+          <rect x="110" y="112" width="178" height="32" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><rect x="288" y="112" width="222" height="32" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <text x="199" y="134" text-anchor="middle" font-size="13" class="on-color">$0.008</text><text x="399" y="134" text-anchor="middle" font-size="13" class="on-color">$0.010</text>
+          <text x="20" y="182" font-size="14">輸出 token 只有輸入的 1/4，花費卻比較多：輸出單價是輸入的 5 倍。</text>
+          <text x="20" y="202" font-size="13">價格查證於 2026-10-22，以官方價目表為準。</text>
+        </svg>`, caption: '每次只要約 1.8 美分，一天 1,000 次、一個月就是約 540 美元。用上面的計算器自己試。' },
+      ],
+      tryit: {
+        q: ['在成本計算器把「每次輸出 token」拉大，再把「每次輸入 token」拉大。哪一個讓每次請求的費用漲得比較快？為什麼？'],
+        draft: '漲得比較快的是：＿＿\n原因：＿＿',
+        answer: ['同樣增加的 token 數，輸出漲得比較快：Opus 5.5 輸出單價是輸入的 5 倍（$20 對 $4）。', '但實務上輸入常常比輸出長很多（附了一堆文件），所以兩邊都要看。第一部 8-2 有完整的省錢方法。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為開串流會讓回答更快產生完。', why: '總時間不變，只是更早開始看到字。', right: '串流改善 TTFT 的體感，不縮短總時間。' },
+      { wrong: '以為串流比較省錢。', why: '計費只看 token 數。', right: '要省錢就減少 token 或用快取、Batch（第一部 8-2）。' },
+      { wrong: '只看「平均每次多少錢」，不看每天請求數。', why: '每次很便宜，乘上每天上萬次就很可觀。', right: '用成本計算器算每月總額。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'TTFT 指的是什麼？', options: [
+        { text: '從送出到第一個字出現的時間', correct: true, why: 'Time To First Token。' },
+        { text: '從送出到整段回答完成的時間', why: '那是總時間。' },
+        { text: '每一個 token 平均要花的錢', why: '那是單價，不是時間。' },
+        { text: 'tokenizer 切完 token 所花的時間', why: '那只是其中一小段。' },
+      ] },
+      { level: '應用', type: 'mc', q: '使用者抱怨「按下去好像當掉了，過一陣子整段才一次跳出來」。最直接的改善是？', options: [
+        { text: '開啟串流，讓字在 TTFT 之後就逐字出現', correct: true, why: '總時間不變，但使用者很快看到進度。' },
+        { text: '換一個更貴的模型讓它回答更快', why: '更大的模型通常更慢，也沒解決「看不到進度」。' },
+        { text: '把 max_tokens 設得非常非常大', why: 'max_tokens 是上限，不會讓它更早出字。' },
+        { text: '請使用者把問題打得再長一點', why: '輸入越長，等第一個字越久。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['老闆問：「AI 功能一個月要花多少？哪裡最花錢？」用這一課的帳單回答他，至少提到兩個數字要怎麼取得。'], answer: [
+        '最花錢的是 ⑤ 站：輸入 token 和輸出 token 各乘單價，再乘每月請求數。',
+        '數字來源：每天請求數看後端日誌；每次 token 數看 API 回應裡的 `usage` 欄位（第一部 1-5）；單價查官方價目表並寫下查證日期。',
+      ] },
+    ],
+    keypoints: [
+      'TTFT 決定「感覺快不快」，總時間由輸出長度決定。',
+      '串流改善等待感，不改變總時間和費用。',
+      '⑤ 站最慢也最貴：輸入＋輸出 token × 單價 × 次數。',
+    ],
+    sources: ['claude-streaming', 'claude-pricing'],
+  },
+});
+</script>
+

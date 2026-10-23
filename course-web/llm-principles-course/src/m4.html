@@ -1,0 +1,470 @@
+<script>
+/* ==========================================================================
+   模組 4：Transformer 結構：block、殘差連接、layer norm
+   ========================================================================== */
+defineTerms({
+  'Transformer block': { en: 'Transformer block', def: 'Transformer 的一層：先做 attention，再做前饋網路，兩者外面都包著殘差連接與 layer norm。', example: 'GPT-3 最大的版本疊了 96 層。', lesson: '4-1' },
+  '前饋網路': { en: 'feed-forward network, FFN', def: 'block 裡的第二部分：每個 token 各自經過兩層線性變換，中間夾一個非線性函式；不和其他 token 交流。', example: '原版 d_ff＝2,048，是 d_model 的 4 倍。', lesson: '4-1' },
+  '殘差連接': { en: 'residual connection', def: '把子層的輸入直接加到輸出上：輸出＝x＋子層(x)。讓資訊與梯度有一條直通路。', example: '來自 2015 年的 ResNet。', lesson: '4-2' },
+  'layer norm': { en: 'layer normalization', def: '把一個向量的數字調成平均 0、標準差 1，再乘上可學的縮放與偏移；讓每層的輸入維持在穩定範圍。', example: '[2, 4, 6, 8] → 約 [−1.34, −0.45, 0.45, 1.34]。', lesson: '4-3' },
+  'pre-LN': { en: 'pre-layer normalization', def: '把 layer norm 放在子層之前：x＋子層(LN(x))。原版是放在之後（post-LN）。', example: 'Xiong 等 2020 分析 pre-LN 訓練較穩定。', lesson: '4-3' },
+  '非線性函式': { en: 'activation function', def: '把線性計算的結果「彎一下」的函式，例如 ReLU（負數變 0）。沒有它，疊再多層也等於一層。', example: 'ReLU(−3)＝0，ReLU(2)＝2。', lesson: '4-1' },
+});
+
+const REVIEW_M3 = [
+  { level: '回想', type: 'mc', q: '（回顧 3-3）Attention 的公式是？', options: [
+    { text: 'softmax(QKᵀ ÷ √d_k) V', correct: true, why: '打分、縮放、softmax、加總 V。' },
+    { text: 'softmax(QV ÷ √d_k) K', why: 'K 和 V 的位置錯了。' },
+    { text: 'QKᵀV ÷ softmax(d_k)', why: 'softmax 是作用在分數上。' },
+    { text: 'softmax(Q ＋ K ＋ V)', why: '不是相加。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 2-1）一句 10 個 token、d＝4,096，查表後的形狀？', options: [
+    { text: '10 × 4,096', correct: true, why: '每個 token 一列。' },
+    { text: '4,096 × 4,096', why: '那是一個方陣，不是輸入。' },
+    { text: '10 × 10', why: '那是 attention 權重表的形狀。' },
+    { text: '1 × 4,096', why: '每個 token 都有一列。' },
+  ] },
+];
+
+const BLOCK_SVG = `<svg viewBox="0 0 560 330" role="img" aria-label="一個 Transformer block：輸入 x 先經過 layer norm 與 attention，加回 x；再經過 layer norm 與前饋網路，加回去；輸出形狀和輸入相同">
+  <rect x="200" y="290" width="160" height="34" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="313" text-anchor="middle" font-size="14" font-weight="900">輸入 x（n × d）</text>
+  <line x1="280" y1="290" x2="280" y2="264" class="stroke-ink" stroke-width="3"/>
+  <rect x="200" y="226" width="160" height="38" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="280" y="250" text-anchor="middle" font-size="14" font-weight="900" class="on-color">layer norm</text>
+  <rect x="200" y="176" width="160" height="40" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="280" y="201" text-anchor="middle" font-size="14" font-weight="900" class="on-color">attention（看別人）</text>
+  <line x1="280" y1="226" x2="280" y2="216" class="stroke-ink" stroke-width="3"/>
+  <circle cx="280" cy="156" r="13" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="162" text-anchor="middle" font-size="18" font-weight="900">＋</text>
+  <line x1="280" y1="176" x2="280" y2="169" class="stroke-ink" stroke-width="3"/>
+  <path d="M200 307 L120 307 L120 156 L267 156" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="7 5"/>
+  <text x="112" y="234" text-anchor="end" font-size="13" font-weight="900">直通</text>
+  <rect x="200" y="96" width="160" height="38" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="280" y="120" text-anchor="middle" font-size="14" font-weight="900" class="on-color">layer norm</text>
+  <line x1="280" y1="143" x2="280" y2="134" class="stroke-ink" stroke-width="3"/>
+  <rect x="200" y="46" width="160" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="280" y="71" text-anchor="middle" font-size="14" font-weight="900" class="on-color">前饋網路（加工自己）</text>
+  <line x1="280" y1="96" x2="280" y2="86" class="stroke-ink" stroke-width="3"/>
+  <circle cx="280" cy="24" r="13" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="30" text-anchor="middle" font-size="18" font-weight="900">＋</text>
+  <line x1="280" y1="46" x2="280" y2="37" class="stroke-ink" stroke-width="3"/>
+  <path d="M293 156 L440 156 L440 24 L293 24" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="7 5"/>
+  <text x="448" y="94" font-size="13" font-weight="900">直通</text>
+  <text x="300" y="20" font-size="13" font-weight="900">→ 輸出（n × d），送進下一層</text>
+</svg>`;
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '說出一個 block 的兩個部分各做什麼',
+      '解釋前饋網路為什麼「不和其他 token 交流」',
+      '知道一個 block 進出的形狀都一樣',
+    ],
+    review: REVIEW_M3,
+    analogy: {
+      text: ['小組報告的一輪討論：先開會聽大家說（attention：資訊在 token 之間流動），再各自回座位把聽到的整理成自己的筆記（[[前饋網路]]：每個 token 自己加工）。', '一個 [[Transformer block]] 就是「開會＋整理」一輪。疊很多層，就是討論很多輪：越後面的層，每個 token 的向量裡帶的資訊越豐富。'],
+      limit: ['小組討論的每一輪內容不同，block 的結構每一層都一樣，只是各層的參數不同。另外「整理筆記」聽起來像有意圖，前饋網路只是兩次矩陣乘法夾一個[[非線性函式]]。'],
+    },
+    model: { svg: BLOCK_SVG, caption: '一個 block 由下往上：layer norm → attention → 加回 → layer norm → 前饋網路 → 加回。這是現代常見的 pre-LN 排法（4-3）。' },
+    define: [
+      { term: 'Transformer block', en: 'block', def: 'attention＋前饋網路，外加殘差與 layer norm。', example: '一層。' },
+      { term: '前饋網路', en: 'FFN', def: '每個 token 各自做：放大到 d_ff → 非線性 → 縮回 d。', example: '512 → 2,048 → 512。' },
+      { term: '非線性函式', en: 'activation', def: '讓多層有意義的「彎曲」。', example: 'ReLU；現代模型常用 GELU 等變體。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'attn', label: 'attention 的工作' }, { id: 'ffn', label: '前饋網路的工作' }], items: [
+          { text: '讓「牠」的向量混進「動物」的資訊', answer: 'attn', why: 'token 之間交流。' },
+          { text: '每個 token 各自把向量放大到 4 倍維度、過 ReLU、再縮回來', answer: 'ffn', why: '前饋網路的固定結構。' },
+          { text: '決定第 5 個 token 要參考第 1 個還是第 3 個', answer: 'attn', why: '分配注意力。' },
+          { text: '所有 token 用同一組矩陣、但彼此不看對方', answer: 'ffn', why: '逐 token 獨立處理。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="前饋網路：一個 512 維向量先乘矩陣放大成 2048 維，經過 ReLU，再乘另一個矩陣縮回 512 維">
+          <rect x="10" y="70" width="90" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="55" y="105" text-anchor="middle" font-size="14" font-weight="900" class="on-color">512</text>
+          <line x1="100" y1="100" x2="130" y2="100" class="stroke-ink" stroke-width="3"/>
+          <rect x="130" y="70" width="80" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="170" y="105" text-anchor="middle" font-size="14" class="mono">× W₁</text>
+          <line x1="210" y1="100" x2="230" y2="100" class="stroke-ink" stroke-width="3"/>
+          <rect x="230" y="30" width="100" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="280" y="96" text-anchor="middle" font-size="14" font-weight="900" class="on-color">2,048</text><text x="280" y="120" text-anchor="middle" font-size="13" class="on-color">ReLU</text>
+          <line x1="330" y1="100" x2="350" y2="100" class="stroke-ink" stroke-width="3"/>
+          <rect x="350" y="70" width="80" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="390" y="105" text-anchor="middle" font-size="14" class="mono">× W₂</text>
+          <line x1="430" y1="100" x2="460" y2="100" class="stroke-ink" stroke-width="3"/>
+          <rect x="460" y="70" width="90" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="505" y="105" text-anchor="middle" font-size="14" font-weight="900" class="on-color">512</text>
+          <text x="280" y="194" text-anchor="middle" font-size="13">原版 Transformer base 的數字；每個 token 各自做一次</text>
+        </svg>`, caption: '放大、彎曲、縮回。研究上常認為很多「知識」存在這裡的參數中（🟡 研究觀察，不是定論）。' },
+        { type: 'table', head: ['', 'attention', '前饋網路'], rows: [
+          ['token 之間有沒有交流', '有', '沒有'],
+          ['參數（原版每層）', '4 × d²（W_Q、W_K、W_V、W_O）', '2 × d × d_ff ＝ 8 × d²'],
+          ['形狀', 'n × d 進、n × d 出', 'n × d 進、n × d 出'],
+        ], caption: 'd_ff＝4d 時，前饋網路的參數是 attention 的兩倍（4-4 會用到）。' },
+      ],
+      tryit: {
+        q: ['如果把前饋網路中間的 ReLU 拿掉，W₁ 和 W₂ 兩次矩陣乘法會等於什麼？'],
+        draft: '我的推測：＿',
+        answer: ['等於一個矩陣（W₁ × W₂）的一次乘法：兩次線性變換疊起來還是線性的，放大到 2,048 維就白做了。', '非線性函式讓「疊起來」真的增加表達能力。第四部 1-2 會用圖看這件事。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為前饋網路會看整句話。', why: '它對每個 token 各自做，彼此不交流。', right: '交流只發生在 attention。' },
+      { wrong: '以為每一層的結構都不一樣。', why: '結構相同，只有參數不同。', right: '疊 N 層同樣的 block。' },
+      { wrong: '以為 attention 是 Transformer 唯一重要的部分。', why: '前饋網路的參數通常佔每層的大多數。', right: '兩個部分分工合作，缺一不可。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在一個 block 裡，哪一部分讓 token 之間交換資訊？', options: [
+        { text: 'attention', correct: true, why: '前饋網路逐 token 獨立。' },
+        { text: '前饋網路', why: '前饋網路不交流。' },
+        { text: 'layer norm', why: 'layer norm 只處理單一向量。' },
+        { text: '殘差連接', why: '殘差只是把輸入加回來。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'd_model＝1,024、d_ff＝4,096，前饋網路一層有多少個權重（不算偏差）？', options: [
+        { text: '約 840 萬', correct: true, why: '2 × 1,024 × 4,096 ＝ 8,388,608。' },
+        { text: '約 420 萬', why: '只算了一個矩陣。' },
+        { text: '約 100 萬', why: '那是 d²。' },
+        { text: '約 1,680 萬', why: '多乘了 2。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['有人說「Transformer 就是很多層的 attention」。用這一課的內容補充這句話。'], answer: [
+        '每一層其實是 attention＋前饋網路，外面還有殘差與 layer norm。',
+        'attention 負責 token 之間的交流，前饋網路負責每個 token 自己的加工，而且前饋網路的參數通常比 attention 多。',
+      ] },
+    ],
+    keypoints: [
+      '一個 block：attention（看別人）＋前饋網路（加工自己）。',
+      '前饋網路：放大、非線性、縮回；逐 token 獨立。',
+      '每層進出形狀相同，所以可以一直疊。',
+    ],
+    sources: ['transformer'],
+  },
+
+  '4-2': {
+    goals: [
+      '寫出殘差連接的式子',
+      '解釋為什麼深的網路需要殘差',
+      '說出殘差讓每一層「只需要學修正量」的意思',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-1）前饋網路的結構是？', options: [
+        { text: '放大 → 非線性 → 縮回', correct: true, why: 'd → d_ff → d。' },
+        { text: '縮小 → 放大 → 縮小', why: '順序錯了。' },
+        { text: '只有一次矩陣乘法', why: '有兩次，中間夾非線性。' },
+        { text: '和 attention 一樣的 Q K V', why: '那是 attention。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-4）因果遮罩的作用？', options: [
+        { text: '讓 token 只能看前面', correct: true, why: '訓練時不會偷看答案。' },
+        { text: '讓 token 只能看後面', why: '方向反了。' },
+        { text: '把重要的 token 遮起來', why: '遮的是後面的位置。' },
+        { text: '加快 softmax', why: '不是為了速度。' },
+      ] },
+    ],
+    analogy: {
+      text: ['傳話遊戲：一句話經過 50 個人，最後面目全非。如果每個人除了口頭轉述，還把原本那張紙條一起往後傳，就算有人講錯，後面的人還看得到原文。', '[[殘差連接]]就是那張紙條：每個子層的輸出＝輸入 x ＋ 子層(x)。資訊有一條直通路，每一層只需要在原本的東西上「加一點修正」。'],
+      limit: ['傳話遊戲的紙條是原文，殘差的直通路上的東西每層都在累加修正，不是一直保持原樣。另外殘差最重要的效果在訓練時：梯度也能沿著直通路一路傳回前面的層（第四部 3）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="殘差：輸入 x 分成兩路，一路經過子層，一路直接繞過去，兩路在輸出相加">
+        <rect x="10" y="90" width="90" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="55" y="121" text-anchor="middle" font-size="16" font-weight="900" class="mono">x</text>
+        <line x1="100" y1="115" x2="190" y2="115" class="stroke-ink" stroke-width="3"/>
+        <rect x="190" y="90" width="170" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="275" y="121" text-anchor="middle" font-size="15" font-weight="900" class="on-color">子層(x)</text>
+        <line x1="360" y1="115" x2="420" y2="115" class="stroke-ink" stroke-width="3"/>
+        <circle cx="436" cy="115" r="16" class="fill-surface stroke-ink" stroke-width="3"/><text x="436" y="122" text-anchor="middle" font-size="20" font-weight="900">＋</text>
+        <path d="M140 115 L140 40 L436 40 L436 99" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="8 6"/>
+        <text x="288" y="32" text-anchor="middle" font-size="14" font-weight="900">直通路：x 原封不動</text>
+        <line x1="452" y1="115" x2="480" y2="115" class="stroke-ink" stroke-width="3"/>
+        <rect x="480" y="90" width="70" height="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="515" y="121" text-anchor="middle" font-size="14" font-weight="900" class="on-color">輸出</text>
+        <text x="280" y="190" text-anchor="middle" font-size="15" font-weight="900" class="mono">輸出 ＝ x ＋ 子層(x)</text>
+        <text x="280" y="212" text-anchor="middle" font-size="13">子層只需要學「要加多少修正」</text>
+      </svg>`,
+      caption: '每個 block 裡有兩個殘差：一個包 attention，一個包前饋網路（4-1 的虛線）。',
+    },
+    define: [
+      { term: '殘差連接', en: 'residual connection', def: '輸出＝x＋子層(x)。', example: 'He 等 2015 的 ResNet。' },
+      { term: '殘差流', en: 'residual stream', def: '貫穿所有層、一路被累加修正的那條主幹向量；研究者常用這個說法描述 Transformer。', example: '每層讀它、寫回一點修正。' },
+      { term: '梯度消失', en: 'vanishing gradient', def: '訓練時誤差訊號往前傳經過很多層後變得太小，前面的層學不動。', example: '第四部 3 細講。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '訊號穿過很多層後剩多少（示意計算）', sliders: [
+          { id: 'layers', label: '層數', min: 1, max: 96, step: 1, value: 24 },
+          { id: 'keep', label: '每層把訊號乘上的倍數', min: 0.5, max: 0.99, step: 0.01, value: 0.8 },
+        ], compute: (v) => {
+          const plain = v.keep ** v.layers;
+          return { rows: [
+            { label: '沒有殘差：連乘', value: plain < 0.0001 ? plain.toExponential(1) : plain.toFixed(4), ratio: plain },
+            { label: '有殘差：直通路保留', value: '1.0000（再加上修正）', ratio: 1 },
+          ], note: `沒有殘差時，訊號是 ${v.keep} 的 ${v.layers} 次方。這是**簡化的示意**：真實網路不是單純連乘，但「很多層連乘會變很小」正是深網路難訓練的原因之一。` };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="殘差流：一條橫貫的主幹，第 1 層、第 2 層、第 3 層各自從主幹讀資料，再把修正加回主幹">
+          <line x1="20" y1="120" x2="540" y2="120" style="stroke:var(--m2)" stroke-width="10"/>
+          <text x="20" y="150" font-size="14" font-weight="900">殘差流（主幹）</text>
+          ${[0, 1, 2].map((i) => `<rect x="${110 + i * 150}" y="30" width="110" height="44" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="${165 + i * 150}" y="58" text-anchor="middle" font-size="14" font-weight="900" class="on-color">第 ${i + 1} 層</text>
+          <path d="M${135 + i * 150} 116 L${135 + i * 150} 74" class="stroke-ink" stroke-width="3"/><path d="M${195 + i * 150} 74 L${195 + i * 150} 112" class="stroke-ink" stroke-width="3"/><path d="M${187 + i * 150} 104 L${195 + i * 150} 116 L${203 + i * 150} 104 Z" class="stroke-ink" style="fill:var(--ink)"/>`).join('')}
+          <text x="280" y="186" text-anchor="middle" font-size="13">每層：從主幹讀（左邊的線）→ 算 → 把修正加回主幹（右邊的箭頭）</text>
+        </svg>`, caption: '把 Transformer 想成一條主幹，每層都在上面「加註解」，是理解深層網路的常用觀點。' },
+      ],
+      tryit: {
+        q: ['把拉桿設成 96 層、每層 0.95。沒有殘差的訊號剩多少？再設成 96 層、0.8 呢？'],
+        draft: '0.95：＿\n0.8：＿',
+        answer: ['0.95⁹⁶ ≈ 0.0073；0.8⁹⁶ ≈ 0.0000000005（約 5×10⁻¹⁰）。', '就算每層只損失 5%，96 層後也只剩不到 1%。殘差的直通路讓訊號和梯度不必穿過每一層的連乘。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為殘差是把輸出「替換」成輸入。', why: '是相加，兩者都保留。', right: '輸出＝x＋子層(x)。' },
+      { wrong: '以為殘差只是為了推論更快。', why: '它主要解決深網路難訓練的問題。', right: '殘差讓訊號與梯度有直通路。' },
+      { wrong: '以為有殘差後子層就沒用了。', why: '子層負責算出修正量，才是模型真正在學的東西。', right: '直通路保底，子層加料。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '殘差連接的式子是？', options: [
+        { text: '輸出 ＝ x ＋ 子層(x)', correct: true, why: '輸入直接加回。' },
+        { text: '輸出 ＝ 子層(x) − x', why: '是加不是減。' },
+        { text: '輸出 ＝ x × 子層(x)', why: '是加不是乘。' },
+        { text: '輸出 ＝ 子層(子層(x))', why: '那是疊兩次，沒有直通路。' },
+      ] },
+      { level: '應用', type: 'mc', q: '一個 block 裡有幾個殘差連接？', options: [
+        { text: '2 個，兩個子層各一個', correct: true, why: '兩個子層各一個。' },
+        { text: '1 個：整個 block 只包一次', why: '兩個子層各有一個。' },
+        { text: '每個 token 各一個，所以有 n 個', why: '殘差是按子層算的。' },
+        { text: '0 個，殘差只在第一層', why: '每一層都有。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['如果訓練一開始，子層的輸出接近 0，整個 96 層的模型會是什麼樣子？這對訓練有什麼好處？'], answer: [
+        '每層都是 x＋約 0，整個模型接近「直接把輸入傳到輸出」，不會一開始就把訊號弄亂。',
+        '好處：訓練可以從一個穩定的起點開始，每層慢慢學會加入有用的修正，而不是一開始就要讓 96 層的連乘恰好合作。',
+      ] },
+    ],
+    keypoints: [
+      '殘差：輸出＝x＋子層(x)，資訊有直通路。',
+      '每個 block 有兩個殘差，分別包 attention 與前饋網路。',
+      '主要好處在訓練：深網路的訊號與梯度不會在連乘中消失。',
+    ],
+    sources: ['resnet', 'transformer'],
+  },
+
+  '4-3': {
+    goals: [
+      '手算一次 layer norm',
+      '說明 layer norm 為什麼讓訓練更穩',
+      '分辨 post-LN 與 pre-LN',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-2）殘差連接主要解決什麼問題？', options: [
+        { text: '深的網路難訓練', correct: true, why: '訊號與梯度有直通路。' },
+        { text: '詞彙表太大', why: '無關。' },
+        { text: '推論太慢', why: '不是為了速度。' },
+        { text: 'token 分不出順序', why: '那是位置編碼的事。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-3）softmax(0, 0) 是？', options: [
+        { text: '(0.5, 0.5)', correct: true, why: '分數一樣，平均分配。' },
+        { text: '(0, 0)', why: '加總一定是 1。' },
+        { text: '(1, 0)', why: '不會偏向任何一個。' },
+        { text: '無法計算', why: 'e⁰＝1。' },
+      ] },
+    ],
+    analogy: {
+      text: ['不同老師的評分尺度不同：A 老師給分 60～100，B 老師給分 0～10。要比較學生，先把每位老師的分數換成「比平均高幾個標準差」，大家就在同一把尺上。', '[[layer norm]] 對每個 token 的向量做這件事：減掉平均、除以標準差，讓數字落在穩定的範圍，再乘上兩組可學的參數（縮放、偏移），保留模型需要的尺度。'],
+      limit: ['老師分數換算一次就好，layer norm 每一層、每個 token 都做；而且最後那組可學參數讓模型可以「把尺度調回來」，所以不是硬性把所有東西都變成平均 0。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="layer norm 三步：算平均與標準差，每個數減平均除以標準差，再乘以 gamma 加上 beta">
+        <rect x="10" y="40" width="160" height="110" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="90" y="70" text-anchor="middle" font-size="14" font-weight="900">① 一個向量</text>
+        <text x="90" y="104" text-anchor="middle" font-size="14" class="mono">[2, 4, 6, 8]</text>
+        <text x="90" y="132" text-anchor="middle" font-size="13">平均 5、標準差 2.24</text>
+        <line x1="170" y1="95" x2="200" y2="95" class="stroke-ink" stroke-width="3"/>
+        <rect x="200" y="40" width="170" height="110" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="285" y="70" text-anchor="middle" font-size="14" font-weight="900" class="on-color">② (x − 平均) ÷ 標準差</text>
+        <text x="285" y="104" text-anchor="middle" font-size="13" class="mono on-color">[−1.34, −0.45,</text>
+        <text x="285" y="126" text-anchor="middle" font-size="13" class="mono on-color">0.45, 1.34]</text>
+        <line x1="370" y1="95" x2="400" y2="95" class="stroke-ink" stroke-width="3"/>
+        <rect x="400" y="40" width="150" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="475" y="70" text-anchor="middle" font-size="14" font-weight="900" class="on-color">③ × γ ＋ β</text>
+        <text x="475" y="104" text-anchor="middle" font-size="13" class="on-color">γ、β 是可學的參數</text>
+        <text x="475" y="126" text-anchor="middle" font-size="13" class="on-color">每一維各一個</text>
+        <text x="280" y="190" text-anchor="middle" font-size="14">標準差用母體公式：√((9＋1＋1＋9)÷4) ＝ √5 ≈ 2.24</text>
+        <text x="280" y="214" text-anchor="middle" font-size="13">實作上分母會再加一個很小的數，避免除以 0</text>
+      </svg>`,
+      caption: '只看單一 token 自己的那 d 個數字，和其他 token、其他資料無關。',
+    },
+    define: [
+      { term: 'layer norm', en: 'layer normalization', def: '對一個向量減平均、除標準差，再 ×γ＋β。', example: 'Ba 等 2016。' },
+      { term: 'post-LN', en: 'post-layer norm', def: 'LN(x＋子層(x))：先加殘差再正規化（原版）。', example: 'Vaswani 2017。' },
+      { term: 'pre-LN', en: 'pre-layer norm', def: 'x＋子層(LN(x))：先正規化再進子層。', example: 'Xiong 2020 分析訓練較穩。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="post-LN 與 pre-LN 對照：post-LN 是子層加上 x 之後再做 layer norm；pre-LN 是先 layer norm 再進子層，直通路不經過 layer norm">
+  <rect x="10" y="20" width="260" height="170" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="140" y="46" text-anchor="middle" font-size="15" font-weight="900">post-LN（原版）</text>
+  <text x="140" y="84" text-anchor="middle" font-size="14" class="mono">x → 子層 → ＋x</text>
+  <text x="140" y="114" text-anchor="middle" font-size="14" class="mono">→ LN → 輸出</text>
+  <text x="140" y="158" text-anchor="middle" font-size="13">直通路每層都經過 LN</text>
+  <rect x="290" y="20" width="260" height="170" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+  <text x="420" y="46" text-anchor="middle" font-size="15" font-weight="900" class="on-color">pre-LN</text>
+  <text x="420" y="84" text-anchor="middle" font-size="14" class="mono on-color">x → LN → 子層</text>
+  <text x="420" y="114" text-anchor="middle" font-size="14" class="mono on-color">→ ＋x → 輸出</text>
+  <text x="420" y="158" text-anchor="middle" font-size="13" class="on-color">直通路完全不經過 LN</text>
+  <text x="280" y="212" text-anchor="middle" font-size="13">差別只在 LN 放的位置</text>
+</svg>`, caption: '4-1 的 block 圖用的是 pre-LN。' },
+        { type: 'widget', name: 'knobs', props: { title: '自己算 layer norm（實際計算，γ＝1、β＝0）', sliders: [
+          { id: 'a', label: '第 1 個數', min: -10, max: 10, step: 1, value: 2 },
+          { id: 'b', label: '第 2 個數', min: -10, max: 10, step: 1, value: 4 },
+          { id: 'c', label: '第 3 個數', min: -10, max: 10, step: 1, value: 6 },
+          { id: 'd', label: '第 4 個數', min: -10, max: 10, step: 1, value: 8 },
+        ], compute: (v) => {
+          const xs = [v.a, v.b, v.c, v.d];
+          const mean = xs.reduce((s, x) => s + x, 0) / xs.length;
+          const std = Math.sqrt(xs.reduce((s, x) => s + (x - mean) ** 2, 0) / xs.length + 1e-5);
+          const ys = xs.map((x) => (x - mean) / std);
+          return { rows: ys.map((y, i) => ({ label: `${xs[i]} → `, value: y.toFixed(2), ratio: (y + 2) / 4 })), note: `平均 ${mean.toFixed(2)}、標準差 ${std.toFixed(2)}。不管輸入多大，輸出都落在差不多的範圍（長條中間是 0）。把 4 個數同時加 5 試試：輸出完全不變。` };
+        } } },
+        { type: 'table', head: ['', 'post-LN（原版）', 'pre-LN（現代常見）'], rows: [
+          ['式子', 'LN(x ＋ 子層(x))', 'x ＋ 子層(LN(x))'],
+          ['直通路', '每層都被 LN 處理過', '完全不經過 LN，最乾淨'],
+          ['訓練', '深的時候需要小心調學習率暖身', 'Xiong 等 2020 分析較穩定'],
+        ], caption: '「現代模型多半用 pre-LN 或其變體」是通則；個別模型的做法要看公開資料。' },
+      ],
+      tryit: {
+        q: ['手算 [1, 1, 1, 5] 的 layer norm（γ＝1、β＝0，不管那個很小的數）。'],
+        draft: '平均：＿\n標準差：＿\n結果：＿',
+        answer: ['平均 ＝ 8 ÷ 4 ＝ 2。差值 [−1, −1, −1, 3]，平方 [1, 1, 1, 9]，平均 3，標準差 √3 ≈ 1.73。', '結果 ≈ [−0.58, −0.58, −0.58, 1.73]。可以用上面的拉桿驗算。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 layer norm 是對整批資料、或整句話一起算平均。', why: '每個 token 的向量各自算。', right: '只看一個向量自己的 d 個數字。' },
+      { wrong: '以為正規化後模型就無法表示「很大的數」。', why: 'γ、β 是可學參數，可以把尺度調回來。', right: '正規化是讓起點穩定，不是限制表達。' },
+      { wrong: '以為 pre-LN 和 post-LN 只是寫法不同、結果一樣。', why: '直通路有沒有經過 LN，影響訓練穩定性。', right: '兩者是不同的架構選擇。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'layer norm 的計算範圍是？', options: [
+        { text: '一個 token 的一個向量', correct: true, why: '只看自己的 d 個數字。' },
+        { text: '整句話所有 token', why: '不跨 token。' },
+        { text: '整個訓練批次裡所有句子的所有 token', why: '那是 batch norm 的做法。' },
+        { text: '整個詞彙表', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '[10, 20, 30, 40] 和 [1, 2, 3, 4] 做 layer norm（γ＝1、β＝0），結果？', options: [
+        { text: '幾乎一樣', correct: true, why: '同比例放大後，減平均除標準差的結果相同。' },
+        { text: '第一組的結果是第二組的 10 倍', why: '除以標準差把倍數消掉了。' },
+        { text: '第一組全部變成 0', why: '不會全部是 0。' },
+        { text: '第二組全部變成 1', why: '不會全部是 1。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼深的模型特別需要 layer norm？用「數字會越來越大或越來越小」的角度說明。'], answer: [
+        '殘差一層一層把修正加上去，向量的數值範圍可能越來越大；每層的計算又可能放大或縮小數值。',
+        'layer norm 讓每個子層拿到的輸入都在穩定範圍，不會因為前面累積了很大的數，讓 softmax 或非線性函式失去作用。',
+      ] },
+    ],
+    keypoints: [
+      'layer norm：減平均、除標準差，再 ×γ＋β。',
+      '每個 token 的向量各自算；整體平移、縮放不影響結果。',
+      'post-LN 是原版，pre-LN 讓直通路更乾淨、訓練更穩。',
+    ],
+    sources: ['layernorm', 'preln', 'transformer'],
+  },
+
+  '4-4': {
+    goals: [
+      '估算一個 Transformer 有多少參數',
+      '說出參數主要集中在哪裡',
+      '用公開數字驗算 GPT-3 的 1,750 億參數',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-3）pre-LN 的式子是？', options: [
+        { text: 'x ＋ 子層(LN(x))', correct: true, why: '先正規化再進子層。' },
+        { text: 'LN(x ＋ 子層(x))', why: '那是 post-LN。' },
+        { text: 'LN(子層(x))', why: '少了殘差。' },
+        { text: '子層(x) ＋ LN(x)', why: '直通路應該是 x。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-3）V＝50,000、d＝12,288，向量表有多少數字？', options: [
+        { text: '約 6.1 億', correct: true, why: '50,000 × 12,288 ≈ 614,400,000。' },
+        { text: '約 6,100 萬', why: '少一個 10。' },
+        { text: '約 61 億', why: '多一個 10。' },
+        { text: '約 62,288', why: '要相乘。' },
+      ] },
+    ],
+    analogy: {
+      text: ['估一棟大樓用了多少鋼筋：先算一層樓用多少，再乘樓層數，最後加上地基。', '一個 Transformer 也一樣：每層 attention 約 4d²、前饋網路約 8d²，一層約 12d²；乘上層數 L，再加上向量表 V×d。這就是常說的「幾十億、幾千億[[參數]]」的來源。'],
+      limit: ['大樓每層用料差不多，模型也是；但實際模型還有偏差、layer norm 參數、不同的前饋網路設計（例如三個矩陣的變體），所以這個公式只是估算。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="參數分布：每一層 attention 4 d 平方，前饋網路 8 d 平方，乘以層數 L，再加上向量表 V 乘 d">
+        <text x="280" y="30" text-anchor="middle" font-size="16" font-weight="900" class="mono">參數 ≈ 12 × L × d² ＋ V × d</text>
+        <rect x="20" y="60" width="160" height="110" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+        <text x="100" y="98" text-anchor="middle" font-size="15" font-weight="900" class="on-color">attention</text>
+        <text x="100" y="128" text-anchor="middle" font-size="14" class="mono on-color">4d²</text>
+        <text x="100" y="152" text-anchor="middle" font-size="13" class="on-color">W_Q W_K W_V W_O</text>
+        <text x="200" y="122" text-anchor="middle" font-size="20" font-weight="900">＋</text>
+        <rect x="220" y="60" width="160" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="300" y="98" text-anchor="middle" font-size="15" font-weight="900" class="on-color">前饋網路</text>
+        <text x="300" y="128" text-anchor="middle" font-size="14" class="mono on-color">8d²</text>
+        <text x="300" y="152" text-anchor="middle" font-size="13" class="on-color">d_ff ＝ 4d</text>
+        <text x="410" y="122" text-anchor="middle" font-size="18" font-weight="900">× L</text>
+        <rect x="440" y="60" width="110" height="110" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="495" y="98" text-anchor="middle" font-size="15" font-weight="900" class="on-color">向量表</text>
+        <text x="495" y="128" text-anchor="middle" font-size="14" class="mono on-color">V × d</text>
+        <text x="280" y="210" text-anchor="middle" font-size="14">忽略偏差與 layer norm 的少量參數；前饋網路佔每層的 2/3</text>
+      </svg>`,
+      caption: 'd 變兩倍，每層參數變四倍：這是模型變大時最主要的成長來源。',
+    },
+    define: [
+      { term: 'd_model', en: 'model dimension', def: '每個 token 向量的維度。', example: 'GPT-3 最大版 12,288。' },
+      { term: '層數 L', en: 'number of layers', def: '疊了幾個 block。', example: 'GPT-3 最大版 96 層。' },
+      { term: '參數量', en: 'parameter count', def: '所有可訓練數字的總數。', example: 'GPT-3：1,750 億。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="GPT-3 的參數分布：Transformer 層約 1,739 億，向量表約 6 億，向量表不到百分之一">
+  <text x="20" y="28" font-size="15" font-weight="900">GPT-3 175B 的參數在哪（用 12Ld² ＋ Vd 估算）</text>
+  <rect x="20" y="50" width="514" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="270" y="81" text-anchor="middle" font-size="14" font-weight="900" class="on-color">Transformer 層 ≈ 1,739 億</text>
+  <rect x="534" y="50" width="6" height="50" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/>
+  <text x="540" y="124" text-anchor="end" font-size="13">向量表 ≈ 6 億（不到 1%）</text>
+  <text x="20" y="168" font-size="14">大模型的參數幾乎全在中間的層；小模型才需要擔心詞彙表佔比（1-3）。</text>
+</svg>`, caption: '估算值；忽略偏差與 layer norm 的少量參數。' },
+        { type: 'widget', name: 'knobs', props: { title: '估算參數量（實際計算：12 × L × d² ＋ V × d）', sliders: [
+          { id: 'L', label: '層數 L', min: 2, max: 128, step: 2, value: 96 },
+          { id: 'd', label: 'd_model', min: 512, max: 16384, step: 512, value: 12288 },
+          { id: 'V', label: '詞彙表', min: 10, max: 260, step: 10, value: 50, unit: '千' },
+        ], compute: (v) => {
+          const layers = 12 * v.L * v.d * v.d;
+          const emb = v.V * 1000 * v.d;
+          const total = layers + emb;
+          const fmt = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} 十億` : `${(n / 1e6).toFixed(0)} 百萬`);
+          return { rows: [
+            { label: 'Transformer 層', value: fmt(layers), ratio: layers / total },
+            { label: '向量表', value: fmt(emb), ratio: emb / total },
+            { label: '合計', value: fmt(total), ratio: 1 },
+          ], note: '預設值是 GPT-3 最大版公開的設定（96 層、d＝12,288、詞彙表約 5 萬），算出約 1,750 億，和論文的 175B 吻合。' };
+        } } },
+        { type: 'table', head: ['模型', '層數', 'd_model', '公開參數量'], rows: [
+          ['Transformer base（2017）', '6＋6（編碼器＋解碼器）', '512', '約 6,500 萬'],
+          ['GPT-3 175B（2020）', '96', '12,288', '1,750 億'],
+          ['Claude', '未公開', '未公開', '未公開'],
+        ], caption: '出處：Vaswani 等 2017、Brown 等 2020。' },
+        { type: 'callout', variant: 'tip', title: '參數量和記憶體', body: ['每個參數用 16 位元（2 位元組）存時，1,750 億參數就要約 350 GB 的記憶體，一張 GPU 放不下。', '這就是第五部要講的記憶體瓶頸，以及量化（把每個參數存得更小）的由來。'] },
+      ],
+      tryit: {
+        q: ['手算 L＝32、d＝4,096 的 Transformer 層參數（不含向量表）。'],
+        draft: '12 × 32 × 4,096² ＝ ＿',
+        answer: ['4,096² ＝ 16,777,216；× 12 × 32 ＝ 6,442,450,944，約 64 億。', '再加上向量表（例如 V＝32,000：約 1.3 億），整個模型約 66 億參數。這是很多「7B 等級」模型的大致規模。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為參數主要在 attention。', why: 'd_ff＝4d 時，前饋網路是 attention 的兩倍。', right: '每層約 1/3 在 attention、2/3 在前饋網路。' },
+      { wrong: '以為層數加倍，參數就加四倍。', why: '參數和層數成正比，和 d 的平方成正比。', right: 'L 兩倍 → 參數兩倍；d 兩倍 → 參數四倍。' },
+      { wrong: '用這個公式去「推算」Claude 的大小。', why: '沒有公開的設定可以代入。', right: '公式只能用在公開設定的模型上。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '一層 Transformer（d_ff＝4d）大約有多少參數？', options: [
+        { text: '12 × d²', correct: true, why: 'attention 4d² ＋ 前饋網路 8d²。' },
+        { text: '4 × d²', why: '只算了 attention。' },
+        { text: '8 × d²', why: '只算了前饋網路。' },
+        { text: '12 × d', why: '少了平方。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'd_model 從 4,096 變成 8,192、層數不變，Transformer 層的參數會？', options: [
+        { text: '變成 4 倍', correct: true, why: '和 d² 成正比。' },
+        { text: '變成 2 倍', why: '那是層數加倍的效果。' },
+        { text: '不變', why: 'd 變大參數一定變多。' },
+        { text: '變成 8 倍', why: '是平方，不是立方。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同樣約 70 億參數，可以選「很多層、d 小」或「很少層、d 大」。各有什麼直覺上的取捨？'], answer: [
+        '很多層：資訊在 token 之間交流、加工的輪數多，但每輪的向量比較窄；序列計算的步驟也比較多。',
+        '很少層、d 大：每輪能裝的資訊多，但加工輪數少。實務上會在兩者之間找平衡，這是設計模型時的經驗與實驗問題。',
+      ] },
+    ],
+    keypoints: [
+      '參數 ≈ 12 × L × d² ＋ V × d。',
+      '每層 2/3 在前饋網路；d 加倍參數變四倍。',
+      'GPT-3：96 層、d＝12,288 → 約 1,750 億。',
+    ],
+    sources: ['transformer', 'gpt3'],
+  },
+});
+</script>

@@ -1,0 +1,434 @@
+<script>
+/* ==========================================================================
+   模組 3：Attention 直覺：每個字在「看」誰
+   ========================================================================== */
+defineTerms({
+  'attention': { en: 'attention', def: '每個 token 依「和其他 token 有多相關」分配權重，再把其他 token 的資訊按權重加總進來。', example: '「牠」把大部分注意力放在「動物」上。', lesson: '3-1' },
+  '注意力權重': { en: 'attention weight', def: '一個 token 分給每個 token 的比例；同一列加起來等於 1。', example: '牠 → 動物 83%、馬路 8%…', lesson: '3-1' },
+  'Q／K／V': { en: 'query / key / value', def: '每個 token 的向量分別乘上三個矩陣得到的三個向量：Q 是「我想找什麼」、K 是「我有什麼標籤」、V 是「我能提供的內容」。', example: '權重由 Q 和 K 的點積決定，加總的是 V。', lesson: '3-2' },
+  '點積': { en: 'dot product', def: '兩個向量對應位置相乘再全部相加；方向越一致、長度越長，點積越大。', example: '[1, 2]·[3, 4] ＝ 3 ＋ 8 ＝ 11。', lesson: '3-2' },
+  '縮放': { en: 'scaling', def: '把點積除以 √d_k，避免維度大時分數太大、softmax 變得太尖。', example: 'd_k＝64 時除以 8。', lesson: '3-3' },
+  '因果遮罩': { en: 'causal mask', def: '讓每個 token 只能看自己和前面的 token，看不到後面的；生成文字的模型都要用。', example: '第 3 個 token 看不到第 4 個以後的。', lesson: '3-4' },
+  '多頭注意力': { en: 'multi-head attention', def: '把 attention 拆成好幾組（頭）同時做，每組有自己的 Q、K、V 矩陣，可以各自關注不同的關係。', example: '原版 Transformer base 有 8 個頭，每個 64 維。', lesson: '3-4' },
+});
+
+const REVIEW_M2 = [
+  { level: '回想', type: 'mc', q: '（回顧 2-3）attention 為什麼需要位置編碼？', options: [
+    { text: '它本身分不出 token 的先後順序', correct: true, why: '只比內容。' },
+    { text: '它需要知道句子有幾個字才能算', why: '長度不是問題。' },
+    { text: '位置編碼讓它算得比較快', why: '不是為了速度。' },
+    { text: '沒有位置編碼就不能做 softmax', why: 'softmax 不需要位置。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 2-1）「蘋果手機」和「蘋果派」的「蘋果」查表後？', options: [
+    { text: '得到同一個向量', correct: true, why: '查表只看編號；分辨意思靠這個模組的 attention。' },
+    { text: '得到兩個不同的向量', why: '查表時還沒看上下文。' },
+    { text: '查表失敗', why: '不會失敗。' },
+    { text: '得到一個機率', why: '查到的是向量。' },
+  ] },
+];
+
+/* 「動物沒過馬路，因為牠太累」：用規則產生示意的分數，不是真實模型的輸出 */
+const ANIMAL_TOKENS = ['動物', '沒', '過', '馬路', '因為', '牠', '太', '累'];
+function scoreGrid(n, fn) {
+  return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => fn(i, j)));
+}
+const HEAD_REFER = scoreGrid(8, (i, j) => {
+  if (i === 5 && j === 0) return 4.0; // 牠 → 動物
+  if (i === 7 && j === 5) return 3.2; // 累 → 牠
+  if (i === 7 && j === 0) return 2.6; // 累 → 動物
+  if (i === 3 && j === 2) return 2.4; // 馬路 → 過
+  if (i === j) return 1.2;
+  return 0.4 + ((i * 3 + j * 5) % 7) / 10;
+});
+const HEAD_PREV = scoreGrid(8, (i, j) => (j === i - 1 ? 3.5 : i === j ? 1.5 : 0.2));
+const ANIMAL_RAW = HEAD_REFER.map((row) => row.map((s) => s * 8)); // 3-3 用：還沒除以 √64 的點積
+
+const QK_SVG = `<svg viewBox="0 0 560 260" role="img" aria-label="Q K V：目前的 token 拿自己的 Q 去和每個 token 的 K 做點積得到分數，softmax 變成權重，再用權重加總每個 token 的 V">
+  <rect x="10" y="20" width="120" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="70" y="51" text-anchor="middle" font-size="15" font-weight="900" class="on-color">「牠」的 Q</text>
+  ${['動物', '馬路', '牠'].map((t, i) => `
+    <rect x="200" y="${20 + i * 60}" width="110" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="255" y="${48 + i * 60}" text-anchor="middle" font-size="14">${t} 的 K</text>
+    <line x1="130" y1="45" x2="200" y2="${42 + i * 60}" class="stroke-ink" stroke-width="2"/>
+    <text x="350" y="${48 + i * 60}" text-anchor="middle" font-size="14" class="mono">${['4.0', '0.6', '1.2'][i]}</text>`).join('')}
+  <text x="350" y="17" text-anchor="middle" font-size="12" font-weight="900">分數</text>
+  <rect x="390" y="20" width="160" height="164" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+  <text x="470" y="52" text-anchor="middle" font-size="14" font-weight="900" class="on-color">softmax</text>
+  <text x="470" y="84" text-anchor="middle" font-size="14" class="mono on-color">動物 83%</text>
+  <text x="470" y="110" text-anchor="middle" font-size="14" class="mono on-color">馬路 3%</text>
+  <text x="470" y="136" text-anchor="middle" font-size="14" class="mono on-color">牠 5%…</text>
+  <text x="280" y="222" text-anchor="middle" font-size="14" font-weight="900">輸出 ＝ 87% × 動物的 V ＋ 4% × 馬路的 V ＋ …</text>
+  <text x="280" y="248" text-anchor="middle" font-size="13">Q、K 決定「看誰」，V 決定「拿到什麼」。數字是示意</text>
+</svg>`;
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '用一句話說出 attention 在做什麼',
+      '讀懂一張注意力權重表',
+      '說明 attention 怎麼讓同一個 token 在不同句子有不同意思',
+    ],
+    review: REVIEW_M2,
+    analogy: {
+      text: ['讀到「牠太累」時，你會自動回頭找「牠」指的是誰：是動物，不是馬路。你的注意力有大有小地分給前面的字。', '[[attention]] 就是讓每個 token 做這件事：給每個 token 打一個相關程度，換成[[注意力權重]]，再把那些 token 的資訊按權重混進自己的向量裡。做完之後，「牠」的向量裡就帶有「動物」的資訊。'],
+      limit: ['你回頭找是有意識的推理，attention 只是一次固定的計算：權重由向量算出來，模型沒有「想」要看誰。另外它同時對每一個 token 都做一次，不是只有代名詞才做。'],
+    },
+    model: { svg: QK_SVG, caption: '先打分（Q 和 K），再分配比例（softmax），最後混合內容（V）。3-2、3-3 一步一步拆開。' },
+    define: [
+      { term: 'attention', en: 'attention', def: '依相關程度混合其他 token 的資訊。', example: '「牠」混進「動物」的資訊。' },
+      { term: '注意力權重', en: 'attention weight', def: '分給每個 token 的比例，一列加總為 1。', example: '牠 → 動物 83%。' },
+      { term: '上下文向量', en: 'contextual vector', def: '經過 attention 之後、已經混入上下文的向量。', example: '「蘋果手機」的蘋果和「蘋果派」的蘋果，到這裡就不同了。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'attnmap', props: { title: '「動物沒過馬路，因為牠太累」：點一個字', tokens: ANIMAL_TOKENS, heads: [{ name: '頭 A', scores: HEAD_REFER }], focus: 5, note: '分數是**示意**，依常見的研究觀察編出來的，不是任何模型的真實輸出。每個字只能看自己和前面的字（3-4 的因果遮罩）。' } },
+        { type: 'callout', variant: 'tip', title: '怎麼讀這張表', body: ['每一**列**是一個 token 把注意力分給誰，加起來是 100%。點「牠」：大部分給了「動物」。', '第一列「動物」只能看自己，所以是 100%；越後面的字，能看的字越多，注意力越分散。'] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="同一個蘋果：在蘋果手機裡混入手機的資訊，在蘋果派裡混入派的資訊，attention 之後兩個向量不同">
+          <rect x="10" y="20" width="250" height="150" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="135" y="50" text-anchor="middle" font-size="15" font-weight="900">「蘋果 手機」</text>
+          <text x="135" y="86" text-anchor="middle" font-size="14">手機 → 看「蘋果」</text>
+          <text x="135" y="112" text-anchor="middle" font-size="14">混入：品牌、科技</text>
+          <text x="135" y="150" text-anchor="middle" font-size="14" font-weight="900">偏向「公司」</text>
+          <rect x="300" y="20" width="250" height="150" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+          <text x="425" y="50" text-anchor="middle" font-size="15" font-weight="900" class="on-color">「蘋果 派」</text>
+          <text x="425" y="86" text-anchor="middle" font-size="14" class="on-color">派 → 看「蘋果」</text>
+          <text x="425" y="112" text-anchor="middle" font-size="14" class="on-color">混入：甜點、水果</text>
+          <text x="425" y="150" text-anchor="middle" font-size="14" font-weight="900" class="on-color">偏向「水果」</text>
+          <text x="280" y="200" text-anchor="middle" font-size="13">查表時一樣（2-1），經過 attention 後就不同了</text>
+        </svg>`, caption: '這是 2-1 留下的問題的答案：意思由上下文決定，而 attention 就是把上下文混進來的步驟。' },
+      ],
+      tryit: {
+        q: ['在表上點「累」。它的注意力主要分給誰？這合理嗎？'],
+        draft: '主要分給：＿\n合不合理：＿',
+        answer: ['示意資料裡「累」主要看「牠」和「動物」，因為「誰累了」的答案在那裡。', '真實模型有很多層、很多頭，每個頭看的關係不同（3-4），不會只有一張這麼乾淨的表。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 attention 只發生在代名詞上。', why: '每個 token 都會對前面所有 token 做一次。', right: '代名詞只是最容易看出效果的例子。' },
+      { wrong: '以為注意力權重就是模型「在想什麼」的完整解釋。', why: '權重只是其中一步，後面還有前饋網路與很多層。', right: '權重表是線索，不是完整的解釋。' },
+      { wrong: '以為 attention 會改變參數。', why: '權重是每次推論時算出來的，參數不變。', right: '權重隨輸入變；產生權重的矩陣是固定的參數。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '一個 token 的注意力權重，一列加起來是多少？', options: [
+        { text: '1（100%）', correct: true, why: 'softmax 的結果。' },
+        { text: '等於句子的 token 數', why: '不是計數。' },
+        { text: '0', why: '權重都是正數。' },
+        { text: '不一定，看分數大小', why: 'softmax 保證加總為 1。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'attention 做完之後，「牠」的向量會怎樣？', options: [
+        { text: '混入了它所注意的 token（例如動物）的資訊', correct: true, why: '按權重加總其他 token 的內容。' },
+        { text: '被直接換成「動物」的向量', why: '是按比例混合，不是替換。' },
+        { text: '保持和查表時完全一樣，因為 attention 只算權重', why: 'attention 會改變向量。' },
+        { text: '變成一個機率值', why: '輸出仍是向量。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['「銀行」在「河的銀行（河岸）」和「去銀行領錢」兩種用法（英文 bank 的例子）。用這一課的概念解釋模型怎麼分辨。'], answer: [
+        '查表時兩個 bank 一樣。經過 attention，它分別混入「河」或「領錢」的資訊，上下文向量就不同了。',
+        '後面的層在這個已經不同的向量上繼續加工，所以最後預測下一個 token 時，兩種用法會接出不同的字。',
+      ] },
+    ],
+    keypoints: [
+      'attention：給其他 token 打分 → 變成權重 → 按權重混合資訊。',
+      '每一列權重加起來是 1。',
+      '經過 attention，同一個 token 會因上下文而有不同向量。',
+    ],
+    sources: ['transformer', 'bahdanau'],
+  },
+
+  '3-2': {
+    goals: [
+      '說出 Q、K、V 各自的角色',
+      '算出兩個向量的點積',
+      '解釋為什麼「打分」和「混合」要用不同的向量',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-1）attention 之後的向量和查表時相比？', options: [
+        { text: '混入了上下文，所以不同', correct: true, why: '按權重加進其他 token 的資訊。' },
+        { text: '完全一樣', why: 'attention 會改變向量。' },
+        { text: '變成一個機率', why: '仍是向量。' },
+        { text: '變成 token 編號', why: '不會回到編號。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-2）兩個方向相反的向量，cosine 是？', options: [
+        { text: '−1', correct: true, why: '方向相反。' },
+        { text: '1', why: '1 是同方向。' },
+        { text: '0', why: '0 是垂直。' },
+        { text: '看長度', why: 'cosine 不看長度。' },
+      ] },
+    ],
+    analogy: {
+      text: ['圖書館找資料：你帶著一個問題（Query），去比對每本書書背上的標籤（Key），標籤越符合就越重視那本書，最後讀的是書的內容（Value）。', '每個 token 都從自己的向量算出三個向量：[[Q／K／V]]。用 Q 和每個 K 做[[點積]]打分，分數越高越重視，最後按比例拿走各 token 的 V。'],
+      limit: ['圖書館的標籤和內容是人寫的，Q、K、V 是由三個參數矩陣算出來的，訓練時才學會「什麼樣的 Q 該配什麼樣的 K」。而且每個 token 同時是發問者（Q）也是被找的書（K、V）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="一個 token 的向量分別乘上 W_Q、W_K、W_V 三個矩陣，得到 Q、K、V 三個向量">
+        <rect x="10" y="90" width="130" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="75" y="126" text-anchor="middle" font-size="15" font-weight="900" class="on-color">token 向量 x</text>
+        ${[['W_Q', 'Q：我想找什麼'], ['W_K', 'K：我的標籤'], ['W_V', 'V：我的內容']].map(([w, t], i) => `
+          <line x1="140" y1="120" x2="210" y2="${45 + i * 75}" class="stroke-ink" stroke-width="3"/>
+          <rect x="210" y="${22 + i * 75}" width="90" height="46" class="fill-surface stroke-ink" stroke-width="3"/><text x="255" y="${51 + i * 75}" text-anchor="middle" font-size="14" font-weight="900" class="mono">× ${w}</text>
+          <line x1="300" y1="${45 + i * 75}" x2="330" y2="${45 + i * 75}" class="stroke-ink" stroke-width="3"/>
+          <rect x="330" y="${22 + i * 75}" width="220" height="46" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="440" y="${51 + i * 75}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text>`).join('')}
+        <text x="280" y="236" text-anchor="middle" font-size="13">W_Q、W_K、W_V 是參數：所有 token 共用同一組</text>
+      </svg>`,
+      caption: '三個矩陣是訓練出來的參數；Q、K、V 是每次推論時現算的。',
+    },
+    define: [
+      { term: 'Q（query）', en: 'query', def: '「我想找什麼」。', example: '和別人的 K 比對。' },
+      { term: 'K（key）', en: 'key', def: '「我有什麼標籤」。', example: '被別人的 Q 比對。' },
+      { term: 'V（value）', en: 'value', def: '「被選中時提供的內容」。', example: '按權重加總。' },
+      { term: '點積', en: 'dot product', def: '對應位置相乘再相加。', example: '[1,2]·[3,4]＝11。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="點積計算：1 2 和 3 4，對應位置相乘得到 3 和 8，相加得到 11">
+  <text x="20" y="40" font-size="16" font-weight="900" class="mono">[ 1 , 2 ] · [ 3 , 4 ]</text>
+  <rect x="40" y="70" width="140" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="110" y="101" text-anchor="middle" font-size="15" font-weight="900" class="on-color">1 × 3 ＝ 3</text>
+  <rect x="200" y="70" width="140" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="270" y="101" text-anchor="middle" font-size="15" font-weight="900" class="on-color">2 × 4 ＝ 8</text>
+  <text x="370" y="101" font-size="18" font-weight="900">→ 3 ＋ 8 ＝ 11</text>
+  <text x="280" y="164" text-anchor="middle" font-size="14">對應位置相乘，再全部相加；結果是一個數字</text>
+  <text x="280" y="188" text-anchor="middle" font-size="13">d 維的向量就是 d 個乘積相加（隨身卷 1）</text>
+</svg>`, caption: '方向越一致、長度越長，點積越大。' },
+        { type: 'widget', name: 'knobs', props: { title: '轉動 Q 的方向，看分數和權重怎麼變（二維，實際計算）', sliders: [
+          { id: 'angle', label: 'Q 的方向（角度）', min: 0, max: 180, step: 5, value: 30, unit: '度' },
+          { id: 'len', label: 'Q 的長度', min: 1, max: 4, step: 0.5, value: 2 },
+        ], compute: (v) => {
+          const keys = [['動物', 20], ['馬路', 110], ['累', 160]];
+          const a = (v.angle * Math.PI) / 180;
+          const q = [v.len * Math.cos(a), v.len * Math.sin(a)];
+          const dots = keys.map(([, deg]) => { const b = (deg * Math.PI) / 180; return q[0] * Math.cos(b) + q[1] * Math.sin(b); });
+          const top = Math.max(...dots);
+          const exps = dots.map((d) => Math.exp(d - top));
+          const total = exps.reduce((x, y) => x + y, 0);
+          return { rows: keys.map(([name], i) => ({ label: `${name}：點積 ${dots[i].toFixed(2)}`, value: `${((exps[i] / total) * 100).toFixed(1)}%`, ratio: exps[i] / total })), note: '三個 K 都是長度 1，方向分別是 20°、110°、160°。Q 轉到哪個 K 的方向，那個 K 的點積最大、拿到最多權重；Q 越長，權重越集中。' };
+        } } },
+        { type: 'code', lang: 'python', title: '一個 token 的 attention（示意，NumPy）', code: 'import numpy as np\n\ndef softmax(x):\n    e = np.exp(x - x.max())          # 先減最大值，避免溢位\n    return e / e.sum()\n\nX = np.random.randn(8, 512)          # 8 個 token，每個 512 維\nW_Q, W_K, W_V = (np.random.randn(512, 64) for _ in range(3))\n\nQ, K, V = X @ W_Q, X @ W_K, X @ W_V   # 每個都是 8 × 64\nscores = K @ Q[5]                    # 第 5 個 token 的 Q 和每個 K 做點積：8 個分數\nweights = softmax(scores / np.sqrt(64))\noutput = weights @ V                 # 按權重加總 V：64 維' },
+        { type: 'table', head: ['', '用在哪', '決定什麼'], rows: [
+          ['Q', '和其他 token 的 K 做點積', '我要看誰'],
+          ['K', '被其他 token 的 Q 比對', '誰會來看我'],
+          ['V', '按權重加總', '別人看我時拿走什麼'],
+        ] },
+      ],
+      tryit: {
+        q: ['手算：Q＝[1, 2]，三個 K 分別是 [1, 0]、[0, 1]、[1, 1]。三個點積各是多少？哪一個最大？'],
+        draft: 'Q·K₁＝＿\nQ·K₂＝＿\nQ·K₃＝＿',
+        answer: ['Q·K₁＝1×1＋2×0＝1；Q·K₂＝1×0＋2×1＝2；Q·K₃＝1×1＋2×1＝3。', 'K₃ 最大，它會拿到最多權重。3-3 會接著把這三個分數變成權重、算出輸出。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 Q、K、V 是三個不同的 token。', why: '它們是同一個 token 的三個不同投影。', right: '每個 token 都有自己的 Q、K、V。' },
+      { wrong: '以為 W_Q、W_K、W_V 每個 token 不同。', why: '同一層的所有 token 共用同一組矩陣。', right: '矩陣是參數，Q、K、V 是現算的結果。' },
+      { wrong: '把分數直接當成權重。', why: '分數可能是負的、加總不為 1。', right: '分數要經過 softmax 才是權重（3-3）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'attention 的分數由哪兩個向量決定？', options: [
+        { text: '自己的 Q 和對方的 K', correct: true, why: '點積打分。' },
+        { text: '自己的 V 和對方的 V', why: 'V 是用來加總的內容。' },
+        { text: '自己的 K 和對方的 V', why: '組合錯了。' },
+        { text: '自己的 Q 和自己的 V', why: '要和別人的 K 比。' },
+      ] },
+      { level: '應用', type: 'mc', q: '[2, −1] 和 [3, 4] 的點積是多少？', options: [
+        { text: '2', correct: true, why: '2×3 ＋（−1）×4 ＝ 6 − 4 ＝ 2。' },
+        { text: '10', why: '忘了負號：6 ＋ 4。' },
+        { text: '−2', why: '正負號弄反了。' },
+        { text: '[6, −4]', why: '點積的結果是一個數字，要相加。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼不直接用 token 向量本身互相做點積打分，而要先乘 W_Q、W_K？'], answer: [
+        '直接用向量本身，「像不像」就是唯一的打分標準：每個 token 只會注意和自己意思相近的 token。',
+        '但「牠」要找的是動物（意思不同的名詞），不是另一個代名詞。W_Q、W_K 讓模型學會「我想找的」和「我是什麼」可以不一樣。',
+      ] },
+    ],
+    keypoints: [
+      'Q 想找什麼、K 有什麼標籤、V 提供什麼內容。',
+      '分數＝Q 和 K 的點積；加總的是 V。',
+      'W_Q、W_K、W_V 是共用的參數，Q、K、V 每次現算。',
+    ],
+    sources: ['transformer'],
+  },
+
+  '3-3': {
+    goals: [
+      '手算 softmax，把分數變成權重',
+      '說出為什麼要除以 √d_k',
+      '手算一個完整的小 attention 輸出',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）attention 加總的是哪一個向量？', options: [
+        { text: 'V', correct: true, why: '權重乘在 V 上。' },
+        { text: 'Q', why: 'Q 用來打分。' },
+        { text: 'K', why: 'K 用來被打分。' },
+        { text: '位置編碼', why: '位置編碼在更前面。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-3）正弦位置編碼哪些維度變化最快？', options: [
+        { text: '前面的低維度', correct: true, why: '頻率最高。' },
+        { text: '後面的高維度', why: '最慢。' },
+        { text: '全部一樣快', why: '頻率依維度遞減。' },
+        { text: '只有最後一維', why: '每一維都在變。' },
+      ] },
+    ],
+    analogy: {
+      text: ['分獎金：你有三個人的業績分數 1、2、3，要分成加起來 100% 的比例。直接按分數比例分（1:2:3）是一種方法；[[softmax]] 是先取指數再分，讓高分的人拿得更多。', '如果分數的尺度太大（例如 10、20、30），取指數後第一名會拿走幾乎全部，其他人接近 0。[[縮放]]（除以 √d_k）就是先把分數的尺度拉回合理範圍。'],
+      limit: ['分獎金是一次性的，attention 的權重每一層、每個 token 都要重算。而且縮放的理由不只是「公平」：分數太尖時，訓練時的梯度會變得很小，模型學不動（原論文的解釋）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="attention 公式拆成四步：Q 乘 K 轉置得到分數，除以根號 d_k，做 softmax 得到權重，乘上 V 得到輸出">
+        <text x="280" y="30" text-anchor="middle" font-size="16" font-weight="900" class="mono">Attention(Q,K,V) ＝ softmax(QKᵀ ÷ √d_k) V</text>
+        ${[['① QKᵀ', '每對 token 的點積'], ['② ÷ √d_k', '拉回合理尺度'], ['③ softmax', '每列變成權重'], ['④ × V', '按權重加總']].map(([a, b], i) => `
+          <rect x="${10 + i * 138}" y="60" width="128" height="110" style="fill:var(--m${[3, 0, 4, 2][i]})" class="stroke-ink" stroke-width="3"/>
+          <text x="${74 + i * 138}" y="100" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text>
+          <text x="${74 + i * 138}" y="134" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="206" text-anchor="middle" font-size="14">原論文：d_k 大時點積的變異數跟著變大，softmax 被推到梯度極小的區域</text>
+        <text x="280" y="228" text-anchor="middle" font-size="13">base 模型 d_k＝64，所以除以 8</text>
+      </svg>`,
+      caption: '整個 attention 就是這一行公式。前兩課講了 Q、K、V，這一課講 ② 和 ③。',
+    },
+    define: [
+      { term: 'softmax', en: 'softmax', def: '取指數再除以總和。', example: 'softmax(1,2,3) ≈ (9%, 24%, 67%)。' },
+      { term: '縮放', en: 'scaling', def: '分數除以 √d_k。', example: 'd_k＝64 → ÷8。' },
+      { term: 'd_k', en: 'key dimension', def: 'Q、K 向量的維度。', example: '原版 base 是 64。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="分數 1 2 3 與 softmax 後的機率 9% 24% 67% 的長條對照">
+  <text x="140" y="24" text-anchor="middle" font-size="15" font-weight="900">分數</text>
+  <text x="420" y="24" text-anchor="middle" font-size="15" font-weight="900">softmax 之後</text>
+  ${[[1, 0.09], [2, 0.245], [3, 0.665]].map(([s, p], i) => `<rect x="${60 + i * 60}" y="${190 - s * 45}" width="44" height="${s * 45}" class="fill-surface stroke-ink" stroke-width="2"/><text x="${82 + i * 60}" y="${180 - s * 45}" text-anchor="middle" font-size="13">${s}</text><rect x="${340 + i * 60}" y="${190 - p * 200}" width="44" height="${p * 200}" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="${362 + i * 60}" y="${180 - p * 200}" text-anchor="middle" font-size="13">${Math.round(p * 100)}%</text>`).join('')}
+  <line x1="40" y1="190" x2="240" y2="190" class="stroke-ink" stroke-width="2"/><line x1="320" y1="190" x2="520" y2="190" class="stroke-ink" stroke-width="2"/>
+  <text x="280" y="214" text-anchor="middle" font-size="13">分數差 1，機率差約 2.7 倍：取指數把差距放大</text>
+</svg>`, caption: '直接按比例會是 17%、33%、50%；softmax 讓高分拿得更多。' },
+        { type: 'table', head: ['步驟', 'K₁＝[1,0]', 'K₂＝[0,1]', 'K₃＝[1,1]'], rows: [
+          ['① 點積（Q＝[1,2]）', '1', '2', '3'],
+          ['不縮放：softmax', '9.0%', '24.5%', '66.5%'],
+          ['② ÷ √2 ≈ 1.414', '0.71', '1.41', '2.12'],
+          ['③ softmax', '14.0%', '28.4%', '57.6%'],
+        ], caption: '這裡 d_k＝2，所以除以 √2。縮放後權重比較平均，第一名沒有拿走那麼多。' },
+        { type: 'widget', name: 'attnmap', props: { title: '同一組點積，切換「除以 √64」看權重表變得多尖', tokens: ANIMAL_TOKENS, heads: [{ name: '頭 A', scores: ANIMAL_RAW }], showScale: true, dk: 64, focus: 7, note: '這裡的分數是 3-1 的 8 倍，代表「還沒縮放的點積」。取消勾選「除以 √d」：幾乎每一列都只剩一個 100%，其他全是 0，這就是 softmax 被推到太尖的區域。' } },
+        { type: 'code', lang: 'python', title: '驗算上面的表（示意）', code: 'import numpy as np\nsoftmax = lambda x: np.exp(x - x.max()) / np.exp(x - x.max()).sum()\n\nq = np.array([1, 2])\nK = np.array([[1, 0], [0, 1], [1, 1]])\nV = np.array([[10, 0], [0, 10], [5, 5]])\n\nscores = K @ q                       # [1, 2, 3]\nw = softmax(scores / np.sqrt(2))     # [0.140, 0.284, 0.576]\nprint(w @ V)                         # [4.28, 5.72]' },
+      ],
+      tryit: {
+        q: ['接續上面的表，用「不縮放」的權重（9.0%、24.5%、66.5%）和 V₁＝[10, 0]、V₂＝[0, 10]、V₃＝[5, 5]，算出輸出向量。'],
+        draft: '第 1 個數：＿\n第 2 個數：＿',
+        answer: ['第 1 個數：0.090×10 ＋ 0.245×0 ＋ 0.665×5 ＝ 0.90 ＋ 3.33 ≈ 4.23。', '第 2 個數：0.090×0 ＋ 0.245×10 ＋ 0.665×5 ＝ 2.45 ＋ 3.33 ≈ 5.78。輸出 ≈ [4.23, 5.78]，偏向 V₃，因為 K₃ 拿到最多權重。縮放後的結果是 [4.28, 5.72]，差不多但更平均一點。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 softmax 是按分數直接比例分配。', why: 'softmax 先取指數，高分會被放大。', right: 'softmax(1,2,3) 是 9:24:67，不是 1:2:3 的 17:33:50。' },
+      { wrong: '以為除以 √d_k 是為了算得快。', why: '是為了避免 softmax 太尖、梯度太小。', right: '縮放是為了訓練穩定。' },
+      { wrong: '以為所有分數都加同一個數後，權重會改變。', why: 'softmax 對整列同時加減一個常數不變（這也是程式先減最大值的原因）。', right: '重要的是分數之間的差距。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'softmax(0, 0, 0) 的結果是？', options: [
+        { text: '每個都是 1/3', correct: true, why: '分數一樣，權重平均。' },
+        { text: '每個都是 0', why: 'softmax 的結果加總一定是 1。' },
+        { text: '第一個是 1，其他是 0', why: '分數一樣不會偏向任何一個。' },
+        { text: '無法計算', why: 'e⁰＝1，可以算。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'd_k 從 64 換成 256，縮放要除以多少？', options: [
+        { text: '16', correct: true, why: '√256 ＝ 16。' },
+        { text: '256', why: '要開根號。' },
+        { text: '8', why: '那是 d_k＝64 的情況。' },
+        { text: '4', why: '√16 才是 4。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['如果一列裡某個分數比其他高很多（例如 50 對 0），softmax 之後會怎樣？這在什麼情況下是好事，什麼情況下是壞事？'], answer: [
+        '幾乎 100% 給那一個，其他接近 0，等於只看一個 token。',
+        '好事：真的只需要看那一個（例如複製前面出現過的名字）。壞事：訓練初期就太尖，其他 token 拿不到梯度，模型學不到更好的分配。縮放就是在減少這種情況。',
+      ] },
+    ],
+    keypoints: [
+      'Attention ＝ softmax(QKᵀ ÷ √d_k) V。',
+      'softmax 先取指數再正規化，高分被放大。',
+      '除以 √d_k 讓分數不會太尖，訓練才學得動。',
+    ],
+    sources: ['transformer'],
+  },
+
+  '3-4': {
+    goals: [
+      '說明因果遮罩為什麼對生成文字的模型是必要的',
+      '解釋多頭注意力的好處',
+      '算出多頭時每個頭的維度',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-3）為什麼要除以 √d_k？', options: [
+        { text: '避免 softmax 太尖', correct: true, why: '原論文的解釋。' },
+        { text: '讓計算速度加快', why: '不是為了速度。' },
+        { text: '讓 softmax 之後的權重加總等於 1', why: 'softmax 本身就會。' },
+        { text: '讓分數都變成正數', why: '縮放不改正負。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-2）「熱」和「冷」向量可能很近，原因是？', options: [
+        { text: '出現在相似的上下文', correct: true, why: '用法相近。' },
+        { text: '意思相同', why: '意思相反。' },
+        { text: '編號相鄰', why: '編號無關。' },
+        { text: '字數相同', why: '無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['考試時不能偷看後面的答案卷。如果訓練時模型可以看到下一個字，「預測下一個字」就變成抄答案，什麼也學不到。', '[[因果遮罩]]把每個 token 後面的位置遮起來，只能看自己和前面。[[多頭注意力]]則像一組評審：每位評審關注不同面向（指代、前後文、語法），最後把意見合起來。'],
+      limit: ['評審是不同的人、有明確分工，多頭是同時進行的同一種計算，只是參數不同；每個頭學到什麼不是人指定的，研究者事後才觀察到某些頭有特定傾向。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="因果遮罩：4 乘 4 的權重表，對角線右上方全部遮住；每一列只能看自己和左邊">
+        <text x="140" y="26" text-anchor="middle" font-size="15" font-weight="900">因果遮罩</text>
+        ${[0, 1, 2, 3].map((i) => [0, 1, 2, 3].map((j) => `<rect x="${40 + j * 50}" y="${40 + i * 44}" width="46" height="40" ${j > i ? 'class="fill-bg stroke-ink"' : 'style="fill:var(--m3)" class="stroke-ink"'} stroke-width="2"/><text x="${63 + j * 50}" y="${66 + i * 44}" text-anchor="middle" font-size="13"${j > i ? '' : ' class="on-color"'}>${j > i ? '✕' : '看'}</text>`).join('')).join('')}
+        <text x="140" y="236" text-anchor="middle" font-size="13">列：誰在看・欄：被看的</text>
+        <text x="420" y="26" text-anchor="middle" font-size="15" font-weight="900">多頭</text>
+        ${['頭 1：指代', '頭 2：前一個字', '頭 3：…'].map((t, i) => `<rect x="320" y="${44 + i * 52}" width="200" height="42" style="fill:var(--m${i + 2})" class="stroke-ink" stroke-width="3"/><text x="420" y="${71 + i * 52}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text>`).join('')}
+        <text x="420" y="218" text-anchor="middle" font-size="14">各算各的，再接起來</text>
+        <text x="420" y="240" text-anchor="middle" font-size="13">乘上 W_O 混合</text>
+      </svg>`,
+      caption: '遮罩讓訓練時不能偷看答案；多頭讓同一層同時看好幾種關係。',
+    },
+    define: [
+      { term: '因果遮罩', en: 'causal mask', def: '把後面位置的分數設成 −∞，softmax 後權重為 0。', example: '第 3 個 token 看不到第 4 個。' },
+      { term: '多頭注意力', en: 'multi-head attention', def: '多組 Q、K、V 同時做 attention。', example: 'base：8 頭 × 64 維＝512。' },
+      { term: 'W_O', en: 'output projection', def: '把所有頭的結果接起來後再乘的矩陣，讓各頭的資訊混合。', example: '也是參數。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="多頭的維度：512 維切成 8 個 64 維的頭，各自做 attention，接回 512 維，再乘 W_O">
+  <rect x="20" y="30" width="520" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="280" y="56" text-anchor="middle" font-size="14" font-weight="900" class="on-color">512 維</text>
+  ${[...Array(8).keys()].map((i) => `<rect x="${20 + i * 65}" y="90" width="60" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="${50 + i * 65}" y="112" text-anchor="middle" font-size="13" class="on-color">頭 ${i + 1}</text><text x="${50 + i * 65}" y="130" text-anchor="middle" font-size="13" class="on-color">64</text>`).join('')}
+  <rect x="20" y="160" width="520" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="280" y="186" text-anchor="middle" font-size="14" font-weight="900" class="on-color">接回 512 維 → × W_O</text>
+</svg>`, caption: '原版 Transformer base 的數字。' },
+        { type: 'widget', name: 'attnmap', props: { title: '兩個頭、可以切換遮罩', tokens: ANIMAL_TOKENS, heads: [{ name: '頭 A：指代', scores: HEAD_REFER }, { name: '頭 B：前一個字', scores: HEAD_PREV }], causalToggle: true, focus: 5, note: '分數是**示意**。切到頭 B：每個字主要看前一個字。取消遮罩：前面的字也能看到後面了，訓練「預測下一個字」時這等於偷看答案。' } },
+        { type: 'table', head: ['原版 Transformer base', '數字'], rows: [
+          ['模型維度 d_model', '512'],
+          ['頭數 h', '8'],
+          ['每個頭的 d_k ＝ d_model ÷ h', '64'],
+          ['所有頭接起來', '8 × 64 ＝ 512，再乘 W_O'],
+        ], caption: '出處：Vaswani 等 2017。拆成多頭時總計算量和單頭差不多。' },
+        { type: 'callout', variant: 'tip', title: '為什麼「編碼器」不用遮罩？', body: ['原版 Transformer 有編碼器（讀整句原文）和解碼器（逐字產生譯文）。編碼器讀的是完整輸入，可以前後都看；解碼器要逐字產生，才需要遮罩。', '現在的聊天 LLM 大多只用解碼器那一半，所以每一層都有因果遮罩。'] },
+      ],
+      tryit: {
+        q: ['d_model＝4,096、頭數＝32。每個頭的 d_k 是多少？縮放要除以多少？'],
+        draft: 'd_k ＝ ＿\n除以 ＿',
+        answer: ['d_k ＝ 4,096 ÷ 32 ＝ 128。', '縮放除以 √128 ≈ 11.3。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為因果遮罩只在訓練時用，推論時不用。', why: '推論時也用，模型的行為才會和訓練時一致；而且推論時後面的 token 本來就還不存在。', right: '解碼器每一層都有遮罩。' },
+      { wrong: '以為多頭是把 attention 重複做很多次、計算量變很多倍。', why: '每個頭的維度縮小成 d_model ÷ h。', right: '總計算量和單頭差不多。' },
+      { wrong: '以為每個頭的分工是人設定好的。', why: '分工是訓練出來的，人只能事後觀察。', right: '看到「這個頭在做指代」是觀察結果，不是設計。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '因果遮罩讓每個 token 能看到哪些 token？', options: [
+        { text: '自己和前面的 token', correct: true, why: '後面的被遮住。' },
+        { text: '自己和後面的 token', why: '方向反了。' },
+        { text: '整句話的所有 token', why: '那是沒有遮罩的編碼器。' },
+        { text: '只有自己', why: '前面的都能看。' },
+      ] },
+      { level: '應用', type: 'mc', q: '8 個頭、d_model＝512，每個頭的 d_k 是多少？', options: [
+        { text: '64', correct: true, why: '512 ÷ 8。' },
+        { text: '512', why: '那是全部加起來。' },
+        { text: '4,096', why: '是乘不是除。' },
+        { text: '8', why: '那是頭數。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['如果訓練時忘了加因果遮罩，模型在訓練資料上的「預測下一個 token」準確率會怎樣？實際拿來生成時會怎樣？'], answer: [
+        '訓練時準確率會非常高，因為答案就在它看得到的位置，只要學會「抄下一格」。',
+        '生成時下一格還不存在，它學會的抄答案方法完全用不上，產生的文字會很差。這是典型的「訓練時看到了不該看到的資訊」。',
+      ] },
+    ],
+    keypoints: [
+      '因果遮罩：只能看自己和前面，訓練時才不會偷看答案。',
+      '多頭：每個頭 d_model ÷ h 維，各看各的關係，再用 W_O 混合。',
+      '頭的分工是訓練出來的，不是設計的。',
+    ],
+    sources: ['transformer'],
+  },
+});
+</script>

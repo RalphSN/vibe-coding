@@ -1,0 +1,509 @@
+<script>
+/* ==========================================================================
+   模組 2：串流回應與前端 UI
+   ========================================================================== */
+defineTerms({
+  '串流': { en: 'streaming', def: '回應一邊產生一邊送過來，而不是全部寫完才一次給你。', example: '`client.messages.stream()`。', lesson: '2-1' },
+  'TTFT': { en: 'time to first token', def: '從送出請求到第一個字出現的時間。使用者覺得「快不快」，主要看它。', example: '串流時 TTFT 約 1 秒，整段寫完要 10 秒。', lesson: '2-1' },
+  '事件': { en: 'event', def: 'SSE 串流裡的一筆資料：`event:` 一行說是哪一種，`data:` 一行帶內容，空一行結束。', example: '`event: content_block_delta`。', lesson: '2-2' },
+  'ReadableStream': { en: 'ReadableStream', def: '瀏覽器與 Node.js 都有的「可以一段一段讀的資料流」。`fetch` 回應的 `body` 就是一個。', example: '`res.body.getReader()`。', lesson: '2-3' },
+  'TextDecoder': { en: 'TextDecoder', def: '把收到的位元組轉成文字的工具。串流時要加 `{ stream: true }`，中文字被切在兩段之間才不會變亂碼。', example: '`decoder.decode(value, { stream: true })`。', lesson: '2-3' },
+  '後端代理': { en: 'backend proxy', def: '前端不直接呼叫 Claude API，而是呼叫你自己的後端，由後端帶著金鑰轉送並把結果傳回。', example: '瀏覽器 → `/api/chat` → Claude API。', lesson: '2-3' },
+  'AbortController': { en: 'AbortController', def: '瀏覽器與 Node.js 內建的「取消器」：把它的 `signal` 交給 `fetch`，呼叫 `abort()` 就能中止請求。', example: '停止生成按鈕呼叫 `controller.abort()`。', lesson: '2-4' },
+});
+
+const TIMELINE_SVG = `<svg viewBox="0 0 560 230" role="img" aria-label="同一個回應的兩種時間軸：不串流時使用者盯著空白等 8 秒才一次看到全部；串流時 0.7 秒就出現第一個字，之後文字持續出現，同樣在 8 秒左右結束">
+  <text x="10" y="26" font-size="15" font-weight="900">不串流</text>
+  <rect x="100" y="10" width="400" height="30" class="fill-bg stroke-ink" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="300" y="31" text-anchor="middle" font-size="14">空白等待…</text>
+  <rect x="500" y="10" width="50" height="30" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+  <text x="525" y="31" text-anchor="middle" font-size="13" class="on-color">全部</text>
+  <text x="10" y="96" font-size="15" font-weight="900">串流</text>
+  <rect x="100" y="80" width="35" height="30" class="fill-bg stroke-ink" stroke-width="2" stroke-dasharray="6 4"/>
+  <rect x="135" y="80" width="415" height="30" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+  <text x="342" y="101" text-anchor="middle" font-size="14" class="on-color">文字一段一段出現</text>
+  <line x1="100" y1="150" x2="550" y2="150" class="stroke-ink" stroke-width="3"/>
+  <line x1="100" y1="142" x2="100" y2="158" class="stroke-ink" stroke-width="3"/>
+  <line x1="135" y1="142" x2="135" y2="158" class="stroke-ink" stroke-width="3"/>
+  <line x1="550" y1="142" x2="550" y2="158" class="stroke-ink" stroke-width="3"/>
+  <text x="100" y="180" text-anchor="middle" font-size="14">送出</text>
+  <text x="150" y="206" text-anchor="middle" font-size="14">0.7 秒：第一個字</text>
+  <text x="550" y="180" text-anchor="end" font-size="14">8 秒：全部完成</text>
+</svg>`;
+
+const SSE_ANATOMY_SVG = `<svg viewBox="0 0 560 250" role="img" aria-label="一筆 SSE 事件的解剖：第一行 event 冒號後面是事件種類；第二行 data 冒號後面是 JSON 內容；接著一個空行代表這筆事件結束；冒號開頭的行是註解，可以當心跳">
+  <rect x="10" y="10" width="340" height="230" style="fill:var(--code-bg)" class="stroke-ink" stroke-width="3"/>
+  <text x="26" y="50" font-size="15" class="mono" style="fill:var(--m0)">event:</text>
+  <text x="100" y="50" font-size="15" class="mono" style="fill:var(--code-ink)">content_block_delta</text>
+  <text x="26" y="90" font-size="15" class="mono" style="fill:var(--m0)">data:</text>
+  <text x="90" y="90" font-size="15" class="mono" style="fill:var(--code-ink)">{"type":…,"delta":</text>
+  <text x="90" y="114" font-size="15" class="mono" style="fill:var(--code-ink)"> {"text":"退款"}}</text>
+  <text x="26" y="160" font-size="15" class="mono" style="fill:#9C9888">（空行）</text>
+  <text x="26" y="206" font-size="15" class="mono" style="fill:#9C9888">: 心跳註解</text>
+  <line x1="350" y1="45" x2="380" y2="45" class="stroke-ink" stroke-width="3"/>
+  <text x="388" y="50" font-size="14">事件種類</text>
+  <line x1="350" y1="100" x2="380" y2="100" class="stroke-ink" stroke-width="3"/>
+  <text x="388" y="105" font-size="14">內容（Claude 是 JSON）</text>
+  <line x1="350" y1="155" x2="380" y2="155" class="stroke-ink" stroke-width="3"/>
+  <text x="388" y="160" font-size="14">一筆事件到這裡結束</text>
+  <line x1="350" y1="201" x2="380" y2="201" class="stroke-ink" stroke-width="3"/>
+  <text x="388" y="206" font-size="14">冒號開頭：忽略</text>
+</svg>`;
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '分清楚 TTFT 和總時間，說出串流改善的是哪一個',
+      '判斷一個功能需不需要串流',
+      '知道長輸出為什麼一定要用串流',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-3）讀回應時，第一個要看的欄位是？', options: [
+        { text: '`stop_reason`', correct: true, why: '先知道為什麼停，才知道 content 能不能用。' },
+        { text: '`content[0].text`', why: '第一格不一定是文字，也可能被截斷。' },
+        { text: '`id`', why: 'id 是編號，回報問題時才用。' },
+        { text: '`model`', why: '你送的就是這個模型，不用先看。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-5）同樣 1,000 token，Opus 5.5 的輸入和輸出哪個貴？', options: [
+        { text: '輸出，是輸入的 5 倍', correct: true, why: '$20 對 $4（每百萬 token）。' },
+        { text: '輸入，因為要讀比較多東西', why: '輸入便宜；輸出是 5 倍。' },
+        { text: '一樣貴，都按 token 計費', why: '都按 token，但單價不同。' },
+        { text: '要看有沒有開串流', why: '串流不改變單價。' },
+      ] },
+    ],
+    analogy: {
+      text: ['不[[串流]]像去餐廳點了一桌菜，廚房要等全部做好才一起上：你盯著空桌子坐十分鐘。串流像熱炒店：好一道上一道，第一道兩分鐘就上桌，你可以邊吃邊等。', '兩種方式**全部上完的時間差不多**，差的是第一道菜多久上桌（[[TTFT]]），以及等待時你有沒有事做。'],
+      limit: ['菜一道一道上，每一道都是完整的；串流送來的是半句話，你的畫面要能顯示「還沒說完」的狀態。而且邊上菜邊吃，中途想喊停也比較容易（2-4）。'],
+    },
+    model: {
+      svg: TIMELINE_SVG,
+      caption: '總時間差不多；串流把「第一個字」從 8 秒提前到 0.7 秒（數字是示意）。',
+    },
+    define: [
+      { term: '串流', en: 'streaming', def: '回應邊產生邊送。Claude API 用 SSE 格式（2-2）；TypeScript SDK 用 `client.messages.stream()`。', example: '聊天畫面一字一字出現。' },
+      { term: 'TTFT', en: 'time to first token', def: '送出後到第一個字出現的時間。模型想得越多（effort 越高），TTFT 通常越長。', example: '使用者說「好慢」，通常是 TTFT 太長。' },
+      { term: '總時間', en: 'total latency', def: '從送出到整段回應結束。主要由輸出長度決定。', example: '請模型回答短一點，總時間就短（8-3）。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'ssestream', props: { view: 'compare', title: '同一段回應，兩種顯示方式（按「送出請求」）', ttft: 700, gap: 120, text: '退款流程是這樣的：商品寄回後，倉庫確認狀況才會退款。信用卡退款約 7 到 14 個工作天到帳；超商付款會退到你的帳戶，約 3 到 5 個工作天。' } },
+        { type: 'table', head: ['情境', '要串流嗎', '原因'], rows: [
+          ['聊天畫面、寫作助手', '✓ 要', '使用者盯著畫面等，TTFT 決定體感'],
+          ['輸出很長（`max_tokens` 上萬）', '✓ 要', '不串流可能撞到 HTTP 逾時；SDK 會要求改用串流'],
+          ['晚上跑的批次分類', '✗ 不用', '沒人在等；用 Batch API 還打 5 折（8-2）'],
+          ['結果要整包解析成 JSON 才能用', '看情況', '畫面不用顯示就不必；長輸出仍可串流，用 `finalMessage()` 拿完整結果'],
+        ] },
+        { type: 'code', lang: 'typescript', title: 'stream.ts：最簡單的串流', code: 'const stream = client.messages.stream({\n  model: "claude-opus-5-5",\n  max_tokens: 4096,\n  messages: [{ role: "user", content: "介紹一下台北捷運的轉乘規則" }],\n});\n\n// 每來一段文字就印出來，不換行\nstream.on("text", (delta) => process.stdout.write(delta));\n\n// 等全部結束，拿到和非串流一樣的完整訊息\nconst message = await stream.finalMessage();\nconsole.log("\\n", message.stop_reason, message.usage);' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="什麼會讓 TTFT 變長：輸入很長、effort 高讓模型先想比較久、模型比較大；什麼會讓總時間變長：輸出很長">
+          <rect x="10" y="10" width="265" height="180" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="142" y="42" text-anchor="middle" font-size="16" font-weight="900" class="on-color">讓 TTFT 變長</text>
+          <text x="30" y="84" font-size="15" class="on-color">・輸入很長（要先讀完）</text>
+          <text x="30" y="116" font-size="15" class="on-color">・effort 高（先想很久）</text>
+          <text x="30" y="148" font-size="15" class="on-color">・模型比較大</text>
+          <rect x="285" y="10" width="265" height="180" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <text x="417" y="42" text-anchor="middle" font-size="16" font-weight="900" class="on-color">讓總時間變長</text>
+          <text x="305" y="84" font-size="15" class="on-color">・輸出很長</text>
+          <text x="305" y="116" font-size="15" class="on-color">・思考 token 多</text>
+          <text x="305" y="148" font-size="15" class="on-color">・工具來回好幾輪</text>
+        </svg>`, caption: '串流不會讓模型變快；它讓使用者早一點看到東西。真正變快要調左右兩欄（8-3）。' },
+      ],
+      tryit: {
+        q: ['把下面三個功能分成「要串流」和「不用串流」，各寫一句理由：'],
+        draft: 'A. 客服聊天視窗：＿＿\nB. 每晚把 2 萬則評論分類成正負面：＿＿\nC. 產生一份 3 萬字的技術文件草稿：＿＿',
+        answer: ['A 要串流：使用者在畫面前等，TTFT 決定體感。', 'B 不用：沒人在等，改用 Batch API 還便宜一半。', 'C 要串流：就算沒人盯著看，輸出這麼長不串流可能撞到 HTTP 逾時；可以串流後用 `finalMessage()` 拿完整結果。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為開了串流，模型就會比較快寫完。', why: '串流不改變模型產生的速度，總時間差不多。', right: '串流改善的是 TTFT 與體感；要縮短總時間，就縮短輸出、降低 effort 或換較小的模型（8-3）。' },
+      { wrong: '長輸出（`max_tokens: 64000`）用一般的 `create()`，結果請求逾時。', why: '整段寫完可能超過 HTTP 連線的等待時間；SDK 也會檢查並要求你改用串流。', right: '用 `client.messages.stream()`，不需要逐字顯示時就 `await stream.finalMessage()`。' },
+      { wrong: '所有功能都開串流，包括晚上跑的批次工作。', why: '沒人在等就不需要；而且批次工作有更便宜的 Batch API。', right: '有人在畫面前等才串流；背景大量工作用 Batch API（8-2）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '串流主要改善了哪一個數字？', options: [
+        { text: '第一個字出現的時間（TTFT）', correct: true, why: '第一個字提早出現；總時間差不多。' },
+        { text: '整段回應寫完的總時間', why: '模型產生速度沒變，總時間差不多。' },
+        { text: '每個 token 的價格', why: '串流不改變價格。' },
+        { text: '模型回答的正確率', why: '串流只改變傳送方式，不改變內容。' },
+      ] },
+      { level: '應用', type: 'mc', q: '使用者抱怨「按下送出後要等 6 秒才有反應」，回答本身其實很短。最先該檢查什麼？', options: [
+        { text: 'effort 太高，模型先想很久才開始寫', correct: true, why: '回答短卻等很久，多半是 TTFT 長；思考越多，第一個字越晚。' },
+        { text: '輸出是不是太長，要請模型把回答講短一點', why: '題目說回答本身很短；問題在開始之前。' },
+        { text: '前端是不是沒有開串流', why: '回答很短時，開不開串流差不多；等待發生在第一個字之前。' },
+        { text: '網路頻寬不夠，回應下載得太慢', why: '回應只有幾百 byte，頻寬不是瓶頸。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在做「上傳合約，產生 20 頁審閱報告」的功能，使用者上傳後會去喝咖啡。要不要串流？畫面上該顯示什麼？'], answer: [
+        '要用串流的 API（長輸出避免逾時），但不一定要把字逐一顯示給使用者看。',
+        '畫面可以顯示進度（例如「已產生約 3,000 字」或目前寫到哪一節），完成後通知使用者；後端用 `finalMessage()` 拿完整報告存起來。',
+      ] },
+    ],
+    keypoints: [
+      '串流讓第一個字提早出現；總時間差不多。',
+      '有人在畫面前等，或輸出很長，就用串流；背景大量工作用 Batch API。',
+      'TTFT 長看輸入長度與 effort；總時間長看輸出長度。',
+    ],
+    sources: ['claude-streaming', 'claude-errors', 'claude-effort'],
+  },
+
+  '2-2': {
+    goals: [
+      '讀懂一筆 SSE 事件的 `event:`、`data:` 與空行',
+      '說出 Claude 串流的事件順序，知道文字在哪一種事件裡',
+      '分辨「正常結束」和「中途出錯」的事件',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）`max_tokens` 設到 64,000 時，為什麼建議用串流？', options: [
+        { text: '整段寫完可能超過 HTTP 連線的等待時間', correct: true, why: 'SDK 也會檢查並要求你改用串流。' },
+        { text: '串流時每個 token 比較便宜', why: '價格一樣。' },
+        { text: '不串流時 max_tokens 最多只能設 4,096', why: '沒有這個限制；問題是逾時。' },
+        { text: '串流時模型寫得比較快', why: '產生速度一樣。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）回應裡的 `usage` 告訴你什麼？', options: [
+        { text: '這次用了多少輸入與輸出 token', correct: true, why: '計費就看它。' },
+        { text: '這把金鑰還剩多少額度', why: '額度在 Console 看。' },
+        { text: '這次請求用了幾秒', why: 'usage 不含時間。' },
+        { text: '模型的 context window 有多大', why: '那要查 Models API。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[SSE]] 像傳真機一張一張吐紙：每張紙上方寫著這是哪一類（`event:`），下面是內容（`data:`），一張紙印完會空一行再印下一張。', '你的程式就是站在傳真機旁邊的人，每吐一張就看標題決定怎麼處理：是新的文字就貼到牆上，是「結束」就收工。'],
+      limit: ['傳真機吐出來的每張紙都完整；網路傳輸可能把一張紙切成兩半送到，所以程式要等到看見空行才算收完一筆（SDK 已經幫你處理）。另外傳真斷線你會聽到嗶聲，SSE 中途出錯則是一筆 `error` 事件。'],
+    },
+    model: {
+      svg: SSE_ANATOMY_SVG,
+      caption: '格式由 WHATWG HTML 標準定義；MIME type 是 `text/event-stream`。',
+    },
+    define: [
+      { term: 'SSE', en: 'server-sent events', def: '伺服器用一條 HTTP 連線持續送事件的格式。每筆事件由 `event:`、`data:` 等欄位組成，空行結束。', example: 'Claude API 串流就是 SSE。' },
+      { term: '事件', en: 'event', def: '串流裡的一筆資料。Claude 用 `event:` 標出種類，`data:` 是 JSON。', example: '`content_block_delta` 帶一小段文字。' },
+      { term: 'text_delta', en: 'text_delta', def: '`content_block_delta` 事件裡，`delta.type` 是 `text_delta` 時，`delta.text` 就是新的一段文字。', example: '`{"type":"text_delta","text":"退款"}`。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'ssestream', props: { view: 'raw', title: '左邊是原始事件，右邊是使用者看到的畫面', text: '退款通常在倉庫收到商品後 7 到 14 個工作天到帳。', inputTokens: 36 } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 330" role="img" aria-label="Claude 串流的事件順序：message_start 開始，content_block_start 開始一個區塊，接著很多個 content_block_delta 帶文字，content_block_stop 結束區塊，message_delta 帶 stop_reason 與輸出 token 數，最後 message_stop；中間可能夾著 ping">
+          <rect x="10" y="10" width="300" height="38" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="26" y="35" font-size="15" class="mono">message_start</text>
+          <line x1="160" y1="48" x2="160" y2="62" class="stroke-ink" stroke-width="3"/>
+          <rect x="10" y="62" width="300" height="38" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="26" y="87" font-size="15" class="mono">content_block_start</text>
+          <line x1="160" y1="100" x2="160" y2="114" class="stroke-ink" stroke-width="3"/>
+          <rect x="10" y="114" width="300" height="76" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+          <text x="26" y="142" font-size="15" class="mono on-color">content_block_delta</text>
+          <text x="26" y="172" font-size="14" class="on-color">× 很多次，每次一小段文字</text>
+          <line x1="160" y1="190" x2="160" y2="204" class="stroke-ink" stroke-width="3"/>
+          <rect x="10" y="204" width="300" height="38" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="26" y="229" font-size="15" class="mono">content_block_stop</text>
+          <line x1="160" y1="242" x2="160" y2="256" class="stroke-ink" stroke-width="3"/>
+          <rect x="10" y="256" width="300" height="38" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="26" y="281" font-size="15" class="mono on-color">message_delta</text>
+          <line x1="160" y1="294" x2="160" y2="300" class="stroke-ink" stroke-width="3"/>
+          <rect x="10" y="300" width="300" height="24" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="26" y="318" font-size="14" class="mono">message_stop</text>
+          <text x="330" y="35" font-size="14">訊息 id、模型、輸入 token</text>
+          <text x="330" y="87" font-size="14">一個區塊開始（文字或思考）</text>
+          <text x="330" y="142" font-size="14">文字在這裡</text>
+          <text x="330" y="229" font-size="14">這個區塊結束</text>
+          <text x="330" y="281" font-size="14">stop_reason、輸出 token</text>
+          <text x="330" y="318" font-size="14">整則訊息結束</text>
+        </svg>`, caption: '中間可能夾著 `ping` 事件（保持連線），直接忽略。思考區塊與工具呼叫也是同樣的 start → delta → stop。' },
+        { type: 'code', lang: 'typescript', title: '用 SDK 逐一處理事件', code: 'const stream = client.messages.stream({ model: "claude-opus-5-5", max_tokens: 1024, messages });\n\nfor await (const event of stream) {\n  if (event.type === "content_block_delta" && event.delta.type === "text_delta") {\n    process.stdout.write(event.delta.text);   // 新的一段文字\n  }\n  if (event.type === "message_delta") {\n    console.log("\\n停止原因：", event.delta.stop_reason);\n  }\n}' },
+        { type: 'code', lang: 'text', title: '中途出錯時（HTTP 已經是 200）', code: 'event: error\ndata: {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}' },
+        { type: 'callout', variant: 'tip', title: '為什麼不能只看 HTTP 狀態碼', body: ['串流開始時伺服器已經回了 200；之後才發生的錯誤只能用一筆 `error` 事件告訴你。SDK 會把它變成例外丟出來，你的程式要接住（2-4）。'] },
+      ],
+      tryit: {
+        q: ['下面是收到的事件。補完：畫面上會顯示什麼？`stop_reason` 是什麼？'],
+        code: true,
+        draft: 'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"明天"}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"會下雨"}}\n\nevent: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":6}}\n\n畫面：＿＿＿＿\nstop_reason：＿＿＿＿',
+        answer: ['畫面：「明天會下雨」（兩筆 `text_delta` 接起來）。', '`stop_reason` 是 `end_turn`，在 `message_delta` 裡；輸出 6 個 token。'],
+      },
+    },
+    mistakes: [
+      { wrong: '每收到一個網路封包就當成一筆完整事件來解析。', why: '一筆事件可能被切在兩個封包裡，直接 `JSON.parse` 會失敗。', right: '用 SDK（它會等到空行才算一筆）；自己解析時要累積到空行再處理。' },
+      { wrong: '從 `message_start` 讀 `stop_reason`。', why: '開始時還不知道會怎麼結束；`stop_reason` 在最後的 `message_delta` 裡。', right: '在 `message_delta` 讀 `stop_reason` 與輸出 token；或等 `finalMessage()`。' },
+      { wrong: '串流開始回了 200，就當作這次一定成功。', why: '錯誤可能在中途以 `error` 事件出現（例如過載）。', right: '用 try/catch 包住串流迴圈，並檢查有沒有收到 `message_stop`（2-4）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '新的一段文字在哪一種事件裡？', options: [
+        { text: '`content_block_delta` 的 text_delta', correct: true, why: '`delta.type` 是 `text_delta` 時，每筆帶一小段文字。' },
+        { text: '`message_start`，`message.content` 裡', why: '開始時 content 是空的。' },
+        { text: '`message_delta`，`delta.text` 裡', why: 'message_delta 帶的是 stop_reason 與用量。' },
+        { text: '`ping`，每隔幾秒送一次', why: 'ping 只是保持連線。' },
+      ] },
+      { level: '應用', type: 'mc', q: '畫面顯示到一半就停了，log 裡最後收到的是一般的 `content_block_delta`，之後沒有 `message_stop`。最合理的判斷是？', options: [
+        { text: '串流中途被中斷，回應不完整', correct: true, why: '正常結束一定有 message_delta 與 message_stop；沒有就是被切斷或出錯。' },
+        { text: '模型說完了，只是沒送 stop 事件', why: '正常結束一定會送 message_stop。' },
+        { text: '撞到了 max_tokens 上限', why: '撞到上限也會正常收到 message_delta（stop_reason 是 max_tokens）。' },
+        { text: '前端顯示太慢，資料其實都收到了', why: 'log 顯示資料沒有收完。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你想在畫面上顯示「AI 正在思考…」，等真正的回答文字開始出現時才換掉。根據事件順序，你要監聽哪幾種事件、怎麼判斷？'], answer: [
+        '送出後先顯示「正在思考」。監聽 `content_block_start`：區塊類型是 `thinking` 時繼續顯示思考中；出現 `text` 區塊、或收到第一筆 `text_delta` 時，換成回答文字。',
+        '收到 `message_stop` 才把狀態改成完成；中途收到錯誤就顯示錯誤（2-4）。',
+      ] },
+    ],
+    keypoints: [
+      'SSE 一筆事件＝`event:`＋`data:`＋空行；冒號開頭的行是註解。',
+      '文字在 `content_block_delta`（`text_delta`）；`stop_reason` 在最後的 `message_delta`。',
+      '串流開始就是 200；中途錯誤以 `error` 事件出現，沒有 `message_stop` 就是不完整。',
+    ],
+    sources: ['whatwg-sse', 'claude-streaming', 'claude-errors'],
+  },
+
+  '2-3': {
+    goals: [
+      '架一個後端代理：金鑰留在後端，把文字串流轉給瀏覽器',
+      '在瀏覽器用 `fetch` 加 `ReadableStream` 逐段讀取並顯示',
+      '說出 `EventSource` 為什麼不適合直接呼叫 LLM',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）Claude 串流裡，`stop_reason` 在哪一種事件？', options: [
+        { text: '`message_delta`', correct: true, why: '最後才知道怎麼結束。' },
+        { text: '`message_start`', why: '開始時還不知道。' },
+        { text: '`content_block_start`', why: '那是區塊開始。' },
+        { text: '`ping`', why: 'ping 不帶內容。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-2）為什麼瀏覽器不能直接帶金鑰呼叫 Claude API？', options: [
+        { text: '前端程式碼人人看得到，金鑰等於公開', correct: true, why: '所以要後端代理。' },
+        { text: '瀏覽器不能送 POST 請求', why: '可以；問題在安全。' },
+        { text: 'Claude API 不接受來自瀏覽器的 JSON', why: '格式一樣；問題在金鑰。' },
+        { text: '瀏覽器的請求一定比較慢', why: '速度不是原因。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[後端代理]]像餐廳的傳菜口：客人（瀏覽器）不能進廚房（Claude API），只能跟服務生點餐。服務生拿著店裡的帳號（金鑰）去廚房下單，菜好一道就從傳菜口遞出一道。', '客人那邊要有人一道一道接（[[ReadableStream]]），接到就擺上桌。'],
+      limit: ['傳菜口遞的是一整盤菜；網路一次遞來的可能是半個中文字的位元組，要用 [[TextDecoder]] 拼回完整的字。服務生也要負責「客人走了就叫廚房別煮了」（2-4）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="三段架構：瀏覽器用 fetch POST 到你的後端 /api/chat；後端從環境變數讀金鑰，用 SDK 呼叫 Claude API 的串流；Claude 回 SSE 給後端，後端把文字一段一段寫回瀏覽器，瀏覽器用 ReadableStream 讀">
+        <rect x="10" y="20" width="150" height="110" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="85" y="50" text-anchor="middle" font-size="16" font-weight="900">瀏覽器</text>
+        <text x="85" y="78" text-anchor="middle" font-size="13" class="mono">fetch POST</text>
+        <text x="85" y="102" text-anchor="middle" font-size="13" class="mono">body.getReader()</text>
+        <rect x="205" y="20" width="160" height="110" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+        <text x="285" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">你的後端</text>
+        <text x="285" y="78" text-anchor="middle" font-size="13" class="mono on-color">/api/chat</text>
+        <text x="285" y="102" text-anchor="middle" font-size="13" class="on-color">金鑰在環境變數</text>
+        <rect x="410" y="20" width="140" height="110" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="480" y="80" text-anchor="middle" font-size="16" font-weight="900">Claude API</text>
+        <line x1="160" y1="55" x2="205" y2="55" class="stroke-ink" stroke-width="3"/>
+        <line x1="365" y1="55" x2="410" y2="55" class="stroke-ink" stroke-width="3"/>
+        <line x1="410" y1="105" x2="365" y2="105" class="stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+        <line x1="205" y1="105" x2="160" y2="105" class="stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+        <text x="85" y="172" text-anchor="middle" font-size="14">一段段讀出來</text>
+        <text x="85" y="196" text-anchor="middle" font-size="14">接到畫面上</text>
+        <text x="285" y="172" text-anchor="middle" font-size="14">收到 SSE，挑出文字</text>
+        <text x="285" y="196" text-anchor="middle" font-size="14">一段段寫回去</text>
+        <text x="480" y="172" text-anchor="middle" font-size="14">送 SSE 事件</text>
+        <text x="280" y="236" text-anchor="middle" font-size="14">實線：請求　虛線：串流回來的資料</text>
+      </svg>`,
+      caption: '瀏覽器只認識你的後端；金鑰、模型名稱、system prompt 都留在後端。',
+    },
+    define: [
+      { term: '後端代理', en: 'backend proxy', def: '前端呼叫你的後端，後端帶金鑰呼叫 Claude API 並轉回結果。也是做登入檢查、限流、記錄用量的地方。', example: '`POST /api/chat`。' },
+      { term: 'ReadableStream', en: 'ReadableStream', def: '可以一段段讀的資料流；`fetch` 回應的 `body` 就是。用 `getReader()` 的 `read()` 一次拿一段。', example: '`const { done, value } = await reader.read()`。' },
+      { term: 'TextDecoder', en: 'TextDecoder', def: '把位元組轉成文字。串流時加 `{ stream: true }`，被切開的中文字才會等到下一段再拼完整。', example: '`decoder.decode(value, { stream: true })`。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'code', lang: 'typescript', title: 'server.ts：後端代理（Node.js，不用額外框架）', code: 'import http from "node:http";\nimport Anthropic from "@anthropic-ai/sdk";\n\nconst client = new Anthropic(); // 金鑰從環境變數來\nconst MAX_MESSAGES = 50;\n\nhttp.createServer(async (req, res) => {\n  if (req.method !== "POST" || req.url !== "/api/chat") {\n    res.writeHead(404).end();\n    return;\n  }\n  const { messages } = JSON.parse(await readBody(req));\n  // 外部輸入一律在伺服器端檢查\n  if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {\n    res.writeHead(400).end("messages 格式不正確");\n    return;\n  }\n\n  res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-cache" });\n  const stream = client.messages.stream({ model: "claude-opus-5-5", max_tokens: 4096, messages });\n  stream.on("text", (delta) => res.write(delta)); // 只轉文字給瀏覽器\n\n  try {\n    await stream.finalMessage();\n  } catch (err) {\n    console.error("串流失敗", err); // 2-4 會處理得更完整\n  }\n  res.end();\n}).listen(3000);\n\nfunction readBody(req: http.IncomingMessage): Promise<string> {\n  return new Promise((resolve, reject) => {\n    let data = "";\n    req.on("data", (chunk) => { data += chunk; });\n    req.on("end", () => resolve(data));\n    req.on("error", reject);\n  });\n}' },
+        { type: 'code', lang: 'typescript', title: 'chat-client.ts：瀏覽器端逐段讀取', code: 'export async function streamChat(\n  messages: { role: "user" | "assistant"; content: string }[],\n  onText: (chunk: string) => void,\n): Promise<void> {\n  const res = await fetch("/api/chat", {\n    method: "POST",\n    headers: { "content-type": "application/json" },\n    body: JSON.stringify({ messages }),\n  });\n  if (!res.ok || !res.body) throw new Error(`請求失敗：HTTP ${res.status}`);\n\n  const reader = res.body.getReader();\n  const decoder = new TextDecoder();\n  for (;;) {\n    const { done, value } = await reader.read();\n    if (done) break;\n    onText(decoder.decode(value, { stream: true })); // stream: true 避免中文被切壞\n  }\n}' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="「退款」兩個字在 UTF-8 各是 3 個位元組：退是 E9 80 80，款是 E6 AC BE。網路把它切成兩段，第一段結尾是 E6 AC，第二段開頭是 BE。每段各自解碼會出現亂碼；加上 stream true 會把 E6 AC 留著，等下一段拼成完整的款">
+          <text x="10" y="26" font-size="15" font-weight="900">「退款」＝ 6 個位元組，被網路切成兩段</text>
+          <rect x="10" y="44" width="58" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="39" y="70" text-anchor="middle" font-size="14" class="mono on-color">E9</text>
+          <rect x="68" y="44" width="58" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="97" y="70" text-anchor="middle" font-size="14" class="mono on-color">80</text>
+          <rect x="126" y="44" width="58" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="155" y="70" text-anchor="middle" font-size="14" class="mono on-color">80</text>
+          <rect x="184" y="44" width="58" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="213" y="70" text-anchor="middle" font-size="14" class="mono on-color">E6</text>
+          <rect x="242" y="44" width="58" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="271" y="70" text-anchor="middle" font-size="14" class="mono on-color">AC</text>
+          <line x1="320" y1="34" x2="320" y2="94" class="stroke-ink" stroke-width="4" stroke-dasharray="6 4"/>
+          <rect x="340" y="44" width="58" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="369" y="70" text-anchor="middle" font-size="14" class="mono on-color">BE</text>
+          <text x="97" y="112" text-anchor="middle" font-size="14">退</text>
+          <text x="242" y="112" text-anchor="middle" font-size="14">款的前 2 個</text>
+          <text x="369" y="112" text-anchor="middle" font-size="14">款的第 3 個</text>
+          <rect x="10" y="132" width="265" height="86" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="3"/>
+          <text x="26" y="160" font-size="14" font-weight="900" class="on-color">每段各自解碼</text>
+          <text x="26" y="188" font-size="15" class="on-color">「退�」＋「�」</text>
+          <rect x="285" y="132" width="265" height="86" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+          <text x="301" y="160" font-size="14" font-weight="900" class="on-color">加上 { stream: true }</text>
+          <text x="301" y="188" font-size="15" class="on-color">「退」＋「款」</text>
+        </svg>`, caption: '英文字母一個位元組不會被切開，所以這個錯誤常常只在中文環境出現。' },
+        { type: 'code', lang: 'typescript', title: 'React：把每一段接到畫面上', code: 'const [reply, setReply] = useState("");\n\nasync function send(question: string): Promise<void> {\n  setReply("");\n  // 用函式形式更新：每一段都接在「最新的」內容後面\n  await streamChat([{ role: "user", content: question }], (chunk) => setReply((prev) => prev + chunk));\n}' },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'browser', label: '瀏覽器' }, { id: 'backend', label: '你的後端' }, { id: 'api', label: 'Claude API' }], items: [
+          { text: '讀 `ANTHROPIC_API_KEY`', answer: 'backend', why: '金鑰只在後端的環境變數裡。' },
+          { text: '檢查 messages 的長度與格式', answer: 'backend', why: '外部輸入要在伺服器端驗證；瀏覽器的檢查可以被繞過。' },
+          { text: '用 `TextDecoder` 把位元組轉成文字', answer: 'browser', why: '瀏覽器收到的是位元組，要自己解碼。' },
+          { text: '產生 `content_block_delta` 事件', answer: 'api', why: 'SSE 事件是 Claude API 送出來的。' },
+          { text: '決定 system prompt 與模型名稱', answer: 'backend', why: '放在後端，使用者改不到；放前端的話任何人都能改。' },
+        ] } },
+        { type: 'table', head: ['做法', '可以 POST 嗎', '適合'], rows: [
+          ['`EventSource`', '✗ 只能 GET、不能加自訂標頭', '伺服器推播通知；不適合送一大段對話'],
+          ['`fetch` ＋ `ReadableStream`', '✓', '本課的做法：POST 對話、逐段讀'],
+          ['後端轉成 SSE 再給瀏覽器', '✓（用 fetch 讀）', '要分辨多種事件時：文字、工具狀態、錯誤、結束（2-4）'],
+        ] },
+      ],
+      tryit: {
+        q: ['這段 React 程式在串流時，畫面只會出現最後一小段。找出問題並改寫：'],
+        code: true,
+        draft: 'await streamChat(messages, (chunk) => setReply(reply + chunk));',
+        answer: ['`reply` 是這次渲染時的舊值，每一段都接在同一個舊值後面，前面的段落就被覆蓋了。', '改成函式形式：`setReply((prev) => prev + chunk)`，每次都拿最新的值往後接。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用 `EventSource` 直接連 Claude API。', why: '`EventSource` 只能 GET、不能加自訂標頭，送不了對話內容，而且金鑰會暴露。', right: '瀏覽器用 `fetch` POST 到自己的後端，再讀 `res.body` 的串流。' },
+      { wrong: '每一段都 `new TextDecoder().decode(value)`。', why: '中文字被切在兩段之間時會變亂碼。', right: '共用一個 decoder，並傳 `{ stream: true }`。' },
+      { wrong: '讓前端決定 `model` 和 `system`，後端照單全收。', why: '任何人都能改成最貴的模型、或改掉你的規則。', right: '前端只送對話內容；模型、system、max_tokens 都由後端決定，並驗證輸入。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '為什麼瀏覽器不用 `EventSource` 直接接 LLM 串流？', options: [
+        { text: '只能 GET，送不了對話內容與標頭', correct: true, why: 'WHATWG 標準的 EventSource 只有 withCredentials 一個選項。' },
+        { text: '它不支援 UTF-8，中文會亂碼', why: 'SSE 一律是 UTF-8。' },
+        { text: '它斷線後不會自動重連', why: '剛好相反，它會自動重連。' },
+        { text: '它只能在 Node.js 裡用', why: 'EventSource 是瀏覽器 API。' },
+      ] },
+      { level: '應用', type: 'mc', q: '串流的中文回答偶爾出現「�」，英文回答都正常。最可能的原因是？', options: [
+        { text: '解碼沒加 `{ stream: true }`', correct: true, why: '英文一個字元一個位元組不會被切開；中文 3 個位元組可能跨兩段。' },
+        { text: '模型輸出了不合法的中文字', why: '模型輸出的是合法文字；亂碼發生在你的解碼。' },
+        { text: '後端的 content-type 沒寫 charset', why: '前端用 TextDecoder 預設就是 UTF-8；問題在分段解碼。' },
+        { text: '網路封包遺失，資料不完整', why: 'TCP 會保證資料完整到達；問題是被切在哪裡。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的後端除了文字，還想告訴前端「模型正在查資料庫」這種狀態。只轉純文字的做法會遇到什麼問題？你會怎麼改？'], answer: [
+        '純文字串流分不出「這段是回答」還是「這段是狀態」；也沒辦法在中途告訴前端出錯了（HTTP 已經是 200）。',
+        '改成後端自己送 SSE 格式：`event: text`、`event: status`、`event: error`、`event: done`，前端用 fetch 讀串流、依 event 種類分別處理。',
+      ] },
+    ],
+    keypoints: [
+      '瀏覽器 → 你的後端 → Claude API；金鑰、模型、system 都留在後端。',
+      '瀏覽器用 `fetch` ＋ `getReader()` 逐段讀；`TextDecoder` 加 `{ stream: true }`。',
+      'React 用 `setReply((prev) => prev + chunk)`；要分辨多種狀態就讓後端送 SSE。',
+    ],
+    sources: ['whatwg-sse', 'mdn-readable-stream', 'claude-streaming', 'ts-sdk'],
+  },
+
+  '2-4': {
+    goals: [
+      '做一個「停止生成」按鈕，前後端都真的停下來',
+      '分辨正常結束、使用者停止、連線中斷三種結局',
+      '決定被中斷的部分回答要怎麼處理',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-3）React 串流時，為什麼要寫 `setReply((prev) => prev + chunk)`？', options: [
+        { text: '每一段都接在最新的內容後面，不會被舊值覆蓋', correct: true, why: '直接用 reply 會拿到舊的渲染值。' },
+        { text: '這樣 React 才會用串流模式渲染', why: 'React 沒有這種模式；是狀態更新的寫法問題。' },
+        { text: '函式形式比較省記憶體', why: '重點是拿到最新值，不是記憶體。' },
+        { text: '這是 TextDecoder 規定的寫法，不這樣寫會亂碼', why: '兩者無關。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 2-2）串流中途發生過載錯誤，你會收到什麼？', options: [
+        { text: '一筆 `error` 事件，HTTP 狀態仍是 200', correct: true, why: '錯誤發生時標頭早就送出了。' },
+        { text: 'HTTP 狀態碼變成 529', why: '狀態碼在一開始就送了，不能改。' },
+        { text: '`stop_reason` 變成 `overloaded`', why: '沒有這個 stop_reason。' },
+        { text: '什麼都不會收到，連線一直開著', why: 'API 會送 error 事件告訴你。' },
+      ] },
+    ],
+    analogy: {
+      text: ['停止生成像在熱炒店喊「後面的菜不用了」：只跟服務生（瀏覽器）說不夠，服務生要跑去廚房（後端 → Claude API）叫停，否則廚房照煮、照收錢。', '[[AbortController]] 就是那聲吆喝，要一路傳到廚房。'],
+      limit: ['熱炒店喊停後，已經下鍋的菜還是要付錢；API 也是，停止前已經產生的 token 照樣計費（依 token 計費的通則）。所以停止按鈕省的是「後面還沒寫的部分」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="停止訊號的路徑：使用者按停止，瀏覽器的 AbortController 中止 fetch；後端偵測到連線關閉，呼叫 stream.abort 中止和 Claude API 的串流；Claude 停止產生">
+        <rect x="10" y="20" width="160" height="90" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="90" y="52" text-anchor="middle" font-size="16" font-weight="900">瀏覽器</text>
+        <text x="90" y="80" text-anchor="middle" font-size="13" class="mono">controller.abort()</text>
+        <rect x="205" y="20" width="170" height="90" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+        <text x="290" y="52" text-anchor="middle" font-size="16" font-weight="900" class="on-color">你的後端</text>
+        <text x="290" y="80" text-anchor="middle" font-size="13" class="mono on-color">res.on("close")</text>
+        <rect x="410" y="20" width="140" height="90" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="480" y="60" text-anchor="middle" font-size="16" font-weight="900">Claude API</text>
+        <text x="480" y="86" text-anchor="middle" font-size="13" class="mono">停止產生</text>
+        <line x1="170" y1="65" x2="205" y2="65" class="stroke-ink" stroke-width="4"/>
+        <line x1="375" y1="65" x2="410" y2="65" class="stroke-ink" stroke-width="4"/>
+        <text x="90" y="150" text-anchor="middle" font-size="14">① fetch 被中止</text>
+        <text x="290" y="150" text-anchor="middle" font-size="14">② 偵測到連線關了</text>
+        <text x="290" y="174" text-anchor="middle" font-size="13" class="mono">stream.abort()</text>
+        <text x="480" y="150" text-anchor="middle" font-size="14">③ 不再產生</text>
+        <rect x="10" y="196" width="540" height="34" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="219" text-anchor="middle" font-size="14" class="on-color">只做 ①：畫面停了，但後端還在付錢產生後面的字</text>
+      </svg>`,
+      caption: '停止要從瀏覽器一路傳到 API；只停前端，後端和帳單都還在跑。',
+    },
+    define: [
+      { term: 'AbortController', en: 'AbortController', def: '內建的取消器：把 `controller.signal` 交給 `fetch`，呼叫 `controller.abort()` 就中止，`fetch` 會丟出 `AbortError`。', example: '停止按鈕呼叫 `controller.abort()`。' },
+      { term: 'stream.abort()', en: 'MessageStream.abort()', def: 'TypeScript SDK 串流物件的方法：中止串流與進行中的網路請求，等於 `stream.controller.abort()`。', example: '後端偵測到瀏覽器斷線就呼叫。' },
+      { term: '部分回應', en: 'partial response', def: '被停止或中斷時已經收到的那一段。它不完整，沒有 `stop_reason`。', example: '畫面上要標示「已停止」。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'ssestream', props: { view: 'ui', abortable: true, title: '試試看：送出後按「停止生成」', gap: 150, text: '申請退款前，請先確認商品還在 7 天鑑賞期內，並保留原包裝與發票。接著在訂單頁按「申請退貨」，選擇退貨原因，系統會產生退貨單號。把商品寄回後，倉庫確認狀況才會開始退款。' } },
+        { type: 'widget', name: 'ssestream', props: { view: 'ui', failAt: 10, title: '模擬中途斷線：注意畫面上留下了什麼、少了什麼', text: '你的訂單已經出貨，物流單號是 8812-0093，預計明天下午送達。如果明天沒收到，可以在這裡回覆，我們會幫你聯絡物流。' } },
+        { type: 'code', lang: 'typescript', title: 'server.ts：瀏覽器斷線就停止向 API 要資料', code: 'const stream = client.messages.stream({ model: "claude-opus-5-5", max_tokens: 4096, messages });\nstream.on("text", (delta) => res.write(`event: text\\ndata: ${JSON.stringify(delta)}\\n\\n`));\n\n// 瀏覽器按了停止或關掉分頁：連線關閉，但我們還沒寫完\nres.on("close", () => {\n  if (!res.writableFinished) stream.abort();\n});\n\ntry {\n  const message = await stream.finalMessage();\n  res.write(`event: done\\ndata: ${JSON.stringify({ stopReason: message.stop_reason })}\\n\\n`);\n} catch (err) {\n  if (err instanceof Anthropic.APIUserAbortError) return; // 使用者自己停的，不算錯誤\n  console.error("串流失敗", err);\n  res.write(`event: error\\ndata: ${JSON.stringify({ message: "回應中斷，請重試" })}\\n\\n`);\n}\nres.end();' },
+        { type: 'code', lang: 'typescript', title: '瀏覽器：停止按鈕', code: 'let controller: AbortController | null = null;\n\nasync function send(messages: ChatMessage[]): Promise<void> {\n  controller = new AbortController();\n  try {\n    await streamChat(messages, onEvent, controller.signal); // fetch 時傳入 { signal }\n  } catch (err) {\n    if (err instanceof DOMException && err.name === "AbortError") {\n      markReply("stopped"); // 使用者按的，保留已收到的文字並標示「已停止」\n      return;\n    }\n    markReply("error");\n    throw err;\n  }\n}\n\nstopButton.addEventListener("click", () => controller?.abort());' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="回覆的狀態：閒置，送出後進入等待；收到第一段文字進入串流中；之後有三種結局：收到 done 是完成，使用者按停止是已停止，收到錯誤或連線斷掉是失敗">
+          <rect x="10" y="90" width="90" height="50" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="55" y="120" text-anchor="middle" font-size="15" font-weight="900">閒置</text>
+          <line x1="100" y1="115" x2="130" y2="115" class="stroke-ink" stroke-width="3"/>
+          <rect x="130" y="90" width="90" height="50" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="175" y="120" text-anchor="middle" font-size="15" font-weight="900">等待</text>
+          <line x1="220" y1="115" x2="250" y2="115" class="stroke-ink" stroke-width="3"/>
+          <rect x="250" y="90" width="100" height="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="300" y="120" text-anchor="middle" font-size="15" font-weight="900" class="on-color">串流中</text>
+          <line x1="350" y1="115" x2="380" y2="115" class="stroke-ink" stroke-width="3"/>
+          <line x1="380" y1="40" x2="380" y2="190" class="stroke-ink" stroke-width="3"/>
+          <line x1="380" y1="40" x2="410" y2="40" class="stroke-ink" stroke-width="3"/>
+          <line x1="380" y1="190" x2="410" y2="190" class="stroke-ink" stroke-width="3"/>
+          <line x1="380" y1="115" x2="410" y2="115" class="stroke-ink" stroke-width="3"/>
+          <rect x="410" y="15" width="140" height="50" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+          <text x="480" y="45" text-anchor="middle" font-size="15" font-weight="900" class="on-color">完成</text>
+          <rect x="410" y="90" width="140" height="50" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/>
+          <text x="480" y="120" text-anchor="middle" font-size="15" font-weight="900" class="on-color">已停止</text>
+          <rect x="410" y="165" width="140" height="50" style="fill:var(--danger)" class="stroke-ink" stroke-width="3"/>
+          <text x="480" y="195" text-anchor="middle" font-size="15" font-weight="900" class="on-color">失敗</text>
+          <text x="175" y="72" text-anchor="middle" font-size="13">送出</text>
+          <text x="300" y="72" text-anchor="middle" font-size="13">第一段文字</text>
+          <text x="280" y="228" text-anchor="middle" font-size="13">done 事件／按停止／錯誤或斷線</text>
+        </svg>`, caption: '三種結局要看起來不一樣：使用者才知道要不要重試。' },
+        { type: 'table', head: ['結局', '怎麼判斷', '畫面', '要不要存進對話歷史'], rows: [
+          ['完成', '收到 `done`（`stop_reason` 是 `end_turn`）', '正常顯示', '✓ 存'],
+          ['已停止', '使用者按停止（`AbortError`）', '保留文字＋「已停止」標記', '看產品：通常存並標記，或讓使用者選'],
+          ['失敗', '收到 `error`，或串流結束卻沒收到 `done`', '保留文字＋錯誤訊息＋重試按鈕', '✗ 不存，重試時重新產生'],
+        ] },
+      ],
+      tryit: {
+        q: ['同事的停止按鈕只寫了前端：`controller.abort()`。上線後帳單沒有因為使用者常按停止而變少。補完你的解釋：'],
+        draft: '原因：＿＿＿＿\n要補的程式：＿＿＿＿',
+        answer: ['原因：前端中止了 fetch，但後端沒發現，仍在跟 Claude API 要資料，模型繼續產生、繼續計費。', '要補：後端監聽連線關閉（`res.on("close")`），沒寫完就呼叫 `stream.abort()`。'],
+      },
+    },
+    mistakes: [
+      { wrong: '停止按鈕只把畫面上的串流隱藏起來。', why: '請求還在跑，後端與 API 都在產生、計費。', right: '前端 `controller.abort()`，後端在連線關閉時 `stream.abort()`。' },
+      { wrong: '把使用者停止和網路錯誤都顯示成「發生錯誤」。', why: '使用者會以為系統壞了；停止是他自己的選擇。', right: '`AbortError` 顯示「已停止」，其他錯誤才顯示失敗與重試。' },
+      { wrong: '串流結束（`done` 為 true）就當作成功，沒檢查有沒有收到結束事件。', why: '連線中斷時串流一樣會結束，但回應不完整。', right: '後端在正常結束時送一筆 `done` 事件；前端沒收到它就當作失敗。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '後端要在哪個時機呼叫 `stream.abort()`？', options: [
+        { text: '瀏覽器的連線關閉，但回應還沒寫完的時候', correct: true, why: '這表示使用者停止或離開了，後面的字不用再產生。' },
+        { text: '每收到一段文字之後', why: '那會讓串流立刻停止。' },
+        { text: '收到 `message_stop` 之後', why: '那時已經正常結束，不需要中止。' },
+        { text: '後端程式啟動的時候', why: '那時還沒有任何串流。' },
+      ] },
+      { level: '應用', type: 'mc', q: '使用者回報：「回答寫到一半就沒了，也沒有錯誤訊息。」log 顯示後端收到了 API 的 error 事件。你的前端最該補什麼？', options: [
+        { text: '後端轉送 error 事件，前端收到就顯示錯誤和重試', correct: true, why: '錯誤發生在 200 之後，只能用事件告訴前端。' },
+        { text: '前端改成檢查 HTTP 狀態碼是不是 200', why: '串流開始時就是 200，之後的錯誤看不到。' },
+        { text: '把 `max_tokens` 調大，避免回答在中途被截斷切掉', why: '這不是截斷，是 API 中途出錯。' },
+        { text: '前端加長 fetch 的逾時時間', why: '連線不是逾時，是收到錯誤後結束。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你做的是「AI 寫信」功能：使用者常在第二段就按停止，然後說「改成比較正式的語氣」。被停止的那段信要不要放進對話歷史？說出你的取捨。'], answer: [
+        '放進去並標記為「已停止」通常比較好：使用者接著說「改正式一點」，模型需要知道剛剛寫了什麼才能改。',
+        '但要讓模型知道它是不完整的（例如在下一則 user 訊息裡說明「上一封信被中途停止」），也要注意不完整的內容不能拿去寄出。如果使用者是因為方向完全錯而停止，提供「捨棄並重寫」的選項。',
+      ] },
+    ],
+    lab: {
+      minutes: 30,
+      task: ['把 2-3 的後端代理和瀏覽器端組起來，加上本課的停止按鈕與三種結局，在自己電腦跑一次：', '1. 送出一個長問題，按停止，確認後端 log 出現中止、畫面標示「已停止」。', '2. 關掉 Wi-Fi 再送一次，確認畫面顯示失敗與重試按鈕。'],
+    },
+    keypoints: [
+      '停止要從瀏覽器傳到後端再傳到 API：`controller.abort()` → `res.on("close")` → `stream.abort()`。',
+      '三種結局分開處理：完成、已停止、失敗；沒收到結束事件就不算完成。',
+      '已經產生的 token 照樣計費；停止省的是後面還沒寫的部分。',
+    ],
+    sources: ['mdn-abort', 'ts-sdk', 'claude-streaming', 'claude-errors'],
+  },
+});
+</script>
+

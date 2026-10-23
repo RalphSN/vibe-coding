@@ -1,0 +1,100 @@
+<script>
+/* ==========================================================================
+   模組 0：一個 token 背後的硬體
+   ========================================================================== */
+defineTerms({
+  'GPU': { en: 'Graphics Processing Unit', def: '有大量簡單核心、擅長同時做很多相同運算的晶片；訓練與執行大型模型的主力。', example: 'NVIDIA H100、Rubin。', lesson: '0-1' },
+  'FLOPs': { en: 'floating point operations', def: '浮點運算次數；FLOPS（大寫 S）則是每秒能做多少次。', example: '推論一個 token 約 2 × 參數量 FLOPs。', lesson: '0-1' },
+  'HBM': { en: 'High Bandwidth Memory', def: '堆疊在 GPU 旁邊、頻寬極高的記憶體；資料中心 GPU 都用它。', example: 'H100 用 80 GB HBM3。', lesson: '0-1' },
+  'VRAM': { en: 'video memory', def: 'GPU 自己的記憶體；模型的權重、KV cache 都要放在這裡才算得快。', example: '消費級顯示卡常見 8～32 GB。', lesson: '2-1' },
+  '頻寬': { en: 'memory bandwidth', def: '每秒能從記憶體搬多少資料到運算單元。', example: 'H100：3.35 TB/s。', lesson: '2-2' },
+});
+
+const REQ_HW_SVG = `<svg viewBox="0 0 560 240" role="img" aria-label="一個請求在硬體上的路：資料中心裡的伺服器，伺服器裡有好幾張 GPU，每張 GPU 旁邊有 HBM 記憶體；權重從記憶體搬到運算核心做矩陣乘法">
+  <rect x="10" y="10" width="540" height="220" class="fill-bg stroke-ink" stroke-width="3" stroke-dasharray="8 6"/>
+  <text x="28" y="36" font-size="15" font-weight="900">資料中心：很多機櫃、電力、散熱</text>
+  <rect x="40" y="52" width="480" height="160" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+  <text x="60" y="78" font-size="14" font-weight="900" class="on-color">一台伺服器：通常 8 張 GPU，用高速互連相接</text>
+  ${[0, 1, 2, 3].map((i) => `<rect x="${60 + i * 112}" y="94" width="100" height="100" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="${110 + i * 112}" y="126" text-anchor="middle" font-size="14" font-weight="900" class="on-color">GPU</text><rect x="${70 + i * 112}" y="142" width="80" height="38" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="${110 + i * 112}" y="166" text-anchor="middle" font-size="13" font-weight="900" class="on-color">HBM</text>`).join('')}
+</svg>`;
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出一個請求在硬體上經過的層次',
+      '用 2N 估算一個 token 的運算量',
+      '知道這一卷要回答的三個問題：放得下嗎、跑多快、要多少錢',
+    ],
+    analogy: {
+      text: ['你點一杯手搖飲：店員（GPU）很多，每人只會做簡單的動作；原料（模型權重）放在冰箱（記憶體）；店開在商場（資料中心），要電、要冷氣；杯子和機器是從工廠（晶圓廠）來的。', '序章 2-3 說「模型的計算在 GPU 上」。這一卷把那一站打開：[[GPU]] 怎麼算、[[HBM]] 和 [[VRAM]] 為什麼常常才是瓶頸、訓練和推論各要多少資源，最後看整條產業鏈和台灣的位置。'],
+      limit: ['手搖飲店的瓶頸通常是人手，大模型推論的瓶頸常常是「從冰箱拿原料的速度」（[[頻寬]]），這是本卷最重要、也最反直覺的一點（模組 2）。'],
+    },
+    model: { svg: REQ_HW_SVG, caption: '從外到內：資料中心 → 伺服器 → GPU → 記憶體。每產生一個 token，權重都要從 HBM 搬進 GPU 核心一次。' },
+    define: [
+      { term: 'GPU', en: 'GPU', def: '大量平行運算的晶片。', example: 'H100。' },
+      { term: 'FLOPs', en: 'FLOPs', def: '浮點運算次數。', example: '2N／token。' },
+      { term: 'HBM', en: 'HBM', def: '高頻寬記憶體。', example: '堆疊在 GPU 旁。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '產生一個 token 要算多少（實際計算：約 2 × 參數）', sliders: [
+          { id: 'n', label: '模型參數量', min: 1, max: 1000, step: 1, value: 70, unit: '十億' },
+          { id: 't', label: '回答長度', min: 100, max: 5000, step: 100, value: 500, unit: 'token' },
+        ], compute: (v) => {
+          const per = 2 * v.n * 1e9;
+          const all = per * v.t;
+          return { rows: [
+            { label: '每個 token', value: `${(per / 1e9).toFixed(0)} GFLOPs`, ratio: Math.min(1, v.n / 1000) },
+            { label: `整段回答（${v.t} token）`, value: `${(all / 1e12).toFixed(1)} TFLOPs`, ratio: Math.min(1, all / 1e16) },
+          ], note: '每個參數大約做一次乘、一次加，所以約 2N（Kaplan 等 2020 的通則；不含 attention 隨長度增加的部分）。70B 模型每個 token 約 1,400 億次浮點運算。' };
+        } } },
+        { type: 'table', head: ['這一卷的問題', '模組'], rows: [
+          ['為什麼要 GPU？算得多快？', '1'],
+          ['模型放得下嗎？為什麼產生文字被記憶體卡住？', '2'],
+          ['訓練為什麼比推論貴那麼多？', '3'],
+          ['怎麼讓模型變小、變便宜？', '4'],
+          ['能不能在自己的電腦跑？晶片從哪裡來？台灣在哪裡？', '5'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="三個估算問題：放得下嗎看記憶體容量，跑多快看頻寬與算力，要多少錢看 GPU 數量與時間">
+          ${[['放得下嗎？', '記憶體容量', 'm2'], ['跑多快？', '頻寬與算力', 'm1'], ['多少錢？', 'GPU 數 × 時間', 'm4']].map(([a, b, c], i) => `<rect x="${10 + i * 185}" y="30" width="170" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="80" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${a}</text><text x="${95 + i * 185}" y="112" text-anchor="middle" font-size="14" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="178" text-anchor="middle" font-size="13">這一卷的拉桿，都在幫你回答這三題</text>
+        </svg>`, caption: '學完這一卷，看到「某某模型 700 億參數」時，你應該能估出大概要什麼硬體。' },
+      ],
+      tryit: {
+        q: ['8B（80 億參數）的模型，產生一個 token 大約要多少 FLOPs？寫出算式。'],
+        draft: '算式：＿\n結果：＿',
+        answer: ['2 × 8 × 10⁹ ＝ 1.6 × 10¹⁰，約 160 億次浮點運算（16 GFLOPs）。', '一張每秒能做數百 TFLOPS 的 GPU，理論上一秒可以做好幾萬個 token 的運算量；實際上做不到，原因在模組 2。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 AI 慢就是「算力不夠」。', why: '產生文字時，瓶頸常常是記憶體頻寬。', right: '先分清是算不夠還是搬不夠（模組 2）。' },
+      { wrong: '以為模型在雲端就不需要硬體成本。', why: '雲端只是別人的 GPU 與資料中心。', right: 'API 的價格裡就包含這些成本。' },
+      { wrong: '把 FLOPs 和 FLOPS 混用。', why: '一個是次數，一個是每秒次數。', right: '算量用 FLOPs，算速度用 FLOPS。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '推論一個 token 的運算量大約是？', options: [
+        { text: '2 × 參數量', correct: true, why: '每個參數一乘一加。' },
+        { text: '6 × 參數量，和訓練一樣', why: '6N 是訓練（含反向）。' },
+        { text: '參數量的平方', why: '不是平方。' },
+        { text: '和參數量無關，只看長度', why: '和參數量成正比。' },
+      ] },
+      { level: '應用', type: 'mc', q: '從外到內，哪個順序正確？', options: [
+        { text: '資料中心 → 伺服器 → GPU → HBM', correct: true, why: '一層包一層。' },
+        { text: 'GPU → 資料中心 → HBM → 伺服器', why: '順序亂了。' },
+        { text: 'HBM → GPU → 資料中心 → 伺服器', why: '倒過來了。' },
+        { text: '伺服器 → 資料中心 → GPU → HBM', why: '伺服器在資料中心裡。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['第一部 1-5 說 API 依 token 計費。用這一課的觀念，說說為什麼輸出 token 通常比輸入 token 貴。'], answer: [
+        '輸入 token 可以一次平行處理（prefill），GPU 利用率高；輸出 token 一個一個產生，每一步都要把整份權重搬一次，GPU 很多時間在等記憶體（2-3）。',
+        '同樣一個 token，輸出佔用硬體的時間比較長，所以比較貴。這是推論，實際定價還有商業考量。',
+      ] },
+    ],
+    keypoints: [
+      '一個請求在硬體上：資料中心 → 伺服器 → GPU → HBM。',
+      '推論一個 token 約 2N FLOPs。',
+      '這一卷回答三題：放得下嗎、跑多快、多少錢。',
+    ],
+    sources: ['kaplan', 'nvidia-h100'],
+  },
+});
+</script>

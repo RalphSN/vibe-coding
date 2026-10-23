@@ -1,0 +1,155 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'AI 系列・第二部｜大型語言模型原理',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-22',
+  version: 'v1',
+};
+
+/* AI 系列七本書：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: 'AI 系列',
+  current: 'ai-llm',
+  volumes: [
+    { id: 'ai-map', vol: '序章', title: 'AI 全景地圖', href: '../ai-series-0-map-course/index.html' },
+    { id: 'ai-app', vol: '第一部', title: 'AI 應用工程', href: '../ai-app-engineering-course/index.html' },
+    { id: 'ai-llm', vol: '第二部', title: '大型語言模型原理', href: '../llm-principles-course/index.html' },
+    { id: 'ai-ml', vol: '第三部', title: '機器學習基礎', href: '../ml-foundations-course/index.html' },
+    { id: 'ai-dl', vol: '第四部', title: '深度學習', href: '../deep-learning-course/index.html' },
+    { id: 'ai-hw', vol: '第五部', title: '硬體與運算', href: '../ai-hardware-course/index.html' },
+    { id: 'ai-math', vol: '隨身卷', title: '數學直覺', href: '../ai-math-pocket-course/index.html' },
+  ],
+};
+
+/* 全書主軸：一段文字在模型裡走過的六站；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '文字', note: '你輸入的句子', color: 'var(--m0)' },
+    { label: 'token 編號', note: 'tokenizer 切段、換編號', color: 'var(--m1)' },
+    { label: '向量', note: '查表變成一串數字', color: 'var(--m2)' },
+    { label: 'Transformer 區塊', note: 'attention 與前饋網路，疊很多層', color: 'var(--m3)' },
+    { label: '下一個 token 的機率', note: '每個候選一個分數，再變機率', color: 'var(--m4)' },
+    { label: '取樣與輸出', note: '選一個，接回去再算', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [0, 1], 2: [1, 2], 3: [3], 4: [3], 5: [2, 3, 4], 6: [3, 4], 7: [4, 5] },
+  byLesson: { '2-3': [2, 3], '4-4': [2, 3, 4], '5-1': [4], '7-2': [1, 3], '7-3': [3], '7-5': [0, 1, 2, 3, 4, 5] },
+};
+
+/* 首頁主視覺：一段文字往下走過模型的六站（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="一段文字在模型裡的路：文字被切成 token 編號，查表變成向量，經過很多層 Transformer 區塊，得到下一個 token 的機率，取樣出一個 token 再接回輸入">
+  <rect x="20" y="14" width="400" height="48" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+  <text x="40" y="45" font-size="17" font-weight="900" class="on-color">文字：「台灣最高的山是」</text>
+  <rect x="20" y="78" width="400" height="48" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+  <text x="40" y="109" font-size="17" font-weight="900" class="on-color">token 編號：[台灣][最高][的][山][是]</text>
+  <rect x="20" y="142" width="400" height="48" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+  <text x="40" y="173" font-size="17" font-weight="900" class="on-color">向量：每個 token 一串數字</text>
+  <rect x="20" y="206" width="400" height="76" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+  <text x="40" y="238" font-size="17" font-weight="900" class="on-color">Transformer 區塊 × 很多層</text>
+  <text x="40" y="264" font-size="15" class="on-color">attention：看別的字・前饋：加工自己</text>
+  <rect x="20" y="298" width="400" height="48" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+  <text x="40" y="329" font-size="17" font-weight="900" class="on-color">機率：玉 85%・雪 6%・合 3%…</text>
+  <rect x="20" y="362" width="400" height="48" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+  <text x="40" y="393" font-size="17" font-weight="900" class="on-color">取樣：選出「玉」</text>
+  <path d="M420 386 L500 386 L500 38 L428 38" fill="none" class="stroke-ink" stroke-width="4"/>
+  <path d="M436 30 L424 38 L436 46 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="0" y="0" font-size="16" font-weight="900" transform="translate(518 170) rotate(90)">接回去再算</text>
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '一段文字|在模型裡的路', short: '起點', desc: '這一卷拆開 LLM 的內部：從文字到下一個 token，一共六站。', lessons: [
+    ['0-1', '打開|黑盒子'],
+  ]},
+  { id: 1, title: 'Tokenization：|文字怎麼被切成 token', short: '切字', desc: '為什麼不用字或字母、BPE 怎麼合併、詞彙表大小的取捨、特殊 token。', lessons: [
+    ['1-1', '為什麼不直接|用字或字母'],
+    ['1-2', 'BPE：|一步一步合併'],
+    ['1-3', '詞彙表大小|與各種文字'],
+    ['1-4', '特殊 token|與對話格式'],
+  ]},
+  { id: 2, title: 'Embedding：|文字怎麼變成向量', short: '向量', desc: '編號查表變向量、向量的距離代表意思的距離、位置資訊怎麼加進去。', lessons: [
+    ['2-1', '從編號|到向量'],
+    ['2-2', '意思相近，|向量就相近'],
+    ['2-3', '位置|從哪裡來'],
+  ]},
+  { id: 3, title: 'Attention 直覺：|每個字在「看」誰', short: '注意力', desc: '每個 token 決定要參考哪些 token：Q、K、V，縮放點積，因果遮罩與多頭。', lessons: [
+    ['3-1', '每個字|在看誰'],
+    ['3-2', 'Q、K、V：|查詢、標籤、內容'],
+    ['3-3', '縮放點積|與 softmax'],
+    ['3-4', '因果遮罩|與多頭'],
+  ]},
+  { id: 4, title: 'Transformer 結構：|block、殘差、layer norm', short: '結構', desc: '一個 block 的兩個部分、殘差連接、layer norm，以及參數都在哪裡。', lessons: [
+    ['4-1', '一個 block：|看別人，再加工自己'],
+    ['4-2', '殘差連接：|留一條直通路'],
+    ['4-3', 'layer norm：|把數字拉回正常範圍'],
+    ['4-4', '疊很多層：|參數都在哪'],
+  ]},
+  { id: 5, title: '預訓練：|預測下一個 token', short: '預訓練', desc: '損失怎麼算、資料從哪裡來、規模定律說了什麼。', lessons: [
+    ['5-1', '猜下一個字|的分數'],
+    ['5-2', '資料：|從哪裡來、怎麼清'],
+    ['5-3', '規模定律：|越大越好嗎'],
+  ]},
+  { id: 6, title: '後訓練：|SFT、偏好學習、推理模型', short: '後訓練', desc: '從會接話變成會當助理：示範、偏好、原則，以及會先想再答的推理模型。', lessons: [
+    ['6-1', 'SFT：|看示範學當助理'],
+    ['6-2', '偏好學習：|RLHF 與 DPO'],
+    ['6-3', '用原則訓練：|安全與拒絕'],
+    ['6-4', '推理模型：|先想再答'],
+  ]},
+  { id: 7, title: '推論：|取樣、context、KV cache、幻覺', short: '推論', desc: '模型實際產生回答時發生的事，以及幻覺為什麼會發生。', lessons: [
+    ['7-1', '取樣：|從機率到文字'],
+    ['7-2', 'context window：|一次能看多少'],
+    ['7-3', 'KV cache：|算過的不再算'],
+    ['7-4', '幻覺|為什麼會發生'],
+    ['7-5', '從頭走一遍|＋總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

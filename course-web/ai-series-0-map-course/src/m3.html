@@ -1,0 +1,384 @@
+<script>
+/* ==========================================================================
+   模組 3：學習地圖
+   ========================================================================== */
+defineTerms({
+  'L1 會用': { en: 'level 1: use', def: '知道是什麼、能判斷什麼時候用、能看懂別人在講什麼。', example: '知道 token 是計費單位，會用 count_tokens 量。', lesson: '3-1' },
+  'L2 會做': { en: 'level 2: build', def: '能自己實作、遇到問題能除錯。', example: '能寫程式呼叫 API、處理串流與錯誤。', lesson: '3-1' },
+  'L3 會推導': { en: 'level 3: derive', def: '懂背後的原理，能從頭推導或改進做法。', example: '能自己寫一個 tokenizer，說明它為什麼這樣切。', lesson: '3-1' },
+  '先修': { en: 'prerequisite', def: '讀某一卷之前，最好先懂的東西。', example: '第四部的反向傳播會用到隨身卷的梯度。', lesson: '3-2' },
+});
+
+const LEVELS_SVG = `<svg viewBox="0 0 560 250" role="img" aria-label="三層階梯：L1 會用在最下層，L2 會做在中間，L3 會推導在最上層；越往上需要的時間越多">
+  <rect x="10" y="170" width="540" height="64" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+  <text x="26" y="198" font-size="15" font-weight="900" class="on-color">L1 會用</text><text x="26" y="222" font-size="13" class="on-color">知道是什麼、能判斷、看得懂別人在講什麼</text>
+  <rect x="110" y="96" width="440" height="64" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+  <text x="126" y="124" font-size="15" font-weight="900" class="on-color">L2 會做</text><text x="126" y="148" font-size="13" class="on-color">能自己實作、遇到問題能除錯</text>
+  <rect x="220" y="22" width="330" height="64" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+  <text x="236" y="50" font-size="15" font-weight="900" class="on-color">L3 會推導</text><text x="236" y="74" font-size="13" class="on-color">懂原理、能從頭推導或改進</text>
+  <text x="20" y="60" font-size="13">越往上</text><text x="20" y="80" font-size="13">時間越多</text>
+</svg>`;
+
+const VOLUME_DEPS_SVG = `<svg viewBox="0 0 560 280" role="img" aria-label="七卷的先修關係：序章接到第一部與第二部；第三部是第四部的基礎；第二部會用到第四部的概念；第五部接在第二與第四部之後；隨身卷支援第二、三、四部">
+  <rect x="200" y="10" width="160" height="44" style="fill:var(--primary)" class="stroke-ink" stroke-width="3"/><text x="280" y="38" text-anchor="middle" font-size="15" font-weight="900" class="on-color">序章</text>
+  <rect x="20" y="90" width="150" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="95" y="118" text-anchor="middle" font-size="14" font-weight="900">第一部 應用</text>
+  <rect x="210" y="90" width="140" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="118" text-anchor="middle" font-size="14" font-weight="900">第三部 ML</text>
+  <rect x="210" y="160" width="140" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="188" text-anchor="middle" font-size="14" font-weight="900">第四部 DL</text>
+  <rect x="390" y="160" width="150" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="465" y="188" text-anchor="middle" font-size="14" font-weight="900">第二部 LLM</text>
+  <rect x="390" y="226" width="150" height="44" class="fill-surface stroke-ink" stroke-width="3"/><text x="465" y="254" text-anchor="middle" font-size="14" font-weight="900">第五部 硬體</text>
+  <rect x="20" y="190" width="150" height="80" class="fill-bg stroke-ink" stroke-width="3" stroke-dasharray="8 6"/><text x="95" y="226" text-anchor="middle" font-size="14" font-weight="900">隨身卷</text><text x="95" y="250" text-anchor="middle" font-size="13">數學，隨時翻</text>
+  <line x1="240" y1="54" x2="120" y2="90" class="stroke-ink" stroke-width="3"/>
+  <line x1="280" y1="54" x2="280" y2="90" class="stroke-ink" stroke-width="3"/>
+  <line x1="280" y1="134" x2="280" y2="160" class="stroke-ink" stroke-width="3"/>
+  <line x1="350" y1="182" x2="390" y2="182" class="stroke-ink" stroke-width="3"/>
+  <line x1="465" y1="204" x2="465" y2="226" class="stroke-ink" stroke-width="3"/>
+  <line x1="170" y1="230" x2="210" y2="190" class="stroke-ink" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="450" y="30" text-anchor="middle" font-size="13">實線：建議先讀</text>
+  <text x="450" y="50" text-anchor="middle" font-size="13">虛線：卡住再翻</text>
+</svg>`;
+
+const REVIEW_2 = [
+  { level: '回想', type: 'mc', q: '（回顧 2-5）開了串流之後，哪一件事會改變？', options: [
+    { text: '使用者更早看到字，等待感變短', correct: true, why: 'TTFT 之後就逐字出現。' },
+    { text: '整段回答的總時間大幅縮短', why: '總時間由輸出長度決定，不變。' },
+    { text: '這次請求的費用跟著變便宜', why: '費用只看 token 數。' },
+    { text: '模型會改用更快的 GPU 來算', why: '串流和硬體無關。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 2-1）回答完全沒用到公司資料，最先該檢查哪一站？', options: [
+    { text: '② 後端：資料有沒有查到、有沒有放進請求', correct: true, why: '模型只看得到請求裡的東西。' },
+    { text: '④ tokenizer：資料是不是被切錯了', why: 'tokenizer 不會丟掉內容。' },
+    { text: '⑥ 回到螢幕：是不是顯示漏掉了', why: '回答本身就沒提到，不是顯示問題。' },
+    { text: '③ API：是不是金鑰權限不夠', why: '金鑰錯會直接報錯，不會只是沒用到資料。' },
+  ] },
+];
+
+/* 3-3 總複習：涵蓋模組 0–2 */
+const REVIEW_10 = [
+  { level: '回想', type: 'mc', q: '（0-1）序章在 AI 系列裡的定位是？', options: [
+    { text: '路線圖：先看全貌，細節在其他卷', correct: true, why: '序章只講到 L1。' },
+    { text: '最難的一卷，要最後才讀', why: '序章是起點。' },
+    { text: '介紹每一家公司的最新產品', why: '產品變太快，不是重點。' },
+    { text: '教你寫第一支呼叫 API 的程式', why: '那是第一部。' },
+  ] },
+  { level: '回想', type: 'mc', q: '（1-1）哪一個包含關係正確？', options: [
+    { text: 'AI ⊃ 機器學習 ⊃ 深度學習 ⊃ LLM', correct: true, why: '外層最廣。' },
+    { text: '機器學習 ⊃ AI ⊃ 深度學習 ⊃ LLM', why: 'AI 在最外層。' },
+    { text: 'AI ⊃ 深度學習 ⊃ 機器學習 ⊃ LLM', why: '深度學習在機器學習裡面。' },
+    { text: 'LLM ⊃ 深度學習 ⊃ 機器學習 ⊃ AI', why: '整個倒過來。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（1-2）「依坪數、屋齡估房價」的模型，在使用者查詢估價時發生的是？', options: [
+    { text: '推論：用固定的參數算出估價', correct: true, why: '查詢時參數不變。' },
+    { text: '訓練：每次查詢都重新調參數', why: '查詢不會改參數。' },
+    { text: '標註：使用者幫忙標出正確房價', why: '查詢時沒有標註。' },
+    { text: '規則式：工程師手寫了每一區的房價', why: '這是從資料學出來的模型。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（1-3）只有 800 筆、10 個欄位的表格資料，要預測客戶會不會流失，比較合理的起點是？', options: [
+    { text: '先試傳統機器學習或簡單統計', correct: true, why: '資料少又是表格，深度學習優勢用不上。' },
+    { text: '一定要訓練一個很深的神經網路', why: '資料太少，容易學偏又浪費。' },
+    { text: '先買幾張 GPU 再開始想做法', why: '先選方法，再看需要什麼硬體。' },
+    { text: '直接把 800 筆資料逐筆丟給 LLM 猜', why: '又貴又難評估，不是第一步。' },
+  ] },
+  { level: '回想', type: 'mc', q: '（1-4）只做過預訓練、沒做後訓練的模型，最可能的表現是？', options: [
+    { text: '很會接話，但不一定照指令回答', correct: true, why: '它學的是文字通常怎麼接。' },
+    { text: '完全不會產生通順的句子', why: '預訓練後已經很會產生文字。' },
+    { text: '比助理模型更懂得拒絕危險要求', why: '拒絕主要在後訓練學。' },
+    { text: '只會用英文回答任何問題', why: '沒有這種限制。' },
+  ] },
+  { level: '回想', type: 'mc', q: '（1-5）哪一個時間順序正確？', options: [
+    { text: 'Dartmouth 提案 → AlexNet → Transformer → ChatGPT', correct: true, why: '1955 → 2012 → 2017 → 2022。' },
+    { text: 'AlexNet → Dartmouth 提案 → ChatGPT → Transformer', why: 'Dartmouth 提案最早。' },
+    { text: 'Transformer → AlexNet → Dartmouth 提案 → ChatGPT', why: 'AlexNet 比 Transformer 早。' },
+    { text: 'Dartmouth 提案 → Transformer → AlexNet → ChatGPT', why: 'AlexNet（2012）早於 Transformer（2017）。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（2-1）API 金鑰放在瀏覽器的程式裡，會有什麼問題？', options: [
+    { text: '任何訪客都看得到，可以拿去刷你的額度', correct: true, why: '金鑰要放在 ② 後端。' },
+    { text: '瀏覽器完全沒辦法送出這種請求', why: '技術上做得到，問題在安全。' },
+    { text: '模型會因此拒絕回答任何中文', why: '和語言無關。' },
+    { text: '回答速度會因此慢上好幾倍', why: '問題是安全，不是速度。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（2-2）同一段說明文字，換成另一家模型後 token 數變了。原因是？', options: [
+    { text: '每個模型有自己的 tokenizer，切法不同', correct: true, why: '換模型要重新量。' },
+    { text: '另一家模型會偷偷改寫你的文字', why: '不會改你的輸入。' },
+    { text: 'token 數會隨著當天的時間浮動', why: '同模型同文字，token 數固定。' },
+    { text: '另一家模型只計算中文字的數量', why: '沒有這種計法。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（2-3、2-4）一段 200 個 token 的回答，GPU 大約做了幾次前向計算？', options: [
+    { text: '約 200 次，每個 token 一次', correct: true, why: '自迴歸：一個一個產生。' },
+    { text: '只有 1 次，整段一次算完', why: '不是一次算完。' },
+    { text: '2 次，輸入一次、輸出一次', why: '輸出每個 token 都要算一次。' },
+    { text: '看 GPU 核心數決定次數', why: '核心數影響每次的速度，不影響次數。' },
+  ] },
+  { level: '遷移', type: 'mc', q: '（2-5）AI 功能每月帳單太高，下面哪個做法完全不會降低費用？', options: [
+    { text: '把回應改成串流顯示', correct: true, why: '串流只改善等待感，計費只看 token。' },
+    { text: '縮短每次附上的參考資料', why: '輸入 token 變少，費用就降。' },
+    { text: '限制回答長度、要求更精簡', why: '輸出 token 變少，費用就降。' },
+    { text: '把非即時的工作改用 Batch API', why: 'Batch 打 5 折（第一部 8-2）。' },
+  ] },
+];
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出 L1、L2、L3 各代表哪一種「懂」',
+      '對同一個主題，寫出三層各會問的問題',
+      '判斷自己在某個主題目前是哪一層',
+    ],
+    review: REVIEW_2,
+    analogy: {
+      text: ['開車有三種懂：會開車（L1）、會自己換輪胎和簡單保養（L2）、懂引擎為什麼會動、能設計更省油的引擎（L3）。', '大部分人只需要 L1，修車師傅需要 L2，汽車工程師需要 L3。學 AI 也一樣：先決定每個主題你要到哪一層，不必每樣都學到 L3。'],
+      limit: ['開車的三層界線很清楚，AI 主題的界線比較模糊；而且同一個人在不同主題會在不同層：你可能 API 是 L2，但 Transformer 只有 L1。這很正常。'],
+    },
+    model: { svg: LEVELS_SVG, caption: '這三層是本系列自訂的分法（原始大綱只給名稱）。每一卷的開頭都會標出它主要帶你到哪一層。' },
+    define: [
+      { term: 'L1 會用', en: 'use', def: '知道是什麼、能判斷。', example: '知道串流不會省錢。' },
+      { term: 'L2 會做', en: 'build', def: '能實作、能除錯。', example: '能寫出串流＋停止按鈕。' },
+      { term: 'L3 會推導', en: 'derive', def: '懂原理、能推導或改進。', example: '能說明 KV cache 為什麼讓之後的 token 變快，並估算它佔多少記憶體。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['主題', 'L1 會用', 'L2 會做', 'L3 會推導'], rows: [
+          ['token', '知道是計費單位，會用 count_tokens', '在程式裡記錄 usage、估月費', '能寫一個 BPE tokenizer'],
+          ['串流', '知道它改善等待感、不省錢', '寫出逐字顯示與停止按鈕', '懂 SSE 協定與連線管理'],
+          ['神經網路', '知道是多層可調函式', '用框架訓練一個小模型', '手推反向傳播'],
+          ['GPU', '知道為什麼要用 GPU', '估算模型需要多少記憶體', '分析頻寬瓶頸、設計平行策略'],
+        ] },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'l1', label: 'L1 會用' }, { id: 'l2', label: 'L2 會做' }, { id: 'l3', label: 'L3 會推導' }], items: [
+          { text: '「我知道 RAG 是先查資料再放進 prompt」', answer: 'l1', why: '知道是什麼、能判斷，還沒動手做。' },
+          { text: '「我做了一個能搜尋公司文件的問答機器人，查不到時會說查不到」', answer: 'l2', why: '自己實作、處理了邊界情況。' },
+          { text: '「我能說明 attention 的公式，並解釋為什麼要除以 √d」', answer: 'l3', why: '能推導原理。' },
+          { text: '「看新聞時，我分得出它講的是模型能力還是產品功能」', answer: 'l1', why: '能判斷、看得懂。' },
+          { text: '「我的 API 呼叫一直回 429，我加了指數退避重試並修好了」', answer: 'l2', why: '能除錯。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="同一個人在不同主題的層級：API 在 L2，token 在 L2，Transformer 在 L1，GPU 在 L1">
+          <text x="20" y="28" font-size="15" font-weight="900">同一個人，不同主題在不同層（範例）</text>
+          <text x="20" y="66" font-size="14">API</text><rect x="130" y="50" width="260" height="24" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><text x="400" y="68" font-size="14" font-weight="900">L2</text>
+          <text x="20" y="104" font-size="14">token</text><rect x="130" y="88" width="260" height="24" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><text x="400" y="106" font-size="14" font-weight="900">L2</text>
+          <text x="20" y="142" font-size="14">Transformer</text><rect x="130" y="126" width="130" height="24" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/><text x="270" y="144" font-size="14" font-weight="900">L1</text>
+          <text x="20" y="180" font-size="14">GPU</text><rect x="130" y="164" width="130" height="24" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/><text x="270" y="182" font-size="14" font-weight="900">L1</text>
+        </svg>`, caption: '一個寫 AI 應用的工程師，很合理的樣子。目標不同，長條長短就不同。' },
+      ],
+      tryit: {
+        q: ['挑你最常聽到的一個 AI 名詞，寫出它在三層各會問的問題：'],
+        draft: '名詞：＿＿\nL1 會問：＿＿\nL2 會問：＿＿\nL3 會問：＿＿',
+        answer: ['範例（幻覺）：L1「什麼是幻覺、什麼時候容易發生？」L2「我的應用怎麼偵測或減少幻覺？」L3「為什麼訓練與評估方式會讓模型傾向亂猜？」', '能寫出三層的問題，就知道自己現在卡在哪一層、要去哪一卷找答案。'],
+      },
+    },
+    mistakes: [
+      { wrong: '覺得要把每個主題都學到 L3 才算懂 AI。', why: '時間有限；多數工作只需要大部分主題在 L1、少數在 L2。', right: '依目標決定每個主題的層級（3-3）。' },
+      { wrong: '把「看過很多教學影片」當成 L2。', why: 'L2 要能自己做出來、遇到錯誤能修。', right: '動手做一個小東西，才算到 L2。' },
+      { wrong: '以為 L3 一定要很強的數學才能開始。', why: '隨身卷就是為了補數學直覺而存在。', right: '卡在數學時翻隨身卷，不必先學完數學。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '「能自己寫程式呼叫 API，並處理錯誤與重試」屬於哪一層？', options: [
+        { text: 'L2 會做', correct: true, why: '能實作、能除錯。' },
+        { text: 'L1 會用', why: 'L1 只要知道是什麼、能判斷。' },
+        { text: 'L3 會推導', why: 'L3 是懂原理、能推導或改進。' },
+        { text: '還不到任何一層', why: '這已經是 L2。' },
+      ] },
+      { level: '應用', type: 'mc', q: '產品經理要和 AI 工程師討論功能，大部分主題最適合學到哪一層？', options: [
+        { text: 'L1：知道是什麼、能判斷取捨', correct: true, why: '能溝通、能判斷，就足以做產品決策。' },
+        { text: '全部都要到 L3 才能討論', why: '時間成本太高，也不是工作需要。' },
+        { text: '全部都要到 L2，自己能寫出功能', why: '寫程式是工程師的工作。' },
+        { text: '完全不用學，直接交給工程師', why: '不懂 L1 很難判斷成本與風險。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你想轉職成 AI 應用工程師。列出三個主題，各寫你打算學到哪一層，並說明理由。'], answer: [
+        '範例：API 與串流 → L2（每天要寫）；RAG → L2（最常見的需求）；Transformer → L1（要看得懂文件與新聞，但不用自己推導）。',
+        '理由的寫法：「工作上會不會需要我自己做出來？」會就 L2，只需要判斷就 L1。',
+      ] },
+    ],
+    keypoints: [
+      'L1 會用、L2 會做、L3 會推導；這是本系列自訂的分法。',
+      '同一個人在不同主題會在不同層，這很正常。',
+      '依目標決定每個主題要到哪一層，不必全部 L3。',
+    ],
+    sources: [],
+  },
+
+  '3-2': {
+    goals: [
+      '說出七卷各自的主題與主要層級',
+      '看懂七卷之間的先修關係',
+      '把一個學習目標對應到該讀的卷',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-1）「看得懂新聞在講模型能力還是產品功能」是哪一層？', options: [
+        { text: 'L1 會用', correct: true, why: '能判斷、看得懂。' },
+        { text: 'L2 會做', why: 'L2 要能動手做。' },
+        { text: 'L3 會推導', why: 'L3 要懂原理並推導。' },
+        { text: '不屬於任何一層', why: '這正是 L1。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-3）「資料少、特徵清楚的表格問題」通常適合？', options: [
+        { text: '傳統機器學習', correct: true, why: '更準、更便宜、好解釋。' },
+        { text: '一定要用深度學習', why: '優勢用不上。' },
+        { text: '一定要用 LLM', why: '又貴又難評估。' },
+        { text: '只能用規則式', why: '有資料時可以用 ML。' },
+      ] },
+    ],
+    analogy: {
+      text: ['大學選課有「先修」：要修微積分二，最好先修過微積分一。不照順序也能修，但會很吃力。', 'AI 系列七卷也有建議的[[先修]]順序：機器學習的基本概念是深度學習的地基，深度學習又是理解 LLM 內部的地基。隨身卷像工具書，卡住就翻。'],
+      limit: ['大學先修是硬規定，這裡只是建議。很多人直接從第一部開始做產品，遇到不懂的原理再回頭補，也完全可行。'],
+    },
+    model: { svg: VOLUME_DEPS_SVG, caption: '序章之後兩條主幹：直接做應用（第一部），或往下打底（第三部 → 第四部 → 第二部 → 第五部）。' },
+    define: [
+      { term: '先修', en: 'prerequisite', def: '讀某一卷之前最好先懂的東西。', example: '第四部之前先讀第三部。' },
+      { term: '主要層級', en: 'target level', def: '一卷主要帶你到 L1、L2 還是 L3。', example: '第一部主要到 L2。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['卷', '主題', '主要層級', '建議先修'], rows: [
+          ['序章', 'AI 全景、請求的旅程、學習地圖', 'L1', '無'],
+          ['第一部', 'API、串流、結構化輸出、工具、RAG、評估、上線', 'L2', '序章'],
+          ['第二部', 'Transformer、attention、訓練與推論、幻覺', 'L1–L3', '序章；第四部更好'],
+          ['第三部', '資料、模型、損失、過擬合、評估', 'L2', '序章'],
+          ['第四部', '神經網路、反向傳播、訓練技巧', 'L2–L3', '第三部；隨身卷'],
+          ['第五部', 'GPU、記憶體、頻寬、晶片產業', 'L1–L2', '第二部或第四部'],
+          ['隨身卷', '向量、矩陣、梯度、機率', '直覺（L1–L2）', '無，隨時翻'],
+        ], caption: '主要層級是本書的規劃；各卷開始製作時可能微調。' },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'v1', label: '第一部' }, { id: 'v2', label: '第二部' }, { id: 'v3', label: '第三部' }, { id: 'v4', label: '第四部' }, { id: 'v5', label: '第五部' }, { id: 'vm', label: '隨身卷' }], items: [
+          { text: '「我想讓 AI 回傳固定格式的 JSON，程式才好處理」', answer: 'v1', why: '結構化輸出是第一部模組 3。' },
+          { text: '「attention 到底在算什麼？」', answer: 'v2', why: 'Transformer 的核心，第二部。' },
+          { text: '「為什麼模型在訓練資料上很準，換新資料就不準？」', answer: 'v3', why: '過擬合是第三部的主題。' },
+          { text: '「梯度是什麼？為什麼往梯度的反方向走？」', answer: 'vm', why: '數學直覺，隨身卷。' },
+          { text: '「為什麼訓練很深的網路會梯度消失？」', answer: 'v4', why: '深度網路的訓練技巧，第四部。' },
+          { text: '「HBM 記憶體為什麼這麼重要？」', answer: 'v5', why: '記憶體頻寬是第五部。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="各卷主要層級的長條：序章 L1，第一部 L2，第二部到 L3，第三部 L2，第四部到 L3，第五部到 L2，隨身卷 L1 到 L2">
+          <text x="20" y="24" font-size="15" font-weight="900">各卷主要帶你到哪一層</text>
+          <text x="130" y="46" font-size="13">L1</text><text x="290" y="46" font-size="13">L2</text><text x="450" y="46" font-size="13">L3</text>
+          ${[['序章', 1], ['第一部', 2], ['第二部', 3], ['第三部', 2], ['第四部', 3], ['第五部', 2], ['隨身卷', 2]].map(([name, lv], i) => `<text x="20" y="${76 + i * 20}" font-size="13">${name}</text><rect x="110" y="${63 + i * 20}" width="${lv * 160 - 40}" height="16" style="fill:var(--m${i % 6})" class="stroke-ink" stroke-width="2"/>`).join('')}
+        </svg>`, caption: '長條到哪一格，代表那一卷最深講到哪一層。' },
+      ],
+      tryit: {
+        q: ['寫下一個你想做到的事（例如「做一個能讀公司文件的問答機器人」），列出要讀的卷與順序：'],
+        draft: '目標：＿＿\n要讀：＿＿ → ＿＿ → ＿＿',
+        answer: ['範例：問答機器人 → 序章 → 第一部（模組 5 RAG）→ 需要時第二部（理解為什麼會幻覺）。', '先看目標落在哪一卷，再往前找先修；不必把所有卷都讀完才開始。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為一定要從第三部讀起，才算打好基礎。', why: '目標是做應用時，第一部可以直接開始。', right: '依目標選起點，遇到不懂的原理再回頭補。' },
+      { wrong: '把隨身卷當成最後一卷，讀完其他卷才讀。', why: '它是工具書，卡在數學時隨時翻。', right: '卡住當下就翻對應的單元。' },
+      { wrong: '以為每一卷都要讀到 L3。', why: '各卷主要層級不同，你的目標也不同。', right: '依 3-1 的方法決定每卷讀多深。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '想深入第四部「深度學習」，最建議先讀哪一卷？', options: [
+        { text: '第三部 機器學習基礎', correct: true, why: '資料、模型、損失是神經網路訓練的地基。' },
+        { text: '第五部 硬體與運算', why: '硬體不是理解訓練的先修。' },
+        { text: '第一部 應用工程', why: '應用工程和訓練網路是不同方向。' },
+        { text: '完全不需要任何先修', why: '可以硬讀，但會很吃力。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你只想把 Claude 接進公司內部系統，最短的路線是？', options: [
+        { text: '序章 → 第一部', correct: true, why: '第一部就是應用工程，主要帶到 L2。' },
+        { text: '序章 → 第三部 → 第四部 → 第一部', why: '對這個目標繞太遠了。' },
+        { text: '隨身卷 → 第二部 → 第一部', why: '先學數學與原理不是最短路線。' },
+        { text: '第五部 → 第一部', why: '硬體和接 API 關係不大。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你讀第二部時看到「softmax」卡住了。照這一課的地圖，你該怎麼做？'], answer: [
+        '翻隨身卷的機率單元，補 softmax 的直覺（把一串分數變成加起來是 1 的機率），補完回到第二部繼續。',
+        '不必停下來把隨身卷從頭讀完；序章 1-4 的 sampler 其實已經在用 softmax 了。',
+      ] },
+    ],
+    keypoints: [
+      '七卷各有主題與主要層級；序章 L1、第一部 L2、第二與第四部到 L3。',
+      '兩條主幹：直接做應用，或第三部 → 第四部 → 第二部往下打底。',
+      '隨身卷是工具書，卡在數學時隨時翻。',
+    ],
+    sources: [],
+  },
+
+  '3-3': {
+    goals: [
+      '從三條路線中選一條適合自己的',
+      '用檢查清單確認目前的起點',
+      '用 10 題總複習確認序章的重點都懂了',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）隨身卷應該怎麼讀？', options: [
+        { text: '卡在數學時翻到對應單元', correct: true, why: '它是工具書。' },
+        { text: '一定要第一個從頭讀完', why: '不必先讀完。' },
+        { text: '其他卷都讀完後才讀', why: '卡住當下就翻最有效。' },
+        { text: '只有做研究的人才需要', why: '任何人卡在數學都可以翻。' },
+      ] },
+    ],
+    analogy: {
+      text: ['登山有很多條路線：有人只想走到觀景台拍照，有人要攻頂，有人要研究沿途的地質。起點都是同一張登山口地圖，走的路不一樣。', '讀完序章，你站在登山口：選一條符合目標的路線，帶著這張地圖出發，迷路時回來看。'],
+      limit: ['登山路線選了就不太能換，學習路線可以隨時換：做應用做到一半想懂原理，就從第一部轉去第二部。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="三條路線：應用開發走序章、第一部，需要時看第二部；懂原理走序章、第三部、第四部、第二部；研究與硬體走序章、第三部、第四部、第二部、第五部；隨身卷三條都可以用">
+        <rect x="10" y="20" width="540" height="64" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="26" y="46" font-size="15" font-weight="900">A 應用開發</text><text x="26" y="70" font-size="14">序章 → 第一部 →（需要時）第二部</text>
+        <rect x="10" y="96" width="540" height="64" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="26" y="122" font-size="15" font-weight="900">B 懂原理</text><text x="26" y="146" font-size="14">序章 → 第三部 → 第四部 → 第二部</text>
+        <rect x="10" y="172" width="540" height="64" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="26" y="198" font-size="15" font-weight="900">C 研究與硬體</text><text x="26" y="222" font-size="14">序章 → 第三部 → 第四部 → 第二部 → 第五部</text>
+        <text x="540" y="254" text-anchor="end" font-size="13">三條都可以隨時翻隨身卷</text>
+      </svg>`,
+      caption: '三條路線的起點都是序章。路線可以中途換。',
+    },
+    define: [
+      { term: '應用開發路線', en: 'builder path', def: '把 AI 接進產品，主要到 L2。', example: '工程師、技術型 PM。' },
+      { term: '懂原理路線', en: 'understanding path', def: '從機器學習往上懂到 LLM 內部。', example: '想看懂論文、評估模型的人。' },
+      { term: '研究與硬體路線', en: 'research path', def: '原理加上運算與硬體。', example: '想做模型訓練、推論優化、晶片相關工作的人。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['路線', '適合誰', '讀完能做到', '主要層級'], rows: [
+          ['A 應用開發', '要做 AI 功能、產品的人', '做出可上線的 AI 功能', '第一部 L2、其他 L1'],
+          ['B 懂原理', '想知道模型為什麼這樣表現的人', '看懂論文與技術文件、判斷模型取捨', '第二、三、四部 L2–L3'],
+          ['C 研究與硬體', '想訓練或部署模型、對晶片有興趣的人', '估算訓練與推論成本、分析瓶頸', '全部到 L2 以上'],
+        ] },
+        { type: 'widget', name: 'checklist', props: { key: '3-3', items: [
+          '我說得出 AI ⊃ 機器學習 ⊃ 深度學習 ⊃ LLM（1-1）',
+          '我能分清訓練與推論（1-2）',
+          '我能說出六站：你的電腦 → 後端 → API → tokenizer → GPU 上的模型 → 回到螢幕（2-1）',
+          '我知道要量 token 數該用 `count_tokens`，不用字數估（2-2）',
+          '我能解釋第一個字為什麼最慢（2-4）',
+          '我知道串流不省錢、只改善等待感（2-5）',
+          '我選好了一條路線，也知道每個主題要學到哪一層（3-1、3-2）',
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="路線 A 的前四週範例：第一週第一部模組 0 到 1，送出第一個請求；第二週模組 2 串流；第三週模組 3 結構化輸出；第四週做一個小功能">
+          <text x="20" y="28" font-size="15" font-weight="900">路線 A 的前四週（範例）</text>
+          ${[['第 1 週', '第一部 模組 0–1', '送出第一個請求'], ['第 2 週', '模組 2', '做出逐字顯示'], ['第 3 週', '模組 3', '拿到固定格式 JSON'], ['第 4 週', '自選', '做一個小功能']].map(([w, what, done], i) => `<rect x="${10 + i * 137}" y="50" width="129" height="150" class="${i === 0 ? '' : 'fill-surface '}stroke-ink" stroke-width="3"${i === 0 ? ' style="fill:var(--m1)"' : ''}/><text x="${74 + i * 137}" y="82" text-anchor="middle" font-size="15" font-weight="900"${i === 0 ? ' class="on-color"' : ''}>${w}</text><text x="${74 + i * 137}" y="116" text-anchor="middle" font-size="13"${i === 0 ? ' class="on-color"' : ''}>${what}</text><text x="${74 + i * 137}" y="150" text-anchor="middle" font-size="13"${i === 0 ? ' class="on-color"' : ''}>做到：</text><text x="${74 + i * 137}" y="172" text-anchor="middle" font-size="13"${i === 0 ? ' class="on-color"' : ''}>${done}</text>`).join('')}
+        </svg>`, caption: '每週一個看得到的成果，比「每週讀幾課」更容易持續。路線 B、C 照同樣方式排。' },
+        { type: 'heading', id: 'final-review', text: '總複習：10 題' },
+        { type: 'quiz', key: '3-3:final', items: REVIEW_10 },
+      ],
+      tryit: {
+        q: ['寫下你的路線，以及接下來一週要讀的第一個單元：'],
+        draft: '我選路線：＿＿\n第一週要讀：＿＿',
+        answer: ['範例：路線 A；第一週讀第一部 0-1 到 1-2，週末用自己的金鑰送出第一個請求。', '把「下一個單元」寫得具體到課號，比「這週學 AI」容易開始得多。'],
+      },
+    },
+    mistakes: [
+      { wrong: '想同時走三條路線。', why: '分散注意力，每條都走不遠。', right: '先選一條走一段，需要時再換。' },
+      { wrong: '選了路線就逼自己按順序讀完每一課。', why: '每卷都可以跳著讀，以目標為主。', right: '先讀和目標最相關的模組，再回頭補。' },
+      { wrong: '總複習錯了幾題就覺得要重讀整本序章。', why: '每題都標了來源單元。', right: '只回去讀答錯那題標示的單元。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '想做出可上線的 AI 功能，最適合哪條路線？', options: [
+        { text: 'A 應用開發：序章 → 第一部', correct: true, why: '第一部就是應用工程。' },
+        { text: 'B 懂原理：先讀第三、四部', why: '對這個目標繞遠了。' },
+        { text: 'C 研究與硬體：把五部全讀完', why: '時間成本太高。' },
+        { text: '只讀隨身卷就夠了', why: '隨身卷是數學工具書。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你走路線 A，做到一半發現「模型為什麼會一本正經地說錯話」很重要，該怎麼辦？', options: [
+        { text: '轉去第二部讀幻覺相關的單元，再回來', correct: true, why: '路線可以中途換，按需要補。' },
+        { text: '從第三部第一課重新開始全部讀過', why: '只為一個問題不需要從頭來。' },
+        { text: '忽略它，因為路線 A 不包含原理', why: '路線 A 本來就寫了「需要時第二部」。' },
+        { text: '先把隨身卷全部讀完再說', why: '這個問題主要不是數學問題。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要帶一個 3 人的小團隊導入 AI：一位工程師、一位設計師、一位主管。各建議他們走哪條路線、哪些主題學到哪一層？'], answer: [
+        '工程師：路線 A，第一部到 L2，第二部挑幻覺與上下文到 L1。設計師：序章＋第一部模組 2（串流與等待體驗）到 L1。',
+        '主管：序章＋第一部 1-5 與 8-2（成本）到 L1，能判斷成本與風險就夠。重點是每個人依角色選深度，不是都學一樣多。',
+      ] },
+    ],
+    keypoints: [
+      '三條路線：A 應用開發、B 懂原理、C 研究與硬體；起點都是序章。',
+      '路線可以中途換，依需要補。',
+      '總複習錯的題目，只回去讀標示的單元。',
+    ],
+    sources: ['claude-token-counting'],
+  },
+});
+</script>
+

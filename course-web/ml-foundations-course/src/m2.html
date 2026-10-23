@@ -1,0 +1,322 @@
+<script>
+/* ==========================================================================
+   模組 2：監督、非監督、強化學習
+   ========================================================================== */
+defineTerms({
+  '監督式學習': { en: 'supervised learning', def: '每筆訓練資料都附正確答案（標籤），模型學「特徵 → 答案」的對應。', example: '附有成交價的房屋資料。', lesson: '2-1' },
+  '回歸': { en: 'regression', def: '預測一個連續的數字。', example: '房價、溫度、送達分鐘數。', lesson: '2-1' },
+  '分類': { en: 'classification', def: '預測屬於哪一個類別。', example: '垃圾信或正常信、貓或狗。', lesson: '2-1' },
+  '非監督式學習': { en: 'unsupervised learning', def: '資料沒有標籤，模型自己找出資料裡的結構，例如分群。', example: '把顧客依購買行為自動分成幾群。', lesson: '2-2' },
+  '分群': { en: 'clustering', def: '把相似的資料點分在同一群，事先不知道每群代表什麼。', example: 'k-means。', lesson: '2-2' },
+  'k-means': { en: 'k-means', def: '先放 k 個中心，反覆「每個點歸給最近的中心 → 中心搬到自己那群的平均」直到不再變化。', example: 'MacQueen 1967 命名。', lesson: '2-2' },
+  '強化學習': { en: 'reinforcement learning', def: '沒有標準答案，代理人做動作、從環境得到獎勵，學會能拿到最多獎勵的策略。', example: '下棋、遊戲、機器人控制。', lesson: '2-3' },
+  '獎勵': { en: 'reward', def: '環境對一個動作的回饋分數。', example: '中獎得 1 分、沒中 0 分。', lesson: '2-3' },
+  '探索與利用': { en: 'exploration vs exploitation', def: '要嘗試還不熟的選項（探索），還是選目前看起來最好的（利用）的兩難。', example: 'ε-greedy：大部分時候利用，少數時候隨機探索。', lesson: '2-3' },
+});
+
+const REVIEW_M1 = [
+  { level: '回想', type: 'mc', q: '（回顧 1-1）「標籤」是什麼？', options: [
+    { text: '每筆資料的正確答案', correct: true, why: '模型要學會預測它。' },
+    { text: '表格最上面寫欄位名稱的那一列', why: '那是欄位名稱。' },
+    { text: '模型裡面可以被調整的數字', why: '那是參數。' },
+    { text: '模型對新資料做出的預測結果', why: '預測不是標籤。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 1-4）損失曲線上坡度是正的，參數該怎麼動？', options: [
+    { text: '變小', correct: true, why: '坡度正：往左是下坡。' },
+    { text: '變大，因為正的坡度代表要往正方向', why: '方向相反。' },
+    { text: '不動，因為坡度正代表已經是最低點', why: '最低點坡度是 0。' },
+    { text: '隨機動一動，坡度和方向沒有關係', why: '坡度就是方向資訊。' },
+  ] },
+];
+
+const KM_POINTS = [[1.5, 2], [2, 1.2], [2.5, 2.6], [1.2, 2.8], [2.8, 1.6], [7, 3], [7.8, 2.4], [6.6, 2.2], [7.4, 3.6], [8.2, 3.1], [4, 8], [4.6, 8.6], [3.4, 8.4], [4.2, 7.2], [5, 7.8]];
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出監督式學習的資料長什麼樣',
+      '分辨回歸與分類',
+      '知道標籤從哪裡來、要花多少成本',
+    ],
+    review: REVIEW_M1,
+    analogy: {
+      text: ['做練習本：每一題後面都附解答。你寫完對答案，錯了就修正自己的想法。', '[[監督式學習]]就是這樣：每筆資料都有標籤（解答），模型預測、對答案、調參數。要預測的如果是數字，叫[[回歸]]；如果是類別，叫[[分類]]。'],
+      limit: ['練習本的解答是老師寫的，資料的標籤常常是人工標的，會有錯、也很貴；而且模型只能學到標籤裡有的東西，標籤有偏見，模型也會有。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="監督式學習：特徵進入模型得到預測，和標籤比較算出損失，回頭調整模型">
+        <rect x="10" y="60" width="120" height="60" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="70" y="96" text-anchor="middle" font-size="15" font-weight="900" class="on-color">特徵 x</text>
+        <line x1="130" y1="90" x2="170" y2="90" class="stroke-ink" stroke-width="3"/>
+        <rect x="170" y="60" width="120" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="230" y="96" text-anchor="middle" font-size="15" font-weight="900" class="on-color">模型</text>
+        <line x1="290" y1="90" x2="330" y2="90" class="stroke-ink" stroke-width="3"/>
+        <rect x="330" y="60" width="100" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="380" y="96" text-anchor="middle" font-size="15" font-weight="900" class="on-color">預測 ŷ</text>
+        <rect x="450" y="60" width="100" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="500" y="96" text-anchor="middle" font-size="15" font-weight="900" class="on-color">標籤 y</text>
+        <text x="440" y="50" text-anchor="middle" font-size="14" font-weight="900">比較 → 損失</text>
+        <path d="M440 120 L440 170 L230 170 L230 126" fill="none" class="stroke-ink" stroke-width="3"/><path d="M222 134 L230 122 L238 134 Z" class="stroke-ink" style="fill:var(--ink)"/>
+        <text x="335" y="196" text-anchor="middle" font-size="14">有標籤才能算損失：這就是「監督」的意思</text>
+      </svg>`,
+      caption: '模組 1 的學習迴圈，就是監督式學習的樣子。',
+    },
+    define: [
+      { term: '監督式學習', en: 'supervised learning', def: '有標籤的學習。', example: '房價、垃圾信。' },
+      { term: '回歸', en: 'regression', def: '預測數字。', example: '房價。' },
+      { term: '分類', en: 'classification', def: '預測類別。', example: '垃圾信／正常信。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'reg', label: '回歸（預測數字）' }, { id: 'cls', label: '分類（預測類別）' }], items: [
+          { text: '預測明天的最高氣溫', answer: 'reg', why: '連續的數字。' },
+          { text: '判斷一張 X 光片有沒有骨折', answer: 'cls', why: '有／沒有兩類。' },
+          { text: '預測這筆訂單幾分鐘送到', answer: 'reg', why: '分鐘數是數字。' },
+          { text: '判斷一則留言是正面、中立還是負面', answer: 'cls', why: '三個類別。' },
+          { text: '預測一位客戶未來一年會花多少錢', answer: 'reg', why: '金額是數字。' },
+        ] } },
+        { type: 'table', head: ['標籤從哪裡來', '例子', '成本與風險'], rows: [
+          ['自然產生', '成交價、使用者按的「垃圾信」', '便宜，但可能有偏差（只有部分人會按）'],
+          ['人工標註', '醫師判讀 X 光、標註員分類留言', '貴、慢，標註者之間會不一致'],
+          ['事後才知道', '「這位客戶半年後有沒有退訂」', '要等，而且世界會變'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="回歸與分類對照：回歸輸出一個數字例如 18.3 百萬；分類輸出一個類別例如垃圾信">
+          <rect x="10" y="30" width="260" height="120" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="140" y="60" text-anchor="middle" font-size="15" font-weight="900">回歸</text>
+          <text x="140" y="96" text-anchor="middle" font-size="22" font-weight="900" class="mono">18.3</text>
+          <text x="140" y="128" text-anchor="middle" font-size="13">損失：MSE、MAE（1-3）</text>
+          <rect x="290" y="30" width="260" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="420" y="60" text-anchor="middle" font-size="15" font-weight="900" class="on-color">分類</text>
+          <text x="420" y="96" text-anchor="middle" font-size="22" font-weight="900" class="on-color">垃圾信</text>
+          <text x="420" y="128" text-anchor="middle" font-size="13" class="on-color">損失：log loss（4-3）</text>
+          <text x="280" y="180" text-anchor="middle" font-size="13">兩者都是監督式學習，差在輸出與損失函數</text>
+        </svg>`, caption: '模組 3 做回歸，模組 4 做分類。' },
+      ],
+      tryit: {
+        q: ['「預測一部電影的評分（1～5 星）」可以當回歸也可以當分類。各寫一個理由。'],
+        draft: '當回歸：＿\n當分類：＿',
+        answer: ['當回歸：星數有大小順序，預測 4.3 和 4.5 很接近，用 MSE 可以反映「差一點」。', '當分類：如果只在意「推薦（4 星以上）或不推薦」，或星數只有整數，就可以當成 5 類或 2 類。問題怎麼定義，取決於你要拿結果做什麼。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為只要資料多，有沒有標籤都一樣。', why: '監督式學習一定要標籤才能算損失。', right: '先確認標籤從哪裡來、品質如何。' },
+      { wrong: '把有數字的問題一律當回歸。', why: '郵遞區號、商品編號是數字，但其實是類別。', right: '看數字之間有沒有大小意義。' },
+      { wrong: '以為人工標籤一定正確。', why: '標註者會犯錯、彼此不一致。', right: '抽查標籤品質，必要時多人標註。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '監督式學習和其他學習方式最大的差別是？', options: [
+        { text: '每筆訓練資料都有標籤', correct: true, why: '有答案才能算損失。' },
+        { text: '一定要用很大的神經網路才能訓練', why: '線性回歸也是監督式。' },
+        { text: '不需要任何資料就能自己學會', why: '一定要資料。' },
+        { text: '只能拿來預測數字，不能預測類別', why: '分類也是監督式。' },
+      ] },
+      { level: '應用', type: 'mc', q: '「預測顧客會不會在 30 天內回購（會／不會）」是？', options: [
+        { text: '分類', correct: true, why: '兩個類別。' },
+        { text: '回歸，因為 30 天是一個數字', why: '要預測的是會不會。' },
+        { text: '非監督式學習，因為顧客沒有標籤', why: '過去的回購紀錄就是標籤。' },
+        { text: '強化學習，因為回購是一種獎勵', why: '這裡是從歷史資料學對應。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做「判斷客服信件急不急」的模型，但沒有任何標好的資料。列出兩種取得標籤的方法，以及各自的風險。'], answer: [
+        '一、請客服人員標一批：準，但貴、慢，不同人的「急」標準不同，要先寫標註指南。',
+        '二、用現有紀錄推：例如「主管有沒有介入」「多快被回覆」：便宜，但反映的是過去的處理方式，不一定是真正的急迫程度。',
+      ] },
+    ],
+    keypoints: [
+      '監督式學習：每筆資料有標籤，才能算損失。',
+      '回歸預測數字，分類預測類別。',
+      '標籤的來源與品質，決定模型的上限。',
+    ],
+    sources: ['gmlcc', 'sklearn-linear'],
+  },
+
+  '2-2': {
+    goals: [
+      '說出非監督式學習在做什麼',
+      '手動跑一次 k-means 的兩個步驟',
+      '知道分群結果需要人來解讀',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）預測明天氣溫是回歸還是分類？', options: [
+        { text: '回歸', correct: true, why: '連續數字。' },
+        { text: '分類，因為天氣只有晴、雨兩種', why: '題目要預測的是氣溫數字。' },
+        { text: '強化學習，因為天氣會給出獎勵', why: '這是從歷史資料預測。' },
+        { text: '非監督式，因為氣溫沒有標籤', why: '過去的氣溫紀錄就是標籤。' },
+      ] },
+    ],
+    analogy: {
+      text: ['倒出一整袋混在一起的樂高，沒人告訴你怎麼分。你自然會把顏色、形狀相近的放成一堆。', '[[非監督式學習]]就是沒有標籤，讓模型自己找結構。最常見的是[[分群]]：[[k-means]] 先隨便放 k 個中心，然後反覆兩步：每個點歸給最近的中心、中心搬到自己那群的平均位置。'],
+      limit: ['你分樂高時知道「顏色」是重點，k-means 只看距離，用哪些特徵、怎麼縮放，會完全改變分群結果；而且分出來的群代表什麼，要人看過才知道。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="k-means 的兩個步驟：分配，每個點歸給最近的中心；移動，中心搬到自己那群的平均位置；重複直到不再改變">
+        <rect x="10" y="30" width="250" height="130" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <text x="135" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">① 分配</text>
+        <text x="135" y="96" text-anchor="middle" font-size="14" class="on-color">每個點歸給</text>
+        <text x="135" y="120" text-anchor="middle" font-size="14" class="on-color">最近的中心</text>
+        <rect x="300" y="30" width="250" height="130" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="425" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">② 移動</text>
+        <text x="425" y="96" text-anchor="middle" font-size="14" class="on-color">中心搬到自己那群</text>
+        <text x="425" y="120" text-anchor="middle" font-size="14" class="on-color">所有點的平均位置</text>
+        <path d="M260 80 L300 80" class="stroke-ink" stroke-width="3"/><path d="M300 120 L260 120" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="196" text-anchor="middle" font-size="14" font-weight="900">重複，直到分配不再改變</text>
+      </svg>`,
+      caption: '每一步都讓「點到自己中心的距離平方和」不會變大，所以一定會停下來。',
+    },
+    define: [
+      { term: '非監督式學習', en: 'unsupervised learning', def: '沒有標籤，找結構。', example: '分群、降維。' },
+      { term: 'k-means', en: 'k-means', def: '分配、移動，反覆到收斂。', example: 'k 要先指定。' },
+      { term: '降維', en: 'dimensionality reduction', def: '把很多特徵壓成少數幾個，方便觀察。', example: '把 100 個特徵壓成 2 個畫圖。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="特徵縮放的影響：沒有縮放時，年收入的數字遠大於年齡，距離幾乎只由收入決定；縮放後兩者都能影響距離">
+  <rect x="10" y="30" width="260" height="120" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="140" y="60" text-anchor="middle" font-size="15" font-weight="900">沒有縮放</text>
+  <text x="140" y="92" text-anchor="middle" font-size="14">收入差 100,000</text>
+  <text x="140" y="118" text-anchor="middle" font-size="14">年齡差 30 → 幾乎沒影響</text>
+  <rect x="290" y="30" width="260" height="120" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+  <text x="420" y="60" text-anchor="middle" font-size="15" font-weight="900" class="on-color">縮放到 0～1</text>
+  <text x="420" y="92" text-anchor="middle" font-size="14" class="on-color">收入差 0.4</text>
+  <text x="420" y="118" text-anchor="middle" font-size="14" class="on-color">年齡差 0.5 → 兩者都算數</text>
+  <text x="280" y="186" text-anchor="middle" font-size="13">k-means 只看距離，所以單位差很多時一定要先縮放</text>
+</svg>`, caption: '數字是示意。' },
+        { type: 'widget', name: 'kmeans', props: { title: '15 個點、k＝3：一步一步看中心怎麼移動', points: KM_POINTS, centers: [[1, 1], [2, 1.5], [9, 9]] } },
+        { type: 'callout', variant: 'tip', title: '看互動時注意', body: ['一開始的中心放得很差（兩個擠在左下）。經過幾輪「分配、移動」後，三個中心各自落到一群裡。', '下面的「距離平方和」每一步都不會變大：這就是 k-means 的損失，它也是在做「讓損失變小」。'] },
+        { type: 'table', head: ['', '監督式', '非監督式'], rows: [
+          ['資料', '特徵＋標籤', '只有特徵'],
+          ['目標', '預測標籤', '找出結構（群、方向）'],
+          ['怎麼知道好不好', '和標籤比', '沒有標準答案，要人解讀、看是否有用'],
+          ['例子', '房價、垃圾信', '顧客分群、異常偵測的前處理'],
+        ] },
+      ],
+      tryit: {
+        q: ['如果把 k 設成 15（和點一樣多），k-means 的結果會是什麼？距離平方和是多少？這是好的分群嗎？'],
+        draft: '結果：＿\n距離平方和：＿\n好不好：＿',
+        answer: ['每個點自己一群，中心就在點上，距離平方和是 0。', '數字最好，但完全沒用：沒有把任何東西歸類。這說明非監督式學習不能只看損失，k 要依「分出來有沒有用」來選。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為分群結果有標準答案。', why: '沒有標籤，同一份資料可以有很多種合理分法。', right: '依用途判斷分群是否有用。' },
+      { wrong: '特徵單位差很多時直接跑 k-means。', why: '年收入（幾十萬）會壓過年齡（幾十）的距離。', right: '先把特徵縮放到差不多的範圍。' },
+      { wrong: '以為 k 越大越好，因為損失越小。', why: 'k 等於點數時損失是 0，但沒有意義。', right: '看損失下降的趨勢與業務上能不能解讀。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'k-means 每一輪做哪兩件事？', options: [
+        { text: '分配點、移動中心', correct: true, why: '反覆直到不再改變。' },
+        { text: '預測標籤，再和正確答案做比較', why: '非監督式沒有標籤。' },
+        { text: '刪掉離群點，再把剩下的點排序', why: '不是這兩步。' },
+        { text: '把點的數量加倍，再隨機抽一半', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '用「年收入（元）」和「年齡」分群，結果幾乎只依收入分開。最可能的原因？', options: [
+        { text: '兩個特徵沒有先縮放', correct: true, why: '收入的數字大，主導了距離。' },
+        { text: 'k-means 演算法本身只會看第一個欄位', why: '它看所有特徵的距離。' },
+        { text: '年齡和群組完全沒有任何關係', why: '可能有關，只是被收入壓過。' },
+        { text: 'k 設太小，只要調大就會依年齡分', why: '問題在尺度，不在 k。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['電商把顧客分成 4 群後，行銷主管問「第 2 群是什麼樣的人？」你要怎麼回答？'], answer: [
+        '分群只給編號，不給意義。要去看每一群的平均特徵（例如購買頻率、客單價、常買類別），再為每群取名字（例如「高單價少量型」）。',
+        '還要檢查分群是否穩定（換個初始中心結果差不多嗎）、對行銷決策有沒有用。',
+      ] },
+    ],
+    keypoints: [
+      '非監督式學習：沒有標籤，自己找結構。',
+      'k-means：分配到最近的中心 → 中心移到平均，反覆到收斂。',
+      '分群沒有標準答案，要縮放特徵、要人解讀。',
+    ],
+    sources: ['kmeans'],
+  },
+
+  '2-3': {
+    goals: [
+      '說出強化學習的代理人、動作、獎勵',
+      '解釋探索與利用的兩難',
+      '用 ε-greedy 實際玩一次拉霸機',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）k-means 的 k 設成和點一樣多，會怎樣？', options: [
+        { text: '每個點一群，沒有意義', correct: true, why: '損失 0 但沒用。' },
+        { text: '得到最好的分群結果，應該這樣設', why: '沒有歸類任何東西。' },
+        { text: '程式會報錯，k 不能等於點數', why: '可以跑，只是沒意義。' },
+        { text: '所有點都會被分進同一群', why: '剛好相反。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-1）預測「會不會回購」是？', options: [
+        { text: '分類', correct: true, why: '兩類。' },
+        { text: '回歸，因為回購次數是數字', why: '題目問會不會。' },
+        { text: '非監督式，因為顧客沒有標籤', why: '歷史紀錄就是標籤。' },
+        { text: '降維，因為要把顧客壓成一個數字', why: '無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['到新城市找好吃的餐廳：一直去第一家吃過還不錯的（利用），可能錯過更好的；每天都試新的（探索），又常踩雷。', '[[強化學習]]處理的就是這種「沒有標準答案、只有事後回饋」的問題：代理人做動作，環境給[[獎勵]]，代理人要學會長期拿最多獎勵的策略，同時面對[[探索與利用]]的兩難。'],
+      limit: ['找餐廳時你可以看評價（別人的經驗），基本的強化學習只能靠自己一次一次試；而且很多問題的獎勵要很久之後才出現（下棋要到最後才知道輸贏），比拉霸機難得多。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="強化學習迴圈：代理人觀察狀態、做出動作，環境回傳新的狀態與獎勵，代理人依獎勵調整策略">
+        <rect x="30" y="70" width="180" height="90" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="120" y="108" text-anchor="middle" font-size="16" font-weight="900" class="on-color">代理人</text>
+        <text x="120" y="134" text-anchor="middle" font-size="13" class="on-color">依策略選動作</text>
+        <rect x="350" y="70" width="180" height="90" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="440" y="108" text-anchor="middle" font-size="16" font-weight="900" class="on-color">環境</text>
+        <text x="440" y="134" text-anchor="middle" font-size="13" class="on-color">拉霸機、棋盤、遊戲</text>
+        <path d="M210 90 L350 90" class="stroke-ink" stroke-width="3"/><path d="M342 82 L354 90 L342 98 Z" class="stroke-ink" style="fill:var(--ink)"/>
+        <text x="280" y="80" text-anchor="middle" font-size="14" font-weight="900">動作</text>
+        <path d="M350 140 L210 140" class="stroke-ink" stroke-width="3"/><path d="M218 132 L206 140 L218 148 Z" class="stroke-ink" style="fill:var(--ink)"/>
+        <text x="280" y="164" text-anchor="middle" font-size="14" font-weight="900">獎勵＋新狀態</text>
+        <text x="280" y="212" text-anchor="middle" font-size="14">沒有人告訴它「正確動作」，只有事後的分數</text>
+      </svg>`,
+      caption: '和監督式最大的差別：回饋只是一個分數，不是正確答案。',
+    },
+    define: [
+      { term: '強化學習', en: 'reinforcement learning', def: '從獎勵學策略。', example: '下棋、遊戲。' },
+      { term: '策略', en: 'policy', def: '在每個狀態下選哪個動作的規則。', example: '「90% 選目前最好的那台」。' },
+      { term: 'ε-greedy', en: 'epsilon-greedy', def: '機率 ε 隨機探索，其餘時間選估計最好的。', example: 'ε＝0.1。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="三種學習對照：監督式有正確答案，非監督式沒有答案只找結構，強化學習只有事後的獎勵分數">
+  ${[['監督式', '有標準答案', '房價、垃圾信', 'm1'], ['非監督式', '沒有答案', '顧客分群', 'm5'], ['強化學習', '只有獎勵分數', '拉霸機、下棋', 'm4']].map(([a, b, c, m], i) => `<rect x="${10 + i * 185}" y="30" width="170" height="130" style="fill:var(--${m})" class="stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="66" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${95 + i * 185}" y="100" text-anchor="middle" font-size="14" class="on-color">${b}</text><text x="${95 + i * 185}" y="130" text-anchor="middle" font-size="13" class="on-color">${c}</text>`).join('')}
+  <text x="280" y="188" text-anchor="middle" font-size="13">差別在「回饋」長什麼樣子</text>
+</svg>`, caption: '模組 2 的三課整理成一張表。' },
+        { type: 'widget', name: 'bandit', props: { title: '三台拉霸機，中獎率不同、你不知道', arms: [{ label: 'A', p: 0.3 }, { label: 'B', p: 0.55 }, { label: 'C', p: 0.4 }], epsilon: 0.1 } },
+        { type: 'callout', variant: 'tip', title: '試試看三種 ε', body: ['ε＝0：只挑目前估計最好的。如果一開始 A 運氣好中了一次，可能就一直拉 A，永遠發現不了 B 比較好。', 'ε＝1：完全亂挑，平均中獎率約是三台的平均。ε＝0.1 左右：大部分時間利用、偶爾探索，通常能找到 B。每個人按出來的結果都不同，因為真的有隨機性。'] },
+        { type: 'table', head: ['強化學習的例子', '代理人', '動作', '獎勵'], rows: [
+          ['拉霸機（上面）', '你', '拉哪一台', '中獎 1、沒中 0'],
+          ['AlphaGo（2016）', '下棋程式', '下哪一步', '最後贏或輸'],
+          ['LLM 的 RLHF（第二部 6-2）', '語言模型', '產生哪段回答', '獎勵模型的分數'],
+          ['推理模型（第二部 6-4）', '語言模型', '寫什麼思考過程', '答案對不對'],
+        ], caption: 'AlphaGo 結合深度神經網路、樹搜尋與強化學習（Silver 等 2016）。' },
+      ],
+      tryit: {
+        q: ['把 ε 設成 0，按「重來」再讓它拉 100 次，重複幾次。有沒有哪一次它一直拉錯的那台？為什麼？'],
+        draft: '觀察：＿\n原因：＿',
+        answer: ['常常會：一開始每台的估計都是 1（還沒拉過），選到第一台後，只要它的估計還比沒拉過的高、或其他台一開始運氣差，就不會再去試。', 'ε＝0 完全不探索，早期的運氣決定了一切。這就是為什麼要保留一點探索。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為強化學習有「正確動作」可以對答案。', why: '只有事後的獎勵分數。', right: '它要靠嘗試，從獎勵推斷哪些動作好。' },
+      { wrong: '永遠選目前看起來最好的。', why: '早期的估計不準，可能錯過更好的選項。', right: '保留一定比例的探索。' },
+      { wrong: '以為強化學習只用在遊戲。', why: 'LLM 的偏好學習、推理訓練也是強化學習。', right: '只要有「動作 → 獎勵」的結構都能用。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '強化學習和監督式學習最大的差別？', options: [
+        { text: '回饋只是獎勵分數，不是正確答案', correct: true, why: '要自己推斷哪個動作好。' },
+        { text: '強化學習完全不需要任何資料或互動', why: '它靠互動產生資料。' },
+        { text: '強化學習只能用在下棋與電腦遊戲上', why: 'LLM 訓練也用。' },
+        { text: '強化學習的模型一定比較小、比較快', why: '和大小無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'ε＝0.2 的 ε-greedy 代表？', options: [
+        { text: '20% 隨機探索，80% 選目前最好的', correct: true, why: 'ε 是探索的比例。' },
+        { text: '只拉中獎率在 20% 以上的拉霸機', why: '不知道真實中獎率。' },
+        { text: '每拉 20 次就重新估計一次中獎率', why: '每次都更新估計。' },
+        { text: '80% 隨機探索，只有 20% 選最好的', why: '比例反了。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['網站要在三種首頁設計中找出點擊率最高的。用這一課的概念，說說「先 A/B 測一個月再決定」和「邊測邊調整」的差別。'], answer: [
+        '先測一個月：每種都平均分到流量（全部探索），結論清楚，但一個月內有很多流量給了比較差的設計。',
+        '邊測邊調整（像 ε-greedy 或其他拉霸機演算法）：表現好的設計逐漸分到更多流量，損失比較少，但結論的統計檢驗比較複雜。兩者是探索與利用的取捨。',
+      ] },
+    ],
+    keypoints: [
+      '強化學習：代理人做動作，環境給獎勵，學會長期獎勵最大的策略。',
+      '探索與利用的兩難；ε-greedy 是最簡單的折衷。',
+      'LLM 的 RLHF 與推理訓練也是強化學習。',
+    ],
+    sources: ['sutton-barto', 'alphago'],
+  },
+});
+</script>

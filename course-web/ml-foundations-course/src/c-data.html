@@ -1,0 +1,159 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'AI 系列・第三部｜機器學習基礎',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-23',
+  version: 'v1',
+};
+
+/* AI 系列七本書：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: 'AI 系列',
+  current: 'ai-ml',
+  volumes: [
+    { id: 'ai-map', vol: '序章', title: 'AI 全景地圖', href: '../ai-series-0-map-course/index.html' },
+    { id: 'ai-app', vol: '第一部', title: 'AI 應用工程', href: '../ai-app-engineering-course/index.html' },
+    { id: 'ai-llm', vol: '第二部', title: '大型語言模型原理', href: '../llm-principles-course/index.html' },
+    { id: 'ai-ml', vol: '第三部', title: '機器學習基礎', href: '../ml-foundations-course/index.html' },
+    { id: 'ai-dl', vol: '第四部', title: '深度學習', href: '../deep-learning-course/index.html' },
+    { id: 'ai-hw', vol: '第五部', title: '硬體與運算', href: '../ai-hardware-course/index.html' },
+    { id: 'ai-math', vol: '隨身卷', title: '數學直覺', href: '../ai-math-pocket-course/index.html' },
+  ],
+};
+
+/* 全書主軸：學習迴圈的六站；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '資料', note: '特徵與標籤', color: 'var(--m0)' },
+    { label: '模型', note: '有參數的函式', color: 'var(--m1)' },
+    { label: '預測', note: '模型算出的答案', color: 'var(--m2)' },
+    { label: '損失', note: '預測和答案差多少', color: 'var(--m3)' },
+    { label: '梯度', note: '參數往哪邊動損失會變小', color: 'var(--m4)' },
+    { label: '更新參數', note: '往下坡走一小步', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [0, 1, 2, 3], 2: [0, 1], 3: [1, 2, 3, 4, 5], 4: [1, 2, 3], 5: [0, 3], 6: [2, 3] },
+  byLesson: { '1-1': [0], '1-2': [1, 2], '1-3': [2, 3], '1-4': [3, 4, 5], '3-1': [1, 2, 3], '3-2': [4], '5-2': [0] },
+};
+
+/* 首頁主視覺：學習迴圈（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="學習迴圈：資料進入模型得到預測，和正確答案比較算出損失，算出梯度，更新參數，再回到模型">
+  <rect x="20" y="30" width="160" height="70" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+  <text x="100" y="62" text-anchor="middle" font-size="18" font-weight="900" class="on-color">資料</text>
+  <text x="100" y="86" text-anchor="middle" font-size="14" class="on-color">特徵＋標籤</text>
+  <rect x="200" y="30" width="160" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+  <text x="280" y="62" text-anchor="middle" font-size="18" font-weight="900" class="on-color">模型</text>
+  <text x="280" y="86" text-anchor="middle" font-size="14" class="on-color">y ＝ w·x ＋ b</text>
+  <rect x="380" y="30" width="160" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+  <text x="460" y="62" text-anchor="middle" font-size="18" font-weight="900" class="on-color">預測</text>
+  <text x="460" y="86" text-anchor="middle" font-size="14" class="on-color">模型的答案</text>
+  <rect x="380" y="180" width="160" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+  <text x="460" y="212" text-anchor="middle" font-size="18" font-weight="900" class="on-color">損失</text>
+  <text x="460" y="236" text-anchor="middle" font-size="14" class="on-color">差多少</text>
+  <rect x="200" y="180" width="160" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+  <text x="280" y="212" text-anchor="middle" font-size="18" font-weight="900" class="on-color">梯度</text>
+  <text x="280" y="236" text-anchor="middle" font-size="14" class="on-color">往哪邊是下坡</text>
+  <rect x="20" y="180" width="160" height="70" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+  <text x="100" y="212" text-anchor="middle" font-size="18" font-weight="900" class="on-color">更新參數</text>
+  <text x="100" y="236" text-anchor="middle" font-size="14" class="on-color">走一小步</text>
+  <line x1="180" y1="65" x2="200" y2="65" class="stroke-ink" stroke-width="4"/><line x1="360" y1="65" x2="380" y2="65" class="stroke-ink" stroke-width="4"/>
+  <line x1="460" y1="100" x2="460" y2="180" class="stroke-ink" stroke-width="4"/>
+  <line x1="380" y1="215" x2="360" y2="215" class="stroke-ink" stroke-width="4"/><line x1="200" y1="215" x2="180" y2="215" class="stroke-ink" stroke-width="4"/>
+  <path d="M100 180 L100 140 L280 140 L280 104" fill="none" class="stroke-ink" stroke-width="4"/>
+  <path d="M272 112 L280 100 L288 112 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="280" y="310" text-anchor="middle" font-size="20" font-weight="900">重複幾千次 → 參數調好了</text>
+  <text x="280" y="342" text-anchor="middle" font-size="15">學習：用資料調整參數，讓損失變小</text>
+  <text x="280" y="380" text-anchor="middle" font-size="14">本書每一課都標出自己在這個迴圈的哪一站</text>
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '學習|是什麼樣的問題', short: '起點', desc: '這一卷用最小的例子把「機器學習」拆開：資料、模型、損失，以及讓損失變小的方法。', lessons: [
+    ['0-1', '從規則|到學習'],
+  ]},
+  { id: 1, title: '什麼叫「學習」：|資料、模型、損失函數', short: '三要素', desc: '特徵與標籤、有參數的模型、衡量錯多少的損失函數，以及「學習＝找讓損失最小的參數」。', lessons: [
+    ['1-1', '資料：|特徵與標籤'],
+    ['1-2', '模型：|一個有參數的函式'],
+    ['1-3', '損失函數：|錯多少'],
+    ['1-4', '學習＝|找損失最小的參數'],
+  ]},
+  { id: 2, title: '監督、非監督、|強化學習', short: '三種學習', desc: '有標準答案、沒有答案、只有獎勵：三種學習的資料長得不一樣，做法也不一樣。', lessons: [
+    ['2-1', '監督式：|有標準答案'],
+    ['2-2', '非監督式：|自己找結構'],
+    ['2-3', '強化學習：|從獎勵中學'],
+  ]},
+  { id: 3, title: '線性回歸|與梯度下降', short: '梯度下降', desc: '畫一條最合適的線，然後手算一次梯度下降：往下坡走、走多大步。', lessons: [
+    ['3-1', '畫一條|最合適的線'],
+    ['3-2', '梯度：|哪邊是下坡'],
+    ['3-3', '手算一次|梯度下降'],
+    ['3-4', '學習率：|步伐大小'],
+  ]},
+  { id: 4, title: '分類|與邏輯回歸', short: '分類', desc: '從預測數字到預測類別：決策邊界、sigmoid、log loss、多類別。', lessons: [
+    ['4-1', '分類問題|與決策邊界'],
+    ['4-2', 'sigmoid：|把分數變機率'],
+    ['4-3', 'log loss：|分類的損失'],
+    ['4-4', '多類別|與 softmax'],
+  ]},
+  { id: 5, title: '過擬合、正則化、|訓練／驗證／測試集', short: '過擬合', desc: '模型背答案的問題：怎麼發現、怎麼預防、怎麼誠實地評估。', lessons: [
+    ['5-1', '過擬合|與欠擬合'],
+    ['5-2', '訓練、驗證、|測試三份資料'],
+    ['5-3', '正則化：|懲罰太複雜'],
+    ['5-4', '資料洩漏|與交叉驗證'],
+  ]},
+  { id: 6, title: '評估指標：|accuracy、precision、recall', short: '指標', desc: '混淆矩陣、精確率與召回率、不平衡資料，以及怎麼選指標。', lessons: [
+    ['6-1', '混淆矩陣：|四種對錯'],
+    ['6-2', 'precision|與 recall'],
+    ['6-3', '不平衡資料|與 F1'],
+    ['6-4', '選對指標|＋總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

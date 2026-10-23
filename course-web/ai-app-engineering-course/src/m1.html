@@ -1,0 +1,658 @@
+<script>
+/* ==========================================================================
+   模組 1：LLM API 基礎
+   ========================================================================== */
+defineTerms({
+  '端點': { en: 'endpoint', def: 'API 上一個固定的網址，負責一種功能。', example: '`POST https://api.anthropic.com/v1/messages` 是送訊息的端點。', lesson: '1-1' },
+  '請求標頭': { en: 'request header', def: 'HTTP 請求附帶的「名稱：值」資訊，寫在信封上而不是信紙裡，例如金鑰、版本、內容格式。', example: '`x-api-key`、`anthropic-version`、`content-type`。', lesson: '1-1' },
+  '請求本文': { en: 'request body', def: 'HTTP 請求真正要送的內容；Messages API 用 JSON。', example: '`{ "model": "...", "max_tokens": 1024, "messages": [...] }`。', lesson: '1-1' },
+  'API 版本': { en: 'API version', def: '用 `anthropic-version` 標頭指定的日期。API 有不相容的改變時會出新版本，程式自己決定什麼時候換。', example: '`2026-10-21` 版拿掉了 `temperature`。', lesson: '1-1' },
+  'system prompt': { en: 'system prompt', def: '放在請求頂層 `system` 欄位的指示，用來設定角色、規則與背景，整段對話都適用。', example: '`system: "你是台灣的程式教學助教，用繁體中文回答。"`', lesson: '1-2' },
+  '角色': { en: 'role', def: '每一則訊息是誰說的：`user`（使用者或你的程式送進的資料）或 `assistant`（模型之前的回覆）。', example: '`{ role: "user", content: "..." }`。', lesson: '1-2' },
+  '對話歷史': { en: 'conversation history', def: '到目前為止所有 user 與 assistant 訊息，照順序放在 `messages` 陣列裡；每次請求都要整包送。', example: '第三輪請求的 messages 有五則訊息。', lesson: '1-2' },
+  'max_tokens': { en: 'max_tokens', def: '這次回應最多能產生幾個 token；思考加上回答一起算。到了就停，停在半句也照停。', example: '`max_tokens: 1024`。', lesson: '1-3' },
+  'stop_reason': { en: 'stop_reason', def: '回應裡說明「為什麼停下來」的欄位，你的程式依它決定下一步。', example: '`end_turn`、`max_tokens`、`tool_use`、`refusal`。', lesson: '1-3' },
+  'effort': { en: 'effort', def: '放在 `output_config.effort` 的設定，控制模型願意花多少 token 思考與回答：`low`、`medium`、`high`、`xhigh`、`max`。', example: 'Opus 5.5 預設 `medium`。', lesson: '1-3' },
+  'temperature': { en: 'temperature', def: '舊的取樣參數：數字越低，模型越傾向挑機率最高的字。Claude API 在 2026-10-21 版本把它拿掉了。', example: '舊教學常見 `temperature: 0.2`。', lesson: '1-3' },
+  'tokenizer': { en: 'tokenizer', def: '把文字切成 token 的規則與程式。每個模型家族可能用不同的 tokenizer，同一句話切出來的數量就不同。', example: 'Claude 4.7 之後的 tokenizer，同樣文字約多 30% token。', lesson: '1-4' },
+  'context window': { en: 'context window', def: '模型一次請求能讀進的 token 上限，包含 system、對話歷史、工具定義和這次的輸出。', example: 'Opus 5.5 是 1M（一百萬）token。', lesson: '1-4' },
+  '速率限制': { en: 'rate limit', def: 'API 限制你每分鐘能送多少請求、多少輸入與輸出 token；超過就回 429。', example: 'RPM、ITPM、OTPM 三種限制。', lesson: '1-5' },
+  '指數退避': { en: 'exponential backoff', def: '重試時每次等待的時間加倍（1 秒、2 秒、4 秒…），避免大家一起重試把服務擠爆。', example: 'SDK 遇到 429、5xx 會自動退避重試兩次。', lesson: '1-5' },
+});
+
+const ANATOMY_SVG = `<svg viewBox="0 0 560 360" role="img" aria-label="一次 API 呼叫的解剖：左邊是請求，包含 POST 方法與網址、三個標頭、JSON 本文；右邊是回應，包含 id、content 陣列、stop_reason 與 usage">
+  <rect x="10" y="10" width="260" height="340" class="fill-surface stroke-ink" stroke-width="4"/>
+  <rect x="10" y="10" width="260" height="40" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+  <text x="26" y="37" font-size="16" font-weight="900" class="on-color">請求（你送出）</text>
+  <text x="26" y="78" font-size="14" font-weight="900">① 方法＋網址</text>
+  <text x="26" y="100" font-size="14" class="mono">POST /v1/messages</text>
+  <text x="26" y="136" font-size="14" font-weight="900">② 標頭（信封）</text>
+  <text x="26" y="158" font-size="13" class="mono">x-api-key: sk-ant-…</text>
+  <text x="26" y="178" font-size="13" class="mono">anthropic-version: …</text>
+  <text x="26" y="198" font-size="13" class="mono">content-type: …/json</text>
+  <text x="26" y="234" font-size="14" font-weight="900">③ 本文（信紙，JSON）</text>
+  <text x="26" y="256" font-size="13" class="mono">model</text>
+  <text x="26" y="276" font-size="13" class="mono">max_tokens</text>
+  <text x="26" y="296" font-size="13" class="mono">messages: [ … ]</text>
+  <text x="26" y="316" font-size="13" class="mono">system（選填）</text>
+  <line x1="270" y1="180" x2="290" y2="180" class="stroke-ink" stroke-width="4"/>
+  <rect x="290" y="10" width="260" height="340" class="fill-surface stroke-ink" stroke-width="4"/>
+  <rect x="290" y="10" width="260" height="40" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+  <text x="306" y="37" font-size="16" font-weight="900" class="on-color">回應（API 回來）</text>
+  <text x="306" y="78" font-size="13" class="mono">id: "msg_01…"</text>
+  <text x="306" y="98" font-size="13" class="mono">role: "assistant"</text>
+  <text x="306" y="134" font-size="14" font-weight="900">④ content（陣列）</text>
+  <text x="306" y="156" font-size="13" class="mono">[ thinking?, text, … ]</text>
+  <text x="306" y="192" font-size="14" font-weight="900">⑤ stop_reason</text>
+  <text x="306" y="214" font-size="13" class="mono">"end_turn"</text>
+  <text x="306" y="250" font-size="14" font-weight="900">⑥ usage</text>
+  <text x="306" y="272" font-size="13" class="mono">input_tokens: 18</text>
+  <text x="306" y="292" font-size="13" class="mono">output_tokens: 42</text>
+  <text x="306" y="328" font-size="13">要付錢的數量</text>
+</svg>`;
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '說出一次 API 請求的三個部分：方法與網址、標頭、JSON 本文',
+      '看懂回應 JSON 的每個欄位，知道答案在哪裡',
+      '用 cURL 送出和 SDK 一樣的請求',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-2）為什麼 Claude 的 API 金鑰不能放進前端程式？', options: [
+        { text: '前端程式會下載到使用者電腦，金鑰等於公開', correct: true, why: '任何人打開開發者工具都看得到，可以拿去刷你的額度。' },
+        { text: '瀏覽器不支援送出帶有金鑰的 HTTP 請求', why: '瀏覽器做得到；問題是安全，不是技術上做不到。' },
+        { text: '金鑰太長，放在前端會讓網頁變慢', why: '金鑰只有幾十個字元，跟速度無關。' },
+        { text: '前端的金鑰每天都會自動過期失效', why: '金鑰不會因為放在前端就過期；正因為不會，外洩才危險。' },
+      ] },
+    ],
+    analogy: {
+      text: ['送一次 API 請求就像寄一封掛號信。**信封**上寫收件地址（[[端點]]）、寄件人證明（金鑰）、信紙格式（[[請求標頭]]）；**信紙**寫你真正要說的話（[[請求本文]]）。', 'API 收到後檢查信封，沒問題才拆信、交給模型，再寄一封回信給你。'],
+      limit: ['掛號信要等幾天，API 通常幾秒就回；回信也可以一段一段寄（模組 2 的串流）。而且信封上錯一個字，整封會被退回（400 錯誤），不會有郵差幫你猜。'],
+    },
+    model: {
+      svg: ANATOMY_SVG,
+      caption: '左邊是你要組的東西，右邊是你要讀的東西。答案在 ④，花費在 ⑥。',
+    },
+    define: [
+      { term: '端點', en: 'endpoint', def: 'API 上負責一種功能的固定網址。', example: '`POST https://api.anthropic.com/v1/messages`。' },
+      { term: '請求標頭', en: 'request header', def: '寫在信封上的資訊：金鑰、API 版本、內容格式。', example: '`anthropic-version: 2026-10-21`。' },
+      { term: '請求本文', en: 'request body', def: '真正要送的 JSON：至少有 `model`、`max_tokens`、`messages`。', example: '`{ "model": "claude-opus-5-5", ... }`。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'reqbuilder', props: { title: '關掉必填欄位，看 API 會說什麼', fields: [
+          { key: 'model', value: 'claude-opus-5-5', on: true, required: '缺少 `model`：API 不知道要交給哪個模型', options: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'], note: '要用哪個模型；ID 要完全一樣，不能自己加日期。' },
+          { key: 'max_tokens', value: 1024, on: true, required: '缺少 `max_tokens`：每次都要明說回應最多幾個 token', options: [256, 1024, 16000], note: '回應的長度上限（1-3）。' },
+          { key: 'messages', value: [{ role: 'user', content: '用一句話解釋 token' }], on: true, required: '缺少 `messages`：沒有任何訊息，模型沒東西可讀', note: '對話內容（1-2）。' },
+          { key: 'system', value: '你是台灣的程式教學助教，用繁體中文回答。', on: false, note: '選填：整段對話都適用的指示。' },
+        ] } },
+        { type: 'heading', id: 'curl', text: '不用 SDK：直接用 cURL 送' },
+        { type: 'code', lang: 'bash', title: 'zsh／bash（Windows 請在 Git Bash 執行）', code: 'curl https://api.anthropic.com/v1/messages \\\n  -H "x-api-key: $ANTHROPIC_API_KEY" \\\n  -H "anthropic-version: 2026-10-21" \\\n  -H "content-type: application/json" \\\n  -d \'{\n    "model": "claude-opus-5-5",\n    "max_tokens": 1024,\n    "messages": [{ "role": "user", "content": "用一句話解釋 token" }]\n  }\'' },
+        { type: 'code', lang: 'json', title: '回應（節錄）', code: '{\n  "id": "msg_01XFDUDYJgAACzvnptvVoYEL",\n  "type": "message",\n  "role": "assistant",\n  "model": "claude-opus-5-5",\n  "content": [\n    { "type": "text", "text": "token 是模型讀寫文字的最小單位……" }\n  ],\n  "stop_reason": "end_turn",\n  "usage": { "input_tokens": 18, "output_tokens": 42 }\n}' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="SDK 和 cURL 的關係：SDK 幫你做了四件事：加上金鑰標頭、加上版本標頭、把物件轉成 JSON、遇到暫時性錯誤自動重試。底下送出去的都是同一個 HTTP 請求">
+          <rect x="10" y="10" width="540" height="100" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+          <text x="26" y="40" font-size="16" font-weight="900" class="on-color">SDK 幫你做的事</text>
+          <text x="26" y="68" font-size="15" class="on-color">加金鑰標頭・加版本標頭・物件轉 JSON</text>
+          <text x="26" y="94" font-size="15" class="on-color">遇到 429、5xx 自動重試・解析回應型別</text>
+          <line x1="280" y1="110" x2="280" y2="140" class="stroke-ink" stroke-width="4"/>
+          <rect x="10" y="140" width="540" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
+          <text x="280" y="171" text-anchor="middle" font-size="16" font-weight="900">同一個 HTTP 請求：POST /v1/messages</text>
+        </svg>`, caption: 'SDK 不是魔法：它送出去的就是上面那個 cURL。出問題時，用 cURL 重現最快。' },
+        { type: 'legacy', title: 'API 版本的變化', rows: [['`anthropic-version: 2023-06-01`（多數舊教學）', '`anthropic-version: 2026-10-21`：拿掉 `temperature`、`top_p`、`top_k`（1-3）']], note: '新版 SDK 會自動帶上它支援的版本；用 cURL 時版本由你自己寫。' },
+      ],
+      tryit: {
+        q: ['同事說「API 一直回 401」，這是他的 cURL。問題最可能在哪一行？'],
+        code: true,
+        draft: 'curl https://api.anthropic.com/v1/messages \\\n  -H "x-api-key: ANTHROPIC_API_KEY" \\\n  -H "anthropic-version: 2026-10-21" \\\n  -H "content-type: application/json" \\\n  -d \'{ ... }\'',
+        answer: ['第二行：`ANTHROPIC_API_KEY` 前面少了 `$`，送出去的是「ANTHROPIC_API_KEY」這串字本身，不是環境變數的值。', '401 是 `authentication_error`：金鑰錯了、格式不對或被撤銷。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把金鑰放在 `Authorization: Bearer ...` 標頭。', why: 'Claude API 的金鑰放在 `x-api-key`；Bearer 是另一種登入方式（OAuth token）用的。', right: '`-H "x-api-key: $ANTHROPIC_API_KEY"`。' },
+      { wrong: '模型 ID 寫成自己記得的舊名字或加上日期，例如 `claude-opus-5-5-20260401`。', why: 'ID 要完全一致；多一個字就找不到模型，回 404。', right: '從官方模型頁複製 ID：`claude-opus-5-5`。' },
+      { wrong: '只看 `content[0].text`，從不看 `stop_reason` 和 `usage`。', why: '回應可能被截斷（`max_tokens`）或被拒絕（`refusal`）；不看就會把半句話當答案，也不知道花了多少錢。', right: '每次讀回應都先看 `stop_reason`，再記錄 `usage`（1-3、1-5）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '這次請求花了多少 token，要看回應的哪個欄位？', options: [
+        { text: '`usage`', correct: true, why: '`usage.input_tokens` 和 `usage.output_tokens` 就是計費的數量。' },
+        { text: '`stop_reason`', why: '`stop_reason` 說明為什麼停，不是用量。' },
+        { text: '`content`', why: '`content` 是回答本身；字數多不代表你能直接換算成 token。' },
+        { text: '`id`', why: '`id` 是這則訊息的編號，回報問題時用。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你的 cURL 回了 400，訊息說缺少某個欄位。本文只有 `model` 和 `messages`。最可能少了什麼？', options: [
+        { text: '`max_tokens`', correct: true, why: 'Messages API 每次都要明說回應上限，沒有就回 400。' },
+        { text: '`system`', why: '`system` 是選填，沒有也能送。' },
+        { text: '`anthropic-version`', why: '那是標頭不是本文欄位；而且題目說的是「本文缺少欄位」。' },
+        { text: '`temperature`', why: '`temperature` 在新版 API 已經移除，送了反而會錯。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你接手一個專案，程式用 SDK 呼叫 Claude，但偶爾出現看不懂的錯誤。說說為什麼「先用 cURL 送一次同樣的請求」常常能幫你找到問題。'], answer: [
+        'cURL 把請求的每一個部分攤開：網址、每個標頭、完整 JSON 都看得到。SDK 幫你做的事（加標頭、轉 JSON、重試）也可能藏住問題，例如讀錯環境變數、版本不同。',
+        '用 cURL 重現成功，問題就在你的程式；cURL 也失敗，就看錯誤訊息裡的 `error.type` 和 `request_id`（1-5）。',
+      ] },
+    ],
+    keypoints: [
+      '請求＝方法與網址＋標頭（金鑰、版本、格式）＋JSON 本文（`model`、`max_tokens`、`messages`）。',
+      '回應先看 `stop_reason`，答案在 `content` 的文字區塊，花費在 `usage`。',
+      'SDK 送出去的就是一個普通的 HTTP 請求；出問題時用 cURL 重現。',
+    ],
+    sources: ['claude-messages', 'claude-versioning', 'claude-migration-20261021', 'claude-errors'],
+  },
+
+  '1-2': {
+    goals: [
+      '用 `system`、`user`、`assistant` 組出一段多輪對話',
+      '解釋為什麼每次請求都要送完整的對話歷史',
+      '說出對話越長，成本與延遲為什麼跟著上升',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）Messages API 的請求本文，哪三個欄位一定要有？', options: [
+        { text: '`model`、`max_tokens`、`messages`', correct: true, why: '少任何一個都會回 400。' },
+        { text: '`model`、`system`、`messages`', why: '`system` 是選填；少的是 `max_tokens`。' },
+        { text: '`api_key`、`model`、`messages`', why: '金鑰放在 `x-api-key` 標頭，不放本文。' },
+        { text: '`model`、`messages`、`temperature`', why: '`temperature` 在 2026-10-21 版本已移除。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 0-1）「讓 AI 記得上一句話」是誰的工作？', options: [
+        { text: '你的程式', correct: true, why: '模型與 API 都不保留上一次請求；程式要把歷史帶上。' },
+        { text: '模型本身', why: '模型每次都是重新讀，沒有記憶。' },
+        { text: 'API 伺服器', why: 'Messages API 不保存對話。' },
+        { text: '使用者的瀏覽器', why: '瀏覽器可以幫忙存，但最後還是要程式把它放進請求。' },
+      ] },
+    ],
+    analogy: {
+      text: ['模型像一位**每次都失憶的編劇**：你每次都要把整本劇本（[[對話歷史]]）交給他，他從頭讀到尾，再寫出下一句台詞。', '劇本封面上的導演筆記就是 [[system prompt]]：「這是一部給小學生看的科普劇」，整本都適用。'],
+      limit: ['真的編劇讀過一次就記得；模型每次都要重讀，所以劇本越長，讀得越久、收的錢越多。而且你可以偷偷改前面的劇本，模型不會發現（但會讓快取失效，8-2）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="對話歷史逐輪變長：第一次請求只有使用者第一句；第二次請求包含使用者第一句、模型第一個回答、使用者第二句；第三次請求有五則訊息。每次都要整包送">
+        <text x="10" y="30" font-size="15" font-weight="900">第 1 次請求</text>
+        <rect x="120" y="12" width="80" height="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="160" y="32" text-anchor="middle" font-size="14" class="on-color">user</text>
+        <text x="10" y="110" font-size="15" font-weight="900">第 2 次請求</text>
+        <rect x="120" y="92" width="80" height="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="160" y="112" text-anchor="middle" font-size="14" class="on-color">user</text>
+        <rect x="206" y="92" width="100" height="28" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="256" y="112" text-anchor="middle" font-size="14" class="on-color">assistant</text>
+        <rect x="312" y="92" width="80" height="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="352" y="112" text-anchor="middle" font-size="14" class="on-color">user</text>
+        <text x="10" y="190" font-size="15" font-weight="900">第 3 次請求</text>
+        <rect x="120" y="172" width="80" height="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="160" y="192" text-anchor="middle" font-size="14" class="on-color">user</text>
+        <rect x="206" y="172" width="100" height="28" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="256" y="192" text-anchor="middle" font-size="14" class="on-color">assistant</text>
+        <rect x="312" y="172" width="80" height="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="352" y="192" text-anchor="middle" font-size="14" class="on-color">user</text>
+        <rect x="398" y="172" width="100" height="28" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="448" y="192" text-anchor="middle" font-size="14" class="on-color">assistant</text>
+        <rect x="504" y="172" width="50" height="28" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="529" y="192" text-anchor="middle" font-size="13" class="on-color">user</text>
+        <rect x="120" y="240" width="434" height="44" class="fill-bg stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+        <text x="337" y="268" text-anchor="middle" font-size="15">每次都從第一句重讀；輸入 token 一輪比一輪多</text>
+      </svg>`,
+      caption: '第 3 次請求時，模型「記得」第 1 句，是因為你又送了一次。',
+    },
+    define: [
+      { term: 'system prompt', en: 'system prompt', def: '請求頂層的 `system` 欄位：角色、規則、背景，整段對話都適用。不放在 `messages` 裡。', example: '`system: "只回答與請假規定有關的問題。"`' },
+      { term: '角色', en: 'role', def: '`messages` 裡每則訊息的身分：`user` 或 `assistant`，照順序輪流。', example: '最後一則要是 `user`，模型才知道要回答什麼。' },
+      { term: '對話歷史', en: 'conversation history', def: '到目前為止的所有訊息。Messages API 是[[無狀態]]的，所以每次都要整包送。', example: '第 3 次請求送 5 則訊息。' },
+    ],
+    examples: {
+      compare: [{
+        title: '把模型的回覆存回歷史',
+        kind: '多輪對話',
+        code: true,
+        badLabel: '只存文字',
+        goodLabel: '存整個 content',
+        bad: 'history.push({\n  role: "assistant",\n  content: {{1:reply.content[0].text}},\n});',
+        good: 'history.push({\n  role: "assistant",\n  content: {{1:reply.content}},\n});',
+        badResult: '第一格可能是空的思考區塊，存到的是空字串；也會丟掉工具呼叫（模組 4）。',
+        goodResult: '思考區塊、文字、工具呼叫都原樣保留，下一輪模型讀到的就是它真正說過的話。',
+        why: ['回覆要原封不動放回歷史，不要自己挑'],
+      }],
+      blocks: [
+        { type: 'code', lang: 'typescript', title: 'chat.ts：一個會記得前文的對話迴圈', code: 'import Anthropic from "@anthropic-ai/sdk";\n\nconst client = new Anthropic();\nconst history: Anthropic.MessageParam[] = [];\n\nasync function ask(question: string): Promise<string> {\n  history.push({ role: "user", content: question });\n\n  const reply = await client.messages.create({\n    model: "claude-opus-5-5",\n    max_tokens: 1024,\n    system: "你是台灣的程式教學助教，用繁體中文、三句以內回答。",\n    messages: history, // 每次送完整歷史\n  });\n\n  // 原封不動放回歷史：思考區塊、文字都保留\n  history.push({ role: "assistant", content: reply.content });\n  return reply.content.filter((b) => b.type === "text").map((b) => b.text).join("");\n}\n\nasync function main(): Promise<void> {\n  console.log(await ask("我叫小安，正在學 TypeScript。"));\n  console.log(await ask("我剛剛說我叫什麼？")); // 答得出來：因為歷史裡有\n}\n\nmain();' },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'ok', label: '可以送出' }, { id: 'bad', label: '會被拒絕或出問題' }], items: [
+          { text: '`messages: [{ role: "user", content: "你好" }]`', answer: 'ok', why: '最簡單的合法請求：一則 user 訊息。' },
+          { text: '`messages: [user, assistant, user]`，`system` 放在頂層', answer: 'ok', why: '輪流出現、最後是 user、system 在頂層，完全正確。' },
+          { text: '最後一則是 `assistant`，內容是「{」，想讓模型接著寫 JSON', answer: 'bad', why: '這叫預填（prefill）。Claude 4.6 之後的模型不支援，回 400；要 JSON 請用結構化輸出（3-4）。' },
+          { text: '把 system 指示寫成 `{ role: "system", content: "..." }` 放在 messages 第一格', answer: 'bad', why: 'system 要放在請求頂層的 `system` 欄位；messages 的第一則要是 user。' },
+          { text: '只送最新一句問題，前面的對話都沒帶', answer: 'bad', why: '格式合法，但模型看不到前文，會答非所問；這是邏輯錯誤，不會有錯誤訊息提醒你。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="請求本文的結構：system 是和 messages 同一層的欄位；messages 陣列裡 user 和 assistant 輪流，第一則與最後一則都是 user">
+          <rect x="10" y="10" width="540" height="230" class="fill-bg stroke-ink" stroke-width="3"/>
+          <text x="26" y="40" font-size="15" class="mono">{</text>
+          <rect x="46" y="54" width="490" height="40" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+          <text x="60" y="80" font-size="15" class="mono on-color">system: "規則、角色、背景"</text>
+          <text x="46" y="122" font-size="15" class="mono">messages: [</text>
+          <rect x="66" y="134" width="100" height="36" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+          <text x="116" y="158" text-anchor="middle" font-size="14" class="mono on-color">user</text>
+          <rect x="176" y="134" width="120" height="36" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="236" y="158" text-anchor="middle" font-size="14" class="mono on-color">assistant</text>
+          <rect x="306" y="134" width="100" height="36" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+          <text x="356" y="158" text-anchor="middle" font-size="14" class="mono on-color">user</text>
+          <text x="416" y="158" font-size="14">← 最後一則</text>
+          <text x="46" y="200" font-size="15" class="mono">]</text>
+          <text x="26" y="228" font-size="15" class="mono">}</text>
+          <text x="530" y="228" text-anchor="end" font-size="14">system 和 messages 同一層</text>
+        </svg>`, caption: 'system 不是一則訊息，是請求的另一個欄位。' },
+        { type: 'table', head: ['放在哪裡', '寫什麼', '例子'], rows: [
+          ['`system`', '不會變的規則、角色、背景', '「你是客服，只回答訂單問題。」'],
+          ['`user`', '使用者說的話，或你的程式送進去的資料', '「我的訂單到哪裡了？」＋訂單資料'],
+          ['`assistant`', '模型之前的回覆，原封不動', '上一輪的 `reply.content`'],
+        ] },
+      ],
+      tryit: {
+        q: ['補完第二次請求的 `messages`，讓模型知道「它」指的是什麼：'],
+        code: true,
+        draft: '// 第一輪：user 問「Python 和 TypeScript 哪個適合新手？」，模型回答了 A\n// 第二輪：user 問「它的缺點是什麼？」\nmessages: [\n  ＿＿＿＿,\n  ＿＿＿＿,\n  { role: "user", content: "它的缺點是什麼？" },\n]',
+        answer: ['`{ role: "user", content: "Python 和 TypeScript 哪個適合新手？" }`', '`{ role: "assistant", content: A }`（A 是第一輪回應的整個 `content`）', '少了這兩則，模型不知道「它」是誰。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把 system 指示當成第一則訊息：`{ role: "system", ... }`。', why: 'system 是請求頂層的欄位；放進 messages 第一格會被拒絕。', right: '`client.messages.create({ system: "...", messages: [...] })`。' },
+      { wrong: '最後放一則 `assistant` 訊息（例如 `"{"`），想控制模型的開頭。', why: 'Claude 4.6 之後的模型不支援預填，回 400。', right: '格式用結構化輸出（3-4），語氣與規則寫在 system。' },
+      { wrong: '對話越聊越長，從來不整理歷史。', why: '每一輪都要重讀全部歷史；輸入 token 越來越多，成本和延遲一起上升，最後還可能超過 context window。', right: '長對話要摘要或截斷舊的部分，並搭配 prompt 快取（8-2）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '為什麼第三輪請求要把第一輪的問題也送出去？', options: [
+        { text: '模型只看得到這次請求送的內容', correct: true, why: 'API 是無狀態的；不送就等於沒說過。' },
+        { text: '模型需要用舊問題來確認使用者的身分', why: '身分靠金鑰與你的登入系統，不靠對話內容。' },
+        { text: '送越多訊息，模型的回答品質一定越好', why: '無關的歷史反而會干擾，還會增加成本。' },
+        { text: 'API 規定訊息數一定要是奇數', why: '沒有這種規定；重點是輪流出現、最後是 user。' },
+      ] },
+      { level: '應用', type: 'mc', q: '客服機器人在第 40 輪開始變慢，帳單也變高。最可能的原因是？', options: [
+        { text: '每輪重送全部歷史，輸入越積越多', correct: true, why: '歷史是累加的；第 40 輪要讀的字比第 1 輪多很多。' },
+        { text: '模型聊太久會累，需要重新啟動', why: '模型沒有疲勞；每次請求都是全新的計算。' },
+        { text: 'API 會對同一個使用者的連續請求逐漸降速', why: '速率限制是依組織的用量，不是依對話輪數慢慢降速。' },
+        { text: '輸出的 token 數每一輪都會自動翻倍', why: '輸出長度由內容與 max_tokens 決定，不會自動翻倍。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做「幫使用者改履歷」的功能：使用者貼上履歷，接著可能來回修改十幾次。履歷全文、修改規則、使用者每次的要求，分別放在 system、user 還是 assistant？為什麼？'], answer: [
+        '修改規則（例如「保留事實、不捏造經歷」）放 **system**：整段對話都適用、不會變。',
+        '履歷全文放在**第一則 user**：它是使用者提供的資料；之後每次的要求也是 user。模型每一版的修改結果是 **assistant**，原封不動留在歷史裡，下一輪才知道改到哪了。',
+        '十幾輪之後歷史會很長，可以只保留最新一版履歷與最近幾輪要求，舊的修改過程摘要掉。',
+      ] },
+    ],
+    keypoints: [
+      'API 沒有記憶：每次請求都要送完整的對話歷史。',
+      '`system` 放頂層寫規則；`messages` 裡 user 和 assistant 輪流，最後一則是 user。',
+      '模型的回覆要原封不動放回歷史；歷史越長，成本和延遲越高。',
+    ],
+    sources: ['claude-messages', 'claude-errors', 'ts-sdk'],
+  },
+
+  '1-3': {
+    goals: [
+      '設定 `max_tokens`，並處理回應被截斷的情況',
+      '依 `stop_reason` 決定程式的下一步',
+      '說出 `temperature` 為什麼被拿掉，現在用什麼控制輸出',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）想讓模型整段對話都扮演「客服」，指示寫在哪裡？', options: [
+        { text: '請求頂層的 `system` 欄位', correct: true, why: 'system 對整段對話都有效，而且不在 messages 裡。' },
+        { text: 'messages 的第一則，role 設成 system', why: 'messages 裡沒有 system 角色；放在頂層。' },
+        { text: '最後一則 assistant 訊息', why: '最後一則要是 user；而且預填在新模型會回 400。' },
+        { text: '請求標頭 `x-role: support`', why: '沒有這個標頭；指示是本文內容。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-1）回應裡哪個欄位告訴你這次花了多少 token？', options: [
+        { text: '`usage`', correct: true, why: '`input_tokens`、`output_tokens` 都在 usage。' },
+        { text: '`stop_reason`', why: '那是停下來的原因。' },
+        { text: '`model`', why: '那是用了哪個模型。' },
+        { text: '`id`', why: '那是訊息編號。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[max_tokens]] 像演講的計時器：時間一到就關麥克風，講到一半也一樣。', '[[stop_reason]] 是主持人事後的紀錄：「講完了」（`end_turn`）、「時間到被切掉」（`max_tokens`）、「講者說要先查資料」（`tool_use`）、「講者拒絕回答」（`refusal`）。你看紀錄決定接下來怎麼辦。'],
+      limit: ['真的主持人會讓講者把這句說完；API 不會，回應可能停在半個字或半個 JSON 括號上。另外思考也算在時間裡：模型想得越久，留給回答的 token 越少。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 320" role="img" aria-label="依 stop_reason 決定下一步：end_turn 顯示結果；max_tokens 代表被截斷，調高上限或請模型分段；tool_use 執行工具再回傳結果；refusal 不讀 content，改走備援或告訴使用者">
+        <rect x="190" y="10" width="180" height="48" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="40" text-anchor="middle" font-size="16" font-weight="900" class="mono">stop_reason</text>
+        <line x1="280" y1="58" x2="280" y2="82" class="stroke-ink" stroke-width="3"/>
+        <line x1="70" y1="82" x2="490" y2="82" class="stroke-ink" stroke-width="3"/>
+        <line x1="70" y1="82" x2="70" y2="104" class="stroke-ink" stroke-width="3"/>
+        <line x1="210" y1="82" x2="210" y2="104" class="stroke-ink" stroke-width="3"/>
+        <line x1="350" y1="82" x2="350" y2="104" class="stroke-ink" stroke-width="3"/>
+        <line x1="490" y1="82" x2="490" y2="104" class="stroke-ink" stroke-width="3"/>
+        <rect x="10" y="104" width="120" height="44" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+        <text x="70" y="132" text-anchor="middle" font-size="14" class="mono on-color">end_turn</text>
+        <rect x="150" y="104" width="120" height="44" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/>
+        <text x="210" y="132" text-anchor="middle" font-size="14" class="mono on-color">max_tokens</text>
+        <rect x="290" y="104" width="120" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="350" y="132" text-anchor="middle" font-size="14" class="mono on-color">tool_use</text>
+        <rect x="430" y="104" width="120" height="44" style="fill:var(--danger)" class="stroke-ink" stroke-width="3"/>
+        <text x="490" y="132" text-anchor="middle" font-size="14" class="mono on-color">refusal</text>
+        <rect x="10" y="168" width="120" height="140" class="fill-bg stroke-ink" stroke-width="2"/>
+        <text x="70" y="200" text-anchor="middle" font-size="14">說完了</text>
+        <text x="70" y="226" text-anchor="middle" font-size="14">→ 顯示結果</text>
+        <rect x="150" y="168" width="120" height="140" class="fill-bg stroke-ink" stroke-width="2"/>
+        <text x="210" y="200" text-anchor="middle" font-size="14">被截斷</text>
+        <text x="210" y="226" text-anchor="middle" font-size="14">→ 調高上限</text>
+        <text x="210" y="250" text-anchor="middle" font-size="14">或請它分段</text>
+        <rect x="290" y="168" width="120" height="140" class="fill-bg stroke-ink" stroke-width="2"/>
+        <text x="350" y="200" text-anchor="middle" font-size="14">想用工具</text>
+        <text x="350" y="226" text-anchor="middle" font-size="14">→ 執行工具</text>
+        <text x="350" y="250" text-anchor="middle" font-size="14">（模組 4）</text>
+        <rect x="430" y="168" width="120" height="140" class="fill-bg stroke-ink" stroke-width="2"/>
+        <text x="490" y="200" text-anchor="middle" font-size="14">安全機制拒絕</text>
+        <text x="490" y="226" text-anchor="middle" font-size="14">→ 別讀 content</text>
+        <text x="490" y="250" text-anchor="middle" font-size="14">改走備援</text>
+        <line x1="70" y1="148" x2="70" y2="168" class="stroke-ink" stroke-width="3"/>
+        <line x1="210" y1="148" x2="210" y2="168" class="stroke-ink" stroke-width="3"/>
+        <line x1="350" y1="148" x2="350" y2="168" class="stroke-ink" stroke-width="3"/>
+        <line x1="490" y1="148" x2="490" y2="168" class="stroke-ink" stroke-width="3"/>
+      </svg>`,
+      caption: '讀回應的第一件事是看 `stop_reason`，不是看 `content`。',
+    },
+    define: [
+      { term: 'max_tokens', en: 'max_tokens', def: '這次最多產生幾個 token，思考＋回答一起算。到了就停。', example: '一般請求用 1024–16000；長輸出搭配串流（2-1）。' },
+      { term: 'stop_reason', en: 'stop_reason', def: '為什麼停下來。常見值：`end_turn`、`max_tokens`、`tool_use`、`refusal`，另有 `stop_sequence`、`pause_turn`。', example: '`refusal` 時 HTTP 狀態仍是 200，要靠這個欄位才看得出來。' },
+      { term: 'effort', en: 'effort', def: '`output_config.effort`：`low`／`medium`／`high`／`xhigh`／`max`，控制模型花多少 token 思考與回答。', example: 'Opus 5.5 預設 `medium`，其他多數模型預設 `high`。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'temperature', text: 'temperature：原本是什麼，為什麼不見了' },
+        '模型寫下一個字之前，會替每個候選字算出一個機率。[[temperature]] 原本用來調整這些機率：調低，最高的那個更突出，輸出更固定；調高，機率被拉平，輸出更多變（第二部 7 會從頭講取樣）。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="temperature 對機率分布的影響示意：低 temperature 時第一個候選字的長條特別高，其他很矮；temperature 1 時長條比較平均">
+          <text x="140" y="24" text-anchor="middle" font-size="15" font-weight="900">低 temperature（示意）</text>
+          <rect x="40" y="50" width="44" height="130" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/>
+          <rect x="94" y="160" width="44" height="20" class="fill-surface stroke-ink" stroke-width="2"/>
+          <rect x="148" y="168" width="44" height="12" class="fill-surface stroke-ink" stroke-width="2"/>
+          <rect x="202" y="172" width="44" height="8" class="fill-surface stroke-ink" stroke-width="2"/>
+          <line x1="30" y1="180" x2="256" y2="180" class="stroke-ink" stroke-width="3"/>
+          <text x="140" y="210" text-anchor="middle" font-size="14">幾乎每次都挑同一個字</text>
+          <text x="420" y="24" text-anchor="middle" font-size="15" font-weight="900">temperature 1（預設）</text>
+          <rect x="320" y="90" width="44" height="90" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/>
+          <rect x="374" y="116" width="44" height="64" class="fill-surface stroke-ink" stroke-width="2"/>
+          <rect x="428" y="136" width="44" height="44" class="fill-surface stroke-ink" stroke-width="2"/>
+          <rect x="482" y="150" width="44" height="30" class="fill-surface stroke-ink" stroke-width="2"/>
+          <line x1="310" y1="180" x2="536" y2="180" class="stroke-ink" stroke-width="3"/>
+          <text x="420" y="210" text-anchor="middle" font-size="14">照機率抽，有變化</text>
+        </svg>`, caption: '長條是四個候選字的機率，數字是示意，不是真實模型的輸出。' },
+        { type: 'legacy', title: 'temperature 的退場', rows: [
+          ['`temperature: 0.2`，想讓輸出穩定', '拿掉；格式要固定用結構化輸出（3-4），內容要穩定把規則寫清楚、給範例（3-2）'],
+          ['`top_p`、`top_k`', 'API 版本 2026-10-21 起一併移除，送了就回 400'],
+          ['Claude 4.7 之前的模型可以調', '4.7 之後只接受預設值；新版 API 連送預設值都不行'],
+        ], note: '其他廠商方向相同：OpenAI 的推理模型改用 `reasoning.effort`，Gemini 3 建議 temperature 維持預設 1.0（🟡 第三方與官方指南摘要）。' },
+        { type: 'widget', name: 'reqbuilder', props: { title: '打開 temperature、換 effort，看請求會不會被擋', fields: [
+          { key: 'model', value: 'claude-opus-5-5', on: true, required: true, options: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'] },
+          { key: 'max_tokens', value: 1024, on: true, required: true, options: [256, 1024, 16000, 64000], breaks: (v) => (v > 16000 ? '（不是 API 錯誤）`max_tokens` 很大時 SDK 會要求改用串流，避免 HTTP 逾時（2-1）' : '') },
+          { key: 'messages', value: [{ role: 'user', content: '幫我把這段會議紀錄整理成三點' }], on: true, required: true },
+          { key: 'output_config', value: { effort: 'medium' }, on: false, options: [{ effort: 'low' }, { effort: 'medium' }, { effort: 'high' }, { effort: 'xhigh' }, { effort: 'max' }], note: '省略時，Opus 5.5 用 `medium`。越高越願意多想，花的 token 也越多。' },
+          { key: 'temperature', value: 0.2, on: false, breaks: '`temperature` 在 API 版本 2026-10-21 已移除，送出就回 400', note: '舊教學常見。' },
+          { key: 'top_p', value: 0.9, on: false, breaks: '`top_p` 在 API 版本 2026-10-21 已移除', note: '和 temperature 一起被拿掉。' },
+        ] } },
+        { type: 'code', lang: 'typescript', title: '依 stop_reason 處理回應', code: 'async function answer(messages: Anthropic.MessageParam[]): Promise<string> {\n  const reply = await client.messages.create({\n    model: "claude-opus-5-5",\n    max_tokens: 2048,\n    output_config: { effort: "low" }, // 簡單任務用低 effort：快、便宜\n    messages,\n  });\n\n  switch (reply.stop_reason) {\n    case "end_turn":\n      return textOf(reply);\n    case "max_tokens":\n      // 被截斷：不要把半句話當答案\n      throw new Error(`回應超過 max_tokens（${reply.usage.output_tokens}），請調高上限或縮小任務`);\n    case "refusal":\n      // HTTP 是 200，但不能讀 content\n      return "這個問題我沒辦法回答，已轉給真人客服。";\n    case "tool_use":\n      return runTools(reply); // 模組 4\n    default:\n      throw new Error(`沒處理到的 stop_reason：${reply.stop_reason}`);\n  }\n}' },
+      ],
+      tryit: {
+        q: ['一個「產生商品描述」的功能，有 3% 的描述停在半句話。補完你的判斷與修法：'],
+        draft: '要先看的欄位：＿＿＿＿\n它的值可能是：＿＿＿＿\n修法：＿＿＿＿',
+        answer: ['先看 `stop_reason`；停在半句的那些，值多半是 `max_tokens`。', '修法：調高 `max_tokens`（記得思考也算在裡面），或在程式裡偵測 `max_tokens` 時重試或標記，不要直接上架半句話。也可以降低 effort，讓模型少想一點、把 token 留給回答。'],
+      },
+    },
+    mistakes: [
+      { wrong: '從舊教學複製 `temperature: 0`，希望輸出每次都一樣。', why: '新版 API 送了就回 400；而且就算在舊版，temperature 0 也不保證每次完全相同。', right: '拿掉 temperature；需要固定格式用結構化輸出，需要穩定內容就把規則與範例寫清楚，再用評估檢查（8-1）。' },
+      { wrong: '`max_tokens` 只抓回答的長度，例如 200。', why: '思考也算在 max_tokens 裡；模型想一想就用光了，回答被截斷。', right: '留足空間（例如 1024 以上），或降低 effort；長輸出改用串流。' },
+      { wrong: 'HTTP 200 就當作成功，直接讀 `content`。', why: '`refusal` 也是 200；被截斷（`max_tokens`）也是 200。', right: '先 switch `stop_reason`，每一種都有對應的處理。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '回應的 `stop_reason` 是 `max_tokens`，代表什麼？', options: [
+        { text: '輸出用完了上限，回答可能停在半路', correct: true, why: '要嘛調高上限，要嘛請模型分段，要嘛降低 effort。' },
+        { text: '模型覺得說完了，自然結束', why: '那是 `end_turn`。' },
+        { text: '輸入太長，超過了 context window', why: '輸入太長會直接回錯誤，不會產生回應。' },
+        { text: '帳戶這個月的花費到了上限', why: '花費上限回的是 429 錯誤，不是 stop_reason。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你把一段舊程式升級到新版 SDK 後，請求開始回 400。程式裡有 `temperature: 0.3`。最好的修法是？', options: [
+        { text: '刪掉 temperature，確認預設輸出可以接受', correct: true, why: '新版 API 不接受取樣參數；先確認預設行為符合需求，再用 prompt 或結構化輸出補強。' },
+        { text: '改成 `temperature: 1`，因為那是預設值', why: '新版 API 連預設值都不收，送了照樣 400。' },
+        { text: '改用 `top_p: 0.3` 達到同樣的效果', why: '`top_p` 也一起被移除了。' },
+        { text: '把 temperature 移進 `output_config` 裡', why: '`output_config` 沒有 temperature 欄位；能放的是 effort 與 format。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在做一個「把客服對話分類成 5 種」的功能，每天幾萬次。effort 設 `low` 還是 `high`？`max_tokens` 大概設多少？說出理由。'], answer: [
+        'effort 用 `low`：分類是簡單、大量、要快的工作，官方建議簡單或延遲敏感的任務用 low。先用 low 跑評估，品質不夠再往上調（8-1）。',
+        '`max_tokens` 不用太大，但要留思考的空間，例如幾百到 1024；輸出格式用結構化輸出固定成一個欄位（3-4）。',
+      ] },
+    ],
+    keypoints: [
+      '先看 `stop_reason`：`end_turn` 才是正常說完；`max_tokens` 和 `refusal` 也會回 HTTP 200。',
+      '`max_tokens` 包含思考；不夠就調高、降 effort 或改串流。',
+      '`temperature` 已經退場；想控制輸出，用 effort、清楚的 prompt 和結構化輸出。',
+    ],
+    sources: ['claude-messages', 'claude-migration-20261021', 'claude-effort', 'claude-thinking-cost', 'openai-models', 'gemini-3-guide'],
+  },
+
+  '1-4': {
+    goals: [
+      '說出 token 是什麼，以及 API 為什麼用它計費',
+      '用 `countTokens` 量出一段請求真正的 token 數',
+      '知道同一段文字在不同模型的 token 數不一樣',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-3）`max_tokens` 設太小，最常見的結果是？', options: [
+        { text: '回答停在半句，被截斷', correct: true, why: '思考加回答一起算；用完就截斷，`stop_reason` 是 `max_tokens`。' },
+        { text: 'API 回 400，要求調高上限', why: '小的 max_tokens 是合法的；只是會被截斷。' },
+        { text: '模型自動把回答濃縮到剛好放得下', why: '模型不保證會濃縮，到上限就停。' },
+        { text: '回應變慢，但內容完整', why: '上限小只會更早停，不會更慢。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-2）對話越來越長，每一輪的輸入 token 會怎樣？', options: [
+        { text: '越來越多，因為每次都送完整歷史', correct: true, why: '歷史是累加的。' },
+        { text: '保持不變，API 只算最新一句', why: 'API 算的是你送出的全部內容。' },
+        { text: '越來越少，因為模型已經記得前文', why: '模型不記得；每次都重讀。' },
+        { text: '只有 system prompt 會被重複計算', why: '整個 messages 都會被計算。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[tokenizer]] 像拆樂高：常見的詞是一整塊現成的大積木，少見的詞就拆成好幾塊小積木。模型讀的、算錢的，都是「積木塊數」，不是字數。', '所以「一句話幾個 [[token]]」要看是哪一盒樂高（哪個 tokenizer）。'],
+      limit: ['樂高的積木大小是固定的；tokenizer 卻是每個模型家族自己設計的。Claude 4.7 之後換了新的 tokenizer，同樣的文字大約多出 30% 的 token，所以不能拿舊數字直接換算。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 210" role="img" aria-label="文字到模型的路徑：一段文字經過 tokenizer 切成 token，每個 token 對應一個編號，模型讀的是一串編號；計費也按這些 token 計算">
+        <rect x="10" y="20" width="150" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="85" y="50" text-anchor="middle" font-size="15" font-weight="900">文字</text>
+        <text x="85" y="74" text-anchor="middle" font-size="14">「退款多久到帳」</text>
+        <line x1="160" y1="55" x2="200" y2="55" class="stroke-ink" stroke-width="4"/>
+        <rect x="200" y="20" width="150" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="275" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">tokenizer</text>
+        <line x1="350" y1="55" x2="390" y2="55" class="stroke-ink" stroke-width="4"/>
+        <rect x="390" y="20" width="160" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="470" y="50" text-anchor="middle" font-size="15" font-weight="900">一串編號</text>
+        <text x="470" y="74" text-anchor="middle" font-size="14" class="mono">[ 1832, 47, … ]</text>
+        <line x1="470" y1="90" x2="470" y2="130" class="stroke-ink" stroke-width="4"/>
+        <rect x="390" y="130" width="160" height="66" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="470" y="160" text-anchor="middle" font-size="15" font-weight="900" class="on-color">模型讀這個</text>
+        <text x="470" y="184" text-anchor="middle" font-size="14" class="on-color">計費也算這個</text>
+        <rect x="10" y="130" width="340" height="66" class="fill-bg stroke-ink" stroke-width="2" stroke-dasharray="8 5"/>
+        <text x="180" y="160" text-anchor="middle" font-size="14">編號是示意；每個模型家族的切法</text>
+        <text x="180" y="182" text-anchor="middle" font-size="14">與編號都不一樣</text>
+      </svg>`,
+      caption: '模型看不到「字」，只看得到 token 的編號。第二部 1 會講 tokenizer 怎麼被做出來。',
+    },
+    define: [
+      { term: 'token', en: 'token', def: '模型讀寫的最小單位，也是計費單位。可能是幾個英文字母、一個中文字、一個標點或一個空白。', example: '`usage.input_tokens: 18`。' },
+      { term: 'tokenizer', en: 'tokenizer', def: '把文字切成 token 的規則。不同模型家族不同。', example: 'Claude 4.7 之後的新 tokenizer，同樣文字約多 30% token。' },
+      { term: 'context window', en: 'context window', def: '一次請求能讀的 token 上限：system＋歷史＋工具定義＋輸出。', example: 'Opus 5.5、Sonnet 5.5 是 1M token。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'tokenmeter', props: { presets: [
+          { label: '中文', text: '請幫我把這份會議紀錄整理成三個重點，每點一句。' },
+          { label: '英文', text: 'Please summarize these meeting notes into three key points, one sentence each.' },
+          { label: '程式碼', text: 'const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);' },
+          { label: '數字與網址', text: '訂單 20261022-00981 的追蹤網址是 https://example.com/track?id=981' },
+        ] } },
+        { type: 'heading', id: 'count', text: '量出真正的數字：countTokens' },
+        { type: 'code', lang: 'typescript', title: 'count.ts', code: 'const result = await client.messages.countTokens({\n  model: "claude-opus-5-5", // 要量哪個模型，就填哪個\n  system: "你是台灣的程式教學助教。",\n  messages: [{ role: "user", content: "請幫我把這份會議紀錄整理成三個重點。" }],\n});\n\nconsole.log(result.input_tokens); // 這次請求的輸入 token 數' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="同一段文字在不同 tokenizer 的 token 數示意：舊 tokenizer 為 100，Claude 4.7 之後的新 tokenizer 約 130，多約 30%">
+          <text x="10" y="28" font-size="15" font-weight="900">同一段文字，兩種 tokenizer（示意）</text>
+          <text x="10" y="82" font-size="14">舊 tokenizer</text>
+          <rect x="140" y="58" width="300" height="38" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="452" y="83" font-size="14" class="mono">100</text>
+          <text x="10" y="150" font-size="14">4.7 之後</text>
+          <rect x="140" y="126" width="390" height="38" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+          <text x="520" y="151" text-anchor="end" font-size="14" class="mono on-color">約 130</text>
+          <text x="140" y="200" font-size="14">官方價格頁：約多 30%，實際依內容而定</text>
+        </svg>`, caption: '換模型時，token 數和單價會一起變；用 `countTokens` 以新模型重新量。' },
+        { type: 'table', head: ['會算進輸入 token 的東西', '常被忘記嗎'], rows: [
+          ['`system` prompt', '偶爾'],
+          ['整段對話歷史（包含模型之前的回覆）', '常常'],
+          ['工具定義（模組 4），有工具時另有一段固定的系統提示', '常常'],
+          ['圖片、PDF 等附件', '常常'],
+          ['你這一次的問題', '不會'],
+        ] },
+      ],
+      tryit: {
+        q: ['你估算「每次請求約 500 token」，但帳單是估算的 3 倍。列出至少兩個你可能漏算的東西：'],
+        draft: '1. ＿＿＿＿\n2. ＿＿＿＿',
+        answer: ['可能漏算：對話歷史（每輪都重送）、system prompt、工具定義與工具使用的系統提示、模型的思考 token（算在輸出）、附件。', '用 `countTokens` 對真實請求量一次，並記錄每次回應的 `usage`，就不用估。'],
+      },
+    },
+    mistakes: [
+      { wrong: '用「字數 ÷ 某個固定比例」估 token，直接拿去報價。', why: '比例依語言、內容和模型而變；中文、程式碼、網址的比例都不一樣。', right: '用 `countTokens` 量真實請求，或記錄 `usage` 取平均。' },
+      { wrong: '用別家的 tokenizer 套件（例如 OpenAI 的）來算 Claude 的 token。', why: '每家 tokenizer 不同，算出來的數字對不上 Claude 的帳單。', right: '用 Claude 的 `countTokens` 端點，並填上你實際要用的模型。' },
+      { wrong: '換到新模型後沿用舊的 token 估算。', why: 'Claude 4.7 之後換了 tokenizer，同樣文字約多 30% token。', right: '換模型時重新量；成本要用新的 token 數乘新的單價。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下列哪一個說法正確？', options: [
+        { text: '同一段文字在不同模型可能有不同的 token 數', correct: true, why: '每個模型家族的 tokenizer 不一樣。' },
+        { text: '一個中文字固定等於一個 token', why: '要看 tokenizer；不能用固定比例。' },
+        { text: 'token 數只跟字元數有關，跟內容無關', why: '常見詞、少見詞、程式碼的切法都不同。' },
+        { text: 'system prompt 不算在輸入 token 裡', why: 'system 也是輸入的一部分，照樣計費。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你要把功能從 Claude Sonnet 4.6 換到 Opus 5.5，想先估成本。最可靠的做法是？', options: [
+        { text: '用新模型跑 countTokens，再乘新單價', correct: true, why: 'tokenizer 和價格都換了，兩個都要用新模型的數字。' },
+        { text: '沿用 Sonnet 4.6 的 token 數，只換單價', why: '4.7 之後的 tokenizer 不同，token 數約多 30%。' },
+        { text: '用字數除以 2 估 token，再乘新單價', why: '固定比例不準，而且沒考慮 tokenizer 的差異。' },
+        { text: '看官方價格頁上的範例金額直接套用', why: '範例金額是別人的請求；你的 prompt 長度不同。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你在做一個 RAG 問答系統（模組 6），每次會把 5 段公司文件塞進 prompt。老闆問：「一次問答大概幾個 token？」你會怎麼回答，怎麼量？'], answer: [
+        '分開算：system＋5 段文件＋歷史＋問題是輸入；回答（含思考）是輸出。文件段落是大頭，切塊大小（6-2）直接決定成本。',
+        '用 `countTokens` 對幾個典型請求量輸入；上線後記錄每次的 `usage`，用真實平均回答，不要用字數猜。',
+      ] },
+    ],
+    keypoints: [
+      'token 是模型讀寫與計費的單位；數量由 tokenizer 決定，不是字數。',
+      '要真實數字就用 `countTokens`，並填上你要用的模型。',
+      'system、歷史、工具定義、思考都會算進 token；換模型要重新量。',
+    ],
+    sources: ['claude-token-counting', 'claude-pricing', 'claude-models'],
+  },
+
+  '1-5': {
+    goals: [
+      '用 `usage` 和單價算出一次請求花多少錢',
+      '分辨 400、429、529 這些錯誤，哪些該重試、哪些不該',
+      '設定 SDK 的重試與逾時，並在程式裡分類處理錯誤',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-4）想知道一個請求的輸入 token 數，最準的方法是？', options: [
+        { text: '用 countTokens 端點，填上實際要用的模型', correct: true, why: '這是 Claude 自己的 tokenizer 算的。' },
+        { text: '中文字數直接當 token 數', why: '比例不固定。' },
+        { text: '用別家廠商的 tokenizer 套件', why: 'tokenizer 不同，數字對不上。' },
+        { text: '把 max_tokens 當作輸入 token 數', why: 'max_tokens 是輸出上限，不是輸入量。' },
+      ] },
+      { level: '回想', type: 'mc', q: '（回顧 1-3）`stop_reason` 是 `refusal` 時，HTTP 狀態碼通常是？', options: [
+        { text: '200', correct: true, why: '所以一定要看 stop_reason，不能只看 HTTP 狀態。' },
+        { text: '400', why: '400 是請求格式有問題。' },
+        { text: '403', why: '403 是金鑰沒有權限。' },
+        { text: '500', why: '500 是伺服器內部錯誤。' },
+      ] },
+    ],
+    analogy: {
+      text: ['API 計費像計程車跳錶，但**去程和回程費率不同**：你送進去的字（輸入）便宜，模型寫出來的字（輸出）貴，Opus 5.5 差了 5 倍。', '[[速率限制]]像車行一分鐘只派這麼多台車：叫太多，車行會說「請過 2 秒再叫」（429 加上 `retry-after`）。'],
+      limit: ['計程車不會因為你叫太多台就拒絕載你；API 會。另外 API 有計程車沒有的折扣：重複的前綴可以快取，讀取便宜到原價的 5%（8-2）；不急的工作用批次 5 折。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 200" role="img" aria-label="一次請求的成本公式：輸入 token 乘以每百萬輸入單價，加上輸出 token 乘以每百萬輸出單價。以 Opus 5.5 為例，輸入 2000、輸出 500，等於 0.008 加 0.01，共 0.018 美元">
+        <rect x="10" y="10" width="250" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="135" y="40" text-anchor="middle" font-size="15" font-weight="900" class="on-color">輸入 token × 輸入單價</text>
+        <text x="135" y="66" text-anchor="middle" font-size="14" class="mono on-color">2,000 × $4 / 1M</text>
+        <text x="280" y="52" text-anchor="middle" font-size="22" font-weight="900">＋</text>
+        <rect x="300" y="10" width="250" height="70" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+        <text x="425" y="40" text-anchor="middle" font-size="15" font-weight="900" class="on-color">輸出 token × 輸出單價</text>
+        <text x="425" y="66" text-anchor="middle" font-size="14" class="mono on-color">500 × $20 / 1M</text>
+        <line x1="280" y1="80" x2="280" y2="116" class="stroke-ink" stroke-width="4"/>
+        <rect x="130" y="116" width="300" height="70" style="fill:var(--primary)" class="stroke-ink" stroke-width="4"/>
+        <text x="280" y="146" text-anchor="middle" font-size="15" font-weight="900" class="on-color">$0.008 ＋ $0.010</text>
+        <text x="280" y="172" text-anchor="middle" font-size="15" font-weight="900" class="on-color">＝ 每次 $0.018</text>
+      </svg>`,
+      caption: '輸出比較貴：寫 500 個字花的錢，比讀 2,000 個字還多。思考 token 也算輸出。',
+    },
+    define: [
+      { term: '速率限制', en: 'rate limit', def: '每分鐘的請求數（RPM）、輸入 token（ITPM）、輸出 token（OTPM）上限；超過回 429。', example: 'Start 等級的 Opus 5.5：1,000 RPM、2,000,000 ITPM、400,000 OTPM。' },
+      { term: '指數退避', en: 'exponential backoff', def: '重試時等待時間逐次加倍。有 `retry-after` 標頭時照它等。', example: 'SDK 預設自動重試 2 次。' },
+      { term: '花費上限', en: 'spend limit', def: '每月最多能花多少；到了就回 429，而且沒有 `retry-after`，重試也沒用。', example: 'Start 等級每月 $500。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['模型', '輸入 $／百萬 token', '輸出 $／百萬 token'], rows: [
+          ['Claude Fable 5.1', '10', '50'],
+          ['Claude Opus 5.5', '4', '20'],
+          ['Claude Sonnet 5.5', '2', '10'],
+          ['Claude Haiku 5.5（prompt ≤ 10 萬 token）', '0.10', '0.50'],
+        ], caption: '查證於 2026-10-22，Claude API 第一方價格。' },
+        { type: 'widget', name: 'costcalc', props: { requestsPerDay: 2000, input: 2000, output: 500 } },
+        { type: 'timely', body: ['價格每幾個月就會變，上線前到官方價格頁再確認一次。'] },
+        { type: 'heading', id: 'errors', text: '錯誤：哪些重試，哪些不要' },
+        { type: 'table', head: ['狀態碼', '類型', '意思', '重試嗎'], rows: [
+          ['400', '`invalid_request_error`', '請求格式或內容錯', '✗ 不要，改請求'],
+          ['401', '`authentication_error`', '金鑰錯或被撤銷', '✗ 不要，換金鑰'],
+          ['403', '`permission_error`', '金鑰沒有這個權限', '✗ 不要'],
+          ['429', '`rate_limit_error`', '超過速率限制（有 `retry-after`）', '✓ 照 retry-after 等'],
+          ['429', '`rate_limit_error`', '到了每月花費上限（沒有 `retry-after`）', '✗ 重試沒用'],
+          ['500', '`api_error`', '伺服器內部錯誤', '✓ 退避重試'],
+          ['529', '`overloaded_error`', 'API 暫時過載', '✓ 退避重試'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="指數退避的時間軸：第一次請求回 429；等 1 秒重試又回 529；等 2 秒再重試成功回 200">
+          <line x1="20" y1="80" x2="540" y2="80" class="stroke-ink" stroke-width="3"/>
+          <rect x="20" y="56" width="90" height="48" style="fill:var(--danger)" class="stroke-ink" stroke-width="3"/>
+          <text x="65" y="86" text-anchor="middle" font-size="15" font-weight="900" class="on-color">429</text>
+          <text x="165" y="70" text-anchor="middle" font-size="14">等 1 秒</text>
+          <rect x="220" y="56" width="90" height="48" style="fill:var(--danger)" class="stroke-ink" stroke-width="3"/>
+          <text x="265" y="86" text-anchor="middle" font-size="15" font-weight="900" class="on-color">529</text>
+          <text x="370" y="70" text-anchor="middle" font-size="14">等 2 秒</text>
+          <rect x="430" y="56" width="90" height="48" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+          <text x="475" y="86" text-anchor="middle" font-size="15" font-weight="900" class="on-color">200</text>
+          <text x="280" y="146" text-anchor="middle" font-size="14">每次等待加倍；有 retry-after 就照它的秒數</text>
+        </svg>`, caption: 'SDK 預設就會這樣做：遇到 408、409、429、5xx 與連線錯誤，自動重試 2 次。' },
+        { type: 'code', lang: 'typescript', title: '設定重試與分類錯誤', code: 'import Anthropic from "@anthropic-ai/sdk";\n\nconst client = new Anthropic({\n  maxRetries: 3,    // 預設 2\n  timeout: 60_000,  // TypeScript 的單位是毫秒\n});\n\ntry {\n  const reply = await client.messages.create({ model: "claude-opus-5-5", max_tokens: 1024, messages });\n  logUsage(reply.usage); // 每次都記下用量，月底才對得上帳\n} catch (err) {\n  // 由具體到一般：先接特定錯誤，再接其他 API 錯誤\n  if (err instanceof Anthropic.RateLimitError) {\n    // SDK 已經重試過了還是 429：可能到了花費上限，通知負責人\n    alertOnCall("Claude API 429", err);\n  } else if (err instanceof Anthropic.APIError) {\n    console.error(`API 錯誤 ${err.status}`, err.message);\n  }\n  throw err;\n}' },
+      ],
+      tryit: {
+        q: ['你的服務每天 5,000 次請求，平均輸入 3,000、輸出 800 token，用 Opus 5.5。先自己算，再用上面的計算器對答案：'],
+        draft: '每次輸入：3,000 × $4 / 1,000,000 ＝ ＿＿\n每次輸出：800 × $20 / 1,000,000 ＝ ＿＿\n每月（30 天）：＿＿',
+        answer: ['輸入 $0.012、輸出 $0.016，每次 $0.028。', '每月 0.028 × 5,000 × 30 ＝ **$4,200**。', '輸出只有輸入的四分之一長，花的錢卻比較多；這就是為什麼「請模型回答簡短一點」常常最省錢。'],
+      },
+    },
+    mistakes: [
+      { wrong: '遇到 400 也自動重試好幾次。', why: '400 是請求本身有錯，重送幾次都一樣錯，只是浪費時間。', right: '只重試暫時性錯誤（429、5xx、529、連線錯誤）；400 要修請求。' },
+      { wrong: '自己寫 `while (true)` 一直重試，沒有等待也沒有上限。', why: '大家一起狂重試會把過載的服務壓得更久，也會燒光你的速率限制。', right: '用 SDK 內建的重試（指數退避、照 `retry-after`），設定合理的次數上限。' },
+      { wrong: '不記錄 `usage`，月底看到帳單才知道花了多少。', why: '沒有逐次紀錄，就不知道哪個功能、哪種請求最燒錢。', right: '每次請求都記下 `usage` 與功能名稱；在 Console 設花費上限當最後防線。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Opus 5.5 一次請求輸入 1,000、輸出 1,000 token，大約多少錢？', options: [
+        { text: '$0.024', correct: true, why: '1,000 × 4 ÷ 1M ＝ 0.004；1,000 × 20 ÷ 1M ＝ 0.02；合計 0.024。' },
+        { text: '$0.008', why: '把輸出也用輸入價算了；輸出是 $20／百萬。' },
+        { text: '$0.040', why: '把輸入也用輸出價算了。' },
+        { text: '$24', why: '少除了一百萬；單價是「每百萬 token」。' },
+      ] },
+      { level: '應用', type: 'mc', q: '月底前三天，所有請求都回 429，回應裡沒有 `retry-after`，SDK 重試也沒用。最可能是？', options: [
+        { text: '到了這個月的花費上限', correct: true, why: '花費上限的 429 不帶 retry-after，要等下個月或調高上限。' },
+        { text: '請求太頻繁，等幾秒就好', why: '一般速率限制的 429 會帶 retry-after，而且等一下就會恢復。' },
+        { text: '金鑰被撤銷了', why: '金鑰問題回 401，不是 429。' },
+        { text: 'API 伺服器過載', why: '過載是 529 overloaded_error。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的服務在晚上 8 點尖峰時常出現 429。除了「等一下再重試」，還有哪些方向可以減少 429？至少列兩個，並說出它們分別減少了哪一種限制（RPM、ITPM、OTPM）。'], answer: [
+        '用 prompt 快取：多數模型的快取讀取不算進 ITPM，等於提高了輸入的吞吐量（8-2）。',
+        '不急的工作改用 Batch API，離開即時的速率限制；請模型回答簡短、降低 effort，減少 OTPM。',
+        '合併請求、減少不必要的呼叫，減少 RPM；長期用量穩定後可以申請更高的等級。',
+      ] },
+    ],
+    keypoints: [
+      '成本＝輸入 token × 輸入價＋輸出 token × 輸出價；輸出貴很多，思考也算輸出。',
+      '只重試暫時性錯誤（429 有 retry-after、5xx、529）；400、401 要修請求或金鑰。',
+      '每次記錄 `usage`，並在 Console 設花費上限。',
+    ],
+    sources: ['claude-pricing', 'claude-rate-limits', 'claude-errors', 'ts-sdk'],
+  },
+});
+</script>
+

@@ -1,0 +1,335 @@
+<script>
+/* ==========================================================================
+   模組 4：量化、蒸餾、小模型
+   ========================================================================== */
+defineTerms({
+  '量化': { en: 'quantization', def: '用更少的位元存權重（例如 16 位元 → 4 位元），把每個數四捨五入到少數幾個等級；省記憶體、加快 decode，代價是一點精度。', example: '70B：140 GB → 約 35 GB。', lesson: '4-1' },
+  '縮放因子': { en: 'scale', def: '量化時把原本的數字範圍對應到整數等級的比例；還原時乘回去。', example: '最大值 0.8、4 位元 → 每一級約 0.114。', lesson: '4-1' },
+  'GGUF': { en: 'GGUF', def: 'llama.cpp 使用的模型檔案格式，常用來存量化後的模型。', example: 'model-Q4_K_M.gguf。', lesson: '4-1' },
+  '蒸餾': { en: 'knowledge distillation', def: '讓小模型（學生）學大模型（老師）的輸出機率，而不只學正確答案；Hinton 等 2015。', example: 'DistilBERT。', lesson: '4-2' },
+  '軟標籤': { en: 'soft targets', def: '老師給的完整機率分布，包含「第二像、第三像」的資訊。', example: '貓 70%、老虎 20%、狗 10%。', lesson: '4-2' },
+  '小模型': { en: 'small language model', def: '參數較少（例如十億級以下到幾十億）的模型；便宜、快、可以在本地跑。', example: '分類、抽取、簡單問答。', lesson: '4-3' },
+});
+
+const REVIEW_M3 = [
+  { level: '回想', type: 'mc', q: '（回顧 3-1）訓練每參數約幾位元組？', options: [
+    { text: '16', correct: true, why: '混合精度＋Adam。' },
+    { text: '2，和推論一樣', why: '那是推論。' },
+    { text: '4', why: '少算了。' },
+    { text: '1', why: '少算了。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 2-3）單人 decode 速度上限？', options: [
+    { text: '頻寬 ÷ 權重大小', correct: true, why: '每 token 讀一次權重。' },
+    { text: '算力 ÷ 參數', why: 'compute-bound 的估法。' },
+    { text: '和權重大小無關', why: '直接相關。' },
+    { text: '只看 CPU', why: '在 GPU。' },
+  ] },
+];
+
+const WEIGHTS = [0.8, -0.35, 0.12, -0.71, 0.05, 0.44, -0.18, 0.63];
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '手算一次對稱量化',
+      '說出量化省了什麼、付出什麼',
+      '知道常見的量化等級與工具',
+    ],
+    review: REVIEW_M3,
+    analogy: {
+      text: ['照片存成 JPEG：看起來幾乎一樣，檔案卻小很多。代價是放大看會有一點點失真。', '[[量化]]對權重做類似的事：把每個 16 位元的數，四捨五入到少數幾個等級（例如 4 位元只有 16 級），存的時候只存「第幾級」和一個[[縮放因子]]。記憶體與 decode 時要搬的資料都少了好幾倍（2-3）。'],
+      limit: ['JPEG 的失真人眼看不出來，量化的失真可能讓模型在某些任務（數學、程式、罕見語言）明顯變差；位元越少，風險越高，要用自己的任務評估。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="對稱量化：把負 0.8 到 0.8 的範圍切成 15 個等級，每個權重四捨五入到最近的等級，只存等級編號">
+        <line x1="40" y1="110" x2="520" y2="110" class="stroke-ink" stroke-width="3"/>
+        ${[...Array(15).keys()].map((i) => `<line x1="${40 + i * (480 / 14)}" y1="100" x2="${40 + i * (480 / 14)}" y2="120" class="stroke-ink" stroke-width="2"/>`).join('')}
+        <text x="40" y="142" text-anchor="middle" font-size="13">−0.8</text><text x="280" y="142" text-anchor="middle" font-size="13">0</text><text x="520" y="142" text-anchor="middle" font-size="13">0.8</text>
+        <circle cx="${280 + 0.44 * 300}" cy="80" r="7" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/><text x="${280 + 0.44 * 300}" y="66" text-anchor="middle" font-size="13">0.44</text>
+        <path d="M${280 + 0.44 * 300} 87 L${40 + 11 * (480 / 14)} 104" class="stroke-ink" stroke-width="2"/>
+        <text x="280" y="40" text-anchor="middle" font-size="15" font-weight="900">4 位元對稱：−7 到 7，共 15 級（每級 ≈ 0.114）</text>
+        <text x="280" y="180" text-anchor="middle" font-size="14">0.44 → 第 4 級 → 還原成 4 × 0.114 ≈ 0.457（誤差 0.017）</text>
+        <text x="280" y="210" text-anchor="middle" font-size="13">實際工具會分組量化、用更聰明的方法，但想法一樣</text>
+      </svg>`,
+      caption: '縮放因子 ＝ 最大絕對值 ÷ 7。只存小整數＋每組一個縮放因子。',
+    },
+    define: [
+      { term: '量化', en: 'quantization', def: '用更少位元存權重。', example: '16 → 4 位元。' },
+      { term: '縮放因子', en: 'scale', def: '等級與真實數值的換算比例。', example: '最大值 ÷ 7。' },
+      { term: 'GGUF', en: 'GGUF', def: 'llama.cpp 的模型格式。', example: 'Q4_K_M。' },
+      { term: 'QLoRA', en: 'QLoRA', def: '4 位元基底模型＋少量可訓練參數的微調方法。', example: '單張 48 GB 卡微調 65B。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '把 8 個權重量化（實際計算：對稱量化）', sliders: [
+          { id: 'b', label: '位元數', min: 2, max: 8, step: 1, value: 4 },
+        ], compute: (v) => {
+          const levels = 2 ** (v.b - 1) - 1;
+          const scale = Math.max(...WEIGHTS.map(Math.abs)) / levels;
+          const q = WEIGHTS.map((w) => Math.round(w / scale) * scale);
+          const mse = WEIGHTS.reduce((s, w, i) => s + (w - q[i]) ** 2, 0) / WEIGHTS.length;
+          const maxErr = Math.max(...WEIGHTS.map((w, i) => Math.abs(w - q[i])));
+          return { rows: [
+            { label: `等級：−${levels} ～ ${levels}，每級`, value: scale.toFixed(4), ratio: Math.min(1, scale / 0.8) },
+            { label: '還原後', value: q.map((x) => x.toFixed(2)).join(' '), ratio: 0 },
+            { label: '平均平方誤差', value: mse.toExponential(2), ratio: Math.min(1, mse / 0.02) },
+            { label: '最大誤差', value: maxErr.toFixed(4), ratio: Math.min(1, maxErr / 0.2) },
+            { label: '記憶體（相對 16 位元）', value: `${((v.b / 16) * 100).toFixed(1)}%`, ratio: v.b / 16 },
+          ], note: `原本：${WEIGHTS.join(' ')}。位元越少誤差越大；2 位元只剩 −1、0、1 三級，很多權重被歸成 0。實際工具會分小組各自算縮放因子，誤差比這裡小。` };
+        } } },
+        { type: 'table', head: ['格式', '每參數', '70B 權重', '常見用途'], rows: [
+          ['BF16', '2 位元組', '140 GB', '訓練、伺服器推論'],
+          ['8 位元', '1', '70 GB', '伺服器推論，品質通常很接近'],
+          ['4 位元', '約 0.5', '約 35 GB', '本地部署最常見'],
+          ['2～3 位元', '更少', '更小', '品質下降較明顯，要評估'],
+        ], caption: 'llama.cpp 支援 1.5～8 位元的整數量化；實際檔案還有縮放因子等額外空間。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="量化的取捨：位元越少，記憶體與速度越好，品質風險越高；要用自己的任務評估">
+          <line x1="40" y1="90" x2="520" y2="90" class="stroke-ink" stroke-width="4"/>
+          ${[['16', 60], ['8', 200], ['4', 340], ['2', 480]].map(([b, x]) => `<circle cx="${x}" cy="90" r="12" style="fill:var(--m${b === '16' ? 3 : b === '8' ? 2 : b === '4' ? 4 : 7})" class="stroke-ink" stroke-width="3"/><text x="${x}" y="70" text-anchor="middle" font-size="14" font-weight="900">${b} 位元</text>`).join('')}
+          <text x="60" y="130" font-size="13">品質最穩</text>
+          <text x="520" y="130" text-anchor="end" font-size="13">最省、最快、風險最高</text>
+          <text x="280" y="166" text-anchor="middle" font-size="13">先試 8 位元或 4 位元，用自己的評估集比較（第一部 8-1）</text>
+        </svg>`, caption: '量化是推論的工具；訓練通常不直接用這麼低的位元。' },
+      ],
+      tryit: {
+        q: ['手算：最大值 0.8、4 位元（每級 0.8 ÷ 7）。權重 −0.35 會被存成第幾級？還原後是多少？'],
+        draft: '每級：＿\n等級：＿\n還原：＿',
+        answer: ['每級 ≈ 0.1143；−0.35 ÷ 0.1143 ≈ −3.06，四捨五入成 −3。', '還原 −3 × 0.1143 ≈ −0.343，誤差約 0.007。用拉桿設 4 位元可以核對第二個數字。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為量化後品質一定和原本一樣。', why: '位元越少誤差越大，某些任務特別敏感。', right: '用自己的任務評估。' },
+      { wrong: '以為量化只省記憶體。', why: 'decode 被頻寬卡住，資料少了就變快。', right: '量化同時省記憶體、加快 decode。' },
+      { wrong: '把量化和蒸餾混為一談。', why: '量化是同一個模型存得更省；蒸餾是訓練一個新的小模型。', right: '兩者可以一起用。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '4 位元對稱量化有幾個等級（−7 到 7）？', options: [
+        { text: '15', correct: true, why: '−7…7。' },
+        { text: '16，2 的 4 次方', why: '對稱時通常不用 −8。' },
+        { text: '4', why: '那是位元數。' },
+        { text: '7', why: '只算了一邊。' },
+      ] },
+      { level: '應用', type: 'mc', q: '同一個模型從 BF16 量化成 4 位元，decode 速度上限大約？', options: [
+        { text: '快 4 倍', correct: true, why: '要搬的資料少 4 倍。' },
+        { text: '慢 4 倍', why: '方向反了。' },
+        { text: '不變', why: '會變快。' },
+        { text: '快 16 倍', why: '是 4 倍。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你把客服模型量化到 4 位元後，一般問答沒問題，但「計算退款金額」常錯。怎麼處理？'], answer: [
+        '一、數字計算本來就不該靠模型，交給工具（第一部模組 4）；二、比較 8 位元版本是否改善；三、只把對精度敏感的部分保留高精度。',
+        '關鍵是用自己的評估集在各種量化等級上實測，而不是只看整體分數。',
+      ] },
+    ],
+    keypoints: [
+      '量化：每個權重四捨五入到少數等級，存等級＋縮放因子。',
+      '省記憶體、加快 decode；位元越少品質風險越高。',
+      '本地部署最常見 4 位元；一定要用自己的任務評估。',
+    ],
+    sources: ['llamacpp', 'qlora'],
+  },
+
+  '4-2': {
+    goals: [
+      '說出蒸餾的基本做法',
+      '解釋軟標籤比硬標籤多了什麼資訊',
+      '用 DistilBERT 的數字說明蒸餾的效果',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-1）量化和蒸餾的差別？', options: [
+        { text: '量化把同一個模型存得更省；蒸餾訓練新的小模型', correct: true, why: '兩者可以一起用。' },
+        { text: '兩者完全一樣', why: '做法不同。' },
+        { text: '蒸餾是把位元數變少', why: '那是量化。' },
+        { text: '量化需要一個大的老師模型來示範，蒸餾則不需要', why: '那是蒸餾。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-1）8B 模型 4 位元？', options: [
+        { text: '4 GB', correct: true, why: '8 × 0.5。' },
+        { text: '8 GB', why: '那是 8 位元。' },
+        { text: '16 GB', why: '那是 BF16。' },
+        { text: '32 GB', why: '那是 FP32。' },
+      ] },
+    ],
+    analogy: {
+      text: ['學圍棋時，只看棋譜的最後勝負（硬標籤）學得很慢；如果有老師在旁邊說「這一步不錯，那一步也可以，但這步最好」，你學得快很多。', '[[蒸餾]]就是讓小模型（學生）跟著大模型（老師）學：不只學正確答案，還學老師給每個選項的機率（[[軟標籤]]），裡面藏著「哪些答案很接近」的知識。'],
+      limit: ['學生再怎麼學，能力上限受自己的大小限制；而且用別家的模型輸出來訓練，可能違反使用條款，這是法律與授權問題，不只是技術問題。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="蒸餾：同一筆輸入給老師和學生，老師輸出機率分布當作軟標籤，學生的損失同時看正確答案和老師的分布">
+        <rect x="20" y="90" width="110" height="56" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="75" y="124" text-anchor="middle" font-size="15" font-weight="900" class="on-color">輸入</text>
+        <rect x="190" y="30" width="150" height="60" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="265" y="58" text-anchor="middle" font-size="15" font-weight="900" class="on-color">老師（大）</text><text x="265" y="78" text-anchor="middle" font-size="12" class="on-color">固定不動</text>
+        <rect x="190" y="150" width="150" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="265" y="178" text-anchor="middle" font-size="15" font-weight="900" class="on-color">學生（小）</text><text x="265" y="198" text-anchor="middle" font-size="12" class="on-color">在學習</text>
+        <line x1="130" y1="110" x2="190" y2="60" class="stroke-ink" stroke-width="3"/><line x1="130" y1="126" x2="190" y2="180" class="stroke-ink" stroke-width="3"/>
+        <rect x="390" y="90" width="150" height="56" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="465" y="114" text-anchor="middle" font-size="14" font-weight="900" class="on-color">損失</text><text x="465" y="134" text-anchor="middle" font-size="12" class="on-color">像老師＋答對</text>
+        <line x1="340" y1="60" x2="390" y2="108" class="stroke-ink" stroke-width="3"/><line x1="340" y1="180" x2="390" y2="128" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="224" text-anchor="middle" font-size="13">只有學生的參數會被更新</text>
+      </svg>`,
+      caption: 'Hinton、Vinyals、Dean 2015 把這個做法系統化。',
+    },
+    define: [
+      { term: '蒸餾', en: 'distillation', def: '小模型學大模型的輸出。', example: 'DistilBERT。' },
+      { term: '軟標籤', en: 'soft targets', def: '老師的完整機率分布。', example: '貓 70%、老虎 20%。' },
+      { term: '硬標籤', en: 'hard label', def: '只有正確答案。', example: '貓。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '老師的分數 → 軟標籤：溫度越高，越看得到「第二像」（實際計算）', sliders: [
+          { id: 't', label: '蒸餾溫度 T', min: 1, max: 10, step: 0.5, value: 1 },
+        ], compute: (v) => {
+          const labels = ['貓', '老虎', '狗', '汽車'];
+          const logits = [6, 4, 2, -2];
+          const s = logits.map((x) => x / v.t); const m = Math.max(...s);
+          const e = s.map((x) => Math.exp(x - m)); const tot = e.reduce((a, b) => a + b, 0);
+          return { rows: labels.map((n, i) => ({ label: n, value: `${((e[i] / tot) * 100).toFixed(1)}%`, ratio: e[i] / tot })), note: '硬標籤只說「是貓」。T＝1 時老師幾乎全押貓；T 拉高後看得出「老虎比狗像、狗比汽車像」：這種相似關係就是軟標籤多給學生的知識。' };
+        } } },
+        { type: 'table', head: ['DistilBERT（Sanh 等 2019）', '相對於 BERT'], rows: [
+          ['模型大小', '小 40%'],
+          ['速度', '快 60%'],
+          ['語言理解能力', '保留 97%'],
+        ], caption: '論文摘要的數字。蒸餾的典型結果：小很多、快很多、只掉一點點能力。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="三種讓模型變便宜的方法：量化、蒸餾、直接選小模型，可以疊加使用">
+          ${[['量化', '同一個模型存更省', 'm4'], ['蒸餾', '訓練一個學大模型的小模型', 'm3'], ['選小模型', '直接用小一號的', 'm2']].map(([a, b, c], i) => `<rect x="${10 + i * 185}" y="30" width="170" height="100" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="70" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${95 + i * 185}" y="100" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="158" text-anchor="middle" font-size="13">可以疊加：蒸餾出的小模型再量化，是本地部署常見的組合</text>
+        </svg>`, caption: '很多公開的小模型本身就是用蒸餾等方法訓練的（🟡 通則；個別模型以官方說明為準）。' },
+      ],
+      tryit: {
+        q: ['為什麼「貓 70%、老虎 20%、狗 9%、汽車 1%」比單純的「貓」能教學生更多？'],
+        draft: '我的回答：＿',
+        answer: ['它告訴學生：這張圖除了是貓，還有點像老虎、不太像狗、完全不像汽車。學生從中學到類別之間的相似結構，用同樣的資料學得更多、更快。', '硬標籤只給了一個 bit 的「對／錯」，軟標籤給了一整組關係。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為學生可以超越老師。', why: '學生學的是老師的輸出，能力上限受自己大小與老師限制。', right: '蒸餾的目標是「小而接近」。' },
+      { wrong: '隨便用別家 API 的輸出來蒸餾自己的模型。', why: '可能違反服務條款。', right: '先確認授權與使用條款。' },
+      { wrong: '以為蒸餾不需要資料。', why: '還是要輸入資料讓老師產生軟標籤。', right: '準備和任務相關的輸入資料。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '蒸餾時哪個模型的參數會更新？', options: [
+        { text: '只有學生', correct: true, why: '老師固定。' },
+        { text: '只有老師', why: '老師是固定的。' },
+        { text: '兩個都更新', why: '老師不動。' },
+        { text: '都不更新', why: '學生要學。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'DistilBERT 相對於 BERT？', options: [
+        { text: '小 40%、快 60%、保留 97% 能力', correct: true, why: '論文摘要。' },
+        { text: '大 40%、慢 60%', why: '相反。' },
+        { text: '一樣大但更準', why: '它比較小。' },
+        { text: '小 97%、能力剩 40%', why: '數字放錯位置。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['公司想要一個便宜的「客訴分類」模型，現在用大模型 API 效果很好但太貴。蒸餾是可行方向嗎？要注意什麼？'], answer: [
+        '可行：用大模型對大量客訴產生分類（與機率），訓練一個小模型學它；小模型推論便宜很多。',
+        '注意：先確認大模型服務的使用條款是否允許；用人工標註的評估集比較小模型與大模型的表現；客訴類型改變時要重新蒸餾。',
+      ] },
+    ],
+    keypoints: [
+      '蒸餾：小模型學大模型的完整機率分布。',
+      '軟標籤包含類別之間的相似關係。',
+      'DistilBERT：小 40%、快 60%、保留 97% 能力；注意授權。',
+    ],
+    sources: ['hinton-distill', 'distilbert'],
+  },
+
+  '4-3': {
+    goals: [
+      '依任務判斷要不要用小模型',
+      '用成本與延遲比較大、小模型',
+      '說出「夠用就好」的選模型流程',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-2）軟標籤比硬標籤多了？', options: [
+        { text: '類別之間的相似關係', correct: true, why: '第二像、第三像。' },
+        { text: '更多訓練資料', why: '資料一樣。' },
+        { text: '更大的模型', why: '無關。' },
+        { text: '更高的精度', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-3）推論成本的特性？', options: [
+        { text: '隨使用量累積', correct: true, why: '每個請求都在花。' },
+        { text: '只發生一次', why: '那是訓練。' },
+        { text: '和使用量無關', why: '直接相關。' },
+        { text: '只和訓練資料有關', why: '無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['搬家不一定要叫大卡車：搬一張椅子騎機車就好。用大卡車搬椅子，貴、慢、還找不到停車位。', '[[小模型]]就是機車：分類、抽取欄位、簡單問答這些任務，小模型常常就夠用，便宜、快、甚至能在自己的電腦或手機上跑。困難的推理、長文寫作、複雜程式，才需要大模型。'],
+      limit: ['機車和卡車的能力差一眼就看得出來，模型的能力差要測：同一個任務，小模型可能在 90% 的情況夠用、10% 的情況出錯，那 10% 的代價決定你該不該用它。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="選模型的流程：先用小模型試，用評估集測，夠用就上線，不夠再換大一號，或把難的請求轉給大模型">
+        ${[['① 先試小模型', 'm2'], ['② 用評估集測', 'm4'], ['③ 夠用 → 上線', 'm3']].map(([t, c], i) => `<rect x="${20 + i * 180}" y="40" width="160" height="56" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${100 + i * 180}" y="74" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text>${i < 2 ? `<line x1="${180 + i * 180}" y1="68" x2="${200 + i * 180}" y2="68" class="stroke-ink" stroke-width="3"/>` : ''}`).join('')}
+        <path d="M280 96 L280 140" class="stroke-ink" stroke-width="3"/>
+        <rect x="140" y="140" width="280" height="56" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="280" y="166" text-anchor="middle" font-size="14" font-weight="900" class="on-color">不夠 → 換大一號</text><text x="280" y="186" text-anchor="middle" font-size="12" class="on-color">或只把難的請求轉給大模型</text>
+        <text x="280" y="226" text-anchor="middle" font-size="13">「評估集」怎麼做見第一部 8-1</text>
+      </svg>`,
+      caption: '從小往大試，比從大往小試省很多錢。',
+    },
+    define: [
+      { term: '小模型', en: 'small model', def: '參數較少的模型。', example: '分類、抽取。' },
+      { term: '路由', en: 'routing', def: '依請求難度決定用哪個模型。', example: '簡單的給小模型。' },
+      { term: '夠用', en: 'good enough', def: '在你的評估集上達到業務要求的品質。', example: '分類正確率 95%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'small', label: '小模型多半夠用' }, { id: 'large', label: '建議用大模型' }], items: [
+          { text: '把客服信件分成「退貨、帳務、技術、其他」', answer: 'small', why: '固定類別、輸入短。' },
+          { text: '從發票照片抽出統一編號、金額、日期', answer: 'small', why: '欄位固定（視覺模型大小依需求）。' },
+          { text: '審查一份 80 頁合約、找出對公司不利的條款並解釋', answer: 'large', why: '長文、需要推理與判斷。' },
+          { text: '依需求寫一個有多個檔案的程式並除錯', answer: 'large', why: '複雜、多步驟。' },
+          { text: '判斷留言是正面還是負面', answer: 'small', why: '簡單分類。' },
+        ] } },
+        { type: 'widget', name: 'knobs', props: { title: '大、小模型的月成本（實際計算，價格查證於 2026-10-22，美元／百萬 token）', sliders: [
+          { id: 'req', label: '每天請求數', min: 100, max: 1000000, step: 100, value: 100000 },
+          { id: 'in', label: '每次輸入 token', min: 50, max: 5000, step: 50, value: 500 },
+          { id: 'out', label: '每次輸出 token', min: 5, max: 1000, step: 5, value: 20 },
+        ], compute: (v) => {
+          const month = v.req * 30;
+          const cost = (pin, pout) => month * (v.in * pin + v.out * pout) / 1e6;
+          const big = cost(4, 20); const small = cost(0.10, 0.50);
+          return { rows: [
+            { label: 'Claude Opus 5.5（$4／$20）', value: `$${Math.round(big).toLocaleString('en-US')}`, ratio: 1 },
+            { label: 'Claude Haiku 5.5（$0.10／$0.50）', value: `$${Math.round(small).toLocaleString('en-US')}`, ratio: small / big },
+          ], note: '預設像一個分類服務：每天 10 萬次、輸入 500、輸出 20 token。兩者差約 40 倍。如果小模型在你的評估集上夠用，這就是每個月省下的錢。Haiku 5.5 的提示超過 10 萬 token 時價格較高（第一部 1-5）。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="路由：一個分類器先判斷請求難度，簡單的送小模型，困難的送大模型">
+          <rect x="20" y="60" width="110" height="50" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="75" y="90" text-anchor="middle" font-size="14" font-weight="900" class="on-color">請求</text>
+          <rect x="170" y="60" width="130" height="50" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="235" y="90" text-anchor="middle" font-size="14" font-weight="900" class="on-color">判斷難度</text>
+          <rect x="370" y="20" width="160" height="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="450" y="50" text-anchor="middle" font-size="14" font-weight="900" class="on-color">簡單 → 小模型</text>
+          <rect x="370" y="100" width="160" height="50" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="450" y="130" text-anchor="middle" font-size="14" font-weight="900" class="on-color">困難 → 大模型</text>
+          <line x1="130" y1="85" x2="170" y2="85" class="stroke-ink" stroke-width="3"/><line x1="300" y1="80" x2="370" y2="45" class="stroke-ink" stroke-width="3"/><line x1="300" y1="90" x2="370" y2="125" class="stroke-ink" stroke-width="3"/>
+        </svg>`, caption: '大部分請求都很簡單時，路由可以省下大部分成本。' },
+      ],
+      tryit: {
+        q: ['用拉桿：每天 1 萬次、輸入 2,000、輸出 300。大、小模型每月各多少？'],
+        draft: '大模型：＿\n小模型：＿',
+        answer: ['每月 30 萬次。大模型：30 萬 ×（2,000×4 ＋ 300×20）÷ 100 萬 ＝ $4,200。', '小模型：30 萬 ×（2,000×0.10 ＋ 300×0.50）÷ 100 萬 ＝ $105。差 40 倍；先確認品質，再決定。'],
+      },
+    },
+    mistakes: [
+      { wrong: '所有任務都用最大的模型。', why: '很多任務小模型就夠，成本差幾十倍。', right: '從小往大試。' },
+      { wrong: '只用感覺判斷小模型夠不夠。', why: '少數錯誤可能代價很高。', right: '用評估集量。' },
+      { wrong: '以為選了就不用再檢查。', why: '資料與需求會變，新模型也會出來。', right: '定期重新評估。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '選模型建議的順序？', options: [
+        { text: '從小模型開始試，不夠再換大', correct: true, why: '省錢。' },
+        { text: '一律用最大的', why: '太貴。' },
+        { text: '一律用最小的', why: '可能不夠。' },
+        { text: '依模型名稱或廣告挑一個看起來最強的', why: '要評估。' },
+      ] },
+      { level: '應用', type: 'mc', q: '哪個任務最可能用小模型就夠？', options: [
+        { text: '把留言分成正面、負面', correct: true, why: '簡單分類。' },
+        { text: '審查長篇合約', why: '需要大模型。' },
+        { text: '寫多檔案程式', why: '需要大模型。' },
+        { text: '撰寫需要多步推理論證的研究報告', why: '需要大模型。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的客服機器人每天 50 萬次請求，其中 90% 是查訂單狀態。怎麼用這一卷的觀念降低成本？'], answer: [
+        '一、查訂單狀態的請求，用規則或小模型＋工具處理（甚至不需要 LLM）；二、剩下 10% 複雜請求才送大模型（路由）。',
+        '三、固定的 system prompt 用 prompt caching；非即時的分析用 Batch（第一部 8-2）。四、用評估集確認每一步品質沒掉。',
+      ] },
+    ],
+    keypoints: [
+      '簡單、固定的任務，小模型常常夠用。',
+      '大小模型成本可差幾十倍：從小往大試，用評估集決定。',
+      '路由：簡單的給小模型，困難的給大模型。',
+    ],
+    sources: ['distilbert'],
+  },
+});
+</script>

@@ -1,0 +1,98 @@
+<script>
+/* ==========================================================================
+   模組 0：從一條線到一個網路
+   ========================================================================== */
+defineTerms({
+  '神經網路': { en: 'neural network', def: '由很多層神經元組成的模型：每一層把上一層的輸出做加權加總、加偏差、過激活函數，再交給下一層。', example: '輸入層 → 隱藏層 → 輸出層。', lesson: '0-1' },
+  '隱藏層': { en: 'hidden layer', def: '輸入層與輸出層之間的層；它的值不是資料給的，是網路自己算出來的中間特徵。', example: '一個隱藏層有 3 個神經元。', lesson: '0-1' },
+  '權重': { en: 'weight', def: '連到神經元的每條線上的數字，決定那個輸入有多重要；訓練就是在調它們。', example: 'w₁＝0.8。', lesson: '1-1' },
+  '偏差': { en: 'bias', def: '每個神經元自己加上的一個常數，讓它的門檻可以移動。', example: 'b＝−0.5。', lesson: '1-1' },
+  '深度': { en: 'depth', def: '網路的層數；層數多就叫「深」。', example: 'ResNet 最深做到 152 層。', lesson: '0-1' },
+});
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出邏輯回歸和一個神經元的關係',
+      '說出一個神經網路由哪些部分組成',
+      '知道這一卷的路線與每個模組在訓練迴圈的哪裡',
+    ],
+    analogy: {
+      text: ['第三部的邏輯回歸是一位專家：看一份報告（特徵），給出一個判斷。一位專家能判斷的事有限。', '[[神經網路]]是一個團隊：第一排專家各自看原始資料、寫下中間結論（[[隱藏層]]），下一排專家看這些結論再判斷，一路傳到最後。每一位專家就是一個神經元，團隊越多排，就越「深」（[[深度]]）。'],
+      limit: ['團隊裡每個人知道自己在判斷什麼，網路裡的神經元沒有被指定任務，它們看什麼是訓練出來的；而且這些「專家」都只會做加權加總再過一個函式。'],
+    },
+    model: { svg: HERO_SVG, caption: '這一卷的主角：前向傳播算出預測（模組 1、2），反向傳播算出每條線的梯度（模組 3），優化器更新（模組 4）。' },
+    define: [
+      { term: '神經網路', en: 'neural network', def: '很多層神經元。', example: '2 → 3 → 1。' },
+      { term: '隱藏層', en: 'hidden layer', def: '中間的層。', example: '自己算出的特徵。' },
+      { term: '深度', en: 'depth', def: '層數。', example: '疊越多層越深。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '一個全連接網路有幾個參數（實際計算）', sliders: [
+          { id: 'i', label: '輸入特徵數', min: 1, max: 784, step: 1, value: 2 },
+          { id: 'h', label: '隱藏層神經元數', min: 1, max: 512, step: 1, value: 3 },
+          { id: 'l', label: '隱藏層層數', min: 1, max: 8, step: 1, value: 1 },
+          { id: 'o', label: '輸出數', min: 1, max: 10, step: 1, value: 1 },
+        ], compute: (v) => {
+          const first = v.i * v.h + v.h;
+          const middle = (v.l - 1) * (v.h * v.h + v.h);
+          const last = v.h * v.o + v.o;
+          const total = first + middle + last;
+          return { rows: [
+            { label: '輸入 → 第一個隱藏層（權重＋偏差）', value: first.toLocaleString('en-US'), ratio: first / total },
+            { label: '隱藏層之間', value: middle.toLocaleString('en-US'), ratio: middle / total },
+            { label: '最後 → 輸出', value: last.toLocaleString('en-US'), ratio: last / total },
+            { label: '合計', value: total.toLocaleString('en-US'), ratio: 1 },
+          ], note: '預設是首頁那個 2 → 3 → 1 的小網路：13 個參數。把輸入拉到 784（28×28 的手寫數字圖片）、隱藏層 128、輸出 10：參數一下子超過 10 萬。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="這一卷的路線：神經元、前向、反向、優化器、CNN、序列、PyTorch">
+          <text x="20" y="26" font-size="15" font-weight="900">這一卷的路線</text>
+          ${[['1', '神經元', 'm1'], ['2', '前向', 'm1'], ['3', '反向', 'm3'], ['4', '優化器', 'm4'], ['5', 'CNN', 'm5'], ['6', '序列', 'm2'], ['7', 'PyTorch', 'm0']].map(([n, t, c], i) => `<rect x="${10 + i * 78}" y="44" width="72" height="96" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${46 + i * 78}" y="84" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${n}</text><text x="${46 + i * 78}" y="114" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+          <text x="20" y="176" font-size="13">1–4：網路怎麼算、怎麼學・5–6：處理圖片與序列的架構・7：用真的工具做一次</text>
+        </svg>`, caption: '模組 3 是全書最重要的一個模組：反向傳播。' },
+        { type: 'table', head: ['第三部', '第四部'], rows: [
+          ['邏輯回歸：σ(w·x＋b)', '一個神經元：激活(w·x＋b)'],
+          ['參數幾個到幾十個', '參數幾千到幾十億個'],
+          ['梯度可以手推公式', '用反向傳播自動算'],
+          ['特徵要人設計', '隱藏層自己學特徵'],
+        ] },
+      ],
+      tryit: {
+        q: ['用拉桿：輸入 784、隱藏層 128（1 層）、輸出 10。參數有多少？其中哪一段最多？'],
+        draft: '合計：＿\n最多的一段：＿',
+        answer: ['輸入到隱藏層：784 × 128 ＋ 128 ＝ 100,480；隱藏到輸出：128 × 10 ＋ 10 ＝ 1,290；合計 101,770。', '第一段最多，因為輸入很寬。這也是第五部的 CNN 要「共用權重」的原因之一：圖片直接全連接，參數會爆炸。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為神經網路是模擬大腦。', why: '名字來自早期靈感；現代網路只是一層層的加權加總與非線性函式。', right: '把它當成可以疊很多層的可調函式。' },
+      { wrong: '以為隱藏層的每個神經元都有明確的任務。', why: '它們看什麼是訓練出來的，不是指定的。', right: '能觀察到傾向，但不是設計出來的。' },
+      { wrong: '以為層數越多一定越好。', why: '太深會難訓練（梯度消失，4-4）、也容易過擬合。', right: '依資料量與問題選深度。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '一個神經元和第三部的哪個模型最像？', options: [
+        { text: '邏輯回歸', correct: true, why: '加權加總再過一個函式。' },
+        { text: 'k-means，因為都在找中心點', why: '那是分群。' },
+        { text: '決策樹，因為都在做判斷', why: '結構不同。' },
+        { text: '拉霸機，因為都會試錯', why: '那是強化學習的例子。' },
+      ] },
+      { level: '應用', type: 'mc', q: '2 個輸入、3 個隱藏神經元、1 個輸出的網路，有幾個參數（含偏差）？', options: [
+        { text: '13', correct: true, why: '2×3＋3 ＋ 3×1＋1。' },
+        { text: '9，只算權重不算偏差', why: '偏差也是參數。' },
+        { text: '6，只算第一層', why: '還有第二層。' },
+        { text: '5，輸入加隱藏', why: '要算線的數量。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼說「隱藏層自己學特徵」是深度學習和傳統機器學習最大的差別？用序章 1-3 的例子說明。'], answer: [
+        '傳統做法要人設計特徵（例如「驚嘆號數量」），模型只學怎麼加權；深度網路直接吃原始資料（像素），前面的層自己學出邊緣、形狀這種中間特徵。',
+        '代價是需要更多資料與運算，而且學到的特徵不容易解釋。',
+      ] },
+    ],
+    keypoints: [
+      '一個神經元＝加權加總＋偏差＋激活函數，就是邏輯回歸的推廣。',
+      '神經網路＝很多層神經元；隱藏層自己學特徵。',
+      '參數數量很快變大，訓練靠反向傳播與優化器。',
+    ],
+    sources: ['rumelhart-1986', 'resnet'],
+  },
+});
+</script>

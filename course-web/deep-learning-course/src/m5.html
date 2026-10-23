@@ -1,0 +1,324 @@
+<script>
+/* ==========================================================================
+   模組 5：CNN：機器怎麼看圖
+   ========================================================================== */
+defineTerms({
+  'CNN': { en: 'convolutional neural network', def: '用卷積層處理圖片的神經網路：同一組小權重（卷積核）在整張圖上滑動，找出局部的圖樣。', example: 'LeNet、AlexNet、ResNet。', lesson: '5-1' },
+  '卷積': { en: 'convolution', def: '把一個小窗格（卷積核）滑過圖片，每個位置做「對應相乘再相加」，得到一張新的特徵圖。', example: '3×3 的垂直邊緣偵測器。', lesson: '5-1' },
+  '卷積核': { en: 'kernel / filter', def: '卷積用的小權重矩陣，例如 3×3；它的數字是訓練學出來的。', example: '[[1,0,−1],[1,0,−1],[1,0,−1]]。', lesson: '5-1' },
+  '特徵圖': { en: 'feature map', def: '卷積的輸出：每個位置表示「這附近有多像卷積核找的圖樣」。', example: '邊緣特徵圖。', lesson: '5-1' },
+  '權重共享': { en: 'weight sharing', def: '同一個卷積核在圖片每個位置都用同一組權重，所以參數很少。', example: '3×3 卷積核只有 9 個權重。', lesson: '5-2' },
+  '池化': { en: 'pooling', def: '把特徵圖的小區域合成一個值（例如取最大值），讓圖變小、對小位移比較不敏感。', example: '2×2 max pooling 讓長寬各減半。', lesson: '5-2' },
+  '感受野': { en: 'receptive field', def: '一個神經元的輸出受到原圖多大範圍的影響；層越深，感受野越大。', example: '兩層 3×3 卷積的感受野是 5×5。', lesson: '5-2' },
+});
+
+const REVIEW_M4 = [
+  { level: '回想', type: 'mc', q: '（回顧 4-3）Adam 的步伐大約是？', options: [
+    { text: '學習率左右，和梯度大小關係不大', correct: true, why: '方向 ÷ √陡度。' },
+    { text: '學習率乘上梯度，梯度越大越遠', why: '那是 SGD。' },
+    { text: '永遠是 0.001', why: '那是預設學習率。' },
+    { text: '和批次大小成正比', why: '無關。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 4-4）權重全部初始化成 0 的問題？', options: [
+    { text: '同一層神經元會學一樣的東西', correct: true, why: '梯度也一樣。' },
+    { text: '訓練會變得太快', why: '問題是學不到東西。' },
+    { text: '記憶體會不夠', why: '無關。' },
+    { text: '完全沒問題', why: '有問題。' },
+  ] },
+];
+
+const IMG7 = ['0000000', '0011100', '0010100', '0010100', '0010100', '0011100', '0000000'];
+const KERNELS = [
+  { name: '垂直邊緣', k: [[1, 0, -1], [1, 0, -1], [1, 0, -1]] },
+  { name: '水平邊緣', k: [[1, 1, 1], [0, 0, 0], [-1, -1, -1]] },
+  { name: '模糊（平均）', k: [[1 / 9, 1 / 9, 1 / 9], [1 / 9, 1 / 9, 1 / 9], [1 / 9, 1 / 9, 1 / 9]] },
+];
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '手算一次 3×3 卷積',
+      '說出卷積核在找什麼圖樣',
+      '解釋為什麼圖片不直接用全連接層',
+    ],
+    review: REVIEW_M4,
+    analogy: {
+      text: ['拿一個放大鏡在照片上一格一格掃，專門找「左亮右暗」的地方。掃完整張，你就得到一張「哪裡有垂直邊緣」的地圖。', '[[卷積]]就是這個放大鏡：[[卷積核]]是一個小權重格子，在圖上滑動，每個位置做對應相乘再相加，輸出一張[[特徵圖]]。[[CNN]] 有很多不同的卷積核，各自找不同的圖樣。'],
+      limit: ['你知道自己要找邊緣，CNN 的卷積核一開始是亂數，找什麼圖樣是訓練出來的；研究者事後觀察到前面幾層常常學到類似邊緣、顏色的偵測器（🟡 研究觀察）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="卷積：3 乘 3 的卷積核蓋在輸入的一個區域，對應相乘再相加得到輸出的一格，然後往右滑一格">
+        ${[...Array(5).keys()].map((r) => [...Array(5).keys()].map((c) => `<rect x="${20 + c * 34}" y="${30 + r * 34}" width="32" height="32" ${r < 3 && c < 3 ? 'style="fill:var(--m0)"' : 'class="fill-surface"'} class="stroke-ink" stroke-width="2"/>`).join('')).join('')}
+        <text x="105" y="214" text-anchor="middle" font-size="13">輸入（黃色是目前的窗格）</text>
+        <text x="215" y="110" font-size="20" font-weight="900">⊙</text>
+        ${[...Array(3).keys()].map((r) => [...Array(3).keys()].map((c) => `<rect x="${245 + c * 34}" y="${64 + r * 34}" width="32" height="32" style="fill:var(--m5)" class="stroke-ink" stroke-width="2"/>`).join('')).join('')}
+        <text x="296" y="214" text-anchor="middle" font-size="13">卷積核（9 個權重）</text>
+        <text x="365" y="120" font-size="20" font-weight="900">→</text>
+        ${[...Array(3).keys()].map((r) => [...Array(3).keys()].map((c) => `<rect x="${400 + c * 44}" y="${50 + r * 44}" width="42" height="42" ${r === 0 && c === 0 ? 'style="fill:var(--m3)"' : 'class="fill-surface"'} class="stroke-ink" stroke-width="2"/>`).join('')).join('')}
+        <text x="466" y="214" text-anchor="middle" font-size="13">輸出：5×5 → 3×3</text>
+      </svg>`,
+      caption: '每一格輸出＝窗格內 9 個值和卷積核對應相乘再相加。不補邊時，輸出比輸入小 2。',
+    },
+    define: [
+      { term: '卷積', en: 'convolution', def: '小窗格滑過、對應相乘再相加。', example: '3×3。' },
+      { term: '卷積核', en: 'kernel', def: '小權重格子，訓練學出來。', example: '9 個數字。' },
+      { term: '特徵圖', en: 'feature map', def: '卷積的輸出。', example: '邊緣在哪裡。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'conv', props: { title: '7×7 的「口」字：選卷積核，點輸出的一格看計算', image: IMG7, kernels: KERNELS } },
+        { type: 'callout', variant: 'tip', title: '看互動時注意', body: ['選「垂直邊緣」：「口」的左邊框出現正值、右邊框出現負值，橫的部分接近 0。選「水平邊緣」則相反：上下框亮起來。', '同一張圖、不同卷積核，看到的東西完全不同。CNN 一層有幾十到幾百個卷積核，每一個都是一種「看法」。'] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="全連接與卷積的參數比較：224 乘 224 乘 3 的圖片接 1000 個神經元需要約 1.5 億個權重；一個 3 乘 3 乘 3 的卷積核只要 27 個">
+          <rect x="10" y="30" width="260" height="110" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <text x="140" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">全連接</text>
+          <text x="140" y="92" text-anchor="middle" font-size="14" class="on-color">224×224×3 → 1,000</text>
+          <text x="140" y="118" text-anchor="middle" font-size="14" class="on-color">約 1.5 億個權重</text>
+          <rect x="290" y="30" width="260" height="110" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+          <text x="420" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">一個卷積核</text>
+          <text x="420" y="92" text-anchor="middle" font-size="14" class="on-color">3×3×3（RGB）</text>
+          <text x="420" y="118" text-anchor="middle" font-size="14" class="on-color">27 個權重，用在每個位置</text>
+          <text x="280" y="168" text-anchor="middle" font-size="13">224×224×3×1,000 ＝ 150,528,000</text>
+        </svg>`, caption: '卷積用很少的參數處理整張圖，而且「在左上角學到的邊緣偵測器，在右下角也能用」。' },
+      ],
+      tryit: {
+        q: ['用「垂直邊緣」卷積核，手算輸出第 1 列第 1 欄（窗格是輸入的第 1～3 列、第 1～3 欄）。'],
+        draft: '窗格：＿\n計算：＿\n結果：＿',
+        answer: ['窗格是 [0,0,0]、[0,0,1]、[0,0,1]（從 0 開始數就是左上角 3×3）。', '垂直邊緣核只看左欄（×1）與右欄（×−1）：左欄 0＋0＋0，右欄 −(0＋1＋1) ＝ −2。結果 −2：右邊比左邊亮，代表有一條邊。在互動上點左上角那一格核對。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為卷積核的數字是人設計的。', why: '那只是示範；CNN 的卷積核是訓練學出來的。', right: '人決定大小與數量，數字由訓練決定。' },
+      { wrong: '把圖片攤平直接接全連接層。', why: '參數爆炸，也丟掉了「相鄰像素有關」的結構。', right: '用卷積保留空間結構。' },
+      { wrong: '以為卷積輸出和輸入一樣大。', why: '不補邊時每邊少 (k−1)/2。', right: '輸出邊長 ＝ n − k ＋ 1（不補邊、步長 1）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '一個 3×3 的卷積核有幾個權重（單一通道、不算偏差）？', options: [
+        { text: '9', correct: true, why: '3×3。' },
+        { text: '3，一邊的長度', why: '是面積。' },
+        { text: '和圖片一樣多', why: '權重共享。' },
+        { text: '27，因為一定有三個顏色', why: '題目是單一通道。' },
+      ] },
+      { level: '應用', type: 'mc', q: '7×7 的輸入、3×3 卷積、不補邊、步長 1，輸出幾乘幾？', options: [
+        { text: '5×5', correct: true, why: '7−3＋1。' },
+        { text: '7×7，大小不變', why: '沒有補邊會變小。' },
+        { text: '3×3，和卷積核一樣', why: '會滑很多位置。' },
+        { text: '4×4', why: '要加 1。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼「權重共享」很適合圖片？舉一個它不適合的情況。'], answer: [
+        '圖片裡同一種圖樣（邊緣、眼睛）可能出現在任何位置，用同一個偵測器到處找很合理，也大幅減少參數。',
+        '不適合的情況：位置本身就有意義的資料，例如表格的每一欄代表不同的東西（年齡、收入），在欄之間滑動同一組權重就沒道理。',
+      ] },
+    ],
+    keypoints: [
+      '卷積：小窗格滑過，對應相乘再相加。',
+      '卷積核找特定圖樣；數字由訓練學出來。',
+      '權重共享讓參數很少，又保留空間結構。',
+    ],
+    sources: ['lenet', 'alexnet'],
+  },
+
+  '5-2': {
+    goals: [
+      '算出卷積與池化之後的大小',
+      '說明池化與感受野',
+      '描述 CNN 從邊緣到物體的特徵階層',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-1）9×9 輸入、3×3 卷積、不補邊，輸出？', options: [
+        { text: '7×7', correct: true, why: '9−3＋1。' },
+        { text: '9×9', why: '會變小。' },
+        { text: '6×6', why: '要加 1。' },
+        { text: '3×3', why: '會滑很多位置。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 4-1）一個 epoch 是？', options: [
+        { text: '看完全部訓練資料一遍', correct: true, why: '定義。' },
+        { text: '更新一次參數', why: '那是一步。' },
+        { text: '一個小批次', why: '一批不是一遍。' },
+        { text: '一層網路', why: '無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['看地圖時，從街道（細節）縮小到行政區（區塊）再到整個城市（全貌）：每縮小一次，看得到的範圍更大，細節更少。', 'CNN 也是：前幾層卷積看小範圍（邊緣），[[池化]]把圖縮小，後面的卷積就能看到更大的範圍（[[感受野]]變大），組合出形狀、部件，最後是整個物體。'],
+      limit: ['地圖縮小是人設計的層級，CNN 的「邊緣 → 形狀 → 物體」是研究者觀察到的傾向，不是規定每一層做什麼。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="CNN 的結構：輸入圖片經過卷積與池化，特徵圖越來越小但通道越來越多，最後攤平接全連接層輸出類別">
+        ${[[20, 150, 150, '圖片'], [150, 120, 120, '卷積＋池化'], [260, 80, 80, '卷積＋池化'], [350, 50, 50, '卷積＋池化']].map(([x, w, h, t], i) => `<rect x="${x}" y="${110 - h / 2}" width="${w * 0.6}" height="${h}" style="fill:var(--m${i})" class="stroke-ink" stroke-width="3"/><rect x="${x + 8}" y="${110 - h / 2 - 8}" width="${w * 0.6}" height="${h}" fill="none" class="stroke-ink" stroke-width="2"/><text x="${x + w * 0.3}" y="${110 + h / 2 + 24}" text-anchor="middle" font-size="13">${t}</text>`).join('')}
+        <rect x="440" y="50" width="30" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="455" y="194" text-anchor="middle" font-size="13">全連接</text>
+        <rect x="500" y="90" width="40" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="520" y="116" text-anchor="middle" font-size="13" font-weight="900" class="on-color">貓</text>
+        <text x="280" y="214" text-anchor="middle" font-size="13">越往後：圖越小、通道越多、看的範圍越大（示意）</text>
+      </svg>`,
+      caption: '典型 CNN 的形狀：空間變小、通道變多。',
+    },
+    define: [
+      { term: '池化', en: 'pooling', def: '小區域合成一個值。', example: '2×2 max pooling。' },
+      { term: '步長', en: 'stride', def: '窗格每次滑幾格。', example: '步長 2 讓輸出減半。' },
+      { term: '補邊', en: 'padding', def: '在邊緣補 0，讓輸出不要變小。', example: '3×3 補 1 格 → 大小不變。' },
+      { term: '感受野', en: 'receptive field', def: '輸出受到原圖多大範圍影響。', example: '越深越大。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '卷積輸出大小與參數（實際公式）', sliders: [
+          { id: 'n', label: '輸入邊長 n', min: 8, max: 224, step: 1, value: 32 },
+          { id: 'k', label: '卷積核大小 k', min: 1, max: 7, step: 2, value: 3 },
+          { id: 'p', label: '補邊 p', min: 0, max: 3, step: 1, value: 1 },
+          { id: 's', label: '步長 s', min: 1, max: 4, step: 1, value: 1 },
+          { id: 'c', label: '輸入通道 × 輸出通道', min: 1, max: 256, step: 1, value: 64 },
+        ], compute: (v) => {
+          const out = Math.floor((v.n - v.k + 2 * v.p) / v.s) + 1;
+          const params = v.k * v.k * v.c * v.c + v.c;
+          return { rows: [
+            { label: '輸出邊長 ⌊(n − k ＋ 2p) ÷ s⌋ ＋ 1', value: String(out), ratio: Math.min(1, out / v.n) },
+            { label: `參數 k×k×${v.c}×${v.c} ＋ 偏差`, value: params.toLocaleString('en-US'), ratio: Math.min(1, params / 600000) },
+            { label: '2×2 max pooling 之後', value: String(Math.floor(out / 2)), ratio: Math.min(1, Math.floor(out / 2) / v.n) },
+          ], note: '3×3、補 1、步長 1：大小不變（很常見的設定）。步長改成 2：輸出約減半。注意參數和輸入邊長完全無關。' };
+        } } },
+        { type: 'table', head: ['2×2 區域', 'max pooling', 'average pooling'], rows: [
+          ['[1, 3; 2, 0]', '3', '1.5'],
+          ['[0, 0; 0, 5]', '5', '1.25'],
+        ], caption: 'max pooling 只保留最強的反應：「這附近有沒有出現過這個圖樣」。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="感受野：第一層 3 乘 3 卷積看原圖 3 乘 3，第二層再一個 3 乘 3 卷積就看到原圖 5 乘 5">
+          ${[...Array(5).keys()].map((r) => [...Array(5).keys()].map((c) => `<rect x="${30 + c * 30}" y="${30 + r * 30}" width="28" height="28" style="fill:var(--m${r >= 1 && r <= 3 && c >= 1 && c <= 3 ? 0 : 2})" class="stroke-ink" stroke-width="2"/>`).join('')).join('')}
+          <text x="105" y="186" text-anchor="middle" font-size="13">原圖：第 2 層看到 5×5</text>
+          ${[...Array(3).keys()].map((r) => [...Array(3).keys()].map((c) => `<rect x="${250 + c * 30}" y="${60 + r * 30}" width="28" height="28" style="fill:var(--m${r === 1 && c === 1 ? 4 : 0})" class="stroke-ink" stroke-width="2"/>`).join('')).join('')}
+          <text x="295" y="186" text-anchor="middle" font-size="13">第 1 層的 3×3</text>
+          <rect x="420" y="90" width="28" height="28" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/>
+          <text x="434" y="186" text-anchor="middle" font-size="13">第 2 層的一格</text>
+        </svg>`, caption: '疊兩層 3×3 就有 5×5 的視野，疊三層有 7×7，參數卻比一層 7×7 少。' },
+      ],
+      tryit: {
+        q: ['32×32 的圖，先 3×3 卷積（補 1、步長 1），再 2×2 max pooling，再一次同樣的卷積和池化。最後是幾乘幾？'],
+        draft: '第 1 次卷積：＿\n第 1 次池化：＿\n第 2 次卷積：＿\n第 2 次池化：＿',
+        answer: ['卷積大小不變 32 → 池化 16 → 卷積 16 → 池化 8。', '最後 8×8。用拉桿可以驗證每一步的大小。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為卷積層的參數和圖片大小有關。', why: '卷積核在每個位置共用。', right: '參數只看核大小與通道數。' },
+      { wrong: '算輸出大小時忘了補邊或步長。', why: '大小會算錯，形狀對不上。', right: '用 ⌊(n−k＋2p)÷s⌋＋1。' },
+      { wrong: '以為池化有可學的參數。', why: 'max／average pooling 只是固定運算。', right: '池化沒有參數。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '2×2 max pooling 對 [4, 1; 2, 3] 輸出？', options: [
+        { text: '4', correct: true, why: '取最大值。' },
+        { text: '2.5，四個數的平均', why: '那是 average。' },
+        { text: '10，四個數相加', why: '不是相加。' },
+        { text: '1，最小值', why: '取最大。' },
+      ] },
+      { level: '應用', type: 'mc', q: '28×28、5×5 卷積、不補邊、步長 1，輸出？', options: [
+        { text: '24×24', correct: true, why: '28−5＋1。' },
+        { text: '28×28，大小不變', why: '沒補邊會變小。' },
+        { text: '23×23', why: '要加 1。' },
+        { text: '14×14', why: '那是池化。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼 CNN 越後面的層，特徵圖越小、通道越多？'], answer: [
+        '空間變小：後面的層看的是更大範圍的組合，不需要那麼細的位置資訊，縮小也省計算。',
+        '通道變多：越抽象的特徵種類越多（各種部件、形狀），需要更多卷積核來表示。',
+      ] },
+    ],
+    keypoints: [
+      '輸出邊長＝⌊(n−k＋2p)÷s⌋＋1；參數和圖片大小無關。',
+      '池化讓圖變小、沒有參數；疊越多層感受野越大。',
+      '典型 CNN：空間越來越小、通道越來越多。',
+    ],
+    sources: ['lenet'],
+  },
+
+  '5-3': {
+    goals: [
+      '把 LeNet、AlexNet、ResNet 放到時間軸上',
+      '說出每一個的關鍵貢獻',
+      '連回殘差連接與 GPU 的故事',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 5-2）池化有幾個可學參數？', options: [
+        { text: '0', correct: true, why: '固定運算。' },
+        { text: '和卷積核一樣多', why: '池化沒有權重。' },
+        { text: '4，2×2 的大小', why: '那是區域大小。' },
+        { text: '看通道數', why: '一樣沒有參數。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-2）深網路隱藏層常用哪個激活？', options: [
+        { text: 'ReLU', correct: true, why: '不易飽和。' },
+        { text: 'sigmoid', why: '容易梯度消失。' },
+        { text: 'softmax', why: '用在輸出。' },
+        { text: '不用激活', why: '一定要非線性。' },
+      ] },
+    ],
+    analogy: {
+      text: ['汽車的演進：先有能跑的車（LeNet），再有引擎大幅升級、跑出新紀錄的車（AlexNet，加上 GPU），最後有能把車身做得很長也不會散架的結構（ResNet 的殘差連接）。', '這三個 CNN 各自解決了當時的瓶頸：能不能用、能不能做大、能不能做深。'],
+      limit: ['汽車演進是一條線，CNN 之間還有很多重要的模型（VGG、Inception 等）；這裡只挑三個最能說明關鍵想法的。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="CNN 時間軸：1998 LeNet 手寫數字，2012 AlexNet 在 ImageNet 大幅領先並使用 GPU，2015 ResNet 用殘差連接做到 152 層">
+        <line x1="40" y1="110" x2="520" y2="110" class="stroke-ink" stroke-width="4"/>
+        ${[[80, '1998', 'LeNet', '手寫數字'], [280, '2012', 'AlexNet', 'GPU＋ReLU'], [470, '2015', 'ResNet', '152 層、殘差']].map(([x, y, n, d]) => `<circle cx="${x}" cy="110" r="10" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="${x}" y="80" text-anchor="middle" font-size="15" font-weight="900">${y}</text><text x="${x}" y="146" text-anchor="middle" font-size="15" font-weight="900">${n}</text><text x="${x}" y="170" text-anchor="middle" font-size="13">${d}</text>`).join('')}
+        <text x="280" y="208" text-anchor="middle" font-size="13">ResNet 集成模型 ImageNet 測試錯誤率 3.57%，ILSVRC 2015 分類第一</text>
+      </svg>`,
+      caption: '出處：He 等 2015；AlexNet 數字見序章 1-3。',
+    },
+    define: [
+      { term: 'LeNet', en: 'LeNet', def: '早期用卷積辨識手寫數字的網路。', example: 'LeCun 等。' },
+      { term: 'AlexNet', en: 'AlexNet', def: '2012 年 ImageNet 冠軍，GPU 訓練、用 ReLU。', example: '15.3% 對 26.2%。' },
+      { term: 'ResNet', en: 'ResNet', def: '用殘差連接把網路做到上百層。', example: '152 層。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'lenet', label: 'LeNet' }, { id: 'alex', label: 'AlexNet' }, { id: 'res', label: 'ResNet' }], items: [
+          { text: '證明卷積網路可以實用地辨識手寫數字', answer: 'lenet', why: '早期的代表作。' },
+          { text: '用兩張 GPU 訓練，在 ImageNet 大幅領先', answer: 'alex', why: '2012 的轉捩點。' },
+          { text: '加上「輸出＝x＋F(x)」的直通路，讓 152 層也訓練得動', answer: 'res', why: '殘差連接。' },
+          { text: '讓 ReLU 在大型網路裡流行起來', answer: 'alex', why: 'AlexNet 使用 ReLU 加速訓練。' },
+        ] } },
+        { type: 'table', head: ['模型', '解決的瓶頸', '和這系列其他地方的連結'], rows: [
+          ['LeNet', '卷積能不能用', '5-1 卷積、權重共享'],
+          ['AlexNet', '能不能做大、訓練得夠快', '序章 1-3、第五部 GPU'],
+          ['ResNet', '能不能做很深', '第二部 4-2 殘差連接（Transformer 也用）'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="殘差區塊：輸入經過兩層卷積得到 F(x)，再加上原本的 x，輸出 x 加 F(x)">
+          <rect x="20" y="60" width="90" height="60" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="65" y="96" text-anchor="middle" font-size="16" font-weight="900" class="on-color">x</text>
+          <rect x="160" y="60" width="110" height="60" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="215" y="96" text-anchor="middle" font-size="14" font-weight="900" class="on-color">卷積</text>
+          <rect x="300" y="60" width="110" height="60" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="355" y="96" text-anchor="middle" font-size="14" font-weight="900" class="on-color">卷積</text>
+          <circle cx="455" cy="90" r="18" class="fill-surface stroke-ink" stroke-width="3"/><text x="455" y="97" text-anchor="middle" font-size="20" font-weight="900">＋</text>
+          <line x1="110" y1="90" x2="160" y2="90" class="stroke-ink" stroke-width="3"/><line x1="270" y1="90" x2="300" y2="90" class="stroke-ink" stroke-width="3"/><line x1="410" y1="90" x2="437" y2="90" class="stroke-ink" stroke-width="3"/>
+          <path d="M65 60 L65 30 L455 30 L455 72" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="7 5"/>
+          <text x="260" y="24" text-anchor="middle" font-size="13" font-weight="900">直通路</text>
+          <text x="280" y="160" text-anchor="middle" font-size="14">輸出 ＝ x ＋ F(x)：和 Transformer 的殘差是同一個想法</text>
+        </svg>`, caption: '殘差讓梯度有一條不經過連乘的路（4-4 的梯度消失對策）。' },
+      ],
+      tryit: {
+        q: ['用這一卷學到的概念，各用一句話說明：為什麼 AlexNet 需要 GPU？為什麼 ResNet 需要殘差？'],
+        draft: 'AlexNet＋GPU：＿\nResNet＋殘差：＿',
+        answer: ['AlexNet：卷積和全連接都是大量矩陣乘法，GPU 能同時做大量乘加，訓練才在合理時間內完成（第五部 1）。', 'ResNet：很深時梯度一路相乘會消失，殘差提供直通路，讓梯度能傳回前面的層（4-4）。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 ResNet 的錯誤率 3.57% 是單一模型。', why: '論文寫的是集成（多個模型合起來）。', right: '引用數字時寫清楚是集成。' },
+      { wrong: '以為 CNN 已經被淘汰。', why: '影像任務仍大量使用，也常和 Transformer 混用。', right: '依任務選架構。' },
+      { wrong: '以為殘差是 Transformer 發明的。', why: 'ResNet 2015 就用了，Transformer 2017 沿用。', right: '殘差是跨架構的通用技巧。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'ResNet 的關鍵貢獻？', options: [
+        { text: '殘差連接，讓很深的網路訓練得動', correct: true, why: '做到 152 層。' },
+        { text: '第一次在網路裡使用卷積', why: '更早就有。' },
+        { text: '第一次在 GPU 上訓練網路', why: 'AlexNet 就用了。' },
+        { text: '發明了 attention', why: '那是另一條路線。' },
+      ] },
+      { level: '應用', type: 'mc', q: '哪一個時間順序正確？', options: [
+        { text: 'LeNet → AlexNet → ResNet', correct: true, why: '1998 → 2012 → 2015。' },
+        { text: 'AlexNet → LeNet → ResNet', why: 'LeNet 最早。' },
+        { text: 'ResNet → AlexNet → LeNet', why: '倒過來了。' },
+        { text: 'LeNet → ResNet → AlexNet', why: 'AlexNet 比 ResNet 早。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['第二部講的 Transformer 也用殘差和 layer norm。為什麼不同架構會重複用到同樣的技巧？'], answer: [
+        '因為它們解決的是「深網路難訓練」這個共同問題，和處理圖片還是文字無關。',
+        '所以學會殘差、正規化、好的初始化與優化器，換架構時大多可以直接帶過去。',
+      ] },
+    ],
+    keypoints: [
+      'LeNet 證明卷積實用；AlexNet 用 GPU＋ReLU 做大；ResNet 用殘差做深。',
+      'ResNet 152 層，集成模型 ImageNet 測試錯誤率 3.57%。',
+      '殘差、正規化是跨架構的通用技巧。',
+    ],
+    sources: ['lenet', 'alexnet', 'resnet'],
+  },
+});
+</script>

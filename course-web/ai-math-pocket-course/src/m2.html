@@ -1,0 +1,237 @@
+<script>
+/* ==========================================================================
+   模組 2：矩陣乘法：一層神經網路
+   ========================================================================== */
+defineTerms({
+  '矩陣乘向量': { en: 'matrix-vector product', def: '矩陣的每一列各和向量做一次點積，得到一個新的向量。', example: '2×3 的矩陣乘 3 維向量 → 2 維向量。', lesson: '2-1' },
+  '偏差': { en: 'bias', def: '每個輸出各加的一個常數，讓輸出不必經過 0。', example: 'y ＝ Wx ＋ b 的 b。', lesson: '2-1' },
+  '活化函數': { en: 'activation function', def: '每一層算完加權加總後套上的非線性函數；沒有它，再多層都等於一層。', example: 'ReLU：負的變 0、正的不變。', lesson: '2-1' },
+  '形狀': { en: 'shape', def: '矩陣有幾列、幾行，寫成「列×行」。', example: '32×768：32 個 token、每個 768 維。', lesson: '2-2' },
+  '批次': { en: 'batch', def: '一次一起送進模型的很多筆資料；疊成矩陣，一次矩陣乘法全部算完。', example: '32 個 token 疊成 32 列。', lesson: '2-2' },
+});
+
+const LAYER_W = [[1, 0, 1], [0.5, -1, 2]];
+const LAYER_B = [0, 1];
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '手算矩陣乘向量',
+      '說出「一列 ＝ 一個神經元」',
+      '算出一層網路有幾個參數',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）(1, 2, 3)·(1, 0, 1) ＝？', options: [
+        { text: '4', correct: true, why: '1 ＋ 0 ＋ 3。' },
+        { text: '6，全部數字加起來', why: '要對應相乘再加。' },
+        { text: '(1, 0, 3)', why: '點積的結果是一個數字。' },
+        { text: '0', why: '這兩個向量不垂直。' },
+      ] },
+    ],
+    analogy: {
+      text: ['評審團有兩位評審，每位對「外觀、口味、價格」三項各有自己的看重程度。同一份參賽作品的三項分數，第一位評審用他的權重加總、第二位用他的權重加總，就得到兩個總分。', '[[矩陣]]就是把每位評審的權重排成一列；[[矩陣乘向量]]就是「每位評審各做一次點積」。一層神經網路做的就是這件事，再加上[[偏差]]和[[活化函數]]。'],
+      limit: ['評審的權重是人定的；網路的權重是訓練時用梯度一點一點調出來的（模組 3）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="矩陣乘向量：2×3 的權重矩陣，每一列和輸入向量 (1, 2, 3) 做點積，第一列得 4，第二列得 4.5，加上偏差後是 4 和 5.5">
+        <text x="20" y="30" font-size="14" font-weight="900">權重 W（2×3）</text>
+        ${LAYER_W.map((row, i) => row.map((w, j) => `<rect x="${20 + j * 56}" y="${44 + i * 56}" width="52" height="50" style="fill:var(--${i ? 'm3' : 'm2'})" class="stroke-ink" stroke-width="3"/><text x="${46 + j * 56}" y="${76 + i * 56}" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">${w}</text>`).join('')).join('')}
+        <text x="205" y="104" font-size="22" font-weight="900">×</text>
+        <text x="236" y="30" font-size="14" font-weight="900">輸入 x</text>
+        ${[1, 2, 3].map((x, i) => `<rect x="236" y="${44 + i * 56}" width="52" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="262" y="${76 + i * 56}" text-anchor="middle" font-size="16" font-weight="900" class="mono">${x}</text>`).join('')}
+        <text x="300" y="104" font-size="22" font-weight="900">＋ b ＝</text>
+        <text x="390" y="30" font-size="14" font-weight="900">輸出 y</text>
+        ${[['4', 'm2', '1＋0＋3＋0'], ['5.5', 'm3', '0.5−2＋6＋1']].map(([y, c, how], i) => `<rect x="390" y="${44 + i * 56}" width="60" height="50" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="420" y="${76 + i * 56}" text-anchor="middle" font-size="16" font-weight="900" class="on-color mono">${y}</text><text x="460" y="${74 + i * 56}" font-size="12" class="mono">${how}</text>`).join('')}
+        <text x="280" y="240" text-anchor="middle" font-size="14">每一列 ＝ 一個神經元 ＝ 和 x 做一次點積</text>
+      </svg>`,
+      caption: '形狀規則：W 是（輸出數 × 輸入數），所以 2×3 乘 3 維得到 2 維。這裡 b ＝ (0, 1)。',
+    },
+    define: [
+      { term: '矩陣乘向量', en: 'matrix-vector product', def: '每一列和向量做點積。', example: '2×3 · 3 → 2。' },
+      { term: '偏差', en: 'bias', def: '每個輸出加的常數。', example: 'b。' },
+      { term: '活化函數', en: 'activation', def: '非線性的轉換。', example: 'ReLU。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '上圖這一層：改輸入，看兩個神經元的輸出（W、b 固定；實際計算）', sliders: [
+          { id: 'x1', label: 'x₁', min: -3, max: 3, step: 0.5, value: 1 },
+          { id: 'x2', label: 'x₂', min: -3, max: 3, step: 0.5, value: 2 },
+          { id: 'x3', label: 'x₃', min: -3, max: 3, step: 0.5, value: 3 },
+        ], compute: (v) => {
+          const x = [v.x1, v.x2, v.x3];
+          const z = LAYER_W.map((row, i) => row.reduce((s, w, j) => s + w * x[j], 0) + LAYER_B[i]);
+          const relu = z.map((s) => Math.max(0, s));
+          return { rows: [
+            { label: '神經元 1：Wx ＋ b', value: z[0].toFixed(2), ratio: Math.min(1, Math.abs(z[0]) / 6) },
+            { label: '神經元 2：Wx ＋ b', value: z[1].toFixed(2), ratio: Math.min(1, Math.abs(z[1]) / 11) },
+            { label: '神經元 1：ReLU 之後', value: relu[0].toFixed(2), ratio: Math.min(1, relu[0] / 6) },
+            { label: '神經元 2：ReLU 之後', value: relu[1].toFixed(2), ratio: Math.min(1, relu[1] / 11) },
+          ], note: '把 x₃ 拉到負的：神經元 2 的 Wx ＋ b 變負，ReLU 之後變成 0，這個神經元「沒有反應」。' };
+        } } },
+        { type: 'code', lang: 'python', title: 'PyTorch 的一層：nn.Linear', code: `import torch
+from torch import nn
+
+layer = nn.Linear(in_features=3, out_features=2)
+print(layer.weight.shape)  # torch.Size([2, 3])：輸出數 × 輸入數
+print(layer.bias.shape)    # torch.Size([2])
+
+x = torch.tensor([1.0, 2.0, 3.0])
+y = torch.relu(layer(x))   # 先 Wx ＋ b，再 ReLU` },
+        'PyTorch 文件寫的是 y ＝ xAᵀ ＋ b：x 放左邊、所以權重要轉置，但算出來和 Wx ＋ b 一樣。權重形狀是（out_features, in_features）。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="參數量：一層有輸入數乘輸出數個權重，加上輸出數個偏差。3 進 2 出是 8 個；4096 進 4096 出約 1,678 萬個">
+          <rect x="20" y="30" width="250" height="120" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="70" text-anchor="middle" font-size="16" font-weight="900" class="on-color">3 進 2 出</text>
+          <text x="145" y="100" text-anchor="middle" font-size="14" class="on-color mono">3×2 ＋ 2 ＝ 8</text>
+          <text x="145" y="128" text-anchor="middle" font-size="13" class="on-color">上圖這一層</text>
+          <rect x="290" y="30" width="250" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="70" text-anchor="middle" font-size="16" font-weight="900" class="on-color">4096 進 4096 出</text>
+          <text x="415" y="100" text-anchor="middle" font-size="14" class="on-color mono">≈ 1,678 萬</text>
+          <text x="415" y="128" text-anchor="middle" font-size="13" class="on-color">大模型裡的一層</text>
+          <text x="280" y="186" text-anchor="middle" font-size="14" font-weight="900" class="mono">參數 ＝ 輸入數 × 輸出數 ＋ 輸出數</text>
+        </svg>`, caption: '模型的「70B 參數」，就是很多層這種矩陣裡的數字全部加起來。' },
+      ],
+      tryit: {
+        q: ['手算：同一層（W、b 同上圖），輸入 x ＝ (2, 0, −1)，兩個輸出各是多少？經過 ReLU 呢？'],
+        draft: '神經元 1：＿\n神經元 2：＿',
+        answer: ['神經元 1：2 ＋ 0 − 1 ＋ 0 ＝ 1，ReLU 後是 1。', '神經元 2：1 − 0 − 2 ＋ 1 ＝ 0，ReLU 後是 0。用上面的拉桿可以驗算。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為一個神經元是一個數字。', why: '一個神經元有一整列權重，外加一個偏差。', right: '一列權重 ＋ 一個 b ＝ 一個神經元。' },
+      { wrong: '參數量只算權重，忘了偏差。', why: '每個輸出都有一個 b。', right: '輸入 × 輸出 ＋ 輸出。' },
+      { wrong: '覺得活化函數可有可無。', why: '沒有它，好幾層矩陣乘法可以合併成一層。', right: '每層之間都要有非線性。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '權重矩陣 5×10 的一層，輸入和輸出各幾維？', options: [
+        { text: '輸入 10、輸出 5', correct: true, why: '（輸出數 × 輸入數）。' },
+        { text: '輸入 5、輸出 10，照寫的順序', why: '順序剛好相反。' },
+        { text: '都是 50', why: '50 是權重數。' },
+        { text: '都是 15', why: '不是相加。' },
+      ] },
+      { level: '應用', type: 'mc', q: '輸入 100 維、輸出 20 維的一層，參數量？', options: [
+        { text: '2,020', correct: true, why: '100×20 ＋ 20。' },
+        { text: '2,000，權重全部就是這麼多', why: '忘了 20 個偏差。' },
+        { text: '120', why: '要相乘。' },
+        { text: '2,100', why: '偏差是輸出數，不是輸入數。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['有人說：「把兩層都不加活化函數，可以省計算，效果一樣。」為什麼不對？'], answer: [
+        'W₂(W₁x) ＝ (W₂W₁)x：兩個矩陣可以先乘成一個矩陣，所以兩層等於一層，表達能力沒有變多。',
+        '加了 ReLU 之類的非線性，兩層才真的比一層能表達更複雜的關係。這就是「深度」有用的前提。',
+      ] },
+    ],
+    keypoints: [
+      '矩陣乘向量 ＝ 每一列各做一次點積。',
+      '一層網路：y ＝ 活化(Wx ＋ b)。',
+      '參數 ＝ 輸入 × 輸出 ＋ 輸出。',
+    ],
+    sources: ['pt-linear', '3b1b-la', '3b1b-nn'],
+  },
+
+  '2-2': {
+    goals: [
+      '用形狀規則判斷兩個矩陣能不能相乘',
+      '說出為什麼要把很多 token 疊成一個矩陣',
+      '估算矩陣乘法的運算量',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）輸入 4 維、輸出 3 維的一層，權重形狀？', options: [
+        { text: '3×4', correct: true, why: '（輸出 × 輸入）。' },
+        { text: '4×3，先寫輸入再寫輸出', why: 'PyTorch 的 weight 是（out, in）。' },
+        { text: '7', why: '形狀是兩個數字。' },
+        { text: '12×1', why: '是矩陣，不是一長條。' },
+      ] },
+    ],
+    analogy: {
+      text: ['上一課是一份作品給評審團打分。比賽有 32 份作品時，不用叫評審團開 32 次會：把 32 份作品的分數排成一張表，一次全部算完。', '這張表就是[[批次]]：32 個 token 疊成 32 列的矩陣，乘上權重矩陣，一次得到 32 個輸出。GPU 最擅長這種一次算一大片的工作。'],
+      limit: ['評審開會有固定成本，GPU 的固定成本是「把權重從記憶體搬進來」：一次多算幾份，權重就被多用幾次（第五部的算術強度）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="矩陣乘矩陣的形狀規則：m×k 乘 k×n 得到 m×n；中間的 k 必須一樣，相乘後消失">
+        <rect x="20" y="50" width="90" height="140" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="65" y="126" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">m×k</text>
+        <text x="130" y="126" font-size="24" font-weight="900">×</text>
+        <rect x="160" y="80" width="170" height="90" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="245" y="132" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">k×n</text>
+        <text x="350" y="126" font-size="24" font-weight="900">＝</text>
+        <rect x="385" y="50" width="160" height="140" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="465" y="126" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">m×n</text>
+        <path d="M90 214 Q 170 244 200 214" fill="none" style="stroke:var(--m5)" stroke-width="4"/>
+        <text x="145" y="246" text-anchor="middle" font-size="13" font-weight="900">中間的 k 要一樣</text>
+        <text x="465" y="30" text-anchor="middle" font-size="13" font-weight="900">留下外面的 m 和 n</text>
+      </svg>`,
+      caption: '輸出的第 i 列第 j 行 ＝ 左邊第 i 列 · 右邊第 j 行（一次點積，k 項相乘再加）。',
+    },
+    define: [
+      { term: '形狀', en: 'shape', def: '列 × 行。', example: '32×768。' },
+      { term: '批次', en: 'batch', def: '很多筆資料疊在一起算。', example: '32 個 token。' },
+      { term: '矩陣', en: 'matrix', def: '列與行的數字。', example: '權重。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '(m×k) × (k×n)：形狀與運算量（實際計算）', sliders: [
+          { id: 'm', label: 'm：一次處理幾個 token', min: 1, max: 512, step: 1, value: 32 },
+          { id: 'k', label: 'k：每個 token 的維度', min: 64, max: 8192, step: 64, value: 768 },
+          { id: 'n', label: 'n：這一層的輸出維度', min: 64, max: 16384, step: 64, value: 3072 },
+        ], compute: (v) => {
+          const mult = v.m * v.k * v.n;
+          const params = v.k * v.n;
+          return { rows: [
+            { label: '輸出形狀', value: `${v.m}×${v.n}`, ratio: Math.min(1, (v.m * v.n) / (512 * 16384)) },
+            { label: '權重數（k×n，不含偏差）', value: params.toLocaleString(), ratio: Math.min(1, params / (8192 * 16384)) },
+            { label: '乘法次數 m×k×n', value: mult.toLocaleString(), ratio: Math.min(1, mult / (512 * 8192 * 16384)) },
+            { label: '浮點運算（乘＋加 ≈ 2mkn）', value: `${(2 * mult / 1e9).toFixed(2)} G`, ratio: Math.min(1, mult / (512 * 8192 * 16384)) },
+          ], note: '預設值：32 個 token、768 維、輸出 3072 維 → 輸出 32×3072，約 7,550 萬次乘法。m 加倍，運算量加倍，但權重數不變。' };
+        } } },
+        { type: 'table', head: ['在模型的哪裡', '形狀', '說明'], rows: [
+          ['一層全連接', '(token 數×d) × (d×4d)', 'Transformer 的前饋層常把維度放大 4 倍再縮回來'],
+          ['attention 分數 QKᵀ', '(n×d) × (d×n) ＝ n×n', '每個 token 對每個 token 一個分數'],
+          ['乘上 V', '(n×n) × (n×d) ＝ n×d', '依分數把資訊加權加總'],
+        ], caption: 'QKᵀ 是 n×n：context 長度加倍，這一步的分數變 4 倍。這是長 context 貴的原因之一。' },
+        { type: 'code', lang: 'python', title: '用 NumPy 檢查形狀', code: `import numpy as np
+
+X = np.ones((32, 768))     # 32 個 token，每個 768 維
+W = np.ones((768, 3072))   # 一層的權重
+print((X @ W).shape)       # (32, 3072)
+
+bad = np.ones((3072, 768))
+X @ bad                    # ValueError：中間的 768 和 3072 對不上` },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="attention 分數矩陣 n×n：context 從 4 個 token 變 8 個，格子從 16 格變 64 格">
+          ${[[4, 30], [8, 300]].map(([n, x0]) => { const s = 18; return Array.from({ length: n * n }, (_, i) => `<rect x="${x0 + (i % n) * s}" y="${30 + Math.floor(i / n) * s}" width="${s}" height="${s}" style="fill:var(--${n === 4 ? 'm1' : 'm4'})" class="stroke-ink" stroke-width="1.5"/>`).join('') + `<text x="${x0 + (n * s) / 2}" y="${n * s + 56}" text-anchor="middle" font-size="14" font-weight="900">n ＝ ${n}：${n * n} 格</text>`; }).join('')}
+          <path d="M140 80 L280 80" class="stroke-ink" stroke-width="3"/><text x="210" y="70" text-anchor="middle" font-size="13" font-weight="900">長度 ×2</text><text x="210" y="102" text-anchor="middle" font-size="13">分數 ×4</text>
+        </svg>`, caption: '長度 ×10，分數格子 ×100。很多長 context 的技巧都在想辦法少算這張表。' },
+      ],
+      tryit: {
+        q: ['(10×64) × (64×64) × (64×5) 最後是什麼形狀？中間有哪些數字「消失」了？'],
+        draft: '形狀：＿\n消失的：＿',
+        answer: ['先算前兩個：(10×64) × (64×64) ＝ 10×64；再乘 (64×5) ＝ 10×5。', '消失的是每次相乘中間對上的 64。可以想成：10 個 token 各經過兩層，最後每個 token 剩 5 個數字。'],
+      },
+    },
+    mistakes: [
+      { wrong: '(3×4) × (3×4) 可以相乘。', why: '中間是 4 和 3，對不上。', right: '其中一個轉置：(3×4) × (4×3)。' },
+      { wrong: '以為 AB 和 BA 一樣。', why: '形狀可能不同，數值通常也不同。', right: '矩陣乘法的順序不能隨便換。' },
+      { wrong: '以為批次變大，權重也要變多。', why: '權重是 k×n，跟 m 無關。', right: '批次只影響運算量與輸出大小。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '(5×3) × (3×7) 的結果形狀？', options: [
+        { text: '5×7', correct: true, why: '留下外面的 5 和 7。' },
+        { text: '3×3，中間的數字留下來', why: '中間的會消失。' },
+        { text: '15×21', why: '形狀不是各自相乘。' },
+        { text: '不能乘', why: '中間都是 3，可以乘。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'context 從 2,000 個 token 變成 8,000 個，attention 分數矩陣變成幾倍？', options: [
+        { text: '16 倍', correct: true, why: '(8000/2000)² ＝ 16。' },
+        { text: '4 倍，跟長度一樣比例增加', why: '分數表是 n×n，要平方。' },
+        { text: '8 倍', why: '沒有這個比例。' },
+        { text: '不變', why: '分數表隨長度變大。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['PyTorch 報錯：mat1 and mat2 shapes cannot be multiplied (32x512 and 768x3072)。你會怎麼找原因？'], answer: [
+        '中間的數字對不上：輸入每個 token 是 512 維，這一層卻預期 768 維。',
+        '常見原因：前一層的輸出維度設錯，或換了 embedding 模型、維度不同。把 nn.Linear 的 in_features 改成 512，或修正前一層讓它輸出 768。',
+      ] },
+    ],
+    keypoints: [
+      '(m×k) × (k×n) ＝ m×n，中間的 k 要一樣。',
+      '很多 token 疊成一個矩陣，一次算完。',
+      '運算量約 2mkn；attention 分數表是 n×n。',
+    ],
+    sources: ['3b1b-la', 'attention', 'pt-linear'],
+  },
+});
+</script>

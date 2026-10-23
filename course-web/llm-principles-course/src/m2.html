@@ -1,0 +1,324 @@
+<script>
+/* ==========================================================================
+   模組 2：Embedding：文字怎麼變成向量
+   ========================================================================== */
+defineTerms({
+  '向量': { en: 'vector', def: '一串排好順序的數字；在模型裡用來代表一個 token 的「特徵」。', example: '[0.12, −0.80, 0.33, …] 共 4,096 個數字。', lesson: '2-1' },
+  'embedding': { en: 'embedding', def: '把 token 編號變成向量的那張查找表，以及查出來的向量本身。表裡的數字是訓練學出來的。', example: '編號 4410 → 第 4410 列的那串數字。', lesson: '2-1' },
+  'cosine 相似度': { en: 'cosine similarity', def: '只看兩個向量的方向像不像：1 是同方向，0 是無關，−1 是相反。', example: '「貓」和「狗」的向量 cosine 通常比「貓」和「發票」高。', lesson: '2-2' },
+  '位置編碼': { en: 'positional encoding', def: '把「第幾個位置」加進向量的方法，讓模型分得出順序。', example: '原版 Transformer 用不同頻率的 sin、cos 波。', lesson: '2-3' },
+  'RoPE': { en: 'Rotary Position Embedding', def: '把位置資訊變成「依位置旋轉向量」的做法，讓 attention 直接感受到兩個 token 的相對距離。', example: 'Su 等 2021 提出，許多開放模型採用。', lesson: '2-3' },
+});
+
+const REVIEW_M1 = [
+  { level: '回想', type: 'mc', q: '（回顧 1-2）BPE 每一步合併哪一對？', options: [
+    { text: '語料裡出現最多次的相鄰配對', correct: true, why: '只看次數。' },
+    { text: '意思最接近的兩個字元', why: 'BPE 不看意思。' },
+    { text: '隨機挑一對相鄰的字元', why: '不是隨機。' },
+    { text: '最長那個詞的頭兩個字元', why: '和詞長無關。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 1-4）模型為什麼會在回答完自己停？', options: [
+    { text: '取樣時選到了結束 token', correct: true, why: '程式看到它就停。' },
+    { text: 'API 依字數自動截斷', why: '那是 max_tokens 的情況。' },
+    { text: '模型判斷使用者已經滿意', why: '模型沒有這種資訊。' },
+    { text: 'tokenizer 切到句號就停', why: '句號只是一般 token。' },
+  ] },
+];
+
+const WORD_POINTS = [
+  { label: '貓', x: -0.62, y: 0.55, group: 'a' }, { label: '狗', x: -0.52, y: 0.66, group: 'a' }, { label: '兔子', x: -0.72, y: 0.40, group: 'a' },
+  { label: '發票', x: 0.62, y: -0.48, group: 'b' }, { label: '收據', x: 0.70, y: -0.36, group: 'b' }, { label: '退款', x: 0.52, y: -0.62, group: 'b' },
+  { label: '下雨', x: 0.48, y: 0.62, group: 'c' }, { label: '颱風', x: 0.62, y: 0.52, group: 'c' }, { label: '晴天', x: 0.36, y: 0.74, group: 'c' },
+];
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出「查表」怎麼把 token 編號變成向量',
+      '知道向量表的數字從哪裡來',
+      '解釋為什麼要用向量而不是直接用編號',
+    ],
+    review: REVIEW_M1,
+    analogy: {
+      text: ['圖書館的索書號只是一個編號，「004.1」和「004.2」相鄰不代表內容相近。要知道一本書講什麼，得翻開它的摘要卡：主題、難度、語氣…每一項打一個分數。', '[[embedding]] 就是每個 token 的摘要卡：用編號去一張大表查出一列[[向量]]。這些數字一開始是亂數，訓練時慢慢調成「對預測下一個 token 有用」的樣子。'],
+      limit: ['摘要卡的每一欄有名字（主題、難度），向量的每一個維度通常沒有人看得懂的名字；意思分散在很多維度的組合裡。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="查表：token 編號 2 去向量表找第 2 列，取出那一列的數字當作向量">
+        <text x="20" y="28" font-size="15" font-weight="900">向量表（V 列 × d 欄）</text>
+        ${[0, 1, 2, 3, 4].map((r) => `<rect x="140" y="${44 + r * 34}" width="300" height="30" ${r === 2 ? 'style="fill:var(--m2)"' : 'class="fill-surface"'} class="stroke-ink" stroke-width="2"/><text x="120" y="${65 + r * 34}" text-anchor="end" font-size="14" class="mono">${r}</text><text x="290" y="${65 + r * 34}" text-anchor="middle" font-size="13" class="mono${r === 2 ? ' on-color' : ''}">${['0.21  −0.70  0.05  …', '−0.33  0.12  0.90  …', '0.64  0.08  −0.41  …', '0.02  −0.55  0.30  …', '−0.18  0.47  0.11  …'][r]}</text>`).join('')}
+        <text x="120" y="226" text-anchor="end" font-size="14" class="mono">…</text>
+        <rect x="10" y="102" width="80" height="34" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="50" y="125" text-anchor="middle" font-size="14" font-weight="900" class="on-color">編號 2</text>
+        <path d="M90 119 L132 119" class="stroke-ink" stroke-width="3"/>
+        <path d="M440 127 L480 127" class="stroke-ink" stroke-width="3"/>
+        <rect x="480" y="100" width="70" height="54" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="515" y="132" text-anchor="middle" font-size="14" font-weight="900" class="on-color">向量</text>
+        <text x="280" y="246" text-anchor="middle" font-size="13">數字是示意；真實的 d 常常是幾千</text>
+      </svg>`,
+      caption: '查表就是「取第幾列」。數學上等於 one-hot 向量乘上這張矩陣（隨身卷 2）。',
+    },
+    define: [
+      { term: 'embedding', en: 'embedding', def: '編號 → 向量的查找表。', example: 'V × d 的矩陣。' },
+      { term: '向量', en: 'vector', def: '一串數字。', example: 'd 個數字。' },
+      { term: 'one-hot', en: 'one-hot', def: '只有一個位置是 1、其他都是 0 的向量；乘上矩陣就等於取出那一列。', example: '[0, 0, 1, 0, 0] 取第 2 列。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="一句 4 個 token 查表後變成 4 列乘 d 欄的矩陣，每一列是一個 token 的向量">
+  ${['今天', '天氣', '很', '好'].map((t, i) => `<rect x="20" y="${30 + i * 44}" width="80" height="36" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><text x="60" y="${54 + i * 44}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text><path d="M100 ${48 + i * 44} L140 ${48 + i * 44}" class="stroke-ink" stroke-width="2"/>${[0, 1, 2, 3, 4, 5, 6].map((j) => `<rect x="${140 + j * 52}" y="${30 + i * 44}" width="48" height="36" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/>`).join('')}`).join('')}
+  <text x="320" y="210" text-anchor="middle" font-size="14">4 列 × d 欄（圖只畫 7 欄）：之後每一層都維持這個形狀</text>
+</svg>`, caption: '一句話＝一個 n × d 的矩陣。' },
+        { type: 'table', head: ['直接用編號當輸入', '用向量當輸入'], rows: [
+          ['編號 4410 和 4411 數字很近，但意思可能毫無關係', '意思相近的 token，向量也可以相近（2-2）'],
+          ['只有一個數字，裝不下多種特徵', 'd 個數字，可以同時表示很多種特徵'],
+          ['編號大小沒有意義，模型很難用', '向量可以拿來做加減乘，正好是神經網路擅長的'],
+        ] },
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'learn', label: '訓練時學出來的' }, { id: 'fixed', label: '事先就固定的' }], items: [
+          { text: '「台灣」這個 token 的向量裡的數字', answer: 'learn', why: '向量表是參數，一開始亂數，訓練時調整。' },
+          { text: '「台灣」這個 token 的編號是幾號', answer: 'fixed', why: '編號是 tokenizer 決定的，訓練模型前就固定。' },
+          { text: '向量有幾個數字（d）', answer: 'fixed', why: 'd 是設計模型時選的。' },
+          { text: '哪些 token 的向量會靠得很近', answer: 'learn', why: '靠近是訓練的結果，不是人安排的。' },
+        ] } },
+        { type: 'code', lang: 'python', title: '查表的兩種寫法，結果一樣（示意）', code: 'import numpy as np\nV, d = 5, 4\nE = np.random.randn(V, d)        # 向量表：一開始是亂數\n\ntoken_id = 2\nv1 = E[token_id]                 # 寫法一：直接取第 2 列\n\none_hot = np.zeros(V); one_hot[token_id] = 1\nv2 = one_hot @ E                 # 寫法二：one-hot 乘矩陣\n\nprint(np.allclose(v1, v2))       # True' },
+      ],
+      tryit: {
+        q: ['一句話有 10 個 token，d＝4,096。查完表後，這句話變成多少個數字？排成什麼形狀？'],
+        draft: '數字個數：＿\n形狀：＿ 列 × ＿ 欄',
+        answer: ['10 × 4,096 ＝ 40,960 個數字，排成 10 列 × 4,096 欄的矩陣：每一列是一個 token 的向量。', '接下來的 Transformer 區塊（模組 3、4）處理的就是這個矩陣，每一層進出都維持 10 × 4,096 的形狀。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為向量的第 1 個數字代表「名詞程度」這種人定義的意思。', why: '維度通常沒有單獨的名字，意思分散在組合裡。', right: '看向量之間的距離與方向，不看單一維度。' },
+      { wrong: '以為向量表是人工整理的字典。', why: '它是參數，從亂數開始被訓練調整。', right: '向量表和其他參數一起在預訓練時學出來。' },
+      { wrong: '以為同一個 token 在句子不同地方，查到的向量不同。', why: '查表只看編號，同一個 token 一定查到同一列。', right: '「看上下文」是後面 attention 的工作（模組 3）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '向量表裡的數字從哪裡來？', options: [
+        { text: '從亂數開始，訓練時被調整出來', correct: true, why: '向量表也是參數。' },
+        { text: '語言學家依詞性一個一個填好', why: '不是人工填寫。' },
+        { text: '由 tokenizer 合併時一起算出', why: 'tokenizer 只決定編號。' },
+        { text: '每次推論時根據上下文重新產生', why: '推論時參數固定。' },
+      ] },
+      { level: '應用', type: 'mc', q: '「蘋果手機」和「蘋果派」裡的「蘋果」是同一個 token。查表時會怎樣？', options: [
+        { text: '查到同一個向量', correct: true, why: '查表只看編號。' },
+        { text: '查到兩個不同的向量，分別代表公司與水果', why: '查表階段還沒看上下文。' },
+        { text: '查表會失敗，因為一個詞有兩個意思', why: '查表不會失敗。' },
+        { text: 'tokenizer 會把兩個「蘋果」切成不同編號', why: '同樣的文字切出同樣的編號。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼不能用「編號除以詞彙表大小」當作一個 0～1 的數字餵給模型，省掉向量表？'], answer: [
+        '編號的大小沒有意義：編號相近不代表意思相近，模型會被迫從一個無意義的數字推斷很多事。',
+        '一個數字也裝不下多種特徵。向量表讓每個 token 有 d 個可以自由調整的數字，訓練可以把有用的特徵放進去。',
+      ] },
+    ],
+    keypoints: [
+      'embedding＝用編號查表，取出一列向量。',
+      '向量表是參數：亂數開始，訓練時調整。',
+      '同一個 token 一定查到同一個向量；上下文由 attention 處理。',
+    ],
+    sources: ['word2vec', 'transformer'],
+  },
+
+  '2-2': {
+    goals: [
+      '說明「意思相近，向量就相近」是怎麼來的',
+      '用 cosine 相似度比較兩個向量',
+      '解釋「國王 − 男人 ＋ 女人 ≈ 女王」在說什麼，以及它的限制',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）查表時，同一個 token 在不同句子會得到？', options: [
+        { text: '同一個向量', correct: true, why: '查表只看編號。' },
+        { text: '依句子內容不同的向量', why: '那是 attention 之後的事。' },
+        { text: '隨機的向量', why: '推論時參數固定。' },
+        { text: '一個 0 到 1 的數字', why: '查到的是 d 個數字。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-3）詞彙表變大，向量表會？', options: [
+        { text: '列數變多，參數變多', correct: true, why: '向量表是 V × d。' },
+        { text: '欄數變多，每個向量變長', why: '欄數是 d，和 V 無關。' },
+        { text: '大小不變', why: 'V 變大，列數就變多。' },
+        { text: '變小', why: '方向反了。' },
+      ] },
+    ],
+    analogy: {
+      text: ['在一個城市裡，賣同類東西的店常常開在同一條街：電子街、婚紗街、書店街。只要知道店的座標，就大概猜得到它賣什麼。', '訓練時，出現在相似上下文的 token 會被調到相近的位置，於是向量空間裡也長出了「動物區」「金錢區」「天氣區」。比較兩個向量像不像，常用 [[cosine 相似度]]。'],
+      limit: ['城市是二維的，向量有幾千維，圖上只能畫出投影。而且城市分區是規劃出來的，向量空間的「分區」是訓練出來的，邊界模糊，還會反映訓練資料裡的偏見。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="cosine 相似度：兩個向量夾角小，cosine 接近 1；夾角 90 度，cosine 是 0；方向相反，cosine 是負 1">
+        ${[[90, 0.97, '夾角小', 15], [280, 0, '垂直', 90], [470, -1, '相反', 180]].map(([cx, cos, label, deg]) => {
+          const r = 70; const a = (deg * Math.PI) / 180;
+          return `<line x1="${cx - 60}" y1="170" x2="${cx + 10}" y2="170" class="stroke-ink" stroke-width="5"/>
+          <line x1="${cx - 60}" y1="170" x2="${Math.round(cx - 60 + r * Math.cos(a))}" y2="${Math.round(170 - r * Math.sin(a))}" style="stroke:var(--m2)" stroke-width="5"/>
+          <text x="${cx - 20}" y="210" text-anchor="middle" font-size="14" font-weight="900">${label}</text>
+          <text x="${cx - 20}" y="234" text-anchor="middle" font-size="14" class="mono">cos ≈ ${cos}</text>`;
+        }).join('')}
+        <text x="280" y="34" text-anchor="middle" font-size="15" font-weight="900">cosine 只看方向，不看長度</text>
+        <text x="280" y="58" text-anchor="middle" font-size="13">cos ＝ 點積 ÷（長度 × 長度）</text>
+      </svg>`,
+      caption: 'cosine 是 1 代表方向完全一樣，0 代表無關，−1 代表相反。點積怎麼算見隨身卷 1。',
+    },
+    define: [
+      { term: 'cosine 相似度', en: 'cosine similarity', def: '兩個向量方向的相似度，−1 到 1。', example: 'cos(貓, 狗) 高於 cos(貓, 發票)。' },
+      { term: '向量空間', en: 'vector space', def: '所有向量所在的那個多維空間。', example: '幾千維，圖上只能畫投影。' },
+      { term: '類比', en: 'analogy', def: '用向量差來表示關係：A − B ＋ C 接近 D。', example: '國王 − 男人 ＋ 女人 ≈ 女王。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'vecplot', props: { points: WORD_POINTS, query: { label: '小貓咪', x: -0.40, y: 0.30 }, k: 3, metrics: ['cosine', 'dot', 'euclid'] } },
+        { type: 'callout', variant: 'tip', title: '國王 − 男人 ＋ 女人 ≈ 女王', body: ['Mikolov、Yih、Zweig（2013）發現，詞向量裡的關係常常是一個固定的「方向」：從「男人」走到「女人」的那個方向，和從「國王」走到「女王」的方向很像。', '所以「國王」的向量減掉「男人」、加上「女人」，最接近的詞會是「女王」。這說明向量空間裡有結構，不只是把相似的詞堆在一起。'] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="向量類比：男人到女人的箭頭和國王到女王的箭頭幾乎平行而且等長">
+          <circle cx="120" cy="170" r="8" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="120" y="200" text-anchor="middle" font-size="15" font-weight="900">男人</text>
+          <circle cx="260" cy="170" r="8" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><text x="260" y="200" text-anchor="middle" font-size="15" font-weight="900">女人</text>
+          <circle cx="220" cy="60" r="8" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="220" y="40" text-anchor="middle" font-size="15" font-weight="900">國王</text>
+          <circle cx="360" cy="60" r="8" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><text x="360" y="40" text-anchor="middle" font-size="15" font-weight="900">女王</text>
+          <line x1="128" y1="170" x2="246" y2="170" class="stroke-ink" stroke-width="4"/><path d="M244 162 L256 170 L244 178 Z" class="stroke-ink" style="fill:var(--ink)"/>
+          <line x1="228" y1="60" x2="346" y2="60" class="stroke-ink" stroke-width="4"/><path d="M344 52 L356 60 L344 68 Z" class="stroke-ink" style="fill:var(--ink)"/>
+          <text x="420" y="110" font-size="14">兩支箭頭方向</text><text x="420" y="132" font-size="14">與長度都很像</text>
+          <text x="20" y="224" font-size="13">二維示意；真實向量的關係只是「大致」平行</text>
+        </svg>`, caption: '關係變成方向：這是向量能拿來做運算的原因。' },
+      ],
+      tryit: {
+        q: ['在向量平面把「問」拖到「發票」「收據」「退款」中間，再拖到原點附近。cosine 的前三名有變嗎？點積呢？'],
+        draft: '在三者中間：＿\n拖到原點附近：cosine ＿、點積 ＿',
+        answer: ['在三者中間時前三名都是金錢區的詞。往原點拖時，只要方向不變，cosine 排名不變；點積的分數會整體變小（向量變短）。', '這就是 cosine 只看方向的意思。LLM 內部的 attention 用的是點積（模組 3），所以長度也有影響。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為 king − man ＋ woman 一定剛好等於 queen。', why: '只是「最接近」，而且很多類比不成立。', right: '把它當成「空間有結構」的證據，不是精確公式。' },
+      { wrong: '以為二維圖上的距離就是真實距離。', why: '幾千維投影到兩維會失真。', right: '圖只能看大概分群；真正比較要在原始維度算。' },
+      { wrong: '以為向量相近一定代表意思相同。', why: '反義詞常出現在相似上下文，向量也可能很近。', right: '向量相近代表「用法相近」，不等於同義。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '兩個向量方向完全相同，cosine 相似度是？', options: [
+        { text: '1', correct: true, why: '同方向最大值是 1。' },
+        { text: '0', why: '0 是垂直。' },
+        { text: '−1', why: '−1 是方向相反。' },
+        { text: '看兩個向量長度而定', why: 'cosine 不看長度。' },
+      ] },
+      { level: '應用', type: 'mc', q: '為什麼「熱」和「冷」的向量可能很接近？', options: [
+        { text: '它們常出現在相似的上下文裡', correct: true, why: '「今天好＿」兩個都填得進去。' },
+        { text: '它們的意思完全相同', why: '意思相反。' },
+        { text: '它們的 token 編號剛好相鄰', why: '編號和向量位置無關。' },
+        { text: '向量表是照字典順序排列的', why: '向量表是訓練出來的。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['第一部模組 5 的「語意搜尋」也用向量。它和這一課的 token 向量有什麼不同？'], answer: [
+        '這一課的是「每個 token 一個向量」，是 LLM 的輸入層，同一個 token 永遠同一個向量。',
+        '語意搜尋用的是 embedding 模型輸出的「一整段文字一個向量」，已經看過上下文。兩者都利用「意思相近，向量相近」的性質。',
+      ] },
+    ],
+    keypoints: [
+      '出現在相似上下文的 token，向量會被訓練得相近。',
+      'cosine 只看方向：1 同向、0 無關、−1 相反。',
+      '關係會變成方向，所以向量能做加減；但只是近似。',
+    ],
+    sources: ['word2vec', 'regularities'],
+  },
+
+  '2-3': {
+    goals: [
+      '解釋為什麼 attention 本身分不出順序',
+      '說出正弦位置編碼的做法',
+      '知道 RoPE 等做法的大致差別',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）cosine 相似度看的是？', options: [
+        { text: '兩個向量的方向', correct: true, why: '不看長度。' },
+        { text: '兩個向量的長度', why: '長度被除掉了。' },
+        { text: 'token 編號的差距', why: '和編號無關。' },
+        { text: '兩個詞的字數', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-1）為什麼不用字母當 token？', options: [
+        { text: '序列會太長', correct: true, why: '每個字母一個 token。' },
+        { text: '字母沒辦法表示中文', why: '位元組可以表示任何文字。' },
+        { text: '字母太少，無法訓練', why: '和數量多寡無關。' },
+        { text: '字母沒有編號', why: '一樣有編號。' },
+      ] },
+    ],
+    analogy: {
+      text: ['把一句話的每個字寫在紙卡上，丟進袋子裡搖一搖。袋子裡的卡片沒有順序：「狗咬人」和「人咬狗」裝起來一模一樣。', 'attention（模組 3）的計算就像這個袋子：它比較的是 token 之間的內容，本身不知道誰在前面。所以要在每張卡片上蓋一個「第幾張」的章，也就是[[位置編碼]]。'],
+      limit: ['紙卡上的章是一個數字，位置編碼是一整串數字，和內容向量相加或用旋轉的方式混在一起（[[RoPE]]），模型要自己學會讀出位置。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="位置編碼：每個 token 的內容向量加上它所在位置的位置向量，得到送進 Transformer 的向量">
+        ${['狗', '咬', '人'].map((t, i) => `
+          <rect x="${30 + i * 180}" y="30" width="140" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="${100 + i * 180}" y="56" text-anchor="middle" font-size="14" font-weight="900" class="on-color">「${t}」的向量</text>
+          <text x="${100 + i * 180}" y="96" text-anchor="middle" font-size="20" font-weight="900">＋</text>
+          <rect x="${30 + i * 180}" y="108" width="140" height="40" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="${100 + i * 180}" y="134" text-anchor="middle" font-size="14" font-weight="900" class="on-color">位置 ${i} 的向量</text>
+          <text x="${100 + i * 180}" y="174" text-anchor="middle" font-size="20" font-weight="900">＝</text>
+          <rect x="${30 + i * 180}" y="184" width="140" height="40" class="fill-surface stroke-ink" stroke-width="3"/><text x="${100 + i * 180}" y="210" text-anchor="middle" font-size="14" font-weight="900">送進第 1 層</text>`).join('')}
+      </svg>`,
+      caption: '原版 Transformer 的做法：內容向量＋位置向量。換了順序，加上的位置向量就不同，模型才分得出來。',
+    },
+    define: [
+      { term: '位置編碼', en: 'positional encoding', def: '把位置資訊放進向量的方法。', example: '原版用 sin、cos。' },
+      { term: '正弦位置編碼', en: 'sinusoidal encoding', def: '第 i 對維度用 sin、cos 波，頻率依維度遞減。', example: '低維度變化快，高維度變化慢。' },
+      { term: 'RoPE', en: 'Rotary Position Embedding', def: '依位置旋轉 Q、K 向量，讓點積反映相對距離。', example: 'Su 等 2021。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '正弦位置編碼（實際計算，d＝512）', sliders: [
+          { id: 'pos', label: '位置 pos', min: 0, max: 200, step: 1, value: 3 },
+        ], compute: (v) => {
+          const d = 512;
+          const dims = [0, 2, 16, 64, 256];
+          const rows = dims.map((k) => {
+            const val = Math.sin(v.pos / 10000 ** (k / d));
+            return { label: `維度 ${k}（sin）`, value: val.toFixed(3), ratio: (val + 1) / 2 };
+          });
+          return { rows, note: '公式：PE(pos, 2i) ＝ sin(pos ÷ 10000^(2i/d))。長條在中間代表 0、最右是 1、最左是 −1。拉動位置：前面的維度變化很快，後面的維度幾乎不動，每個位置都得到一組獨特的數字。' };
+        } } },
+        { type: 'table', head: ['做法', '怎麼加位置', '出處'], rows: [
+          ['正弦位置編碼', '固定的 sin、cos 波，加到向量上', '原版 Transformer（2017）'],
+          ['學出來的位置向量', '每個位置一個可訓練的向量，加上去', '原論文說結果和正弦版幾乎一樣'],
+          ['RoPE', '依位置旋轉 Q、K 向量；點積自然反映相對距離', 'Su 等 2021；許多開放模型採用'],
+        ], caption: '各家實際用哪一種不一定公開；Claude 沒有公開。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="沒有位置編碼時，狗咬人和人咬狗在 attention 看來是同一袋向量；加了位置編碼後就不同">
+          <rect x="10" y="20" width="260" height="140" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="140" y="48" text-anchor="middle" font-size="15" font-weight="900">沒有位置</text>
+          <text x="140" y="84" text-anchor="middle" font-size="14">狗咬人 → {狗, 咬, 人}</text>
+          <text x="140" y="110" text-anchor="middle" font-size="14">人咬狗 → {人, 咬, 狗}</text>
+          <text x="140" y="140" text-anchor="middle" font-size="14" font-weight="900">同一袋，分不出來</text>
+          <rect x="290" y="20" width="260" height="140" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+          <text x="420" y="48" text-anchor="middle" font-size="15" font-weight="900" class="on-color">有位置</text>
+          <text x="420" y="84" text-anchor="middle" font-size="14" class="on-color">狗₀ 咬₁ 人₂</text>
+          <text x="420" y="110" text-anchor="middle" font-size="14" class="on-color">人₀ 咬₁ 狗₂</text>
+          <text x="420" y="140" text-anchor="middle" font-size="14" font-weight="900" class="on-color">向量不同，分得出來</text>
+          <text x="280" y="190" text-anchor="middle" font-size="13">下標代表位置</text>
+        </svg>`, caption: '「誰咬誰」完全靠順序決定，位置資訊不可少。' },
+      ],
+      tryit: {
+        q: ['把位置從 0 拉到 1，再從 100 拉到 101。哪幾個維度變化明顯？這對模型分辨「相鄰」和「遠近」有什麼幫助？'],
+        draft: '變化明顯的維度：＿\n幫助：＿',
+        answer: ['前面的維度（0、2）每一步都大幅變化，後面的維度（256）幾乎不動。', '變化快的維度幫忙分辨相鄰的位置，變化慢的維度幫忙分辨很遠的位置。像時鐘的秒針、分針、時針一起看，就能表示很長的時間。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為模型天生就知道字的順序。', why: 'attention 的計算本身不分前後。', right: '要靠位置編碼把順序放進去。' },
+      { wrong: '以為位置編碼是每個位置加一個 0、1、2 這樣的數字。', why: '單一數字會越來越大，也很難和向量混合。', right: '用一整串數字（sin、cos 或旋轉）表示位置。' },
+      { wrong: '以為所有 LLM 都用同一種位置編碼。', why: '有正弦、學習式、RoPE 等多種。', right: '看各模型公開的資料；沒公開就不要猜。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '為什麼 Transformer 需要位置編碼？', options: [
+        { text: '它本身分不出先後順序', correct: true, why: '它只比內容。' },
+        { text: '為了讓 tokenizer 切得更準', why: '位置編碼在 tokenizer 之後。' },
+        { text: '為了減少向量表的大小', why: '和向量表大小無關。' },
+        { text: '為了讓模型計算得更快', why: '它是為了正確性，不是速度。' },
+      ] },
+      { level: '應用', type: 'mc', q: '正弦位置編碼裡，哪些維度變化最快？', options: [
+        { text: '前面的（低）維度', correct: true, why: '分母 10000^(2i/d) 小，波的頻率高。' },
+        { text: '後面的（高）維度', why: '高維度變化最慢。' },
+        { text: '所有維度變化一樣快', why: '頻率依維度遞減。' },
+        { text: '只有中間的維度會變化', why: '每個維度都會變，快慢不同。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['模型訓練時最長只看過 4,000 個 token，推論時硬塞 40,000 個。從位置編碼的角度推測可能出什麼問題。'], answer: [
+        '後面的位置是模型從沒看過的位置編碼，它不知道怎麼解讀，表現可能變差。',
+        '這就是為什麼擴大 context window 不只是「把上限調高」，還要調整位置編碼的做法並用長文本再訓練（7-2）。',
+      ] },
+    ],
+    keypoints: [
+      'attention 分不出順序，要靠位置編碼。',
+      '正弦編碼：低維度變化快、高維度變化慢，每個位置一組獨特數字。',
+      '還有學習式與 RoPE 等做法；各家不一定公開。',
+    ],
+    sources: ['transformer', 'rope'],
+  },
+});
+</script>

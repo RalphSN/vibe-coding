@@ -1,0 +1,279 @@
+<script>
+/* ==========================================================================
+   模組 0：開始之前
+   ========================================================================== */
+defineTerms({
+  'LLM': { en: 'large language model', def: '大型語言模型：讀進一段文字、預測接下來最可能出現的文字的模型。', example: 'Claude、GPT、Gemini 都是 LLM。', lesson: '0-1' },
+  'API': { en: 'application programming interface', def: '讓程式呼叫另一個服務的固定格式：送出約定好的請求，拿回約定好的回應。', example: '你的程式送 JSON 到 `/v1/messages`，Claude API 回一段 JSON。', lesson: '0-1' },
+  'token': { en: 'token', def: '模型讀寫文字的最小單位，也是計費單位。一個 token 可能是幾個英文字母、一個中文字或一個標點。', example: '同一句話在不同模型的 token 數不一樣，要用 `count_tokens` 量。', lesson: '1-4' },
+  'SSE': { en: 'server-sent events', def: '伺服器用一條 HTTP 連線，持續一行一行送事件給用戶端的格式，MIME type 是 `text/event-stream`。', example: '串流回應時，每個 `content_block_delta` 事件帶來一小段文字。', lesson: '2-2' },
+  '模型': { en: 'model', def: '讀文字、寫文字的那個東西本身。它不會執行程式、不會上網，也不記得上一次對話。', example: '`claude-opus-5-5` 是一個模型的 ID。', lesson: '0-1' },
+  'AI 應用工程': { en: 'AI application engineering', def: '把模型接進產品的那一層工程：組請求、管對話、接工具與資料、控制成本、擋攻擊、量品質。', example: '做一個會查訂單的客服機器人，九成的程式碼在模型外面。', lesson: '0-1' },
+  '無狀態': { en: 'stateless', def: '伺服器不保留上一次請求的任何資訊；每次請求都要自己帶齊需要的東西。', example: 'Messages API 是無狀態的：要模型「記得」前面的對話，就把前面的訊息一起送。', lesson: '1-2' },
+  'API 金鑰': { en: 'API key', def: '證明「這個請求是你送的、錢算你的」的一串密碼。拿到它的人可以用你的額度。', example: 'Claude 的金鑰以 `sk-ant-` 開頭，放在 `x-api-key` 標頭。', lesson: '0-2' },
+  '環境變數': { en: 'environment variable', def: '作業系統替每個程式準備的一組「名稱＝值」設定，程式啟動時可以讀到。用來放金鑰，金鑰就不必寫進程式碼。', example: 'SDK 預設讀 `ANTHROPIC_API_KEY` 這個環境變數。', lesson: '0-2' },
+  'SDK': { en: 'software development kit', def: '官方提供的程式庫，把 HTTP 請求、重試、型別、串流解析都包好，讓你用函式呼叫 API。', example: '`@anthropic-ai/sdk` 是 Claude 的 TypeScript SDK。', lesson: '0-2' },
+  '後端': { en: 'backend', def: '跑在你自己伺服器上的程式。使用者看不到它的程式碼和環境變數，所以金鑰放這裡。', example: 'Node.js 寫的 `/api/chat` 路由。', lesson: '0-2' },
+  '前端': { en: 'frontend', def: '跑在使用者瀏覽器裡的程式。整包程式碼會下載到使用者電腦，任何人都看得到。', example: 'React 寫的聊天畫面。', lesson: '0-2' },
+});
+
+/* 七本書的地圖：0-1 用 */
+const SERIES_MAP_SVG = `<svg viewBox="0 0 560 300" role="img" aria-label="AI 系列七卷地圖：序章是全景地圖；第一部應用工程在最上層，往下是第二部大型語言模型原理、第三部機器學習基礎、第四部深度學習、第五部硬體與運算；隨身卷數學直覺在旁邊，每一部都會用到">
+  <rect x="10" y="10" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="38" font-size="16" font-weight="900">序章</text><text x="90" y="38" font-size="16">全景地圖：先看整張地圖</text>
+  <rect x="10" y="66" width="400" height="44" style="fill:var(--primary)" class="stroke-ink" stroke-width="4"/>
+  <text x="26" y="94" font-size="16" font-weight="900" class="on-color">第一部</text><text x="90" y="94" font-size="16" class="on-color">應用工程：把模型接進程式</text>
+  <rect x="10" y="122" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="150" font-size="16" font-weight="900">第二部</text><text x="90" y="150" font-size="16">LLM 原理：模型裡面在做什麼</text>
+  <rect x="10" y="178" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="206" font-size="16" font-weight="900">第三部</text><text x="90" y="206" font-size="16">機器學習：什麼叫「學習」</text>
+  <rect x="10" y="234" width="195" height="56" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="268" font-size="16" font-weight="900">第四部</text><text x="90" y="268" font-size="16">深度學習</text>
+  <rect x="215" y="234" width="195" height="56" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="231" y="268" font-size="16" font-weight="900">第五部</text><text x="295" y="268" font-size="16">硬體</text>
+  <rect x="430" y="66" width="120" height="224" class="fill-bg stroke-ink" stroke-width="3" stroke-dasharray="8 6"/>
+  <text x="490" y="160" text-anchor="middle" font-size="16" font-weight="900">隨身卷</text>
+  <text x="490" y="186" text-anchor="middle" font-size="15">數學直覺</text>
+  <text x="490" y="212" text-anchor="middle" font-size="14">每一部都用</text>
+</svg>`;
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '分清楚模型、API、應用三層各負責什麼',
+      '判斷一個功能裡哪些事是模型做的、哪些是你的程式做的',
+      '知道這一本在 AI 系列七卷裡的位置',
+    ],
+    analogy: {
+      text: ['[[模型]]像一位關在房間裡的專家顧問：你只能從門縫塞紙條進去，他讀完寫一張紙條遞出來。他不會出門查資料、不會幫你打電話，**連上一張紙條寫了什麼都不記得**。', '[[AI 應用工程]]就是門外那個人的工作：決定紙條上寫什麼、把上一張的內容抄進新紙條、拿著回覆去打電話或查資料，再把結果塞回去。'],
+      limit: ['真的顧問寫完整張才遞出來；模型可以一邊寫一邊把字遞出來（模組 2 的串流）。另外這位顧問按字數收費，而且你塞進去的字和他寫出來的字分開算價錢（1-5）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="三層架構：使用者面對你的應用；你的應用透過 API 送請求給模型；模型只負責讀文字寫文字。你的應用負責記住對話、呼叫工具、查資料、檢查輸出、顯示畫面；API 負責驗證金鑰、計費、限流">
+        <rect x="10" y="10" width="160" height="56" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="90" y="44" text-anchor="middle" font-size="17" font-weight="900">使用者</text>
+        <line x1="170" y1="38" x2="200" y2="38" class="stroke-ink" stroke-width="4"/>
+        <rect x="200" y="10" width="350" height="140" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+        <text x="220" y="40" font-size="17" font-weight="900" class="on-color">你的應用（本書的主角）</text>
+        <text x="220" y="70" font-size="15" class="on-color">記住對話・呼叫工具・查你的資料</text>
+        <text x="220" y="96" font-size="15" class="on-color">檢查輸出・擋攻擊・顯示畫面</text>
+        <text x="220" y="122" font-size="15" class="on-color">控制成本與延遲</text>
+        <line x1="375" y1="150" x2="375" y2="176" class="stroke-ink" stroke-width="4"/>
+        <rect x="200" y="176" width="350" height="62" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+        <text x="220" y="204" font-size="17" font-weight="900" class="on-color">API</text>
+        <text x="220" y="228" font-size="15" class="on-color">驗證金鑰・計費・限流・HTTP ＋ JSON</text>
+        <line x1="375" y1="238" x2="375" y2="264" class="stroke-ink" stroke-width="4"/>
+        <rect x="200" y="264" width="350" height="56" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+        <text x="220" y="298" font-size="17" font-weight="900" class="on-color">模型：讀文字、寫文字</text>
+      </svg>`,
+      caption: '模型只佔最下面那一格。這一本教的是最上面那一大格。',
+      blocks: ['看到一個 AI 功能時，先問：**這件事是模型做的，還是程式做的？** 模型只會讀一段文字、寫一段文字；其他每一件事，都是有人寫程式做出來的。'],
+    },
+    define: [
+      { term: '模型', en: 'model', def: '讀進文字、寫出文字的那個東西本身。本書的 [[LLM]] 指的就是它。', example: '`claude-opus-5-5`、`claude-sonnet-5-5` 是模型 ID。' },
+      { term: 'API', en: 'application programming interface', def: '你的程式和模型之間的固定格式：用 HTTP 送一段 JSON，拿回一段 JSON。', example: '`POST https://api.anthropic.com/v1/messages`。' },
+      { term: 'AI 應用工程', en: 'AI application engineering', def: '把模型接進產品的工程：組請求、管對話、接工具與資料、控制成本、擋攻擊、量品質。', example: '做一個查訂單的客服機器人。' },
+    ],
+    examples: {
+      compare: [{
+        title: '產品經理說：「讓 AI 記得客人上次問過什麼。」',
+        kind: '誰負責',
+        badLabel: '以為是模型的事',
+        goodLabel: '其實是程式的事',
+        bad: '在 prompt 裡寫「請記住這位客人」，然後就{{1:期待它下次記得}}',
+        good: '程式把每一輪對話{{1:存進資料庫}}，下次請求時把需要的部分一起送給模型',
+        badResult: '下一個請求時模型什麼都不記得，因為 API 不保留任何東西。',
+        goodResult: '模型「看起來」記得，其實是每次都重新讀到。',
+        why: ['模型沒有記憶；「記得」是程式把資料重新送進去'],
+      }],
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'model', label: '模型做的' }, { id: 'app', label: '你的程式做的' }, { id: 'api', label: 'API 做的' }], items: [
+          { text: '決定回覆的下一個字要寫什麼', answer: 'model', why: '這是模型唯一真正在做的事。' },
+          { text: '記得使用者五分鐘前說過的話', answer: 'app', why: 'API 沒有記憶；你的程式每次把對話歷史一起送出去（1-2）。' },
+          { text: '真的去查明天台北的天氣', answer: 'app', why: '模型只會說「我想查天氣」；呼叫天氣服務的是你的程式（模組 4）。' },
+          { text: '檢查請求帶的金鑰是不是有效', answer: 'api', why: '金鑰錯了，API 直接回 401，請求根本到不了模型。' },
+          { text: '把回答一個字一個字顯示在畫面上', answer: 'app', why: '模型送出的是一段一段的文字；畫出來的是你的前端（模組 2）。' },
+          { text: '算這次請求用了多少錢', answer: 'api', why: 'API 依輸入和輸出的 token 數計費，回應裡的 `usage` 告訴你用了多少（1-5）。' },
+        ] } },
+        { type: 'heading', id: 'series', text: '這一本在系列裡的位置' },
+        { type: 'svg', svg: SERIES_MAP_SVG, caption: '第一部站在最上層：先學會用。想知道模型裡面在做什麼，再往下讀第二到第五部。' },
+        { type: 'table', head: ['你想知道', '去哪一部'], rows: [
+          ['怎麼把模型接進自己的程式', '第一部（這一本）'],
+          ['token、attention、為什麼會幻覺', '第二部'],
+          ['什麼叫「訓練」、損失函數', '第三部'],
+          ['神經網路、反向傳播、PyTorch', '第四部'],
+          ['為什麼模型吃 GPU 記憶體', '第五部'],
+        ] },
+      ],
+      tryit: {
+        q: ['你要做一個「幫員工查請假規定」的聊天機器人。把下面三件事，各自標上是模型做的還是程式做的：'],
+        draft: '1. 讀懂員工問的是特休還是病假：＿＿\n2. 從公司規章裡找出相關的段落：＿＿\n3. 把找到的段落和問題一起交給模型，寫成回答：＿＿',
+        answer: ['1 是模型做的：理解一句話的意思是它的強項。', '2 是程式做的：模型看不到你的規章，要程式先搜尋、再把結果送進去（這就是模組 6 的 RAG）。', '3 是兩者合作：程式負責組合，模型負責寫。'],
+      },
+    },
+    mistakes: [
+      { wrong: '在 prompt 裡寫「請記住使用者的名字」，以為下次請求它就會記得。', why: '每次 API 請求都是獨立的，模型看不到上一次的任何東西。', right: '程式把名字存起來，每次請求時放進 system prompt 或對話歷史（1-2）。' },
+      { wrong: '請模型「去公司網站查最新價格」，期待它真的上網。', why: '模型本身不會發 HTTP 請求；它只能寫出「我想查」這段文字。', right: '提供一個查價格的工具，由你的程式真的去查，再把結果交給模型（模組 4）。' },
+      { wrong: '覺得「AI 功能做不好」就一直換更大的模型。', why: '很多問題出在模型外面：資料沒送進去、prompt 沒寫清楚、輸出沒驗證。', right: '先檢查應用這一層：模型拿到的資料對嗎？指示清楚嗎？輸出有檢查嗎？（模組 8 的評估）' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '下列哪一件事是**模型**本身在做的？', options: [
+        { text: '根據讀到的文字，寫出接下來的回覆', correct: true, why: '模型只做這件事：讀文字、寫文字。' },
+        { text: '把上一輪對話存起來，下次自動帶上', why: '模型沒有記憶，存與帶都是你的程式做的。' },
+        { text: '呼叫天氣服務，取得明天的降雨機率', why: '模型只能提出「想呼叫」；真的呼叫的是程式。' },
+        { text: '檢查請求帶來的金鑰有沒有權限', why: '金鑰是 API 在檢查，請求到不了模型。' },
+      ] },
+      { level: '應用', type: 'mc', q: '客服機器人回答了一個三個月前就改掉的退貨規定。最該先檢查哪裡？', options: [
+        { text: '程式送給模型的規章資料是不是舊版', correct: true, why: '模型只會根據讀到的文字回答；送進去的是舊規章，它就會照舊規章答。' },
+        { text: '模型是不是太小，該換更大的模型', why: '換模型解決不了「資料是舊的」；大模型照樣讀舊規章。' },
+        { text: 'prompt 有沒有寫「請使用最新的規定」', why: '模型不知道什麼是「最新」，它只看得到你送進去的那份。' },
+        { text: 'API 的回應是不是被快取住沒有更新', why: '每次請求模型都重新產生回應；問題在輸入的資料。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['有人說：「ChatGPT 網頁版就會記得我之前聊過什麼，所以模型有記憶。」根據這一課，你怎麼解釋？'], answer: [
+        '網頁版是一個**應用**，不是模型本身。記得之前聊過什麼，是那個應用把對話歷史（或整理過的摘要）存起來，在新的請求裡一起送給模型。',
+        '模型每次都是重新讀一遍。你自己用 API 做應用時，這件事要你的程式來做。',
+      ] },
+    ],
+    keypoints: [
+      '模型只會讀文字、寫文字，而且不記得上一次。',
+      '記憶、工具、資料、檢查、畫面、成本，都是應用這一層的工作，也就是這一本要教的。',
+      '看到 AI 功能先問：這件事是模型做的，還是程式做的？',
+    ],
+    sources: ['claude-messages', 'claude-models'],
+  },
+
+  '0-2': {
+    goals: [
+      '申請 [[API 金鑰]]並放進環境變數，不寫進程式碼',
+      '安裝 TypeScript SDK，送出第一個請求',
+      '說出金鑰為什麼只能放在後端',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1）「讓 AI 記得使用者上次說了什麼」是誰的工作？', options: [
+        { text: '你的程式：存下對話，下次請求一起送', correct: true, why: 'API 是無狀態的，記憶要程式自己處理。' },
+        { text: '模型：它會自動記住同一個金鑰的對話', why: '模型不記得任何上一次的請求，跟金鑰無關。' },
+        { text: 'API：它會幫每個使用者保存對話紀錄', why: 'Messages API 不保存對話；每次請求都要帶齊。' },
+        { text: 'prompt：寫「請記住」模型就會記住', why: '寫在 prompt 裡也只在這一次請求有效。' },
+      ] },
+    ],
+    analogy: {
+      text: ['[[API 金鑰]]像你的信用卡號碼：店家（API）只認號碼，不認人。誰拿到號碼，誰就能刷你的卡。', '所以金鑰只放在你自己控制的地方（[[後端]]的[[環境變數]]），不寫進程式碼、不放進瀏覽器、不貼到聊天室。'],
+      limit: ['金鑰比信用卡好處理：可以在 Console 隨時撤銷、重新產生，也可以設花費上限（1-5）。但撤銷前被刷掉的額度一樣算你的，所以還是要一開始就藏好。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="金鑰的正確路徑：瀏覽器把問題送到你的後端，後端從環境變數讀金鑰，再呼叫 Claude API。錯誤路徑：瀏覽器直接帶著金鑰呼叫 API，任何人都能從開發者工具看到金鑰">
+        <text x="10" y="28" font-size="16" font-weight="900">✓ 正確：金鑰只在後端</text>
+        <rect x="10" y="44" width="150" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="85" y="74" text-anchor="middle" font-size="16" font-weight="900">瀏覽器</text>
+        <text x="85" y="98" text-anchor="middle" font-size="14">沒有金鑰</text>
+        <line x1="160" y1="79" x2="200" y2="79" class="stroke-ink" stroke-width="4"/>
+        <rect x="200" y="44" width="170" height="70" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+        <text x="285" y="74" text-anchor="middle" font-size="16" font-weight="900" class="on-color">你的後端</text>
+        <text x="285" y="98" text-anchor="middle" font-size="14" class="on-color">環境變數裡的金鑰</text>
+        <line x1="370" y1="79" x2="410" y2="79" class="stroke-ink" stroke-width="4"/>
+        <rect x="410" y="44" width="140" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="480" y="84" text-anchor="middle" font-size="16" font-weight="900">Claude API</text>
+        <text x="10" y="170" font-size="16" font-weight="900">✗ 錯誤：金鑰在瀏覽器</text>
+        <rect x="10" y="186" width="150" height="70" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="3"/>
+        <text x="85" y="216" text-anchor="middle" font-size="16" font-weight="900" class="on-color">瀏覽器</text>
+        <text x="85" y="240" text-anchor="middle" font-size="14" class="on-color">程式碼裡有金鑰</text>
+        <line x1="160" y1="221" x2="410" y2="221" class="stroke-ink" stroke-width="4" stroke-dasharray="10 6"/>
+        <rect x="410" y="186" width="140" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="480" y="226" text-anchor="middle" font-size="16" font-weight="900">Claude API</text>
+        <text x="285" y="280" text-anchor="middle" font-size="14">打開開發者工具就看得到金鑰</text>
+      </svg>`,
+      caption: '前端程式會整包下載到使用者的電腦；放在裡面的東西都等於公開。',
+    },
+    define: [
+      { term: 'API 金鑰', en: 'API key', def: '證明請求是你送的、錢算你的那串密碼。Claude 的金鑰放在 `x-api-key` 標頭。', example: '在 Claude Console 的 API Keys 頁面產生。' },
+      { term: '環境變數', en: 'environment variable', def: '作業系統替程式準備的「名稱＝值」設定。SDK 預設讀 `ANTHROPIC_API_KEY`。', example: '`export ANTHROPIC_API_KEY="..."`（zsh）。' },
+      { term: 'SDK', en: 'software development kit', def: '官方程式庫，包好 HTTP、重試、型別與串流解析。', example: '`npm install @anthropic-ai/sdk`。' },
+    ],
+    examples: {
+      compare: [{
+        title: '建立 client 的兩種寫法',
+        kind: '金鑰放哪裡',
+        code: true,
+        badLabel: '寫死在程式碼',
+        goodLabel: '從環境變數讀',
+        bad: 'const client = new Anthropic({\n  apiKey: "{{1:sk-ant-api03-…}}",\n});',
+        good: '// 不給參數，SDK 自己讀 ANTHROPIC_API_KEY\nconst client = {{1:new Anthropic()}};',
+        badResult: '一 commit 到 GitHub，金鑰就公開了；機器人會掃描公開 repo 裡的金鑰。',
+        goodResult: '程式碼裡沒有秘密，可以放心分享；換金鑰只要改環境變數。',
+        why: ['秘密不進程式碼，只進環境變數'],
+      }],
+      blocks: [
+        { type: 'heading', id: 'setup', text: '從零到第一個回應' },
+        { type: 'table', head: ['步驟', '做什麼', '在哪裡'], rows: [
+          ['1', '登入 Claude Console，到 API Keys 產生一把金鑰，複製起來', 'platform.claude.com'],
+          ['2', '建立專案資料夾，`npm init -y`，裝 SDK', '終端機'],
+          ['3', '把金鑰設成環境變數 `ANTHROPIC_API_KEY`', '終端機'],
+          ['4', '寫 `first-call.ts`，用 `npx tsx` 執行', '編輯器＋終端機'],
+        ] },
+        { type: 'tabs', label: '作業系統', tabs: [
+          { label: 'Windows（PowerShell）', blocks: [{ type: 'code', lang: 'powershell', title: 'PowerShell', code: 'mkdir hello-claude; cd hello-claude\nnpm init -y\nnpm install @anthropic-ai/sdk\n\n# 只在這個終端機視窗有效；關掉就要重設\n$env:ANTHROPIC_API_KEY = "貼上你的金鑰"' }] },
+          { label: 'macOS（zsh）', blocks: [{ type: 'code', lang: 'bash', title: 'zsh', code: 'mkdir hello-claude && cd hello-claude\nnpm init -y\nnpm install @anthropic-ai/sdk\n\n# 只在這個終端機視窗有效；關掉就要重設\nexport ANTHROPIC_API_KEY="貼上你的金鑰"' }] },
+        ] },
+        { type: 'code', lang: 'typescript', title: 'first-call.ts', code: 'import Anthropic from "@anthropic-ai/sdk";\n\n// 不給參數：SDK 從環境變數 ANTHROPIC_API_KEY 讀金鑰\nconst client = new Anthropic();\n\nasync function main(): Promise<void> {\n  const message = await client.messages.create({\n    model: "claude-opus-5-5",\n    max_tokens: 1024,\n    messages: [{ role: "user", content: "用一句話解釋什麼是 token" }],\n  });\n\n  // content 是一個陣列；Opus 5.5 可能先放一個思考區塊，所以只印文字區塊\n  for (const block of message.content) {\n    if (block.type === "text") console.log(block.text);\n  }\n  console.log(message.usage); // 這次用了多少 token\n}\n\nmain();' },
+        { type: 'code', lang: 'bash', title: '執行', code: 'npx tsx first-call.ts' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="回應物件的結構：content 是一個陣列，第一格可能是 type 為 thinking 的思考區塊，文字是空的；第二格才是 type 為 text 的回答。旁邊的 usage 記錄輸入與輸出 token 數">
+          <rect x="10" y="10" width="540" height="230" class="fill-bg stroke-ink" stroke-width="3"/>
+          <text x="26" y="40" font-size="16" font-weight="900" class="mono">message</text>
+          <text x="26" y="72" font-size="15" class="mono">content: [</text>
+          <rect x="46" y="84" width="230" height="64" class="fill-surface stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+          <text x="60" y="110" font-size="15" class="mono">type: "thinking"</text>
+          <text x="60" y="134" font-size="14">文字是空的（預設不顯示）</text>
+          <rect x="290" y="84" width="240" height="64" style="fill:var(--success)" class="stroke-ink" stroke-width="3"/>
+          <text x="304" y="110" font-size="15" class="mono on-color">type: "text"</text>
+          <text x="304" y="134" font-size="14" class="on-color">真正的回答在這裡</text>
+          <text x="26" y="174" font-size="15" class="mono">]</text>
+          <text x="26" y="210" font-size="15" class="mono">usage: { input_tokens, output_tokens }</text>
+          <text x="530" y="230" text-anchor="end" font-size="14">要付錢的數量</text>
+        </svg>`, caption: '用 `block.type === "text"` 篩，就不會把空的思考區塊印出來。' },
+        { type: 'callout', variant: 'tip', title: '印出來的 usage 是什麼', body: ['`usage` 裡的 `input_tokens` 和 `output_tokens` 就是這次要付錢的數量。1-5 會教你怎麼把它換算成錢。'] },
+        { type: 'widget', name: 'checklist', props: { key: '0-2', items: ['金鑰只存在環境變數或 `.env` 檔', '`.env` 已經寫進 `.gitignore`', '程式碼裡搜尋不到 `sk-ant-`', '前端（瀏覽器）程式不直接呼叫 Claude API', '在 Console 設了每月花費上限'] } },
+      ],
+      tryit: {
+        q: ['朋友傳來一段程式，說「照這樣做就能在網頁上直接聊天」。找出問題並寫出你的修法：'],
+        code: true,
+        draft: '// app.js（瀏覽器載入）\nconst res = await fetch("https://api.anthropic.com/v1/messages", {\n  headers: { "x-api-key": "sk-ant-api03-…" },\n  ...\n});',
+        answer: ['問題：金鑰寫在瀏覽器載入的檔案裡，任何訪客打開開發者工具都看得到，可以拿去刷你的額度。', '修法：瀏覽器改打你自己的後端（例如 `/api/chat`），後端從環境變數讀金鑰再呼叫 Claude API。2-3 會完整做一次。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把金鑰寫在程式碼裡，打算「上線前再拿掉」。', why: '只要 commit 過一次，金鑰就留在 git 歷史裡，刪掉檔案也還在。', right: '一開始就用環境變數；萬一真的 commit 了，立刻在 Console 撤銷那把金鑰，再產生新的。' },
+      { wrong: '印出 `message.content[0].text` 當作回答。', why: '`content` 是陣列，第一個區塊不一定是文字；Opus 5.5 常常先放一個思考區塊。', right: '用 `block.type === "text"` 篩出文字區塊再讀。' },
+      { wrong: '在 PowerShell 用 `export ANTHROPIC_API_KEY=...`。', why: '`export` 是 bash／zsh 的語法，PowerShell 不認得。', right: 'PowerShell 用 `$env:ANTHROPIC_API_KEY = "..."`；macOS 的 zsh 才用 `export`。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '不給參數的 `new Anthropic()` 會從哪裡拿金鑰？', options: [
+        { text: '環境變數 `ANTHROPIC_API_KEY`', correct: true, why: '這是 SDK 的預設來源；所以程式碼裡不必出現金鑰。' },
+        { text: '專案資料夾裡的 `package.json`', why: '`package.json` 放套件設定，SDK 不會去那裡找金鑰，也不該放。' },
+        { text: '瀏覽器的 localStorage', why: 'SDK 跑在後端，而且金鑰不該進瀏覽器。' },
+        { text: '第一次執行時跳出視窗請你輸入', why: 'SDK 不會互動式詢問；找不到金鑰就直接報錯。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你發現三天前 commit 的檔案裡有金鑰，repo 是公開的。第一件事該做什麼？', options: [
+        { text: '到 Console 撤銷那把金鑰，再產生一把新的', correct: true, why: '金鑰可能已經被掃走；只有撤銷才能讓它失效。清理 git 歷史是之後的事。' },
+        { text: '刪掉那個檔案，再 commit 一次', why: '舊的 commit 還在歷史裡，金鑰照樣查得到。' },
+        { text: '把 repo 改成私人的就好', why: '公開的那三天可能已經被複製；改私人不會讓金鑰失效。' },
+        { text: '先看用量有沒有異常，沒有就不用處理', why: '沒看到異常不代表沒外洩；被盜用可能在之後才發生。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你要做一個手機 App，App 裡要能跟 Claude 聊天。根據這一課，金鑰應該放在哪裡？為什麼不能放在 App 裡？'], answer: [
+        '放在你自己的後端伺服器；App 呼叫你的後端，後端再呼叫 Claude API。',
+        'App 安裝檔會下載到每個使用者的手機，和網頁前端一樣可以被拆開來看，放在裡面的金鑰等於公開。後端還可以順便做登入檢查與用量限制，避免有人用你的 App 大量刷額度。',
+      ] },
+    ],
+    lab: {
+      minutes: 15,
+      task: ['照上面「從零到第一個回應」四個步驟，在自己電腦跑出第一個回應。', '跑成功後，把 `content` 改成問你自己工作上的一個問題，再看一次 `usage` 裡的數字變了多少。'],
+    },
+    keypoints: [
+      '金鑰等於信用卡號碼：只放在後端的環境變數，不進程式碼、不進瀏覽器。',
+      '`new Anthropic()` 會自己讀 `ANTHROPIC_API_KEY`；回應的 `content` 是陣列，要篩出文字區塊。',
+      '萬一外洩，第一件事是撤銷金鑰，不是刪檔案。',
+    ],
+    sources: ['claude-messages', 'ts-sdk', 'claude-pricing'],
+  },
+});
+</script>
+
