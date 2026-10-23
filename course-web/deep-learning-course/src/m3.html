@@ -1,0 +1,408 @@
+<script>
+/* ==========================================================================
+   模組 3：反向傳播與計算圖（手寫迷你自動微分）
+   ========================================================================== */
+defineTerms({
+  '計算圖': { en: 'computational graph', def: '把一個大公式拆成很多小運算（加、乘、ReLU…），每個運算是一個節點，箭頭表示誰用了誰的結果。', example: 'L＝(a·b＋c)²：乘、加、平方三個節點。', lesson: '3-1' },
+  '鏈鎖律': { en: 'chain rule', def: '一連串函式的導數＝每一段的導數相乘：∂L/∂x＝∂L/∂y × ∂y/∂x。', example: 'y＝3x＋1、L＝y² → ∂L/∂x＝2y × 3。', lesson: '3-2' },
+  '局部梯度': { en: 'local gradient', def: '一個節點的輸出對它自己輸入的導數，只看這個節點本身。', example: '乘法 a·b 對 a 的局部梯度是 b。', lesson: '3-2' },
+  '反向傳播': { en: 'backpropagation', def: '從損失開始，沿計算圖往回走，用鏈鎖律把梯度一路乘回每個參數。', example: 'Rumelhart、Hinton、Williams 1986。', lesson: '3-3' },
+  '自動微分': { en: 'automatic differentiation', def: '程式在計算時記下計算圖，之後自動做反向傳播算出所有梯度；PyTorch 的 autograd 就是這個。', example: 'loss.backward()。', lesson: '3-4' },
+});
+
+const REVIEW_M2 = [
+  { level: '回想', type: 'mc', q: '（回顧 2-3）PyTorch 的 CrossEntropyLoss 吃什麼？', options: [
+    { text: 'logits', correct: true, why: '內部自己做 softmax。' },
+    { text: '先 softmax 過的機率', why: '會做兩次 softmax。' },
+    { text: '取過 log 的機率再取負', why: '那是損失本身。' },
+    { text: 'one-hot 後的預測', why: '預測要給 logits。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 2-2）前向傳播的中間值為什麼要記住？', options: [
+    { text: '反向傳播要用', correct: true, why: '算局部梯度需要它們。' },
+    { text: '為了印出來好看', why: '有實際用途。' },
+    { text: '下一筆資料會用到', why: '每筆各算各的。' },
+    { text: '推論時一定要存', why: '推論可以不存。' },
+  ] },
+];
+
+const GRAPH_SIMPLE = [
+  { id: 'a', op: 'leaf', value: 2 }, { id: 'b', op: 'leaf', value: -3 }, { id: 'c', op: 'leaf', value: 10 },
+  { id: 'd', op: 'mul', args: ['a', 'b'] }, { id: 'e', op: 'add', args: ['d', 'c'] }, { id: 'L', op: 'sq', args: ['e'] },
+];
+const GRAPH_NET = [
+  { id: 'x1', op: 'leaf', value: 1 }, { id: 'x2', op: 'leaf', value: 0.5 }, { id: 'w1', op: 'leaf', value: 0.4 }, { id: 'w2', op: 'leaf', value: 0.6 }, { id: 'b1', op: 'leaf', value: 0.1 },
+  { id: 'p1', op: 'mul', args: ['w1', 'x1'] }, { id: 'p2', op: 'mul', args: ['w2', 'x2'] }, { id: 's', op: 'add', args: ['p1', 'p2'] }, { id: 'z', op: 'add', args: ['s', 'b1'] }, { id: 'h', op: 'relu', args: ['z'] },
+  { id: 'v', op: 'leaf', value: 1.5 }, { id: 'q', op: 'mul', args: ['v', 'h'] }, { id: 'c', op: 'leaf', value: 0.2 }, { id: 'yhat', op: 'add', args: ['q', 'c'] },
+  { id: 't', op: 'leaf', value: 1 }, { id: 'err', op: 'sub', args: ['yhat', 't'] }, { id: 'L', op: 'sq', args: ['err'] },
+];
+const GRAPH_TANH = [
+  { id: 'x1', op: 'leaf', value: 2 }, { id: 'w1', op: 'leaf', value: -3 }, { id: 'x2', op: 'leaf', value: 0 }, { id: 'w2', op: 'leaf', value: 1 }, { id: 'b', op: 'leaf', value: 6.8813735870195432 },
+  { id: 'x1w1', op: 'mul', args: ['x1', 'w1'] }, { id: 'x2w2', op: 'mul', args: ['x2', 'w2'] }, { id: 'sum', op: 'add', args: ['x1w1', 'x2w2'] }, { id: 'n', op: 'add', args: ['sum', 'b'] }, { id: 'o', op: 'tanh', args: ['n'] },
+];
+
+const SIMPLE_GRAPH_SVG = `<svg viewBox="0 0 560 256" role="img" aria-label="計算圖：a 和 b 相乘得到 d，d 加上 c 得到 e，e 平方得到 L；前向值寫在上方，反向梯度寫在下方">
+  ${[['a', 40, 50, '2', '−24'], ['b', 40, 130, '−3', '16'], ['c', 220, 170, '10', '8']].map(([n, x, y, v, g]) => `<rect x="${x}" y="${y}" width="80" height="44" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="${x + 40}" y="${y + 28}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${n}＝${v}</text><text x="${x + 40}" y="${y + 62}" text-anchor="middle" font-size="13" style="fill:var(--m7)" font-weight="900">∂L/∂${n}＝${g}</text>`).join('')}
+  <circle cx="220" cy="92" r="30" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="220" y="98" text-anchor="middle" font-size="16" font-weight="900" class="on-color">×</text>
+  <circle cx="360" cy="120" r="30" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="360" y="126" text-anchor="middle" font-size="16" font-weight="900" class="on-color">＋</text>
+  <circle cx="480" cy="120" r="30" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="480" y="126" text-anchor="middle" font-size="15" font-weight="900" class="on-color">²</text>
+  <line x1="120" y1="72" x2="190" y2="88" class="stroke-ink" stroke-width="2"/><line x1="120" y1="152" x2="192" y2="102" class="stroke-ink" stroke-width="2"/>
+  <line x1="250" y1="96" x2="330" y2="114" class="stroke-ink" stroke-width="2"/><line x1="300" y1="190" x2="336" y2="138" class="stroke-ink" stroke-width="2"/>
+  <line x1="390" y1="120" x2="450" y2="120" class="stroke-ink" stroke-width="2"/>
+  <text x="290" y="84" text-anchor="middle" font-size="13">d＝−6</text><text x="420" y="110" text-anchor="middle" font-size="13">e＝4</text><text x="520" y="76" text-anchor="middle" font-size="14" font-weight="900">L＝16</text>
+  <text x="280" y="250" text-anchor="middle" font-size="13">方框裡：前向的值・方框下方：反向得到的梯度</text>
+</svg>`;
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '把一個公式拆成計算圖',
+      '在計算圖上做一次前向傳播',
+      '說出計算圖為什麼讓求梯度變簡單',
+    ],
+    review: REVIEW_M2,
+    analogy: {
+      text: ['做一道菜的食譜：切菜 → 炒 → 加醬 → 收汁。每一步只做一件小事，用上一步的結果。', '[[計算圖]]就是公式的食譜：把 L＝(a·b＋c)² 拆成「乘、加、平方」三個節點。每個節點都很簡單，簡單到我們知道它自己的導數；把這些小導數接起來，就能算出整個公式的梯度。'],
+      limit: ['食譜是一條線，計算圖可以分岔又合流（一個值被好幾個節點用到）；那時候梯度要把每一條路的貢獻加起來（3-3）。'],
+    },
+    model: { svg: SIMPLE_GRAPH_SVG, caption: 'a＝2、b＝−3、c＝10：前向算出 L＝16；反向得到 a、b、c 各自的梯度。下面的互動一步一步算出這些數字。' },
+    define: [
+      { term: '計算圖', en: 'computational graph', def: '公式拆成小運算的圖。', example: '乘 → 加 → 平方。' },
+      { term: '節點', en: 'node', def: '一個運算或一個輸入。', example: 'd＝a×b。' },
+      { term: '葉節點', en: 'leaf', def: '沒有再往前的輸入：資料或參數。', example: 'a、b、c。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="前向與反向的方向：前向從輸入往輸出算值，反向從損失往輸入算梯度">
+  ${['a、b、c', 'd＝a×b', 'e＝d＋c', 'L＝e²'].map((t, i) => `<rect x="${20 + i * 135}" y="60" width="115" height="50" style="fill:var(--m${i})" class="stroke-ink" stroke-width="3"/><text x="${77 + i * 135}" y="91" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text>`).join('')}
+  <path d="M30 40 L520 40" class="stroke-ink" stroke-width="3"/><path d="M512 32 L524 40 L512 48 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="280" y="30" text-anchor="middle" font-size="14" font-weight="900">前向：算值</text>
+  <path d="M520 132 L30 132" class="stroke-ink" stroke-width="3"/><path d="M38 124 L26 132 L38 140 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="280" y="160" text-anchor="middle" font-size="14" font-weight="900">反向：算梯度（從 ∂L/∂L＝1 開始）</text>
+</svg>`, caption: '同一張圖走兩次：先往右算值，再往左算梯度。' },
+        { type: 'widget', name: 'autodiff', props: { title: 'L ＝ (a × b ＋ c)²：先前向 3 步，再反向 4 步', nodes: GRAPH_SIMPLE } },
+        { type: 'table', head: ['節點', '運算', '對輸入的局部梯度'], rows: [
+          ['加法 u＋v', '把兩個數相加', '對 u 是 1、對 v 是 1'],
+          ['乘法 u×v', '把兩個數相乘', '對 u 是 v、對 v 是 u'],
+          ['平方 u²', '自己乘自己', '2u'],
+          ['ReLU(u)', '負數變 0', 'u＞0 時 1，否則 0'],
+          ['tanh(u)', 'S 形壓縮', '1 − tanh(u)²'],
+        ], caption: '每種節點的局部梯度都很簡單：反向傳播只需要這張表加上鏈鎖律。' },
+      ],
+      tryit: {
+        q: ['把 c 改成 0（a＝2、b＝−3 不變），前向算 L，再猜 ∂L/∂a 會是多少。'],
+        draft: 'L ＝ ＿\n∂L/∂a ＝ ＿',
+        answer: ['d ＝ −6、e ＝ −6、L ＝ 36。', '∂L/∂e ＝ 2e ＝ −12；∂L/∂d ＝ −12；∂L/∂a ＝ b × (−12) ＝ −3 × (−12) ＝ 36。3-2 會說明為什麼是這樣乘。'],
+      },
+    },
+    mistakes: [
+      { wrong: '想一次對整個大公式求導。', why: '公式一大就很容易算錯。', right: '拆成小節點，每個節點只管自己的局部梯度。' },
+      { wrong: '以為計算圖是人另外畫的。', why: '框架在你寫計算時自動記錄。', right: '前向算一次，圖就有了（3-4）。' },
+      { wrong: '忘了葉節點也包含參數。', why: '我們要的正是參數的梯度。', right: '權重、偏差都是葉節點。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '乘法節點 u×v 對 u 的局部梯度是？', options: [
+        { text: 'v', correct: true, why: 'u 每多 1，結果多 v。' },
+        { text: 'u，就是它自己', why: '是另一個輸入。' },
+        { text: '1，和加法一樣', why: '加法才是 1。' },
+        { text: 'u×v，就是結果', why: '不是結果本身。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'a＝3、b＝2、c＝−5，L＝(a×b＋c)² 是多少？', options: [
+        { text: '1', correct: true, why: '6−5＝1，平方 1。' },
+        { text: '121，加錯了正負號', why: 'c 是 −5。' },
+        { text: '−1，忘了平方', why: '平方後是正的。' },
+        { text: '36，忘了加 c', why: 'c 要加進去。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個有 100 萬個參數的網路，為什麼還是可以用「每個節點只管自己的局部梯度」的方法算出所有梯度？'], answer: [
+        '不管網路多大，它都是由加、乘、激活這幾種簡單運算組成的計算圖。每個節點的局部梯度都很簡單。',
+        '反向傳播只要從輸出往回走一次，每個節點做一次「局部梯度 × 從後面傳來的梯度」，就能得到所有參數的梯度，計算量和前向傳播差不多。',
+      ] },
+    ],
+    keypoints: [
+      '計算圖：把公式拆成簡單的小運算。',
+      '每種節點的局部梯度都很簡單（加 1、乘換另一個、平方 2u）。',
+      '前向算值，反向算梯度。',
+    ],
+    sources: ['micrograd'],
+  },
+
+  '3-2': {
+    goals: [
+      '寫出鏈鎖律',
+      '用鏈鎖律算出兩層組合函式的導數',
+      '用「推一點點」驗證鏈鎖律的結果',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-1）平方節點 u² 的局部梯度？', options: [
+        { text: '2u', correct: true, why: '平方的導數。' },
+        { text: 'u，就是自己', why: '少了 2 倍。' },
+        { text: '1，和加法一樣', why: '不是加法。' },
+        { text: 'u²，就是結果', why: '不是結果。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-2）ReLU 在 z＝−1 的斜率？', options: [
+        { text: '0', correct: true, why: '負數區是平的。' },
+        { text: '1', why: '正數區才是 1。' },
+        { text: '−1', why: '不是負的。' },
+        { text: '0.5', why: '那是別的函式。' },
+      ] },
+    ],
+    analogy: {
+      text: ['齒輪組：第一個齒輪轉 1 圈，第二個轉 3 圈；第二個轉 1 圈，第三個轉 2 圈。那第一個轉 1 圈，第三個轉幾圈？3 × 2 ＝ 6 圈。', '[[鏈鎖律]]就是這樣：x 影響 y，y 影響 L，x 對 L 的影響＝每一段的[[局部梯度]]相乘。不管中間有幾段，都是一路乘過去。'],
+      limit: ['齒輪的比例是固定的，函式的局部梯度會隨當下的值改變（例如 y² 的斜率是 2y），所以要先做前向傳播知道每個值，才能算反向。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 210" role="img" aria-label="鏈鎖律：x 經過 y 等於 3x 加 1 到達 y，再經過 L 等於 y 平方到達 L；dL/dx 等於 dL/dy 乘以 dy/dx 等於 2y 乘以 3">
+        <rect x="20" y="60" width="100" height="60" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="70" y="96" text-anchor="middle" font-size="18" font-weight="900" class="on-color">x</text>
+        <rect x="230" y="60" width="100" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="96" text-anchor="middle" font-size="18" font-weight="900" class="on-color">y</text>
+        <rect x="440" y="60" width="100" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="490" y="96" text-anchor="middle" font-size="18" font-weight="900" class="on-color">L</text>
+        <line x1="120" y1="90" x2="230" y2="90" class="stroke-ink" stroke-width="3"/><text x="175" y="80" text-anchor="middle" font-size="14">y＝3x＋1</text><text x="175" y="114" text-anchor="middle" font-size="14" font-weight="900">dy/dx＝3</text>
+        <line x1="330" y1="90" x2="440" y2="90" class="stroke-ink" stroke-width="3"/><text x="385" y="80" text-anchor="middle" font-size="14">L＝y²</text><text x="385" y="114" text-anchor="middle" font-size="14" font-weight="900">dL/dy＝2y</text>
+        <text x="280" y="164" text-anchor="middle" font-size="17" font-weight="900" class="mono">dL/dx ＝ 2y × 3</text>
+        <text x="280" y="194" text-anchor="middle" font-size="14">每一段的局部梯度相乘</text>
+      </svg>`,
+      caption: '中間有幾段，就乘幾次。隨身卷 3 有導數與斜率的直覺。',
+    },
+    define: [
+      { term: '鏈鎖律', en: 'chain rule', def: '∂L/∂x＝∂L/∂y × ∂y/∂x。', example: '一路相乘。' },
+      { term: '局部梯度', en: 'local gradient', def: '一段自己的導數。', example: 'dy/dx＝3。' },
+      { term: '上游梯度', en: 'upstream gradient', def: '從後面傳回來的 ∂L/∂(這個節點)。', example: 'dL/dy＝2y。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '鏈鎖律 vs 推一點點（實際計算）：L＝(3x＋1)²', sliders: [
+          { id: 'x', label: 'x', min: -3, max: 3, step: 0.25, value: 1 },
+        ], compute: (v) => {
+          const y = 3 * v.x + 1;
+          const L = (x) => (3 * x + 1) ** 2;
+          const chain = 2 * y * 3;
+          const num = (L(v.x + 1e-5) - L(v.x - 1e-5)) / 2e-5;
+          return { rows: [
+            { label: `y ＝ 3×${v.x} ＋ 1`, value: y.toFixed(2), ratio: Math.min(1, Math.abs(y) / 10) },
+            { label: 'L ＝ y²', value: (y * y).toFixed(2), ratio: Math.min(1, (y * y) / 100) },
+            { label: '鏈鎖律：2y × 3', value: chain.toFixed(3), ratio: Math.min(1, Math.abs(chain) / 60) },
+            { label: '推一點點看變化', value: num.toFixed(3), ratio: Math.min(1, Math.abs(num) / 60) },
+          ], note: '兩種算法一模一樣。x＝1 時：y＝4，dL/dx＝2×4×3＝24。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 214" role="img" aria-label="分岔時要相加：x 同時被兩條路用到，到 L 的總梯度等於兩條路的梯度相加">
+          <rect x="20" y="70" width="90" height="56" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="65" y="104" text-anchor="middle" font-size="17" font-weight="900" class="on-color">x</text>
+          <rect x="220" y="20" width="110" height="50" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="275" y="51" text-anchor="middle" font-size="15" font-weight="900" class="on-color">路線 1</text>
+          <rect x="220" y="126" width="110" height="50" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="275" y="157" text-anchor="middle" font-size="15" font-weight="900" class="on-color">路線 2</text>
+          <rect x="440" y="70" width="90" height="56" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="485" y="104" text-anchor="middle" font-size="17" font-weight="900" class="on-color">L</text>
+          <line x1="110" y1="90" x2="220" y2="45" class="stroke-ink" stroke-width="3"/><line x1="110" y1="106" x2="220" y2="151" class="stroke-ink" stroke-width="3"/>
+          <line x1="330" y1="45" x2="440" y2="90" class="stroke-ink" stroke-width="3"/><line x1="330" y1="151" x2="440" y2="106" class="stroke-ink" stroke-width="3"/>
+          <text x="280" y="198" text-anchor="middle" font-size="14" font-weight="900">∂L/∂x ＝ 路線 1 的乘積 ＋ 路線 2 的乘積</text>
+        </svg>`, caption: '一個值被用在好幾個地方時，梯度要「累加」：這是自動微分程式裡用 ＋＝ 的原因。' },
+      ],
+      tryit: {
+        q: ['L＝(2x − 1)³，x＝1。用鏈鎖律算 dL/dx。（提示：u³ 的導數是 3u²）'],
+        draft: 'u ＝ 2x − 1 ＝ ＿\ndL/du ＝ ＿\ndu/dx ＝ ＿\ndL/dx ＝ ＿',
+        answer: ['u ＝ 1；dL/du ＝ 3u² ＝ 3；du/dx ＝ 2。', 'dL/dx ＝ 3 × 2 ＝ 6。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把局部梯度相加而不是相乘。', why: '串連的每一段是相乘的關係。', right: '串連：相乘；分岔再合流：各路相加。' },
+      { wrong: '不做前向就想算反向。', why: '局部梯度（像 2y）要用到前向的值。', right: '先前向，再反向。' },
+      { wrong: '一個值被用兩次時，只算其中一條路。', why: '兩條路都會影響 L。', right: '梯度累加（＋＝）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'x 經過 y 到 L，dL/dx 等於？', options: [
+        { text: 'dL/dy × dy/dx', correct: true, why: '鏈鎖律。' },
+        { text: 'dL/dy ＋ dy/dx', why: '串連要相乘。' },
+        { text: 'dL/dy ÷ dy/dx', why: '不是相除。' },
+        { text: '只要 dL/dy 就好', why: '少了一段。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'y＝5x、L＝y²，x＝2 時 dL/dx？', options: [
+        { text: '100', correct: true, why: 'y＝10，2y×5＝100。' },
+        { text: '20，只算 2y', why: '還要乘 5。' },
+        { text: '10，就是 y', why: '要算導數。' },
+        { text: '50，2x 乘 5 再乘 5', why: '用錯了中間值。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個網路有 50 層，每層的局部梯度大約都是 0.5。從損失傳到第一層，梯度大約剩多少？這說明了什麼？'], answer: [
+        '0.5⁵⁰ ≈ 8.9 × 10⁻¹⁶，幾乎是 0。',
+        '鏈鎖律是一路相乘，局部梯度小於 1 時，深網路前面的層幾乎收不到梯度（梯度消失，4-4）。殘差連接、ReLU、好的初始化都是為了對付這個問題。',
+      ] },
+    ],
+    keypoints: [
+      '鏈鎖律：串連的局部梯度一路相乘。',
+      '分岔再合流：各條路的梯度相加。',
+      '局部梯度要用前向的值，所以先前向再反向。',
+    ],
+    sources: ['rumelhart-1986'],
+  },
+
+  '3-3': {
+    goals: [
+      '在 2-2 的小網路上走完一次反向傳播',
+      '算出權重的梯度並更新一次',
+      '說出反向傳播的成本為什麼和前向差不多',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）一個值被兩條路用到，它的梯度？', options: [
+        { text: '兩條路的貢獻相加', correct: true, why: '都會影響 L。' },
+        { text: '只取比較大的那條', why: '兩條都要算。' },
+        { text: '兩條路相乘', why: '串連才相乘。' },
+        { text: '取平均', why: '是相加。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-2）小網路 x＝[1, 0.5] 的 ŷ？', options: [
+        { text: '1.4', correct: true, why: '1.5×0.8＋0.2。' },
+        { text: '1.5，沒有 ReLU 時的值', why: '有 ReLU。' },
+        { text: '0.8，就是 h₁', why: '還要乘 1.5 加 0.2。' },
+        { text: '0.16，那是損失', why: '問的是 ŷ。' },
+      ] },
+    ],
+    analogy: {
+      text: ['餐廳客訴：菜太鹹。主管往回查：是醬料多了？還是廚師加鹽多了？每一站依照「它對最後結果的影響有多大」分擔責任。', '[[反向傳播]]就是在分責任：從損失出發，沿著計算圖往回走，每個節點把收到的梯度乘上自己的局部梯度，分給它的輸入。走到葉節點，就得到每個權重「該為損失負多少責任」。'],
+      limit: ['餐廳分責任靠判斷，反向傳播是精確的乘法；而且責任可以是負的：負梯度代表「這個權重變大，損失會變小」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="小網路的反向傳播：損失的梯度 1 往回乘，err 的梯度 0.8，y-hat 0.8，h 1.2，w1 1.2，w2 0.6，v 0.64">
+        ${[['L', 500, '1'], ['err', 420, '0.8'], ['ŷ', 340, '0.8'], ['h', 260, '1.2'], ['z', 180, '1.2']].map(([n, x, g]) => `<rect x="${x - 34}" y="40" width="68" height="44" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="${x}" y="68" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${n}</text><text x="${x}" y="104" text-anchor="middle" font-size="13" font-weight="900">${g}</text>`).join('')}
+        ${[[466, 454], [386, 374], [306, 294], [226, 214]].map(([a, b]) => `<line x1="${a}" y1="62" x2="${b}" y2="62" class="stroke-ink" stroke-width="2"/>`).join('')}
+        ${[['w₁', 80, 150, '1.2'], ['w₂', 180, 150, '0.6'], ['v', 300, 150, '0.64'], ['b₁', 400, 150, '1.2']].map(([n, x, y, g]) => `<rect x="${x - 40}" y="${y}" width="80" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${x}" y="${y + 28}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${n}：${g}</text>`).join('')}
+        <text x="280" y="222" text-anchor="middle" font-size="13">上排：沿主幹往回的梯度・下排：各參數得到的梯度（答案 y＝1）</text>
+      </svg>`,
+      caption: '下面的互動一步一步算出每個數字；h₂ 那一支因為 ReLU 關掉，梯度是 0，這裡省略。',
+    },
+    define: [
+      { term: '反向傳播', en: 'backpropagation', def: '從損失往回，用鏈鎖律算出所有梯度。', example: 'loss.backward()。' },
+      { term: '梯度', en: 'gradient', def: '∂L/∂參數。', example: '∂L/∂w₁＝1.2。' },
+      { term: '更新', en: 'update', def: '參數 ← 參數 − 學習率 × 梯度。', example: 'w₁：0.4 → 0.28（學習率 0.1）。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'autodiff', props: { title: '2-2 的小網路（h₁ 那一支）：前向 9 步、反向 10 步', nodes: GRAPH_NET } },
+        { type: 'table', head: ['參數', '梯度', '學習率 0.1 更新後', '方向'], rows: [
+          ['w₁', '1.2', '0.4 − 0.12 ＝ 0.28', '變小 → h₁ 變小 → ŷ 往 1 靠近'],
+          ['w₂', '0.6', '0.6 − 0.06 ＝ 0.54', '變小'],
+          ['b₁', '1.2', '0.1 − 0.12 ＝ −0.02', '變小'],
+          ['v', '0.64', '1.5 − 0.064 ＝ 1.436', '變小'],
+          ['c', '0.8', '0.2 − 0.08 ＝ 0.12', '變小'],
+        ], caption: 'ŷ＝1.4 比答案 1 大，所以每個會讓 ŷ 變大的參數都被往下調。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="成本比較：前向傳播走一次計算圖，反向傳播也走一次，所以算出全部梯度的成本只是前向的常數倍">
+          <rect x="20" y="40" width="240" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="140" y="76" text-anchor="middle" font-size="15" font-weight="900" class="on-color">前向：走一次 →</text>
+          <rect x="300" y="40" width="240" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="420" y="76" text-anchor="middle" font-size="15" font-weight="900" class="on-color">← 反向：也走一次</text>
+          <text x="280" y="134" text-anchor="middle" font-size="14">不管有幾個參數，一次反向就得到全部梯度</text>
+          <text x="280" y="158" text-anchor="middle" font-size="13">對比「推一點點」：每個參數都要多算一次損失</text>
+        </svg>`, caption: '這是反向傳播能訓練幾十億參數模型的關鍵。' },
+      ],
+      tryit: {
+        q: ['如果答案 y 改成 2（ŷ 還是 1.4），∂L/∂err 和 ∂L/∂w₁ 會變成多少？更新後 w₁ 是變大還是變小？'],
+        draft: '∂L/∂err ＝ ＿\n∂L/∂w₁ ＝ ＿\nw₁ 變大／變小',
+        answer: ['err ＝ 1.4 − 2 ＝ −0.6，∂L/∂err ＝ 2 × (−0.6) ＝ −1.2。', '一路乘回去：∂L/∂h ＝ 1.5 × (−1.2) ＝ −1.8，∂L/∂w₁ ＝ x₁ × (−1.8) ＝ −1.8。梯度是負的，更新後 w₁ 變大，讓 ŷ 往 2 靠近。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為反向傳播是另一種學習演算法。', why: '它只是「算梯度」的方法；更新參數是優化器的事。', right: '反向傳播算梯度，優化器用梯度更新（模組 4）。' },
+      { wrong: '被 ReLU 關掉的分支也照樣傳梯度。', why: 'ReLU 在負數的局部梯度是 0。', right: '關掉的神經元這一次不會被更新。' },
+      { wrong: '每次更新前忘了把舊梯度清掉。', why: '梯度是累加的，會疊上上一批的。', right: 'PyTorch 每步要 optimizer.zero_grad()（7-2）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '反向傳播的起點是什麼？', options: [
+        { text: '損失對自己的梯度＝1', correct: true, why: '從輸出往回乘。' },
+        { text: '輸入資料的梯度', why: '那是終點附近。' },
+        { text: '隨機產生一個梯度', why: '是確定的。' },
+        { text: '學習率', why: '學習率是更新用的。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'w₁ 的梯度是 1.2，學習率 0.1，更新後的 w₁（原本 0.4）？', options: [
+        { text: '0.28', correct: true, why: '0.4 − 0.12。' },
+        { text: '0.52，把梯度加上去', why: '要減。' },
+        { text: '1.6，0.4 加 1.2', why: '要乘學習率並相減。' },
+        { text: '0.12，就是學習率乘梯度', why: '要從 0.4 減。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['為什麼說「反向傳播讓訓練大模型變得可行」？如果用「推一點點」算 10 億個參數的梯度會怎樣？'], answer: [
+        '推一點點：每個參數都要多做一次前向傳播才能看損失變多少，10 億個參數就要 10 億次前向，完全不可行。',
+        '反向傳播：一次前向＋一次反向（成本大約是前向的兩三倍）就得到全部 10 億個梯度。',
+      ] },
+    ],
+    keypoints: [
+      '反向傳播：從損失往回，每個節點「局部梯度 × 上游梯度」分給輸入。',
+      '得到梯度後，優化器才更新參數。',
+      '一次反向就得到全部梯度，成本和前向同一個量級。',
+    ],
+    sources: ['rumelhart-1986', 'micrograd'],
+  },
+
+  '3-4': {
+    goals: [
+      '讀懂一個約 30 行的自動微分程式',
+      '說出 Value 物件需要記住哪三件事',
+      '把它對應到 PyTorch 的 autograd',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-3）反向傳播算出梯度之後，誰負責更新參數？', options: [
+        { text: '優化器', correct: true, why: '例如 SGD、Adam。' },
+        { text: '反向傳播自己', why: '它只算梯度。' },
+        { text: '損失函數', why: '損失只負責算錯多少。' },
+        { text: '資料', why: '資料不會更新參數。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-1）tanh(u) 的局部梯度？', options: [
+        { text: '1 − tanh(u)²', correct: true, why: '表上的公式。' },
+        { text: 'tanh(u)，就是自己', why: '不是自己。' },
+        { text: '2u', why: '那是平方。' },
+        { text: '1', why: '那是加法。' },
+      ] },
+    ],
+    analogy: {
+      text: ['寫日記：每做一件事，就記下「用了什麼、做了什麼」。之後要追溯原因，翻日記往回看就好。', '[[自動微分]]的做法一樣：每個數字包成一個 Value 物件，做運算時記下「我的輸入是誰」和「怎麼把梯度傳回去」。呼叫 backward() 時，照記錄的相反順序往回走。這就是 Karpathy 的 micrograd（約 100 行）和 PyTorch autograd 的核心想法。'],
+      limit: ['日記可以隨便記，自動微分每種運算都要寫對局部梯度；PyTorch 在 tensor 上做同樣的事，並用 GPU 一次算整個矩陣，而不是一個一個數字。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="Value 物件記住三件事：data 是數值，grad 是梯度，_prev 與 _backward 記錄輸入是誰以及怎麼把梯度傳回去">
+        <rect x="140" y="20" width="280" height="180" class="fill-surface stroke-ink" stroke-width="4"/>
+        <text x="280" y="50" text-anchor="middle" font-size="17" font-weight="900" class="mono">Value</text>
+        ${[['data', '這個數字是多少（前向）', 'm1'], ['grad', '∂L/∂這個數字（反向）', 'm3'], ['_prev、_backward', '輸入是誰、怎麼傳梯度', 'm4']].map(([a, b, c], i) => `<rect x="160" y="${66 + i * 42}" width="240" height="36" style="fill:var(--${c})" class="stroke-ink" stroke-width="2"/><text x="176" y="${89 + i * 42}" font-size="14" font-weight="900" class="mono on-color">${a}</text><text x="390" y="${89 + i * 42}" text-anchor="end" font-size="13" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="222" text-anchor="middle" font-size="13">PyTorch 的 tensor 也有 .data、.grad、.grad_fn，對應這三件事</text>
+      </svg>`,
+      caption: 'micrograd 的設計；完整版在 GitHub（MIT 授權）。',
+    },
+    define: [
+      { term: '自動微分', en: 'autodiff', def: '記錄計算圖、自動反向傳播。', example: 'PyTorch autograd。' },
+      { term: 'Value', en: 'Value', def: '包著 data 與 grad 的數字物件。', example: 'micrograd。' },
+      { term: '拓撲排序', en: 'topological sort', def: '把節點排成「輸入一定在前面」的順序；反向時倒過來走。', example: 'backward() 第一步。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'code', lang: 'python', title: 'mini_autograd.py：約 30 行的自動微分（示意，參考 micrograd 的設計）', code: 'import math\n\nclass Value:\n    def __init__(self, data, _prev=()):\n        self.data, self.grad = data, 0.0\n        self._prev = _prev\n        self._backward = lambda: None\n\n    def __add__(self, other):\n        out = Value(self.data + other.data, (self, other))\n        def _backward():\n            self.grad += out.grad            # 加法：局部梯度 1\n            other.grad += out.grad\n        out._backward = _backward\n        return out\n\n    def __mul__(self, other):\n        out = Value(self.data * other.data, (self, other))\n        def _backward():\n            self.grad += other.data * out.grad   # 乘法：換成另一個輸入\n            other.grad += self.data * out.grad\n        out._backward = _backward\n        return out\n\n    def tanh(self):\n        t = math.tanh(self.data)\n        out = Value(t, (self,))\n        def _backward():\n            self.grad += (1 - t ** 2) * out.grad\n        out._backward = _backward\n        return out\n\n    def backward(self):\n        order, seen = [], set()\n        def build(v):                        # 拓撲排序：輸入一定排在前面\n            if v not in seen:\n                seen.add(v)\n                for p in v._prev:\n                    build(p)\n                order.append(v)\n        build(self)\n        self.grad = 1.0\n        for v in reversed(order):            # 倒過來走：反向傳播\n            v._backward()' },
+        { type: 'widget', name: 'autodiff', props: { title: '用上面的程式算一個 tanh 神經元：o ＝ tanh(x₁w₁ ＋ x₂w₂ ＋ b)', nodes: GRAPH_TANH } },
+        { type: 'code', lang: 'python', title: '同一個神經元，用 PyTorch（示意）', code: 'import torch\nx1, x2 = torch.tensor(2.0), torch.tensor(0.0)\nw1 = torch.tensor(-3.0, requires_grad=True)\nw2 = torch.tensor(1.0, requires_grad=True)\nb = torch.tensor(6.8813735870195432, requires_grad=True)\no = torch.tanh(x1 * w1 + x2 * w2 + b)\no.backward()\nprint(o.item(), w1.grad.item(), w2.grad.item())   # 約 0.7071、1.0、0.0' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="對照：自己寫的 Value 與 PyTorch tensor；data 對 data，grad 對 grad，_backward 對 grad_fn，backward 對 backward">
+          ${[['我們的 Value', 'PyTorch tensor'], ['.data', '.data／.item()'], ['.grad', '.grad'], ['._backward', '.grad_fn'], ['.backward()', '.backward()']].map(([a, b], i) => `<text x="150" y="${30 + i * 32}" text-anchor="middle" font-size="14" ${i === 0 ? 'font-weight="900"' : 'class="mono"'}>${a}</text><text x="410" y="${30 + i * 32}" text-anchor="middle" font-size="14" ${i === 0 ? 'font-weight="900"' : 'class="mono"'}>${b}</text>${i ? `<line x1="230" y1="${26 + i * 32}" x2="330" y2="${26 + i * 32}" class="stroke-ink" stroke-width="2" stroke-dasharray="4 3"/>` : ''}`).join('')}
+        </svg>`, caption: '差別在 PyTorch 處理的是整個 tensor，並可以在 GPU 上算。' },
+      ],
+      tryit: {
+        q: ['在上面的 tanh 神經元，x₁ 的梯度是多少？為什麼 w₂ 的梯度是 0？'],
+        draft: '∂o/∂x₁ ＝ ＿\nw₂ 的梯度為 0 的原因：＿',
+        answer: ['n ＝ 0.8814，o ＝ tanh(n) ≈ 0.7071，∂o/∂n ＝ 1 − 0.5 ＝ 0.5。∂o/∂x₁ ＝ w₁ × 0.5 ＝ −1.5。', 'w₂ 的局部梯度是 x₂，而 x₂ ＝ 0：這個輸入是 0，調 w₂ 完全不會影響輸出。'],
+      },
+    },
+    mistakes: [
+      { wrong: '_backward 裡用 ＝ 而不是 ＋＝。', why: '一個值被用兩次時，第二條路會蓋掉第一條。', right: '梯度一律累加。' },
+      { wrong: '不排序就直接往回呼叫 _backward。', why: '可能在上游梯度還沒算完時就往下傳。', right: '先拓撲排序，再倒序走。' },
+      { wrong: '以為 PyTorch 的 autograd 是完全不同的東西。', why: '核心想法一樣，只是對象是 tensor。', right: '把 micrograd 當成 autograd 的縮小版來理解。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'Value 物件的 grad 存的是？', options: [
+        { text: '最終輸出對這個值的梯度', correct: true, why: '∂L/∂這個值。' },
+        { text: '這個值自己的數字', why: '那是 data。' },
+        { text: '這個值的輸入是誰', why: '那是 _prev。' },
+        { text: '學習率', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'backward() 為什麼要先做拓撲排序？', options: [
+        { text: '確保往回傳時，上游梯度已經算完', correct: true, why: '倒序走才正確。' },
+        { text: '讓程式跑得比較快', why: '是為了正確性。' },
+        { text: '把重複的節點刪掉', why: '不會刪節點。' },
+        { text: '幫參數排大小', why: '和大小無關。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['要讓這個 Value 支援 ReLU，_backward 該怎麼寫？'], answer: [
+        'out ＝ Value(max(0, self.data), (self,))；_backward 裡寫 self.grad ＋＝ (1 if out.data ＞ 0 else 0) × out.grad。',
+        '也就是局部梯度：正數時 1、否則 0（3-1 的表）。',
+      ] },
+    ],
+    keypoints: [
+      'Value 記住 data、grad，以及輸入與怎麼傳梯度。',
+      'backward()：拓撲排序，倒序呼叫每個節點的 _backward，梯度累加。',
+      'PyTorch autograd 是同一個想法在 tensor 上的版本。',
+    ],
+    sources: ['micrograd', 'pytorch-autograd'],
+  },
+});
+</script>

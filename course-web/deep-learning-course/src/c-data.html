@@ -1,0 +1,148 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'AI 系列・第四部｜深度學習',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-23',
+  version: 'v1',
+};
+
+/* AI 系列七本書：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: 'AI 系列',
+  current: 'ai-dl',
+  volumes: [
+    { id: 'ai-map', vol: '序章', title: 'AI 全景地圖', href: '../ai-series-0-map-course/index.html' },
+    { id: 'ai-app', vol: '第一部', title: 'AI 應用工程', href: '../ai-app-engineering-course/index.html' },
+    { id: 'ai-llm', vol: '第二部', title: '大型語言模型原理', href: '../llm-principles-course/index.html' },
+    { id: 'ai-ml', vol: '第三部', title: '機器學習基礎', href: '../ml-foundations-course/index.html' },
+    { id: 'ai-dl', vol: '第四部', title: '深度學習', href: '../deep-learning-course/index.html' },
+    { id: 'ai-hw', vol: '第五部', title: '硬體與運算', href: '../ai-hardware-course/index.html' },
+    { id: 'ai-math', vol: '隨身卷', title: '數學直覺', href: '../ai-math-pocket-course/index.html' },
+  ],
+};
+
+/* 全書主軸：訓練一個神經網路的一輪；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '一批資料', note: '輸入與答案', color: 'var(--m0)' },
+    { label: '前向傳播', note: '一層一層算出預測', color: 'var(--m1)' },
+    { label: '損失', note: '預測和答案差多少', color: 'var(--m2)' },
+    { label: '反向傳播', note: '鏈鎖律算出每個權重的梯度', color: 'var(--m3)' },
+    { label: '優化器更新', note: 'SGD、Adam 調整權重', color: 'var(--m4)' },
+    { label: '下一批', note: '重複幾千幾萬次', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [1], 2: [0, 1, 2], 3: [3], 4: [4, 5], 5: [0, 1], 6: [1], 7: [0, 1, 2, 3, 4, 5] },
+  byLesson: { '2-3': [1, 2], '3-1': [1, 3], '4-4': [3, 4] },
+};
+
+/* 首頁主視覺：一個小網路，前向往右、反向往左（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="一個小的神經網路：兩個輸入、三個隱藏神經元、一個輸出；上方箭頭往右是前向傳播，下方箭頭往左是反向傳播">
+  ${[[80, 150], [80, 270]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="30" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>`).join('')}
+  ${[[280, 110], [280, 210], [280, 310]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="30" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>`).join('')}
+  <circle cx="480" cy="210" r="34" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+  ${[[80, 150], [80, 270]].map(([x1, y1]) => [[280, 110], [280, 210], [280, 310]].map(([x2, y2]) => `<line x1="${x1 + 30}" y1="${y1}" x2="${x2 - 30}" y2="${y2}" class="stroke-ink" stroke-width="2.5"/>`).join('')).join('')}
+  ${[[280, 110], [280, 210], [280, 310]].map(([x1, y1]) => `<line x1="${x1 + 30}" y1="${y1}" x2="446" y2="210" class="stroke-ink" stroke-width="2.5"/>`).join('')}
+  <text x="80" y="156" text-anchor="middle" font-size="18" font-weight="900" class="on-color">x₁</text>
+  <text x="80" y="276" text-anchor="middle" font-size="18" font-weight="900" class="on-color">x₂</text>
+  <text x="480" y="216" text-anchor="middle" font-size="18" font-weight="900" class="on-color">ŷ</text>
+  <path d="M60 46 L480 46" class="stroke-ink" stroke-width="4"/><path d="M472 38 L486 46 L472 54 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="270" y="34" text-anchor="middle" font-size="17" font-weight="900">前向傳播：算出預測</text>
+  <path d="M480 380 L60 380" class="stroke-ink" stroke-width="4"/><path d="M68 372 L54 380 L68 388 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="270" y="408" text-anchor="middle" font-size="17" font-weight="900">反向傳播：把誤差的責任分回每條線</text>
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '從一條線|到一個網路', short: '起點', desc: '第三部的邏輯回歸就是一個神經元；這一卷把它疊成網路，並親手算出它怎麼學。', lessons: [
+    ['0-1', '從邏輯回歸|到神經網路'],
+  ]},
+  { id: 1, title: '神經元|與激活函數', short: '神經元', desc: '一個神經元算什麼、激活函數有哪些、為什麼一定要有非線性。', lessons: [
+    ['1-1', '一個|神經元'],
+    ['1-2', '激活函數：|ReLU、sigmoid、GELU'],
+    ['1-3', '為什麼要|非線性：XOR'],
+  ]},
+  { id: 2, title: '前向|傳播', short: '前向', desc: '一層就是一次矩陣乘法；手算一個小網路從輸入到損失。', lessons: [
+    ['2-1', '一層＝|矩陣乘法'],
+    ['2-2', '手算|一個小網路'],
+    ['2-3', '輸出層|與損失'],
+  ]},
+  { id: 3, title: '反向傳播|與計算圖', short: '反向', desc: '計算圖、鏈鎖律、梯度一層一層往回傳，最後手寫一個迷你自動微分。', lessons: [
+    ['3-1', '計算圖：|把公式拆成小步驟'],
+    ['3-2', '鏈鎖律：|責任一層一層分'],
+    ['3-3', '反向傳播|一步一步'],
+    ['3-4', '手寫一個|迷你自動微分'],
+  ]},
+  { id: 4, title: '優化器|與學習率', short: '優化器', desc: 'SGD 與小批次、動量、Adam、學習率排程，以及梯度消失與初始化。', lessons: [
+    ['4-1', 'SGD|與小批次'],
+    ['4-2', '動量：|帶著慣性走'],
+    ['4-3', 'Adam：|每個參數自己的步伐'],
+    ['4-4', '排程、初始化|與梯度消失'],
+  ]},
+  { id: 5, title: 'CNN：|機器怎麼看圖', short: 'CNN', desc: '卷積的小窗格、池化、特徵的層次，以及 LeNet 到 ResNet。', lessons: [
+    ['5-1', '卷積：|小窗格滑過圖片'],
+    ['5-2', '池化|與特徵階層'],
+    ['5-3', '從 LeNet|到 ResNet'],
+  ]},
+  { id: 6, title: '從 RNN|到 Transformer', short: '序列', desc: '一個字一個字讀的 RNN、長距離記不住的問題，以及 attention 怎麼取代遞迴。', lessons: [
+    ['6-1', 'RNN：|一個字一個字讀'],
+    ['6-2', '長距離依賴|與 LSTM'],
+    ['6-3', 'attention|取代遞迴'],
+  ]},
+  { id: 7, title: 'PyTorch 入門，|訓練迷你 GPT', short: 'PyTorch', desc: 'tensor 與自動微分、訓練迴圈、字元級語言模型，最後拼出一個迷你 GPT。', lessons: [
+    ['7-1', 'tensor|與自動微分'],
+    ['7-2', 'nn.Module|與訓練迴圈'],
+    ['7-3', '字元級|語言模型'],
+    ['7-4', '迷你 GPT|＋總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

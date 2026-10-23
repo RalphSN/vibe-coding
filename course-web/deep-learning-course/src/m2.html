@@ -1,0 +1,333 @@
+<script>
+/* ==========================================================================
+   模組 2：前向傳播
+   ========================================================================== */
+defineTerms({
+  '前向傳播': { en: 'forward pass', def: '輸入從第一層一路算到輸出與損失的過程；每一層都是矩陣乘法＋偏差＋激活。', example: 'x → h → ŷ → 損失。', lesson: '2-1' },
+  '全連接層': { en: 'fully connected layer / linear layer', def: '每個輸入都連到每個輸出的層：輸出＝激活(x·W＋b)。PyTorch 叫 nn.Linear。', example: '2 個輸入、3 個輸出：W 是 2×3。', lesson: '2-1' },
+  '批次': { en: 'batch', def: '一次一起算的一組樣本；把多筆輸入疊成矩陣，一次矩陣乘法就算完。', example: '64 筆一批。', lesson: '2-1' },
+  '形狀': { en: 'shape', def: '矩陣或 tensor 每一維的大小，例如 (批次, 特徵)。寫程式最常見的錯就是形狀對不上。', example: '(64, 784)。', lesson: '2-1' },
+  'cross-entropy': { en: 'cross-entropy loss', def: '分類用的損失：−log(給正確類別的機率)；二元時就是 log loss。', example: '正確類別機率 0.7 → 約 0.357。', lesson: '2-3' },
+});
+
+const REVIEW_M1 = [
+  { level: '回想', type: 'mc', q: '（回顧 1-3）為什麼層與層之間要有激活函數？', options: [
+    { text: '沒有的話，疊再多層也等於一層', correct: true, why: '線性疊線性還是線性。' },
+    { text: '讓數字變小，避免溢位', why: '主要目的是非線性。' },
+    { text: '讓輸出一定落在 0 到 1 之間', why: 'ReLU 沒有上限。' },
+    { text: '讓訓練不需要梯度', why: '還是需要梯度。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 1-1）x＝[2, 0]、w＝[1, 5]、b＝−1，ReLU 輸出？', options: [
+    { text: '1', correct: true, why: 'z＝2＋0−1。' },
+    { text: '11，因為 5 也要乘上去', why: 'x₂ 是 0。' },
+    { text: '0，因為 b 是負的', why: 'z 還是正的。' },
+    { text: '−1，就是 b', why: '要加權重項。' },
+  ] },
+];
+
+const SMALL_NET = { w: [[0.4, -0.5], [0.6, 0.2]], b: [0.1, 0.3], v: [1.5, -1], c: 0.2 };
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '把一整層神經元寫成一次矩陣乘法',
+      '算出每一層輸入、權重、輸出的形狀',
+      '說出為什麼要一次算一批',
+    ],
+    review: REVIEW_M1,
+    analogy: {
+      text: ['學校統計成績：每位學生有三科分數，每個獎項對三科有不同的加權。把「所有學生 × 三科」排成一張表、「三科 × 每個獎項的權重」排成另一張表，相乘一次就得到「每位學生在每個獎項的總分」。', '一個[[全連接層]]就是這件事：輸入（[[批次]] × 特徵）乘上權重（特徵 × 神經元），一次矩陣乘法算完整層、整批的加權加總，再加偏差、過激活。'],
+      limit: ['成績單只算一次，網路每一層都要算一次；而且[[形狀]]對不上（例如特徵數不同）就完全不能乘，這是寫深度學習程式最常見的錯誤。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="一層等於矩陣乘法：輸入 X 的形狀是批次乘以輸入特徵，乘上 W 的形狀輸入特徵乘以輸出神經元，得到批次乘以輸出神經元，再加上偏差 b">
+        <rect x="20" y="50" width="90" height="120" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="65" y="104" text-anchor="middle" font-size="16" font-weight="900" class="on-color">X</text><text x="65" y="128" text-anchor="middle" font-size="13" class="on-color">B × 2</text>
+        <text x="132" y="116" font-size="22" font-weight="900">×</text>
+        <rect x="160" y="80" width="140" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="230" y="106" text-anchor="middle" font-size="16" font-weight="900" class="on-color">W</text><text x="230" y="128" text-anchor="middle" font-size="13" class="on-color">2 × 3</text>
+        <text x="322" y="116" font-size="22" font-weight="900">＋b →</text>
+        <rect x="400" y="50" width="140" height="120" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="470" y="104" text-anchor="middle" font-size="16" font-weight="900" class="on-color">Z</text><text x="470" y="128" text-anchor="middle" font-size="13" class="on-color">B × 3</text>
+        <text x="280" y="204" text-anchor="middle" font-size="14">中間的 2 要對得上；B（批次大小）一路保留</text>
+      </svg>`,
+      caption: '一層：Z＝X·W＋b，A＝激活(Z)。b 的長度等於神經元數，加到每一列上。',
+    },
+    define: [
+      { term: '全連接層', en: 'linear layer', def: 'A＝激活(XW＋b)。', example: 'nn.Linear(2, 3)。' },
+      { term: '批次', en: 'batch', def: '一次一起算的一組樣本。', example: 'B＝64。' },
+      { term: '形狀', en: 'shape', def: '每一維的大小。', example: '(64, 784)。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '一層的形狀與計算量（實際計算）', sliders: [
+          { id: 'B', label: '批次大小 B', min: 1, max: 256, step: 1, value: 64 },
+          { id: 'i', label: '輸入特徵', min: 1, max: 1024, step: 1, value: 784 },
+          { id: 'o', label: '輸出神經元', min: 1, max: 1024, step: 1, value: 128 },
+        ], compute: (v) => {
+          const mults = v.B * v.i * v.o;
+          return { rows: [
+            { label: `輸入 X：(${v.B}, ${v.i})`, value: (v.B * v.i).toLocaleString('en-US'), ratio: Math.min(1, (v.B * v.i) / 262144) },
+            { label: `權重 W：(${v.i}, ${v.o})`, value: (v.i * v.o).toLocaleString('en-US'), ratio: Math.min(1, (v.i * v.o) / 1048576) },
+            { label: `輸出 Z：(${v.B}, ${v.o})`, value: (v.B * v.o).toLocaleString('en-US'), ratio: Math.min(1, (v.B * v.o) / 262144) },
+            { label: '乘法次數 B × 輸入 × 輸出', value: mults.toLocaleString('en-US'), ratio: Math.min(1, mults / 268435456) },
+          ], note: '權重的大小和批次無關：同一組 W 給整批共用。乘法次數則和 B 成正比，GPU 的強項就是一次做完這些（第五部 1）。' };
+        } } },
+        { type: 'code', lang: 'python', title: '一層＝一次矩陣乘法（示意，NumPy）', code: 'import numpy as np\nX = np.array([[1.0, 0.5],      # 第 1 筆\n              [0.0, 2.0]])     # 第 2 筆：形狀 (2, 2)\nW = np.array([[0.4, -0.5, 1.0],\n              [0.6,  0.2, 0.0]])  # (2 個輸入, 3 個神經元)\nb = np.array([0.1, 0.3, -1.0])\nZ = X @ W + b                  # (2, 3)\nA = np.maximum(0, Z)           # ReLU\nprint(Z)  # [[0.8 -0.1 0. ] [1.3 0.7 -1. ]]' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="形狀錯誤：X 是 64 乘 784，W 是 512 乘 128，中間的 784 和 512 對不上，無法相乘">
+          <rect x="20" y="50" width="150" height="60" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="95" y="86" text-anchor="middle" font-size="15" font-weight="900" class="on-color">(64, 784)</text>
+          <text x="190" y="88" font-size="22" font-weight="900">×</text>
+          <rect x="220" y="50" width="150" height="60" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="295" y="86" text-anchor="middle" font-size="15" font-weight="900" class="on-color">(512, 128)</text>
+          <text x="400" y="88" font-size="16" font-weight="900">→ 錯誤</text>
+          <text x="280" y="148" text-anchor="middle" font-size="14">784 ≠ 512：前一層的輸出數要等於下一層的輸入數</text>
+          <text x="280" y="174" text-anchor="middle" font-size="13">PyTorch 會報「mat1 and mat2 shapes cannot be multiplied」</text>
+        </svg>`, caption: '寫網路時，先把每一層的形狀寫在註解裡，可以省下很多除錯時間。' },
+      ],
+      tryit: {
+        q: ['用上面程式的 X、W、b，手算第 2 筆（x＝[0, 2]）的 Z 三個值。'],
+        draft: 'z₁ ＝ ＿\nz₂ ＝ ＿\nz₃ ＝ ＿',
+        answer: ['z₁ ＝ 0×0.4 ＋ 2×0.6 ＋ 0.1 ＝ 1.3；z₂ ＝ 0×(−0.5) ＋ 2×0.2 ＋ 0.3 ＝ 0.7；z₃ ＝ 0×1 ＋ 2×0 − 1 ＝ −1。', '和程式印出的第二列 [1.3, 0.7, −1.0] 一樣；過 ReLU 後變成 [1.3, 0.7, 0]。'],
+      },
+    },
+    mistakes: [
+      { wrong: '一筆一筆用迴圈算。', why: '很慢，也浪費 GPU。', right: '疊成批次，一次矩陣乘法。' },
+      { wrong: '以為批次變大，權重也要變大。', why: '權重形狀只看輸入與輸出數。', right: '批次只影響輸入與輸出的第一維。' },
+      { wrong: '前一層輸出 128，下一層輸入寫成 256。', why: '形狀對不上無法相乘。', right: '相鄰兩層的數字要一致。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'X 的形狀 (32, 10)，W 的形狀 (10, 4)，XW 的形狀？', options: [
+        { text: '(32, 4)', correct: true, why: '保留批次，換成輸出數。' },
+        { text: '(10, 10)，兩個中間的數相乘', why: '中間的數會消掉。' },
+        { text: '(32, 10)，和輸入一樣', why: '輸出變成 4。' },
+        { text: '(4, 32)，順序倒過來', why: '順序是 (批次, 輸出)。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'nn.Linear(784, 128) 有多少參數（含偏差）？', options: [
+        { text: '100,480', correct: true, why: '784×128＋128。' },
+        { text: '100,352，只算權重', why: '還有 128 個偏差。' },
+        { text: '912，兩數相加', why: '要相乘。' },
+        { text: '784，只算輸入', why: '每個輸入連到每個輸出。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個 784 → 128 → 64 → 10 的網路，寫出每一層的權重形狀，並算總參數。'], answer: [
+        '權重：(784, 128)、(128, 64)、(64, 10)；偏差：128、64、10。',
+        '參數：100,352＋128 ＋ 8,192＋64 ＋ 640＋10 ＝ 109,386。',
+      ] },
+    ],
+    keypoints: [
+      '一層：Z＝XW＋b，A＝激活(Z)。',
+      '形狀：(B, 輸入) × (輸入, 輸出) → (B, 輸出)；中間要對得上。',
+      '一次算一批：同一組權重給整批共用。',
+    ],
+    sources: ['pytorch-quickstart'],
+  },
+
+  '2-2': {
+    goals: [
+      '手算一個 2 → 2 → 1 網路的前向傳播',
+      '看出 ReLU 怎麼讓某些神經元「關掉」',
+      '算出這筆資料的損失',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-1）(B, 5) × (5, 3) 的結果形狀？', options: [
+        { text: '(B, 3)', correct: true, why: '保留批次。' },
+        { text: '(5, 5)', why: '中間的 5 會消掉。' },
+        { text: '(B, 5)', why: '輸出變 3。' },
+        { text: '(3, B)', why: '順序不對。' },
+      ] },
+    ],
+    analogy: {
+      text: ['工廠兩道工序：第一站兩位師傅各自加工（隱藏層），第二站主管看兩位師傅的成品決定最終產品（輸出層）。', '前向傳播就是把原料一站一站送過去，每站都用固定的配方（權重）。下面用一組小數字手算一次，每一步都可以拿互動核對。'],
+      limit: ['工廠師傅的工作有意義，網路裡的 h₁、h₂ 只是數字；它們代表什麼，是訓練之後才「長」出來的。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="2 到 2 到 1 的小網路：輸入 x1 等於 1、x2 等於 0.5；隱藏 h1 等於 0.8，h2 等於 0；輸出 y-hat 等於 1.4">
+        <circle cx="70" cy="70" r="30" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="70" y="76" text-anchor="middle" font-size="15" font-weight="900" class="on-color">x₁＝1</text>
+        <circle cx="70" cy="180" r="30" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="70" y="186" text-anchor="middle" font-size="14" font-weight="900" class="on-color">x₂＝.5</text>
+        <circle cx="280" cy="70" r="34" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="76" text-anchor="middle" font-size="15" font-weight="900" class="on-color">h₁＝.8</text>
+        <circle cx="280" cy="180" r="34" class="fill-bg stroke-ink" stroke-width="3" stroke-dasharray="6 4"/><text x="280" y="186" text-anchor="middle" font-size="15" font-weight="900">h₂＝0</text>
+        <circle cx="480" cy="125" r="36" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="480" y="131" text-anchor="middle" font-size="15" font-weight="900" class="on-color">ŷ＝1.4</text>
+        <line x1="100" y1="70" x2="246" y2="70" class="stroke-ink" stroke-width="2"/><text x="170" y="62" font-size="13">0.4</text>
+        <line x1="100" y1="180" x2="246" y2="76" class="stroke-ink" stroke-width="2"/><text x="132" y="140" font-size="13">0.6</text>
+        <line x1="100" y1="70" x2="246" y2="174" class="stroke-ink" stroke-width="2"/><text x="200" y="104" font-size="13">−0.5</text>
+        <line x1="100" y1="180" x2="246" y2="180" class="stroke-ink" stroke-width="2"/><text x="170" y="198" font-size="13">0.2</text>
+        <line x1="314" y1="70" x2="446" y2="115" class="stroke-ink" stroke-width="2"/><text x="380" y="80" font-size="13">1.5</text>
+        <line x1="314" y1="180" x2="446" y2="135" class="stroke-ink" stroke-width="2"/><text x="380" y="176" font-size="13">−1</text>
+        <text x="280" y="236" text-anchor="middle" font-size="13">偏差：h₁ 0.1、h₂ 0.3、輸出 0.2；h 用 ReLU，輸出不加激活</text>
+      </svg>`,
+      caption: 'h₂ 的 z 是 −0.1，ReLU 把它關掉了（虛線）。',
+    },
+    define: [
+      { term: '前向傳播', en: 'forward pass', def: '一層一層算到輸出。', example: 'x → h → ŷ。' },
+      { term: '被關掉的神經元', en: 'inactive unit', def: 'ReLU 輸入為負，輸出 0。', example: '這筆資料的 h₂。' },
+      { term: '線性輸出', en: 'linear output', def: '回歸問題的輸出層通常不加激活。', example: 'ŷ 可以是任何數。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['步驟', '算式', '結果'], rows: [
+          ['z₁（h₁ 的加總）', '0.4×1 ＋ 0.6×0.5 ＋ 0.1', '0.8'],
+          ['h₁ ＝ ReLU(z₁)', '', '0.8'],
+          ['z₂（h₂ 的加總）', '−0.5×1 ＋ 0.2×0.5 ＋ 0.3', '−0.1'],
+          ['h₂ ＝ ReLU(z₂)', '', '0（關掉）'],
+          ['ŷ', '1.5×0.8 ＋ (−1)×0 ＋ 0.2', '1.4'],
+          ['損失（答案 1，平方誤差）', '(1.4 − 1)²', '0.16'],
+        ] },
+        { type: 'widget', name: 'knobs', props: { title: '同一個網路，換輸入看看（實際計算，權重固定）', sliders: [
+          { id: 'x1', label: 'x₁', min: -2, max: 2, step: 0.5, value: 1 },
+          { id: 'x2', label: 'x₂', min: -2, max: 2, step: 0.5, value: 0.5 },
+          { id: 't', label: '答案 y', min: -2, max: 3, step: 0.5, value: 1 },
+        ], compute: (v) => {
+          const { w, b, v: vv, c } = SMALL_NET;
+          const z = [0, 1].map((j) => w[0][j] * v.x1 + w[1][j] * v.x2 + b[j]);
+          const h = z.map((x) => Math.max(0, x));
+          const y = vv[0] * h[0] + vv[1] * h[1] + c;
+          const L = (y - v.t) ** 2;
+          return { rows: [
+            { label: `h₁ ＝ ReLU(${z[0].toFixed(2)})`, value: h[0].toFixed(2), ratio: Math.min(1, h[0] / 3) },
+            { label: `h₂ ＝ ReLU(${z[1].toFixed(2)})`, value: h[1].toFixed(2), ratio: Math.min(1, h[1] / 3) },
+            { label: 'ŷ', value: y.toFixed(2), ratio: Math.min(1, Math.abs(y) / 5) },
+            { label: '損失 (ŷ − y)²', value: L.toFixed(3), ratio: Math.min(1, L / 10) },
+          ], note: '試試 x₁＝−1：h₁ 也被關掉，ŷ 只剩偏差 0.2 和 h₂ 的貢獻。不同輸入會「點亮」不同的神經元，這就是網路能表示彎曲關係的原因。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="前向傳播一路算到損失：輸入、隱藏層加總、ReLU、輸出、損失；每一步的值都要存起來給反向傳播用">
+          ${[['x', '輸入'], ['z', '加總'], ['h', 'ReLU'], ['ŷ', '輸出'], ['L', '損失']].map(([a, b], i) => `<rect x="${10 + i * 110}" y="40" width="100" height="70" style="fill:var(--m${i})" class="stroke-ink" stroke-width="3"/><text x="${60 + i * 110}" y="74" text-anchor="middle" font-size="18" font-weight="900" class="on-color">${a}</text><text x="${60 + i * 110}" y="98" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="146" text-anchor="middle" font-size="14">每一格算出來的值都要記住</text>
+          <text x="280" y="170" text-anchor="middle" font-size="13">反向傳播會用到它們（模組 3）</text>
+        </svg>`, caption: '這也是訓練比推論更吃記憶體的原因之一：中間值要留著（第五部 3）。' },
+      ],
+      tryit: {
+        q: ['輸入改成 x＝[0, 2]，答案還是 1。手算 h₁、h₂、ŷ 和損失。'],
+        draft: 'h₁ ＝ ＿\nh₂ ＝ ＿\nŷ ＝ ＿\n損失 ＝ ＿',
+        answer: ['z₁ ＝ 0 ＋ 1.2 ＋ 0.1 ＝ 1.3 → h₁ ＝ 1.3；z₂ ＝ 0 ＋ 0.4 ＋ 0.3 ＝ 0.7 → h₂ ＝ 0.7。', 'ŷ ＝ 1.5×1.3 − 0.7 ＋ 0.2 ＝ 1.45；損失 ＝ 0.45² ≈ 0.203。用互動拉 x₁＝0、x₂＝2 核對。'],
+      },
+    },
+    mistakes: [
+      { wrong: '忘了每一層都要加偏差。', why: '偏差是每個神經元自己的參數。', right: '每層：加權加總＋偏差，再激活。' },
+      { wrong: '回歸問題的輸出也套 ReLU。', why: '預測不到負數。', right: '回歸輸出層通常不加激活。' },
+      { wrong: '以為被 ReLU 關掉的神經元沒用。', why: '換一筆資料它可能就打開了。', right: '不同輸入點亮不同神經元。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '這筆資料 h₂ 為什麼是 0？', options: [
+        { text: '它的加總是 −0.1，ReLU 輸出 0', correct: true, why: '負數被關掉。' },
+        { text: '它的權重全部都是 0', why: '權重不是 0。' },
+        { text: 'x₂ 太小所以被忽略', why: '是整體加總為負。' },
+        { text: '網路出錯了', why: '這是正常行為。' },
+      ] },
+      { level: '應用', type: 'mc', q: '如果答案是 2，這筆資料（ŷ＝1.4）的平方誤差？', options: [
+        { text: '0.36', correct: true, why: '(1.4−2)²。' },
+        { text: '0.6，忘了平方', why: '要平方。' },
+        { text: '0.16，用了原本的答案', why: '答案改成 2。' },
+        { text: '−0.6，殘差本身', why: '平方後是正的。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同樣的網路結構，如果把所有 ReLU 拿掉，對 x＝[1, 0.5] 的輸出會變成多少？為什麼結果不同？'], answer: [
+        '沒有 ReLU 時 h₂ ＝ −0.1 不會變 0：ŷ ＝ 1.5×0.8 ＋ (−1)×(−0.1) ＋ 0.2 ＝ 1.5。',
+        '差別在 ReLU 把負的中間值關掉了。有了這種開關，網路對不同區域的輸入才能用不同的「組合」，這就是非線性的來源。',
+      ] },
+    ],
+    keypoints: [
+      '前向傳播：一層一層加權加總、加偏差、激活，最後算損失。',
+      'ReLU 會讓某些神經元在某些輸入下關掉。',
+      '中間值要記住，反向傳播會用到。',
+    ],
+    sources: ['rumelhart-1986'],
+  },
+
+  '2-3': {
+    goals: [
+      '依問題類型選輸出層與損失',
+      '算出 softmax ＋ cross-entropy 的損失',
+      '知道 PyTorch 為什麼常把 softmax 包進損失函數',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）回歸問題的輸出層通常？', options: [
+        { text: '不加激活', correct: true, why: '要能輸出任何數。' },
+        { text: '一定要加 ReLU', why: '就預測不到負數。' },
+        { text: '一定要加 sigmoid', why: '會被限制在 0～1。' },
+        { text: '加 softmax', why: 'softmax 給分類。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-1）nn.Linear(10, 3) 有幾個參數？', options: [
+        { text: '33', correct: true, why: '10×3＋3。' },
+        { text: '30，只算權重', why: '加 3 個偏差。' },
+        { text: '13', why: '要相乘。' },
+        { text: '3', why: '那只是偏差。' },
+      ] },
+    ],
+    analogy: {
+      text: ['同一台機器，最後的出口要依產品換模具：倒出液體（數字）、壓成兩種形狀之一（是／否）、或分裝到好幾個格子（多類別）。', '輸出層與損失也要配對：回歸用線性輸出＋MSE；二元分類用 sigmoid＋log loss；多類別用 softmax＋[[cross-entropy]]。前面的隱藏層可以完全一樣。'],
+      limit: ['換模具是實體的，換輸出層只是改最後一層與損失；但配錯（例如多類別用 MSE）網路一樣跑得動，只是學得差，錯誤不會自己跳出來。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="三種輸出層與損失的配對：回歸是線性加 MSE，二元分類是 sigmoid 加 log loss，多類別是 softmax 加 cross-entropy">
+        ${[['回歸', '線性輸出', 'MSE', 'm2'], ['二元分類', 'sigmoid', 'log loss', 'm4'], ['多類別', 'softmax', 'cross-entropy', 'm3']].map(([a, b, c, m], i) => `<rect x="${10 + i * 185}" y="30" width="170" height="150" style="fill:var(--${m})" class="stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="66" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${95 + i * 185}" y="106" text-anchor="middle" font-size="14" class="on-color">輸出：${b}</text><text x="${95 + i * 185}" y="140" text-anchor="middle" font-size="14" class="on-color">損失：${c}</text>`).join('')}
+        <text x="280" y="208" text-anchor="middle" font-size="13">前面的隱藏層可以一樣；只換最後一層和損失</text>
+      </svg>`,
+      caption: '第三部 4-3、4-4 講過的 log loss 與 softmax，在這裡變成網路的最後一層。',
+    },
+    define: [
+      { term: 'logits', en: 'logits', def: '最後一層還沒做 softmax 的分數。', example: '[2.0, 0.5, −1.0]。' },
+      { term: 'cross-entropy', en: 'cross-entropy', def: '−log(正確類別的機率)。', example: '機率 0.7 → 0.357。' },
+      { term: 'CrossEntropyLoss', en: 'nn.CrossEntropyLoss', def: 'PyTorch 的損失：直接吃 logits，內部做 softmax＋取 log。', example: '不要自己先 softmax。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '三類的 logits → softmax → cross-entropy（實際計算）', sliders: [
+          { id: 'a', label: '貓的 logit', min: -3, max: 5, step: 0.5, value: 2 },
+          { id: 'b', label: '狗的 logit', min: -3, max: 5, step: 0.5, value: 0.5 },
+          { id: 'c', label: '兔的 logit', min: -3, max: 5, step: 0.5, value: -1 },
+          { id: 'y', label: '正確答案（0 貓、1 狗、2 兔）', min: 0, max: 2, step: 1, value: 0 },
+        ], compute: (v) => {
+          const s = [v.a, v.b, v.c]; const m = Math.max(...s);
+          const e = s.map((x) => Math.exp(x - m)); const t = e.reduce((x, y) => x + y, 0);
+          const p = e.map((x) => x / t);
+          const loss = -Math.log(p[v.y]);
+          return { rows: [
+            ...['貓', '狗', '兔'].map((n, i) => ({ label: `${n}${i === v.y ? '（正確）' : ''}`, value: `${(p[i] * 100).toFixed(1)}%`, ratio: p[i] })),
+            { label: 'cross-entropy ＝ −ln(正確類別的機率)', value: loss.toFixed(3), ratio: Math.min(1, loss / 5) },
+          ], note: '把正確答案改成「兔」：同樣的 logits，損失從約 0.24 跳到約 3.24。損失只看正確類別拿到多少機率。' };
+        } } },
+        { type: 'code', lang: 'python', title: 'PyTorch：直接把 logits 給損失函數（示意）', code: 'import torch\nimport torch.nn as nn\n\nlogits = torch.tensor([[2.0, 0.5, -1.0]])  # (批次 1, 3 類)\ntarget = torch.tensor([0])                 # 正確答案是第 0 類\nloss = nn.CrossEntropyLoss()(logits, target)\nprint(loss.item())   # 約 0.241：內部已經做了 softmax 與 log' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="常見錯誤：先自己做 softmax 再交給 CrossEntropyLoss，等於做了兩次 softmax，損失和梯度都會錯">
+          <rect x="10" y="30" width="260" height="120" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+          <text x="140" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">錯：softmax → 損失</text>
+          <text x="140" y="96" text-anchor="middle" font-size="14" class="on-color">CrossEntropyLoss 裡</text>
+          <text x="140" y="120" text-anchor="middle" font-size="14" class="on-color">又做一次 softmax</text>
+          <rect x="290" y="30" width="260" height="120" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+          <text x="420" y="62" text-anchor="middle" font-size="15" font-weight="900" class="on-color">對：logits → 損失</text>
+          <text x="420" y="96" text-anchor="middle" font-size="14" class="on-color">推論要機率時</text>
+          <text x="420" y="120" text-anchor="middle" font-size="14" class="on-color">再另外做 softmax</text>
+          <text x="280" y="178" text-anchor="middle" font-size="13">合在一起算也比較不容易數值溢位</text>
+        </svg>`, caption: '程式跑得動但學得很差，是這類錯誤最麻煩的地方。' },
+      ],
+      tryit: {
+        q: ['logits [1, 1, 1]、正確答案第 0 類。softmax 機率與 cross-entropy 各是多少？'],
+        draft: '機率：＿\n損失：＿',
+        answer: ['三類都是 1/3。', '損失 ＝ −ln(1/3) ＝ ln 3 ≈ 1.099：這是「完全沒學」時三分類的損失。訓練一開始的損失大約就是 ln(類別數)，可以拿來檢查程式有沒有寫錯。'],
+      },
+    },
+    mistakes: [
+      { wrong: '多類別問題用 MSE。', why: '梯度在答錯時太小，學得慢。', right: 'softmax＋cross-entropy。' },
+      { wrong: '自己先 softmax，再丟給 CrossEntropyLoss。', why: '做了兩次 softmax。', right: '直接給 logits。' },
+      { wrong: '多標籤問題用 softmax。', why: '標籤可以同時成立，不該互相競爭。', right: '每個標籤各自 sigmoid＋log loss。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '多類別分類常用的輸出與損失？', options: [
+        { text: 'softmax＋cross-entropy', correct: true, why: '標準配對。' },
+        { text: 'ReLU＋MSE，因為最簡單', why: '不適合分類。' },
+        { text: '線性輸出＋MAE', why: '那是回歸。' },
+        { text: 'sigmoid＋MSE', why: '不是標準做法。' },
+      ] },
+      { level: '應用', type: 'mc', q: '10 類問題，訓練剛開始的損失大約？', options: [
+        { text: 'ln 10 ≈ 2.3', correct: true, why: '每類約 1/10。' },
+        { text: '10，就是類別數', why: '要取 log。' },
+        { text: '0，因為還沒開始學', why: '一開始損失最大。' },
+        { text: '0.1，就是每類的機率', why: '損失是 −log。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的 5 分類模型一開始的損失是 25。可能哪裡寫錯了？'], answer: [
+        '合理的初始損失約 ln 5 ≈ 1.6。25 太大，常見原因：損失用錯（例如用 MSE 對沒有正規化的數字）、標籤格式錯（給了 one-hot 卻用錯 API）、初始權重太大讓 logits 極端。',
+        '先檢查損失函數與標籤格式，再看最後一層輸出的數值範圍。',
+      ] },
+    ],
+    keypoints: [
+      '回歸：線性＋MSE；二元：sigmoid＋log loss；多類別：softmax＋cross-entropy。',
+      'PyTorch 的 CrossEntropyLoss 直接吃 logits。',
+      '初始損失約 ln(類別數)，可以用來檢查程式。',
+    ],
+    sources: ['pytorch-quickstart'],
+  },
+});
+</script>
