@@ -1,0 +1,326 @@
+<script>
+/* ==========================================================================
+   模組 3：導數與梯度：往下坡走
+   ========================================================================== */
+defineTerms({
+  '導數': { en: 'derivative', def: '某一點的斜率：輸入動一點點，輸出會跟著動幾倍。', example: 'f(x) ＝ x² 在 x ＝ 3 的導數是 6。', lesson: '3-1' },
+  '斜率': { en: 'slope', def: '往右走 1，高度變多少；正的是上坡、負的是下坡。', example: '斜率 −6：往右走一點點，會往下掉 6 倍。', lesson: '3-1' },
+  '損失': { en: 'loss', def: '模型猜得多差的一個數字；訓練就是讓它變小。', example: '(預測 − 答案)²。', lesson: '3-1' },
+  '偏導數': { en: 'partial derivative', def: '有很多個輸入時，只動其中一個、其他不動，算出的斜率。', example: 'f ＝ w₁² ＋ 3w₂²，對 w₂ 的偏導數是 6w₂。', lesson: '3-2' },
+  '學習率': { en: 'learning rate', def: '每一步沿著梯度反方向走多遠的倍數；太小走很慢，太大會衝過頭。', example: '0.1、0.001。', lesson: '3-2' },
+  '梯度下降': { en: 'gradient descent', def: '一直重複「算梯度 → 往反方向走一小步」，讓損失越來越小。', example: 'w ← w − 學習率 × 梯度。', lesson: '3-2' },
+  '鏈鎖律': { en: 'chain rule', def: '一連串函數接在一起時，整體的斜率等於每一段的斜率相乘。', example: 'A 帶 B 轉 2 倍、B 帶 C 轉 3 倍 → A 帶 C 轉 6 倍。', lesson: '3-3' },
+  '反向傳播': { en: 'backpropagation', def: '從損失開始往回，用鏈鎖律一層一層算出每個權重的梯度。', example: 'PyTorch 的 loss.backward()。', lesson: '3-3' },
+});
+
+const PARABOLA_PATH = Array.from({ length: 41 }, (_, i) => { const x = -4 + i * 0.2; return `${i ? 'L' : 'M'}${(280 + x * 55).toFixed(1)} ${(220 - x * x * 11).toFixed(1)}`; }).join(' ');
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出導數就是某一點的斜率',
+      '用「動一點點」估算導數',
+      '用斜率的正負判斷權重該加還是減',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 2-2）(5×3) × (3×7) 的形狀？', options: [
+        { text: '5×7', correct: true, why: '留下外面兩個。' },
+        { text: '3×3，中間的數字留下來', why: '中間的消失。' },
+        { text: '15×21', why: '不是各自相乘。' },
+        { text: '不能相乘', why: '中間都是 3。' },
+      ] },
+    ],
+    analogy: {
+      text: ['你在一片起霧的山坡上，看不到山谷在哪，只感覺得到腳下的坡度。腳下往右是上坡，就往左走；往右是下坡，就往右走。', '[[導數]]就是腳下的坡度（[[斜率]]）。訓練模型時，山的高度是[[損失]]，你站的位置是權重。不需要看到整座山，只要知道腳下的斜率，就知道往哪邊走會變低。'],
+      limit: ['真實模型的「山」有幾十億個方向（每個權重一個），而且到處是平台和小坑；這個比喻只說明一個權重的情況，下一課再加方向。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="拋物線 f(x) ＝ x²，在 x ＝ 3 畫一條切線，切線斜率是 6；在 x ＝ −2 的切線斜率是 −4">
+        <line x1="40" y1="220" x2="520" y2="220" class="stroke-ink" stroke-width="2"/><line x1="280" y1="20" x2="280" y2="230" class="stroke-ink" stroke-width="2"/>
+        <path d="${PARABOLA_PATH}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+        <line x1="${280 + 2 * 55}" y1="${220 - (9 - 6) * 11}" x2="${280 + 4 * 55}" y2="${220 - (9 + 6) * 11}" style="stroke:var(--m5)" stroke-width="4"/>
+        <circle cx="${280 + 3 * 55}" cy="${220 - 9 * 11}" r="7" style="fill:var(--m5)" class="stroke-ink" stroke-width="2"/>
+        <text x="${280 + 3 * 55 - 14}" y="${220 - 9 * 11 + 6}" text-anchor="end" font-size="14" font-weight="900">x ＝ 3：斜率 6（上坡）</text>
+        <line x1="${280 - 3 * 55}" y1="${220 - (4 + 4) * 11}" x2="${280 - 1 * 55}" y2="${220 - (4 - 4) * 11}" style="stroke:var(--m3)" stroke-width="4"/>
+        <circle cx="${280 - 2 * 55}" cy="${220 - 4 * 11}" r="7" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/>
+        <text x="${280 - 2 * 55 - 14}" y="${220 - 4 * 11 - 14}" text-anchor="end" font-size="14" font-weight="900">x ＝ −2：斜率 −4</text>
+        <text x="290" y="246" font-size="13">最低點 x ＝ 0：斜率 0</text>
+      </svg>`,
+      caption: 'f(x) ＝ x² 的導數是 2x：每一點的切線斜率。右邊正（上坡）、左邊負（下坡）、谷底是 0。',
+    },
+    define: [
+      { term: '導數', en: 'derivative', def: '某一點的斜率。', example: 'x² → 2x。' },
+      { term: '斜率', en: 'slope', def: '輸出變化 ÷ 輸入變化。', example: '6。' },
+      { term: '損失', en: 'loss', def: '猜得多差。', example: '(預測 − 答案)²。' },
+    ],
+    examples: {
+      blocks: [
+        '導數的定義其實很直白：往旁邊動一點點 h，看高度變多少，再除以 h。h 越小，就越接近那一點真正的斜率。',
+        { type: 'widget', name: 'knobs', props: { title: 'f(x) ＝ x²：用「動一點點」估斜率（實際計算）', sliders: [
+          { id: 'x', label: '站在 x ＝', min: -4, max: 4, step: 0.5, value: 3 },
+          { id: 'h', label: '往右動 h ＝', min: 0.001, max: 2, step: 0.001, value: 1 },
+        ], compute: (v) => {
+          const est = ((v.x + v.h) ** 2 - v.x ** 2) / v.h;
+          const exact = 2 * v.x;
+          return { rows: [
+            { label: '估計：(f(x＋h) − f(x)) ÷ h', value: est.toFixed(4), ratio: Math.min(1, Math.abs(est) / 10) },
+            { label: '真正的導數 2x', value: exact.toFixed(4), ratio: Math.min(1, Math.abs(exact) / 10) },
+            { label: '差多少', value: (est - exact).toFixed(4), ratio: Math.min(1, Math.abs(est - exact) / 2) },
+            { label: '這裡是', value: exact > 0 ? '上坡：x 該變小' : exact < 0 ? '下坡：x 該變大' : '谷底', ratio: exact === 0 ? 0 : 1 },
+          ], note: '對 x² 來說，估計值剛好是 2x ＋ h，所以「差多少」永遠等於 h。把 h 拉到 0.001，估計值就幾乎等於真正的導數。' };
+        } } },
+        { type: 'table', head: ['函數', '導數', '白話'], rows: [
+          ['常數 c', '0', '不會變，坡度 0'],
+          ['a·x', 'a', '直線，到處一樣斜'],
+          ['x²', '2x', '離 0 越遠越陡'],
+          ['eˣ', 'eˣ', '越大長得越快（4-2）'],
+          ['ln x', '1/x', 'x 越大越平（5-1）'],
+        ], caption: '這本只會用到這幾個；其他的交給 PyTorch 自動算（3-3）。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="用斜率走一步：損失 (w − 4)² 在 w ＝ 1 的斜率是 −6，往反方向走，w 從 1 變成 1.6，更接近谷底 4">
+          <line x1="40" y1="170" x2="520" y2="170" class="stroke-ink" stroke-width="2"/>
+          ${[0, 1, 2, 3, 4, 5, 6].map((w) => `<line x1="${60 + w * 70}" y1="166" x2="${60 + w * 70}" y2="174" class="stroke-ink" stroke-width="2"/><text x="${60 + w * 70}" y="194" text-anchor="middle" font-size="13" class="mono">${w}</text>`).join('')}
+          <circle cx="130" cy="150" r="9" style="fill:var(--m5)" class="stroke-ink" stroke-width="2"/><text x="130" y="128" text-anchor="middle" font-size="13" font-weight="900">w ＝ 1</text>
+          <circle cx="172" cy="150" r="9" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="190" y="104" text-anchor="middle" font-size="13" font-weight="900">走一步 → 1.6</text>
+          <path d="M172 112 L172 136" class="stroke-ink" stroke-width="2"/>
+          <circle cx="340" cy="150" r="9" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="340" y="128" text-anchor="middle" font-size="13" font-weight="900">谷底 w ＝ 4</text>
+          <rect x="380" y="20" width="160" height="70" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="460" y="48" text-anchor="middle" font-size="13" class="mono">斜率 ＝ 2(1−4) ＝ −6</text>
+          <text x="460" y="74" text-anchor="middle" font-size="13" class="mono">1 − 0.1×(−6) ＝ 1.6</text>
+        </svg>`, caption: '損失 L(w) ＝ (w − 4)²。斜率是負的（下坡往右），所以 w 往右走；0.1 是學習率（下一課）。' },
+      ],
+      tryit: {
+        q: ['損失 L(w) ＝ (w − 4)²，現在 w ＝ 6。斜率是多少？w 應該變大還是變小？用學習率 0.1 走一步，w 變成多少？'],
+        draft: '斜率：＿\n方向：＿\n新的 w：＿',
+        answer: ['斜率 ＝ 2(6 − 4) ＝ 4，正的（上坡）。', 'w 應該變小：6 − 0.1 × 4 ＝ 5.6，更接近谷底 4。'],
+      },
+    },
+    mistakes: [
+      { wrong: '沿著斜率的方向走。', why: '斜率指向上坡，損失會變大。', right: '往反方向：w − 學習率 × 斜率。' },
+      { wrong: '斜率是 0 就一定是最低點。', why: '也可能是山頂或平台。', right: '斜率 0 只代表「這裡是平的」。' },
+      { wrong: '用很大的 h 估導數。', why: 'h 大時估計會偏掉（例如 x² 會差 h）。', right: 'h 要很小；實務上直接用公式或自動微分。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'f(x) ＝ x² 在 x ＝ −3 的導數？', options: [
+        { text: '−6', correct: true, why: '2 × (−3)。' },
+        { text: '9，把 x 代進去算出來的值', why: '那是 f(−3)，不是斜率。' },
+        { text: '6', why: '負號不能丟。' },
+        { text: '0', why: '只有 x ＝ 0 時是 0。' },
+      ] },
+      { level: '應用', type: 'mc', q: '某個權重的損失斜率是 +2.5。下一步這個權重會？', options: [
+        { text: '變小', correct: true, why: '正斜率 ＝ 上坡，往反方向。' },
+        { text: '變大，跟著斜率的方向走', why: '那會讓損失變大。' },
+        { text: '不變', why: '斜率不是 0。' },
+        { text: '變成 0', why: '只走一小步。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你是咖啡店老闆，試著調整售價：漲 1 元，每天利潤少了 30 元。用「斜率」的語言描述，下一步該怎麼做？'], answer: [
+        '利潤對售價的斜率約是 −30：往漲價方向是下坡。要讓利潤變大（爬上坡），就往反方向：降一點價。',
+        '注意這裡是「要變大」，所以順著上坡走；訓練模型是「要讓損失變小」，所以往下坡走。斜率只告訴你方向，走多遠要另外決定（學習率）。',
+      ] },
+    ],
+    keypoints: [
+      '導數 ＝ 某一點的斜率。',
+      '正斜率往左、負斜率往右：往下坡走。',
+      'w ← w − 學習率 × 斜率。',
+    ],
+    sources: ['3b1b-calc', 'dlbook'],
+  },
+
+  '3-2': {
+    goals: [
+      '算出兩個參數的梯度',
+      '說出梯度指向上坡、所以要往反方向走',
+      '判斷學習率太小或太大的症狀',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-1）損失 (w − 4)² 在 w ＝ 6 的斜率？', options: [
+        { text: '4', correct: true, why: '2 × (6 − 4)。' },
+        { text: '2，就是 6 減 4', why: '還要乘 2。' },
+        { text: '−4', why: 'w 在谷底右邊，是上坡。' },
+        { text: '0', why: '那是谷底 w ＝ 4。' },
+      ] },
+    ],
+    analogy: {
+      text: ['回到起霧的山坡，現在可以往東西、南北兩個方向走。你先只往東試一步，感覺坡度；再只往北試一步，感覺坡度。這兩個數字就是兩個[[偏導數]]。', '兩個數字排成一個向量，就是[[梯度]]：它指向「最陡的上坡」。往它的反方向走一小步，重複很多次，就是[[梯度下降]]。每步走多遠，由[[學習率]]決定。'],
+      limit: ['山坡只有兩個方向；模型有幾十億個參數，梯度就是幾十億個數字的向量。畫不出來，但每一個數字的意思都一樣：「這個參數動一點，損失會變多少」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="等高線圖：橢圓形的碗，谷底在中央；在 (1, 1) 這點，梯度 (2, 6) 指向外側上坡，往反方向走一步到 (0.8, 0.4)">
+        ${[1, 2, 3, 4].map((r) => `<ellipse cx="280" cy="140" rx="${r * 55}" ry="${r * 24}" fill="none" class="stroke-ink" stroke-width="1.5" opacity="0.45"/>`).join('')}
+        <circle cx="280" cy="140" r="6" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/><text x="280" y="164" text-anchor="middle" font-size="12" font-weight="900">谷底</text>
+        <circle cx="390" cy="80" r="8" style="fill:var(--m5)" class="stroke-ink" stroke-width="2"/><text x="402" y="104" font-size="13" font-weight="900">(1, 1)</text>
+        <line x1="390" y1="80" x2="420" y2="22" style="stroke:var(--m5)" stroke-width="4"/><text x="430" y="30" font-size="13" font-weight="900">梯度 (2, 6)：上坡</text>
+        <line x1="390" y1="80" x2="368" y2="116" style="stroke:var(--m3)" stroke-width="5"/>
+        <circle cx="368" cy="116" r="7" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="356" y="146" text-anchor="end" font-size="13" font-weight="900">走一步 → (0.8, 0.4)</text>
+        <text x="280" y="246" text-anchor="middle" font-size="14" class="mono">f(w₁, w₂) ＝ w₁² ＋ 3w₂²　梯度 ＝ (2w₁, 6w₂)</text>
+      </svg>`,
+      caption: '學習率 0.1：(1, 1) − 0.1 × (2, 6) ＝ (0.8, 0.4)，損失從 4 降到 1.12。示意圖，比例不精確。',
+    },
+    define: [
+      { term: '偏導數', en: 'partial derivative', def: '只動一個參數的斜率。', example: '6w₂。' },
+      { term: '梯度', en: 'gradient', def: '所有偏導數排成的向量。', example: '(2, 6)。' },
+      { term: '學習率', en: 'learning rate', def: '每步走多遠的倍數。', example: '0.1。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['步驟', 'f ＝ w₁² ＋ 3w₂²，從 (1, 1) 出發'], rows: [
+          ['只動 w₁ 的斜率', '2w₁ ＝ 2'],
+          ['只動 w₂ 的斜率', '6w₂ ＝ 6'],
+          ['梯度', '(2, 6)'],
+          ['走一步（學習率 0.1）', '(1 − 0.2, 1 − 0.6) ＝ (0.8, 0.4)'],
+          ['損失', '4 → 0.64 ＋ 0.48 ＝ 1.12'],
+        ], caption: 'w₂ 的方向比較陡，所以一步就走得比較多。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="梯度下降的迴圈：用目前的權重算損失，算梯度，權重減去學習率乘梯度，再回到第一步，重複很多次">
+          ${[['1 算損失', '前向', 'm0'], ['2 算梯度', '反向（3-3）', 'm5'], ['3 更新權重', 'w ← w − η·梯度', 'm3']].map(([a, b, c], i) => `<rect x="${20 + i * 185}" y="30" width="155" height="90" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 185}" y="68" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 185}" y="96" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+          <path d="M175 75 L205 75 M360 75 L390 75" class="stroke-ink" stroke-width="3"/>
+          <path d="M467 120 L467 160 L97 160 L97 120" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+          <text x="282" y="186" text-anchor="middle" font-size="13" font-weight="900">重複幾千到幾百萬次（η 是學習率）</text>
+        </svg>`, caption: '訓練一個模型，就是這三步不停地轉。' },
+        { type: 'widget', name: 'knobs', props: { title: '學習率太小、剛好、太大：f(w) ＝ w²，從 w ＝ 3 走 10 步（實際計算）', sliders: [
+          { id: 'lr', label: '學習率', min: 0.01, max: 1.2, step: 0.01, value: 0.1 },
+        ], compute: (v) => {
+          let w = 3;
+          const trace = [w];
+          for (let i = 0; i < 10; i += 1) { w -= v.lr * 2 * w; trace.push(w); }
+          const status = Math.abs(w) > 3 ? '發散：越走越遠' : Math.abs(w) < 0.01 ? '已經到谷底' : trace.some((t, i) => i && Math.sign(t) !== Math.sign(trace[i - 1])) ? '來回跳過谷底' : '穩定往下';
+          return { rows: [
+            { label: '10 步後的 w', value: Math.abs(w) > 1e4 ? w.toExponential(1) : w.toFixed(3), ratio: Math.min(1, Math.abs(w) / 3) },
+            { label: '10 步後的損失 w²', value: w * w > 1e4 ? (w * w).toExponential(1) : (w * w).toFixed(3), ratio: Math.min(1, (w * w) / 9) },
+            { label: '狀態', value: status, ratio: Math.abs(w) > 3 ? 1 : 0.4 },
+          ], note: '每一步 w 變成 w × (1 − 2 × 學習率)。學習率 0.5 一步就到谷底；超過 0.5 會跳過谷底；超過 1 就越跳越遠。' };
+        } } },
+        { type: 'widget', name: 'optim2d', props: { title: '狹長的碗 f ＝ ½(w₁² ＋ 10w₂²)：看 SGD 怎麼走（另外兩條線是第四部的優化器）', lr: 0.15, steps: 20, note: '先只看 SGD（一般的梯度下降）那條線：陡的方向（w₂）來回晃，平的方向（w₁）走得慢。把學習率拉到 0.2 以上，陡的方向會發散。' } },
+      ],
+      tryit: {
+        q: ['f ＝ w₁² ＋ 3w₂²，從 (2, −1) 出發。梯度是多少？學習率 0.1 走一步之後在哪？'],
+        draft: '梯度：＿\n新位置：＿',
+        answer: ['梯度 ＝ (2×2, 6×(−1)) ＝ (4, −6)。', '新位置 ＝ (2 − 0.4, −1 ＋ 0.6) ＝ (1.6, −0.4)。兩個都往 0 靠近；w₂ 的梯度是負的，所以往正的方向走。'],
+      },
+    },
+    mistakes: [
+      { wrong: '學習率越大，訓練越快。', why: '太大會跳過谷底甚至發散。', right: '從小的開始試，看損失有沒有穩定下降。' },
+      { wrong: '所有參數用同一個「走一樣遠」的步伐。', why: '梯度大的方向本來就走得多。', right: '步伐 ＝ 學習率 × 各自的梯度。' },
+      { wrong: '以為梯度下降一定找到最低點。', why: '可能卡在平台或局部的小坑。', right: '大模型實務上找到「夠好」的點就行。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '梯度指向哪裡？', options: [
+        { text: '損失上升最快的方向', correct: true, why: '所以訓練往反方向走。' },
+        { text: '損失下降最快的方向，直接照著走', why: '要加負號才是下坡。' },
+        { text: '谷底的位置', why: '梯度只看腳下，不知道谷底在哪。' },
+        { text: '隨機方向', why: '是算出來的。' },
+      ] },
+      { level: '應用', type: 'mc', q: '訓練時損失變成 NaN（數字爆掉）。最可能先調整什麼？', options: [
+        { text: '把學習率調小', correct: true, why: '太大會發散，數字越來越大。' },
+        { text: '把學習率調大，讓它更快跳出去', why: '會更快發散。' },
+        { text: '增加訓練步數', why: '已經發散，走更多步沒用。' },
+        { text: '換一個更大的模型', why: '問題在步伐。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個 70B 模型訓練一步，梯度有幾個數字？這對 GPU 記憶體代表什麼？'], answer: [
+        '每個參數一個偏導數，所以梯度也有 700 億個數字，和模型一樣大。',
+        '訓練時記憶體要同時放權重、梯度，還有優化器的狀態；這就是訓練比推論需要多好幾倍記憶體的原因（第五部）。',
+      ] },
+    ],
+    keypoints: [
+      '梯度 ＝ 每個參數各自的斜率。',
+      '梯度指向上坡；往反方向走一小步。',
+      '學習率太小很慢，太大會發散。',
+    ],
+    sources: ['3b1b-calc', 'dlbook', '3b1b-nn'],
+  },
+
+  '3-3': {
+    goals: [
+      '用鏈鎖律算出一連串計算的導數',
+      '說出反向傳播就是從損失往回用鏈鎖律',
+      '手算一個權重的梯度',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）f ＝ w₁² ＋ 3w₂² 在 (1, 1) 的梯度？', options: [
+        { text: '(2, 6)', correct: true, why: '(2w₁, 6w₂)。' },
+        { text: '(1, 3)，就是兩項前面的係數', why: '要乘上次方的 2。' },
+        { text: '4', why: '那是函數值；梯度是向量。' },
+        { text: '(0, 0)', why: '那是谷底。' },
+      ] },
+    ],
+    analogy: {
+      text: ['三個齒輪咬在一起：A 轉 1 圈，B 轉 2 圈；B 轉 1 圈，C 轉 3 圈。A 轉 1 圈，C 轉幾圈？2 × 3 ＝ 6 圈。', '這就是[[鏈鎖律]]：一連串的計算，整體的斜率等於每一段的斜率相乘。神經網路從權重到損失要經過很多步，[[反向傳播]]就是從損失開始，往回一段一段乘，算出每個權重的梯度。'],
+      limit: ['齒輪是一條直線；網路裡一個值常常同時影響好幾條路，這時每條路各自相乘，再把結果加起來。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="一個權重的計算鏈：w 乘 x 得到預測 6，減掉答案 10 得到誤差 −4，平方得到損失 16；反向時每一段的斜率是 2、1、−8，相乘得到 −16">
+        ${[['w ＝ 3', 'm2', 20], ['預測 ＝ wx ＝ 6', 'm0', 150], ['誤差 ＝ 預測 − 10 ＝ −4', 'm1', 300], ['L ＝ 誤差² ＝ 16', 'm4', 440]].map(([t, c, x], i) => `<rect x="${x}" y="40" width="${i === 2 ? 120 : 110}" height="70" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/>${t.split(' ＝ ').length > 2 ? `<text x="${x + 60}" y="70" text-anchor="middle" font-size="13" font-weight="900" class="on-color">${t.split(' ＝ ')[0]}</text><text x="${x + 60}" y="94" text-anchor="middle" font-size="12" class="on-color mono">${t.split(' ＝ ').slice(1).join(' ＝ ')}</text>` : `<text x="${x + 55}" y="70" text-anchor="middle" font-size="13" font-weight="900" class="on-color">${t.split(' ＝ ')[0]}</text><text x="${x + 55}" y="94" text-anchor="middle" font-size="13" class="on-color mono">${t.split(' ＝ ')[1]}</text>`}`).join('')}
+        <path d="M130 75 L150 75 M260 75 L300 75 M420 75 L440 75" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="28" text-anchor="middle" font-size="13" font-weight="900">前向（x ＝ 2、答案 ＝ 10）</text>
+        ${[['×x ＝ 2', 140], ['× 1', 280], ['× 2·誤差 ＝ −8', 430]].map(([t, x]) => `<text x="${x}" y="150" text-anchor="middle" font-size="13" font-weight="900" class="mono">${t}</text>`).join('')}
+        <path d="M500 125 L500 175 L75 175 L75 125" fill="none" style="stroke:var(--m5)" stroke-width="4" stroke-dasharray="8 5"/>
+        <rect x="160" y="190" width="240" height="44" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="218" text-anchor="middle" font-size="15" font-weight="900" class="on-color mono">∂L/∂w ＝ −8 × 1 × 2 ＝ −16</text>
+      </svg>`,
+      caption: '反向：從損失往回，每一段的斜率相乘。−16 是負的：w 該變大（預測 6 太小，答案是 10）。',
+    },
+    define: [
+      { term: '鏈鎖律', en: 'chain rule', def: '整體斜率 ＝ 每段斜率相乘。', example: '2 × 3 ＝ 6。' },
+      { term: '反向傳播', en: 'backpropagation', def: '從損失往回套鏈鎖律。', example: 'loss.backward()。' },
+      { term: '梯度', en: 'gradient', def: '每個參數的斜率。', example: '−16。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'autodiff', props: { title: 'L ＝ (w·x − 10)²，w ＝ 3、x ＝ 2：先前向、再反向', nodes: [
+          { id: 'w', op: 'leaf', value: 3 }, { id: 'x', op: 'leaf', value: 2 }, { id: 't', op: 'leaf', value: 10 },
+          { id: 'p', op: 'mul', args: ['w', 'x'] }, { id: 'err', op: 'sub', args: ['p', 't'] }, { id: 'L', op: 'sq', args: ['err'] },
+        ] } },
+        '一步一步按，看「梯度」那一欄怎麼從 L 往回填：L 自己是 1，err 是 2 × (−4) ＝ −8，p 是 −8 × 1，w 是 −8 × x ＝ −16。順便也算出了 x 的梯度（−8 × w ＝ −24），雖然 x 是資料、不會被更新。',
+        { type: 'code', lang: 'python', title: '同一個例子交給 PyTorch', code: `import torch
+
+w = torch.tensor(3.0, requires_grad=True)
+x, target = 2.0, 10.0
+
+loss = (w * x - target) ** 2   # 前向：16
+loss.backward()                # 反向：自動用鏈鎖律
+print(w.grad)                  # tensor(-16.)` },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="一個值走兩條路影響損失時，兩條路的斜率各自相乘，再加起來">
+          <rect x="20" y="70" width="90" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="65" y="106" text-anchor="middle" font-size="16" font-weight="900" class="on-color">a</text>
+          <rect x="220" y="20" width="110" height="56" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="275" y="54" text-anchor="middle" font-size="14" font-weight="900" class="on-color">路線 1：×2</text>
+          <rect x="220" y="124" width="110" height="56" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="275" y="158" text-anchor="middle" font-size="14" font-weight="900" class="on-color">路線 2：×5</text>
+          <rect x="440" y="70" width="100" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="490" y="106" text-anchor="middle" font-size="16" font-weight="900" class="on-color">L</text>
+          <path d="M110 90 L220 48 M110 110 L220 152 M330 48 L440 90 M330 152 L440 110" class="stroke-ink" stroke-width="3"/>
+          <text x="385" y="104" text-anchor="middle" font-size="13" font-weight="900" class="mono">2 ＋ 5 ＝ 7</text>
+        </svg>`, caption: '同一個值影響好幾個地方時，梯度要「加總」。PyTorch 的 .grad 用 ＋＝ 累加，就是這個原因；每一步訓練前要先清零（optimizer.zero_grad()）。' },
+      ],
+      tryit: {
+        q: ['同一個例子，但 w ＝ 6（預測 12，答案 10）。∂L/∂w 是多少？w 該變大還是變小？'],
+        draft: '誤差：＿\n∂L/∂w：＿\n方向：＿',
+        answer: ['誤差 ＝ 12 − 10 ＝ 2；∂L/∂w ＝ 2 × 2 × 1 × x ＝ 4 × 2 ＝ 8。', '正的：w 該變小，因為預測太大了。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把每一段的斜率相加。', why: '一條鏈上是相乘（齒輪）。', right: '同一條路相乘；不同的路才相加。' },
+      { wrong: '忘了每次訓練前把梯度清零。', why: 'PyTorch 會累加上一步的梯度。', right: '每一步先 optimizer.zero_grad()。' },
+      { wrong: '以為反向傳播是另一種學習方法。', why: '它只是「算梯度」的方法。', right: '反向傳播算梯度，梯度下降負責更新。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'A 轉 1 圈讓 B 轉 4 圈，B 轉 1 圈讓 C 轉 0.5 圈。A 轉 1 圈，C 轉幾圈？', options: [
+        { text: '2', correct: true, why: '4 × 0.5。' },
+        { text: '4.5，兩段加起來', why: '一條鏈上要相乘。' },
+        { text: '8', why: '是乘 0.5，不是除。' },
+        { text: '0.5', why: '還要乘第一段的 4。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'L ＝ (w·x − t)²，w ＝ 1、x ＝ 3、t ＝ 5。∂L/∂w ＝？', options: [
+        { text: '−12', correct: true, why: '誤差 −2；2 × (−2) × 3。' },
+        { text: '4，就是誤差的平方', why: '那是損失本身。' },
+        { text: '−4', why: '還要乘 x ＝ 3。' },
+        { text: '12', why: '誤差是負的。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['網路很深時（例如 50 層），每一層的斜率如果都是 0.5，傳到第 1 層的梯度大約變成多少？這會造成什麼問題？'], answer: [
+        '0.5⁵⁰ ≈ 8.9 × 10⁻¹⁶，幾乎是 0：前面幾層的權重幾乎不會動，這叫梯度消失。',
+        '反過來，每層斜率都是 2 時會爆炸成很大的數。第四部的殘差連接、正規化，都是為了讓這串乘法維持在 1 附近。',
+      ] },
+    ],
+    keypoints: [
+      '鏈鎖律：一條路上的斜率相乘。',
+      '反向傳播：從損失往回，算出每個權重的梯度。',
+      '好幾條路的梯度要相加。',
+    ],
+    sources: ['3b1b-nn', 'micrograd', 'dlbook'],
+  },
+});
+</script>

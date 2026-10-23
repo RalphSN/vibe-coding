@@ -1,0 +1,223 @@
+<script>
+/* ==========================================================================
+   模組 4：機率與 softmax：模型怎麼選字
+   ========================================================================== */
+defineTerms({
+  '機率分布': { en: 'probability distribution', def: '每一種可能結果各有一個 0 到 1 的機率，全部加起來剛好是 1。', example: '台北 0.90、新北 0.05、高雄 0.03、其他 0.02。', lesson: '4-1' },
+  '條件機率': { en: 'conditional probability', def: '在已知某件事的前提下，另一件事的機率；寫成 P(B｜A)。', example: 'P(下一個字｜前面的字)。', lesson: '4-1' },
+  '期望值': { en: 'expected value', def: '每個結果乘上它的機率再加總；重複很多次後的平均。', example: '骰子：(1＋2＋…＋6) ÷ 6 ＝ 3.5。', lesson: '4-1' },
+  '取樣': { en: 'sampling', def: '依照機率分布隨機抽一個結果；機率高的比較常被抽到，但不是每次都抽到。', example: '模型每次回答可能不一樣。', lesson: '4-1' },
+  'logits': { en: 'logits', def: '模型最後一層算出來、還沒變成機率的原始分數；可以是負數，加總也不是 1。', example: '(2, 1, 0)。', lesson: '4-2' },
+  '指數': { en: 'exponential', def: 'eˣ：e（約 2.718）的 x 次方。永遠是正數，x 每加 1 就乘上約 2.718。', example: 'e⁰ ＝ 1、e² ≈ 7.39。', lesson: '4-2' },
+  'temperature': { en: 'temperature', def: '取樣前先把 logits 除以 T：T 小於 1 讓分布更集中，大於 1 讓分布更平均。', example: 'T ＝ 0.5：(2, 1, 0) → (4, 2, 0)。', lesson: '4-2' },
+});
+
+const STAR_SVG_ROWS = [['★ 1', 0.1, 'm5'], ['★ 3', 0.3, 'm2'], ['★ 5', 0.6, 'm3']];
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '說出機率分布的兩個條件',
+      '算出一個分布的期望值',
+      '知道語言模型輸出的是條件機率',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-3）一條鏈上每一段的斜率是 2、3、0.5，整體斜率？', options: [
+        { text: '3', correct: true, why: '2 × 3 × 0.5。' },
+        { text: '5.5，三段的斜率加起來', why: '同一條路要相乘。' },
+        { text: '6', why: '還要乘 0.5。' },
+        { text: '0.5', why: '只看了最後一段。' },
+      ] },
+    ],
+    analogy: {
+      text: ['氣象預報說明天「降雨機率 70%」：不是說會下 70% 的雨，而是「像明天這樣的天氣，100 天裡大約 70 天會下雨」。下雨 70%、不下 30%，加起來 100%，這就是一個[[機率分布]]。', '語言模型也在做預報：看了前面的字，對「下一個字」的每一種可能各給一個機率。這是[[條件機率]]：P(下一個字｜前面的字)。然後[[取樣]]，從中抽一個。'],
+      limit: ['天氣預報可以事後對答案、算準不準；下一個字往往沒有唯一的「正確答案」，很多個都合理。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="「台灣的首都是」之後的下一個字機率：台北 0.90、新北 0.05、高雄 0.03、其他 0.02，四根長條加起來是 1">
+        <text x="20" y="30" font-size="15" font-weight="900">前面的字：「台灣的首都是」</text>
+        ${[['台北', 0.9, 'm3'], ['新北', 0.05, 'm2'], ['高雄', 0.03, 'm1'], ['其他', 0.02, 'm7']].map(([w, p, c], i) => `<text x="20" y="${76 + i * 42}" font-size="15" font-weight="900">${w}</text><rect x="80" y="${56 + i * 42}" width="${Math.max(4, p * 400)}" height="28" style="fill:var(--${c})" class="stroke-ink" stroke-width="2"/><text x="${90 + Math.max(4, p * 400)}" y="${76 + i * 42}" font-size="14" class="mono">${p.toFixed(2)}</text>`).join('')}
+        <text x="280" y="238" text-anchor="middle" font-size="14" font-weight="900">0.90 ＋ 0.05 ＋ 0.03 ＋ 0.02 ＝ 1</text>
+      </svg>`,
+      caption: '示意數字。真實模型會對詞彙表裡的每一個 token（常有數萬到數十萬個）都給一個機率。',
+    },
+    define: [
+      { term: '機率分布', en: 'distribution', def: '每個 0～1，加總 1。', example: '下一個字的機率。' },
+      { term: '條件機率', en: 'conditional', def: '已知 A 時 B 的機率。', example: 'P(字｜前文)。' },
+      { term: '期望值', en: 'expected value', def: 'Σ 結果 × 機率。', example: '3.5。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'sampler', props: { title: '照上圖的機率抽下一個字：按很多次「抽一個」', temperature: false, steps: [
+          { context: '台灣的首都是', candidates: [{ t: '台北', logit: Math.log(0.9) }, { t: '新北', logit: Math.log(0.05) }, { t: '高雄', logit: Math.log(0.03) }, { t: '其他', logit: Math.log(0.02) }] },
+        ], note: '機率 0.90 不是「一定」：按 20 次，大約會有 2 次抽到別的。這就是模型偶爾會說出奇怪答案的一個原因。' } },
+        '[[期望值]]回答「平均起來會怎樣」：把每種結果乘上它的機率，再加起來。下面用商品評價試試：每種星數有幾則，先除以總數變成機率，再算期望值（平均星數）。',
+        { type: 'widget', name: 'knobs', props: { title: '評價則數 → 機率分布 → 期望值（實際計算）', sliders: [
+          { id: 'a', label: '1 星的則數', min: 0, max: 100, step: 1, value: 10 },
+          { id: 'b', label: '3 星的則數', min: 0, max: 100, step: 1, value: 30 },
+          { id: 'c', label: '5 星的則數', min: 0, max: 100, step: 1, value: 60 },
+        ], compute: (v) => {
+          const total = v.a + v.b + v.c;
+          if (!total) return { rows: [{ label: '總則數', value: '0', ratio: 0 }], note: '沒有資料，無法變成機率。' };
+          const p = [v.a / total, v.b / total, v.c / total];
+          const ev = p[0] * 1 + p[1] * 3 + p[2] * 5;
+          return { rows: [
+            { label: 'P(1 星)', value: p[0].toFixed(3), ratio: p[0] },
+            { label: 'P(3 星)', value: p[1].toFixed(3), ratio: p[1] },
+            { label: 'P(5 星)', value: p[2].toFixed(3), ratio: p[2] },
+            { label: '機率加總', value: (p[0] + p[1] + p[2]).toFixed(3), ratio: 1 },
+            { label: '期望值（平均星數）', value: ev.toFixed(2), ratio: ev / 5 },
+          ], note: '預設值：1×0.1 ＋ 3×0.3 ＋ 5×0.6 ＝ 4.0。除以總數讓「加起來是 1」，這一步叫正規化；下一課的 softmax 也在做同一件事。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="期望值的算法：1 星機率 0.1、3 星 0.3、5 星 0.6，各自相乘後加總得到 4.0">
+          ${STAR_SVG_ROWS.map(([s, p, c], i) => `<rect x="${20 + i * 140}" y="40" width="120" height="100" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${80 + i * 140}" y="78" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${s}</text><text x="${80 + i * 140}" y="108" text-anchor="middle" font-size="14" class="on-color mono">× ${p}</text>`).join('')}
+          <rect x="440" y="40" width="100" height="100" class="fill-surface stroke-ink" stroke-width="3"/><text x="490" y="84" text-anchor="middle" font-size="14" font-weight="900">加總</text><text x="490" y="114" text-anchor="middle" font-size="18" font-weight="900" class="mono">4.0</text>
+          <text x="280" y="180" text-anchor="middle" font-size="14" class="mono">0.1 ＋ 0.9 ＋ 3.0 ＝ 4.0</text>
+          <text x="280" y="204" text-anchor="middle" font-size="13">沒有任何一則評價是 4 星，但平均是 4.0</text>
+        </svg>`, caption: '期望值不一定是「會出現的結果」，它是長期的平均。訓練時的損失，也是「所有訓練資料的平均」。' },
+      ],
+      tryit: {
+        q: ['抽獎：1% 機會中 1,000 元，其他什麼都沒有。一張券賣 20 元，值得買嗎？用期望值說明。'],
+        draft: '期望值：＿\n結論：＿',
+        answer: ['期望值 ＝ 0.01 × 1000 ＋ 0.99 × 0 ＝ 10 元。', '花 20 元換平均 10 元，長期每張虧 10 元。期望值說的是「重複很多次」的平均，單次還是可能中獎。'],
+      },
+    },
+    mistakes: [
+      { wrong: '機率 0.9 就是「一定會」。', why: '10 次裡大約有 1 次不會。', right: '機率是長期比例；取樣時低機率的也會被抽到。' },
+      { wrong: '各個結果的機率加起來超過 1。', why: '那就不是機率分布。', right: '先除以總和（正規化）。' },
+      { wrong: '期望值就是最可能出現的結果。', why: '例子裡最常見的是 5 星，期望值卻是 4.0。', right: '最可能的叫眾數；期望值是加權平均。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '四個結果的機率是 0.5、0.2、0.2、x。x ＝？', options: [
+        { text: '0.1', correct: true, why: '加總要是 1。' },
+        { text: '0.2，跟前兩個小的一樣', why: '加起來會超過 1。' },
+        { text: '0.25', why: '不是平均分。' },
+        { text: '任何數都可以', why: '加總必須是 1。' },
+      ] },
+      { level: '應用', type: 'mc', q: '一個遊戲：60% 得 10 分、40% 扣 5 分。期望值？', options: [
+        { text: '4 分', correct: true, why: '6 − 2。' },
+        { text: '5 分，就是 10 和 −5 的中間', why: '要用機率加權。' },
+        { text: '10 分', why: '那只是最常見的結果。' },
+        { text: '2.5 分', why: '6 − 2 ＝ 4。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['同一個問題問 ChatGPT 兩次，答案措辭不一樣。用這一課的語言解釋原因。'], answer: [
+        '模型每一步給出的是下一個 token 的機率分布，再取樣抽一個；機率不是 1 的字都可能被抽到。',
+        '前面抽到的字不同，後面的條件機率也跟著變，整段回答就分岔了。把 temperature 調低（下一課）可以讓結果更穩定。',
+      ] },
+    ],
+    keypoints: [
+      '機率分布：每個 0～1，加總是 1。',
+      '期望值：結果 × 機率，再加總。',
+      '語言模型輸出 P(下一個字｜前文)，再取樣。',
+    ],
+    sources: ['dlbook', '3b1b-nn'],
+  },
+
+  '4-2': {
+    goals: [
+      '手算三個數字的 softmax',
+      '說出指數為什麼讓大的更大',
+      '解釋 temperature 怎麼改變分布',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 4-1）機率分布一定要滿足？', options: [
+        { text: '每個 0～1，加總是 1', correct: true, why: '兩個條件。' },
+        { text: '每個都一樣大，才算公平', why: '可以不一樣。' },
+        { text: '最大的那個要超過 0.5', why: '沒有這個規定。' },
+        { text: '加總是 100', why: '用百分比時才是 100%。' },
+      ] },
+    ],
+    analogy: {
+      text: ['班上投票，候選人的「人氣分數」有正有負（[[logits]]）。要把分數變成「得票率」，有兩個要求：每個都是正的，而且加起來是 100%。', '[[softmax]] 的做法是：每個分數先取[[指數]] eˣ（負的也會變成正的），再除以總和。指數的特性是「差 1 分就差 2.7 倍」，所以分數領先的人得票率會被拉得更開。'],
+      limit: ['真正的投票不會把差距放大；softmax 的放大是刻意的設計，而放大多少可以用 [[temperature]] 調整。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="softmax 三步：logits 2、1、0 取指數得 7.39、2.72、1，加總 11.11，各自除以總和得 0.665、0.245、0.090">
+        ${[['logits', ['2', '1', '0'], 'm7', 20], ['取 eˣ', ['7.39', '2.72', '1.00'], 'm2', 200], ['÷ 11.11', ['0.665', '0.245', '0.090'], 'm3', 380]].map(([t, vals, c, x]) => `<text x="${x + 80}" y="30" text-anchor="middle" font-size="15" font-weight="900">${t}</text>${vals.map((val, i) => `<rect x="${x}" y="${44 + i * 56}" width="160" height="48" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 80}" y="${75 + i * 56}" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">${val}</text>`).join('')}`).join('')}
+        <path d="M180 120 L200 120 M360 120 L380 120" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="236" text-anchor="middle" font-size="14" font-weight="900" class="mono">softmax(zᵢ) ＝ e^zᵢ ÷ Σ e^zⱼ</text>
+      </svg>`,
+      caption: '分數差 1（2 和 1），機率差約 2.7 倍（0.665 和 0.245）。加總 0.665 ＋ 0.245 ＋ 0.090 ＝ 1。',
+    },
+    define: [
+      { term: 'logits', en: 'logits', def: '還沒變成機率的分數。', example: '(2, 1, 0)。' },
+      { term: '指數', en: 'exponential', def: 'eˣ，永遠是正的。', example: 'e² ≈ 7.39。' },
+      { term: 'softmax', en: 'softmax', def: '取指數再除以總和。', example: '(0.665, 0.245, 0.090)。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '三個 logits 與 temperature → softmax 機率（實際計算）', sliders: [
+          { id: 'a', label: '「貓」的 logit', min: -3, max: 5, step: 0.5, value: 2 },
+          { id: 'b', label: '「狗」的 logit', min: -3, max: 5, step: 0.5, value: 1 },
+          { id: 'c', label: '「車」的 logit', min: -3, max: 5, step: 0.5, value: 0 },
+          { id: 't', label: 'temperature T', min: 0.1, max: 3, step: 0.1, value: 1 },
+        ], compute: (v) => {
+          const z = [v.a, v.b, v.c].map((s) => s / v.t);
+          const top = Math.max(...z);
+          const e = z.map((s) => Math.exp(s - top));
+          const sum = e.reduce((x, y) => x + y, 0);
+          const p = e.map((s) => s / sum);
+          return { rows: [
+            { label: 'P(貓)', value: p[0].toFixed(3), ratio: p[0] },
+            { label: 'P(狗)', value: p[1].toFixed(3), ratio: p[1] },
+            { label: 'P(車)', value: p[2].toFixed(3), ratio: p[2] },
+          ], note: '試試：三個 logits 都加 3，機率完全不變（只有差距有影響）。T 拉到 0.5：(2, 1, 0) 變成 (4, 2, 0)，貓升到 0.867；T 拉到 2：變成 (1, 0.5, 0)，貓降到 0.506。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="指數函數 e 的 x 次方：x 從 −2 到 2，曲線從接近 0 快速上升到約 7.4；永遠在 0 以上">
+          <line x1="60" y1="190" x2="520" y2="190" class="stroke-ink" stroke-width="2"/><line x1="290" y1="20" x2="290" y2="196" class="stroke-ink" stroke-width="2"/>
+          <path d="${Array.from({ length: 41 }, (_, i) => { const x = -2 + i * 0.1; return `${i ? 'L' : 'M'}${(290 + x * 110).toFixed(1)} ${(190 - Math.exp(x) * 22).toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+          ${[[-2, '0.14'], [0, '1'], [1, '2.72'], [2, '7.39']].map(([x, t]) => `<circle cx="${290 + x * 110}" cy="${(190 - Math.exp(x) * 22).toFixed(1)}" r="6" style="fill:var(--m5)" class="stroke-ink" stroke-width="2"/><text x="${290 + x * 110 + (x === 2 ? -12 : 10)}" y="${(190 - Math.exp(x) * 22 - 10).toFixed(1)}" text-anchor="${x === 2 ? 'end' : 'start'}" font-size="13" font-weight="900" class="mono">e^${x} ＝ ${t}</text>`).join('')}
+          <text x="290" y="216" text-anchor="middle" font-size="13">x 每加 1，高度乘 2.72；負數也會變成正的</text>
+        </svg>`, caption: '這兩個特性正是 softmax 需要的：保證是正數，而且把差距放大。' },
+        { type: 'widget', name: 'sampler', props: { title: '同樣的 logits，用 temperature 控制要多「冒險」', steps: [
+          { context: '我家養了一隻', candidates: [{ t: '貓', logit: 2 }, { t: '狗', logit: 1 }, { t: '車', logit: 0 }] },
+        ], note: '這裡的機率就是上面拉桿的 softmax。temperature 0.1 幾乎只會抽到「貓」；2 的時候「車」也常出現。' } },
+        { type: 'code', lang: 'python', title: '自己寫 softmax：先減最大值', code: `import numpy as np
+
+def softmax(z, T=1.0):
+    z = np.asarray(z) / T
+    z = z - z.max()        # 不改變結果，但避免 e 的 1000 次方溢位
+    e = np.exp(z)
+    return e / e.sum()
+
+print(softmax([2, 1, 0]))         # [0.665 0.245 0.090]
+print(softmax([1002, 1001, 1000]))  # 一樣的結果，不會變成 nan` },
+      ],
+      tryit: {
+        q: ['手算 softmax(0, 0)。再算 softmax(ln 3, 0)，也就是 e 的次方剛好是 3 和 1 的情況。'],
+        draft: 'softmax(0, 0) ＝ ＿\nsoftmax(ln 3, 0) ＝ ＿',
+        answer: ['e⁰ ＝ 1、1，總和 2 → (0.5, 0.5)。分數一樣，機率就一樣。', 'e 的次方是 3 和 1，總和 4 → (0.75, 0.25)。分數差 ln 3 ≈ 1.1，機率差 3 倍。'],
+      },
+    },
+    mistakes: [
+      { wrong: '直接用 logits 除以總和當機率。', why: 'logits 可以是負數，除完會出現負的「機率」。', right: '先取指數，再除以總和。' },
+      { wrong: '以為 logits 全部加 10，機率會改變。', why: '分子分母都乘了 e¹⁰，互相抵消。', right: '只有 logits 之間的差距有影響。' },
+      { wrong: '以為 temperature 0 就是「最準」。', why: 'T 很小只是一直挑最高的那個，不保證正確。', right: '要穩定就調低 T；要多樣就調高。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: 'softmax 的第一步是？', options: [
+        { text: '每個分數取 eˣ', correct: true, why: '讓每個數都是正的。' },
+        { text: '除以分數的總和，直接變成比例', why: '負數會出問題。' },
+        { text: '只留最大的', why: '那是 argmax。' },
+        { text: '取平方', why: '平方會讓負的大分數變大。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'logits (2, 1, 0) 用 temperature 0.5，第一名的機率會？', options: [
+        { text: '變大', correct: true, why: '除以 0.5 拉大差距：0.665 → 0.867。' },
+        { text: '變小，因為 temperature 變小了', why: 'T 小讓分布更集中。' },
+        { text: '不變', why: '差距變了，機率就變。' },
+        { text: '變成 0.5', why: '那是分數相同的情況。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['attention 裡也有 softmax（1-2）。如果點積沒有除以 √d，分數可能都很大、差距也很大。softmax 之後會發生什麼事？'], answer: [
+        '差距很大時，softmax 幾乎把全部機率給最大的那一個（接近 1），其他接近 0：attention 只看一個字。',
+        '這時 softmax 的斜率也接近 0，梯度很小、學不動。除以 √d 等於把 temperature 調高，讓分數回到合理範圍，這正是 Vaswani 等 2017 給的理由。',
+      ] },
+    ],
+    keypoints: [
+      'softmax：取 eˣ，再除以總和。',
+      '只有分數的差距有影響；差 1 約差 2.7 倍。',
+      'temperature 小 → 集中；大 → 分散。',
+    ],
+    sources: ['attention', 'dlbook', '3b1b-nn'],
+  },
+});
+</script>

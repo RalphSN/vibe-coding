@@ -1,0 +1,239 @@
+<script>
+/* ==========================================================================
+   模組 1：向量與點積：相似度
+   ========================================================================== */
+defineTerms({
+  '維度': { en: 'dimension', def: '向量裡有幾個數字。二維可以畫在紙上；模型的向量常有數百到數千維。', example: '(3, 4) 是 2 維。', lesson: '1-1' },
+  '長度': { en: 'norm / magnitude', def: '向量箭頭有多長：每個數字平方、加總、開根號。', example: '(3, 4) 的長度 ＝ √(9＋16) ＝ 5。', lesson: '1-1' },
+  'embedding': { en: 'embedding', def: '把文字、圖片等東西變成一個向量；意思相近的東西，向量也靠近。', example: '「貓」和「小貓」的向量方向很接近。', lesson: '1-1' },
+  '點積': { en: 'dot product', def: '兩個向量對應位置相乘再全部加起來，得到一個數字。', example: '(3, 4)·(4, 3) ＝ 12＋12 ＝ 24。', lesson: '1-2' },
+  'cosine 相似度': { en: 'cosine similarity', def: '點積除以兩個長度：只看方向像不像，不管多長。範圍 −1 到 1。', example: '(3, 4) 和 (4, 3)：24 ÷ 25 ＝ 0.96。', lesson: '1-2' },
+});
+
+const ARROW_DEF = `<defs><marker id="m1-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="14" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="fill-ink"/></marker></defs>`;
+
+const WORD_POINTS = [
+  { label: '貓', x: 0.80, y: 0.55 }, { label: '小貓', x: 0.70, y: 0.62 }, { label: '狗', x: 0.82, y: 0.30 },
+  { label: '汽車', x: -0.60, y: 0.70 }, { label: '卡車', x: -0.75, y: 0.52 },
+  { label: '香蕉', x: -0.30, y: -0.80 }, { label: '蘋果', x: -0.05, y: -0.85 },
+  { label: '很大的貓', x: 0.98, y: 0.70 },
+];
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '說出向量就是一串有順序的數字',
+      '算出向量的長度、相加、乘一個數',
+      '知道 embedding 為什麼要用向量表示意思',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 0-1）模型產生一個字（前向）時，哪一個工具用不到？', options: [
+        { text: '梯度', correct: true, why: '只有訓練時才算梯度。' },
+        { text: '矩陣乘法，因為那只在訓練時用', why: '每一層都在做矩陣乘法。' },
+        { text: 'softmax', why: '選字前要先變成機率。' },
+        { text: '向量，因為文字直接進模型', why: 'token 要先變成向量。' },
+      ] },
+    ],
+    analogy: {
+      text: ['描述一杯手搖飲：甜度 3 分、冰塊 7 分、珍珠 1 份。寫成 (3, 7, 1)，就是一個三維[[向量]]。兩杯飲料的三個數字都很接近，喝起來就很像。', '模型把每個 token 變成一個向量，只是不是 3 個數字，而是數百到數千個（[[維度]]）。每個數字不像「甜度」那樣有清楚的名字，但整串數字合起來，意思相近的字就會落在附近，這就是 [[embedding]]。'],
+      limit: ['飲料的每一個數字都有名字；embedding 的單一維度通常說不出意思，要整串一起看。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="二維平面上的向量 (3, 4)：從原點出發的箭頭，往右 3、往上 4，長度 5">
+        ${ARROW_DEF}
+        ${[0, 1, 2, 3, 4, 5].map((i) => `<line x1="${60 + i * 40}" y1="20" x2="${60 + i * 40}" y2="220" class="stroke-ink" stroke-width="1" opacity="0.2"/><line x1="60" y1="${220 - i * 40}" x2="260" y2="${220 - i * 40}" class="stroke-ink" stroke-width="1" opacity="0.2"/>`).join('')}
+        <line x1="60" y1="220" x2="270" y2="220" class="stroke-ink" stroke-width="2"/><line x1="60" y1="220" x2="60" y2="14" class="stroke-ink" stroke-width="2"/>
+        <line x1="60" y1="220" x2="180" y2="220" style="stroke:var(--m2)" stroke-width="5"/><line x1="180" y1="220" x2="180" y2="60" style="stroke:var(--m3)" stroke-width="5"/>
+        <line x1="60" y1="220" x2="178" y2="62" class="stroke-ink" stroke-width="4" marker-end="url(#m1-arrow)"/>
+        <text x="120" y="244" text-anchor="middle" font-size="14" font-weight="900">往右 3</text>
+        <text x="190" y="144" font-size="14" font-weight="900">往上 4</text>
+        <text x="100" y="130" font-size="15" font-weight="900" transform="rotate(-53 100 130)">長度 5</text>
+        <rect x="300" y="40" width="240" height="170" class="fill-surface stroke-ink" stroke-width="3"/>
+        <text x="420" y="78" text-anchor="middle" font-size="22" font-weight="900" class="mono">a ＝ (3, 4)</text>
+        <text x="420" y="118" text-anchor="middle" font-size="15">兩個數字 → 2 維</text>
+        <text x="420" y="152" text-anchor="middle" font-size="15" class="mono">|a| ＝ √(3²＋4²) ＝ 5</text>
+        <text x="420" y="186" text-anchor="middle" font-size="13">（就是畢氏定理）</text>
+      </svg>`,
+      caption: '向量 ＝ 一串數字 ＝ 一支箭頭。二維畫得出來；一千維畫不出來，但算法完全一樣。',
+    },
+    define: [
+      { term: '向量', en: 'vector', def: '一串有順序的數字。', example: '(3, 7, 1)。' },
+      { term: '長度', en: 'norm', def: '√（每個數平方的總和）。', example: '|(3, 4)| ＝ 5。' },
+      { term: 'embedding', en: 'embedding', def: '代表意思的向量。', example: '一個 token 一個向量。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['動作', '怎麼算', '例子（a ＝ (3, 4)、b ＝ (1, 2)）'], rows: [
+          ['相加', '對應位置相加', 'a ＋ b ＝ (4, 6)'],
+          ['乘一個數', '每個位置都乘', '2a ＝ (6, 8)，方向不變、長度變 2 倍'],
+          ['長度', '平方、加總、開根號', '|a| ＝ 5'],
+        ], caption: '一千維的向量也一樣，只是加總時有一千項。' },
+        { type: 'widget', name: 'knobs', props: { title: '改 a 的兩個數字，看長度與 a ＋ b（b ＝ (1, 2)；實際計算）', sliders: [
+          { id: 'x', label: 'a 的第 1 個數', min: -5, max: 5, step: 0.5, value: 3 },
+          { id: 'y', label: 'a 的第 2 個數', min: -5, max: 5, step: 0.5, value: 4 },
+          { id: 'c', label: '乘上的數 c', min: -2, max: 3, step: 0.5, value: 2 },
+        ], compute: (v) => {
+          const len = Math.hypot(v.x, v.y);
+          return { rows: [
+            { label: '|a|（長度）', value: len.toFixed(2), ratio: Math.min(1, len / 7.1) },
+            { label: 'a ＋ b', value: `(${v.x + 1}, ${v.y + 2})`, ratio: Math.min(1, Math.hypot(v.x + 1, v.y + 2) / 9.3) },
+            { label: `c·a（c ＝ ${v.c}）`, value: `(${v.c * v.x}, ${v.c * v.y})`, ratio: Math.min(1, Math.abs(v.c) * len / 21.3) },
+            { label: '|c·a| ÷ |a|', value: len ? (Math.abs(v.c * v.x) + Math.abs(v.c * v.y) > 0 ? (Math.hypot(v.c * v.x, v.c * v.y) / len).toFixed(2) : '0.00') : '—', ratio: Math.min(1, Math.abs(v.c) / 3) },
+          ], note: '最後一列永遠等於 |c|：乘一個數只改長度；c 是負數時方向會反過來。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="向量相減與相加的經典例子：國王減男人加女人，最接近的向量是女王；兩條平行的箭頭代表同樣的性別方向">
+          ${ARROW_DEF}
+          <circle cx="120" cy="170" r="8" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="120" y="200" text-anchor="middle" font-size="15" font-weight="900">男人</text>
+          <circle cx="300" cy="170" r="8" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="300" y="200" text-anchor="middle" font-size="15" font-weight="900">女人</text>
+          <circle cx="170" cy="60" r="8" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="170" y="40" text-anchor="middle" font-size="15" font-weight="900">國王</text>
+          <circle cx="350" cy="60" r="8" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="350" y="40" text-anchor="middle" font-size="15" font-weight="900">女王</text>
+          <line x1="130" y1="170" x2="288" y2="170" class="stroke-ink" stroke-width="3" stroke-dasharray="6 4" marker-end="url(#m1-arrow)"/>
+          <line x1="180" y1="60" x2="338" y2="60" class="stroke-ink" stroke-width="3" stroke-dasharray="6 4" marker-end="url(#m1-arrow)"/>
+          <rect x="390" y="80" width="160" height="90" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="470" y="112" text-anchor="middle" font-size="13" font-weight="900">國王 − 男人</text>
+          <text x="470" y="134" text-anchor="middle" font-size="13" font-weight="900">＋ 女人</text>
+          <text x="470" y="158" text-anchor="middle" font-size="13">≈ 女王</text>
+        </svg>`, caption: 'Mikolov 等 2013（word2vec）的經典例子：同一種關係（男 → 女）在空間裡是同一個方向。示意圖，不是實際座標。' },
+      ],
+      tryit: {
+        q: ['手算：a ＝ (6, 8)，長度是多少？3a 的長度呢？'],
+        draft: '|a| ＝ ＿\n|3a| ＝ ＿',
+        answer: ['|a| ＝ √(36＋64) ＝ √100 ＝ 10。', '|3a| ＝ 30：乘一個數，長度就乘那個數（取絕對值），方向不變。可以用上面的拉桿驗算。'],
+      },
+    },
+    mistakes: [
+      { wrong: '長度直接把數字加起來：(3, 4) → 7。', why: '箭頭是斜的，不是走兩段路。', right: '平方、加總、開根號：5。' },
+      { wrong: '以為 embedding 的第 1 個數字代表某個固定意思（例如「是不是動物」）。', why: '單一維度通常說不出意思，意思分散在整串數字裡。', right: '整個向量一起比較（1-2）。' },
+      { wrong: '兩個向量維度不同也拿來相加。', why: '相加要一個位置對一個位置。', right: '先確認維度一樣；不同模型的 embedding 不能混用。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '(1, 2) ＋ (3, −1) ＝？', options: [
+        { text: '(4, 1)', correct: true, why: '1＋3、2＋(−1)。' },
+        { text: '(3, −2)，對應位置相乘的結果', why: '那是相乘。' },
+        { text: '5', why: '相加的結果還是向量。' },
+        { text: '(4, 3)', why: '2＋(−1) ＝ 1。' },
+      ] },
+      { level: '應用', type: 'mc', q: '(5, 12) 的長度是？', options: [
+        { text: '13', correct: true, why: '√(25＋144) ＝ √169。' },
+        { text: '17，兩個數字加起來', why: '不能直接相加。' },
+        { text: '169', why: '還要開根號。' },
+        { text: '60', why: '那是相乘。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['推薦系統把每部電影表示成向量（例如 (動作, 浪漫, 喜劇) 的程度）。使用者看過的電影向量加總起來，可以拿來做什麼？'], answer: [
+        '加總（或平均）得到「使用者口味」向量，再找跟這個向量最接近的電影推薦。',
+        '這就是 embedding 的用法：東西變成向量後，「像不像」就能用數學算（下一課的點積與 cosine）。真實系統的維度更多，而且每一維沒有名字。',
+      ] },
+    ],
+    keypoints: [
+      '向量是一串數字，也是一支箭頭。',
+      '長度 ＝ √（平方總和）；乘一個數只改長度。',
+      'embedding 讓意思相近的東西落在附近。',
+    ],
+    sources: ['3b1b-la', 'word2vec', 'dlbook'],
+  },
+
+  '1-2': {
+    goals: [
+      '手算兩個向量的點積',
+      '用 cosine 判斷兩個向量像不像',
+      '說出 attention 為什麼用點積、為什麼除以 √d',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）(6, 8) 的長度？', options: [
+        { text: '10', correct: true, why: '√100。' },
+        { text: '14，兩個數字加起來', why: '不能直接相加。' },
+        { text: '100', why: '還要開根號。' },
+        { text: '48', why: '那是相乘。' },
+      ] },
+    ],
+    analogy: {
+      text: ['兩個人填同一份口味問卷（甜、辣、酸，喜歡 +、討厭 −）。每一題兩人答案相乘：都喜歡或都討厭得正分，一個喜歡一個討厭得負分；全部加起來就是[[點積]]。分數越高，口味越合。', '但兩人「多熱情」也會影響總分：每題都打滿分的人，跟誰都高分。[[cosine 相似度]]把兩人的熱情（[[長度]]）除掉，只看方向像不像。'],
+      limit: ['問卷每題都有意思；embedding 的維度沒有名字。而且點積高不代表「意思一樣」，只代表在模型學到的空間裡方向接近。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="三種角度的兩個向量：方向相同時 cosine 是 1，垂直時是 0，相反時是負 1">
+        ${ARROW_DEF}
+        ${[[0, '同方向', '1', 'm3'], [90, '垂直', '0', 'm2'], [180, '相反', '−1', 'm5']].map(([deg, t, c, col], i) => {
+          const cx = 95 + i * 185; const cy = 120; const r = 70; const rad = (deg * Math.PI) / 180;
+          return `<line x1="${cx}" y1="${cy}" x2="${cx + r}" y2="${cy}" class="stroke-ink" stroke-width="4" marker-end="url(#m1-arrow)"/>
+          <line x1="${cx}" y1="${cy - (deg === 0 ? 16 : 0)}" x2="${(cx + (r - 12) * Math.cos(rad)).toFixed(1)}" y2="${(cy - (r - 12) * Math.sin(rad) - (deg === 0 ? 16 : 0)).toFixed(1)}" style="stroke:var(--${col})" stroke-width="5" marker-end="url(#m1-arrow)"/>
+          <text x="${cx}" y="${cy + 70}" text-anchor="middle" font-size="16" font-weight="900">${t}</text>
+          <text x="${cx}" y="${cy + 96}" text-anchor="middle" font-size="15" class="mono">cos ＝ ${c}</text>`;
+        }).join('')}
+      </svg>`,
+      caption: 'cosine 只看夾角：0° 是 1、90° 是 0、180° 是 −1。長度不影響。',
+    },
+    define: [
+      { term: '點積', en: 'dot product', def: '對應相乘再加總。', example: '(3, 4)·(4, 3) ＝ 24。' },
+      { term: 'cosine 相似度', en: 'cosine similarity', def: '點積 ÷ (|a| × |b|)。', example: '24 ÷ 25 ＝ 0.96。' },
+      { term: '長度', en: 'norm', def: '√（平方總和）。', example: '5。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'table', head: ['步驟', 'a ＝ (3, 4)、b ＝ (4, 3)'], rows: [
+          ['對應相乘', '3×4 ＝ 12、4×3 ＝ 12'],
+          ['加總 → 點積', '24'],
+          ['兩個長度', '|a| ＝ 5、|b| ＝ 5'],
+          ['cosine ＝ 點積 ÷ 長度相乘', '24 ÷ 25 ＝ 0.96（非常像）'],
+        ] },
+        { type: 'widget', name: 'vecplot', props: { points: WORD_POINTS, query: { label: '貓咪', x: 0.6, y: 0.5 }, k: 3, metrics: ['cosine', 'dot', 'euclid'] } },
+        '試著切換三種算法，把「問」移到「貓」附近。點積會偏愛「很大的貓」這種長度大的點；cosine 只看方向；歐氏距離看兩點實際隔多遠。很多 embedding 會先把長度統一成 1，這時三種排名會一樣。',
+        { type: 'widget', name: 'knobs', props: { title: '點積 ＝ |a| × |b| × cos(夾角)（實際計算）', sliders: [
+          { id: 'deg', label: '夾角', min: 0, max: 180, step: 5, value: 30, unit: '度' },
+          { id: 'la', label: 'a 的長度', min: 0.5, max: 5, step: 0.5, value: 2 },
+          { id: 'lb', label: 'b 的長度', min: 0.5, max: 5, step: 0.5, value: 3 },
+        ], compute: (v) => {
+          const c = Math.cos((v.deg * Math.PI) / 180);
+          const dot = v.la * v.lb * c;
+          return { rows: [
+            { label: 'cosine', value: c.toFixed(3), ratio: (c + 1) / 2 },
+            { label: '點積', value: dot.toFixed(2), ratio: Math.min(1, Math.abs(dot) / 25) },
+          ], note: '只拉長度：點積跟著變、cosine 不動。只改角度：兩個一起變。90 度時點積剛好是 0。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="attention 裡的點積：目前這個字的 Q 和每個字的 K 做點積得到分數，除以根號 d，再用 softmax 變成要看多少">
+          <rect x="20" y="80" width="90" height="60" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="65" y="116" text-anchor="middle" font-size="15" font-weight="900" class="on-color">Q（問）</text>
+          ${['我', '愛', '貓'].map((w, i) => `<rect x="170" y="${20 + i * 66}" width="90" height="50" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="215" y="${51 + i * 66}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">K「${w}」</text><path d="M110 110 L170 ${45 + i * 66}" class="stroke-ink" stroke-width="2"/>`).join('')}
+          <rect x="300" y="70" width="110" height="80" class="fill-surface stroke-ink" stroke-width="3"/><text x="355" y="102" text-anchor="middle" font-size="14" font-weight="900">Q·K ÷ √d</text><text x="355" y="128" text-anchor="middle" font-size="13">三個分數</text>
+          <rect x="440" y="70" width="100" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="490" y="106" text-anchor="middle" font-size="14" font-weight="900" class="on-color">softmax</text><text x="490" y="130" text-anchor="middle" font-size="12" class="on-color">看多少（4-2）</text>
+          <path d="M260 110 L300 110 M410 110 L440 110" class="stroke-ink" stroke-width="3"/>
+          <text x="280" y="210" text-anchor="middle" font-size="13">點積越大 ＝ 越相關 ＝ 越要看它</text>
+        </svg>`, caption: 'Vaswani 等 2017：softmax(QKᵀ/√d)V。維度 d 越大，點積的數值越大，除以 √d 把它拉回適當範圍，避免 softmax 太極端、梯度變得很小。' },
+      ],
+      tryit: {
+        q: ['手算：a ＝ (1, 2, 2)、b ＝ (2, 1, −2)。點積和 cosine 各是多少？'],
+        draft: '點積 ＝ ＿\ncosine ＝ ＿',
+        answer: ['點積 ＝ 2 ＋ 2 − 4 ＝ 0。', '長度都是 3，cosine ＝ 0 ÷ 9 ＝ 0：兩個向量互相垂直，在這個空間裡「不相關」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '點積越大就一定越像。', why: '長度大的向量點積本來就大。', right: '要比方向就用 cosine，或先把長度統一成 1。' },
+      { wrong: 'cosine 是 0 代表「相反」。', why: '0 是垂直、不相關；−1 才是相反。', right: '記三個點：1、0、−1。' },
+      { wrong: '以為 attention 的 √d 是隨便加的常數。', why: '它和維度有關：維度越大，點積的變異越大。', right: '除以 √d 讓分數不會隨維度暴增。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '(2, 0)·(0, 5) ＝？', options: [
+        { text: '0', correct: true, why: '2×0 ＋ 0×5。兩個向量垂直。' },
+        { text: '10，兩個數字相乘', why: '要對應位置相乘。' },
+        { text: '7', why: '不是全部相加。' },
+        { text: '(0, 0)', why: '點積的結果是一個數字。' },
+      ] },
+      { level: '應用', type: 'mc', q: '向量資料庫裡，文件 A 和問題的點積是 8，文件 B 是 6。但 A 的長度是 B 的 2 倍。用 cosine 看，誰比較像？', options: [
+        { text: 'B', correct: true, why: 'A 的 cosine 是 8 ÷ (2L × |q|) ＝ 4/(L|q|)，B 是 6/(L|q|)，B 較大。' },
+        { text: 'A，因為點積比較大，就代表比較相似', why: '點積被長度放大了。' },
+        { text: '一樣像', why: '算出來不一樣。' },
+        { text: '資訊不夠，無法判斷', why: '長度比例已經足夠算。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['做照片搜尋：每張照片和每段文字都變成同一個空間的向量。使用者輸入「海邊的夕陽」，系統怎麼找照片？'], answer: [
+        '把這句話變成向量，跟每張照片的向量算 cosine（或長度統一後的點積），取最大的幾張。',
+        '前提是文字和照片的 embedding 來自同一個模型、同一個空間；不同模型的向量不能互相比較（1-1 的常見錯誤）。',
+      ] },
+    ],
+    keypoints: [
+      '點積：對應相乘再加總。',
+      'cosine ＝ 點積 ÷ 長度相乘，只看方向。',
+      'attention 用 Q·K 決定要看誰，再除以 √d。',
+    ],
+    sources: ['3b1b-la', 'attention', 'dlbook'],
+  },
+});
+</script>

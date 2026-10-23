@@ -1,0 +1,111 @@
+<script>
+/* ==========================================================================
+   模組 0：怎麼用這本隨身卷
+   ========================================================================== */
+defineTerms({
+  '向量': { en: 'vector', def: '一串有順序的數字；可以想成空間裡的一支箭頭。', example: '(3, 4) 是二維向量；embedding 常有上千維。', lesson: '1-1' },
+  '矩陣': { en: 'matrix', def: '排成列與行的一格一格數字；一層神經網路的權重就是一個矩陣。', example: '2 列 3 行的矩陣，形狀寫成 2×3。', lesson: '2-1' },
+  '梯度': { en: 'gradient', def: '每個參數各自的斜率排成的向量；指向「損失上升最快」的方向，所以訓練往反方向走。', example: 'f＝w₁²＋3w₂² 在 (1, 1) 的梯度是 (2, 6)。', lesson: '3-2' },
+  'softmax': { en: 'softmax', def: '把一串任意的分數變成加起來是 1 的機率：每個分數取 e 的次方，再除以總和。', example: '(2, 1, 0) → (0.665, 0.245, 0.090)。', lesson: '4-2' },
+  'cross-entropy': { en: 'cross-entropy', def: '分類與語言模型最常用的損失：正確答案拿到的機率取 −log。猜對且有把握時接近 0，越沒把握越大。', example: '正確答案機率 0.665 → 損失 0.41。', lesson: '5-2' },
+});
+
+const TOOLS_SVG = `<svg viewBox="0 0 560 280" role="img" aria-label="一個 token 在模型裡經過的五個數學工具：先變成向量，用矩陣乘法經過每一層，用點積決定要看誰，最後 softmax 變成機率，訓練時用 cross-entropy 算損失、用梯度往回調">
+  ${[['向量', 'token 變數字', 'm0', 20], ['矩陣乘法', '每一層', 'm2', 130], ['點積', 'attention', 'm1', 240], ['softmax', '變成機率', 'm3', 350]].map(([t, s, c, x]) => `<rect x="${x}" y="40" width="100" height="90" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 50}" y="82" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text><text x="${x + 50}" y="104" text-anchor="middle" font-size="12" class="on-color">${s}</text>`).join('')}
+  ${[120, 230, 340].map((x) => `<path d="M${x} 85 L${x + 10} 85" class="stroke-ink" stroke-width="3"/>`).join('')}
+  <rect x="460" y="40" width="80" height="90" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="500" y="82" text-anchor="middle" font-size="13" font-weight="900" class="on-color">−log</text><text x="500" y="104" text-anchor="middle" font-size="12" class="on-color">損失</text>
+  <path d="M450 85 L460 85" class="stroke-ink" stroke-width="3"/>
+  <path d="M500 140 L500 200 L70 200 L70 140" fill="none" style="stroke:var(--m5)" stroke-width="4" stroke-dasharray="10 6"/>
+  <rect x="170" y="180" width="230" height="44" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="285" y="208" text-anchor="middle" font-size="14" font-weight="900" class="on-color">梯度：往回調每個權重</text>
+  <text x="280" y="26" text-anchor="middle" font-size="14" font-weight="900">前向：產生一個字</text>
+  <text x="280" y="256" text-anchor="middle" font-size="14" font-weight="900">反向：訓練時才有</text>
+</svg>`;
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出五個數學工具各對應模型的哪裡',
+      '知道卡在哪一卷時該翻哪一課',
+      '用一個小例子感受「模型就是一堆加減乘除」',
+    ],
+    analogy: {
+      text: ['這本像廚房裡的工具架：刀、砧板、鍋、秤、計時器。你不用先把每件工具的歷史讀完才能下廚，做到哪一步需要什麼，就拿那一件。', '大型語言模型也只用到五件工具：[[向量]]、[[矩陣]]乘法、導數與[[梯度]]、機率與 [[softmax]]、對數與 [[cross-entropy]]。其他卷講「模型做了什麼」，這本講「那一步的數學在算什麼」。'],
+      limit: ['廚具彼此獨立，數學工具則會互相疊起來：softmax 用到指數，cross-entropy 用到 softmax，梯度又要算 cross-entropy 的斜率。所以第一次讀，照順序比較順。'],
+    },
+    model: { svg: TOOLS_SVG, caption: '前向（上排）產生下一個字；反向（虛線）只在訓練時發生，用梯度調整每一個權重。' },
+    define: [
+      { term: '向量', en: 'vector', def: '一串有順序的數字。', example: '(3, 4)。' },
+      { term: '矩陣', en: 'matrix', def: '列與行排好的數字。', example: '一層的權重。' },
+      { term: '梯度', en: 'gradient', def: '每個參數的斜率。', example: '(2, 6)。' },
+    ],
+    examples: {
+      blocks: [
+        '先看一個最小的「模型」：輸入兩個數字，各乘一個權重再相加，得到一個分數。這已經用到向量（輸入）、點積（乘完相加）兩件工具。',
+        { type: 'widget', name: 'knobs', props: { title: '最小的神經元：分數 ＝ w₁·x₁ ＋ w₂·x₂（實際計算）', sliders: [
+          { id: 'x1', label: '輸入 x₁', min: -3, max: 3, step: 0.5, value: 2 },
+          { id: 'x2', label: '輸入 x₂', min: -3, max: 3, step: 0.5, value: 1 },
+          { id: 'w1', label: '權重 w₁', min: -2, max: 2, step: 0.1, value: 0.5 },
+          { id: 'w2', label: '權重 w₂', min: -2, max: 2, step: 0.1, value: -1 },
+        ], compute: (v) => {
+          const a = v.w1 * v.x1;
+          const b = v.w2 * v.x2;
+          const s = a + b;
+          return { rows: [
+            { label: 'w₁·x₁', value: a.toFixed(2), ratio: Math.min(1, Math.abs(a) / 6) },
+            { label: 'w₂·x₂', value: b.toFixed(2), ratio: Math.min(1, Math.abs(b) / 6) },
+            { label: '分數（相加）', value: s.toFixed(2), ratio: Math.min(1, Math.abs(s) / 12) },
+          ], note: '一個 70B 模型產生一個字，大約要做 1,400 億次這種「乘完再加」。數學不難，難的是數量。' };
+        } } },
+        { type: 'table', head: ['你在其他卷卡在…', '翻這一課'], rows: [
+          ['embedding、相似度、向量資料庫', '1-1、1-2'],
+          ['attention 的 Q·K、為什麼除以 √d', '1-2'],
+          ['一層網路、參數量、形狀對不上', '2-1、2-2'],
+          ['梯度下降、學習率', '3-1、3-2'],
+          ['反向傳播', '3-3'],
+          ['temperature、選字、logits', '4-1、4-2'],
+          ['loss、perplexity', '5-1、5-2'],
+        ], caption: '每課最後的「三個重點」可以當成速查卡。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="這本書的程度：從看得懂符號，到能手算小例子；嚴謹證明不在範圍內">
+          ${[['L0', '聽過名字', 'm7'], ['L1', '看得懂公式在算什麼', 'm2'], ['L2', '能手算小例子', 'm3'], ['L3', '能推導、證明', 'm5']].map(([a, b, c], i) => `<rect x="${10 + i * 137}" y="${130 - i * 30}" width="127" height="${40 + i * 30}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${73 + i * 137}" y="${158 - i * 30}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text>`).join('')}
+          ${[['聽過名字', 10], ['看得懂公式', 147], ['能手算小例子', 284], ['能推導、證明', 421]].map(([t, x]) => `<text x="${x + 63}" y="190" text-anchor="middle" font-size="13">${t}</text>`).join('')}
+          <path d="M147 40 L405 40" style="stroke:var(--m1)" stroke-width="6"/><text x="276" y="30" text-anchor="middle" font-size="14" font-weight="900">這本的範圍</text>
+        </svg>`, caption: '目標是 L1–L2：知道每個符號在算什麼，能用小數字驗算。' },
+      ],
+      tryit: {
+        q: ['用拉桿：讓分數剛好等於 0。你調了哪個數？還有沒有別的組合也可以？'],
+        draft: '我的組合：＿\n另一個組合：＿',
+        answer: ['例如 x₁＝2、x₂＝1、w₁＝0.5、w₂＝−1：1 ＋（−1）＝ 0。', '組合有無限多種：只要 w₁·x₁ 和 w₂·x₂ 互相抵消就好。訓練就是在這麼多組合裡，找一組讓整體預測最準的權重。'],
+      },
+    },
+    mistakes: [
+      { wrong: '覺得要先學完微積分和線性代數才能讀其他卷。', why: '模型只用到少數幾個概念，而且多半是加減乘除。', right: '卡住時再翻對應的課。' },
+      { wrong: '把公式裡的符號當成要背的東西。', why: '符號只是縮寫，背了不懂也用不上。', right: '每個公式都用小數字手算一次。' },
+      { wrong: '以為模型裡有很深奧的數學在「思考」。', why: '每一步都是乘、加、取指數、取對數；能力來自數量和訓練。', right: '把模型想成很大量的簡單運算。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '模型產生一個字時（前向），下面哪一個工具「不會」用到？', options: [
+        { text: '梯度', correct: true, why: '梯度只在訓練、往回調權重時才算。' },
+        { text: '矩陣乘法，因為每一層都要用到它', why: '每一層都在做矩陣乘法。' },
+        { text: '點積', why: 'attention 用點積決定要看哪些字。' },
+        { text: 'softmax，把分數變成機率再選字', why: '選字前要先變成機率。' },
+      ] },
+      { level: '應用', type: 'mc', q: '你在第二部讀到「Q 和 K 做點積再除以 √d」看不懂。先翻哪一課？', options: [
+        { text: '1-2', correct: true, why: '點積與 cosine：衡量兩個向量像不像。' },
+        { text: '3-3，鏈鎖律講的是往回傳遞', why: '那是反向傳播。' },
+        { text: '5-1，對數把乘法變成加法的那一課', why: '那是損失的部分。' },
+        { text: '2-2', why: '形狀有關，但先要懂點積。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['看上面的地圖，用自己的話說：「模型產生一個字」和「模型學會一件事」各經過哪幾個工具？'], answer: [
+        '產生一個字：token 變成向量 → 每一層做矩陣乘法（attention 裡用點積）→ softmax 變成機率 → 選一個字。',
+        '學會一件事：先做一次上面的前向，用 cross-entropy（−log）算猜得多差，再用梯度往回調每個權重，讓下次猜得好一點。',
+      ] },
+    ],
+    keypoints: [
+      '五個工具：向量與點積、矩陣乘法、梯度、softmax、cross-entropy。',
+      '產生文字只用前向；訓練才需要梯度。',
+      '卡在哪裡就翻哪一課，每個公式都用小數字算一次。',
+    ],
+    sources: ['dlbook', '3b1b-nn'],
+  },
+});
+</script>

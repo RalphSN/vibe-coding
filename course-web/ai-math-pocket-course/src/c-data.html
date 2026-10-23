@@ -1,0 +1,120 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'AI 系列・隨身卷｜數學直覺',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-23',
+  version: 'v1',
+};
+
+/* AI 系列七本書：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: 'AI 系列',
+  current: 'ai-math',
+  volumes: [
+    { id: 'ai-map', vol: '序章', title: 'AI 全景地圖', href: '../ai-series-0-map-course/index.html' },
+    { id: 'ai-app', vol: '第一部', title: 'AI 應用工程', href: '../ai-app-engineering-course/index.html' },
+    { id: 'ai-llm', vol: '第二部', title: '大型語言模型原理', href: '../llm-principles-course/index.html' },
+    { id: 'ai-ml', vol: '第三部', title: '機器學習基礎', href: '../ml-foundations-course/index.html' },
+    { id: 'ai-dl', vol: '第四部', title: '深度學習', href: '../deep-learning-course/index.html' },
+    { id: 'ai-hw', vol: '第五部', title: '硬體與運算', href: '../ai-hardware-course/index.html' },
+    { id: 'ai-math', vol: '隨身卷', title: '數學直覺', href: '../ai-math-pocket-course/index.html' },
+  ],
+};
+
+/* 全書主軸：六個數學工具在模型裡的位置；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '向量', note: '一個 token 一串數字', color: 'var(--m0)' },
+    { label: '點積', note: '像不像、該看誰', color: 'var(--m1)' },
+    { label: '矩陣', note: '一層網路', color: 'var(--m2)' },
+    { label: 'softmax', note: '分數變機率', color: 'var(--m3)' },
+    { label: '對數', note: '損失怎麼算', color: 'var(--m4)' },
+    { label: '梯度', note: '往哪邊調', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [0, 1], 2: [2], 3: [5], 4: [3], 5: [4] },
+  byLesson: { '1-1': [0], '1-2': [1], '5-2': [3, 4, 5] },
+};
+
+/* 首頁主視覺：五個工具對應模型的五個地方（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="五個數學工具：向量與點積對應相似度，矩陣乘法對應一層網路，導數與梯度對應往下坡走，機率與 softmax 對應選字，對數與 cross-entropy 對應損失">
+  ${[['向量與點積', '＝ 相似度', 'm0'], ['矩陣乘法', '＝ 一層神經網路', 'm2'], ['導數與梯度', '＝ 往下坡走', 'm5'], ['機率與 softmax', '＝ 模型怎麼選字', 'm3'], ['對數與 cross-entropy', '＝ 損失怎麼算', 'm4']].map(([a, b, c], i) => `<rect x="30" y="${20 + i * 78}" width="500" height="64" style="fill:var(--${c})" class="stroke-ink" stroke-width="4"/><text x="54" y="${60 + i * 78}" font-size="20" font-weight="900" class="on-color">${a}</text><text x="506" y="${60 + i * 78}" text-anchor="end" font-size="18" class="on-color">${b}</text>`).join('')}
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '怎麼用|這本隨身卷', short: '起點', desc: '五個數學工具，各對應模型裡的一個地方；卡在哪裡就翻哪一課。', lessons: [
+    ['0-1', '五個工具|一張地圖'],
+  ]},
+  { id: 1, title: '向量與點積：|相似度', short: '向量', desc: '向量是一串有方向的數字；點積與 cosine 衡量兩個向量像不像。', lessons: [
+    ['1-1', '向量：|一串有方向的數字'],
+    ['1-2', '點積與 cosine：|像不像'],
+  ]},
+  { id: 2, title: '矩陣乘法：|一層神經網路', short: '矩陣', desc: '矩陣乘向量就是一層網路的加權加總；矩陣乘矩陣就是一次處理一整批。', lessons: [
+    ['2-1', '矩陣乘向量：|一層網路'],
+    ['2-2', '矩陣乘矩陣|與形狀'],
+  ]},
+  { id: 3, title: '導數與梯度：|往下坡走', short: '梯度', desc: '導數是斜率、梯度是每個方向的斜率、鏈鎖律把它們一路乘起來。', lessons: [
+    ['3-1', '導數：|斜率'],
+    ['3-2', '偏導數|與梯度'],
+    ['3-3', '鏈鎖律：|一路乘回去'],
+  ]},
+  { id: 4, title: '機率與 softmax：|模型怎麼選字', short: '機率', desc: '機率分布、期望值，以及把分數變成機率的 softmax。', lessons: [
+    ['4-1', '機率分布|與期望值'],
+    ['4-2', '指數|與 softmax'],
+  ]},
+  { id: 5, title: '對數與 cross-entropy：|損失怎麼算', short: '對數', desc: '對數把乘法變加法；cross-entropy 用 −log 衡量猜得多差。', lessons: [
+    ['5-1', '對數：|把乘法變加法'],
+    ['5-2', 'cross-entropy|＋總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>
