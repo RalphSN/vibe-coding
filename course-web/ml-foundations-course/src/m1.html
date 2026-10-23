@@ -1,0 +1,409 @@
+<script>
+/* ==========================================================================
+   模組 1：什麼叫「學習」：資料、模型、損失函數
+   ========================================================================== */
+defineTerms({
+  '特徵': { en: 'feature', def: '模型拿來做判斷的輸入資訊，通常寫成 x。', example: '坪數、屋齡、樓層。', lesson: '1-1' },
+  '標籤': { en: 'label', def: '每筆資料的正確答案，通常寫成 y；監督式學習才有。', example: '這間房子實際賣了多少錢。', lesson: '1-1' },
+  '樣本': { en: 'sample', def: '資料裡的一筆：一組特徵加上（可能有的）標籤。', example: '一間房子的所有資訊是一個樣本。', lesson: '1-1' },
+  'one-hot': { en: 'one-hot encoding', def: '把類別變成一排 0 和 1：屬於哪一類，那一格就是 1。', example: '台北 → [1, 0, 0]，台中 → [0, 1, 0]。', lesson: '1-1' },
+  '模型': { en: 'model', def: '一個有參數的函式：輸入特徵，輸出預測。', example: 'y＝w·x＋b。', lesson: '1-2' },
+  '殘差': { en: 'residual', def: '預測值減掉正確答案的差，也叫誤差。', example: '預測 6.0、實際 6.1，殘差是 −0.1。', lesson: '1-3' },
+  'MSE': { en: 'mean squared error', def: '平均平方誤差：每筆殘差平方後取平均。大的錯被罰得特別重。', example: '殘差 1、−3 → (1＋9)÷2＝5。', lesson: '1-3' },
+  'MAE': { en: 'mean absolute error', def: '平均絕對誤差：每筆殘差取絕對值後平均。對極端值比較不敏感。', example: '殘差 1、−3 → (1＋3)÷2＝2。', lesson: '1-3' },
+  '損失地形': { en: 'loss landscape', def: '把「參數值 → 損失」畫成圖，像一片有高有低的地形；學習就是往最低點走。', example: '線性回歸的 MSE 地形像一個碗。', lesson: '1-4' },
+});
+
+const REVIEW_M0 = [
+  { level: '回想', type: 'mc', q: '（回顧 0-1）訓練和推論的差別是？', options: [
+    { text: '訓練調參數，推論時參數固定', correct: true, why: '先訓練好再拿來用。' },
+    { text: '訓練用 GPU，推論只能用 CPU 來算', why: '兩者都可以用各種硬體。' },
+    { text: '推論時模型會一邊預測、一邊學新東西', why: '推論不改參數。' },
+    { text: '兩者完全一樣，只是叫法不同而已', why: '差在參數改不改。' },
+  ] },
+];
+
+const HOUSE = [[1, 2.2], [2, 3.9], [3, 6.1], [4, 7.8], [5, 10.2]];
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '分辨特徵與標籤',
+      '把一份表格資料看成「很多個樣本」',
+      '知道類別資料要怎麼變成數字',
+    ],
+    review: REVIEW_M0,
+    analogy: {
+      text: ['醫生看診：量體溫、問症狀、看檢驗報告（[[特徵]]），最後寫下診斷（[[標籤]]）。病歷本裡每一頁就是一個[[樣本]]。', '機器學習的資料就是一大疊這樣的病歷：每一頁有特徵和答案，模型要從中找出「什麼樣的特徵對應什麼樣的答案」。'],
+      limit: ['醫生會追問、會補做檢查，模型只能用表格裡已經有的特徵；沒放進去的資訊，它永遠不知道。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="一份資料表：每一列是一個樣本，前三欄是特徵坪數、屋齡、樓層，最後一欄是標籤價格">
+        <text x="20" y="26" font-size="15" font-weight="900">一份資料表</text>
+        ${[['坪數', '屋齡', '樓層', '價格'], ['30', '5', '8', '18'], ['25', '20', '3', '11'], ['40', '2', '12', '26']].map((row, r) => row.map((c, k) => `<rect x="${30 + k * 120}" y="${44 + r * 40}" width="116" height="36" ${r === 0 ? `style="fill:var(--${k === 3 ? 'm3' : 'm0'})"` : 'class="fill-surface"'} class="stroke-ink" stroke-width="2"/><text x="${88 + k * 120}" y="${68 + r * 40}" text-anchor="middle" font-size="14"${r === 0 ? ' font-weight="900" class="on-color"' : ''}>${c}</text>`).join('')).join('')}
+        <text x="210" y="222" text-anchor="middle" font-size="14" font-weight="900">特徵 x（模型看得到）</text>
+        <text x="448" y="222" text-anchor="middle" font-size="14" font-weight="900">標籤 y（答案）</text>
+      </svg>`,
+      caption: '每一列是一個樣本。數字是示意（價格單位：百萬）。',
+    },
+    define: [
+      { term: '特徵', en: 'feature', def: '輸入資訊 x。', example: '坪數、屋齡。' },
+      { term: '標籤', en: 'label', def: '正確答案 y。', example: '實際成交價。' },
+      { term: '樣本', en: 'sample', def: '一筆資料。', example: '表格的一列。' },
+      { term: 'one-hot', en: 'one-hot', def: '類別 → 一排 0/1。', example: '北中南 → 三欄。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'x', label: '特徵' }, { id: 'y', label: '標籤' }, { id: 'no', label: '不該放進來' }], items: [
+          { text: '預測房價：房子的坪數', answer: 'x', why: '和價格有關，而且預測時就知道。' },
+          { text: '預測房價：實際成交價', answer: 'y', why: '要預測的答案。' },
+          { text: '預測客戶會不會退訂：過去三個月登入次數', answer: 'x', why: '預測時就有的資訊。' },
+          { text: '預測客戶會不會退訂：客服寫的「已退訂原因」', answer: 'no', why: '退訂之後才會有，預測時拿不到：這是資料洩漏（5-4）。' },
+          { text: '判斷郵件是不是垃圾信：使用者按的「這是垃圾信」', answer: 'y', why: '這就是標籤。' },
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="one-hot：城市欄位台北、台中、高雄，變成三欄 0 與 1">
+          <rect x="20" y="40" width="120" height="36" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/><text x="80" y="64" text-anchor="middle" font-size="14" font-weight="900" class="on-color">城市</text>
+          ${['台北', '台中', '高雄'].map((c, i) => `<rect x="20" y="${80 + i * 34}" width="120" height="32" class="fill-surface stroke-ink" stroke-width="2"/><text x="80" y="${102 + i * 34}" text-anchor="middle" font-size="14">${c}</text>`).join('')}
+          <text x="180" y="130" font-size="22" font-weight="900">→</text>
+          ${['是台北', '是台中', '是高雄'].map((h, k) => `<rect x="${230 + k * 105}" y="40" width="100" height="36" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="${280 + k * 105}" y="64" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${h}</text>${[0, 1, 2].map((r) => `<rect x="${230 + k * 105}" y="${80 + r * 34}" width="100" height="32" class="fill-surface stroke-ink" stroke-width="2"/><text x="${280 + k * 105}" y="${102 + r * 34}" text-anchor="middle" font-size="14" class="mono">${r === k ? 1 : 0}</text>`).join('')}`).join('')}
+        </svg>`, caption: '不能直接寫台北＝1、台中＝2、高雄＝3：那會讓模型以為「高雄是台北的三倍」。' },
+      ],
+      tryit: {
+        q: ['你要預測「這杯飲料會不會被退貨」。列出三個特徵和一個標籤，並寫出其中一個要怎麼變成數字。'],
+        draft: '特徵：＿、＿、＿\n標籤：＿\n變成數字：＿',
+        answer: ['範例：特徵＝甜度、冰塊、外送距離（公里）；標籤＝是否退貨（1 或 0）。', '甜度（全糖、半糖、微糖、無糖）可以用 one-hot，或因為有順序，轉成 0～3 的數字；外送距離本來就是數字。'],
+      },
+    },
+    mistakes: [
+      { wrong: '把預測當下還拿不到的資訊當特徵。', why: '訓練時看起來很準，實際上線時根本沒有這個資訊。', right: '只用「預測那一刻就知道」的資訊（5-4 資料洩漏）。' },
+      { wrong: '把類別直接編成 1、2、3。', why: '模型會以為類別之間有大小與距離。', right: '沒有順序的類別用 one-hot。' },
+      { wrong: '以為特徵越多越好。', why: '無關的特徵會增加雜訊，資料少時容易過擬合（模組 5）。', right: '選和答案有關、預測時拿得到的特徵。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在監督式學習裡，「標籤」是？', options: [
+        { text: '每筆資料的正確答案', correct: true, why: '模型要學會預測它。' },
+        { text: '表格最上面那一列寫著欄位名稱的文字', why: '那是欄位名稱，不是標籤。' },
+        { text: '模型裡面可以被調整的那些數字', why: '那是參數。' },
+        { text: '模型對新資料做出的預測結果', why: '預測是模型的輸出，標籤是正確答案。' },
+      ] },
+      { level: '應用', type: 'mc', q: '「付款方式」有信用卡、轉帳、貨到付款三種，最合適的處理是？', options: [
+        { text: '用 one-hot 變成三欄', correct: true, why: '沒有順序的類別。' },
+        { text: '直接編號成 1、2、3，讓模型自己去理解', why: '會被當成有大小的數字。' },
+        { text: '因為不是數字所以直接刪掉這個欄位', why: '它可能很有用。' },
+        { text: '全部換成同一個數字，避免模型產生偏見', why: '等於丟掉這個資訊。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['醫院想預測「病人 30 天內會不會再住院」。有人建議把「出院後第 10 天的回診結果」當特徵。你怎麼看？'], answer: [
+        '如果要在出院當天預測，第 10 天的回診結果還不存在，不能當特徵；訓練時用了，模型會看起來很準，上線後卻用不了。',
+        '先定義「什麼時候做預測」，只用那個時間點之前就有的資訊。',
+      ] },
+    ],
+    keypoints: [
+      '資料＝很多樣本；每個樣本有特徵 x，監督式學習還有標籤 y。',
+      '只用預測當下拿得到的資訊當特徵。',
+      '沒有順序的類別用 one-hot，不要直接編號。',
+    ],
+    sources: ['gmlcc'],
+  },
+
+  '1-2': {
+    goals: [
+      '說出模型就是「有參數的函式」',
+      '解釋 y＝w·x＋b 裡 w、b 的意思',
+      '知道模型的形狀決定了它學得到什麼',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-1）為什麼類別不能直接編成 1、2、3？', options: [
+        { text: '模型會以為類別有大小', correct: true, why: '高雄不是台北的三倍。' },
+        { text: '因為數字 3 太大，模型會算不完', why: '數字大小不是問題。' },
+        { text: '類別資料一律不能拿來訓練任何模型', why: '可以，只是要好好轉換。' },
+        { text: '因為編號會讓整份資料表變得更長', why: 'one-hot 才會讓欄位變多。' },
+      ] },
+    ],
+    analogy: {
+      text: ['烤箱有兩個旋鈕：溫度和時間。食譜（模型的形狀）規定「用烤箱烤」，旋鈕轉到哪（參數）決定烤出來的結果。', '[[模型]] y＝w·x＋b 就是一個有兩個旋鈕的機器：w 決定線有多斜，b 決定線整體往上還是往下。學習就是自動把旋鈕轉到最好的位置。'],
+      limit: ['烤箱旋鈕少，真實模型可能有幾百萬到幾十億個旋鈕；而且食譜選錯了（例如資料其實是曲線卻選直線），旋鈕再怎麼轉都做不好。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 220" role="img" aria-label="模型像一台機器：輸入 x，裡面有兩個旋鈕 w 和 b，輸出預測 y 等於 w 乘 x 加 b">
+        <rect x="20" y="80" width="100" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="70" y="116" text-anchor="middle" font-size="16" font-weight="900">x＝3</text>
+        <line x1="120" y1="110" x2="170" y2="110" class="stroke-ink" stroke-width="3"/>
+        <rect x="170" y="40" width="220" height="140" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="74" text-anchor="middle" font-size="16" font-weight="900" class="on-color">y ＝ w·x ＋ b</text>
+        <circle cx="235" cy="125" r="24" class="fill-surface stroke-ink" stroke-width="3"/><text x="235" y="130" text-anchor="middle" font-size="14" font-weight="900">w＝2</text>
+        <circle cx="325" cy="125" r="24" class="fill-surface stroke-ink" stroke-width="3"/><text x="325" y="130" text-anchor="middle" font-size="14" font-weight="900">b＝1</text>
+        <line x1="390" y1="110" x2="440" y2="110" class="stroke-ink" stroke-width="3"/>
+        <rect x="440" y="80" width="100" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="490" y="116" text-anchor="middle" font-size="16" font-weight="900" class="on-color">ŷ＝7</text>
+        <text x="280" y="210" text-anchor="middle" font-size="14">形狀（直線）是人選的；旋鈕 w、b 是學出來的</text>
+      </svg>`,
+      caption: 'ŷ（讀作 y-hat）是預測值，y 是正確答案。2 × 3 ＋ 1 ＝ 7。',
+    },
+    define: [
+      { term: '模型', en: 'model', def: '有參數的函式。', example: 'y＝w·x＋b。' },
+      { term: '斜率 w', en: 'weight', def: 'x 每多 1，預測多幾。', example: 'w＝2：每多 10 坪貴 200 萬。' },
+      { term: '截距 b', en: 'bias', def: 'x＝0 時的預測，整條線往上下移。', example: 'b＝1。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'fitline', props: { title: '只轉一個旋鈕：先固定 b，拉 w 看線怎麼轉', points: HOUSE, w: 1, b: 0, xRange: [0, 6], yRange: [0, 12], xLabel: '坪數（十坪）', yLabel: '價格（百萬）', note: 'w 讓線繞著 y 軸上的一點轉動；b 讓整條線平移。兩個一起調才能貼近所有點。' } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="模型形狀選錯：資料是彎曲的，直線怎麼調都貼不近；換成曲線模型才貼得近">
+          <rect x="10" y="20" width="260" height="150" class="fill-surface stroke-ink" stroke-width="3"/>
+          <path d="M30 150 Q140 20 250 150" fill="none" class="stroke-ink" stroke-width="2" stroke-dasharray="5 4"/>
+          ${[[40, 132], [80, 80], [140, 62], [200, 80], [240, 132]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>`).join('')}
+          <line x1="30" y1="100" x2="250" y2="100" style="stroke:var(--m7)" stroke-width="4"/>
+          <text x="140" y="192" text-anchor="middle" font-size="14">直線：怎麼調都差很多</text>
+          <rect x="290" y="20" width="260" height="150" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+          ${[[320, 132], [360, 80], [420, 62], [480, 80], [520, 132]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>`).join('')}
+          <path d="M310 150 Q420 -10 530 150" fill="none" style="stroke:var(--m7)" stroke-width="4"/>
+          <text x="420" y="192" text-anchor="middle" font-size="14">曲線：形狀對了才調得好</text>
+        </svg>`, caption: '模型的形狀決定它「最多能學到多好」；太簡單會欠擬合，太複雜會過擬合（模組 5）。' },
+      ],
+      tryit: {
+        q: ['w＝1.5、b＝2，x＝4 時預測是多少？如果實際答案是 9，殘差是多少？'],
+        draft: '預測 ŷ ＝ ＿\n殘差 ＝ ŷ − y ＝ ＿',
+        answer: ['ŷ ＝ 1.5 × 4 ＋ 2 ＝ 8。', '殘差 ＝ 8 − 9 ＝ −1：預測低估了 1。下一課會把所有殘差合起來變成一個「損失」。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為參數是人設定好的常數。', why: '參數是從資料學出來的。', right: '人選形狀，資料決定參數值。' },
+      { wrong: '以為直線模型什麼都能學。', why: '資料是彎曲的，直線再怎麼調都不貼。', right: '選和資料形狀相符的模型。' },
+      { wrong: '把 b 想成「誤差」。', why: 'b 是截距參數，整條線的上下位置。', right: '誤差是殘差；b 是旋鈕之一。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '在 y＝w·x＋b 裡，b 增加會怎樣？', options: [
+        { text: '整條線往上平移', correct: true, why: '每個預測都加同樣的量。' },
+        { text: '線變得更斜，右邊升得比左邊快', why: '那是 w 的作用。' },
+        { text: '線會繞著原點轉一個角度', why: 'b 不改變斜率。' },
+        { text: '資料點的位置跟著一起往上移', why: '資料不會變。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'w＝3、b＝−1，x＝2 的預測是？', options: [
+        { text: '5', correct: true, why: '3 × 2 − 1 ＝ 5。' },
+        { text: '7，因為 3 × 2 再加上 1', why: 'b 是 −1，要減。' },
+        { text: '4，因為 3 ＋ 2 − 1', why: 'w 要乘 x。' },
+        { text: '6，因為 b 只在 x＝0 的時候才有作用', why: 'b 每個預測都要加。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你的模型 y＝w·x＋b 預測冰品銷量，x 是氣溫。夏天很準、冬天總是高估。可能是模型形狀的問題嗎？'], answer: [
+        '很可能：銷量和氣溫的關係不一定是一直線（例如低於某溫度後幾乎沒人買），直線會在冬天高估。',
+        '可以換成曲線、分段模型，或加入「季節」等特徵；先畫散布圖看關係長什麼樣。',
+      ] },
+    ],
+    keypoints: [
+      '模型＝有參數的函式；人選形狀，資料決定參數。',
+      'w 決定斜率，b 讓整條線上下平移。',
+      '形狀選錯，參數再怎麼調也學不好。',
+    ],
+    sources: ['least-squares', 'gmlcc'],
+  },
+
+  '1-3': {
+    goals: [
+      '算出一組預測的 MSE 與 MAE',
+      '說明為什麼要用平方或絕對值',
+      '解釋 MSE 對極端值比較敏感',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-2）w＝2、b＝1、x＝3 的預測是？', options: [
+        { text: '7', correct: true, why: '2 × 3 ＋ 1。' },
+        { text: '6，因為 b 只是用來平移圖形的', why: 'b 也要加進預測。' },
+        { text: '9，因為要先把 2 和 1 加起來再乘', why: '先乘 w 再加 b。' },
+        { text: '5，因為 2 ＋ 3 這兩個數字相加', why: 'w 要乘 x。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-1）預測退訂時，「退訂原因」能當特徵嗎？', options: [
+        { text: '不行，預測時還沒有', correct: true, why: '資料洩漏。' },
+        { text: '可以，而且應該是最重要的特徵', why: '上線時拿不到。' },
+        { text: '可以，只要先把它轉成 one-hot', why: '問題不在格式。' },
+        { text: '可以，但只能拿來當作標籤使用', why: '標籤是「會不會退訂」。' },
+      ] },
+    ],
+    analogy: {
+      text: ['射箭比賽算分：每一箭離靶心多遠。如果只把距離相加，偏左 2 公分和偏右 2 公分會互相抵消成 0，看起來像全中。', '所以要先把每一箭的偏差變成正數：取平方（[[MSE]]）或取絕對值（[[MAE]]），再平均。這個「平均錯多少」就是[[損失]]，學習的目標就是把它變小。'],
+      limit: ['射箭的偏差是一個距離，模型的[[殘差]]可正可負，而且平方會把大錯放大很多：一箭偏 10 公分的懲罰，等於十箭各偏 3 公分。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="MSE 的圖像意義：每個點到線的殘差畫成一個正方形，正方形面積的平均就是 MSE">
+        <line x1="40" y1="200" x2="520" y2="60" style="stroke:var(--m7)" stroke-width="4"/>
+        ${[[100, 140, 182], [220, 180, 147], [340, 80, 112], [460, 105, 77]].map(([x, y, ly]) => { const d = Math.abs(ly - y); const top = Math.min(y, ly); return `<rect x="${x}" y="${top}" width="${d}" height="${d}" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><line x1="${x}" y1="${y}" x2="${x}" y2="${ly}" class="stroke-ink" stroke-width="3"/><circle cx="${x}" cy="${y}" r="7" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>`; }).join('')}
+        <text x="280" y="28" text-anchor="middle" font-size="15" font-weight="900">每個殘差畫成一個正方形，MSE＝面積的平均</text>
+        <text x="280" y="230" text-anchor="middle" font-size="13">殘差加倍，正方形面積變 4 倍：大錯被罰得特別重</text>
+      </svg>`,
+      caption: '平方讓正負不會抵消，也讓大錯的懲罰變重。',
+    },
+    define: [
+      { term: '殘差', en: 'residual', def: '預測 − 答案。', example: '8 − 9 ＝ −1。' },
+      { term: 'MSE', en: 'mean squared error', def: '殘差平方的平均。', example: '(1² ＋ 3²) ÷ 2 ＝ 5。' },
+      { term: 'MAE', en: 'mean absolute error', def: '殘差絕對值的平均。', example: '(1 ＋ 3) ÷ 2 ＝ 2。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="正負抵消：殘差 3 和負 3 直接相加是 0，看起來像沒有誤差；平方後是 9 加 9 等於 18">
+  <rect x="20" y="40" width="250" height="110" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="145" y="72" text-anchor="middle" font-size="15" font-weight="900">直接相加</text>
+  <text x="145" y="104" text-anchor="middle" font-size="16" class="mono">3 ＋ (−3) ＝ 0</text>
+  <text x="145" y="132" text-anchor="middle" font-size="13">看起來完全沒錯</text>
+  <rect x="290" y="40" width="250" height="110" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+  <text x="415" y="72" text-anchor="middle" font-size="15" font-weight="900" class="on-color">平方再平均</text>
+  <text x="415" y="104" text-anchor="middle" font-size="16" class="mono on-color">(9 ＋ 9) ÷ 2 ＝ 9</text>
+  <text x="415" y="132" text-anchor="middle" font-size="13" class="on-color">誤差被看見了</text>
+  <text x="280" y="186" text-anchor="middle" font-size="13">這就是損失函數要先平方或取絕對值的原因</text>
+</svg>`, caption: '正負抵消會讓兩個大錯看起來像全對。' },
+        { type: 'widget', name: 'knobs', props: { title: '加一個極端值，看 MSE 和 MAE 怎麼反應（實際計算）', sliders: [
+          { id: 'out', label: '第 5 筆的殘差', min: -20, max: 20, step: 1, value: 1 },
+        ], compute: (v) => {
+          const res = [1, -1, 2, -2, v.out];
+          const mse = res.reduce((s, e) => s + e * e, 0) / res.length;
+          const mae = res.reduce((s, e) => s + Math.abs(e), 0) / res.length;
+          return { rows: [
+            { label: `殘差：${res.join('、')}`, value: '', ratio: 0 },
+            { label: 'MSE', value: mse.toFixed(2), ratio: Math.min(1, mse / 82) },
+            { label: 'MAE', value: mae.toFixed(2), ratio: Math.min(1, mae / 5.2) },
+          ], note: '把第 5 筆拉到 20：MSE 從 2.2 變成 82（大 37 倍），MAE 從 1.4 變成 5.2（不到 4 倍）。資料裡有少數離譜的錯誤標註時，MSE 會被它們拖著走。' };
+        } } },
+        { type: 'table', head: ['', 'MSE', 'MAE'], rows: [
+          ['算法', '殘差平方的平均', '殘差絕對值的平均'],
+          ['大錯的懲罰', '特別重（平方）', '照比例'],
+          ['對極端值', '敏感', '比較不敏感'],
+          ['好處', '處處平滑，好算梯度（模組 3）', '容易解讀：「平均差幾單位」'],
+        ] },
+        { type: 'code', lang: 'python', title: '算 MSE 與 MAE（示意）', code: 'pred = [2.0, 4.0, 6.0]\ny    = [2.2, 3.9, 6.1]\nres  = [p - t for p, t in zip(pred, y)]     # [-0.2, 0.1, -0.1]\nmse  = sum(r * r for r in res) / len(res)  # 0.02\nmae  = sum(abs(r) for r in res) / len(res) # 0.133' },
+      ],
+      tryit: {
+        q: ['預測 [3, 5, 10]，答案 [2, 5, 7]。算 MSE 和 MAE。'],
+        draft: '殘差：＿\nMSE：＿\nMAE：＿',
+        answer: ['殘差 ＝ [1, 0, 3]。', 'MSE ＝ (1 ＋ 0 ＋ 9) ÷ 3 ≈ 3.33；MAE ＝ (1 ＋ 0 ＋ 3) ÷ 3 ≈ 1.33。'],
+      },
+    },
+    mistakes: [
+      { wrong: '直接把殘差相加當損失。', why: '正負會互相抵消。', right: '先平方或取絕對值。' },
+      { wrong: '以為 MSE 小就代表每一筆都很準。', why: 'MSE 是平均，少數大錯可能被很多小錯掩蓋，或反過來。', right: '也看殘差的分布與最大誤差。' },
+      { wrong: '有錯誤標註的極端值時還堅持用 MSE。', why: 'MSE 會被極端值拖著走。', right: '先清理資料，或改用對極端值較不敏感的損失。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '殘差 [2, −2] 的 MSE 是？', options: [
+        { text: '4', correct: true, why: '(4 ＋ 4) ÷ 2。' },
+        { text: '0，因為正負兩個殘差剛好互相抵消', why: '平方後不會抵消。' },
+        { text: '2，因為要先取絕對值再平均', why: '那是 MAE。' },
+        { text: '8，因為兩個平方要相加但不用除', why: '要取平均。' },
+      ] },
+      { level: '應用', type: 'mc', q: '資料裡混入幾筆打錯的離譜價格，哪一種損失比較不容易被拖走？', options: [
+        { text: 'MAE', correct: true, why: '絕對值照比例懲罰。' },
+        { text: 'MSE，因為平方會讓損失比較穩定', why: '平方會放大離譜值。' },
+        { text: '兩種完全一樣，因為都是平均出來的', why: '對極端值的敏感度不同。' },
+        { text: '直接把殘差相加，正負就會抵消掉錯誤', why: '抵消會讓損失失去意義。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['預測外送時間：晚 10 分鐘和早 10 分鐘，對客人的傷害一樣嗎？如果不一樣，損失函數可以怎麼設計？'], answer: [
+        '通常不一樣：晚到比早到更讓人不滿。MSE 與 MAE 對正負一視同仁，沒反映這點。',
+        '可以設計不對稱的損失：晚到的殘差乘上比較大的權重。損失函數要反映「什麼錯比較嚴重」，這是商業判斷，不只是數學。',
+      ] },
+    ],
+    keypoints: [
+      '損失＝平均錯多少；先平方或取絕對值，避免正負抵消。',
+      'MSE 重罰大錯，對極端值敏感；MAE 照比例。',
+      '損失函數要反映「什麼錯比較嚴重」。',
+    ],
+    sources: ['sklearn-eval'],
+  },
+
+  '1-4': {
+    goals: [
+      '把「學習」說成「找讓損失最小的參數」',
+      '讀懂一條損失曲線（損失地形）',
+      '說出為什麼需要比「一個一個試」更聰明的方法',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 1-3）MSE 對什麼特別敏感？', options: [
+        { text: '極端值', correct: true, why: '平方放大大錯。' },
+        { text: '資料表裡欄位的排列順序', why: '欄位順序不影響。' },
+        { text: '殘差是正數還是負數', why: '平方後正負一樣。' },
+        { text: '資料筆數剛好是奇數還是偶數', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-2）y＝w·x＋b 裡，學習要調的是？', options: [
+        { text: 'w 和 b', correct: true, why: '這兩個是參數。' },
+        { text: 'x 和 y，讓資料更符合模型', why: '資料不能改。' },
+        { text: '只有 x，因為它是輸入', why: 'x 是資料。' },
+        { text: '模型的形狀本身，從直線變成曲線', why: '形狀是人選的。' },
+      ] },
+    ],
+    analogy: {
+      text: ['蒙著眼睛在山谷裡找最低點：你看不到全貌，只能用腳感覺哪邊是下坡，往下走一小步，再感覺一次。', '把每一組參數對應的損失畫出來，就是一片[[損失地形]]。學習＝在這片地形上找最低點。參數只有一兩個時可以畫出來看；有幾百萬個時，就只能「用腳感覺坡度」，也就是梯度（模組 3）。'],
+      limit: ['真實的山谷可能有很多個低點；線性回歸的 MSE 地形剛好是一個漂亮的碗，只有一個最低點，這是它好學的原因。神經網路的地形就複雜得多（第四部）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="損失曲線：橫軸是參數 w，縱軸是 MSE，曲線像一個碗，最低點在 w 約等於 2">
+        <line x1="60" y1="210" x2="530" y2="210" class="stroke-ink" stroke-width="3"/><line x1="60" y1="20" x2="60" y2="210" class="stroke-ink" stroke-width="3"/>
+        <path d="${[...Array(41).keys()].map((i) => { const w = i * 0.1; const loss = 11 * (w - 1.99) ** 2 + 0.03; return `${i ? 'L' : 'M'}${(60 + w * 112).toFixed(1)} ${(210 - Math.min(loss, 45) * 4).toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m3)" stroke-width="5"/>
+        <circle cx="${(60 + 1.99 * 112).toFixed(0)}" cy="209" r="8" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+        <text x="${(60 + 1.99 * 112).toFixed(0)}" y="196" text-anchor="middle" font-size="14" font-weight="900">最低點 w ≈ 2</text>
+        <text x="300" y="238" text-anchor="middle" font-size="14">參數 w（固定 b ≈ 0.07）</text>
+        <text x="30" y="110" text-anchor="middle" font-size="14" transform="rotate(-90 30 110)">MSE</text>
+      </svg>`,
+      caption: '用 1-1 那 5 個房價點畫出來的損失曲線（固定 b，只動 w）。',
+    },
+    define: [
+      { term: '損失地形', en: 'loss landscape', def: '參數 → 損失的圖。', example: '線性回歸是一個碗。' },
+      { term: '最佳參數', en: 'optimal parameters', def: '讓損失最小的那組參數。', example: 'w ≈ 1.99、b ≈ 0.07。' },
+      { term: '最佳化', en: 'optimization', def: '找最佳參數的過程。', example: '梯度下降是最常用的方法。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="兩個參數的損失地形：等高線是一圈圈的橢圓，中心是最低點；越往外損失越大">
+  ${[150, 115, 82, 50, 22].map((r, i) => `<ellipse cx="280" cy="105" rx="${r * 1.6}" ry="${r * 0.62}" fill="none" style="stroke:var(--m${i % 6})" stroke-width="3"/>`).join('')}
+  <circle cx="280" cy="105" r="7" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>
+  <text x="290" y="100" font-size="13" font-weight="900">最低點</text>
+  <text x="30" y="200" font-size="13">橫：w　縱：b（示意）</text>
+  <text x="530" y="200" text-anchor="end" font-size="13">每一圈損失相同，越外圈越大</text>
+</svg>`, caption: '兩個參數時，損失地形可以畫成等高線；參數再多就畫不出來了。' },
+        { type: 'widget', name: 'knobs', props: { title: '自己在損失曲線上走：拉 w，看 MSE（實際計算，b 固定 0.07）', sliders: [
+          { id: 'w', label: 'w', min: 0, max: 4, step: 0.05, value: 0.5 },
+        ], compute: (v) => {
+          const pts = [[1, 2.2], [2, 3.9], [3, 6.1], [4, 7.8], [5, 10.2]];
+          const loss = (w) => pts.reduce((s, [x, y]) => s + (w * x + 0.07 - y) ** 2, 0) / pts.length;
+          const here = loss(v.w);
+          const slope = (loss(v.w + 0.001) - loss(v.w - 0.001)) / 0.002;
+          return { rows: [
+            { label: 'MSE', value: here.toFixed(3), ratio: Math.min(1, here / 45) },
+            { label: '這一點的坡度（斜率）', value: slope.toFixed(2), ratio: Math.min(1, Math.abs(slope) / 90) },
+          ], note: `坡度${slope > 0.05 ? '是正的：往左（w 變小）才是下坡' : slope < -0.05 ? '是負的：往右（w 變大）才是下坡' : '接近 0：你在谷底附近'}。這個「坡度」就是模組 3 的梯度。` };
+        } } },
+        { type: 'table', head: ['找最低點的方法', '做法', '問題'], rows: [
+          ['一個一個試', '把 w 從 0 試到 4，每次加 0.01', '參數一多就試不完：10 個參數各試 100 個值＝10²⁰ 次'],
+          ['公式直接解', '線性回歸可以用最小平方公式一次算出', '只適用少數簡單模型'],
+          ['梯度下降', '看坡度，往下坡走一小步，重複', '幾乎所有模型都能用（模組 3）'],
+        ], caption: '最小平方法最早由 Legendre 在 1805 年發表。' },
+      ],
+      tryit: {
+        q: ['把 w 從 0.5 慢慢往右拉，記下坡度什麼時候從負變正。那個位置附近的 MSE 是多少？'],
+        draft: '坡度變號的 w：＿\n那裡的 MSE：＿',
+        answer: ['坡度大約在 w ≈ 2.0 時由負變正，那裡的 MSE 約 0.03，是曲線的最低點。', '「坡度＝0 的地方是最低點」是梯度下降的核心直覺：只要一直往坡度的反方向走，就會走到這裡。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為學習是「記住」訓練資料。', why: '學習是調參數讓損失變小，參數數量通常遠少於資料。', right: '模型學的是規律，不是逐筆存起來。' },
+      { wrong: '以為損失最小就一定是好模型。', why: '在訓練資料上最小，不代表新資料也好（模組 5 過擬合）。', right: '還要看沒看過的資料上的表現。' },
+      { wrong: '以為可以把所有參數組合都試一遍。', why: '參數一多，組合數爆炸。', right: '用坡度（梯度）決定往哪走。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '「學習」在數學上是在做什麼？', options: [
+        { text: '找讓損失最小的參數', correct: true, why: '這就是最佳化。' },
+        { text: '把所有訓練資料逐筆存進模型裡面', why: '學的是參數，不是資料本身。' },
+        { text: '讓模型的形狀自動從直線變成曲線', why: '形狀是人選的。' },
+        { text: '讓訓練資料的標籤變得更整齊一點', why: '資料不會被改。' },
+      ] },
+      { level: '應用', type: 'mc', q: '在某個 w，損失曲線的坡度是 −5。要讓損失變小，w 該怎麼動？', options: [
+        { text: '變大', correct: true, why: '坡度負：往右是下坡。' },
+        { text: '變小，因為坡度是負的所以要往負的方向', why: '方向剛好相反。' },
+        { text: '不動，因為坡度負代表已經在最低點', why: '最低點的坡度是 0。' },
+        { text: '隨便動都可以，坡度和方向沒有關係', why: '坡度正是方向的資訊。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['一個模型有 100 萬個參數。為什麼「畫出損失地形找最低點」行不通？要怎麼辦？'], answer: [
+        '100 萬維的地形畫不出來，也不可能把所有組合試一遍。',
+        '只能在目前的位置算出每個參數方向的坡度（梯度），往下坡走一小步，重複很多次。這就是梯度下降，模組 3 手算一次。',
+      ] },
+    ],
+    keypoints: [
+      '學習＝找讓損失最小的參數（最佳化）。',
+      '損失地形：線性回歸是一個碗，谷底坡度為 0。',
+      '參數一多就不能一個一個試，要靠坡度決定方向。',
+    ],
+    sources: ['least-squares'],
+  },
+});
+</script>

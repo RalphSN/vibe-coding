@@ -1,0 +1,425 @@
+<script>
+/* ==========================================================================
+   模組 3：線性回歸與梯度下降（手算一次）
+   ========================================================================== */
+defineTerms({
+  '線性回歸': { en: 'linear regression', def: '用一條直線（或平面）y＝w·x＋b 預測數字，找讓 MSE 最小的 w、b。', example: '用坪數估房價。', lesson: '3-1' },
+  '最小平方法': { en: 'least squares', def: '直接用公式算出讓平方誤差總和最小的參數；線性回歸專用。', example: 'Legendre 1805 發表。', lesson: '3-1' },
+  '梯度': { en: 'gradient', def: '損失對每個參數的斜率排成的一組數字；指向損失「上升最快」的方向。', example: '(∂L/∂w, ∂L/∂b)。', lesson: '3-2' },
+  '偏微分': { en: 'partial derivative', def: '只動一個參數、其他固定時，損失的斜率。', example: '∂L/∂w：只動 w。', lesson: '3-2' },
+  '梯度下降': { en: 'gradient descent', def: '每一步把參數往梯度的反方向移動一小段：參數 ← 參數 − 學習率 × 梯度。', example: 'w ← w − 0.05 × ∂L/∂w。', lesson: '3-3' },
+  '學習率': { en: 'learning rate', def: '梯度下降每一步走多遠的倍數；太小走很慢，太大會越走越遠。', example: '0.01、0.05。', lesson: '3-4' },
+  '收斂': { en: 'convergence', def: '參數與損失穩定下來、不再明顯變化。', example: '損失停在最低點附近。', lesson: '3-4' },
+  '發散': { en: 'divergence', def: '每一步都跨過谷底跑得更遠，損失越來越大。', example: '學習率太大時。', lesson: '3-4' },
+});
+
+const REVIEW_M2 = [
+  { level: '回想', type: 'mc', q: '（回顧 2-3）ε-greedy 的 ε 代表？', options: [
+    { text: '隨機探索的比例', correct: true, why: '其餘時間選最好的。' },
+    { text: '每台拉霸機真正的中獎機率', why: '那是不知道的。' },
+    { text: '學習迴圈要重複跑的總次數', why: '無關。' },
+    { text: '允許的最大損失，超過就停止', why: '無關。' },
+  ] },
+  { level: '應用', type: 'mc', q: '（回顧 1-4）損失曲線坡度為 0 的地方通常是？', options: [
+    { text: '谷底（最低點）附近', correct: true, why: '線性回歸的碗只有一個谷底。' },
+    { text: '損失最大、最該避開的地方', why: '碗形曲線的坡度 0 在谷底。' },
+    { text: '參數完全沒有意義的地方', why: '那正是最佳參數。' },
+    { text: '學習率應該設成 0 的地方', why: '無關。' },
+  ] },
+];
+
+const HOUSE3 = [[1, 2.2], [2, 3.9], [3, 6.1], [4, 7.8], [5, 10.2]];
+const TINY = [[1, 2], [2, 4], [3, 6]];
+
+const TANGENT_SVG = `<svg viewBox="0 0 560 240" role="img" aria-label="坡度：在損失曲線上某一點畫切線，切線往右上代表斜率正，要讓損失變小就往左走">
+  <line x1="60" y1="200" x2="530" y2="200" class="stroke-ink" stroke-width="3"/><line x1="60" y1="20" x2="60" y2="200" class="stroke-ink" stroke-width="3"/>
+  <path d="M80 40 Q295 330 510 40" fill="none" style="stroke:var(--m3)" stroke-width="5"/>
+  <circle cx="420" cy="104" r="8" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+  <line x1="350" y1="160" x2="500" y2="40" style="stroke:var(--m7)" stroke-width="4"/>
+  <text x="440" y="150" font-size="14" font-weight="900">斜率 ＞ 0</text>
+  <path d="M410 104 L330 104" class="stroke-ink" stroke-width="4"/><path d="M338 96 L326 104 L338 112 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <text x="300" y="96" text-anchor="end" font-size="14" font-weight="900">往左走：損失變小</text>
+  <text x="295" y="230" text-anchor="middle" font-size="14">參數 w</text>
+  <text x="30" y="110" text-anchor="middle" font-size="14" transform="rotate(-90 30 110)">損失</text>
+</svg>`;
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出線性回歸要找什麼',
+      '用拉桿把 MSE 拉到接近最小',
+      '知道線性回歸有公式解，但大部分模型沒有',
+    ],
+    review: REVIEW_M2,
+    analogy: {
+      text: ['用一根直尺壓在一堆散落的米粒上，想讓它「最貼近」所有米粒：不一定會穿過任何一粒，但整體偏離最少。', '[[線性回歸]]就是這把直尺：找一條 y＝w·x＋b，讓所有點到線的垂直距離平方後的平均（MSE）最小。對直線來說，[[最小平方法]]可以直接用公式算出答案。'],
+      limit: ['直尺只能是直的；如果資料彎曲，直線再怎麼放都不貼（1-2）。而且「最貼近」是用平方來定義的，極端值會把線拉過去（1-3）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="最佳直線：5 個點與一條穿過它們中間的直線，每個點到線都有一段垂直的虛線殘差">
+        <line x1="50" y1="210" x2="530" y2="210" class="stroke-ink" stroke-width="2"/><line x1="50" y1="20" x2="50" y2="210" class="stroke-ink" stroke-width="2"/>
+        <line x1="50" y1="${210 - 0.07 * 16}" x2="530" y2="${(210 - (1.99 * 6 + 0.07) * 16).toFixed(1)}" style="stroke:var(--m7)" stroke-width="4"/>
+        ${[[1, 2.2], [2, 3.9], [3, 6.1], [4, 7.8], [5, 10.2]].map(([x, y]) => `<line x1="${50 + x * 80}" y1="${(210 - y * 16).toFixed(1)}" x2="${50 + x * 80}" y2="${(210 - (1.99 * x + 0.07) * 16).toFixed(1)}" class="stroke-ink" stroke-width="2" stroke-dasharray="4 3"/><circle cx="${50 + x * 80}" cy="${(210 - y * 16).toFixed(1)}" r="7" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>`).join('')}
+        <text x="300" y="232" text-anchor="middle" font-size="14">最佳直線 y ≈ 1.99x ＋ 0.07（MSE ≈ 0.026）</text>
+      </svg>`,
+      caption: '虛線是殘差；線性回歸要讓「虛線長度平方的平均」最小。',
+    },
+    define: [
+      { term: '線性回歸', en: 'linear regression', def: '用直線預測數字，最小化 MSE。', example: 'y＝w·x＋b。' },
+      { term: '最小平方法', en: 'least squares', def: '公式直接解出最佳 w、b。', example: 'w＝Σ(x−x̄)(y−ȳ) ÷ Σ(x−x̄)²。' },
+      { term: '多元線性回歸', en: 'multiple regression', def: '有多個特徵：y＝w₁x₁＋w₂x₂＋…＋b。', example: '坪數、屋齡一起看。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="外插的風險：資料範圍在 1 到 5 之間，直線延伸到 8 以後可能和真實關係差很多">
+  <line x1="40" y1="160" x2="530" y2="160" class="stroke-ink" stroke-width="2"/>
+  <rect x="90" y="30" width="230" height="130" class="fill-bg stroke-ink" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="205" y="50" text-anchor="middle" font-size="13" font-weight="900">有資料的範圍</text>
+  <line x1="60" y1="150" x2="520" y2="30" style="stroke:var(--m7)" stroke-width="4"/>
+  <path d="M320 98 C400 90 460 92 520 94" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="6 4"/>
+  <text x="430" y="122" text-anchor="middle" font-size="13">真實關係可能變平</text>
+  <text x="280" y="184" text-anchor="middle" font-size="13">範圍外的預測（外插）要特別小心（示意）</text>
+</svg>`, caption: '模型只在看過的範圍內有根據。' },
+        { type: 'widget', name: 'fitline', props: { title: '用拉桿把 MSE 拉到最小', points: HOUSE3, w: 0.5, b: 3, xRange: [0, 6], yRange: [0, 12], xLabel: '坪數（十坪）', yLabel: '價格（百萬）' } },
+        { type: 'table', head: ['步驟', '算式', '結果'], rows: [
+          ['x 的平均 x̄', '(1＋2＋3＋4＋5) ÷ 5', '3'],
+          ['y 的平均 ȳ', '(2.2＋3.9＋6.1＋7.8＋10.2) ÷ 5', '6.04'],
+          ['Σ(x−x̄)(y−ȳ)', '(−2)(−3.84)＋(−1)(−2.14)＋0＋(1)(1.76)＋(2)(4.16)', '19.9'],
+          ['Σ(x−x̄)²', '4＋1＋0＋1＋4', '10'],
+          ['w ＝ 19.9 ÷ 10', '', '1.99'],
+          ['b ＝ ȳ − w·x̄', '6.04 − 1.99 × 3', '0.07'],
+        ], caption: '最小平方法的公式解。只有線性模型能這樣一次算出來。' },
+        { type: 'code', lang: 'python', title: '同樣的計算（示意）', code: 'xs = [1, 2, 3, 4, 5]\nys = [2.2, 3.9, 6.1, 7.8, 10.2]\nxm, ym = sum(xs) / 5, sum(ys) / 5\nw = sum((x - xm) * (y - ym) for x, y in zip(xs, ys)) / sum((x - xm) ** 2 for x in xs)\nb = ym - w * xm\nprint(round(w, 2), round(b, 2))   # 1.99 0.07' },
+      ],
+      tryit: {
+        q: ['用模型 y＝1.99x＋0.07 估 x＝6（60 坪）的價格。這個估計可靠嗎？'],
+        draft: '估計：＿\n可不可靠：＿',
+        answer: ['1.99 × 6 ＋ 0.07 ≈ 12.0（百萬）。', 'x＝6 超出資料範圍（1～5），叫外插：直線關係不一定延續到那裡，可靠度比範圍內低。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為最佳直線一定會穿過某些點。', why: '它要的是整體偏離最小，可能一個點都不穿過。', right: '看 MSE，不看有沒有穿過點。' },
+      { wrong: '用模型去預測遠超出資料範圍的值。', why: '關係在範圍外不一定成立。', right: '外插要特別小心，或補資料。' },
+      { wrong: '以為所有模型都有公式解。', why: '只有線性回歸這類簡單模型有。', right: '其他模型用梯度下降（3-2 起）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '線性回歸要最小化的是？', options: [
+        { text: 'MSE', correct: true, why: '殘差平方的平均。' },
+        { text: '直線穿過的資料點個數，越多越好', why: '不是看穿過幾個點。' },
+        { text: '直線的斜率，越平越好', why: '斜率是要找的參數之一。' },
+        { text: '資料點彼此之間的距離總和', why: '和點彼此的距離無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '模型 y＝2x＋1，x＝4 的殘差（答案是 10）是？', options: [
+        { text: '−1', correct: true, why: '預測 9 − 答案 10。' },
+        { text: '1，因為答案比預測大所以是正的', why: '殘差＝預測 − 答案。' },
+        { text: '9，就是模型的預測值本身', why: '殘差是差值。' },
+        { text: '19，預測和答案加起來', why: '是相減。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['房價其實還和屋齡有關。要怎麼把屋齡加進模型？參數會變成幾個？'], answer: [
+        '多元線性回歸：價格＝w₁ × 坪數 ＋ w₂ × 屋齡 ＋ b。',
+        '參數變成 3 個（w₁、w₂、b）。損失還是 MSE，找最佳參數的方法一樣：公式解或梯度下降。',
+      ] },
+    ],
+    keypoints: [
+      '線性回歸：找讓 MSE 最小的 w、b。',
+      '最小平方法有公式解，但只適用簡單模型。',
+      '超出資料範圍的預測（外插）要小心。',
+    ],
+    sources: ['least-squares', 'sklearn-linear'],
+  },
+
+  '3-2': {
+    goals: [
+      '用「斜率」說明梯度',
+      '寫出線性回歸 MSE 對 w、b 的梯度公式',
+      '說出梯度的方向和大小各代表什麼',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-1）最小平方法的限制是？', options: [
+        { text: '只適用簡單的線性模型', correct: true, why: '其他模型要用梯度下降。' },
+        { text: '一次只能處理兩筆資料', why: '可以處理很多筆。' },
+        { text: '算出來的線一定穿過所有點', why: '不一定穿過任何點。' },
+        { text: '只能用在分類問題上', why: '它是回歸的方法。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 1-3）殘差 [1, −3] 的 MSE 是？', options: [
+        { text: '5', correct: true, why: '(1＋9)÷2。' },
+        { text: '−1，因為 1 和 −3 相加後再平均', why: '要先平方。' },
+        { text: '2，因為先取絕對值再平均', why: '那是 MAE。' },
+        { text: '10，平方相加但不用平均', why: '要除以 2。' },
+      ] },
+    ],
+    analogy: {
+      text: ['站在山坡上，閉著眼用腳感覺：往東走一步會升高多少、往北走一步會升高多少。把這兩個數字合起來，就知道哪個方向最陡。', '[[梯度]]就是這組數字：損失對每個參數的斜率（[[偏微分]]）。它指向損失上升最快的方向，所以「往反方向走」就是下坡最快的方向。'],
+      limit: ['山坡的坡度用腳就感覺得到，梯度要用數學算；而且它只告訴你「現在這一點」的坡度，走一步之後要重新算。'],
+    },
+    model: { svg: TANGENT_SVG, caption: '一個參數時，梯度就是切線的斜率；斜率為正，往左走才會下坡。' },
+    define: [
+      { term: '梯度', en: 'gradient', def: '每個參數的斜率排在一起。', example: '(∂L/∂w, ∂L/∂b)。' },
+      { term: '偏微分', en: 'partial derivative', def: '只動一個參數時的斜率。', example: '∂L/∂w。' },
+      { term: '梯度公式（MSE、直線）', en: 'gradient of MSE', def: '∂L/∂w＝(2/n)Σ(ŷ−y)·x；∂L/∂b＝(2/n)Σ(ŷ−y)。', example: '殘差乘上 x 再平均，再乘 2。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '數值斜率 vs 公式：兩種算法得到一樣的梯度（實際計算）', sliders: [
+          { id: 'w', label: 'w', min: 0, max: 4, step: 0.1, value: 1 },
+          { id: 'b', label: 'b', min: -2, max: 4, step: 0.1, value: 0 },
+        ], compute: (v) => {
+          const pts = [[1, 2.2], [2, 3.9], [3, 6.1], [4, 7.8], [5, 10.2]];
+          const L = (w, b) => pts.reduce((s, [x, y]) => s + (w * x + b - y) ** 2, 0) / pts.length;
+          const h = 1e-4;
+          const numW = (L(v.w + h, v.b) - L(v.w - h, v.b)) / (2 * h);
+          const numB = (L(v.w, v.b + h) - L(v.w, v.b - h)) / (2 * h);
+          const fW = (2 / pts.length) * pts.reduce((s, [x, y]) => s + (v.w * x + v.b - y) * x, 0);
+          const fB = (2 / pts.length) * pts.reduce((s, [x, y]) => s + (v.w * x + v.b - y), 0);
+          return { rows: [
+            { label: 'MSE', value: L(v.w, v.b).toFixed(3), ratio: Math.min(1, L(v.w, v.b) / 40) },
+            { label: '∂L/∂w（推一點點看變化）', value: numW.toFixed(3), ratio: Math.min(1, Math.abs(numW) / 80) },
+            { label: '∂L/∂w（公式）', value: fW.toFixed(3), ratio: Math.min(1, Math.abs(fW) / 80) },
+            { label: '∂L/∂b（推一點點看變化）', value: numB.toFixed(3), ratio: Math.min(1, Math.abs(numB) / 20) },
+            { label: '∂L/∂b（公式）', value: fB.toFixed(3), ratio: Math.min(1, Math.abs(fB) / 20) },
+          ], note: '「推一點點」：把 w 加減 0.0001，看 MSE 變多少再相除，這就是斜率的定義。公式算出來的一模一樣，但快得多。梯度是負的，代表那個參數該變大。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="梯度公式拆解：每筆的殘差乘上 x，平均後乘以 2 得到 w 的梯度；殘差直接平均乘以 2 得到 b 的梯度">
+          <text x="20" y="30" font-size="15" font-weight="900">梯度公式拆開看</text>
+          <rect x="20" y="50" width="250" height="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="82" text-anchor="middle" font-size="15" font-weight="900" class="on-color">∂L/∂w</text>
+          <text x="145" y="112" text-anchor="middle" font-size="14" class="on-color">每筆：殘差 × x</text>
+          <text x="145" y="138" text-anchor="middle" font-size="14" class="on-color">平均後 × 2</text>
+          <rect x="290" y="50" width="250" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="82" text-anchor="middle" font-size="15" font-weight="900" class="on-color">∂L/∂b</text>
+          <text x="415" y="112" text-anchor="middle" font-size="14" class="on-color">每筆：殘差</text>
+          <text x="415" y="138" text-anchor="middle" font-size="14" class="on-color">平均後 × 2</text>
+          <text x="280" y="196" text-anchor="middle" font-size="13">x 大的點對 w 的影響比較大：它的殘差被乘上比較大的數</text>
+        </svg>`, caption: '公式來自「平方的斜率是 2 倍」與鏈鎖律；推導細節在隨身卷 3 與第四部 3。' },
+      ],
+      tryit: {
+        q: ['資料只有一點 (2, 5)，模型 w＝1、b＝0。算出 ∂L/∂w 和 ∂L/∂b。'],
+        draft: '預測 ŷ ＝ ＿\n殘差 ＝ ＿\n∂L/∂w ＝ ＿\n∂L/∂b ＝ ＿',
+        answer: ['ŷ ＝ 1 × 2 ＋ 0 ＝ 2；殘差 ＝ 2 − 5 ＝ −3。', '∂L/∂w ＝ 2 × (−3) × 2 ＝ −12；∂L/∂b ＝ 2 × (−3) ＝ −6。兩個都是負的：w、b 都該變大，預測才會往 5 靠近。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為梯度指向下坡。', why: '梯度指向損失上升最快的方向。', right: '要往梯度的反方向走。' },
+      { wrong: '以為梯度為 0 就一定是最低點。', why: '在複雜的地形上也可能是平台或鞍點。', right: '線性回歸的碗只有一個谷底；神經網路要另外小心（第四部）。' },
+      { wrong: '以為每個參數的梯度都一樣大。', why: '每個參數對損失的影響不同。', right: '梯度是一組數字，每個參數各一個。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '梯度指向哪個方向？', options: [
+        { text: '損失上升最快的方向', correct: true, why: '所以要往反方向走。' },
+        { text: '損失下降最快的方向，直接照著走就好', why: '方向相反。' },
+        { text: '資料點最密集的方向', why: '和資料分布無關。' },
+        { text: '參數等於 0 的方向', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '∂L/∂w＝−8、∂L/∂b＝2。要讓損失變小，w 和 b 該怎麼動？', options: [
+        { text: 'w 變大、b 變小', correct: true, why: '都往梯度的反方向。' },
+        { text: 'w 變小、b 變大，跟著梯度的正負號走', why: '剛好相反。' },
+        { text: '兩個都變大，因為損失要變小', why: 'b 的梯度是正的，要變小。' },
+        { text: '兩個都不動，因為梯度一正一負會抵消', why: '每個參數各自看。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['在拉桿互動裡，為什麼「推一點點看變化」和公式的結果會一樣？既然一樣，為什麼實務上用公式？'], answer: [
+        '兩者都在算同一件事：斜率。推一點點是斜率的定義，公式是把定義化簡後的結果。',
+        '公式快很多：參數有 100 萬個時，推一點點要算 200 萬次損失；用公式（反向傳播，第四部）一次就能算出全部梯度。',
+      ] },
+    ],
+    keypoints: [
+      '梯度＝每個參數的斜率，指向損失上升最快的方向。',
+      'MSE 直線：∂L/∂w＝(2/n)Σ殘差·x，∂L/∂b＝(2/n)Σ殘差。',
+      '往梯度的反方向走就是下坡。',
+    ],
+    sources: ['gmlcc'],
+  },
+
+  '3-3': {
+    goals: [
+      '手算一次梯度下降的更新',
+      '確認走一步之後損失真的變小',
+      '說出梯度下降的完整迴圈',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-2）∂L/∂w 是負的，w 該怎麼動？', options: [
+        { text: '變大', correct: true, why: '往反方向。' },
+        { text: '變小，跟著梯度的負號走', why: '方向相反。' },
+        { text: '不動，負的梯度代表已經最好', why: '梯度 0 才是谷底。' },
+        { text: '變成 0，從頭重新開始', why: '無關。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 2-1）預測送達分鐘數是？', options: [
+        { text: '回歸', correct: true, why: '數字。' },
+        { text: '分類，因為分鐘數只有整數', why: '分鐘數有大小意義。' },
+        { text: '分群，因為訂單要分成快和慢', why: '有標籤，是監督式。' },
+        { text: '強化學習，因為送到會有獎勵', why: '從歷史資料預測。' },
+      ] },
+    ],
+    analogy: {
+      text: ['照著導航開車：每到一個路口，導航重新算一次方向，你照著開一小段，再重新算。', '[[梯度下降]]就是這樣：在目前的參數算出梯度（方向），參數 ← 參數 − 學習率 × 梯度（開一小段），再重新算。下面用 3 個點手算第一步，你會看到損失真的變小了。'],
+      limit: ['導航知道終點在哪，梯度下降不知道最低點在哪，只知道腳下的坡度；所以每一步都要小心別走太遠（3-4 學習率）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="梯度下降迴圈：用目前參數預測，算殘差與損失，算梯度，參數減去學習率乘梯度，重複">
+        ${[['① 預測', 'ŷ＝w·x＋b', 'm2'], ['② 殘差', 'ŷ − y', 'm3'], ['③ 梯度', '∂L/∂w、∂L/∂b', 'm4'], ['④ 更新', 'w ← w − η·∂L/∂w', 'm5']].map(([a, b, c], i) => `<rect x="${10 + i * 138}" y="40" width="128" height="100" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 138}" y="80" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 138}" y="110" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+        <path d="M488 140 L488 180 L74 180 L74 146" fill="none" class="stroke-ink" stroke-width="3"/><path d="M66 154 L74 142 L82 154 Z" class="stroke-ink" style="fill:var(--ink)"/>
+        <text x="280" y="206" text-anchor="middle" font-size="14" font-weight="900">重複到損失不再明顯下降</text>
+        <text x="280" y="226" text-anchor="middle" font-size="13">η（eta）是學習率</text>
+      </svg>`,
+      caption: 'b 也照同樣的方式更新：b ← b − η·∂L/∂b。',
+    },
+    define: [
+      { term: '梯度下降', en: 'gradient descent', def: '參數 ← 參數 − 學習率 × 梯度。', example: '重複很多次。' },
+      { term: '一步', en: 'step / iteration', def: '算一次梯度、更新一次參數。', example: '下面手算的第 1 步。' },
+      { term: 'epoch', en: 'epoch', def: '把全部訓練資料看過一遍。', example: '資料少時一步就是一個 epoch。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="梯度下降的前幾步：w 從 0 走到 0.93、1.3、1.5，越來越接近 2；損失從 18.67 快速下降">
+  <line x1="40" y1="150" x2="530" y2="150" class="stroke-ink" stroke-width="2"/>
+  ${[0, 0.93, 2].map((w, i) => `<text x="${40 + w * 230}" y="176" text-anchor="middle" font-size="13">${w}</text>`).join('')}
+  ${[[0, '18.67'], [0.93, '3.76']].map(([w, l], i) => `<circle cx="${40 + w * 230}" cy="150" r="9" style="fill:var(--m${i ? 5 : 0})" class="stroke-ink" stroke-width="2"/><text x="${40 + w * 230}" y="${120 - i * 30}" text-anchor="middle" font-size="13" font-weight="900">MSE ${l}</text>`).join('')}
+  <path d="M60 140 Q150 90 245 140" fill="none" class="stroke-ink" stroke-width="3"/><path d="M237 132 L249 142 L235 146 Z" class="stroke-ink" style="fill:var(--ink)"/>
+  <circle cx="500" cy="150" r="9" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/><text x="500" y="120" text-anchor="middle" font-size="13" font-weight="900">目標 w＝2</text>
+  <text x="280" y="196" text-anchor="middle" font-size="13">第 1 步走得最多：離谷底越遠，坡越陡，步伐越大</text>
+</svg>`, caption: '同樣的學習率，坡陡時走得多、坡緩時走得少：梯度自己會調整步伐。' },
+        { type: 'table', head: ['手算第 1 步', '算式', '結果'], rows: [
+          ['資料', '(1, 2)、(2, 4)、(3, 6)', '起點 w＝0、b＝0，學習率 0.05'],
+          ['預測 ŷ', '0、0、0', '殘差 −2、−4、−6'],
+          ['MSE', '(4＋16＋36) ÷ 3', '18.67'],
+          ['∂L/∂w', '(2/3) × [(−2)(1)＋(−4)(2)＋(−6)(3)]', '(2/3) × (−28) ＝ −18.67'],
+          ['∂L/∂b', '(2/3) × (−2 − 4 − 6)', '−8'],
+          ['新的 w', '0 − 0.05 × (−18.67)', '0.933'],
+          ['新的 b', '0 − 0.05 × (−8)', '0.4'],
+          ['新的 MSE', '殘差 −0.67、−1.73、−2.80', '約 3.76（從 18.67 降下來）'],
+        ], caption: '一步就讓損失從 18.67 降到 3.76。下面的互動用同樣的資料與起點。' },
+        { type: 'widget', name: 'fitline', props: { title: '同一份資料：按「走 1 步」對照上面的表', points: TINY, w: 0, b: 0, gd: true, lr: 0.05, lrMax: 0.3, xRange: [0, 4], yRange: [0, 8], wRange: [-1, 4], bRange: [-3, 3], note: '按一下「走 1 步」，w 應該變成 0.93、b 變成 0.40、MSE 約 3.76。再多走幾步，看 w 慢慢靠近 2、b 靠近 0。' } },
+        { type: 'code', lang: 'python', title: '同樣的迴圈（示意）', code: 'data = [(1, 2), (2, 4), (3, 6)]\nw, b, lr = 0.0, 0.0, 0.05\nfor step in range(200):\n    res = [w * x + b - y for x, y in data]\n    dw = 2 / len(data) * sum(r * x for r, (x, _) in zip(res, data))\n    db = 2 / len(data) * sum(res)\n    w, b = w - lr * dw, b - lr * db\nprint(round(w, 2), round(b, 2))   # 接近 2.0 和 0.0' },
+      ],
+      tryit: {
+        q: ['接續上表，用 w＝0.933、b＝0.4 手算第 2 步的 ∂L/∂b 和新的 b（學習率 0.05）。'],
+        draft: '殘差：＿\n∂L/∂b ＝ ＿\n新的 b ＝ ＿',
+        answer: ['預測 1.333、2.267、3.2，殘差 −0.667、−1.733、−2.8。', '∂L/∂b ＝ (2/3) × (−5.2) ≈ −3.47；新的 b ＝ 0.4 − 0.05 × (−3.47) ≈ 0.573。用互動按第 2 步可以核對。'],
+      },
+    },
+    mistakes: [
+      { wrong: '更新時用「加」梯度。', why: '那是往上坡走。', right: '參數 ＝ 參數 − 學習率 × 梯度。' },
+      { wrong: '先更新 w，再用新的 w 算 b 的梯度。', why: '同一步的梯度要用同一組舊參數算。', right: '先算完全部梯度，再一起更新。' },
+      { wrong: '以為走一步就到最低點。', why: '每步只走一小段，要很多步。', right: '看損失曲線，下降到平穩才停。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '梯度下降的更新式是？', options: [
+        { text: 'w ← w − η·∂L/∂w', correct: true, why: '往梯度的反方向。' },
+        { text: 'w ← w ＋ η·∂L/∂w，照著梯度往上走', why: '那會讓損失變大。' },
+        { text: 'w ← η·∂L/∂w，直接換成梯度的值', why: '要從舊的 w 出發。' },
+        { text: 'w ← w ÷ ∂L/∂w，用梯度去除參數', why: '不是除法。' },
+      ] },
+      { level: '應用', type: 'mc', q: 'w＝1、∂L/∂w＝4、學習率 0.1，更新後的 w？', options: [
+        { text: '0.6', correct: true, why: '1 − 0.1 × 4。' },
+        { text: '1.4，因為梯度是正的所以要加', why: '要減。' },
+        { text: '0.4，也就是學習率乘上梯度', why: '要從 1 減掉。' },
+        { text: '−3，也就是 1 減掉 4', why: '忘了乘學習率。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['資料有 1,000 萬筆，每一步都用全部資料算梯度太慢。可以怎麼辦？'], answer: [
+        '每一步只隨機抽一小批（例如 64 筆）算梯度，叫隨機梯度下降（SGD）或小批次梯度下降。',
+        '每步的方向比較「抖」，但快很多，總體還是往下坡走。這是訓練神經網路的標準做法（第四部 4）。',
+      ] },
+    ],
+    keypoints: [
+      '梯度下降：預測 → 殘差 → 梯度 → 參數減去學習率 × 梯度。',
+      '手算一步：MSE 從 18.67 降到 3.76。',
+      '同一步的梯度用同一組舊參數算，再一起更新。',
+    ],
+    sources: ['gmlcc'],
+  },
+
+  '3-4': {
+    goals: [
+      '說出學習率太小與太大各會怎樣',
+      '用互動看出「發散」',
+      '知道怎麼判斷學習率合不合適',
+    ],
+    review: [
+      { level: '回想', type: 'mc', q: '（回顧 3-3）w＝2、∂L/∂w＝−5、學習率 0.1，新的 w？', options: [
+        { text: '2.5', correct: true, why: '2 − 0.1 × (−5)。' },
+        { text: '1.5，因為梯度是負的所以要減', why: '減掉負數是加。' },
+        { text: '−0.5，就是學習率乘梯度', why: '要從 2 開始。' },
+        { text: '7，就是 2 減掉 −5', why: '忘了乘學習率。' },
+      ] },
+      { level: '應用', type: 'mc', q: '（回顧 3-2）梯度的方向代表？', options: [
+        { text: '損失上升最快的方向', correct: true, why: '所以走反方向。' },
+        { text: '損失下降最快的方向', why: '相反。' },
+        { text: '資料最多的方向', why: '無關。' },
+        { text: '參數最大的方向', why: '無關。' },
+      ] },
+    ],
+    analogy: {
+      text: ['下樓梯：步伐太小，走到一樓要很久；步伐太大，一腳跨過好幾階，甚至跳到對面牆上彈回來，越晃越遠。', '[[學習率]]就是步伐：太小會[[收斂]]得很慢，太大會每一步都跨過谷底、跑到另一邊更高的地方，損失越來越大，叫[[發散]]。'],
+      limit: ['樓梯的高度是固定的，損失地形的「陡峭程度」每個模型、每份資料都不同，所以沒有一個萬用的學習率；要實際試，看損失曲線。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 240" role="img" aria-label="三種學習率：太小走很多步還沒到谷底；剛好幾步就到；太大來回跳，越跳越高">
+        ${[['太小', [[40, 40], [52, 60], [62, 76], [70, 90], [77, 102]], 'm2'], ['剛好', [[220, 40], [260, 130], [282, 165], [290, 175]], 'm3'], ['太大', [[440, 120], [520, 100], [400, 70], [540, 30]], 'm7']].map(([t, path, c], g) => `
+          <path d="M${20 + g * 185} 30 Q${110 + g * 185} 330 ${200 + g * 185} 30" fill="none" class="stroke-ink" stroke-width="2"/>
+          <path d="${path.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ')}" fill="none" style="stroke:var(--${c})" stroke-width="4"/>
+          ${path.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" style="fill:var(--${c})" class="stroke-ink" stroke-width="2"/>`).join('')}
+          <text x="${110 + g * 185}" y="220" text-anchor="middle" font-size="15" font-weight="900">${t}</text>`).join('')}
+      </svg>`,
+      caption: '示意圖。太大時每一步都跨過谷底，落點比原本還高。',
+    },
+    define: [
+      { term: '學習率', en: 'learning rate', def: '每一步的倍數 η。', example: '0.001～0.1 常見。' },
+      { term: '收斂', en: 'convergence', def: '損失穩定在低點。', example: '曲線變平。' },
+      { term: '發散', en: 'divergence', def: '損失越來越大。', example: '數字爆成無限大。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'fitline', props: { title: '房價資料：調學習率，各走 10 步看看', points: HOUSE3, w: 0, b: 0, gd: true, lr: 0.01, lrMax: 0.1, xRange: [0, 6], yRange: [0, 12], wRange: [-2, 5], bRange: [-5, 10], note: '學習率 0.01：每 10 步損失穩定下降。拉到 0.09 以上再按「走 10 步」：線會左右亂甩、MSE 越來越大，這就是發散。這份資料大約在 0.085 以上就會發散。' } },
+        { type: 'table', head: ['症狀', '可能原因', '怎麼調'], rows: [
+          ['損失降得非常慢', '學習率太小', '放大 3～10 倍試試'],
+          ['損失上下亂跳或變成無限大', '學習率太大', '縮小 3～10 倍'],
+          ['一開始降很快，後來停滯', '可能已經接近谷底，或需要逐步縮小學習率', '看驗證資料的表現（模組 5）'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="損失曲線對照：學習率太小的曲線緩慢下降；剛好的曲線快速下降後變平；太大的曲線上下震盪並往上衝">
+          <line x1="50" y1="180" x2="530" y2="180" class="stroke-ink" stroke-width="2"/><line x1="50" y1="20" x2="50" y2="180" class="stroke-ink" stroke-width="2"/>
+          <path d="M60 60 C200 80 350 100 520 120" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+          <path d="M60 60 C90 160 140 170 520 172" fill="none" style="stroke:var(--m3)" stroke-width="4"/>
+          <path d="M60 60 L100 90 L140 50 L180 80 L220 30 L250 22" fill="none" style="stroke:var(--m7)" stroke-width="4"/>
+          <text x="520" y="112" text-anchor="end" font-size="13" font-weight="900">太小</text>
+          <text x="520" y="164" text-anchor="end" font-size="13" font-weight="900">剛好</text>
+          <text x="260" y="40" font-size="13" font-weight="900">太大</text>
+          <text x="290" y="202" text-anchor="middle" font-size="13">橫軸：步數・縱軸：損失（示意）</text>
+        </svg>`, caption: '訓練時一定要畫損失曲線：它是判斷學習率最直接的方法。' },
+      ],
+      tryit: {
+        q: ['把學習率設成 0.001 走 10 步，再設成 0.05 走 10 步（都先按重設）。兩者的 MSE 各降到多少？'],
+        draft: '0.001：＿\n0.05：＿',
+        answer: ['起點 MSE 約 44.4。0.001 時 10 步後還有約 27.5；0.05 時 10 步後已經降到約 0.05。', '同樣的步數，學習率差 50 倍，結果差很多；但 0.09 以上就發散，所以「越大越好」也不對。'],
+      },
+    },
+    mistakes: [
+      { wrong: '以為學習率越大學得越快。', why: '太大會跨過谷底、發散。', right: '在不發散的範圍內選大一點的。' },
+      { wrong: '損失變成 NaN 或無限大時，以為是程式壞了。', why: '最常見的原因是學習率太大。', right: '先把學習率縮小 10 倍試試。' },
+      { wrong: '換了資料或模型還沿用同一個學習率。', why: '地形不同，合適的步伐也不同。', right: '每次都看損失曲線重新確認。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '學習率太大最典型的症狀？', options: [
+        { text: '損失越來越大', correct: true, why: '發散。' },
+        { text: '損失降得非常慢，要很多步才到底', why: '那是太小。' },
+        { text: '損失一步就剛好降到 0', why: '幾乎不會發生。' },
+        { text: '模型的參數數量自己變多', why: '參數數量不會變。' },
+      ] },
+      { level: '應用', type: 'mc', q: '訓練時損失從 5 降到 4.99、4.98…非常慢。最先該試的是？', options: [
+        { text: '把學習率調大', correct: true, why: '典型的太小。' },
+        { text: '把學習率調小，讓它更穩定', why: '會更慢。' },
+        { text: '把資料刪掉一半，讓計算變快', why: '不是根本原因。' },
+        { text: '把損失函數換成 MAE 再重來', why: '先調學習率。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['很多訓練會「一開始用比較大的學習率，後面逐漸縮小」。用下樓梯的比喻說明為什麼。'], answer: [
+        '一開始離谷底很遠，大步伐可以快速接近；接近谷底時大步伐會一直跨過去，換小步伐才能停在最低點附近。',
+        '這叫學習率排程（schedule），訓練神經網路時很常用（第四部 4）。',
+      ] },
+    ],
+    keypoints: [
+      '學習率太小收斂慢，太大會發散。',
+      '看損失曲線判斷：慢就加大，亂跳或爆掉就縮小。',
+      '常見做法：先大後小。',
+    ],
+    sources: ['gmlcc'],
+  },
+});
+</script>
