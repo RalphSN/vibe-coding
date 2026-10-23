@@ -1,0 +1,129 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: 'AI 系列・序章｜AI 全景地圖',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-22',
+  version: 'v1',
+};
+
+/* AI 系列七本書：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: 'AI 系列',
+  current: 'ai-map',
+  volumes: [
+    { id: 'ai-map', vol: '序章', title: 'AI 全景地圖', href: '../ai-series-0-map-course/index.html' },
+    { id: 'ai-app', vol: '第一部', title: 'AI 應用工程', href: '../ai-app-engineering-course/index.html' },
+    { id: 'ai-llm', vol: '第二部', title: '大型語言模型原理', href: '../llm-principles-course/index.html' },
+    { id: 'ai-ml', vol: '第三部', title: '機器學習基礎', href: '../ml-foundations-course/index.html' },
+    { id: 'ai-dl', vol: '第四部', title: '深度學習', href: '../deep-learning-course/index.html' },
+    { id: 'ai-hw', vol: '第五部', title: '硬體與運算', href: '../ai-hardware-course/index.html' },
+    { id: 'ai-math', vol: '隨身卷', title: '數學直覺', href: '../ai-math-pocket-course/index.html' },
+  ],
+};
+
+/* 全書主軸「從按下送出到出現回答」的六站；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '你的電腦', note: '打字、按送出', color: 'var(--m0)' },
+    { label: '後端', note: '應用程式組請求、帶金鑰', color: 'var(--m1)' },
+    { label: 'API', note: '驗證、計費、排隊', color: 'var(--m2)' },
+    { label: 'tokenizer', note: '文字切成 token', color: 'var(--m3)' },
+    { label: 'GPU 上的模型', note: '算出下一個 token 的機率', color: 'var(--m4)' },
+    { label: '回到螢幕', note: '一段一段串流回來', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [4], 2: [0, 1, 2, 3, 4, 5], 3: [0, 1, 2, 3, 4, 5] },
+  byLesson: { '2-2': [3], '2-3': [4], '2-4': [4], '2-5': [2, 5] },
+};
+
+/* 首頁主視覺：俄羅斯套娃（包含關係不是會動的機制，所以是靜態圖） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="AI 全景的套娃：最外層是人工智慧，裡面是機器學習，再裡面是深度學習，最裡面是大型語言模型">
+  <rect x="10" y="10" width="540" height="400" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+  <text x="30" y="46" font-size="22" font-weight="900" class="on-color">AI 人工智慧</text>
+  <text x="30" y="72" font-size="15" class="on-color">讓機器做看起來需要智慧的事</text>
+  <rect x="60" y="92" width="460" height="296" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
+  <text x="80" y="128" font-size="21" font-weight="900" class="on-color">機器學習</text>
+  <text x="80" y="152" font-size="15" class="on-color">從資料學出規則</text>
+  <rect x="110" y="172" width="380" height="194" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+  <text x="130" y="208" font-size="20" font-weight="900" class="on-color">深度學習</text>
+  <text x="130" y="232" font-size="15" class="on-color">多層網路自己找特徵</text>
+  <rect x="160" y="252" width="300" height="92" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+  <text x="180" y="290" font-size="20" font-weight="900" class="on-color">LLM</text>
+  <text x="180" y="318" font-size="15" class="on-color">在文字上預測下一個 token</text>
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '這張地圖|怎麼用', short: '起點', desc: '七卷各回答什麼問題，序章要帶你看懂整張地圖。', lessons: [
+    ['0-1', '為什麼|先看地圖'],
+  ]},
+  { id: 1, title: 'AI、ML、DL、LLM：|一組俄羅斯套娃', short: '套娃', desc: '人工智慧、機器學習、深度學習、大型語言模型一層包一層；每一層是什麼、什麼時候出現。', lessons: [
+    ['1-1', 'AI：|最外層的娃娃'],
+    ['1-2', '機器學習：|從資料學出規則'],
+    ['1-3', '深度學習：|多層網路自己找特徵'],
+    ['1-4', 'LLM：|會接話的深度學習'],
+    ['1-5', '七十年|時間軸'],
+  ]},
+  { id: 2, title: '從按下送出|到出現回答', short: '旅程', desc: '一個問題經過的六站：你的電腦、後端、API、tokenizer、GPU 上的模型、回到螢幕。', lessons: [
+    ['2-1', '全程鳥瞰：|一個問題經過的六站'],
+    ['2-2', '文字|變 token'],
+    ['2-3', 'GPU 上的|一次計算'],
+    ['2-4', '一個字|一個字長出來'],
+    ['2-5', '回到螢幕：|時間與錢花在哪'],
+  ]},
+  { id: 3, title: '學習|地圖', short: '地圖', desc: 'L1 會用、L2 會做、L3 會推導；七卷各在哪一層，你該走哪條路線。', lessons: [
+    ['3-1', '三種「懂」：|L1、L2、L3'],
+    ['3-2', '七卷地圖：|每卷教什麼、到哪一層'],
+    ['3-3', '選一條路線|＋總複習'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

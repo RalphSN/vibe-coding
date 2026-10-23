@@ -1,0 +1,128 @@
+<script>
+/* ==========================================================================
+   模組 0：這張地圖怎麼用
+   ========================================================================== */
+defineTerms({
+  'AI 系列': { en: 'AI series', def: '七卷一套的課程：序章看地圖、第一部會用、第二到第五部懂原理到硬體、隨身卷補數學直覺。', example: '頂部列的「AI 系列」選單可以切換到其他卷。', lesson: '0-1' },
+  'L1／L2／L3': { en: 'depth levels', def: '本系列自訂的三種「懂」：L1 會用、L2 會做、L3 會推導。', example: '序章只講到 L1。', lesson: '3-1' },
+});
+
+const VOLUMES_SVG = `<svg viewBox="0 0 560 330" role="img" aria-label="七卷地圖：序章在最上面看全景；第一部應用工程教怎麼用；第二部大型語言模型原理、第三部機器學習基礎、第四部深度學習、第五部硬體與運算往下挖；隨身卷數學直覺在旁邊支援每一卷">
+  <rect x="10" y="10" width="400" height="44" style="fill:var(--primary)" class="stroke-ink" stroke-width="4"/>
+  <text x="26" y="38" font-size="15" font-weight="900" class="on-color">序章　AI 全景地圖：先看整張地圖（你在這裡）</text>
+  <rect x="10" y="66" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="94" font-size="15"><tspan font-weight="900">第一部</tspan>　應用工程：把模型接進程式</text>
+  <rect x="10" y="122" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="150" font-size="15"><tspan font-weight="900">第二部</tspan>　LLM 原理：模型裡面在做什麼</text>
+  <rect x="10" y="178" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="206" font-size="15"><tspan font-weight="900">第三部</tspan>　機器學習：什麼叫「學習」</text>
+  <rect x="10" y="234" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="262" font-size="15"><tspan font-weight="900">第四部</tspan>　深度學習：神經網路怎麼訓練</text>
+  <rect x="10" y="276" width="400" height="44" class="fill-surface stroke-ink" stroke-width="3"/>
+  <text x="26" y="304" font-size="15"><tspan font-weight="900">第五部</tspan>　硬體：為什麼要 GPU、記憶體</text>
+  <rect x="430" y="66" width="120" height="254" class="fill-bg stroke-ink" stroke-width="3" stroke-dasharray="8 6"/>
+  <text x="490" y="176" text-anchor="middle" font-size="15" font-weight="900">隨身卷</text>
+  <text x="490" y="202" text-anchor="middle" font-size="14">數學直覺</text>
+  <text x="490" y="226" text-anchor="middle" font-size="13">每一卷都用</text>
+</svg>`;
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出 AI 系列七卷各回答什麼問題',
+      '知道序章只講到「知道是什麼」，細節在其他卷',
+      '把自己心裡的一個 AI 問題，放到對的那一卷',
+    ],
+    analogy: {
+      text: ['到一座陌生城市，先看捷運路線圖：哪幾條線、在哪裡轉乘、你要去的地方在哪一站。路線圖不告訴你每一站外面有什麼店，但它讓你不會搭錯車。', '序章就是 [[AI 系列]]的路線圖：先知道全貌，再決定要在哪幾站下車、逛多久。'],
+      limit: ['路線圖畫得很整齊，真實城市卻很亂；AI 的各個領域也不是切得那麼乾淨，常常互相重疊。另外路線圖不會變，AI 每幾個月就有新東西：序章講的是比較不會變的骨架，會變的細節（模型名稱、價格）都標了查證日期。'],
+    },
+    model: {
+      svg: VOLUMES_SVG,
+      caption: '序章在最上面：先看全景，再往下挖。隨身卷不是最後才讀，是卡在數學時隨時翻。',
+    },
+    define: [
+      { term: 'AI 系列', en: 'AI series', def: '七卷：序章、第一到第五部、隨身卷。', example: '頂部列「AI 系列」選單。' },
+      { term: '全景地圖', en: 'big picture', def: '只講每個東西是什麼、彼此什麼關係，不講細節。', example: '「LLM 是深度學習的一種」。' },
+      { term: '深度', en: 'depth', def: '對一個主題懂到什麼程度：會用、會做、還是會推導（3-1）。', example: '同樣是 token，可以只會算錢，也可以會自己寫 tokenizer。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'v1', label: '第一部 應用' }, { id: 'v2', label: '第二部 LLM 原理' }, { id: 'v3', label: '第三部 機器學習' }, { id: 'v4', label: '第四部 深度學習' }, { id: 'v5', label: '第五部 硬體' }], items: [
+          { text: '「我要怎麼把 Claude 接進公司的客服系統？」', answer: 'v1', why: '把模型接進程式，是第一部的主題。' },
+          { text: '「為什麼模型會一本正經地說錯話？」', answer: 'v2', why: '幻覺的成因在第二部的推論與訓練章節。' },
+          { text: '「訓練模型時說的『損失』是什麼？」', answer: 'v3', why: '資料、模型、損失函數是第三部第一課。' },
+          { text: '「反向傳播到底怎麼算出每個參數要改多少？」', answer: 'v4', why: '第四部會手寫一個迷你自動微分。' },
+          { text: '「為什麼跑一個大模型要那麼多張 GPU？」', answer: 'v5', why: '記憶體與頻寬瓶頸是第五部的主題。' },
+        ] } },
+        { type: 'table', head: ['卷', '回答的問題', '適合誰先讀'], rows: [
+          ['序章', 'AI 是什麼？一個請求怎麼變成回答？我該學多深？', '所有人'],
+          ['第一部', '怎麼把模型接進自己的程式？', '要做產品、寫程式的人'],
+          ['第二部', 'LLM 裡面在做什麼？', '想懂原理的人'],
+          ['第三部', '機器怎麼從資料學習？', '想打基礎的人'],
+          ['第四部', '神經網路怎麼訓練？', '想自己訓練模型的人'],
+          ['第五部', '為什麼需要 GPU？台灣在哪裡？', '對硬體與產業有興趣的人'],
+          ['隨身卷', '向量、矩陣、梯度、機率的直覺', '讀到數學卡住的人'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="建議的讀法：先讀序章；想做產品走第一部；想懂原理走第二部再往第三、四部；想懂硬體走第五部；數學卡住隨時翻隨身卷">
+          <rect x="10" y="80" width="110" height="50" style="fill:var(--primary)" class="stroke-ink" stroke-width="3"/>
+          <text x="65" y="111" text-anchor="middle" font-size="15" font-weight="900" class="on-color">序章</text>
+          <line x1="120" y1="105" x2="160" y2="40" class="stroke-ink" stroke-width="3"/>
+          <line x1="120" y1="105" x2="160" y2="105" class="stroke-ink" stroke-width="3"/>
+          <line x1="120" y1="105" x2="160" y2="170" class="stroke-ink" stroke-width="3"/>
+          <rect x="160" y="16" width="160" height="48" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="240" y="46" text-anchor="middle" font-size="14">做產品 → 第一部</text>
+          <rect x="160" y="81" width="390" height="48" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="355" y="111" text-anchor="middle" font-size="14">懂原理 → 第二部 → 第三部 → 第四部</text>
+          <rect x="160" y="146" width="160" height="48" class="fill-surface stroke-ink" stroke-width="3"/>
+          <text x="240" y="176" text-anchor="middle" font-size="14">懂硬體 → 第五部</text>
+          <rect x="340" y="146" width="210" height="48" class="fill-bg stroke-ink" stroke-width="3" stroke-dasharray="8 6"/>
+          <text x="445" y="176" text-anchor="middle" font-size="14">數學卡住 → 隨身卷</text>
+        </svg>`, caption: '3-3 會依你的目標給一條完整路線。' },
+        { type: 'table', head: ['模組', '內容', '大約時間'], rows: [
+          ['0', '這張地圖怎麼用（這一課）', '7 分鐘'],
+          ['1', 'AI、機器學習、深度學習、LLM 一層包一層；七十年時間軸', '35 分鐘'],
+          ['2', '從按下送出到出現回答的六站，時間與錢花在哪', '35 分鐘'],
+          ['3', '三種「懂」、七卷地圖、選路線＋10 題總複習', '25 分鐘'],
+        ], caption: '加起來不到兩小時；一天讀一個模組，四天讀完。' },
+        { type: 'callout', variant: 'tip', title: '每一課都長一樣', body: ['先看「學完你能做到的 3 件事」與暖身回顧，再依序是比喻、心智模型圖、正式定義、範例與互動、常見錯誤、練習、三個重點。', '結構固定，是為了讓你不用每次重新找重點在哪：趕時間時，只讀心智模型圖和三個重點，也能抓到這一課的骨架。練習的答案都先藏起來，想過再展開。'] },
+      ],
+      tryit: {
+        q: ['寫下你現在最想搞懂的一個 AI 問題，猜猜它在哪一卷，讀完序章再回來看猜得對不對：'],
+        draft: '我的問題：＿＿＿＿\n我猜在：＿＿',
+        answer: ['沒有標準答案。讀完 3-2 的七卷地圖後回來對照；如果一個問題橫跨好幾卷（例如「為什麼 AI 回答很慢」跨第一、二、五部），代表它剛好是序章模組 2 在講的事。'],
+      },
+    },
+    mistakes: [
+      { wrong: '一開始就從最難的第四部讀起，想「一次學到底」。', why: '沒有地圖，很容易迷失在細節裡，不知道學的東西用在哪裡。', right: '先讀序章，再依目標選路線（3-3）。' },
+      { wrong: '以為七卷一定要照順序讀完。', why: '每卷都可以單獨讀；不同目標需要的卷不同。', right: '照路線讀，數學卡住才翻隨身卷。' },
+      { wrong: '把序章當成懂了整個 AI。', why: '序章只講到 L1：知道是什麼、彼此的關係。', right: '序章讓你知道自己不懂什麼、去哪裡學（從「不知道不知道」到「知道不知道」）。' },
+    ],
+    practice: [
+      { level: '回想', type: 'mc', q: '序章的定位是什麼？', options: [
+        { text: '全景地圖：知道每個東西是什麼、彼此的關係', correct: true, why: '細節都在其他卷。' },
+        { text: '從頭推導 Transformer 的數學', why: '那是第二部與隨身卷。' },
+        { text: '教你寫出第一個 AI 應用的程式', why: '那是第一部。' },
+        { text: '介紹每一家 AI 公司的最新產品', why: '產品變得太快，不是序章的重點。' },
+      ] },
+      { level: '應用', type: 'mc', q: '同事問：「為什麼大模型推論那麼吃記憶體？」最適合推薦他讀哪一卷？', options: [
+        { text: '第五部 硬體與運算', correct: true, why: 'VRAM 與頻寬瓶頸是第五部的主題。' },
+        { text: '第一部 應用工程', why: '第一部講怎麼用 API，不講硬體。' },
+        { text: '第三部 機器學習基礎', why: '第三部講學習的概念，不講記憶體。' },
+        { text: '隨身卷 數學直覺', why: '數學可以幫忙，但問題本身是硬體。' },
+      ] },
+      { level: '遷移', type: 'reveal', q: ['你是產品經理，要和工程師討論「我們的 AI 功能為什麼又慢又貴」。用這一課的地圖，說說你會先讀哪些部分。'], answer: [
+        '先讀序章模組 2（一個請求的旅程）：知道時間與錢花在哪幾站。',
+        '再讀第一部的 1-5（計費）、8-2（成本）、8-3（延遲）：知道有哪些可以調的槓桿。需要更深入時才看第五部的硬體。',
+      ] },
+    ],
+    keypoints: [
+      '序章是路線圖：先看全貌，再決定去哪幾站、逛多久。',
+      '七卷各回答一類問題；不必照順序讀完。',
+      '序章只到 L1：讓你知道自己不懂什麼、去哪裡學。',
+    ],
+    sources: ['dartmouth-proposal', 'transformer'],
+  },
+});
+</script>
+
