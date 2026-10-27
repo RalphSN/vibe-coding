@@ -1727,6 +1727,18 @@ function wrapPhrases(ctx, phrases, maxWidth) {
   return lines;
 }
 
+/**
+ * 書名字級：最長的詞組放不下 maxWidth 時等比縮小（下限是原字級的 60%），並設定好 ctx.font。
+ * wrapPhrases 不拆詞組，所以一個詞組太長會直接超出封面（2026-10 實際發生）。
+ */
+function fitTitleFont(ctx, phrases, maxWidth, size, weight, family) {
+  ctx.font = `${weight} ${size}px ${family}`;
+  const widest = Math.max(...phrases.map((p) => ctx.measureText(p).width));
+  const fitted = widest > maxWidth ? Math.max(size * 0.6, size * (maxWidth / widest)) : size;
+  ctx.font = `${weight} ${fitted}px ${family}`;
+  return fitted;
+}
+
 /** 中文可以在任何字之間換行，英文單字不拆 */
 function wrapText(ctx, text, maxWidth) {
   const tokens = text.match(/[A-Za-z0-9.\-]+|\s+|./gu) || [];
@@ -1902,9 +1914,9 @@ function paintLeafFront(canvas, site) {
   drawOrnament(ctx, W / 2, m + 48 * u, 60 * u, u, 'rgba(42, 33, 24, 0.45)');
 
   ctx.fillStyle = INK;
-  ctx.font = `700 ${21 * u}px ${SERIF}`;
+  const leafSize = fitTitleFont(ctx, text.titlePhrases, W - 80 * u, 21 * u, 700, SERIF);
   const lines = wrapPhrases(ctx, text.titlePhrases, W - 80 * u);
-  const lineH = 31 * u;
+  const lineH = leafSize * (31 / 21);
   const top = H * 0.42 - ((lines.length - 1) * lineH) / 2;
   lines.forEach((line, i) => ctx.fillText(line, W / 2, top + i * lineH));
   drawOrnament(ctx, W / 2, top + lines.length * lineH - 4 * u, 120 * u, u, hexAlpha(site.color, 0.85));
@@ -1990,9 +2002,9 @@ function paintRightPage(canvas, site, progress) {
   ctx.font = `600 ${10 * u}px ${SERIF}`;
   fillSpaced(ctx, t('chapter'), cx, pad + 42 * u, 5 * u);
   ctx.fillStyle = INK;
-  ctx.font = `700 ${18 * u}px ${SERIF}`;
+  const pageSize = fitTitleFont(ctx, text.titlePhrases, W - pad * 2, 18 * u, 700, SERIF);
   let y = pad + 70 * u;
-  wrapPhrases(ctx, text.titlePhrases, W - pad * 2).forEach((line) => { ctx.fillText(line, cx, y); y += 26 * u; });
+  wrapPhrases(ctx, text.titlePhrases, W - pad * 2).forEach((line) => { ctx.fillText(line, cx, y); y += pageSize * (26 / 18); });
   drawOrnament(ctx, cx, y - 6 * u, 90 * u, u, 'rgba(42, 33, 24, 0.45)');
   y += 22 * u;
 
@@ -2118,10 +2130,9 @@ function paintCover(canvas, site, mode) {
   ctx.fillText(site.external ? 'YouTube' : `${site.lessons} ${t('lessonUnit')}`, W - inset - 18 * u, inset + 38 * u);
 
   // 書名：按詞組換行，靠左下
-  const titleSize = 30 * u;
-  ctx.font = `700 ${titleSize}px ${FONT}`;
   ctx.textAlign = 'left';
   const maxWidth = W - padX - inset - 18 * u;
+  const titleSize = fitTitleFont(ctx, siteText(site).titlePhrases, maxWidth, 30 * u, 700, FONT);
   const lines = wrapPhrases(ctx, siteText(site).titlePhrases, maxWidth);
   const lineH = titleSize * 1.25;
   const bottom = H - inset - 46 * u;

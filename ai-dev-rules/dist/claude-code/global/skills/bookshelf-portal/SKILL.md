@@ -41,11 +41,11 @@ description: 建立或更新「擬真書櫃」風格的個人入口網站（預�
   icon: 'layers',                     // ICONS 裡的鍵；新增圖示用 24×24、stroke 1.4–1.6 的 SVG
   href: 'course-web/xxx/index.html',  // 相對路徑，寫到 index.html
   spineTitle: 'Claude Code 安全開發',  // 書背直排用，12 個全形字以內
-  titlePhrases: ['Claude Code', '× 安全開發', '實戰課'], // 封面與說明欄，按詞組切，換行只發生在詞組之間
+  titlePhrases: ['Claude Code', '× 安全開發', '實戰課'], // 封面與說明欄，按詞組切，換行只發生在詞組之間；每個詞組中文 ≤ 7 字、英文 ≤ 14 字元
   desc: '一句話簡介。',
   modules: 9, lessons: 29, readyLessons: 29, // readyLessons < lessons 時書背顯示 25/50 並標「製作中」
   updated: '2026-10',
-  height: 0.92,                       // 書高，相對書櫃高度 0.85–1；相鄰兩本不要一樣高
+  height: 0.92,                       // 書高，相對書櫃高度 0.85–1；同一系列一律同高，不同書相鄰時不要一樣高
   progressKey: 'claude-secure-dev-course.v1',
 }
 ```
@@ -61,6 +61,7 @@ description: 建立或更新「擬真書櫃」風格的個人入口網站（預�
 5. **攤開要對稱**：左頁（扉頁背面）與右頁的紙範圍完全一樣，四周露出同寬的布邊；扉頁翻到正好 -180° 並墊高到封面之上。
 6. **可略過、可退回**：動畫中點一下直接跳轉；Ctrl／Cmd／中鍵點擊交給瀏覽器開新分頁；`prefers-reduced-motion` 時直接跳轉；從子網站按返回（bfcache）要收掉動畫並更新進度。
 7. **書名不能被截斷**：`fitSpineTitles()` 依標籤高度等比縮小字級（下限 11px），3D 書脊沿用同一字級。書名標籤 `.spine-label` 一定寫 `width: max-content`：裡面的直排書名和標籤方向不同，Safari 自動算寬時不計直排內容，標籤只剩內距寬，書名被整個裁掉（2026-10 在 Safari 27 實際發生，Chrome 正常）。
+   封面、扉頁、右頁的書名不准超出版面：3D 版用 `fitTitleFont()`，最長的詞組放不下就等比縮小（下限 60%）。詞組本身也要短（見 SITES 欄位），縮小只是保險；加書後用同字體量一次每個詞組的寬度（2026-10 有 24 個詞組超出封面）。
 8. **3D 書的各面不疊明暗遮罩**：Safari 的 `backface-visibility: hidden` 只藏住朝後的那一面本身，上面的 `.shade` 遮罩照樣畫出來，翻到背面時閃黑一下（2026-10 實際發生，改 `background-color`、切換 `visibility` 都沒有穩定解決，拿掉遮罩才不閃）。有延遲的動畫用 `fill: 'both'`。
 9. **Chrome 與 Safari 都要實測**：兩邊都看過才算完成；改一邊的寫法時要確認另一邊沒壞。Playwright 的 WebKit 不等於 Safari，書名消失這個問題它量不出來。流程見 [verification.md](references/verification.md) 第 5 節。
 10. **風格基準**：Apple 系統字體與色票（淺色底 `#f5f5f7`、深色底 `#000`、焦點藍 `#0071e3`／`#2997ff`），遵守 impeccable 的 craft floor：不用漸層文字、不用 eyebrow 小標、不用 emoji 當圖示、對比 ≥ 4.5:1。等寬字只用在路徑、數字、統計這類真的是資料的地方。

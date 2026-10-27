@@ -4,8 +4,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `bookshelf-portal`：同一系列的書在書櫃上用同一高度；`titlePhrases` 每個詞組限制長度（中文 ≤ 7 字、英文 ≤ 14 字元）。
+
 ### Fixed
 
+- `bookshelf-portal` 3D 範本：書名詞組太長時超出封面、扉頁與右頁。新增 `fitTitleFont()`，放不下就等比縮小（下限 60%）。
 - `bookshelf-portal` 3D 範本：載入動畫剛開瀏覽器時像破圖。第 2–4 頁有延遲卻沒有 `animation-fill-mode`，延遲期間沒墊高、陷進書頁塊；改成 `both`，並在瀏覽器畫出兩格前先停在第一格。
 - `bookshelf-portal` 3D 範本：載入動畫在 3D 書櫃準備時卡住約 1 秒。第一次 render 一次上傳上百張貼圖並同步編譯 shader；改成載入動畫還在時先分段上傳貼圖（每段 10ms）、`compileAsync` 背景編譯、畫好第一格才收掉載入動畫，`warmUp` 完成前不畫 3D。
 
