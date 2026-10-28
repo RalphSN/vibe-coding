@@ -1,0 +1,2316 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>房間 Blockout</title>
+<style>
+  :root {
+    --accent: #1fb6d5;
+    --accent-ink: #062a33;
+    --confirm: #34c759;
+    --confirm-ink: #04310f;
+    --glass: rgba(28, 28, 30, 0.86);
+    --glass-hover: rgba(255, 255, 255, 0.14);
+    --ink: #1d1d1f;
+    --ok: #2e7d32;
+    --bad: #c62828;
+    --warn: #8a5a00;
+    --warn-bg: #ffcc00;
+    --z-overlay: 1100;   /* 要蓋過 lil-gui 面板（z-index 1001） */
+  }
+  #actionbar, #hint, #readout { z-index: var(--z-overlay); }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #eef0f2; font-family: system-ui, "Noto Sans TC", sans-serif; }
+  canvas { display: block; touch-action: none; }
+
+  #hud {
+    position: fixed; left: 12px; bottom: 12px;
+    max-width: min(360px, calc(100vw - 24px));
+    padding: 10px 12px; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.9); color: #222;
+    font-size: 13px; line-height: 1.5; pointer-events: none;
+  }
+  #hud h1 { font-size: 14px; margin: 0 0 4px; }
+  #hud ul { margin: 0; padding-left: 18px; }
+  #status { margin-top: 6px; font-weight: 600; }
+  #status.ok { color: var(--ok); }
+  #status.bad { color: var(--bad); }
+  #status.warn { color: var(--warn); }
+
+  /* 選取後跟著家具的浮動選單（參考模擬類遊戲的物件選單） */
+  #actionbar {
+    position: fixed; left: 0; top: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.16s ease;
+  }
+  #actionbar.visible { opacity: 1; pointer-events: auto; }
+  .bar, .size-panel {
+    background: var(--glass); color: #fff;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+  .bar { display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 999px; }
+  .bar .name { padding: 0 10px 0 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .icon-btn {
+    position: relative; display: grid; place-items: center;
+    width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: #fff; cursor: pointer;
+    transition: background-color 0.12s ease;
+  }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn:hover { background: var(--glass-hover); }
+  .icon-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .icon-btn.confirm { background: var(--confirm); color: var(--confirm-ink); }
+  .icon-btn.confirm:hover { background: #2fb350; }
+  .icon-btn::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 10px); left: 50%;
+    padding: 4px 8px; border-radius: 6px;
+    background: var(--ink); color: #fff; font-size: 12px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transform: translate(-50%, 4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+  .icon-btn:hover::after, .icon-btn:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+
+  .angle { display: flex; align-items: center; gap: 2px; padding: 0 2px; font-size: 13px; }
+  .angle input {
+    width: 48px; height: 32px; box-sizing: border-box; border: 0; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12); color: #fff;
+    font: 600 13px system-ui, sans-serif; text-align: center;
+    -moz-appearance: textfield;
+  }
+  .angle input::-webkit-inner-spin-button, .angle input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .angle input:hover { background: rgba(255, 255, 255, 0.24); }
+  .angle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .size-panel { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; font-size: 13px; }
+  .size-panel[hidden] { display: none; }
+  .size-row { display: grid; grid-template-columns: 20px 32px 76px 32px 14px; align-items: center; gap: 6px; }
+  .step-btn {
+    width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 18px; line-height: 1; cursor: pointer;
+    transition: background-color 0.12s ease;
+  }
+  .step-btn:hover { background: rgba(255, 255, 255, 0.24); }
+  .preset-row { display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 6px; }
+  .preset-row select {
+    height: 32px; padding: 0 8px; border: 0; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.95); color: var(--ink);
+    font: 600 13px system-ui, sans-serif;
+  }
+  .size-row input {
+    width: 100%; height: 32px; box-sizing: border-box; border: 0; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.95); color: var(--ink);
+    font: 600 13px system-ui, sans-serif; text-align: center;
+  }
+
+  #hint {
+    position: fixed; top: 12px; left: 50%;
+    padding: 6px 14px; border-radius: 999px;
+    background: var(--glass); color: #fff; font-size: 12px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transform: translate(-50%, -8px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+  }
+  #hint.visible { opacity: 1; transform: translate(-50%, 0); }
+  kbd { padding: 1px 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.18); font: 600 11px system-ui, sans-serif; }
+
+  #readout {
+    position: fixed; left: 0; top: 0; padding: 4px 8px; border-radius: 6px;
+    background: var(--ink); color: #fff; font: 600 12px/1.3 system-ui, sans-serif;
+    white-space: nowrap; pointer-events: none; opacity: 0;
+  }
+  #readout.visible { opacity: 1; }
+  #readout.bad { background: var(--bad); }
+  #readout.warn { background: var(--warn-bg); color: var(--ink); }
+
+  .icon-btn:focus-visible, .step-btn:focus-visible, .size-row input:focus-visible, .preset-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* 第一人稱的操作提示：不擋滑鼠，開始移動或拖曳就收掉 */
+  #fp-hint {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: rgba(0, 0, 0, 0.25); color: #fff; pointer-events: none;
+  }
+  #fp-hint .card {
+    padding: 16px 20px; border-radius: 14px; background: var(--glass);
+    font-size: 14px; line-height: 1.7; text-align: center;
+  }
+  #fp-hint .card b { display: block; font-size: 16px; margin-bottom: 4px; }
+  #fp-hint[hidden], #hud [hidden] { display: none; }
+  @media (max-width: 767px) { #hint { display: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    #actionbar, #hint, .icon-btn, .icon-btn::after, .step-btn { transition: none; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hud">
+  <h1>房間 Blockout</h1>
+  <ul data-view="orbit">
+    <li><b>Tab</b> 切換到第一人稱</li>
+    <li>點一下家具選取，拖曳移動（靠近牆或其他家具會自動貼齊；放不下會移到最近的空位）</li>
+    <li>拖家具角落的旋轉鈕自由轉（1°，靠近 45° 倍數會吸附；按住 Shift 每 15°）</li>
+    <li>浮動選單：轉 90°、輸入角度、調整尺寸、完成</li>
+    <li>快捷鍵：<b>R</b>／<b>.</b> 順轉 90°、<b>,</b> 逆轉 90°、<b>Q</b>／<b>E</b> 轉 15°（加 Shift 1°）、<b>S</b> 尺寸、方向鍵微移、<b>Esc</b> 完成</li>
+    <li>尺寸面板可選標準規格；每種家具有合理的尺寸範圍，超過會停在上下限</li>
+    <li>紅色區域不能放（門口、窗前）；黃色是建議留的活動空間，被擋到只提醒</li>
+    <li>空白處拖曳環繞、滾輪縮放、右鍵平移</li>
+  </ul>
+  <ul data-view="firstPerson" hidden>
+    <li><b>W</b>／<b>S</b>（↑／↓）前進後退、<b>A</b>／<b>D</b>（←／→）轉身、<b>Q</b>／<b>E</b> 平移、<b>空白鍵</b> 跳</li>
+    <li>拖曳轉視角；第三人稱時左鍵只轉鏡頭（可看角色正面，放開後一移動就轉回背後），右鍵連角色一起轉</li>
+    <li>按住右鍵時 A／D 改成平移，左右鍵一起按往前走</li>
+    <li><b>滾輪</b> 往後拉成第三人稱、往前推回第一人稱；往前走時鏡頭會回到預設距離與角度（右邊設定可改）</li>
+    <li>可以從房門走出去；牆和家具會擋住</li>
+    <li><b>Tab</b> 回環繞檢視</li>
+  </ul>
+  <div id="status"></div>
+</div>
+
+<div id="hint" aria-hidden="true">拖曳移動 · 拖角落鈕旋轉 · <kbd>Q</kbd><kbd>E</kbd> 微調角度 · <kbd>S</kbd> 尺寸 · <kbd>Esc</kbd> 完成</div>
+
+<!-- 圖示路徑取自 Feather Icons（MIT） -->
+<div id="actionbar" role="toolbar" aria-label="家具編輯" inert>
+  <div class="bar">
+    <span class="name"></span>
+    <button type="button" class="icon-btn" data-action="rotate-ccw" aria-label="逆時針轉 90°" data-tip="逆轉 90°（,）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    </button>
+    <label class="angle">
+      <input type="number" step="1" aria-label="旋轉角度（度，逆時針）">
+      <span aria-hidden="true">°</span>
+    </label>
+    <button type="button" class="icon-btn" data-action="rotate-cw" aria-label="順時針轉 90°" data-tip="順轉 90°（R）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
+    <button type="button" class="icon-btn" data-action="size" aria-label="調整尺寸" aria-pressed="false" data-tip="尺寸（S）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </button>
+    <button type="button" class="icon-btn confirm" data-action="done" aria-label="完成" data-tip="完成（Esc）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+    </button>
+  </div>
+  <div class="size-panel" hidden>
+    <label class="preset-row">
+      <span>規格</span>
+      <select aria-label="標準規格"></select>
+    </label>
+    <div class="size-row" data-prop="width">
+      <span>寬</span>
+      <button type="button" class="step-btn" data-step="-1" aria-label="寬度減少">−</button>
+      <input type="number" step="0.01" aria-label="寬度（公尺）">
+      <button type="button" class="step-btn" data-step="1" aria-label="寬度增加">+</button>
+      <span>m</span>
+    </div>
+    <div class="size-row" data-prop="depth">
+      <span>深</span>
+      <button type="button" class="step-btn" data-step="-1" aria-label="深度減少">−</button>
+      <input type="number" step="0.01" aria-label="深度（公尺）">
+      <button type="button" class="step-btn" data-step="1" aria-label="深度增加">+</button>
+      <span>m</span>
+    </div>
+    <div class="size-row" data-prop="height">
+      <span>高</span>
+      <button type="button" class="step-btn" data-step="-1" aria-label="高度減少">−</button>
+      <input type="number" step="0.01" aria-label="高度（公尺）">
+      <button type="button" class="step-btn" data-step="1" aria-label="高度增加">+</button>
+      <span>m</span>
+    </div>
+  </div>
+</div>
+
+<div id="readout"></div>
+<div id="fp-hint" hidden>
+  <div class="card"><b>第一人稱</b>W／S 前進後退 · A／D 轉身 · Q／E 平移 · 空白鍵跳<br>拖曳畫面轉視角 · 滾輪切第三人稱 · Tab 回環繞檢視</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import GUI from 'lil-gui';
+
+// ================= 1. 設定（單位：公尺、角度） =================
+// 座標：原點在房間地板中心；+X 東、-Z 北、+Y 上。
+// 家具的 x / z 是佔地中心；width 沿家具自身 X，depth 沿自身 Z（rotation 0 時背面朝北）。
+// rotation 是從上往下看的逆時針角度（整數度，0–359）。type 決定外型與顏色，同一種家具可以有好幾件。
+const config = {
+  room: { width: 8, depth: 7, height: 2.8, wallThickness: 0.1 },
+  openings: {
+    northWindow: { offset: 0, width: 1.2, height: 1.2, sill: 0.9 },   // offset：+往東
+    eastWindow:  { offset: 0, width: 1.2, height: 1.2, sill: 0.9 },   // offset：+往南
+    door:        { offset: 1.8, width: 0.9, height: 2.1 },            // offset：+往東
+  },
+  outsideFloor: { width: 2, depth: 1.5 },   // 房門外的一小塊地板，置中對齊房門
+  player: { eyeHeight: 1.6, speed: 1.5, turnSpeed: 180 },   // 第一人稱：眼睛離地高度（m）、走路速度（m/s）、A／D 轉身速度（度/秒）
+  // 第三人稱預設視角：往前走、滑鼠沒抓著畫面時會平滑回到這裡。
+  // distance 鏡頭離頭多遠（m）；pitch 俯仰角（度，負的是往下看）；height 鏡頭支點比眼睛高多少（m；中心視線要低於 2.1 m 的門楣，過門才不會被硬性拉近）。
+  thirdPerson: { distance: 3.5, pitch: -15, height: 0.4 },
+  furniture: {
+    bed:       { type: 'bed',      label: '床',     x: -3.09, z: -2.56, rotation: 0,   width: 1.82, depth: 1.88, height: 0.45 },
+    desk:      { type: 'desk',     label: '書桌',   x: 0,     z: -3.2,  rotation: 0,   width: 1.2,  depth: 0.6,  height: 0.75 },
+    chair:     { type: 'chair',    label: '椅子',   x: 0,     z: -2.6,  rotation: 180, width: 0.45, depth: 0.45, height: 0.85 },
+    bookcase:  { type: 'bookcase', label: '書櫃 1', x: 3.85,  z: -1.2,  rotation: 270, width: 0.8,  depth: 0.3,  height: 1.8 },
+    bookcase2: { type: 'bookcase', label: '書櫃 2', x: 3.85,  z: 1.2,   rotation: 270, width: 0.8,  depth: 0.3,  height: 1.8 },
+    wardrobe:  { type: 'wardrobe', label: '衣櫃',   x: -3.4,  z: 3.2,   rotation: 180, width: 1.2,  depth: 0.6,  height: 2.0 },
+  },
+  rules: { gridSnap: 0.05, edgeSnap: 0.12, sizeSnap: 0.01, windowClearance: 0.3 },
+};
+
+const ROTATION_STEP = 90;
+const FLOOR_THICKNESS = 0.05;
+const PREVIEW_LIFT = 0.004;
+const EPSILON = 1e-3;
+const BED_HEADBOARD = { minHeight: 0.9, aboveMattress: 0.3, thickness: 0.06 };   // 床頭板至少高出床墊 aboveMattress
+const DESK_PARTS = { topThickness: 0.04, legSize: 0.05, legInset: 0.03 };
+const BOOKCASE_PARTS = { board: 0.02, shelfSpacing: 0.35 };
+const CHAIR_PARTS = { seatHeight: 0.45, seatThickness: 0.04, legSize: 0.04, backThickness: 0.04 };
+const SIZE_NAMES = { width: '寬', depth: '深', height: '高' };
+const SIZE_PROPS = Object.keys(SIZE_NAMES);
+
+// 每種家具的尺寸規則，數值是室內設計常用範圍（未逐條查證出處）。
+// limits：每個尺寸能調的範圍；presets：標準規格（床用台灣尺數，1 尺約 30.3 cm）；
+// clearance：建議留的活動空間，不夠只提醒、不擋放置。side 用家具自身座標：front 是 +Z、left 是 -X；
+// need 'any' 表示列出的幾側有一側夠就好（例如靠牆的床只要一側有走道）；ignoreTypes 是可以放在裡面的家具。
+const FURNITURE_SPECS = {
+  bed: {
+    limits: { width: [0.9, 2.0], depth: [1.88, 2.2], height: [0.25, 0.65] },
+    presets: [
+      { name: '單人 3×6.2 尺', width: 0.91, depth: 1.88, height: 0.45 },
+      { name: '單人加大 3.5×6.2 尺', width: 1.06, depth: 1.88, height: 0.45 },
+      { name: '雙人 5×6.2 尺', width: 1.52, depth: 1.88, height: 0.45 },
+      { name: '雙人加大 6×6.2 尺', width: 1.82, depth: 1.88, height: 0.45 },
+      { name: '特大 6×7 尺', width: 1.82, depth: 2.12, height: 0.45 },
+    ],
+    clearance: [{ sides: ['left', 'right'], need: 'any', depth: 0.6, name: '上下床走道' }],
+  },
+  desk: {
+    limits: { width: [0.8, 2.0], depth: [0.45, 0.8], height: [0.68, 0.8] },
+    presets: [
+      { name: '小書桌 100×50', width: 1.0, depth: 0.5, height: 0.75 },
+      { name: '標準 120×60', width: 1.2, depth: 0.6, height: 0.75 },
+      { name: '寬桌 140×70', width: 1.4, depth: 0.7, height: 0.75 },
+      { name: '工作桌 160×80', width: 1.6, depth: 0.8, height: 0.75 },
+    ],
+    clearance: [{ sides: ['front'], depth: 0.9, name: '拉椅空間', ignoreTypes: ['chair'] }],
+  },
+  // 椅子高度是椅背頂；座高固定 CHAIR_PARTS.seatHeight，下限要留得出椅背。
+  chair: {
+    limits: { width: [0.4, 0.7], depth: [0.4, 0.7], height: [0.75, 1.25] },
+    presets: [
+      { name: '餐椅型 45×45', width: 0.45, depth: 0.45, height: 0.85 },
+      { name: '辦公椅 60×60', width: 0.6, depth: 0.6, height: 1.1 },
+    ],
+    clearance: [],
+  },
+  bookcase: {
+    limits: { width: [0.4, 1.2], depth: [0.24, 0.45], height: [0.6, 2.4] },
+    presets: [
+      { name: '窄櫃 40×30×180', width: 0.4, depth: 0.3, height: 1.8 },
+      { name: '標準 80×30×180', width: 0.8, depth: 0.3, height: 1.8 },
+      { name: '矮櫃 80×30×90', width: 0.8, depth: 0.3, height: 0.9 },
+      { name: '高櫃 80×30×220', width: 0.8, depth: 0.3, height: 2.2 },
+    ],
+    clearance: [{ sides: ['front'], depth: 0.6, name: '取物空間' }],
+  },
+  wardrobe: {
+    limits: { width: [0.5, 2.4], depth: [0.55, 0.65], height: [1.8, 2.4] },
+    presets: [
+      { name: '單門 60×60×200', width: 0.6, depth: 0.6, height: 2.0 },
+      { name: '雙門 120×60×200', width: 1.2, depth: 0.6, height: 2.0 },
+      { name: '三門 180×60×200', width: 1.8, depth: 0.6, height: 2.0 },
+      { name: '頂天 120×60×240', width: 1.2, depth: 0.6, height: 2.4 },
+    ],
+    clearance: [{ sides: ['front'], depth: 0.9, name: '開門空間' }],
+  },
+};
+
+// 椅子用書桌的深一階橘色，看得出是一組，又能和書桌分開。
+const COLORS = {
+  floor: 0xd8d8d8, wall: 0xc4c4c4, outsideFloor: 0xb4b4b4,
+  bed: 0x4f86e8, desk: 0xe8a33c, chair: 0xb8741c, bookcase: 0x47a65a, wardrobe: 0x9b62d1,
+  player: 0xff6f3c, playerFace: 0x3a2a20,
+};
+const FURNITURE_TYPES = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe'];
+const HIGHLIGHT_EMISSIVE = 0x2a2a2a;
+const ACCENT = 0x1fb6d5;
+const COLOR_OK = 0x34c759;
+const COLOR_BAD = 0xff3b30;
+
+const materials = Object.fromEntries(
+  Object.entries(COLORS).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]),
+);
+// 滑過或選取中的家具：同色加一點自發光，看起來「亮起來」。
+const litMaterials = Object.fromEntries(
+  FURNITURE_TYPES.map((type) => [type, new THREE.MeshLambertMaterial({ color: COLORS[type], emissive: HIGHLIGHT_EMISSIVE })]),
+);
+// 選取描邊：每個方塊外面套一個稍大、只畫背面的方塊（inverted hull），看起來像粗描邊。
+materials.outline = new THREE.MeshBasicMaterial({ color: ACCENT, side: THREE.BackSide });
+// 紅色＝硬規則（門窗淨空，不能放）；黃色＝建議的活動空間（擋到只提醒）。
+materials.keepClear = new THREE.MeshBasicMaterial({ color: COLOR_BAD, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+materials.clearance = new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.18, depthWrite: false });
+materials.clearanceWarn = new THREE.MeshBasicMaterial({ color: 0xffb300, transparent: true, opacity: 0.55, depthWrite: false });
+
+// ================= 2. 場景基礎 =================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xeef0f2);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
+camera.position.set(6, 13, 10);
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(3, 6, 2);
+scene.add(sun);
+
+// world 是之後第一人稱模式也會用到的共用狀態：colliders 給玩家碰撞用。
+const world = {
+  room: new THREE.Group(),
+  furniture: new THREE.Group(),
+  guides: new THREE.Group(),    // 常駐：地板格線、佔地格
+  overlay: new THREE.Group(),   // 拖曳中才有：門窗淨空區
+  editor: new THREE.Group(),    // 尺寸模式的控制點
+  colliders: [],
+};
+scene.add(world.room, world.furniture, world.guides, world.overlay, world.editor);
+
+// ================= 3. 建模（只用 Box） =================
+function addBox(parent, material, size, center) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+  mesh.position.set(...center);
+  parent.add(mesh);
+  return mesh;
+}
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const round3 = (value) => Number(value.toFixed(3));
+const snapTo = (value, step) => round3(Math.round(value / step) * step);
+const normalizeDeg = (deg) => ((Math.round(deg) % 360) + 360) % 360;
+
+// 牆面在局部座標沿 X 展開；開口切成「開口左右的整面牆段＋開口上下的牆段」，所以是真的洞。
+function buildWall(length, height, thickness, openings) {
+  const wall = new THREE.Group();
+  const half = length / 2;
+  const addPiece = (u0, u1, y0, y1) => {
+    if (u1 - u0 < EPSILON || y1 - y0 < EPSILON) return;
+    addBox(wall, materials.wall, [u1 - u0, y1 - y0, thickness], [(u0 + u1) / 2, (y0 + y1) / 2, 0]);
+  };
+  const holes = openings
+    .map((o) => ({
+      u0: clamp(o.offset - o.width / 2, -half, half),
+      u1: clamp(o.offset + o.width / 2, -half, half),
+      y0: clamp(o.bottom, 0, height),
+      y1: clamp(o.bottom + o.height, 0, height),
+    }))
+    .sort((a, b) => a.u0 - b.u0);
+
+  let cursor = -half;
+  for (const hole of holes) {
+    addPiece(cursor, hole.u0, 0, height);
+    addPiece(Math.max(cursor, hole.u0), hole.u1, 0, hole.y0);
+    addPiece(Math.max(cursor, hole.u0), hole.u1, hole.y1, height);
+    cursor = Math.max(cursor, hole.u1);
+  }
+  addPiece(cursor, half, 0, height);
+  return wall;
+}
+
+function buildRoom(cfg) {
+  const { width: W, depth: D, height: H, wallThickness: T } = cfg.room;
+  const { northWindow, eastWindow, door } = cfg.openings;
+  const room = new THREE.Group();
+  addBox(room, materials.floor, [W + 2 * T, FLOOR_THICKNESS, D + 2 * T], [0, -FLOOR_THICKNESS / 2, 0]);
+  const outside = cfg.outsideFloor;
+  addBox(room, materials.outsideFloor, [outside.width, FLOOR_THICKNESS, outside.depth],
+    [door.offset, -FLOOR_THICKNESS / 2, D / 2 + T + outside.depth / 2]);
+
+  const toHole = (o) => ({ offset: o.offset, width: o.width, height: o.height, bottom: o.sill ?? 0 });
+  // 南北牆含轉角（長 W+2T），東西牆夾在中間；牆都在室內尺寸外側，室內淨寬深維持設定值。
+  // 東西牆轉 -90°：局部 +X 對到世界 +Z，所以東窗 offset 是往南。
+  const walls = [
+    { length: W + 2 * T, holes: [toHole(northWindow)], x: 0, z: -(D + T) / 2, rotY: 0 },
+    { length: W + 2 * T, holes: [toHole(door)], x: 0, z: (D + T) / 2, rotY: 0 },
+    { length: D, holes: [toHole(eastWindow)], x: (W + T) / 2, z: 0, rotY: -Math.PI / 2 },
+    { length: D, holes: [], x: -(W + T) / 2, z: 0, rotY: -Math.PI / 2 },
+  ];
+  for (const spec of walls) {
+    const wall = buildWall(spec.length, H, T, spec.holes);
+    wall.position.set(spec.x, 0, spec.z);
+    wall.rotation.y = spec.rotY;
+    wall.userData.isWall = true;
+    room.add(wall);
+  }
+  return room;
+}
+
+// 每個建構函式在「家具局部座標」作圖：原點在佔地中心的地面，背面在 -Z。
+const furnitureBuilders = {
+  bed(group, { width, depth, height }, mat) {
+    addBox(group, mat, [width, height, depth], [0, height / 2, 0]);
+    const { thickness: ht } = BED_HEADBOARD;
+    const hh = Math.max(BED_HEADBOARD.minHeight, height + BED_HEADBOARD.aboveMattress);
+    addBox(group, mat, [width, hh, ht], [0, hh / 2, -depth / 2 + ht / 2]);
+  },
+  desk(group, { width, depth, height }, mat) {
+    const { topThickness, legSize, legInset } = DESK_PARTS;
+    addBox(group, mat, [width, topThickness, depth], [0, height - topThickness / 2, 0]);
+    const legHeight = height - topThickness;
+    const lx = width / 2 - legInset - legSize / 2;
+    const lz = depth / 2 - legInset - legSize / 2;
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      addBox(group, mat, [legSize, legHeight, legSize], [sx * lx, legHeight / 2, sz * lz]);
+    }
+  },
+  bookcase(group, { width, depth, height }, mat) {
+    const b = BOOKCASE_PARTS.board;
+    const innerWidth = width - 2 * b;
+    for (const side of [-1, 1]) addBox(group, mat, [b, height, depth], [side * (width / 2 - b / 2), height / 2, 0]);
+    addBox(group, mat, [innerWidth, b, depth], [0, b / 2, 0]);
+    addBox(group, mat, [innerWidth, b, depth], [0, height - b / 2, 0]);
+    addBox(group, mat, [innerWidth, height - 2 * b, b], [0, height / 2, -depth / 2 + b / 2]);
+    const shelfCount = Math.max(1, Math.round(height / BOOKCASE_PARTS.shelfSpacing) - 1);
+    for (let i = 1; i <= shelfCount; i++) {
+      addBox(group, mat, [innerWidth, b, depth - b], [0, (height * i) / (shelfCount + 1), b / 2]);
+    }
+  },
+  wardrobe(group, { width, depth, height }, mat) {
+    addBox(group, mat, [width, height, depth], [0, height / 2, 0]);
+  },
+  chair(group, { width, depth, height }, mat) {
+    const { seatThickness, legSize, backThickness } = CHAIR_PARTS;
+    const seatTop = Math.min(CHAIR_PARTS.seatHeight, height);
+    addBox(group, mat, [width, seatThickness, depth], [0, seatTop - seatThickness / 2, 0]);
+    const legHeight = seatTop - seatThickness;
+    const lx = width / 2 - legSize / 2;
+    const lz = depth / 2 - legSize / 2;
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      addBox(group, mat, [legSize, legHeight, legSize], [sx * lx, legHeight / 2, sz * lz]);
+    }
+    const backHeight = height - seatTop;
+    addBox(group, mat, [width, backHeight, backThickness], [0, seatTop + backHeight / 2, -depth / 2 + backThickness / 2]);
+  },
+};
+
+function buildFurnitureItem(key, item, material) {
+  const group = new THREE.Group();
+  furnitureBuilders[item.type](group, item, material);
+  group.position.set(item.x, 0, item.z);
+  group.rotation.y = THREE.MathUtils.degToRad(item.rotation);
+  group.userData.furnitureKey = key;
+  return group;
+}
+
+function addSelectionOutline(group) {
+  const t = OUTLINE_THICKNESS;
+  for (const mesh of group.children.filter((obj) => obj.isMesh)) {
+    const { width, height, depth } = mesh.geometry.parameters;
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(width + 2 * t, height + 2 * t, depth + 2 * t), materials.outline);
+    hull.position.copy(mesh.position);
+    hull.userData.isOutline = true;
+    group.add(hull);
+  }
+}
+
+function disposeChildren(group) {
+  group.traverse((obj) => obj.geometry?.dispose());
+  group.clear();
+}
+
+// 門外地板三邊的隱形圍欄：只給第一人稱碰撞用，走到地板邊緣就停住，不會走進虛空。
+function outsideFenceBoxes(cfg) {
+  const { depth: D, height: H, wallThickness: T } = cfg.room;
+  const { door } = cfg.openings;
+  const { width, depth } = cfg.outsideFloor;
+  const x0 = door.offset - width / 2;
+  const x1 = door.offset + width / 2;
+  const z0 = D / 2 + T;
+  const z1 = z0 + depth;
+  return [
+    new THREE.Box3(new THREE.Vector3(x0 - T, 0, z0), new THREE.Vector3(x0, H, z1 + T)),
+    new THREE.Box3(new THREE.Vector3(x1, 0, z0), new THREE.Vector3(x1 + T, H, z1 + T)),
+    new THREE.Box3(new THREE.Vector3(x0 - T, 0, z1), new THREE.Vector3(x1 + T, H, z1 + T)),
+  ];
+}
+
+// 碰撞用軸對齊外框（Box3）：斜放的家具外框會比實際大一點，blockout 階段夠用。
+function collectColliders() {
+  scene.updateMatrixWorld(true);
+  const boxes = outsideFenceBoxes(config);
+  world.room.traverse((obj) => {
+    if (obj.isMesh && obj.parent?.userData.isWall) boxes.push(new THREE.Box3().setFromObject(obj));
+  });
+  for (const item of world.furniture.children) boxes.push(new THREE.Box3().setFromObject(item));
+  return boxes;
+}
+
+const itemGroups = new Map();
+// 畫面上看到的位置（pose）會往設定值滑過去，旋轉、拿起、放下、退回原位都有過程。
+const displayPoses = new Map();
+
+const isItemLit = (key) => key === editor.hoverKey || key === editor.selectedKey;
+
+function applyPose(group, pose) {
+  group.position.set(pose.x, pose.lift, pose.z);
+  group.rotation.y = pose.angle;
+}
+
+function renderItem(key, item) {
+  const old = itemGroups.get(key);
+  if (old) {
+    disposeChildren(old);
+    world.furniture.remove(old);
+  }
+  const material = isItemLit(key) ? litMaterials[item.type] : materials[item.type];
+  const group = buildFurnitureItem(key, item, material);
+  if (key === editor.selectedKey) {
+    addSelectionOutline(group);
+    group.traverse((obj) => { obj.renderOrder = RENDER_ORDER.selected; });
+  }
+  if (!displayPoses.has(key)) displayPoses.set(key, targetPose(key));
+  applyPose(group, displayPoses.get(key));
+  world.furniture.add(group);
+  // 重建後馬上算矩陣，下一格繪製前的點擊判定才會打在新的家具上。
+  group.updateMatrixWorld(true);
+  itemGroups.set(key, group);
+}
+
+function applyTint(key) {
+  const group = key && itemGroups.get(key);
+  if (!group) return;
+  const type = config.furniture[key].type;
+  const material = isItemLit(key) ? litMaterials[type] : materials[type];
+  group.traverse((obj) => { if (obj.isMesh && !obj.userData.isOutline) obj.material = material; });
+}
+
+function rebuildScene() {
+  disposeChildren(world.room);
+  disposeChildren(world.furniture);
+  itemGroups.clear();
+  world.room.add(buildRoom(config));
+  for (const [key, item] of Object.entries(config.furniture)) renderItem(key, item);
+  world.colliders = collectColliders();
+  updateRoomGrid();
+  updateFootprint();
+  refreshGizmo();
+  syncInputs();
+  showLayoutStatus();
+}
+
+// ================= 4. 擺放規則（2D 佔地） =================
+const CORNER_SIGNS = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
+
+function withBounds(corners) {
+  const xs = corners.map((c) => c.x);
+  const zs = corners.map((c) => c.z);
+  return { corners, minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs) };
+}
+
+// 佔地是跟著 rotation 轉的長方形：四個角＋外接的軸對齊範圍（出界判定、貼齊、選單定位用）。
+// 自身 X 軸在世界是 (cos, -sin)，自身 Z 軸是 (sin, cos)，和 localAxis 一致。
+// orientedRect：家具自身座標裡、中心 (cx, cz)、半寬 hw、半深 hd 的長方形（活動空間也用它）。
+function orientedRect(item, cx, cz, hw, hd) {
+  const angle = THREE.MathUtils.degToRad(item.rotation);
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return withBounds(CORNER_SIGNS.map(([sx, sz]) => {
+    const lx = cx + sx * hw;
+    const lz = cz + sz * hd;
+    return { x: item.x + lx * cos + lz * sin, z: item.z - lx * sin + lz * cos };
+  }));
+}
+
+const getFootprint = (item) => orientedRect(item, 0, 0, item.width / 2, item.depth / 2);
+
+const rectFootprint = (r) =>
+  withBounds([{ x: r.minX, z: r.minZ }, { x: r.maxX, z: r.minZ }, { x: r.maxX, z: r.maxZ }, { x: r.minX, z: r.maxZ }]);
+
+function projectCorners(corners, ax, az) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const c of corners) {
+    const d = c.x * ax + c.z * az;
+    min = Math.min(min, d);
+    max = Math.max(max, d);
+  }
+  return [min, max];
+}
+
+// 分離軸定理（SAT）：兩個長方形只要在任一邊的法線方向上投影不重疊，就沒有相交。剛好貼著不算重疊。
+function footprintsOverlap(a, b) {
+  if (a.minX >= b.maxX - EPSILON || a.maxX <= b.minX + EPSILON || a.minZ >= b.maxZ - EPSILON || a.maxZ <= b.minZ + EPSILON) {
+    return false;
+  }
+  for (const { corners } of [a, b]) {
+    for (let i = 0; i < 2; i++) {
+      const ex = corners[i + 1].x - corners[i].x;
+      const ez = corners[i + 1].z - corners[i].z;
+      const length = Math.hypot(ex, ez);
+      if (length < EPSILON) continue;
+      const [minA, maxA] = projectCorners(a.corners, -ez / length, ex / length);
+      const [minB, maxB] = projectCorners(b.corners, -ez / length, ex / length);
+      if (maxA <= minB + EPSILON || maxB <= minA + EPSILON) return false;
+    }
+  }
+  return true;
+}
+
+// 淨空區：房門留一個門寬的開門半徑；窗前留 windowClearance，只擋比窗台高的家具。
+function getKeepClearZones(cfg) {
+  const { width: W, depth: D } = cfg.room;
+  const { northWindow: nw, eastWindow: ew, door } = cfg.openings;
+  const c = cfg.rules.windowClearance;
+  return [
+    { label: '房門', maxHeight: 0,
+      rect: { minX: door.offset - door.width / 2, maxX: door.offset + door.width / 2, minZ: D / 2 - door.width, maxZ: D / 2 } },
+    { label: '北窗', maxHeight: nw.sill,
+      rect: { minX: nw.offset - nw.width / 2, maxX: nw.offset + nw.width / 2, minZ: -D / 2, maxZ: -D / 2 + c } },
+    { label: '東窗', maxHeight: ew.sill,
+      rect: { minX: W / 2 - c, maxX: W / 2, minZ: ew.offset - ew.width / 2, maxZ: ew.offset + ew.width / 2 } },
+  ];
+}
+
+// 會擋住這件家具的東西：其他家具（任何高度都擋）＋門窗淨空區（只擋比 maxHeight 高的家具）。
+function buildObstacles(key, cfg) {
+  const items = Object.entries(cfg.furniture)
+    .filter(([otherKey]) => otherKey !== key)
+    .map(([, other]) => ({ issue: `和${other.label}重疊`, fp: getFootprint(other), maxHeight: -Infinity }));
+  const zones = getKeepClearZones(cfg)
+    .map((zone) => ({ issue: `擋到${zone.label}`, fp: rectFootprint(zone.rect), maxHeight: zone.maxHeight }));
+  return [...items, ...zones];
+}
+
+function isInsideRoom(fp, room) {
+  const halfW = room.width / 2;
+  const halfD = room.depth / 2;
+  return fp.minX >= -halfW - EPSILON && fp.maxX <= halfW + EPSILON && fp.minZ >= -halfD - EPSILON && fp.maxZ <= halfD + EPSILON;
+}
+
+function findPlacementIssue(key, candidate, cfg, obstacles = buildObstacles(key, cfg)) {
+  const fp = getFootprint(candidate);
+  if (!isInsideRoom(fp, cfg.room)) return '超出房間';
+  if (candidate.height > cfg.room.height + EPSILON) return '比房間高';
+  for (const obstacle of obstacles) {
+    if (candidate.height > obstacle.maxHeight && footprintsOverlap(fp, obstacle.fp)) return obstacle.issue;
+  }
+  return null;
+}
+
+// 放不下時要試的位移，由近到遠排好（格距 gridSnap、半徑 SEARCH_RADIUS 公尺），只算一次。
+const SEARCH_RADIUS = 2;
+const SEARCH_OFFSETS = (() => {
+  const step = config.rules.gridSnap;
+  const n = Math.round(SEARCH_RADIUS / step);
+  const offsets = [];
+  for (let i = -n; i <= n; i++) {
+    for (let j = -n; j <= n; j++) {
+      const distance = Math.hypot(i, j) * step;
+      if (distance > 0 && distance <= SEARCH_RADIUS) offsets.push({ dx: i * step, dz: j * step, distance });
+    }
+  }
+  return offsets.sort((a, b) => a.distance - b.distance);
+})();
+
+// 找離 candidate 最近、能放的位置；找不到回傳 null。
+// 先把佔地夾回房間內（拖到牆外也會落在牆邊），再由近到遠試格點；
+// 找到後再貼齊一次，讓家具靠緊擋住它的東西，不會留下格點造成的小縫。
+function findNearestFreeSpot(key, candidate, cfg) {
+  if (candidate.height > cfg.room.height + EPSILON) return null;
+  const obstacles = buildObstacles(key, cfg);
+  const fp = getFootprint(candidate);
+  const halfX = (fp.maxX - fp.minX) / 2;
+  const halfZ = (fp.maxZ - fp.minZ) / 2;
+  const limitX = cfg.room.width / 2 - halfX;
+  const limitZ = cfg.room.depth / 2 - halfZ;
+  if (limitX < -EPSILON || limitZ < -EPSILON) return null;
+  const start = { ...candidate, x: round3(clamp(candidate.x, -limitX, limitX)), z: round3(clamp(candidate.z, -limitZ, limitZ)) };
+  const isFree = (spot) => !findPlacementIssue(key, spot, cfg, obstacles);
+  if (isFree(start)) return { x: start.x, z: start.z };
+  for (const { dx, dz } of SEARCH_OFFSETS) {
+    const spot = { ...start, x: round3(start.x + dx), z: round3(start.z + dz) };
+    if (!isFree(spot)) continue;
+    const snapped = { ...spot, ...snapPosition(key, spot, spot.x, spot.z) };
+    return isFree(snapped) ? { x: snapped.x, z: snapped.z } : { x: spot.x, z: spot.z };
+  }
+  return null;
+}
+
+// --- 尺寸範圍與活動空間 ---
+function clampSize(type, prop, value) {
+  const [min, max] = FURNITURE_SPECS[type].limits[prop];
+  return clamp(round3(value), min, max);
+}
+
+const formatRange = (type, prop) => FURNITURE_SPECS[type].limits[prop].map((v) => v.toFixed(2)).join('–') + ' m';
+
+// 改尺寸時寬、高以中心為準；深度固定背面，靠牆的家具加深時才不會撞牆。
+function sizePatch(item, sizes) {
+  const patch = { ...sizes };
+  if ('depth' in sizes) {
+    const dir = localAxis(item.rotation, 'z');
+    const shift = (sizes.depth - item.depth) / 2;
+    patch.x = round3(item.x + dir.x * shift);
+    patch.z = round3(item.z + dir.z * shift);
+  }
+  return patch;
+}
+
+// 每一側活動空間在家具自身座標裡的長方形（中心與寬深）。
+const CLEARANCE_SIDES = {
+  front: (w, d, c) => ({ cx: 0, cz: (d + c) / 2, w, d: c }),
+  back: (w, d, c) => ({ cx: 0, cz: -(d + c) / 2, w, d: c }),
+  right: (w, d, c) => ({ cx: (w + c) / 2, cz: 0, w: c, d }),
+  left: (w, d, c) => ({ cx: -(w + c) / 2, cz: 0, w: c, d }),
+};
+const SIDE_TEXT = { front: '前方', back: '後方', right: '右側', left: '左側' };
+const WALL_BLOCKER = '牆';
+
+function findZoneBlockers(key, fp, rule, furniture, room) {
+  const blockers = isInsideRoom(fp, room) ? [] : [WALL_BLOCKER];
+  for (const [otherKey, other] of Object.entries(furniture)) {
+    if (otherKey === key || rule.ignoreTypes?.includes(other.type)) continue;
+    if (footprintsOverlap(fp, getFootprint(other))) blockers.push(otherKey);
+  }
+  return blockers;
+}
+
+// 檢查每件家具的活動空間；furniture 可以是拖曳中的草稿，所以不直接讀 config。
+function getClearanceReport(furniture, room) {
+  const report = [];
+  for (const [key, item] of Object.entries(furniture)) {
+    for (const rule of FURNITURE_SPECS[item.type].clearance) {
+      const zones = rule.sides.map((side) => {
+        const rect = CLEARANCE_SIDES[side](item.width, item.depth, rule.depth);
+        const fp = orientedRect(item, rect.cx, rect.cz, rect.w / 2, rect.d / 2);
+        return { side, rect, blockers: findZoneBlockers(key, fp, rule, furniture, room) };
+      });
+      const blockedCount = zones.filter((zone) => zone.blockers.length > 0).length;
+      const isFailed = rule.need === 'any' ? blockedCount === zones.length : blockedCount > 0;
+      report.push({ key, item, rule, zones, isFailed });
+    }
+  }
+  return report;
+}
+
+const involvesKey = (entry, key) => entry.key === key || entry.zones.some((zone) => zone.blockers.includes(key));
+
+function clearanceMessage({ item, rule, zones }) {
+  const sideText = zones.length > 1 ? '兩側都' : SIDE_TEXT[zones[0].side];
+  const blockers = [...new Set(zones.flatMap((zone) => zone.blockers))]
+    .map((blocker) => config.furniture[blocker]?.label ?? blocker);
+  return `${item.label}${sideText}不到 ${Math.round(rule.depth * 100)} cm ${rule.name}（${blockers.join('、')}）`;
+}
+
+// 貼齊：佔地邊緣離牆面或其他家具的邊在 edgeSnap 內就吸過去，否則照 gridSnap 對齊。
+function snapAxis(center, half, edges, step) {
+  let bestShift = null;
+  for (const edge of edges) {
+    for (const side of [-1, 1]) {
+      const shift = edge - (center + side * half);
+      if (Math.abs(shift) < config.rules.edgeSnap && (bestShift === null || Math.abs(shift) < Math.abs(bestShift))) {
+        bestShift = shift;
+      }
+    }
+  }
+  return bestShift === null ? snapTo(center, step) : round3(center + bestShift);
+}
+
+// 其他家具只有「並排」時才當貼齊對象（另一軸的範圍有重疊），遠處的家具不會把你吸過去。
+function snapPosition(key, item, rawX, rawZ) {
+  const { width: W, depth: D } = config.room;
+  const own = getFootprint({ ...item, x: rawX, z: rawZ });
+  const reach = config.rules.edgeSnap;
+  const edgesX = [-W / 2, W / 2];
+  const edgesZ = [-D / 2, D / 2];
+  for (const [otherKey, other] of Object.entries(config.furniture)) {
+    if (otherKey === key) continue;
+    const fp = getFootprint(other);
+    const isAlongsideZ = fp.minZ < own.maxZ + reach && fp.maxZ > own.minZ - reach;
+    const isAlongsideX = fp.minX < own.maxX + reach && fp.maxX > own.minX - reach;
+    if (isAlongsideZ) edgesX.push(fp.minX, fp.maxX);
+    if (isAlongsideX) edgesZ.push(fp.minZ, fp.maxZ);
+  }
+  const halfX = (own.maxX - own.minX) / 2;
+  const halfZ = (own.maxZ - own.minZ) / 2;
+  const step = config.rules.gridSnap;
+  return { x: snapAxis(rawX, halfX, edgesX, step), z: snapAxis(rawZ, halfZ, edgesZ, step) };
+}
+
+const statusEl = document.getElementById('status');
+// tone：'ok' | 'warn' | 'bad'
+function setStatus(text, tone) {
+  statusEl.textContent = text;
+  statusEl.className = tone;
+}
+
+function showLayoutStatus() {
+  const issues = Object.entries(config.furniture)
+    .map(([key, item]) => {
+      const issue = findPlacementIssue(key, item, config);
+      return issue && `${item.label}${issue}`;
+    })
+    .filter(Boolean);
+  if (issues.length > 0) {
+    setStatus(`配置檢查：${issues.join('、')}`, 'bad');
+    return;
+  }
+  const warnings = getClearanceReport(config.furniture, config.room).filter((entry) => entry.isFailed).map(clearanceMessage);
+  if (warnings.length > 0) setStatus(`活動空間提醒：${warnings.join('、')}`, 'warn');
+  else setStatus('配置檢查：全部可放，活動空間足夠', 'ok');
+}
+
+// ================= 5. 視角模式 =================
+// 每個模式都提供同一組介面：enter() / exit() / update(dt) / setInputLocked(bool) / allowsEditing。
+// Tab 在環繞（可編輯）與第一人稱（只能看、走）之間切換，見 toggleViewMode。
+function createOrbitMode() {
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0.8, 0);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.minDistance = 1;
+  controls.maxDistance = 30;
+  let savedPosition = null;   // 切回來時回到離開前的鏡頭位置
+  return {
+    allowsEditing: true,
+    enter() {
+      if (savedPosition) camera.position.copy(savedPosition);
+      controls.enabled = true;
+    },
+    exit() {
+      savedPosition = camera.position.clone();
+      controls.enabled = false;
+    },
+    update() { controls.update(); },
+    setInputLocked(isLocked) { controls.enabled = !isLocked; },
+  };
+}
+
+const ORBIT_FOV = camera.fov;
+const FIRST_PERSON_FOV = 70;
+const PLAYER_RADIUS = 0.25;      // 身體當成邊長 0.5 m 的方塊，過 0.9 m 的門綽綽有餘
+const HEAD_CLEARANCE = 0.1;      // 眼睛以上還有頭頂，門楣比這低就過不去
+const STEP_HEIGHT = 0.05;        // 比這低的東西不擋腳
+const MAX_SUBSTEP = 0.05;        // 每格移動切成小段，速度調高也不會穿過 0.1 m 的牆
+const SPAWN_INSET = 0.6;         // 第一次進入時站在房門內這麼遠
+const GRAVITY = 9.8;
+const JUMP_HEIGHT = 0.45;        // 起跳到最高點時腳離地多高
+const LOOK_SENSITIVITY = 0.004;  // 拖曳畫面時每移動 1 px 轉幾弧度
+const MAX_PITCH = THREE.MathUtils.degToRad(85);
+const MOUSE_LEFT = 1;            // PointerEvent.buttons 的位元
+const MOUSE_RIGHT = 2;
+const ZOOM_PER_WHEEL = 0.004;     // 滾輪 deltaY 每單位拉遠幾公尺（滑鼠滾一格約 100，也就是 0.4 m）
+const MIN_THIRD_PERSON = 1.2;     // 第三人稱最近的距離；推得比這近就直接回第一人稱，不會卡在頭裡
+const MAX_CAMERA_DISTANCE = 5;
+// 第三人稱鏡頭用「彈簧臂」（spring arm）的做法：從頭往後探路，被擋住時快速拉近、障礙物離開後慢慢退回。
+const CAMERA_WALL_MARGIN = 0.2;   // 平常鏡頭停在障礙物前這麼遠
+const CAMERA_NEAR_GAP = 0.06;     // 硬性下限：再貼近就會看穿，所以這裡不做平滑、直接卡住
+const CAMERA_PROBE_RADIUS = 0.2;  // 用 5 條平行射線模擬這麼粗的探測球，門框邊緣提早發現
+const PROBE_OFFSETS = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+const ZOOM_SMOOTH_TIME = 0.25;    // 滾輪拉遠拉近（秒，越大越慢）
+const ARM_IN_SMOOTH_TIME = 0.08;  // 被擋住時拉近：要快，但不是瞬間
+const ARM_OUT_SMOOTH_TIME = 0.6;  // 障礙物離開後退回：慢，經過門框時不會忽遠忽近
+const FOLLOW_SMOOTH_TIME = 0.45;  // 移動時鏡頭轉回角色背後
+const FOLLOW_COAST_DAMPING = 6;   // 停下來時鏡頭轉動不急停，而是這個速率衰減
+const RESET_SMOOTH_TIME = 0.5;    // 往前走時距離、俯仰角回到預設的平滑時間
+const AVATAR_VISIBLE_DISTANCE = 0.4;
+const AVATAR = { width: 0.42, depth: 0.24, head: 0.24, nose: 0.06 };
+// 按鍵配置參考 MMORPG 常見的預設（例如魔獸世界）：A／D 轉身、Q／E 平移、拖曳滑鼠轉視角。
+const KEY_ACTIONS = {
+  KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
+  KeyA: 'turnLeft', ArrowLeft: 'turnLeft', KeyD: 'turnRight', ArrowRight: 'turnRight',
+  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump',
+};
+
+// 臨界阻尼彈簧（和 Unity Mathf.SmoothDamp 同一套近似公式）：起步、停下都平順、不會過衝。
+// motion.velocity 保存目前速度；smoothTime 約等於追到目標要的時間。減少動態效果時直接到位。
+function smoothDamp(current, target, motion, smoothTime, dt) {
+  if (reducedMotion.matches) {
+    motion.velocity = 0;
+    return target;
+  }
+  const omega = 2 / smoothTime;
+  const x = omega * dt;
+  const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const change = current - target;
+  const temp = (motion.velocity + omega * change) * dt;
+  motion.velocity = (motion.velocity - omega * temp) * decay;
+  return target + (change + temp) * decay;
+}
+
+// 第一人稱與第三人稱是同一個模式：鏡頭距離 0 是第一人稱，滾輪拉遠就從背後看到方塊角色。
+function createFirstPersonMode() {
+  const canvas = renderer.domElement;
+  const body = new THREE.Vector3();   // 腳底中心的 x、z（高度用 feetY）
+  const head = new THREE.Vector3();
+  const lookDir = new THREE.Vector3();
+  const cameraRay = new THREE.Raycaster();
+  const avatar = new THREE.Group();
+  avatar.visible = false;
+  scene.add(avatar);
+  let avatarEyeHeight = null;
+  let targetDistance = 0;               // 滾輪設定的距離
+  let zoomDistance = 0;                 // 平滑後的滾輪距離
+  let obstructionArm = MAX_CAMERA_DISTANCE;   // 障礙物允許的最遠距離（平滑後）
+  const zoomMotion = { velocity: 0 };
+  const armMotion = { velocity: 0 };
+  const followMotion = { velocity: 0 };
+  const pitchMotion = { velocity: 0 };
+  const distanceMotion = { velocity: 0 };
+  const sideDir = new THREE.Vector3();
+  const upDir = new THREE.Vector3();
+  const backDir = new THREE.Vector3();
+  const probeOrigin = new THREE.Vector3();
+  const hint = document.getElementById('fp-hint');
+  const heldCodes = new Set();
+  const view = new THREE.Euler(0, 0, 0, 'YXZ');
+  let isActive = false;
+  let yaw = 0;            // 角色面向（移動方向）
+  let cameraYaw = 0;      // 鏡頭水平方向；第一人稱時永遠等於 yaw
+  let pitch = 0;
+  let feetY = 0;
+  let velocityY = 0;
+  let mouseButtons = 0;
+  let lastPointer = null;
+  let savedPose = null;   // 上次離開時站的位置與朝向，再進來時接著走
+
+  const isHeld = (action) => [...heldCodes].some((code) => KEY_ACTIONS[code] === action);
+  const isGrounded = () => feetY === 0 && velocityY === 0;
+  const blocksBody = (box) => box.max.y > feetY + STEP_HEIGHT && box.min.y < feetY + config.player.eyeHeight + HEAD_CLEARANCE;
+  const overlapsAt = (box, x, z) =>
+    x + PLAYER_RADIUS > box.min.x && x - PLAYER_RADIUS < box.max.x && z + PLAYER_RADIUS > box.min.z && z - PLAYER_RADIUS < box.max.z;
+  const isFree = (x, z) => !world.colliders.some((box) => blocksBody(box) && overlapsAt(box, x, z));
+  const dismissHint = () => { hint.hidden = true; };
+
+  // 先走 X 再走 Z，撞到就停在表面、另一軸照走，貼著牆能沿牆滑。
+  // 一開始就重疊的方塊不擋（例如在環繞模式把家具搬到玩家身上），才走得出來。
+  function slide(dx, dz) {
+    const p = body;
+    const solids = world.colliders.filter((box) => blocksBody(box) && !overlapsAt(box, p.x, p.z));
+    let x = p.x + dx;
+    for (const box of solids) {
+      if (overlapsAt(box, x, p.z)) x = dx > 0 ? box.min.x - PLAYER_RADIUS - EPSILON : box.max.x + PLAYER_RADIUS + EPSILON;
+    }
+    let z = p.z + dz;
+    for (const box of solids) {
+      if (overlapsAt(box, x, z)) z = dz > 0 ? box.min.z - PLAYER_RADIUS - EPSILON : box.max.z + PLAYER_RADIUS + EPSILON;
+    }
+    p.x = x;
+    p.z = z;
+  }
+
+  // 站在房門內側、面向北；那裡被家具佔了就找最近的空位（和擺家具共用搜尋順序）。
+  function findSpawn() {
+    const x = config.openings.door.offset;
+    const z = config.room.depth / 2 - SPAWN_INSET;
+    const offset = [{ dx: 0, dz: 0 }, ...SEARCH_OFFSETS].find(({ dx, dz }) => isFree(x + dx, z + dz)) ?? { dx: 0, dz: 0 };
+    return { x: x + offset.dx, z: z + offset.dz, yaw: 0, pitch: 0 };
+  }
+
+  function onKeyChange(event) {
+    const action = KEY_ACTIONS[event.code];
+    if (!isActive || !action) return;
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    event.preventDefault();
+    if (event.type === 'keyup') {
+      heldCodes.delete(event.code);
+      return;
+    }
+    heldCodes.add(event.code);
+    if (action === 'jump' && isGrounded()) velocityY = Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
+    dismissHint();
+  }
+
+  // 拖曳畫面轉視角（左右鍵都可以）；buttons 記住目前按著哪些鍵，右鍵會讓 A／D 變平移。
+  const isThirdPerson = () => targetDistance > 0;
+  // 第三人稱只按左鍵：只轉鏡頭、角色面向不變，可以繞到前面看角色正面。
+  // 有按右鍵（或第一人稱）：角色跟著鏡頭轉，移動方向也跟著改。
+  const isOrbitingCamera = () => isThirdPerson() && (mouseButtons & MOUSE_LEFT) !== 0 && (mouseButtons & MOUSE_RIGHT) === 0;
+
+  // 剛按下右鍵時，角色先轉到鏡頭看的方向，之後拖曳就一起轉。
+  function setMouseButtons(buttons) {
+    const isRightPressed = (buttons & MOUSE_RIGHT) !== 0 && (mouseButtons & MOUSE_RIGHT) === 0;
+    mouseButtons = buttons;
+    if (isRightPressed) yaw = cameraYaw;
+  }
+
+  // 位移用 clientX／Y 自己算：movementX 在部分瀏覽器和合成事件裡可能沒有值，會讓視角變成 NaN。
+  function onPointerDown(event) {
+    if (!isActive) return;
+    setMouseButtons(event.buttons);
+    lastPointer = { x: event.clientX, y: event.clientY };
+    canvas.setPointerCapture(event.pointerId);
+    setCursor('grabbing');
+    dismissHint();
+  }
+
+  function onPointerMove(event) {
+    if (!isActive) return;
+    setMouseButtons(event.buttons);
+    if (!mouseButtons || !lastPointer) return;
+    const deltaYaw = -(event.clientX - lastPointer.x) * LOOK_SENSITIVITY;
+    if (isOrbitingCamera()) {
+      cameraYaw += deltaYaw;
+    } else {
+      yaw += deltaYaw;
+      cameraYaw = yaw;
+    }
+    pitch = clamp(pitch - (event.clientY - lastPointer.y) * LOOK_SENSITIVITY, -MAX_PITCH, MAX_PITCH);
+    lastPointer = { x: event.clientX, y: event.clientY };
+  }
+
+  function onPointerUp(event) {
+    if (!isActive) return;
+    setMouseButtons(event.buttons);
+    if (mouseButtons) return;
+    lastPointer = null;
+    setCursor('grab');
+  }
+
+  addEventListener('keydown', onKeyChange);
+  addEventListener('keyup', onKeyChange);
+  addEventListener('blur', () => {
+    heldCodes.clear();
+    mouseButtons = 0;
+  });
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('contextmenu', (event) => { if (isActive) event.preventDefault(); });
+
+  // 方塊角色：身體＋頭＋鼻子（看得出面向哪裡），高度跟著眼睛高度。
+  function buildAvatar() {
+    disposeChildren(avatar);
+    const h = config.player.eyeHeight;
+    const { width, depth, head: headSize, nose } = AVATAR;
+    const torsoHeight = h - headSize / 2;
+    addBox(avatar, materials.player, [width, torsoHeight, depth], [0, torsoHeight / 2, 0]);
+    addBox(avatar, materials.player, [headSize, headSize, headSize], [0, h, 0]);
+    addBox(avatar, materials.playerFace, [nose, nose, nose], [0, h, -headSize / 2 - nose / 2]);
+    avatarEyeHeight = h;
+  }
+
+  function zoom(deltaY) {
+    let next = targetDistance + deltaY * ZOOM_PER_WHEEL;
+    if (deltaY > 0 && targetDistance === 0) next = config.thirdPerson.distance;   // 從第一人稱往後滾，一格就到預設距離
+    else if (deltaY > 0) next = Math.max(next, MIN_THIRD_PERSON);
+    else if (next < MIN_THIRD_PERSON) next = 0;
+    targetDistance = clamp(next, 0, MAX_CAMERA_DISTANCE);
+    distanceMotion.velocity = 0;
+  }
+
+  canvas.addEventListener('wheel', (event) => {
+    if (!isActive) return;
+    event.preventDefault();
+    zoom(event.deltaY);
+    dismissHint();
+  }, { passive: false });
+
+  // 停止追目標時不急停：速度按 FOLLOW_COAST_DAMPING 衰減，數值再滑一小段。
+  function coast(value, motion, dt) {
+    motion.velocity *= Math.exp(-FOLLOW_COAST_DAMPING * dt);
+    return value + motion.velocity * dt;
+  }
+
+  // 滑鼠沒抓著畫面時：
+  // - 第一人稱往前走 → 視線平滑回到水平（被拖去看天空或地板時）；
+  // - 第三人稱移動或轉身 → 鏡頭水平方向平滑轉回角色背後；
+  // - 第三人稱往前走 → 距離與俯仰角也平滑回到 config.thirdPerson 的預設。
+  function followCharacter(dt, isMoving, isMovingForward) {
+    const motions = [followMotion, pitchMotion, distanceMotion];
+    if (!isThirdPerson()) {
+      cameraYaw = yaw;
+      followMotion.velocity = 0;
+      distanceMotion.velocity = 0;
+      if (mouseButtons === 0 && isMovingForward) pitch = smoothDamp(pitch, 0, pitchMotion, RESET_SMOOTH_TIME, dt);
+      else if (mouseButtons === 0) pitch = clamp(coast(pitch, pitchMotion, dt), -MAX_PITCH, MAX_PITCH);
+      else pitchMotion.velocity = 0;
+      return;
+    }
+    if (mouseButtons !== 0) {
+      for (const motion of motions) motion.velocity = 0;
+      return;
+    }
+    if (isMoving) cameraYaw = smoothDamp(cameraYaw, cameraYaw + wrapAngle(yaw - cameraYaw), followMotion, FOLLOW_SMOOTH_TIME, dt);
+    else cameraYaw = coast(cameraYaw, followMotion, dt);
+    if (isMovingForward) {
+      const preset = config.thirdPerson;
+      pitch = smoothDamp(pitch, THREE.MathUtils.degToRad(preset.pitch), pitchMotion, RESET_SMOOTH_TIME, dt);
+      targetDistance = smoothDamp(targetDistance, preset.distance, distanceMotion, RESET_SMOOTH_TIME, dt);
+    } else {
+      pitch = clamp(coast(pitch, pitchMotion, dt), -MAX_PITCH, MAX_PITCH);
+      targetDistance = clamp(coast(targetDistance, distanceMotion, dt), MIN_THIRD_PERSON, MAX_CAMERA_DISTANCE);
+    }
+  }
+
+  // 從支點往鏡頭方向打 5 條平行射線（中心＋上下左右）。
+  // center 是鏡頭本身那條視線（超過它才會看穿）；nearest 是 5 條裡最近的（用來提早、平滑地拉近）。
+  function probeObstruction(maxDistance) {
+    sideDir.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    upDir.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    backDir.copy(lookDir).negate();
+    const result = { center: Infinity, nearest: Infinity };
+    for (const [sx, sy] of PROBE_OFFSETS) {
+      probeOrigin.copy(head).addScaledVector(sideDir, sx * CAMERA_PROBE_RADIUS).addScaledVector(upDir, sy * CAMERA_PROBE_RADIUS);
+      cameraRay.set(probeOrigin, backDir);
+      cameraRay.far = maxDistance;
+      const hit = cameraRay.intersectObjects([world.room, world.furniture], true)[0];
+      if (!hit) continue;
+      result.nearest = Math.min(result.nearest, hit.distance);
+      if (sx === 0 && sy === 0) result.center = hit.distance;
+    }
+    return result;
+  }
+
+  // 鏡頭在支點正後方（沿視線反方向）。第三人稱時支點抬到頭頂上方，視線越過角色；越近抬得越少，切換時不會跳。
+  // 距離 = min(滾輪距離, 障礙物允許距離)，兩者各自平滑；只有中心視線快要看穿時才硬性卡住，
+  // 旁邊的探測線擦到門框只會平滑拉近，不會一格內跳到第一人稱。
+  function placeCamera(dt) {
+    zoomDistance = smoothDamp(zoomDistance, targetDistance, zoomMotion, ZOOM_SMOOTH_TIME, dt);
+    const lift = config.thirdPerson.height * Math.min(1, zoomDistance / MIN_THIRD_PERSON);
+    head.set(body.x, feetY + config.player.eyeHeight + lift, body.z);
+    camera.quaternion.setFromEuler(view.set(pitch, cameraYaw, 0));
+    lookDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+
+    const probe = zoomDistance > 0 ? probeObstruction(MAX_CAMERA_DISTANCE + CAMERA_WALL_MARGIN) : { center: Infinity, nearest: Infinity };
+    const armTarget = Math.min(MAX_CAMERA_DISTANCE, probe.nearest - CAMERA_WALL_MARGIN);
+    const smoothTime = armTarget < obstructionArm ? ARM_IN_SMOOTH_TIME : ARM_OUT_SMOOTH_TIME;
+    obstructionArm = smoothDamp(obstructionArm, armTarget, armMotion, smoothTime, dt);
+    const hardLimit = probe.center - CAMERA_NEAR_GAP;
+    if (obstructionArm > hardLimit) {
+      obstructionArm = hardLimit;
+      armMotion.velocity = 0;
+    }
+    const distance = clamp(Math.min(zoomDistance, obstructionArm), 0, MAX_CAMERA_DISTANCE);
+
+    camera.position.copy(head).addScaledVector(lookDir, -distance);
+    if (avatarEyeHeight !== config.player.eyeHeight) buildAvatar();
+    avatar.position.set(body.x, feetY, body.z);
+    avatar.rotation.y = yaw;
+    avatar.visible = distance > AVATAR_VISIBLE_DISTANCE;
+  }
+
+  function updateJump(dt) {
+    if (isGrounded()) return;
+    velocityY -= GRAVITY * dt;
+    feetY += velocityY * dt;
+    if (feetY <= 0) {
+      feetY = 0;
+      velocityY = 0;
+    }
+  }
+
+  function walk(forward, right, dt) {
+    const length = Math.hypot(right, forward);
+    if (length === 0) return;
+    dismissHint();
+    const sin = Math.sin(yaw);
+    const cos = Math.cos(yaw);
+    const step = (config.player.speed * dt) / length;
+    const dx = (-sin * forward + cos * right) * step;
+    const dz = (-cos * forward - sin * right) * step;
+    const substeps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / MAX_SUBSTEP));
+    for (let i = 0; i < substeps; i++) slide(dx / substeps, dz / substeps);
+  }
+
+  return {
+    allowsEditing: false,
+    enter() {
+      isActive = true;
+      const pose = savedPose && isFree(savedPose.x, savedPose.z) ? savedPose : findSpawn();
+      ({ yaw, pitch } = pose);
+      cameraYaw = yaw;
+      feetY = 0;
+      velocityY = 0;
+      body.set(pose.x, 0, pose.z);
+      targetDistance = pose.distance ?? 0;
+      zoomDistance = targetDistance;
+      obstructionArm = MAX_CAMERA_DISTANCE;
+      for (const motion of [zoomMotion, armMotion, followMotion, pitchMotion, distanceMotion]) motion.velocity = 0;
+      placeCamera(0);
+      camera.fov = FIRST_PERSON_FOV;
+      camera.updateProjectionMatrix();
+      hint.hidden = false;
+      setCursor('grab');
+    },
+    exit() {
+      isActive = false;
+      savedPose = { x: body.x, z: body.z, yaw, pitch, distance: targetDistance };
+      avatar.visible = false;
+      heldCodes.clear();
+      mouseButtons = 0;
+      hint.hidden = true;
+      camera.fov = ORBIT_FOV;
+      camera.updateProjectionMatrix();
+      setCursor('');
+    },
+    update(dt) {
+      const isRightHeld = (mouseButtons & MOUSE_RIGHT) !== 0;
+      const isBothHeld = isRightHeld && (mouseButtons & MOUSE_LEFT) !== 0;
+      const isTurnLeftHeld = isHeld('turnLeft');
+      const isTurnRightHeld = isHeld('turnRight');
+      // 按住右鍵時 A／D 改成平移，和轉視角的滑鼠不打架。
+      const turn = isRightHeld ? 0 : Number(isTurnLeftHeld) - Number(isTurnRightHeld);
+      let right = Number(isHeld('strafeRight')) - Number(isHeld('strafeLeft'));
+      if (isRightHeld) right += Number(isTurnRightHeld) - Number(isTurnLeftHeld);
+      const forward = clamp(Number(isHeld('forward')) - Number(isHeld('back')) + Number(isBothHeld), -1, 1);
+      right = clamp(right, -1, 1);
+
+      // 鍵盤轉身時鏡頭同步轉（沒抓著畫面時），不經過平滑；平滑只負責收回左鍵轉開的那段角度。
+      const turnDelta = turn * THREE.MathUtils.degToRad(config.player.turnSpeed) * dt;
+      yaw += turnDelta;
+      if (mouseButtons === 0) cameraYaw += turnDelta;
+      updateJump(dt);
+      walk(forward, right, dt);
+      followCharacter(dt, turn !== 0 || forward !== 0 || right !== 0, forward > 0);
+      placeCamera(dt);
+    },
+    setInputLocked() {},
+  };
+}
+
+const viewModes = { orbit: createOrbitMode(), firstPerson: createFirstPersonMode() };
+let activeMode = null;
+let activeModeName = null;
+function setViewMode(name) {
+  activeMode?.exit();
+  activeMode = viewModes[name];
+  activeModeName = name;
+  activeMode.enter();
+  for (const list of document.querySelectorAll('[data-view]')) list.hidden = list.dataset.view !== name;
+}
+
+// ================= 6. 編輯器：選取 → 移動／旋轉／尺寸 =================
+const OUTLINE_THICKNESS = 0.018;
+const ROTATION_COARSE = 15;          // Q / E、拖旋轉鈕時按住 Shift
+const ROTATION_MAGNET_DEG = 4;       // 自由旋轉時，離 45° 的倍數這麼近就吸過去，方便轉回正
+const ROTATION_MAGNET_STEP = 45;
+const RENDER_ORDER = { footprint: 5, selected: 6, handle: 10 };
+const GRID_CELL = 0.5;
+const FOOTPRINT_CELL = 0.25;
+const GRID_OPACITY = 0.35;
+const LIFT_HEIGHT = 0.12;            // 拖曳時「拿起來」的高度
+const MOTION_SPEED = 16;             // 越大滑得越快（指數趨近）
+const HANDLE_PX = 30;                // 尺寸控制點在螢幕上的直徑
+const HANDLE_GAP_PX = 8;             // 控制點和家具表面的距離
+const HANDLE_HOT_SCALE = 1.18;
+const HANDLE_EASE = 0.3;
+const SIZE_STEP = 0.05;
+const SIZE_STEP_FINE = 0.01;
+const CLICK_TOLERANCE_PX = 5;
+const NUDGE_FINE = config.rules.gridSnap;
+const NUDGE_COARSE = 0.25;
+const BAR_GAP_PX = 18;
+const VIEWPORT_MARGIN_PX = 8;
+const READOUT_OFFSET_PX = 16;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+const editor = {
+  selectedKey: null,
+  hoverKey: null,
+  hotId: null,          // 滑鼠底下或正在拖的控制點
+  isSizeMode: false,
+  gizmo: null,
+  rotateCorner: [1, 1], // 旋轉鈕掛在哪個角（自身座標的正負號），見 placeRotateHandle
+  rotatePush: 1,
+  action: null,         // { type: 'move' | 'rotate' | 'resize', key, start, draft, handleId, issue, landing, ... }
+  press: null,          // 按下但還沒判定是點擊還是拖曳視角
+  handleScale: new Map(),
+};
+
+const ui = {
+  actionbar: document.getElementById('actionbar'),
+  barName: document.querySelector('#actionbar .name'),
+  sizeButton: document.querySelector('[data-action="size"]'),
+  sizePanel: document.querySelector('.size-panel'),
+  sizeRows: [...document.querySelectorAll('.size-row')],
+  angleInput: document.querySelector('.angle input'),
+  presetSelect: document.querySelector('.preset-row select'),
+  hint: document.getElementById('hint'),
+  readout: document.getElementById('readout'),
+};
+
+const currentItemData = () =>
+  editor.action?.draft ?? (editor.selectedKey ? config.furniture[editor.selectedKey] : null);
+
+const isHot = (id) => id === (editor.action?.handleId ?? editor.hotId);
+
+// --- 貼圖：格線（地板與佔地格共用畫法）、尺寸控制點 ---
+function createTileTexture(fillAlpha) {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = `rgba(255, 255, 255, ${fillAlpha})`;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(0, 0, size, size);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return texture;
+}
+
+// 圓形底＋雙向箭頭；箭頭方向每格依控制點在螢幕上的方向轉（sprite 的 material.rotation）。
+function createHandleTexture({ fill, ring, arrow }) {
+  const size = 96;
+  const c = size / 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(c, c, 40, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = ring;
+  ctx.stroke();
+  ctx.strokeStyle = arrow;
+  ctx.fillStyle = arrow;
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(c - 16, c);
+  ctx.lineTo(c + 16, c);
+  ctx.stroke();
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(c + dir * 28, c);
+    ctx.lineTo(c + dir * 14, c - 13);
+    ctx.lineTo(c + dir * 14, c + 13);
+    ctx.closePath();
+    ctx.fill();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+// 旋轉鈕：圓形底＋四分之三圈的弧形箭頭。
+function createRotateTexture({ fill, ring, arrow }) {
+  const size = 96;
+  const c = size / 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(c, c, 40, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = ring;
+  ctx.stroke();
+  const radius = 20;
+  const endAngle = -Math.PI * 0.25;
+  ctx.strokeStyle = arrow;
+  ctx.fillStyle = arrow;
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(c, c, radius, Math.PI * 0.25, Math.PI * 1.75);
+  ctx.stroke();
+  // 箭頭頂點在弧的終點、沿切線方向（順時針畫，所以切線是角度 +90°）
+  const tipX = c + radius * Math.cos(endAngle);
+  const tipY = c + radius * Math.sin(endAngle);
+  const tangent = endAngle + Math.PI / 2;
+  const back = 15;
+  const spread = 10;
+  ctx.beginPath();
+  ctx.moveTo(tipX + Math.cos(tangent) * 6, tipY + Math.sin(tangent) * 6);
+  ctx.lineTo(tipX - Math.cos(tangent) * back + Math.cos(endAngle) * spread, tipY - Math.sin(tangent) * back + Math.sin(endAngle) * spread);
+  ctx.lineTo(tipX - Math.cos(tangent) * back - Math.cos(endAngle) * spread, tipY - Math.sin(tangent) * back - Math.sin(endAngle) * spread);
+  ctx.closePath();
+  ctx.fill();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+const HANDLE_STYLE = {
+  normal: { fill: '#ffffff', ring: '#1fb6d5', arrow: '#0b3a45' },
+  hot: { fill: '#1fb6d5', ring: '#ffffff', arrow: '#ffffff' },
+};
+const handleTextures = {
+  size: { normal: createHandleTexture(HANDLE_STYLE.normal), hot: createHandleTexture(HANDLE_STYLE.hot) },
+  rotate: { normal: createRotateTexture(HANDLE_STYLE.normal), hot: createRotateTexture(HANDLE_STYLE.hot) },
+};
+const handleTexture = (handle) => handleTextures[handle.kind][isHot(handle.id) ? 'hot' : 'normal'];
+
+// --- 常駐導引：地板格線、佔地格 ---
+const roomGrid = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ color: 0x55606b, map: createTileTexture(0), transparent: true, opacity: 0, depthWrite: false }),
+);
+roomGrid.rotation.x = -Math.PI / 2;
+roomGrid.position.y = PREVIEW_LIFT / 2;
+roomGrid.visible = false;
+
+// 佔地格不做深度測試、畫在其他家具之後，拖到床上時紅格才看得到；選取中的家具再畫在它之後。
+const footprintFill = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ color: ACCENT, map: createTileTexture(0.28), transparent: true, opacity: 0.9, depthWrite: false, depthTest: false }),
+);
+footprintFill.rotation.x = -Math.PI / 2;
+footprintFill.renderOrder = RENDER_ORDER.footprint;
+const footprintBorder = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.PlaneGeometry(1, 1)),
+  new THREE.LineBasicMaterial({ color: ACCENT, depthTest: false }),
+);
+footprintBorder.rotation.x = -Math.PI / 2;
+footprintBorder.renderOrder = RENDER_ORDER.footprint;
+const footprint = new THREE.Group();
+footprint.add(footprintFill, footprintBorder);
+footprint.visible = false;
+const clearanceZones = new THREE.Group();
+world.guides.add(roomGrid, footprint, clearanceZones);
+
+function updateRoomGrid() {
+  const { width: W, depth: D } = config.room;
+  roomGrid.scale.set(W, D, 1);
+  roomGrid.material.map.repeat.set(W / GRID_CELL, D / GRID_CELL);
+}
+
+// 佔地格畫在「放開後會落下的位置」：游標處放不下時，它會跳到最近的空位，家具本體還跟著游標。
+function updateFootprint() {
+  const item = currentItemData();
+  footprint.visible = Boolean(item);
+  // 活動空間要在提早 return 前更新：取消選取時也得收掉選取中那件的淺黃區域。
+  updateClearanceZones();
+  if (!item) return;
+  const action = editor.action;
+  const landing = action?.landing ?? item;
+  footprint.position.set(landing.x, PREVIEW_LIFT, landing.z);
+  footprint.rotation.y = THREE.MathUtils.degToRad(item.rotation);
+  footprint.scale.set(item.width, 1, item.depth);
+  footprintFill.material.map.repeat.set(item.width / FOOTPRINT_CELL, item.depth / FOOTPRINT_CELL);
+  let color = ACCENT;
+  if (action) color = action.landing ? COLOR_OK : COLOR_BAD;
+  footprintFill.material.color.setHex(color);
+  footprintBorder.material.color.setHex(color);
+}
+
+// 目前的家具配置；拖曳中那件換成放開後的樣子（草稿＋落點）。
+function liveFurniture() {
+  const action = editor.action;
+  if (!action) return config.furniture;
+  return { ...config.furniture, [action.key]: { ...action.draft, ...(action.landing ?? {}) } };
+}
+
+// 黃色活動空間：不夠的一律顯示（深黃）；選取中的家具連夠的也顯示（淺黃），讓人知道要留多少。
+function updateClearanceZones() {
+  disposeChildren(clearanceZones);
+  const activeKey = editor.action?.key ?? editor.selectedKey;
+  for (const entry of getClearanceReport(liveFurniture(), config.room)) {
+    if (!entry.isFailed && entry.key !== activeKey) continue;
+    const { item, zones, isFailed } = entry;
+    const group = new THREE.Group();
+    group.position.set(item.x, PREVIEW_LIFT * 0.75, item.z);
+    group.rotation.y = THREE.MathUtils.degToRad(item.rotation);
+    for (const { rect } of zones) {
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(rect.w, rect.d), isFailed ? materials.clearanceWarn : materials.clearance);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(rect.cx, 0, rect.cz);
+      group.add(mesh);
+    }
+    clearanceZones.add(group);
+  }
+}
+
+// --- 動畫：家具滑向目標、地板格線淡入淡出 ---
+function targetPose(key) {
+  const action = editor.action;
+  const item = action?.key === key ? action.draft : config.furniture[key];
+  const isLifted = action?.key === key && action.type === 'move';
+  return {
+    x: item.x,
+    z: item.z,
+    angle: THREE.MathUtils.degToRad(item.rotation),
+    lift: isLifted ? LIFT_HEIGHT : 0,
+  };
+}
+
+const wrapAngle = (rad) => Math.atan2(Math.sin(rad), Math.cos(rad));
+
+function animateItems(dt) {
+  const ease = reducedMotion.matches ? 1 : 1 - Math.exp(-MOTION_SPEED * dt);
+  for (const [key, group] of itemGroups) {
+    const target = targetPose(key);
+    const pose = displayPoses.get(key);
+    // 拖控制點改尺寸時，被拖的那一面要黏著游標，不能慢半拍。
+    const isResizing = editor.action?.key === key && editor.action.type === 'resize';
+    const k = isResizing ? 1 : ease;
+    pose.x += (target.x - pose.x) * k;
+    pose.z += (target.z - pose.z) * k;
+    pose.lift += (target.lift - pose.lift) * k;
+    pose.angle += wrapAngle(target.angle - pose.angle) * k;
+    applyPose(group, pose);
+  }
+}
+
+function animateGuides(dt) {
+  const target = editor.selectedKey ? GRID_OPACITY : 0;
+  const ease = reducedMotion.matches ? 1 : 1 - Math.exp(-MOTION_SPEED * dt);
+  roomGrid.material.opacity += (target - roomGrid.material.opacity) * ease;
+  roomGrid.visible = roomGrid.material.opacity > 0.01;
+}
+
+// --- 控制點（sprite：永遠面向鏡頭、螢幕上固定大小） ---
+// 旋轉鈕選取後就有；尺寸控制點只在尺寸模式出現。
+function buildGizmo(item, withSizeHandles) {
+  const { width: w, depth: d, height: h } = item;
+  const gizmo = new THREE.Group();
+  gizmo.position.set(item.x, 0, item.z);
+  gizmo.rotation.y = THREE.MathUtils.degToRad(item.rotation);
+  gizmo.userData.handles = [];
+  // 高度控制點從頂面中心往上推，推到家具在畫面上的最上緣之外（見 heightHandleOffset）。
+  // 旋轉鈕的 base / outward 每格依 rotateCorner 更新（見 updateHandles）。
+  const specs = [{ id: 'rot', kind: 'rotate', base: [0, 0, 0], outward: [1, 0, 0] }];
+  if (withSizeHandles) {
+    specs.push(
+      { id: 'x+', kind: 'size', base: [w / 2, h / 2, 0], outward: [1, 0, 0] },
+      { id: 'x-', kind: 'size', base: [-w / 2, h / 2, 0], outward: [-1, 0, 0] },
+      { id: 'z+', kind: 'size', base: [0, h / 2, d / 2], outward: [0, 0, 1] },
+      { id: 'z-', kind: 'size', base: [0, h / 2, -d / 2], outward: [0, 0, -1] },
+      { id: 'y+', kind: 'size', base: [0, h, 0], outward: [0, 1, 0] },
+    );
+  }
+  for (const spec of specs) {
+    const handle = {
+      id: spec.id,
+      kind: spec.kind,
+      base: new THREE.Vector3(...spec.base),
+      outward: new THREE.Vector3(...spec.outward),
+    };
+    const material = new THREE.SpriteMaterial({ map: handleTexture(handle), depthTest: false, sizeAttenuation: false });
+    const sprite = new THREE.Sprite(material);
+    sprite.renderOrder = RENDER_ORDER.handle;
+    sprite.userData.handle = handle;
+    gizmo.add(sprite);
+    gizmo.userData.handles.push(sprite);
+  }
+  return gizmo;
+}
+
+// 拿起來移動時不顯示控制點，放下後再出現。
+function refreshGizmo() {
+  world.editor.traverse((obj) => obj.material?.dispose?.());
+  disposeChildren(world.editor);
+  editor.gizmo = null;
+  const item = currentItemData();
+  if (!item || editor.action?.type === 'move') return;
+  editor.gizmo = buildGizmo(item, editor.isSizeMode);
+  world.editor.add(editor.gizmo);
+  updateOverlay();
+}
+
+function refreshHandleTextures() {
+  if (!editor.gizmo) return;
+  for (const sprite of editor.gizmo.userData.handles) sprite.material.map = handleTexture(sprite.userData.handle);
+}
+
+// --- 射線與座標換算 ---
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const tmpVec = new THREE.Vector3();
+
+function aimRay(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+}
+
+function pickFurnitureKey() {
+  let obj = raycaster.intersectObjects(world.furniture.children, true)[0]?.object;
+  while (obj && !obj.userData.furnitureKey) obj = obj.parent;
+  return obj?.userData.furnitureKey ?? null;
+}
+
+function pickHandleId() {
+  if (!editor.gizmo) return null;
+  return raycaster.intersectObjects(editor.gizmo.userData.handles, false)[0]?.object.userData.handle.id ?? null;
+}
+
+const intersectPlane = (plane) => raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+
+function toScreen(worldPoint) {
+  const v = worldPoint.clone().project(camera);
+  const canvas = renderer.domElement;
+  return { x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight, isVisible: v.z < 1 };
+}
+
+function worldPerPixel(distance) {
+  const fov = THREE.MathUtils.degToRad(camera.fov);
+  return (2 * distance * Math.tan(fov / 2)) / renderer.domElement.clientHeight;
+}
+
+// 家具自身 X / Z 軸在世界座標的方向（rotation 是從上往下看的逆時針角度）。
+function localAxis(rotationDeg, axis) {
+  const angle = THREE.MathUtils.degToRad(rotationDeg);
+  return axis === 'x'
+    ? new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle))
+    : new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+}
+
+// 控制點方向在螢幕上的角度（逆時針、y 朝上），給箭頭旋轉和游標樣式用。
+function screenAngleOf(worldFrom, worldDir) {
+  const from = toScreen(worldFrom);
+  const to = toScreen(worldFrom.clone().add(worldDir));
+  return Math.atan2(-(to.y - from.y), to.x - from.x);
+}
+
+// --- 游標樣式 ---
+function resizeCursor(handleId) {
+  const sprite = editor.gizmo.userData.handles.find((s) => s.userData.handle.id === handleId);
+  const deg = ((THREE.MathUtils.radToDeg(sprite.material.rotation) % 180) + 180) % 180;
+  if (deg < 22.5 || deg >= 157.5) return 'ew-resize';
+  if (deg < 67.5) return 'nesw-resize';
+  if (deg < 112.5) return 'ns-resize';
+  return 'nwse-resize';
+}
+
+function cursorFor(handleId, furnitureKey) {
+  if (handleId === 'rot') return 'grab';
+  if (handleId) return resizeCursor(handleId);
+  if (furnitureKey && furnitureKey === editor.selectedKey) return 'grab';
+  if (furnitureKey) return 'pointer';
+  return '';
+}
+
+const setCursor = (cursor) => { renderer.domElement.style.cursor = cursor; };
+
+// --- 選取與浮動選單 ---
+function select(key) {
+  if (editor.action) return;
+  const previous = editor.selectedKey;
+  editor.selectedKey = key;
+  editor.hotId = null;
+  if (!key) editor.isSizeMode = false;
+  if (previous) renderItem(previous, config.furniture[previous]);
+  if (key) renderItem(key, config.furniture[key]);
+  refreshGizmo();
+  updateFootprint();
+  syncActionBar();
+  showLayoutStatus();
+}
+
+function toggleSizeMode() {
+  if (!editor.selectedKey) return;
+  editor.isSizeMode = !editor.isSizeMode;
+  refreshGizmo();
+  syncActionBar();
+}
+
+function syncActionBar() {
+  const key = editor.selectedKey;
+  const isShown = Boolean(key) && !editor.action;
+  ui.actionbar.classList.toggle('visible', isShown);
+  ui.actionbar.inert = !isShown;
+  ui.hint.classList.toggle('visible', isShown);
+  if (!key) return;
+  ui.barName.textContent = config.furniture[key].label;
+  ui.sizeButton.setAttribute('aria-pressed', String(editor.isSizeMode));
+  ui.sizePanel.hidden = !editor.isSizeMode;
+  syncInputs();
+  updateOverlay();
+}
+
+const CUSTOM_PRESET = 'custom';
+
+function syncPresetSelect(item) {
+  const { presets } = FURNITURE_SPECS[item.type];
+  const select = ui.presetSelect;
+  if (select.dataset.type !== item.type) {
+    const custom = new Option('自訂', CUSTOM_PRESET);
+    custom.disabled = true;
+    select.replaceChildren(...presets.map((preset, index) => new Option(preset.name, String(index))), custom);
+    select.dataset.type = item.type;
+  }
+  const index = presets.findIndex((preset) => SIZE_PROPS.every((prop) => Math.abs(preset[prop] - item[prop]) < EPSILON));
+  select.value = index >= 0 ? String(index) : CUSTOM_PRESET;
+}
+
+function syncInputs() {
+  const key = editor.selectedKey;
+  if (!key) return;
+  const item = config.furniture[key];
+  for (const row of ui.sizeRows) {
+    const input = row.querySelector('input');
+    const prop = row.dataset.prop;
+    [input.min, input.max] = FURNITURE_SPECS[item.type].limits[prop];
+    input.title = `範圍 ${formatRange(item.type, prop)}`;
+    if (document.activeElement !== input) input.value = item[prop].toFixed(2);
+  }
+  syncPresetSelect(item);
+  if (document.activeElement !== ui.angleInput) ui.angleInput.value = config.furniture[key].rotation;
+}
+
+function updateHover() {
+  const handleId = pickHandleId();
+  if (handleId !== editor.hotId) {
+    editor.hotId = handleId;
+    refreshHandleTextures();
+  }
+  const key = handleId ? null : pickFurnitureKey();
+  if (key !== editor.hoverKey) {
+    const previous = editor.hoverKey;
+    editor.hoverKey = key;
+    applyTint(previous);
+    applyTint(key);
+  }
+  setCursor(cursorFor(handleId, key));
+}
+
+// --- 直接套用（選單、步進器、鍵盤）：不合規則就不套用 ---
+function updateGuiDisplay() {
+  gui.controllersRecursive().forEach((c) => c.updateDisplay());
+}
+
+// canRelocate：旋轉後原地放不下時，改放到最近的空位（尺寸、微移不搬，直接不套用）。
+function tryUpdate(key, patch, canRelocate = false) {
+  const item = config.furniture[key];
+  const candidate = { ...item, ...patch };
+  const issue = findPlacementIssue(key, candidate, config);
+  const spot = issue && canRelocate ? findNearestFreeSpot(key, candidate, config) : null;
+  if (issue && !spot) {
+    setStatus(`${item.label}：${issue}，沒有套用`, 'bad');
+    return false;
+  }
+  Object.assign(item, candidate, spot);
+  rebuildScene();
+  updateGuiDisplay();
+  if (spot) setStatus(`${item.label}原地${issue}，已移到最近的空位`, 'ok');
+  return true;
+}
+
+function setSelectedRotation(deg) {
+  const key = editor.selectedKey;
+  if (key) tryUpdate(key, { rotation: normalizeDeg(deg) }, true);
+}
+
+const rotateSelected = (deltaDeg) => editor.selectedKey && setSelectedRotation(config.furniture[editor.selectedKey].rotation + deltaDeg);
+
+// 自由旋轉：1° 為單位，接近 45° 的倍數時吸過去；按住 Shift 改成每 15° 一格。
+function snapRotation(deg, isCoarse) {
+  if (isCoarse) return normalizeDeg(Math.round(deg / ROTATION_COARSE) * ROTATION_COARSE);
+  const nearest = Math.round(deg / ROTATION_MAGNET_STEP) * ROTATION_MAGNET_STEP;
+  return normalizeDeg(Math.abs(deg - nearest) <= ROTATION_MAGNET_DEG ? nearest : deg);
+}
+
+// 游標相對家具中心的角度，和 rotation 同一套約定（從上往下看逆時針、0° 指向 +X）。
+const pointerAngleDeg = (center, point) => THREE.MathUtils.radToDeg(Math.atan2(-(point.z - center.z), point.x - center.x));
+
+// 超出範圍的值停在上下限，並告訴使用者範圍是多少。
+function resizeSelected(prop, value) {
+  const key = editor.selectedKey;
+  const item = config.furniture[key];
+  const size = clampSize(item.type, prop, value);
+  if (!tryUpdate(key, sizePatch(item, { [prop]: size }))) {
+    syncInputs();
+    return;
+  }
+  if (size !== round3(value)) {
+    setStatus(`${item.label}${SIZE_NAMES[prop]}的範圍是 ${formatRange(item.type, prop)}，已停在 ${size.toFixed(2)} m`, 'warn');
+  }
+}
+
+// 套用標準規格：放不下時移到最近的空位（tryUpdate 會寫狀態）。
+function applyPreset(index) {
+  const key = editor.selectedKey;
+  const item = config.furniture[key];
+  const preset = FURNITURE_SPECS[item.type].presets[index];
+  if (!preset) return;
+  const { width, depth, height } = preset;
+  const patch = sizePatch(item, { width, depth, height });
+  if (!tryUpdate(key, patch, true)) {
+    syncInputs();
+    return;
+  }
+  const isRelocated = item.x !== patch.x || item.z !== patch.z;
+  if (!isRelocated) setStatus(`${item.label}改成${preset.name}`, 'ok');
+}
+
+function nudgeSelected(event) {
+  const step = event.shiftKey ? NUDGE_COARSE : NUDGE_FINE;
+  const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+  const move = moves[event.key];
+  if (!move) return false;
+  const item = config.furniture[editor.selectedKey];
+  tryUpdate(editor.selectedKey, { x: round3(item.x + move[0]), z: round3(item.z + move[1]) });
+  return true;
+}
+
+// --- 拖曳動作：移動（拿起來）／改尺寸 ---
+function beginAction(type, handleId, event) {
+  const key = editor.selectedKey;
+  const item = config.furniture[key];
+  const action = { type, key, handleId, start: { ...item }, draft: { ...item }, issue: null, landing: null };
+
+  if (type === 'move') {
+    const floorPoint = intersectPlane(floorPlane);
+    if (!floorPoint) return;
+    action.grabDX = item.x - floorPoint.x;
+    action.grabDZ = item.z - floorPoint.z;
+  } else if (type === 'rotate') {
+    const floorPoint = intersectPlane(floorPlane);
+    if (!floorPoint) return;
+    action.grabAngle = pointerAngleDeg(item, floorPoint) - item.rotation;
+  } else if (handleId === 'y+') {
+    // 改高度：用一面通過家具、面向鏡頭的垂直平面來讀滑鼠高度。
+    const normal = camera.position.clone().sub(new THREE.Vector3(item.x, 0, item.z)).setY(0);
+    if (normal.lengthSq() < EPSILON) normal.set(0, 0, 1);
+    action.plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal.normalize(), new THREE.Vector3(item.x, item.height, item.z));
+    const hit = intersectPlane(action.plane);
+    if (!hit) return;
+    action.grabOffset = item.height - hit.y;
+  } else {
+    // 改寬或深：拖的那一面跟著滑鼠，對面固定不動。
+    const axis = handleId[0];
+    const prop = axis === 'x' ? 'width' : 'depth';
+    const dir = localAxis(item.rotation, axis).multiplyScalar(handleId[1] === '+' ? 1 : -1);
+    const anchor = new THREE.Vector3(item.x, 0, item.z).addScaledVector(dir, -item[prop] / 2);
+    action.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -item.height / 2);
+    const hit = intersectPlane(action.plane);
+    if (!hit) return;
+    Object.assign(action, { prop, dir, anchor });
+    action.grabOffset = item[prop] - hit.setY(0).sub(anchor).dot(dir);
+  }
+
+  editor.action = action;
+  editor.press = null;
+  activeMode.setInputLocked(true);
+  renderer.domElement.setPointerCapture(event.pointerId);
+  if (type !== 'resize') setCursor('grabbing');
+  if (type === 'move') refreshGizmo();
+  syncActionBar();
+  showKeepClearZones();
+  applyDraft(event);
+}
+
+function updateAction(event) {
+  const a = editor.action;
+  const d = a.draft;
+  const { sizeSnap } = config.rules;
+
+  if (a.type === 'move') {
+    const p = intersectPlane(floorPlane);
+    if (!p) return;
+    Object.assign(d, snapPosition(a.key, d, p.x + a.grabDX, p.z + a.grabDZ));
+  } else if (a.type === 'rotate') {
+    const p = intersectPlane(floorPlane);
+    if (!p) return;
+    d.rotation = snapRotation(pointerAngleDeg(a.start, p) - a.grabAngle, event.shiftKey);
+  } else if (a.handleId === 'y+') {
+    const p = intersectPlane(a.plane);
+    if (!p) return;
+    d.height = clampDraftSize(a, 'height', snapTo(p.y + a.grabOffset, sizeSnap));
+  } else {
+    const p = intersectPlane(a.plane);
+    if (!p) return;
+    const size = clampDraftSize(a, a.prop, snapTo(p.setY(0).sub(a.anchor).dot(a.dir) + a.grabOffset, sizeSnap));
+    d[a.prop] = size;
+    d.x = round3(a.anchor.x + (a.dir.x * size) / 2);
+    d.z = round3(a.anchor.z + (a.dir.z * size) / 2);
+  }
+  applyDraft(event);
+}
+
+// 拖控制點改尺寸：超過範圍就停在上下限，讀數標出「上限／下限」。
+function clampDraftSize(action, prop, raw) {
+  const size = clampSize(action.draft.type, prop, raw);
+  action.limitNote = null;
+  if (raw > size) action.limitNote = '上限';
+  else if (raw < size) action.limitNote = '下限';
+  return size;
+}
+
+const RELOCATE_NOTE = '放開會移到最近的空位';
+const CROWDED_NOTE = '活動空間不足';
+
+function showReadout(event) {
+  const a = editor.action;
+  const parts = [];
+  if (a.type === 'resize') {
+    const prop = a.handleId === 'y+' ? 'height' : a.prop;
+    parts.push(`${SIZE_NAMES[prop]} ${a.draft[prop].toFixed(2)} m${a.limitNote ? `（${a.limitNote}）` : ''}`);
+  }
+  if (a.type === 'rotate') parts.push(`${a.draft.rotation}°`);
+  if (a.issue) parts.push(a.landing ? RELOCATE_NOTE : a.issue);
+  if (a.landing && a.isCrowded) parts.push(CROWDED_NOTE);
+  const text = parts.join('・');
+  ui.readout.textContent = text;
+  ui.readout.classList.toggle('visible', Boolean(text));
+  ui.readout.classList.toggle('bad', !a.landing);
+  ui.readout.classList.toggle('warn', Boolean(a.landing) && a.isCrowded);
+  ui.readout.style.transform = `translate(${event.clientX + READOUT_OFFSET_PX}px, ${event.clientY + READOUT_OFFSET_PX}px)`;
+}
+
+// landing：放開後實際落下的位置。移動、旋轉放不下時找最近的空位；改尺寸放不下就是 null（放開會退回）。
+function applyDraft(event) {
+  const a = editor.action;
+  const d = a.draft;
+  a.issue = findPlacementIssue(a.key, d, config);
+  if (!a.issue) a.landing = { x: d.x, z: d.z };
+  else a.landing = a.type === 'resize' ? null : findNearestFreeSpot(a.key, d, config);
+  const crowded = getClearanceReport(liveFurniture(), config.room).filter((entry) => entry.isFailed && involvesKey(entry, a.key));
+  a.isCrowded = crowded.length > 0;
+  if (a.type === 'resize') renderItem(a.key, d);
+  if (a.type !== 'move') refreshGizmo();
+  updateFootprint();
+  showReadout(event);
+  const label = config.furniture[a.key].label;
+  if (a.issue) setStatus(`${label}：${a.issue}${a.landing ? `，${RELOCATE_NOTE}` : '，放開會退回'}`, a.landing ? 'ok' : 'bad');
+  else if (a.isCrowded) setStatus(`${label}：可以放，但${crowded.map(clearanceMessage).join('、')}`, 'warn');
+  else setStatus(`${label}：可以放`, 'ok');
+}
+
+function endAction(shouldCommit) {
+  const { key, draft, issue, landing } = editor.action;
+  const item = config.furniture[key];
+  editor.action = null;
+  activeMode.setInputLocked(false);
+  disposeChildren(world.overlay);
+  ui.readout.classList.remove('visible');
+  const isCommitted = shouldCommit && Boolean(landing);
+  if (isCommitted) Object.assign(item, draft, landing);
+  rebuildScene();
+  syncActionBar();
+  if (isCommitted) updateGuiDisplay();
+  if (isCommitted && issue) setStatus(`${item.label}原處${issue}，已移到最近的空位`, 'ok');
+  else if (!isCommitted && shouldCommit) setStatus(`${item.label}放不下（${issue}），已退回`, 'bad');
+}
+
+function showKeepClearZones() {
+  for (const { rect } of getKeepClearZones(config)) {
+    const zone = new THREE.Mesh(new THREE.PlaneGeometry(rect.maxX - rect.minX, rect.maxZ - rect.minZ), materials.keepClear);
+    zone.rotation.x = -Math.PI / 2;
+    zone.position.set((rect.minX + rect.maxX) / 2, PREVIEW_LIFT / 2, (rect.minZ + rect.maxZ) / 2);
+    world.overlay.add(zone);
+  }
+}
+
+// --- 指標事件 ---
+function onPointerDown(event) {
+  if (event.button !== 0 || !activeMode.allowsEditing) return;
+  aimRay(event);
+  const handleId = pickHandleId();
+  if (handleId) {
+    beginAction(handleId === 'rot' ? 'rotate' : 'resize', handleId, event);
+    return;
+  }
+  const key = pickFurnitureKey();
+  if (key && key === editor.selectedKey) {
+    beginAction('move', null, event);
+    return;
+  }
+  // 沒選取的家具或空白處：放開時沒移動才算點擊；有移動就交給 OrbitControls 環繞。
+  editor.press = { x: event.clientX, y: event.clientY, key };
+}
+
+function onPointerMove(event) {
+  aimRay(event);
+  if (editor.action) updateAction(event);
+  else if (activeMode.allowsEditing) updateHover();
+}
+
+function onPointerUp(event) {
+  if (editor.action) {
+    endAction(true);
+    updateHover();
+    return;
+  }
+  const press = editor.press;
+  editor.press = null;
+  if (!press) return;
+  const moved = Math.hypot(event.clientX - press.x, event.clientY - press.y);
+  if (moved <= CLICK_TOLERANCE_PX) select(press.key);
+  updateHover();
+}
+
+// 進第一人稱前先收掉編輯狀態：拖到一半的取消、選取與滑過的高亮清掉。
+function toggleViewMode() {
+  if (editor.action) endAction(false);
+  select(null);
+  const hovered = editor.hoverKey;
+  editor.hoverKey = null;
+  applyTint(hovered);
+  setCursor('');
+  setViewMode(activeModeName === 'orbit' ? 'firstPerson' : 'orbit');
+}
+
+function onKeyDown(event) {
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+  // 只在焦點不在按鈕等控制項上時攔 Tab，用鍵盤在選單間移動焦點仍然可以。
+  if (event.key === 'Tab' && (event.target === document.body || event.target === renderer.domElement)) {
+    event.preventDefault();
+    toggleViewMode();
+    return;
+  }
+  if (!activeMode.allowsEditing) return;
+  if (event.key === 'Escape') {
+    if (editor.action) endAction(false);
+    else select(null);
+    return;
+  }
+  if (!editor.selectedKey || editor.action) return;
+  const key = event.key.toLowerCase();
+  if (key === 'r') rotateSelected(event.shiftKey ? ROTATION_STEP : -ROTATION_STEP);
+  else if (key === '.') rotateSelected(-ROTATION_STEP);
+  else if (key === ',') rotateSelected(ROTATION_STEP);
+  else if (key === 'q') rotateSelected(event.shiftKey ? 1 : ROTATION_COARSE);
+  else if (key === 'e') rotateSelected(event.shiftKey ? -1 : -ROTATION_COARSE);
+  else if (key === 's') toggleSizeMode();
+  else if (nudgeSelected(event)) event.preventDefault();
+}
+
+renderer.domElement.addEventListener('pointerdown', onPointerDown, { capture: true });
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
+renderer.domElement.addEventListener('pointercancel', () => editor.action && endAction(false));
+renderer.domElement.addEventListener('pointerleave', () => {
+  if (editor.action) return;
+  const previous = editor.hoverKey;
+  editor.hoverKey = null;
+  applyTint(previous);
+});
+addEventListener('keydown', onKeyDown);
+
+// --- 浮動選單與尺寸面板 ---
+ui.actionbar.querySelector('.bar').addEventListener('click', (event) => {
+  const action = event.target.closest('button')?.dataset.action;
+  if (action === 'rotate-ccw') rotateSelected(ROTATION_STEP);
+  else if (action === 'rotate-cw') rotateSelected(-ROTATION_STEP);
+  else if (action === 'size') toggleSizeMode();
+  else if (action === 'done') select(null);
+});
+
+ui.angleInput.addEventListener('change', () => {
+  const value = Number(ui.angleInput.value);
+  if (Number.isFinite(value)) setSelectedRotation(value);
+  syncInputs();
+});
+
+ui.angleInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') ui.angleInput.blur();
+  if (event.key === 'Escape') {
+    ui.angleInput.value = config.furniture[editor.selectedKey].rotation;
+    ui.angleInput.blur();
+  }
+});
+
+ui.presetSelect.addEventListener('change', () => {
+  if (editor.selectedKey) applyPreset(Number(ui.presetSelect.value));
+});
+
+ui.sizePanel.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-step]');
+  if (!button || !editor.selectedKey) return;
+  const prop = button.closest('.size-row').dataset.prop;
+  const step = (event.shiftKey ? SIZE_STEP_FINE : SIZE_STEP) * Number(button.dataset.step);
+  resizeSelected(prop, config.furniture[editor.selectedKey][prop] + step);
+});
+
+ui.sizePanel.addEventListener('change', (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;   // 規格選單的 change 也會冒泡到這裡，由它自己的監聽器處理
+  const value = Number(input.value);
+  if (!editor.selectedKey || !Number.isFinite(value)) {
+    syncInputs();
+    return;
+  }
+  resizeSelected(input.closest('.size-row').dataset.prop, value);
+});
+
+ui.sizePanel.addEventListener('keydown', (event) => {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  if (event.key === 'Enter') event.target.blur();
+  if (event.key === 'Escape') {
+    event.target.value = config.furniture[editor.selectedKey][event.target.closest('.size-row').dataset.prop].toFixed(2);
+    event.target.blur();
+  }
+});
+
+// --- 每格更新：控制點與浮動選單跟著家具 ---
+const MIN_UP_PX_PER_METER = 20;      // 鏡頭幾乎正上方時，往上推多少都看不出來，就不再加大
+
+// 高度控制點要往上推多少公尺，才會在畫面上落在家具最上緣之上。
+function heightHandleOffset(topCenterWorld) {
+  const { corners } = getFootprint(currentItemData());
+  const topY = toScreen(topCenterWorld).y;
+  let boxTopY = topY;
+  for (const c of corners) boxTopY = Math.min(boxTopY, toScreen(new THREE.Vector3(c.x, topCenterWorld.y, c.z)).y);
+  const targetY = boxTopY - HANDLE_PX / 2 - HANDLE_GAP_PX;
+  const upPxPerMeter = Math.max(MIN_UP_PX_PER_METER, topY - toScreen(topCenterWorld.clone().setY(topCenterWorld.y + 1)).y);
+  return Math.max(0, (topY - targetY) / upPxPerMeter);
+}
+
+const handleGapWorld = (worldPoint) => worldPerPixel(camera.position.distanceTo(worldPoint)) * (HANDLE_PX / 2 + HANDLE_GAP_PX);
+const ROTATE_PUSH_STEPS = [1, 2, 3];   // 角落太擠時，旋轉鈕沿對角線再往外推幾倍
+const HANDLE_CLEARANCE_PX = HANDLE_PX + 4;
+
+// 旋轉鈕掛在地面角落：優先畫面上最右上的角（避開下方的選單），但不能和尺寸控制點疊在一起；
+// 四個角都太擠就再往外推。拖曳中固定不換位置，游標才不會抓空。
+function placeRotateHandle(gizmo, handle, occupied) {
+  const { width, depth } = currentItemData();
+  if (editor.action?.type !== 'rotate') {
+    let best = null;
+    for (const push of ROTATE_PUSH_STEPS) {
+      for (const [sx, sz] of CORNER_SIGNS) {
+        const base = new THREE.Vector3((sx * width) / 2, 0, (sz * depth) / 2);
+        const outward = new THREE.Vector3(sx, 0, sz).normalize();
+        const offset = handleGapWorld(gizmo.localToWorld(base.clone())) * push;
+        const p = toScreen(gizmo.localToWorld(base.clone().addScaledVector(outward, offset)));
+        const clearance = Math.min(Infinity, ...occupied.map((q) => Math.hypot(p.x - q.x, p.y - q.y)));
+        const score = p.x - p.y;
+        if (clearance >= HANDLE_CLEARANCE_PX && (!best || score > best.score)) best = { score, corner: [sx, sz], push };
+      }
+      if (best) break;
+    }
+    editor.rotateCorner = best?.corner ?? editor.rotateCorner;
+    editor.rotatePush = best?.push ?? ROTATE_PUSH_STEPS.at(-1);
+  }
+  const [sx, sz] = editor.rotateCorner;
+  handle.base.set((sx * width) / 2, 0, (sz * depth) / 2);
+  handle.outward.set(sx, 0, sz).normalize();
+  return editor.rotatePush;
+}
+
+function updateHandles() {
+  const gizmo = editor.gizmo;
+  gizmo.updateMatrixWorld(true);
+  const fovFactor = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / renderer.domElement.clientHeight;
+  // 先放尺寸控制點，旋轉鈕最後放，才知道要避開哪裡。
+  const sprites = [...gizmo.userData.handles].sort((a, b) => (a.userData.handle.kind === 'rotate') - (b.userData.handle.kind === 'rotate'));
+  const occupied = [];
+  for (const sprite of sprites) {
+    const handle = sprite.userData.handle;
+    const push = handle.kind === 'rotate' ? placeRotateHandle(gizmo, handle, occupied) : 1;
+    const { id, kind, base, outward } = handle;
+    const target = isHot(id) ? HANDLE_HOT_SCALE : 1;
+    const current = editor.handleScale.get(id) ?? 1;
+    const next = reducedMotion.matches ? target : current + (target - current) * HANDLE_EASE;
+    editor.handleScale.set(id, next);
+    const baseWorld = gizmo.localToWorld(tmpVec.copy(base));
+    const offset = id === 'y+' ? heightHandleOffset(baseWorld) : handleGapWorld(baseWorld) * push;
+    sprite.position.copy(base).addScaledVector(outward, offset);
+    const size = HANDLE_PX * next * fovFactor;
+    sprite.scale.set(size, size, 1);
+    const outwardWorld = outward.clone().transformDirection(gizmo.matrixWorld);
+    sprite.material.rotation = kind === 'rotate' ? 0 : screenAngleOf(baseWorld.clone(), outwardWorld);
+    occupied.push(toScreen(gizmo.localToWorld(sprite.position.clone())));
+  }
+  // 控制點剛改了位置與大小，馬上重算矩陣，同一個事件裡的射線判定才不會用到舊值。
+  gizmo.updateMatrixWorld(true);
+}
+
+// 選單放在家具在螢幕上的最下緣之下；下面放不下就改放上面。
+function placeActionBar(item) {
+  if (!ui.actionbar.classList.contains('visible')) return;
+  const points = [];
+  for (const c of getFootprint(item).corners) {
+    for (const y of [0, item.height]) points.push(toScreen(new THREE.Vector3(c.x, y, c.z)));
+  }
+  const center = toScreen(new THREE.Vector3(item.x, item.height / 2, item.z));
+  const barWidth = ui.actionbar.offsetWidth;
+  const barHeight = ui.actionbar.offsetHeight;
+  const bottomY = Math.max(...points.map((p) => p.y));
+  const topY = Math.min(...points.map((p) => p.y));
+  let top = bottomY + BAR_GAP_PX;
+  if (top + barHeight > innerHeight - VIEWPORT_MARGIN_PX) top = topY - BAR_GAP_PX - barHeight;
+  top = clamp(top, VIEWPORT_MARGIN_PX, innerHeight - barHeight - VIEWPORT_MARGIN_PX);
+  const left = clamp(center.x - barWidth / 2, VIEWPORT_MARGIN_PX, innerWidth - barWidth - VIEWPORT_MARGIN_PX);
+  ui.actionbar.style.transform = `translate(${left}px, ${top}px)`;
+}
+
+function updateOverlay() {
+  const item = currentItemData();
+  if (!item) return;
+  if (editor.gizmo) updateHandles();
+  placeActionBar(item);
+}
+
+// ================= 7. lil-gui =================
+function addOpeningFolder(parent, opening, title, offsetLabel) {
+  const folder = parent.addFolder(title);
+  folder.add(opening, 'offset', -6, 6, 0.05).name(offsetLabel).onChange(rebuildScene);
+  folder.add(opening, 'width', 0.3, 3, 0.05).name('寬').onChange(rebuildScene);
+  folder.add(opening, 'height', 0.3, 2.6, 0.05).name('高').onChange(rebuildScene);
+  if ('sill' in opening) folder.add(opening, 'sill', 0, 2, 0.05).name('離地').onChange(rebuildScene);
+}
+
+function buildGui() {
+  const panel = new GUI({ title: '設定（公尺）' });
+  const room = panel.addFolder('房間');
+  room.add(config.room, 'width', 2, 12, 0.05).name('寬（東西）').onChange(rebuildScene);
+  room.add(config.room, 'depth', 2, 12, 0.05).name('深（南北）').onChange(rebuildScene);
+  room.add(config.room, 'height', 2, 4, 0.05).name('高').onChange(rebuildScene);
+  room.add(config.room, 'wallThickness', 0.05, 0.4, 0.01).name('牆厚').onChange(rebuildScene);
+
+  const player = panel.addFolder('第一人稱');
+  player.add(config.player, 'eyeHeight', 1, 2, 0.05).name('眼睛高度');
+  player.add(config.player, 'speed', 0.5, 4, 0.1).name('速度（m/s）');
+  player.add(config.player, 'turnSpeed', 60, 360, 10).name('轉身（度/秒）');
+
+  const thirdPerson = panel.addFolder('第三人稱預設視角');
+  thirdPerson.add(config.thirdPerson, 'distance', MIN_THIRD_PERSON, MAX_CAMERA_DISTANCE, 0.1).name('距離（m）');
+  thirdPerson.add(config.thirdPerson, 'pitch', -45, 20, 1).name('俯仰（度）');
+  thirdPerson.add(config.thirdPerson, 'height', 0, 0.6, 0.05).name('鏡頭高度（m）');
+
+  const openings = panel.addFolder('門窗');
+  addOpeningFolder(openings, config.openings.northWindow, '北窗', '偏移（+往東）');
+  addOpeningFolder(openings, config.openings.eastWindow, '東窗', '偏移（+往南）');
+  addOpeningFolder(openings, config.openings.door, '房門', '偏移（+往東）');
+
+  for (const item of Object.values(config.furniture)) {
+    const folder = panel.addFolder(item.label);
+    const { limits } = FURNITURE_SPECS[item.type];
+    folder.add(item, 'x', -6, 6, 0.05).name('位置 X').onChange(rebuildScene);
+    folder.add(item, 'z', -6, 6, 0.05).name('位置 Z').onChange(rebuildScene);
+    folder.add(item, 'rotation', 0, 359, 1).name('旋轉（度）').onChange(rebuildScene);
+    for (const prop of SIZE_PROPS) folder.add(item, prop, ...limits[prop], 0.01).name(SIZE_NAMES[prop]).onChange(rebuildScene);
+    folder.close();
+  }
+  if (innerWidth < 768) panel.close();
+  return panel;
+}
+
+// ================= 8. 啟動 =================
+const gui = buildGui();
+setViewMode('orbit');
+rebuildScene();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const MAX_FRAME_DT = 0.1;
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), MAX_FRAME_DT);
+  activeMode.update(dt);
+  animateItems(dt);
+  animateGuides(dt);
+  updateOverlay();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
