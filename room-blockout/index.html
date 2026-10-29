@@ -165,7 +165,7 @@
     <li>空白處拖曳環繞、滾輪縮放、右鍵平移</li>
   </ul>
   <ul data-view="firstPerson" hidden>
-    <li><b>W</b>／<b>S</b>（↑／↓）前進後退、<b>A</b>／<b>D</b>（←／→）轉身、<b>Q</b>／<b>E</b> 平移、<b>空白鍵</b> 跳</li>
+    <li><b>W</b>／<b>S</b>（↑／↓）前進後退、<b>A</b>／<b>D</b>（←／→）轉身、<b>Q</b>／<b>E</b> 平移、<b>空白鍵</b> 跳、按住 <b>Shift</b> 跑步</li>
     <li>拖曳轉視角；第三人稱時左鍵只轉鏡頭（可看角色正面，放開後一移動就轉回背後），右鍵連角色一起轉</li>
     <li>按住右鍵時 A／D 改成平移，左右鍵一起按往前走</li>
     <li><b>滾輪</b> 往後拉成第三人稱、往前推回第一人稱；往前走時鏡頭會回到預設距離與角度（右邊設定可改）</li>
@@ -229,7 +229,7 @@
 
 <div id="readout"></div>
 <div id="fp-hint" hidden>
-  <div class="card"><b>第一人稱</b>W／S 前進後退 · A／D 轉身 · Q／E 平移 · 空白鍵跳<br>拖曳畫面轉視角 · 滾輪切第三人稱 · Tab 回環繞檢視</div>
+  <div class="card"><b>第一人稱</b>W／S 前進後退 · A／D 轉身 · Q／E 平移 · 空白鍵跳 · Shift 跑<br>拖曳畫面轉視角 · 滾輪切第三人稱 · Tab 回環繞檢視</div>
 </div>
 
 <script type="module">
@@ -249,7 +249,7 @@ const config = {
     door:        { offset: 1.8, width: 0.9, height: 2.1 },            // offset：+往東
   },
   outsideFloor: { width: 2, depth: 1.5 },   // 房門外的一小塊地板，置中對齊房門
-  player: { eyeHeight: 1.6, speed: 1.5, turnSpeed: 180 },   // 第一人稱：眼睛離地高度（m）、走路速度（m/s）、A／D 轉身速度（度/秒）
+  player: { eyeHeight: 1.6, speed: 1.5, runSpeed: 3.5, turnSpeed: 180 },   // 第一人稱：眼睛離地高度（m）、走路／按住 Shift 跑步的速度（m/s）、A／D 轉身速度（度/秒）
   // 第三人稱預設視角：往前走、滑鼠沒抓著畫面時會平滑回到這裡。
   // distance 鏡頭離頭多遠（m）；pitch 俯仰角（度，負的是往下看）；height 鏡頭支點比眼睛高多少（m；中心視線要低於 2.1 m 的門楣，過門才不會被硬性拉近）。
   thirdPerson: { distance: 3.5, pitch: -15, height: 0.4 },
@@ -336,7 +336,7 @@ const FURNITURE_SPECS = {
 const COLORS = {
   floor: 0xd8d8d8, wall: 0xc4c4c4, outsideFloor: 0xb4b4b4,
   bed: 0x4f86e8, desk: 0xe8a33c, chair: 0xb8741c, bookcase: 0x47a65a, wardrobe: 0x9b62d1,
-  player: 0xff6f3c, playerFace: 0x3a2a20,
+  player: 0xff6f3c, playerFace: 0x3a2a20, playerSkin: 0xf0c39c, playerPants: 0x3d4f73, playerShoe: 0x2b2b2b,
 };
 const FURNITURE_TYPES = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe'];
 const HIGHLIGHT_EMISSIVE = 0x2a2a2a;
@@ -924,12 +924,11 @@ const FOLLOW_SMOOTH_TIME = 0.45;  // 移動時鏡頭轉回角色背後
 const FOLLOW_COAST_DAMPING = 6;   // 停下來時鏡頭轉動不急停，而是這個速率衰減
 const RESET_SMOOTH_TIME = 0.5;    // 往前走時距離、俯仰角回到預設的平滑時間
 const AVATAR_VISIBLE_DISTANCE = 0.4;
-const AVATAR = { width: 0.42, depth: 0.24, head: 0.24, nose: 0.06 };
 // 按鍵配置參考 MMORPG 常見的預設（例如魔獸世界）：A／D 轉身、Q／E 平移、拖曳滑鼠轉視角。
 const KEY_ACTIONS = {
   KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
   KeyA: 'turnLeft', ArrowLeft: 'turnLeft', KeyD: 'turnRight', ArrowRight: 'turnRight',
-  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump',
+  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', ShiftLeft: 'run', ShiftRight: 'run',
 };
 
 // 臨界阻尼彈簧（和 Unity Mathf.SmoothDamp 同一套近似公式）：起步、停下都平順、不會過衝。
@@ -948,6 +947,396 @@ function smoothDamp(current, target, motion, smoothTime, dt) {
   return target + (change + temp) * decay;
 }
 
+// ---------- 方塊人角色 ----------
+// 比例採風格化 5.75 頭身（卡通風 3D 遊戲常見）：頭大一點、上身長一點，比寫實的 7.5 頭身好讀。
+// 單位是身高 H 的倍數；大腿＋小腿＋腳踝 = 髖關節高，站直時腳底剛好在地上。
+const BODY = {
+  head: 0.17, neck: 0.03, chest: 0.21, pelvis: 0.11,
+  thigh: 0.22, shin: 0.22, ankle: 0.04, upperArm: 0.17, forearm: 0.14, hand: 0.08,
+};
+const HIP_RATIO = BODY.thigh + BODY.shin + BODY.ankle;
+const EYE_RATIO = HIP_RATIO + BODY.pelvis + BODY.chest + BODY.neck + BODY.head / 2;   // 眼睛在頭的一半高
+const DEG = THREE.MathUtils.degToRad;
+const REFERENCE_HEIGHT = 1.75;
+const CYCLE_BASE = 0.65;          // 一個步態週期（左右各一步）走多遠：0.65 + 0.55 × 速度（m），1.75 m 身高時
+const CYCLE_PER_SPEED = 0.55;     // 對應步頻：走路 1.5 m/s 約每秒 2 步、跑步 3.5 m/s 約每秒 2.7 步
+const RUN_BLEND = [2, 3];         // 速度在這區間內從走路漸變成跑步（m/s）
+const TURN_STEP_RATE = 0.5;       // 原地轉身時，每轉 1 弧度踏多少個週期
+const BOB_SAMPLES = 16;           // 骨盆高度表每個週期取幾格
+const BOB_SMOOTH_PASSES = 2;      // 換腳那格是兩條曲線取最低的尖角，跑步時特別尖；磨圓後才不會頓一下（腳底誤差約 1 cm）
+const BREATH_RATE = 1.6;          // 待機呼吸（弧度/秒，約 4 秒一次）
+const GAIT_SMOOTH_TIME = 0.08;
+const AIR_SMOOTH_TIME = 0.1;
+const LAND_SMOOTH_TIME = 0.14;
+const LAND_HOLD = 0.06;           // 落地後蹲多久才開始站起來（秒）
+const LAND_MIN = 0.35;            // 落地緩衝最小幅度；下落越快蹲越深
+const LEAN_SMOOTH_TIME = 0.18;
+const ACCEL_LEAN_PER_MS2 = 1.5;   // 每 1 m/s² 加速度前傾幾度
+const MAX_ACCEL_LEAN = 8;
+const BANK_PER_TURN_SPEED = 1.2;   // 轉彎內傾：轉速（rad/s）× 速度（m/s）× 這個值 = 度
+const MAX_BANK = 10;
+
+// 步態用「關鍵姿勢＋曲線內插」（動畫教科書的走路循環）：一個週期 8 格，第 0 格是這隻腳前腳跟著地。
+// 0 接觸 → 1 下沉 → 2 交錯 → 3 最高點 → 4 在後（另一腳著地）→ 5 蹬地 → 6 擺盪交錯 → 7 往前伸。
+// 角度單位：度。hip 正的是往前擺；knee 負的是往後彎；foot 是腳板對地面的角度（正的是腳尖抬起）。
+// 骨盆上下起伏不手調：build 時用這些姿勢算出「最低的腳底剛好踩地」的高度，烘焙成平滑的表。
+const GAIT_KEYS = {
+  walk: {
+    hip: [22, 16, 2, -12, -18, -8, 18, 26],
+    knee: [-3, -15, -8, -5, -12, -40, -60, -20],
+    foot: [14, 0, 0, 0, -15, -35, 5, 12],
+  },
+  run: {
+    hip: [30, 15, -5, -25, -20, 10, 45, 45],
+    knee: [-25, -40, -25, -15, -60, -100, -95, -45],
+    foot: [5, -5, -15, -30, -20, 10, 10, 5],
+  },
+};
+// 手臂、上身擺動在真實步態裡本來就接近正弦，用參數就夠。
+const GAIT_STYLE = {
+  walk: { sideSwing: 12, armSwing: 20, armBias: 3, elbow: 15, elbowSwing: 15, armOut: 6, lean: 3, twist: 7 },
+  run: { sideSwing: 18, armSwing: 40, armBias: 10, elbow: 85, elbowSwing: 15, armOut: 10, lean: 10, twist: 12 },
+};
+// 跳躍三個關鍵姿勢，依垂直速度內插：蹬地伸展 → 最高點縮腿 → 準備落地。
+const JUMP_KEYS = {
+  takeoff: { spinePitch: 4, hipX: -5, knee: -8, foot: -35, shoulderX: 150, shoulderZ: 10, elbow: 20 },
+  apex: { spinePitch: -8, hipX: 55, knee: -95, foot: -10, shoulderX: 95, shoulderZ: 20, elbow: 40 },
+  landing: { spinePitch: -2, hipX: 25, knee: -30, foot: 5, shoulderX: 40, shoulderZ: 40, elbow: 20 },
+};
+const LIMB_KEYS = ['hipX', 'hipZ', 'knee', 'foot', 'shoulderX', 'shoulderZ', 'elbow'];
+const POSE_KEYS = ['hipsYaw', 'spinePitch', 'spineYaw', ...LIMB_KEYS.flatMap((key) => [key + 0, key + 1])];
+const DIRECTIONS = ['forward', 'backward', 'side'];
+const smoothstep = (edge0, edge1, value) => {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+const lerp = (a, b, t) => a + (b - a) * t;
+const sideOf = (index) => (index === 0 ? -1 : 1);   // 0 = 左（-x）、1 = 右（+x）；角色面向 -z
+const wrap01 = (t) => ((t % 1) + 1) % 1;
+
+// 循環的 Catmull-Rom 曲線：經過每個關鍵值，而且速度連續，關鍵格之間不會有轉折頓點。
+function sampleLoop(values, t) {
+  const n = values.length;
+  const x = wrap01(t) * n;
+  const i = Math.floor(x);
+  const f = x - i;
+  const p0 = values[(i - 1 + n) % n];
+  const p1 = values[i % n];
+  const p2 = values[(i + 1) % n];
+  const p3 = values[(i + 2) % n];
+  return 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (3 * p1 - p0 - 3 * p2 + p3) * f * f * f);
+}
+
+// 循環陣列做 [1, 2, 1] / 4 平均，每做一次尖角就圓一點。
+function smoothLoop(values, passes) {
+  let out = values;
+  for (let pass = 0; pass < passes; pass++) {
+    out = out.map((value, k) => (out[(k - 1 + out.length) % out.length] + 2 * value + out[(k + 1) % out.length]) / 4);
+  }
+  return out;
+}
+
+function blendPose(a, b, t) {
+  const out = {};
+  for (const key of POSE_KEYS) out[key] = lerp(a[key], b[key], t);
+  return out;
+}
+
+function idlePose(time) {
+  const breath = Math.sin(time * BREATH_RATE);
+  const pose = { hipsYaw: 0, spinePitch: breath, spineYaw: 0 };
+  for (const i of [0, 1]) {
+    const side = sideOf(i);
+    Object.assign(pose, {
+      ['hipX' + i]: 0, ['hipZ' + i]: side * 2, ['knee' + i]: -4, ['foot' + i]: 0,
+      ['shoulderX' + i]: 3, ['shoulderZ' + i]: side * (6 + breath * 0.8), ['elbow' + i]: 10,
+    });
+  }
+  return pose;
+}
+
+// 方向權重：往前、往後、平移三組各自的比重（總和 1）。
+function directionWeights(sag, lat) {
+  const weights = { forward: Math.max(0, sag), backward: Math.max(0, -sag), side: Math.abs(lat) };
+  const total = weights.forward + weights.backward + weights.side || 1;
+  for (const key of DIRECTIONS) weights[key] /= total;
+  return weights;
+}
+
+// 一隻腳在週期 t 的姿勢。往後走 = 把走路循環倒著播；平移時腳只小幅前後擺，主要往外跨。
+function legPose(keys, t, weights, lat, side, sideSwing) {
+  const ahead = { hip: sampleLoop(keys.hip, t), knee: sampleLoop(keys.knee, t), foot: sampleLoop(keys.foot, t) };
+  const behind = { hip: sampleLoop(keys.hip, -t), knee: sampleLoop(keys.knee, -t), foot: sampleLoop(keys.foot, -t) };
+  const mix = (key, sideScale) => ahead[key] * weights.forward + behind[key] * weights.backward + ahead[key] * sideScale * weights.side;
+  const lift = clamp((-ahead.knee - 10) / 50, 0, 1);   // 膝蓋抬越高 = 越在跨步
+  // 平移時每隻腳只在自己跨步時往外張（往移動方向那隻張得大），兩腿不會交叉。
+  const spread = sideSwing * lift * weights.side * (side * lat > 0 ? 1 : 0.4);
+  return { hipX: mix('hip', 0.2), hipZ: side * (2 + spread), knee: mix('knee', 1), foot: mix('foot', 0.5) };
+}
+
+function gaitPose(phase, keys, style, sag, lat) {
+  const weights = directionWeights(sag, lat);
+  const swingSign = weights.forward - weights.backward;
+  const twist = style.twist * Math.cos(Math.PI * 2 * (phase + 0.1)) * swingSign;
+  const pose = { hipsYaw: -twist * 0.5, spinePitch: -style.lean * swingSign, spineYaw: twist };
+  for (const i of [0, 1]) {
+    const side = sideOf(i);
+    const t = phase + i * 0.5;
+    const leg = legPose(keys, t, weights, lat, side, style.sideSwing);
+    // 手和同側的腳反向擺：腳在前（t≈0.9）時手在後。
+    const armForward = -Math.cos(Math.PI * 2 * (t + 0.1)) * swingSign;
+    Object.assign(pose, {
+      ['hipX' + i]: leg.hipX, ['hipZ' + i]: leg.hipZ, ['knee' + i]: leg.knee, ['foot' + i]: leg.foot,
+      ['shoulderX' + i]: style.armBias + style.armSwing * armForward,
+      ['shoulderZ' + i]: side * style.armOut,
+      ['elbow' + i]: style.elbow + style.elbowSwing * Math.max(0, armForward),
+    });
+  }
+  return pose;
+}
+
+// rise：1 = 剛起跳、0 = 最高點、-1 = 往下掉。三個關鍵姿勢之間平滑內插。
+function airPose(rise) {
+  const u = (1 - clamp(rise, -1, 1)) / 2;
+  const [from, to, t] = u < 0.5
+    ? [JUMP_KEYS.takeoff, JUMP_KEYS.apex, smoothstep(0, 0.5, u)]
+    : [JUMP_KEYS.apex, JUMP_KEYS.landing, smoothstep(0.5, 1, u)];
+  const value = (key) => lerp(from[key], to[key], t);
+  const pose = { hipsYaw: 0, spinePitch: value('spinePitch'), spineYaw: 0 };
+  for (const i of [0, 1]) {
+    const side = sideOf(i);
+    const lead = (i === 0 ? 8 : -6) * t;   // 兩腳不完全對稱，看起來比較自然
+    Object.assign(pose, {
+      ['hipX' + i]: value('hipX') + lead, ['hipZ' + i]: side * 4, ['knee' + i]: value('knee'), ['foot' + i]: value('foot'),
+      ['shoulderX' + i]: value('shoulderX'), ['shoulderZ' + i]: side * value('shoulderZ'), ['elbow' + i]: value('elbow'),
+    });
+  }
+  return pose;
+}
+
+// 落地緩衝：蹲低、上身前傾，手往前平衡。疊加在地面姿勢上。
+function addLandingCrouch(pose, amount) {
+  pose.spinePitch -= 10 * amount;
+  for (const i of [0, 1]) {
+    pose['hipX' + i] += 40 * amount;
+    pose['knee' + i] -= 75 * amount;
+    pose['shoulderX' + i] += 15 * amount;
+    pose['elbow' + i] += 15 * amount;
+  }
+}
+
+// 有關節的方塊人：骨盆（下身）→ 腰 → 胸（上身）→ 脖子 → 頭；肩 → 肘 → 腕；髖 → 膝 → 踝。
+// 架構照遊戲引擎的動畫系統：步態依速度混合走路／跑步、跳躍分成起跳／空中／落地三個狀態，
+// 最後疊上次要動作（加速前傾、轉彎內傾、頭部保持水平）。步伐依實際移動距離推進，腳不會滑。
+function createAvatarRig() {
+  const root = new THREE.Group();
+  const tilt = new THREE.Group();   // 轉彎內傾的支點在腳底
+  root.add(tilt);
+  const joints = { hip: [], knee: [], ankle: [], shoulder: [], elbow: [] };
+  const soleMarkers = [];
+  const markerPos = new THREE.Vector3();
+  const motions = {
+    fwd: { velocity: 0 }, side: { velocity: 0 }, gait: { velocity: 0 }, air: { velocity: 0 },
+    land: { velocity: 0 }, lean: { velocity: 0 }, bank: { velocity: 0 },
+  };
+  const state = {
+    height: REFERENCE_HEIGHT, phase: 0, time: 0, fwd: 0, side: 0, sag: 1, lat: 0, gait: 0,
+    air: 0, land: 0, landHold: 0, lastRise: 0, wasGrounded: true, lean: 0, bank: 0,
+  };
+  const ground = { rest: 0, idle: 0, crouch: 0, walk: {}, run: {} };   // 烘焙好的骨盆高度
+  let hips;
+  let spine;
+  let neck;
+
+  function addJoint(parent, position) {
+    const joint = new THREE.Group();
+    joint.position.set(...position);
+    parent.add(joint);
+    return joint;
+  }
+
+  // 四肢方塊從關節往下長，轉關節時整段跟著擺。
+  function addLimb(joint, material, width, length, depth) {
+    addBox(joint, material, [width, length, depth], [0, -length / 2, 0]);
+  }
+
+  function buildHead(parent, H) {
+    const head = addJoint(parent, [0, BODY.neck * H, 0]);
+    const w = 0.15 * H;
+    const h = BODY.head * H;
+    const d = 0.15 * H;
+    addBox(head, materials.playerSkin, [w, h, d], [0, h / 2, 0]);
+    addBox(head, materials.playerFace, [w + 0.01, 0.04 * H, d + 0.01], [0, h - 0.015 * H, 0]);        // 頭髮
+    addBox(head, materials.playerFace, [w + 0.01, h * 0.6, 0.025 * H], [0, h * 0.65, d / 2]);         // 後腦頭髮
+    addBox(head, materials.playerSkin, [0.03 * H, 0.035 * H, 0.03 * H], [0, h * 0.38, -d / 2 - 0.012 * H]);   // 鼻子
+    for (const side of [-1, 1]) {
+      addBox(head, materials.playerFace, [0.028 * H, 0.022 * H, 0.006], [side * 0.035 * H, h * 0.52, -d / 2 - 0.002]);
+    }
+  }
+
+  function buildArm(index, H) {
+    const side = sideOf(index);
+    const shoulder = addJoint(spine, [side * 0.15 * H, (BODY.chest - 0.025) * H, 0]);
+    addLimb(shoulder, materials.player, 0.065 * H, BODY.upperArm * H, 0.07 * H);
+    const elbow = addJoint(shoulder, [0, -BODY.upperArm * H, 0]);
+    addLimb(elbow, materials.playerSkin, 0.055 * H, BODY.forearm * H, 0.058 * H);
+    const wrist = addJoint(elbow, [0, -BODY.forearm * H, 0]);
+    addLimb(wrist, materials.playerSkin, 0.06 * H, BODY.hand * H, 0.035 * H);
+    joints.shoulder[index] = shoulder;
+    joints.elbow[index] = elbow;
+  }
+
+  function buildLeg(index, H) {
+    const side = sideOf(index);
+    const hip = addJoint(hips, [side * 0.055 * H, 0, 0]);
+    addLimb(hip, materials.playerPants, 0.095 * H, BODY.thigh * H, 0.1 * H);
+    const knee = addJoint(hip, [0, -BODY.thigh * H, 0]);
+    addLimb(knee, materials.playerPants, 0.08 * H, BODY.shin * H, 0.085 * H);
+    const ankle = addJoint(knee, [0, -BODY.shin * H, 0]);
+    const sole = -BODY.ankle * H;
+    const heel = 0.045 * H;
+    const toe = 0.12 * H;
+    addBox(ankle, materials.playerShoe, [0.075 * H, BODY.ankle * H, heel + toe], [0, sole / 2, (heel - toe) / 2]);
+    for (const z of [heel, -toe]) soleMarkers.push(addJoint(ankle, [0, sole, z]));
+    joints.hip[index] = hip;
+    joints.knee[index] = knee;
+    joints.ankle[index] = ankle;
+  }
+
+  function applyPose(pose) {
+    hips.rotation.y = DEG(pose.hipsYaw);
+    spine.rotation.set(DEG(pose.spinePitch), DEG(pose.spineYaw), 0);
+    neck.rotation.x = -DEG(pose.spinePitch);   // 頭部保持水平：上身怎麼傾，脖子就反向補回來
+    for (const i of [0, 1]) {
+      joints.hip[i].rotation.set(DEG(pose['hipX' + i]), 0, DEG(pose['hipZ' + i]));
+      joints.knee[i].rotation.x = DEG(pose['knee' + i]);
+      // 腳踝角度由「腳板對地角度」反推，大腿、小腿怎麼擺，腳板都維持想要的角度。
+      joints.ankle[i].rotation.x = DEG(pose['foot' + i] - pose['hipX' + i] - pose['knee' + i]);
+      joints.shoulder[i].rotation.set(DEG(pose['shoulderX' + i]), 0, DEG(pose['shoulderZ' + i]));
+      joints.elbow[i].rotation.x = DEG(pose['elbow' + i]);
+    }
+  }
+
+  // 骨盆在原位時，最低的腳底離地多高（正的 = 浮在空中，骨盆要往下降這麼多）。
+  function measureLowestSole(pose) {
+    applyPose(pose);
+    hips.position.y = ground.rest;
+    tilt.rotation.z = 0;
+    root.updateMatrixWorld(true);
+    let lowest = Infinity;
+    for (const marker of soleMarkers) lowest = Math.min(lowest, marker.getWorldPosition(markerPos).y - root.position.y);
+    return lowest;
+  }
+
+  // 每種步態、方向各取 16 格算出骨盆高度，執行時用平滑曲線讀表；不再每格找最低點，
+  // 支撐腳換腳的那一格也不會有高度轉折（之前落地會震一下就是這個原因）。
+  function bakeGroundHeights() {
+    ground.idle = measureLowestSole(idlePose(0));
+    const crouched = idlePose(0);
+    addLandingCrouch(crouched, 1);
+    ground.crouch = measureLowestSole(crouched) - ground.idle;
+    for (const gaitName of ['walk', 'run']) {
+      for (const direction of DIRECTIONS) {
+        const sag = { forward: 1, backward: -1, side: 0 }[direction];
+        const samples = [];
+        for (let k = 0; k < BOB_SAMPLES; k++) {
+          samples.push(measureLowestSole(gaitPose(k / BOB_SAMPLES, GAIT_KEYS[gaitName], GAIT_STYLE[gaitName], sag, 1 - Math.abs(sag))));
+        }
+        ground[gaitName][direction] = smoothLoop(samples, BOB_SMOOTH_PASSES);
+      }
+    }
+  }
+
+  function build(eyeHeight) {
+    disposeChildren(tilt);
+    soleMarkers.length = 0;
+    const H = eyeHeight / EYE_RATIO;
+    state.height = H;
+    ground.rest = HIP_RATIO * H;
+    hips = addJoint(tilt, [0, ground.rest, 0]);
+    addBox(hips, materials.playerPants, [0.2 * H, (BODY.pelvis + 0.03) * H, 0.12 * H], [0, ((BODY.pelvis - 0.03) / 2) * H, 0]);   // 骨盆（下身）
+    spine = addJoint(hips, [0, BODY.pelvis * H, 0]);
+    addBox(spine, materials.player, [0.23 * H, BODY.chest * H, 0.13 * H], [0, (BODY.chest / 2) * H, 0]);                       // 胸（上身）
+    neck = addJoint(spine, [0, BODY.chest * H, 0]);
+    addBox(neck, materials.playerSkin, [0.06 * H, (BODY.neck + 0.02) * H, 0.06 * H], [0, (BODY.neck / 2) * H, 0]);
+    buildHead(neck, H);
+    for (const i of [0, 1]) {
+      buildArm(i, H);
+      buildLeg(i, H);
+    }
+    bakeGroundHeights();
+  }
+
+  function groundHeight(run) {
+    const weights = directionWeights(state.sag, state.lat);
+    const gaitHeight = (gaitName) => DIRECTIONS.reduce((sum, direction) => sum + weights[direction] * sampleLoop(ground[gaitName][direction], state.phase), 0);
+    const moving = lerp(gaitHeight('walk'), gaitHeight('run'), run);
+    return lerp(ground.idle, moving, state.gait) + ground.crouch * state.land;
+  }
+
+  function updateLocomotion(motion, dt) {
+    const previousFwd = state.fwd;
+    state.fwd = smoothDamp(state.fwd, motion.forwardSpeed, motions.fwd, GAIT_SMOOTH_TIME, dt);
+    state.side = smoothDamp(state.side, motion.sideSpeed, motions.side, GAIT_SMOOTH_TIME, dt);
+    const speed = Math.hypot(state.fwd, state.side);
+    const isTurningInPlace = speed < 0.1 && motion.turnRate !== 0;
+    if (speed > 0.05) {
+      state.sag = state.fwd / speed;
+      state.lat = state.side / speed;
+    } else if (isTurningInPlace) {
+      state.sag = 1;
+      state.lat = 0;
+    }
+    const cycleLength = (CYCLE_BASE + CYCLE_PER_SPEED * speed) * (state.height / REFERENCE_HEIGHT);
+    const cyclesPerSecond = isTurningInPlace ? Math.abs(motion.turnRate) * TURN_STEP_RATE : speed / cycleLength;
+    if (motion.isGrounded) state.phase = wrap01(state.phase + cyclesPerSecond * dt);
+    const gaitTarget = isTurningInPlace ? 0.35 : smoothstep(0, 0.5, speed);
+    state.gait = smoothDamp(state.gait, gaitTarget, motions.gait, GAIT_SMOOTH_TIME, dt);
+
+    const accel = (state.fwd - previousFwd) / dt;
+    const leanTarget = motion.isGrounded ? clamp(accel * ACCEL_LEAN_PER_MS2, -MAX_ACCEL_LEAN, MAX_ACCEL_LEAN) : 0;
+    state.lean = smoothDamp(state.lean, leanTarget, motions.lean, LEAN_SMOOTH_TIME, dt);
+    const bankTarget = clamp(motion.turnRate * speed * BANK_PER_TURN_SPEED, -MAX_BANK, MAX_BANK);
+    state.bank = smoothDamp(state.bank, bankTarget, motions.bank, LEAN_SMOOTH_TIME, dt);
+    return speed;
+  }
+
+  // 跳躍狀態：地面 → 空中（姿勢跟著垂直速度走）→ 落地緩衝（下落越快蹲越深）→ 地面。
+  function updateAirborne(motion, dt) {
+    if (motion.isGrounded && !state.wasGrounded) {
+      state.land = clamp(-state.lastRise, LAND_MIN, 1);
+      state.landHold = LAND_HOLD;
+      motions.land.velocity = 0;
+    }
+    if (!motion.isGrounded) state.lastRise = motion.riseRatio;
+    state.wasGrounded = motion.isGrounded;
+    state.landHold = Math.max(0, state.landHold - dt);
+    if (state.landHold === 0) state.land = smoothDamp(state.land, 0, motions.land, LAND_SMOOTH_TIME, dt);
+    state.air = smoothDamp(state.air, motion.isGrounded ? 0 : 1, motions.air, AIR_SMOOTH_TIME, dt);
+  }
+
+  // motion：forwardSpeed／sideSpeed 是實際位移換算的速度（m/s，角色座標），撞牆時是 0，腳就不會原地空踩。
+  function animate(motion, dt) {
+    if (!hips || dt <= 0) return;
+    state.time += dt;
+    const speed = updateLocomotion(motion, dt);
+    updateAirborne(motion, dt);
+    const run = smoothstep(RUN_BLEND[0], RUN_BLEND[1], speed);
+    const keys = {};
+    for (const channel of ['hip', 'knee', 'foot']) keys[channel] = GAIT_KEYS.walk[channel].map((value, k) => lerp(value, GAIT_KEYS.run[channel][k], run));
+    const style = Object.fromEntries(Object.keys(GAIT_STYLE.walk).map((key) => [key, lerp(GAIT_STYLE.walk[key], GAIT_STYLE.run[key], run)]));
+    const grounded = blendPose(idlePose(state.time), gaitPose(state.phase, keys, style, state.sag, state.lat), state.gait);
+    addLandingCrouch(grounded, state.land);
+    const pose = blendPose(grounded, airPose(motion.riseRatio), state.air);
+    pose.spinePitch -= state.lean;
+    applyPose(pose);
+    hips.position.y = ground.rest - groundHeight(run) * (1 - state.air);
+    tilt.rotation.z = DEG(state.bank);
+  }
+
+  return { root, build, animate };
+}
+
 // 第一人稱與第三人稱是同一個模式：鏡頭距離 0 是第一人稱，滾輪拉遠就從背後看到方塊角色。
 function createFirstPersonMode() {
   const canvas = renderer.domElement;
@@ -955,7 +1344,8 @@ function createFirstPersonMode() {
   const head = new THREE.Vector3();
   const lookDir = new THREE.Vector3();
   const cameraRay = new THREE.Raycaster();
-  const avatar = new THREE.Group();
+  const rig = createAvatarRig();
+  const avatar = rig.root;
   avatar.visible = false;
   scene.add(avatar);
   let avatarEyeHeight = null;
@@ -1088,16 +1478,10 @@ function createFirstPersonMode() {
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('contextmenu', (event) => { if (isActive) event.preventDefault(); });
 
-  // 方塊角色：身體＋頭＋鼻子（看得出面向哪裡），高度跟著眼睛高度。
+  // 角色身高跟著眼睛高度；改設定時整個重建。
   function buildAvatar() {
-    disposeChildren(avatar);
-    const h = config.player.eyeHeight;
-    const { width, depth, head: headSize, nose } = AVATAR;
-    const torsoHeight = h - headSize / 2;
-    addBox(avatar, materials.player, [width, torsoHeight, depth], [0, torsoHeight / 2, 0]);
-    addBox(avatar, materials.player, [headSize, headSize, headSize], [0, h, 0]);
-    addBox(avatar, materials.playerFace, [nose, nose, nose], [0, h, -headSize / 2 - nose / 2]);
-    avatarEyeHeight = h;
+    rig.build(config.player.eyeHeight);
+    avatarEyeHeight = config.player.eyeHeight;
   }
 
   function zoom(deltaY) {
@@ -1210,13 +1594,28 @@ function createFirstPersonMode() {
     }
   }
 
+  // 實際位移轉成角色座標的前後／左右速度，交給方塊人決定步伐。
+  function animateAvatar(dx, dz, turn, dt) {
+    if (dt <= 0) return;
+    const sin = Math.sin(yaw);
+    const cos = Math.cos(yaw);
+    rig.animate({
+      forwardSpeed: (-sin * dx - cos * dz) / dt,
+      sideSpeed: (cos * dx - sin * dz) / dt,
+      turnRate: turn * DEG(config.player.turnSpeed),
+      isGrounded: isGrounded(),
+      riseRatio: velocityY / Math.sqrt(2 * GRAVITY * JUMP_HEIGHT),
+    }, dt);
+  }
+
   function walk(forward, right, dt) {
     const length = Math.hypot(right, forward);
     if (length === 0) return;
     dismissHint();
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
-    const step = (config.player.speed * dt) / length;
+    const speed = isHeld('run') ? config.player.runSpeed : config.player.speed;
+    const step = (speed * dt) / length;
     const dx = (-sin * forward + cos * right) * step;
     const dz = (-cos * forward - sin * right) * step;
     const substeps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / MAX_SUBSTEP));
@@ -1271,7 +1670,10 @@ function createFirstPersonMode() {
       yaw += turnDelta;
       if (mouseButtons === 0) cameraYaw += turnDelta;
       updateJump(dt);
+      const startX = body.x;
+      const startZ = body.z;
       walk(forward, right, dt);
+      animateAvatar(body.x - startX, body.z - startZ, turn, dt);
       followCharacter(dt, turn !== 0 || forward !== 0 || right !== 0, forward > 0);
       placeCamera(dt);
     },
@@ -2264,7 +2666,8 @@ function buildGui() {
 
   const player = panel.addFolder('第一人稱');
   player.add(config.player, 'eyeHeight', 1, 2, 0.05).name('眼睛高度');
-  player.add(config.player, 'speed', 0.5, 4, 0.1).name('速度（m/s）');
+  player.add(config.player, 'speed', 0.5, 4, 0.1).name('走路（m/s）');
+  player.add(config.player, 'runSpeed', 1, 6, 0.1).name('跑步（m/s）');
   player.add(config.player, 'turnSpeed', 60, 360, 10).name('轉身（度/秒）');
 
   const thirdPerson = panel.addFolder('第三人稱預設視角');
