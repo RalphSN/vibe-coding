@@ -1,0 +1,265 @@
+<script>
+/* ==========================================================================
+   模組 5：資產類別
+   ========================================================================== */
+defineTerms({
+  '股票': { en: 'stock / equity', def: '公司所有權的一小部分；持有人分享公司的獲利（股利）與成長，也承擔經營失敗的風險。', example: '持有一張股票 ＝ 1,000 股。', lesson: '5-1' },
+  '股利': { en: 'dividend', def: '公司把一部分獲利以現金或股票分配給股東。', example: '每股配 2 元現金股利。', lesson: '5-1' },
+  '除權息': { en: 'ex-dividend', def: '發放股利時，股價會在除息日扣掉股利金額；配息本身不會讓總資產變多。', example: '股價 100、配 3 元 → 除息後參考價 97。', lesson: '5-1' },
+  '債券': { en: 'bond', def: '借錢給政府或企業的憑證；借方承諾定期付利息、到期還本金。', example: '10 年期公債，每年付 2% 利息。', lesson: '5-2' },
+  '殖利率': { en: 'yield', def: '以目前價格買進債券並持有到期，每年大約能得到的報酬率；和債券價格反方向變動。', example: '價格下跌，殖利率上升。', lesson: '5-2' },
+  '存續期間': { en: 'duration', def: '衡量債券價格對利率變化有多敏感；利率每上升 1 個百分點，價格大約下跌「存續期間」個百分點。', example: '存續期間 9 年，利率升 1% → 價格約跌 9%。', lesson: '5-2' },
+  '信用風險': { en: 'credit risk', def: '借款人無法如期付息或還本的風險；風險越高，要求的殖利率越高。', example: '公司債殖利率高於公債。', lesson: '5-2' },
+  'REITs': { en: 'real estate investment trusts', def: '不動產投資信託：把多筆不動產的租金收入包裝成可在市場交易的受益憑證。', example: '持有辦公大樓、商場的 REITs。', lesson: '5-3' },
+});
+
+function bondPrice(coupon, y, n) { let p = 0; for (let k = 1; k <= n; k += 1) p += coupon / (1 + y) ** k; return p + 100 / (1 + y) ** n; }
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '說出股票報酬的來源與風險',
+      '說明配息為什麼不會讓總資產變多',
+      '分辨個股風險與市場風險',
+    ],
+    analogy: {
+      text: ['買[[股票]]就是成為一家公司的小股東。公司賺錢，你分到[[股利]]，公司長大，你持有的那一小塊也跟著變值錢；公司虧損甚至倒閉，你的那一塊也會縮水或歸零。', '股票的長期報酬高於債券與現金，是因為股東排在最後：員工、供應商、債權人都先拿走他們的份，剩下的才是股東的。承擔「最後一個拿」的風險，換來「拿走全部剩餘」的權利。'],
+      limit: ['小股東沒辦法決定公司怎麼經營；股價也不只反映公司的實際表現，還反映市場情緒（0-1 的評價變化）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="公司營收的分配順序：先付員工薪資與供應商成本，再付債權人利息，再繳稅，剩下的盈餘屬於股東，可以發放股利或保留再投資">
+        ${[['營收', 520, 'm7'], ['− 薪資、原料、營運成本', 420, 'm5'], ['− 利息（債權人先拿）', 340, 'm1'], ['− 稅', 290, 'm0'], ['＝ 盈餘（屬於股東）', 240, 'm2']].map(([t, w, c], i) => `<rect x="20" y="${14 + i * 50}" width="${w}" height="42" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="34" y="${41 + i * 50}" font-size="14" font-weight="900" class="on-color">${t}</text>`).join('')}
+        <text x="270" y="258" font-size="13" font-weight="900">→ 發股利，或保留下來再投資</text>
+      </svg>`,
+      caption: '股東是「剩餘請求權人」：好年冬分到最多，壞年冬最先被犧牲。',
+    },
+    define: [
+      { term: '股票', en: 'stock', def: '公司所有權的一部分。', example: '1 張 ＝ 1,000 股。' },
+      { term: '股利', en: 'dividend', def: '分給股東的獲利。', example: '每股 2 元。' },
+      { term: '除權息', en: 'ex-dividend', def: '配息時股價扣掉股利。', example: '100 → 97。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'dividend', text: '配息不是「多出來的錢」' },
+        '很多人偏好高股息，覺得每年有現金入帳比較安心。但配息時，股價會在除息日扣掉同樣的金額：股價 100 元、配 3 元，除息後的參考價就是 97 元，你的總資產（股票 97 ＋ 現金 3）沒有變。真正讓總資產增加的，是公司後續賺到的錢，而不是配息這個動作本身。',
+        { type: 'widget', name: 'knobs', props: { title: '配息與總報酬（實際計算，不含稅與二代健保，第四部再算）', sliders: [
+          { id: 'price', label: '除息前股價', min: 10, max: 1000, step: 1, value: 100, unit: '元' },
+          { id: 'div', label: '每股股利', min: 0, max: 50, step: 0.5, value: 3, unit: '元' },
+          { id: 'shares', label: '持有股數', min: 1000, max: 100000, step: 1000, value: 10000, unit: '股' },
+          { id: 'fill', label: '之後一年股價變化（相對除息參考價）', min: -40, max: 40, step: 1, value: 0, unit: '%' },
+        ], compute: (v) => {
+          const before = v.price * v.shares;
+          const ref = v.price - v.div;
+          const after = ref * (1 + v.fill / 100) * v.shares + v.div * v.shares;
+          return { rows: [
+            { label: '除息前總資產', value: `${before.toLocaleString()} 元`, ratio: 1 },
+            { label: '除息當下：股票＋現金', value: `${(ref * v.shares).toLocaleString()} ＋ ${(v.div * v.shares).toLocaleString()} 元`, ratio: 1 },
+            { label: '一年後總資產', value: `${Math.round(after).toLocaleString()} 元`, ratio: Math.min(1, after / (before * 1.5)) },
+            { label: '總報酬', value: `${(((after / before) - 1) * 100).toFixed(1)}%`, ratio: Math.min(1, Math.abs(after / before - 1)) },
+          ], note: '股價沒有「填息」（之後變化 0%）時，總報酬是 0%：配息只是把一部分股票價值換成現金。判斷投資好壞要看總報酬（價格變化＋股利），不是殖利率。' };
+        } } },
+        { type: 'heading', id: 'single', text: '單一股票 vs 整個市場' },
+        { type: 'table', head: ['', '單一股票', '整個市場（指數）'], rows: [
+          ['報酬來源', '這家公司的成敗', '所有上市公司的總和'],
+          ['可能歸零嗎', '可能（倒閉、下市）', '整個市場長期歸零的情況極少'],
+          ['波動', '大', '較小（個別風險被分散）'],
+          ['需要的功課', '財報、產業、估值（第五部）', '很少'],
+          ['長期結果分布', '很不平均：少數公司貢獻大部分漲幅', '接近市場平均'],
+        ], caption: '長期研究普遍發現，股市的整體漲幅集中在少數表現極好的公司；隨機挑一檔股票，結果落後市場的機率比贏過市場高。這是指數化投資（模組 6）的另一個理由。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="個股報酬分布的示意：很多股票報酬普通或虧損，少數股票報酬極高，把平均拉高；所以平均報酬高於多數個股的報酬">
+          <line x1="40" y1="190" x2="530" y2="190" class="stroke-ink" stroke-width="2"/>
+          ${[30, 55, 70, 62, 45, 30, 20, 13, 8, 5, 3, 2, 1, 1].map((h, i) => `<rect x="${50 + i * 34}" y="${190 - h * 2}" width="28" height="${h * 2}" style="fill:var(--m${i < 4 ? 4 : i < 9 ? 3 : 2})" class="stroke-ink" stroke-width="2"/>`).join('')}
+          <line x1="260" y1="30" x2="260" y2="190" style="stroke:var(--m5)" stroke-width="3" stroke-dasharray="6 4"/>
+          <text x="266" y="40" font-size="13" font-weight="900">市場平均</text>
+          <text x="90" y="212" text-anchor="middle" font-size="12">虧損</text>
+          <text x="490" y="212" text-anchor="middle" font-size="12">報酬極高的少數</text>
+        </svg>`, caption: '示意圖。右尾的少數贏家把平均拉高，所以「中位數的個股」常常低於市場平均。持有整個市場，才能確保持有那些少數贏家。' },
+        { type: 'heading', id: 'metrics', text: '深入：三個最常見的股票數字' },
+        { type: 'table', head: ['數字', '算法', '意思', '限制'], rows: [
+          ['市值', '股價 × 總股數', '市場對整家公司的定價', '不代表公司「值」多少'],
+          ['本益比', '股價 ÷ 每股盈餘', '每賺 1 元，市場願意付幾元', '盈餘可能是一時的高或低'],
+          ['股利殖利率', '每股股利 ÷ 股價', '用現在價格買進的現金回報率', '高殖利率可能是因為股價大跌'],
+        ], caption: '這些數字的完整用法（財報、估值）在第五部；用指數化投資的人，只要知道它們的意思就夠了。' },
+        { type: 'heading', id: 'small-amounts', text: '深入：小額投資股票的方式' },
+        '台股一張是 1,000 股，價格高的股票或 ETF 一張要數十萬元。小額投資常見的方式有兩種：零股交易（以股為單位買賣），以及券商提供的定期定額（每月固定金額自動買進）。兩者都讓小額投資人能夠持有分散的 ETF；要注意的是每筆的最低手續費，金額太小時手續費的比例可能偏高。細節與成本比較在第四部。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為高股息就是高報酬。', why: '配息時股價會扣掉股利。', right: '看總報酬：價格變化＋股利。' },
+      { wrong: '用「公司很有名」選股。', why: '好公司不等於好投資，價格可能早已反映。', right: '不想研究就持有整個市場。' },
+      { wrong: '集中持有少數個股。', why: '個股可能歸零，報酬分布很不平均。', right: '用指數分散，確保持有少數贏家。' },
+    ],
+    keypoints: [
+      '股東最後拿、拿全部剩餘，所以長期報酬較高。',
+      '配息本身不增加總資產，要看總報酬。',
+      '市場漲幅集中在少數公司，持有整體最穩。',
+    ],
+    sources: ['ubs-2026', 'tw50-2025'],
+  },
+
+  '5-2': {
+    goals: [
+      '說明債券價格與殖利率為什麼反向',
+      '用存續期間估算利率變動的影響',
+      '說出債券在組合裡的角色',
+    ],
+    analogy: {
+      text: ['你手上有一張每年付 2% 利息的借據。如果市場上新的借據變成付 3%，還有誰願意用原價買你那張只付 2% 的？只有打折賣才賣得掉。這就是[[債券]]價格和[[殖利率]]反向變動的原因。', '借據離到期越久，被「低利息」綁住的時間越長，打折就要打得越多。衡量這個敏感度的數字叫[[存續期間]]。'],
+      limit: ['借據的比喻假設借方一定會還錢；真實的債券還有[[信用風險]]：公司可能違約，這時價格會大跌，而且不一定和利率有關。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="債券價格與殖利率的蹺蹺板：殖利率上升時價格下跌，殖利率下降時價格上漲；10 年期、票面 2% 的債券，殖利率升到 3% 價格約 91.5，降到 1% 價格約 109.5">
+        <polygon points="280,200 260,240 300,240" class="fill-surface stroke-ink" stroke-width="3"/>
+        <line x1="80" y1="150" x2="480" y2="230" class="stroke-ink" stroke-width="6"/>
+        <rect x="70" y="100" width="130" height="50" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="135" y="131" text-anchor="middle" font-size="14" font-weight="900" class="on-color">殖利率 ↑ 3%</text>
+        <rect x="380" y="180" width="140" height="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="450" y="211" text-anchor="middle" font-size="14" font-weight="900" class="on-color">價格 ↓ 約 91.5</text>
+        <text x="280" y="40" text-anchor="middle" font-size="14" font-weight="900">10 年期、票面利率 2%、面額 100</text>
+        <text x="280" y="66" text-anchor="middle" font-size="13">殖利率降到 1%：價格約 109.5</text>
+      </svg>`,
+      caption: '價格 ＝ 未來每一筆利息與本金的現值（1-2）。用來折現的利率（殖利率）越高，現值越低。',
+    },
+    define: [
+      { term: '殖利率', en: 'yield', def: '持有到期的年化報酬。', example: '和價格反向。' },
+      { term: '存續期間', en: 'duration', def: '價格對利率的敏感度。', example: '9 年。' },
+      { term: '信用風險', en: 'credit risk', def: '借方違約的風險。', example: '公司債較高。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '債券價格計算器（每年付息、面額 100，實際計算）', sliders: [
+          { id: 'coupon', label: '票面利率', min: 0, max: 10, step: 0.25, value: 2, unit: '%' },
+          { id: 'years', label: '剩餘年數', min: 1, max: 30, step: 1, value: 10, unit: '年' },
+          { id: 'y0', label: '原本的殖利率', min: 0.25, max: 10, step: 0.25, value: 2, unit: '%' },
+          { id: 'y1', label: '變動後的殖利率', min: 0.25, max: 10, step: 0.25, value: 3, unit: '%' },
+        ], compute: (v) => {
+          const p0 = bondPrice(v.coupon, v.y0 / 100, v.years);
+          const p1 = bondPrice(v.coupon, v.y1 / 100, v.years);
+          let mac = 0; for (let k = 1; k <= v.years; k += 1) mac += (k * v.coupon) / (1 + v.y0 / 100) ** k;
+          mac = (mac + (v.years * 100) / (1 + v.y0 / 100) ** v.years) / p0;
+          const mod = mac / (1 + v.y0 / 100);
+          return { rows: [
+            { label: '原本價格', value: p0.toFixed(2), ratio: Math.min(1, p0 / 150) },
+            { label: '變動後價格', value: p1.toFixed(2), ratio: Math.min(1, p1 / 150) },
+            { label: '價格變化', value: `${(((p1 / p0) - 1) * 100).toFixed(2)}%`, ratio: Math.min(1, Math.abs(p1 / p0 - 1) * 4) },
+            { label: '修正存續期間（估算用）', value: `${mod.toFixed(2)} 年`, ratio: Math.min(1, mod / 25) },
+          ], note: '預設：10 年期、2% 票面，殖利率從 2% 升到 3%，價格約從 100 跌到 91.5，約 −8.5%；存續期間約 9 年，用「−9 × 1%」估算也很接近。把剩餘年數改成 2 年，同樣的升息只跌約 2%。' };
+        } } },
+        { type: 'heading', id: 'role', text: '債券在組合裡的角色' },
+        { type: 'table', head: ['角色', '說明', '要注意'], rows: [
+          ['降低波動', '高品質債券的波動通常遠小於股票', '利率大幅上升時，長天期債券也會大跌'],
+          ['危機時的緩衝', '股市大跌時，高品質公債常持平或上漲', '不是每一次都成立（例如高通膨時期）'],
+          ['再平衡的彈藥', '股票大跌時，可以賣債券買股票（第四部）', '需要事先決定規則'],
+          ['穩定的現金流', '定期利息，適合接近退休的人', '高收益債的利息高，是因為信用風險高'],
+        ], caption: '台灣 10 年期公債殖利率在 2026 年 7 月底升到約 1.8% 多，是三年來的高點；殖利率水準會影響債券未來的預期報酬。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="債券的兩個風險軸：橫軸是期限，越長對利率越敏感；縱軸是信用品質，越低違約風險越高；短天期高品質公債最穩，長天期低品質債券波動最大">
+          <line x1="60" y1="200" x2="530" y2="200" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="200" class="stroke-ink" stroke-width="2"/>
+          <text x="295" y="224" text-anchor="middle" font-size="13" font-weight="900">期限：短 → 長（利率風險）</text>
+          <text x="36" y="60" text-anchor="middle" font-size="12" font-weight="900">信用</text><text x="36" y="76" text-anchor="middle" font-size="12" font-weight="900">低</text>
+          <text x="36" y="170" text-anchor="middle" font-size="12" font-weight="900">信用</text><text x="36" y="186" text-anchor="middle" font-size="12" font-weight="900">高</text>
+          <circle cx="110" cy="175" r="14" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="130" y="168" font-size="13" font-weight="900">短天期公債：最穩</text>
+          <circle cx="460" cy="175" r="14" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="440" y="150" text-anchor="end" font-size="13" font-weight="900">長天期公債：對利率敏感</text>
+          <circle cx="460" cy="50" r="14" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="440" y="55" text-anchor="end" font-size="13" font-weight="900">長天期高收益債：波動最大</text>
+        </svg>`, caption: '想用債券「降低組合的波動」，通常選高品質、期限適中的債券；追求高利息的高收益債，行為更像股票。' },
+        { type: 'heading', id: 'curve', text: '深入：殖利率曲線與再投資風險' },
+        '把不同期限的公債殖利率連成一條線，就是殖利率曲線。通常期限越長、殖利率越高，因為借越久，要補償的不確定性越多；偶爾會出現短期殖利率高於長期的「倒掛」，市場常把它當作景氣可能放緩的訊號（第五部）。',
+        { type: 'table', head: ['風險', '是什麼', '誰比較怕'], rows: [
+          ['利率風險', '利率上升，手上債券的價格下跌', '持有長天期債券、可能提前賣出的人'],
+          ['再投資風險', '利率下降，到期的錢只能用較低利率再投入', '持有短天期債券、需要穩定收入的人'],
+        ], caption: '兩種風險方向相反；選擇存續期間，就是在兩者之間取捨。' },
+        { type: 'heading', id: 'fund-vs-hold', text: '深入：直接買債券 vs 債券基金' },
+        '直接買一張債券並持有到期，只要發行人不違約，就能拿回面額，中途的價格起伏不影響最後結果。債券基金則持續換券、沒有到期日，價格會隨利率變動、不會「到期還本」。兩者各有用途：確定某個時間要用的錢，可以用到期日對應的債券；長期配置裡的債券部位，用低成本的債券基金比較方便。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為債券不會虧錢。', why: '利率上升時價格會跌，信用不佳時可能違約。', right: '看存續期間與信用品質。' },
+      { wrong: '只看殖利率高低挑債券。', why: '高殖利率常反映高信用風險。', right: '先決定債券的角色，再挑品質與期限。' },
+      { wrong: '在利率剛上升、價格下跌時恐慌賣出。', why: '殖利率變高，未來的預期報酬也變高。', right: '依配置與再平衡規則處理。' },
+    ],
+    keypoints: [
+      '殖利率上升，債券價格下跌，反之亦然。',
+      '價格變化 ≈ −存續期間 × 利率變化。',
+      '高品質債券用來降低波動；高收益債像股票。',
+    ],
+    sources: ['tw-bond-2026', 'ubs-2026'],
+  },
+
+  '5-3': {
+    goals: [
+      '說出現金在投資組合裡的位置',
+      '比較自住房、投資房與 REITs',
+      '用四個面向比較四種資產類別',
+    ],
+    analogy: {
+      text: ['如果把投資組合想成一支球隊：股票是前鋒，負責得分但常受傷；債券是後衛，負責防守；現金是板凳上的替補，平常不上場，但隨時可以派上用場；不動產則像一位能攻能守、但很難轉隊的球員。', '沒有一個位置永遠最好。好球隊是依比賽情況搭配，而不是全部派前鋒上場。'],
+      limit: ['球員可以隨時換位置；資產的特性比較固定，而且在極端情況下（例如金融危機）彼此的關係可能突然改變。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="四種資產類別的比較：股票長期報酬高、波動大、流動性好；債券報酬中等、波動中等；現金報酬低、波動最低、流動性最高；不動產報酬中等、流動性最低、單筆金額大">
+        <text x="140" y="24" text-anchor="middle" font-size="13" font-weight="900">長期報酬</text>
+        <text x="300" y="24" text-anchor="middle" font-size="13" font-weight="900">波動</text>
+        <text x="460" y="24" text-anchor="middle" font-size="13" font-weight="900">流動性</text>
+        ${[['股票', [5, 5, 4], 'm4'], ['債券', [3, 3, 4], 'm1'], ['現金', [1, 1, 5], 'm0'], ['不動產', [3, 3, 1], 'm3']].map(([a, vals, c], i) => `<text x="12" y="${68 + i * 56}" font-size="15" font-weight="900">${a}</text>${vals.map((n, j) => Array.from({ length: n }, (_, k) => `<rect x="${80 + j * 160 + k * 24}" y="${50 + i * 56}" width="20" height="28" style="fill:var(--${c})" class="stroke-ink" stroke-width="2"/>`).join('')).join('')}`).join('')}
+      </svg>`,
+      caption: '格數是相對的示意，不是精確數字。不動產的報酬與波動依地段、槓桿差異很大。',
+    },
+    define: [
+      { term: 'REITs', en: 'REITs', def: '可交易的不動產收益憑證。', example: '辦公大樓、商場。' },
+      { term: '股票', en: 'stock', def: '公司所有權。', example: '前鋒。' },
+      { term: '債券', en: 'bond', def: '借據。', example: '後衛。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'cash', text: '現金：不只是預備金' },
+        '第一部的緊急預備金是現金最主要的用途。在投資組合裡，現金還有兩個角色：短期內（例如 3 年內）確定要用的錢，應該放在現金或短期存款，而不是股票；以及作為心理上的緩衝，讓你在市場大跌時不必賣出投資。代價是長期的實質報酬接近 0（2-1）。',
+        { type: 'heading', id: 'realestate', text: '不動產：三種持有方式' },
+        { type: 'table', head: ['', '自住房', '投資（出租）房', 'REITs'], rows: [
+          ['主要報酬', '省下的房租＋房價變化', '租金＋房價變化', '租金分配＋價格變化'],
+          ['金額門檻', '很高，通常要貸款', '很高，通常要貸款', '低，可以小額買'],
+          ['分散', '集中在單一物件', '集中在少數物件', '分散在多個物件'],
+          ['流動性', '很低，買賣要數月', '很低', '高，可以在市場交易'],
+          ['額外成本與工作', '稅、管理費、維修', '空租、管理、維修、稅', '基金的管理費'],
+          ['槓桿', '房貸放大漲跌（第一部 4-2）', '房貸放大漲跌', '通常不需自己借錢'],
+        ], caption: '自住房同時是「消費」與「資產」：它提供居住，也承擔房價風險。把它當成資產配置的一部分時，要記得它高度集中、流動性很低。' },
+        { type: 'widget', name: 'knobs', props: { title: '出租房的實際報酬（簡化試算，不含房價變化與稅）', sliders: [
+          { id: 'price', label: '房價', min: 3000000, max: 50000000, step: 100000, value: 15000000, unit: '元' },
+          { id: 'rent', label: '月租金', min: 5000, max: 150000, step: 1000, value: 30000, unit: '元' },
+          { id: 'vacancy', label: '一年空租', min: 0, max: 6, step: 0.5, value: 1, unit: '個月' },
+          { id: 'cost', label: '每年稅費、維修、管理', min: 0, max: 300000, step: 5000, value: 40000, unit: '元' },
+        ], compute: (v) => {
+          const gross = v.rent * 12;
+          const net = v.rent * (12 - v.vacancy) - v.cost;
+          return { rows: [
+            { label: '毛租金報酬率', value: `${((gross / v.price) * 100).toFixed(2)}%`, ratio: Math.min(1, gross / v.price / 0.06) },
+            { label: '淨租金報酬率', value: `${((net / v.price) * 100).toFixed(2)}%`, ratio: Math.min(1, Math.max(0, net) / v.price / 0.06) },
+            { label: '一年淨收入', value: `${Math.round(net).toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, net) / 1000000) },
+          ], note: '預設：1,500 萬的房子、月租 3 萬，毛報酬 2.4%，扣掉空租一個月與費用後約 1.93%。和定存、債券殖利率比較時，要用淨報酬，再考慮流動性與集中風險；如果有房貸，還要扣掉利息。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="依錢的使用時間選擇資產：三年內要用的錢放現金與短期存款，三到十年的錢可以搭配債券，十年以上的錢才適合較高比例的股票">
+          ${[['3 年內要用', '現金、短期存款', 'm0'], ['3–10 年', '債券為主，搭配部分股票', 'm1'], ['10 年以上', '股票比例可以較高', 'm4']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="${110 - i * 30}" width="165" height="${90 + i * 30}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="${145 - i * 30}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="${172 - i * 30}" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="216" text-anchor="middle" font-size="13">時間越長，越能承受波動、換取較高的長期報酬</text>
+        </svg>`, caption: '這是常見的經驗法則，不是規則；實際比例取決於你的風險承受度，在第四部的資產配置詳細說明。' },
+        { type: 'heading', id: 'rent-buy', text: '深入：租屋還是買房的判斷框架' },
+        '租或買沒有標準答案，但可以用同一張表比較每年的「不可回收成本」：租屋的成本是房租；買房的成本是房貸利息、房屋稅與地價稅、維修、管理費，以及自備款放在別處可能賺到的報酬（機會成本）。',
+        { type: 'table', head: ['租屋的不可回收成本', '買房的不可回收成本'], rows: [
+          ['房租', '房貸利息'],
+          ['—', '房屋稅、地價稅、保險'],
+          ['—', '維修與管理費'],
+          ['—', '自備款的機會成本（1-2）'],
+          ['搬家的成本與不確定', '買賣的交易成本與流動性'],
+        ], caption: '不可回收的成本相近時，買房多了「房價變化」的風險與報酬，以及居住的穩定；租屋多了彈性與分散的機會。房價對年租金的倍數越高，租屋在財務上通常越有利。' },
+        '另一個常被忽略的面向是集中：買房後，很多家庭的淨值大部分集中在一間房子、一個城市，加上房貸的槓桿（第一部 4-2）。這不一定是錯的，但應該是看清楚之後的選擇。',
+      ],
+    },
+    mistakes: [
+      { wrong: '把短期要用的錢放進股票。', why: '需要用錢時可能剛好在低點。', right: '3 年內要用的錢放現金或短期存款。' },
+      { wrong: '只看毛租金報酬率。', why: '空租、稅費、維修、利息都會吃掉報酬。', right: '用淨報酬比較，並考慮流動性。' },
+      { wrong: '把自住房當成可以隨時變現的資產。', why: '流動性極低，而且賣了還要住。', right: '自住房另外看，不計入可投資資產。' },
+    ],
+    keypoints: [
+      '股票前鋒、債券後衛、現金替補、不動產難轉隊。',
+      '不動產有自住、出租、REITs 三種持有方式。',
+      '依錢的使用時間選擇資產類別。',
+    ],
+    sources: ['bot-rates', 'cpi-2026-09', 'ubs-2026'],
+  },
+});
+</script>

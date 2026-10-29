@@ -1,0 +1,257 @@
+<script>
+/* ==========================================================================
+   模組 1：資產配置
+   ========================================================================== */
+defineTerms({
+  '風險能力': { en: 'risk capacity', def: '財務上能承受多大的損失：看投資期間、收入穩定度、預備金與負債。', example: '30 年後才用的錢，承受能力高。', lesson: '1-1' },
+  '風險意願': { en: 'risk willingness', def: '心理上能承受多大的下跌而不賣出。', example: '帳面跌 30% 會不會睡不著。', lesson: '1-1' },
+  '風險需要': { en: 'risk need', def: '為了達成目標，必須承擔多少風險；目標已經達成時，需要就變低。', example: '退休金已經夠了，就不需要高股票比例。', lesson: '1-1' },
+  '核心組合': { en: 'core portfolio', def: '組合中佔大部分、長期持有的低成本分散部位。', example: '全球股票與債券指數基金。', lesson: '1-2' },
+  '目標分桶': { en: 'goal-based buckets', def: '依用錢的時間把資金分成幾個「桶」，每個桶有自己的配置。', example: '3 年內買房的頭期款、20 年後的退休金。', lesson: '1-3' },
+});
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '用能力、意願、需要三個面向決定股債比',
+      '用跌幅測試檢查自己的承受度',
+      '知道年齡法則的用途與限制',
+    ],
+    analogy: {
+      text: ['決定股債比，像是決定開車的速度。能開多快，看三件事：路況與車子（[[風險能力]]：期間多長、收入穩不穩、有沒有預備金）、你敢不敢開快（[[風險意願]]）、以及有沒有必要趕時間（[[風險需要]]）。', '三者取最低的那一個。路況很好、但你一開快就手心冒汗，硬開快只會在彎道出事；你敢開快、但其實時間很充裕，也沒必要冒險。'],
+      limit: ['開車的速度可以隨時調整；股債比如果在恐慌時大幅調降，常常就是賣在低點。所以要在冷靜時先決定好，並寫下來。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="決定股債比的三個面向：風險能力、風險意願、風險需要；最後的股票比例取三者之中最低的那一個">
+        ${[['風險能力', '期間、收入、預備金', 70, 'm2'], ['風險意願', '跌多少會賣', 45, 'm4'], ['風險需要', '目標需要多少報酬', 60, 'm3']].map(([a, b, h, c], i) => `<rect x="${40 + i * 170}" y="${220 - h * 2.4}" width="140" height="${h * 2.4}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${110 + i * 170}" y="${212 - h * 2.4}" text-anchor="middle" font-size="14" font-weight="900">${a}：${h}%</text><text x="${110 + i * 170}" y="${245}" text-anchor="middle" font-size="12">${b}</text>`).join('')}
+        <line x1="30" y1="${220 - 45 * 2.4}" x2="530" y2="${220 - 45 * 2.4}" style="stroke:var(--m5)" stroke-width="3" stroke-dasharray="8 5"/>
+        <text x="530" y="${210 - 45 * 2.4}" text-anchor="end" font-size="13" font-weight="900">取最低：股票約 45%</text>
+      </svg>`,
+      caption: '數字是示意。意願最常是最低的那一個，而且在沒經歷過大跌之前，多數人都高估了自己的意願。',
+    },
+    define: [
+      { term: '風險能力', en: 'capacity', def: '財務上能承受多少。', example: '期間長。' },
+      { term: '風險意願', en: 'willingness', def: '心理上能承受多少。', example: '跌 30% 不賣。' },
+      { term: '風險需要', en: 'need', def: '目標需要多少風險。', example: '已達標就低。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '三個面向的股票比例上限（經驗法則，實際計算）', sliders: [
+          { id: 'years', label: '這筆錢幾年後才用', min: 1, max: 40, step: 1, value: 20, unit: '年' },
+          { id: 'stable', label: '收入穩定度（1 很不穩、3 很穩）', min: 1, max: 3, step: 1, value: 2 },
+          { id: 'fund', label: '預備金已經存滿', min: 0, max: 1, step: 1, value: 1 },
+          { id: 'maxdrop', label: '帳面最多能跌多少而不賣', min: 5, max: 60, step: 5, value: 25, unit: '%' },
+          { id: 'need', label: '目標需要的年報酬', min: 0, max: 8, step: 0.5, value: 5, unit: '%' },
+        ], compute: (v) => {
+          let cap = Math.min(100, v.years * 6) * ({ 1: 0.75, 2: 0.9, 3: 1 }[v.stable]);
+          if (!v.fund) cap = Math.min(cap, 30);
+          const will = Math.min(100, (v.maxdrop / 50) * 100);
+          const need = Math.max(0, Math.min(100, ((v.need - 2.5) / (7 - 2.5)) * 100));
+          const pick = Math.min(cap, will, Math.max(need, 0));
+          return { rows: [
+            { label: '能力上限', value: `${cap.toFixed(0)}%`, ratio: cap / 100 },
+            { label: '意願上限（假設股票最差跌 50%）', value: `${will.toFixed(0)}%`, ratio: will / 100 },
+            { label: '需要（達成目標報酬的比例）', value: `${need.toFixed(0)}%`, ratio: need / 100 },
+            { label: '建議的起點：取最低', value: `股票約 ${Math.round(pick / 5) * 5}%`, ratio: pick / 100 },
+          ], note: '這是幫你思考的經驗法則，不是正式的評估。意願的算法：如果股票在很差的時候跌 50%、債券持平，能承受 25% 的跌幅，股票最多約 50%。需要的算法假設股票 7%、債券 2.5%。' };
+        } } },
+        { type: 'heading', id: 'drop-test', text: '跌幅測試：最誠實的問題' },
+        '問卷很容易高估自己。比較誠實的方法，是用金額而不是百分比想像：你的投資帳戶現在 200 萬，三個月後變成 130 萬，新聞每天都在說還會再跌，同事在討論要不要全部賣掉。你會怎麼做？如果答案是「可能會賣」，現在就把股票比例調低到不會讓你賣的程度。',
+        { type: 'heading', id: 'age-rule', text: '年齡法則：粗略的起點' },
+        { type: 'table', head: ['法則', '算法', '30 歲', '50 歲', '限制'], rows: [
+          ['100 − 年齡', '股票 ＝ 100 − 年齡', '70%', '50%', '對年輕人可能偏保守'],
+          ['110 − 年齡', '股票 ＝ 110 − 年齡', '80%', '60%', '沒有考慮收入穩定度與意願'],
+        ], caption: '年齡法則反映的是「離用錢越近，承受能力越低」。它可以當作起點，但三個面向的判斷比年齡更重要。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="常見的股債比與它們大致的特性：股 80／債 20 波動大、長期報酬期望較高；股 60／債 40 平衡；股 40／債 60 穩健、波動較小">
+          ${[['80／20', '波動大', 'm4', 80], ['60／40', '平衡', 'm3', 60], ['40／60', '穩健', 'm2', 40]].map(([a, b, c, s], i) => `<rect x="${30 + i * 175}" y="30" width="150" height="150" class="fill-bg stroke-ink" stroke-width="3"/><rect x="${30 + i * 175}" y="${30 + 150 * (1 - s / 100)}" width="150" height="${150 * s / 100}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${105 + i * 175}" y="205" text-anchor="middle" font-size="15" font-weight="900">${a}</text><text x="${105 + i * 175}" y="224" text-anchor="middle" font-size="12">${b}</text>`).join('')}
+        </svg>`, caption: '有顏色的部分是股票比例。沒有一個比例適合所有人；重點是你選的比例，在最差的時候也守得住。' },
+        { type: 'heading', id: 'whole-picture', text: '深入：把全部的資產一起看' },
+        '股債比應該看「所有可投資資產」的總比例，而不是每個帳戶各自的比例。例如退休金帳戶全是股票、另一個證券帳戶全是債券，合起來的比例才是你的真實配置。另外，穩定的薪資（尤其是公教人員）有點像債券：未來收入越穩定，越能承受投資組合裡較高的股票比例；收入高度依賴景氣的人則相反（第三部 4-2）。',
+        { type: 'heading', id: 'lifetime', text: '深入：配置會隨人生改變' },
+        { type: 'table', head: ['人生階段', '能力', '需要', '常見的方向'], rows: [
+          ['剛工作', '期間長，但預備金與收入可能還不穩', '需要成長', '預備金存滿後，股票比例可以較高'],
+          ['成家、買房', '固定支出與負債增加', '多個目標同時進行', '依目標分桶，長期桶維持較高股票'],
+          ['中年收入高峰', '能力強', '可能已接近目標', '檢查是否承擔了超過需要的風險'],
+          ['接近退休', '期間縮短、順序風險增加', '保護成果', '逐步降低股票比例，保留一兩年現金'],
+        ], caption: '這是一般的方向，不是規則。最重要的仍是你自己的意願：任何階段，承受不了的配置都不是好配置。' },
+        '調整配置最好是「事先排好的」：例如寫下「50 歲起每年把股票比例降低 1 個百分點」，而不是在某次大跌後才決定降低。',
+      ],
+    },
+    mistakes: [
+      { wrong: '用「想賺多少」決定股票比例。', why: '承受不了的跌幅會讓你賣在低點。', right: '取能力、意願、需要三者最低。' },
+      { wrong: '在大漲之後提高股票比例。', why: '那時的意願常被高估。', right: '在冷靜時決定、寫下來。' },
+      { wrong: '每個帳戶分開看比例。', why: '真實配置是全部加總。', right: '把所有可投資資產合在一起算。' },
+    ],
+    keypoints: [
+      '股債比取能力、意願、需要三者最低。',
+      '用金額做跌幅測試，比問卷誠實。',
+      '年齡法則只是起點；看全部資產的總比例。',
+    ],
+    sources: ['ubs-2026', 'vanguard-rebal'],
+  },
+
+  '1-2': {
+    goals: [
+      '說出兩到三檔基金就能組成的核心組合',
+      '決定台灣與全球股票的比例',
+      '用加權平均算出整個組合的費用',
+    ],
+    analogy: {
+      text: ['一個好的衣櫥不需要一百件衣服：幾件百搭的基本款（[[核心組合]]），就能應付大部分的場合；有餘力再加幾件個人風格的單品。投資組合也是這樣。', '最常見的核心組合只有兩到三塊：全球（或多國）股票、本國股票、債券。用涵蓋面廣的低成本指數基金來做，就同時完成了第三部的分散、低成本與資產類別配置。'],
+      limit: ['衣服可以每天換；組合的比例一旦決定，就應該長期維持，只在再平衡或人生大事時調整。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="三基金核心組合：全球股票、台灣股票、債券三塊；股票之中再決定台灣與全球的比例">
+        <rect x="20" y="40" width="300" height="160" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+        <text x="170" y="110" text-anchor="middle" font-size="18" font-weight="900" class="on-color">全球股票</text>
+        <text x="170" y="138" text-anchor="middle" font-size="13" class="on-color">多國、多產業</text>
+        <rect x="320" y="40" width="100" height="160" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="370" y="110" text-anchor="middle" font-size="16" font-weight="900" class="on-color">台灣股票</text>
+        <rect x="420" y="40" width="120" height="160" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="480" y="110" text-anchor="middle" font-size="18" font-weight="900" class="on-color">債券</text>
+        <text x="220" y="228" text-anchor="middle" font-size="13" font-weight="900">股票（例如 70%）</text>
+        <text x="480" y="228" text-anchor="middle" font-size="13" font-weight="900">債券（例如 30%）</text>
+        <text x="280" y="258" text-anchor="middle" font-size="12">寬度是示意比例</text>
+      </svg>`,
+      caption: '也有「一檔就涵蓋全球股債」的基金或 ETF 可以選；檔數越少，再平衡越簡單。',
+    },
+    define: [
+      { term: '核心組合', en: 'core', def: '長期持有的分散部位。', example: '三檔基金。' },
+      { term: '資產配置', en: 'allocation', def: '各類資產的比例。', example: '70／30。' },
+      { term: '總持有成本', en: 'TCO', def: '所有成本加總。', example: '加權平均費用。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '三塊核心組合：比例與加權費用（實際計算，費用請填你選的工具）', sliders: [
+          { id: 'g', label: '全球股票', min: 0, max: 100, step: 5, value: 50, unit: '%' },
+          { id: 't', label: '台灣股票', min: 0, max: 100, step: 5, value: 20, unit: '%' },
+          { id: 'feeG', label: '全球股票工具的總費用率', min: 0, max: 2, step: 0.05, value: 0.3, unit: '%' },
+          { id: 'feeT', label: '台灣股票工具的總費用率', min: 0, max: 2, step: 0.05, value: 0.2, unit: '%' },
+          { id: 'feeB', label: '債券工具的總費用率', min: 0, max: 2, step: 0.05, value: 0.2, unit: '%' },
+        ], compute: (v) => {
+          const b = Math.max(0, 100 - v.g - v.t);
+          const over = v.g + v.t > 100;
+          const fee = (v.g * v.feeG + v.t * v.feeT + b * v.feeB) / Math.max(1, v.g + v.t + b);
+          const twShare = v.g + v.t > 0 ? v.t / (v.g + v.t) : 0;
+          return { rows: [
+            { label: '債券（剩下的）', value: over ? '股票已超過 100%' : `${b}%`, ratio: b / 100 },
+            { label: '股票合計', value: `${Math.min(100, v.g + v.t)}%`, ratio: Math.min(1, (v.g + v.t) / 100) },
+            { label: '台灣佔股票的比例', value: `${(twShare * 100).toFixed(0)}%`, ratio: twShare },
+            { label: '組合的加權費用率', value: `${fee.toFixed(3)}%／年`, ratio: Math.min(1, fee / 2) },
+          ], note: '預設：全球 50%、台灣 20%、債券 30%，台灣佔股票約 29%，整體費用約 0.25%。100 萬一年的費用大約 2,500 元；同樣比例用平均 1.5% 的工具，一年就是 1.5 萬。' };
+        } } },
+        { type: 'heading', id: 'home', text: '台灣要佔多少' },
+        { type: 'table', head: ['考量', '偏向多一點台股', '偏向少一點台股'], rows: [
+          ['熟悉與匯率', '新臺幣計價、不必換匯、資訊容易取得', '—'],
+          ['稅與健保', '—', '台股配息有股利所得稅與二代健保（模組 5）'],
+          ['集中度', '—', '台股產業集中在半導體與電子（第三部 4-2）'],
+          ['你的工作', '—', '在電子產業工作的人，人力資本已經高度集中'],
+        ], caption: '依全球市值，台灣只佔全球股市的一小部分；多數人會在這個基礎上有意識地多配一些。比例沒有標準答案，但應該是想清楚後的決定。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="三種常見的組合方式：一檔全球股債基金最簡單；兩檔一股一債；三檔再把台股獨立出來；檔數越多，越能自訂比例，但再平衡越麻煩">
+          ${[['1 檔', '全球股債一次買齊', '最簡單', 'm2'], ['2 檔', '全球股票＋債券', '自己定股債比', 'm3'], ['3 檔', '全球股＋台股＋債券', '可以調台股比重', 'm1']].map(([a, b, c, col], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="150" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="75" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="108" text-anchor="middle" font-size="12" class="on-color">${b}</text><text x="${97 + i * 182}" y="140" text-anchor="middle" font-size="13" font-weight="900" class="on-color">${c}</text>`).join('')}
+        </svg>`, caption: '超過三到五檔之後，額外的分散效果通常很小，反而增加管理與再平衡的負擔。' },
+        { type: 'heading', id: 'satellite', text: '深入：核心與衛星' },
+        '有些人想保留一點空間給自己的看法（例如特定產業、個股）。常見做法是「核心－衛星」：核心組合佔大部分（例如 90% 以上），用低成本指數長期持有；衛星部位佔一小部分，失敗了也不影響整體計畫。關鍵是事先決定衛星的上限，而不是看到漲就加碼。',
+        { type: 'heading', id: 'one-fund', text: '深入：一檔與多檔的取捨' },
+        '一檔涵蓋全球股債的基金，優點是內部自動再平衡、不會因為看到某一部分大跌而想賣，行為上最簡單；缺點是比例固定、費用可能稍高、不能自己調整台股比重。多檔組合則相反：彈性大、可以挑最低成本的工具，但要自己再平衡。對容易被市場影響情緒的人，「簡單到不會去碰」本身就有很大的價值。',
+        { type: 'table', head: ['', '一檔全球股債', '兩到三檔自組'], rows: [
+          ['再平衡', '基金內部自動', '自己做（模組 3）'],
+          ['比例', '固定，依產品', '自己決定'],
+          ['費用', '可能稍高', '可以挑最低成本'],
+          ['行為', '最少誘惑', '看得到各部分的漲跌，容易想調整'],
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '持有十幾檔重疊的基金。', why: '費用增加，分散沒有增加。', right: '兩到三檔涵蓋面廣的基金。' },
+      { wrong: '台股比例只因為熟悉而決定。', why: '本土與產業集中的風險被忽略。', right: '把稅、集中度、工作一起考慮。' },
+      { wrong: '衛星部位越加越大。', why: '計畫被追高的情緒改寫。', right: '事先設定衛星上限。' },
+    ],
+    keypoints: [
+      '兩到三檔低成本指數基金就能組成核心組合。',
+      '台股比例要考慮稅、集中度與你的工作。',
+      '核心為主、衛星有上限。',
+    ],
+    sources: ['etf-0050-fee', 'ubs-2026'],
+  },
+
+  '1-3': {
+    goals: [
+      '把不同用途的錢分成幾個桶',
+      '依每個桶的期限決定配置',
+      '算出每個目標每月要存多少',
+    ],
+    analogy: {
+      text: ['廚房裡的食材不會放在同一個地方：今天要煮的放流理台、這週的放冰箱、半年後才用的放冷凍庫。錢也一樣，依什麼時候要用，放在不同的「桶」裡，每個桶有自己的配置。', '[[目標分桶]]解決了一個常見的困擾：「我有存錢也有投資，但不知道哪些錢可以冒險。」答案是看那筆錢什麼時候要用。'],
+      limit: ['食材放錯地方頂多壞掉一些；錢放錯桶，可能是在需要買房時剛好遇到股市大跌。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="三個桶：3 年內要用的錢放現金與短期存款；3 到 10 年的錢以債券為主搭配少量股票；10 年以上的錢以股票為主">
+        ${[['短期桶', '3 年內', '現金、定存', 10, 'm0'], ['中期桶', '3–10 年', '債券為主', 40, 'm2'], ['長期桶', '10 年以上', '股票為主', 75, 'm4']].map(([a, b, c, s, col], i) => `<rect x="${30 + i * 175}" y="40" width="150" height="160" class="fill-bg stroke-ink" stroke-width="3"/><rect x="${30 + i * 175}" y="${40 + 160 * (1 - s / 100)}" width="150" height="${160 * s / 100}" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${105 + i * 175}" y="30" text-anchor="middle" font-size="15" font-weight="900">${a}</text><text x="${105 + i * 175}" y="222" text-anchor="middle" font-size="13" font-weight="900">${b}</text><text x="${105 + i * 175}" y="242" text-anchor="middle" font-size="12">${c}・股票約 ${s}%</text>`).join('')}
+      </svg>`,
+      caption: '有顏色的部分是股票比例（示意）。緊急預備金是另外一個桶，不算在這裡（第一部）。',
+    },
+    define: [
+      { term: '目標分桶', en: 'buckets', def: '依用錢時間分開的資金。', example: '頭期款、退休金。' },
+      { term: '風險能力', en: 'capacity', def: '期間越長越高。', example: '20 年後才用。' },
+      { term: '資產配置', en: 'allocation', def: '每個桶有自己的比例。', example: '短期桶 10%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '一個目標每月要存多少（實際計算，按月複利）', sliders: [
+          { id: 'goal', label: '目標金額（今天的錢）', min: 100000, max: 20000000, step: 50000, value: 2000000, unit: '元' },
+          { id: 'years', label: '幾年後要用', min: 1, max: 40, step: 1, value: 5, unit: '年' },
+          { id: 'have', label: '已經準備的錢', min: 0, max: 10000000, step: 10000, value: 300000, unit: '元' },
+          { id: 'r', label: '這個桶的預期年報酬', min: 0, max: 8, step: 0.5, value: 2, unit: '%' },
+          { id: 'inf', label: '通膨', min: 0, max: 5, step: 0.5, value: 2, unit: '%' },
+        ], compute: (v) => {
+          const target = v.goal * (1 + v.inf / 100) ** v.years;
+          const i = v.r / 100 / 12; const n = v.years * 12;
+          const haveFv = v.have * (1 + v.r / 100) ** v.years;
+          const gap = Math.max(0, target - haveFv);
+          const pmt = i === 0 ? gap / n : gap * i / ((1 + i) ** n - 1);
+          return { rows: [
+            { label: '到時候需要的金額（含通膨）', value: `${Math.round(target).toLocaleString()} 元`, ratio: Math.min(1, target / 30000000) },
+            { label: '已準備的錢到時候會變成', value: `${Math.round(haveFv).toLocaleString()} 元`, ratio: Math.min(1, haveFv / Math.max(1, target)) },
+            { label: '每月要存', value: `${Math.round(pmt).toLocaleString()} 元`, ratio: Math.min(1, pmt / 100000) },
+          ], note: '預設：5 年後的 200 萬頭期款（今天的錢），通膨 2% 後約需 221 萬；已有 30 萬，放在約 2% 的短中期工具，每月約要存 3 萬。期限短的桶，不能靠提高報酬率來縮短差距，只能多存或延後。' };
+        } } },
+        { type: 'heading', id: 'glide', text: '桶會隨時間移動' },
+        '一個 15 年後要用的教育金，一開始是長期桶，可以有較高的股票比例；隨著時間接近，它會慢慢變成中期桶、短期桶，股票比例也應該跟著降低。這種「越接近越保守」的路徑，常被稱為下滑路徑（glide path），目標日期基金就是用這個邏輯設計的。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="下滑路徑：距離用錢 15 年時股票約 80%，10 年時約 60%，5 年時約 40%，到用錢前一兩年降到 10% 左右">
+          <line x1="60" y1="190" x2="530" y2="190" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="190" class="stroke-ink" stroke-width="2"/>
+          <path d="M60 54 L215 88 L370 122 L500 173" fill="none" style="stroke:var(--m4)" stroke-width="4"/>
+          ${[['15 年', 60, 54, '80%'], ['10 年', 215, 88, '60%'], ['5 年', 370, 122, '40%'], ['1 年', 500, 173, '10%']].map(([t, x, y, p]) => `<circle cx="${x}" cy="${y}" r="7" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="${x + (x > 450 ? -10 : 10)}" y="${y - 10}" text-anchor="${x > 450 ? 'end' : 'start'}" font-size="13" font-weight="900">${p}</text><text x="${x}" y="210" text-anchor="middle" font-size="12">${t}</text>`).join('')}
+          <text x="295" y="226" text-anchor="middle" font-size="12">距離用錢的時間 →</text>
+        </svg>`, caption: '數字是示意。降低的速度依目標的彈性而定：完全不能延後的目標（例如學費），要降得更早。' },
+        { type: 'heading', id: 'flex', text: '深入：目標的彈性' },
+        { type: 'table', head: ['目標', '彈性', '配置的含意'], rows: [
+          ['子女學費', '低：時間固定、金額難減', '接近時要很保守'],
+          ['買房頭期款', '中：可以延後或換小一點', '可以多承擔一點，但要有延後的心理準備'],
+          ['退休', '中：可以晚一點退、少花一點，而且會分很多年提領', '退休時仍可保留相當的股票比例（6-1）'],
+          ['夢想旅行', '高：可以改期、改地點', '可以承擔較高的風險'],
+        ] },
+        { type: 'heading', id: 'conflict', text: '深入：目標衝突時怎麼排' },
+        '多數家庭同時有好幾個目標：買房、子女教育、退休。錢不夠同時滿足時，常見的排序原則是：先處理沒有彈性、又沒有其他資金來源的目標。子女教育可以靠獎學金、學貸；退休沒有人會借你錢。所以很多規劃者會建議：不要為了其他目標完全停止退休的投入，即使比例小一點，也讓時間繼續替你工作。',
+        { type: 'list', items: [
+          '列出每個目標的金額、時間、彈性。',
+          '算出每個目標每月要存多少（上面的試算）。',
+          '總額超過可以存的錢時，先延後彈性高的目標，或降低金額。',
+          '每年重新排一次，因為收入與目標都會變。',
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '短期要用的錢放進股票。', why: '要用時可能剛好在低點。', right: '3 年內要用的放現金或短期存款。' },
+      { wrong: '所有目標用同一個配置。', why: '不同期限的承受能力不同。', right: '每個桶自己的配置。' },
+      { wrong: '期限快到了才發現不夠，於是提高風險。', why: '短期限下冒險可能讓結果更差。', right: '多存、延後或降低目標。' },
+    ],
+    keypoints: [
+      '依用錢時間分桶：短期、中期、長期。',
+      '桶會隨時間移動，越接近越保守。',
+      '目標越沒有彈性，越要提早降低風險。',
+    ],
+    sources: ['cpi-2026-09', 'ubs-2026'],
+  },
+});
+</script>

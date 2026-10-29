@@ -1,0 +1,94 @@
+<script>
+/* ==========================================================================
+   模組 5：把它串起來
+   ========================================================================== */
+defineTerms({
+  '投資論點': { en: 'investment thesis', def: '買進一檔股票時，寫下「為什麼它值得買、什麼情況代表我錯了」的幾句話。', example: '「毛利率回升到 40% 以上；若連續兩季低於 35% 就重新評估。」', lesson: '5-1' },
+  '衛星部位': { en: 'satellite position', def: '核心指數組合之外、用來選個股或主題的小比例部位。', example: '總資產的 5%–10%。', lesson: '5-1' },
+});
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '照六個步驟分析一家公司',
+      '寫下投資論點與「我錯了」的條件',
+      '設定個股在組合裡的上限',
+    ],
+    analogy: {
+      text: ['醫生看診有固定的流程：問病史、量血壓、看檢查報告、做判斷、開處方、安排回診。流程不能保證每次都診斷正確，但能避免漏掉重要的步驟。', '個股分析也一樣。這一課把整卷收成六個步驟，再加上最重要的一件事：在組合裡，個股應該只佔一小部分（[[衛星部位]]），讓你即使看錯，也不會影響整體的財務計畫。'],
+      limit: ['醫生有多年的訓練與臨床經驗；個人投資人的分析，最大的限制是時間與資訊。流程能讓你少犯錯，不能讓你變成專業機構。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="個股分析的六個步驟：了解生意、看三大財報趨勢、檢查比率與警訊、估值並要求安全邊際、寫下投資論點與錯誤條件、決定部位大小並定期追蹤">
+        ${[['1 了解生意', '它怎麼賺錢、競爭優勢是什麼', 'm0'], ['2 看財報趨勢', '營收、獲利、現金流 5 年', 'm1'], ['3 檢查警訊', '比率、治理、附註', 'm3'], ['4 估值', '多種方法看範圍＋安全邊際', 'm4'], ['5 寫投資論點', '為什麼買、什麼情況代表錯了', 'm2'], ['6 部位與追蹤', '設上限，每季對照論點', 'm5']].map(([a, b, c], i) => `<rect x="20" y="${12 + i * 46}" width="520" height="40" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="36" y="${37 + i * 46}" font-size="14" font-weight="900" class="on-color">${a}</text><text x="524" y="${37 + i * 46}" text-anchor="end" font-size="12" class="on-color">${b}</text>`).join('')}
+      </svg>`,
+      caption: '第 5 步最常被跳過，卻最重要：沒有寫下「什麼情況代表我錯了」，就很難在該賣的時候賣出（第六部）。',
+    },
+    define: [
+      { term: '投資論點', en: 'thesis', def: '為什麼買、何時算錯。', example: '毛利率條件。' },
+      { term: '衛星部位', en: 'satellite', def: '核心之外的小部位。', example: '5%–10%。' },
+      { term: '安全邊際', en: 'margin of safety', def: '價格低於價值的折扣。', example: '30%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'checklist', text: '分析一家公司的檢查清單' },
+        { type: 'widget', name: 'checklist', props: { key: 'stock-analysis', items: [
+          '我能用三句話說明這家公司怎麼賺錢、客戶是誰、為什麼選它而不是對手',
+          '過去 5 年營收、營業利益、營業現金流的趨勢一致（1-1、1-3）',
+          '營業現金流長期接近或高於淨利；自由現金流足以支應股利（1-3）',
+          'ROE 的來源主要是獲利與效率，而不是高槓桿（2-1）',
+          '沒有明顯的警訊：應收、存貨、質押、關係人交易（2-2）',
+          '用至少兩種方法估值，得到一個範圍，而不是單一數字（模組 3）',
+          '目前價格低於估計價值，且有足夠的安全邊際（3-4）',
+          '如果是循環股，我用正常化獲利估值，並知道目前大概在循環的哪裡（4-3）',
+          '寫下投資論點，以及兩到三個「代表我錯了」的條件',
+          '這筆部位在衛星的上限之內',
+        ] } },
+        { type: 'heading', id: 'sizing', text: '個股部位的上限' },
+        { type: 'widget', name: 'knobs', props: { title: '核心與衛星：個股部位的上限（實際計算）', sliders: [
+          { id: 'total', label: '可投資資產總額', min: 100000, max: 50000000, step: 100000, value: 3000000, unit: '元' },
+          { id: 'sat', label: '衛星部位上限（佔總資產）', min: 0, max: 30, step: 1, value: 10, unit: '%' },
+          { id: 'single', label: '單一個股上限（佔總資產）', min: 1, max: 20, step: 1, value: 3, unit: '%' },
+          { id: 'drop', label: '假設一檔個股下跌', min: 10, max: 100, step: 10, value: 70, unit: '%' },
+        ], compute: (v) => {
+          const sat = v.total * v.sat / 100; const one = v.total * v.single / 100; const loss = one * v.drop / 100;
+          return { rows: [
+            { label: '衛星部位上限', value: `${Math.round(sat).toLocaleString()} 元`, ratio: v.sat / 30 },
+            { label: '單一個股上限', value: `${Math.round(one).toLocaleString()} 元（最多約 ${Math.max(1, Math.floor(v.sat / v.single))} 檔）`, ratio: v.single / 20 },
+            { label: '一檔看錯時，總資產少', value: `${Math.round(loss).toLocaleString()} 元（${((loss / v.total) * 100).toFixed(1)}%）`, ratio: Math.min(1, loss / v.total * 5) },
+          ], note: '預設：300 萬、衛星 10%、單一個股 3%，一檔跌 70%，總資產只少約 2.1%。這就是部位上限的價值：看錯是常態，但不應該讓一次看錯改變你的人生計畫。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="核心與衛星：核心是低成本指數組合，佔大部分；衛星是個股與主題，佔一小部分，單一個股另有上限">
+          <rect x="30" y="40" width="400" height="130" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="230" y="96" text-anchor="middle" font-size="18" font-weight="900" class="on-color">核心：低成本指數（第四部）</text>
+          <text x="230" y="126" text-anchor="middle" font-size="13" class="on-color">例如 90%</text>
+          ${[0, 1, 2].map((i) => `<rect x="440" y="${40 + i * 44}" width="90" height="38" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="485" y="${64 + i * 44}" text-anchor="middle" font-size="12" font-weight="900" class="on-color">個股 ${i + 1}</text>`).join('')}
+          <text x="485" y="200" text-anchor="middle" font-size="12">衛星：例如 10%</text>
+        </svg>`, caption: '衛星部位的成果要和核心（指數）比較（0-1）。連續幾年落後，就值得考慮把衛星縮小甚至取消。' },
+        { type: 'heading', id: 'thesis', text: '投資論點的範例' },
+        { type: 'table', head: ['項目', '範例（虛構的甲公司）'], rows: [
+          ['為什麼買', '新產品帶動毛利率回升；營業現金流穩定；估值在保守假設下仍有 30% 安全邊際'],
+          ['要追蹤的數字', '每季毛利率、營業現金流、月營收年增率'],
+          ['代表我錯了', '毛利率連續兩季低於 35%；營業現金流連續兩年低於淨利；大股東大量質押'],
+          ['不代表我錯了', '股價短期下跌 20%（若論點的數字沒有變）'],
+          ['部位', '總資產的 3%，不加碼超過上限'],
+        ], caption: '「不代表我錯了」那一列很重要：它讓你區分「價格的波動」和「論點的失效」。' },
+        { type: 'heading', id: 'honest', text: '深入：誠實的檢討' },
+        '每年檢討一次衛星部位：當初的論點有沒有成立？賺錢的部位，是因為論點正確，還是運氣？虧錢的部位，是論點錯了，還是執行出了問題（例如超過上限、沒有照條件賣出）？把這些寫下來，幾年後你會很清楚自己在選股上有沒有優勢；如果沒有，把衛星縮小，不是失敗，而是把時間留給更值得的事。',
+        { type: 'callout', variant: 'tip', title: '接下來：第六部 投資心理', body: ['這一卷給了你分析的工具；但多數人選股失敗，不是因為不會讀財報，而是因為追高、捨不得停損、過度自信。第六部處理的正是這些行為。'] },
+      ],
+    },
+    mistakes: [
+      { wrong: '沒寫投資論點就買進。', why: '之後無法判斷什麼時候該賣。', right: '寫下為什麼買、什麼情況代表錯了。' },
+      { wrong: '看好就重押單一個股。', why: '一次看錯可能改變整個財務計畫。', right: '設定衛星與單一個股上限。' },
+      { wrong: '把股價下跌當成論點錯了。', why: '價格波動不等於基本面改變。', right: '對照論點裡的數字判斷。' },
+    ],
+    keypoints: [
+      '六步驟：生意、財報、警訊、估值、論點、部位。',
+      '寫下「代表我錯了」的條件，區分波動與失效。',
+      '個股是衛星：設上限，並誠實地和指數比較。',
+    ],
+    sources: ['mops', 'sharpe-1991'],
+  },
+});
+</script>

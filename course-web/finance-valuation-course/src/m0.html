@@ -1,0 +1,88 @@
+<script>
+/* ==========================================================================
+   模組 0：起點：選個股之前
+   ========================================================================== */
+defineTerms({
+  '能力圈': { en: 'circle of competence', def: '你真正了解的產業與公司範圍；在範圍外選股，等於在不懂規則的比賽下注。', example: '在半導體業工作的人，比較懂設備與製程的循環。', lesson: '0-1' },
+  '基準': { en: 'benchmark', def: '用來比較自己投資成果的對照組；選個股的人，最自然的基準是同市場的指數。', example: '台股個股組合對照台灣 50 或加權報酬指數。', lesson: '0-1' },
+  '財報': { en: 'financial statements', def: '公司依會計準則編製、定期公告的財務報告，主要是損益表、資產負債表、現金流量表。', example: '季報、年報。', lesson: '1-1' },
+  '估值': { en: 'valuation', def: '估計一家公司（或一股）值多少錢，再和市場價格比較。', example: '本益比、現金流折現。', lesson: '3-1' },
+});
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出選個股要付出的三種成本',
+      '用指數當基準，評估自己的選股成果',
+      '知道這一卷能幫你做什麼、不能做什麼',
+    ],
+    analogy: {
+      text: ['買二手車時，你可以直接買有原廠認證的車（像指數：品質平均、價格公道），也可以自己去車行一台一台看（像選個股）。自己看可能撿到便宜的好車，但你得懂引擎、看得懂保養紀錄，還要承擔看走眼的風險。', '這一卷就是在教你「看保養紀錄」：讀[[財報]]、算比率、做[[估值]]。學會之後，至少不會買到泡過水的車；但要長期挑到比原廠認證更好的車，仍然很困難（第三部 6-1）。'],
+      limit: ['二手車的品質看得到摸得到；公司的未來充滿不確定，財報只是過去的紀錄，好公司也不一定是好投資（價格可能早已反映）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="選個股的三種成本：時間（研究與追蹤）、集中風險（持股較少，個別風險較高）、機會成本（不如指數時少賺的部分）">
+        ${[['時間', '讀財報、追蹤新聞、每季更新', 'm1'], ['集中風險', '持股少，個別風險沒分散掉', 'm4'], ['機會成本', '落後指數時少賺的部分', 'm3']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="170" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="90" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="126" text-anchor="middle" font-size="11" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="240" text-anchor="middle" font-size="14" font-weight="900">選個股的報酬，要扣掉這三種成本後仍贏過指數才值得</text>
+      </svg>`,
+      caption: '這不是說不能選個股，而是說：要知道自己付出了什麼，並用指數當[[基準]]誠實地檢查成果。',
+    },
+    define: [
+      { term: '能力圈', en: 'circle of competence', def: '你真正懂的範圍。', example: '自己的產業。' },
+      { term: '基準', en: 'benchmark', def: '比較成果的對照組。', example: '同市場指數。' },
+      { term: '估值', en: 'valuation', def: '估計值多少錢。', example: '本益比。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'benchmark', text: '用指數誠實地打分數' },
+        '選個股最常見的問題，是不知道自己其實落後市場。股票漲了就覺得自己選得好，但同期間指數可能漲更多。最簡單的檢查方式：把選股組合的總報酬（含股利），和同期間同市場指數的總報酬放在一起比。',
+        { type: 'widget', name: 'knobs', props: { title: '我的選股贏過指數了嗎（實際計算，含股利的總報酬）', sliders: [
+          { id: 'mine', label: '選股組合的年化總報酬', min: -20, max: 40, step: 0.5, value: 9, unit: '%' },
+          { id: 'index', label: '同期間指數的年化總報酬', min: -20, max: 40, step: 0.5, value: 11, unit: '%' },
+          { id: 'hours', label: '每週花在研究的時間', min: 0, max: 20, step: 0.5, value: 3, unit: '小時' },
+          { id: 'amt', label: '投入金額', min: 100000, max: 20000000, step: 100000, value: 1000000, unit: '元' },
+        ], compute: (v) => {
+          const diff = v.mine - v.index;
+          const money = v.amt * diff / 100;
+          const hours = v.hours * 52;
+          return { rows: [
+            { label: '每年贏（輸）指數', value: `${diff.toFixed(1)} 個百分點`, ratio: Math.min(1, Math.abs(diff) / 20) },
+            { label: '換算成金額', value: `${Math.round(money).toLocaleString()} 元／年`, ratio: Math.min(1, Math.abs(money) / (v.amt * 0.2)) },
+            { label: '一年花的時間', value: `${hours.toFixed(0)} 小時`, ratio: Math.min(1, hours / 1000) },
+            { label: '每小時的「超額報酬」', value: hours ? `${Math.round(money / hours).toLocaleString()} 元／小時` : '—', ratio: Math.min(1, Math.abs(hours ? money / hours : 0) / 2000) },
+          ], note: '預設：選股 9%、指數 11%，100 萬一年少賺 2 萬，還花了約 156 小時。選股的成果要誠實地和指數比，至少比較 3–5 年；一兩年的勝負很可能只是運氣。' };
+        } } },
+        { type: 'heading', id: 'scope', text: '這一卷能做什麼、不能做什麼' },
+        { type: 'table', head: ['能做', '不能做'], rows: [
+          ['看懂一家公司賺多少、有什麼、現金從哪來', '告訴你明天會漲還是跌'],
+          ['找出財務上的警訊，避開明顯的地雷', '保證你挑到的公司會贏過指數'],
+          ['估計價值的合理範圍，避免買得太貴', '算出一個精確的「正確股價」'],
+          ['理解利率與景氣怎麼影響股價', '預測景氣何時反轉'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="好公司與好投資的差別：好公司是經營得好；好投資是用合理或便宜的價格買到；兩者的交集才是想找的">
+          <circle cx="220" cy="110" r="90" style="fill:var(--m2)" class="stroke-ink" stroke-width="3" opacity="0.85"/>
+          <circle cx="340" cy="110" r="90" style="fill:var(--m4)" class="stroke-ink" stroke-width="3" opacity="0.85"/>
+          <text x="180" y="115" text-anchor="middle" font-size="15" font-weight="900" class="on-color">好公司</text>
+          <text x="380" y="115" text-anchor="middle" font-size="15" font-weight="900" class="on-color">好價格</text>
+          <text x="280" y="115" text-anchor="middle" font-size="13" font-weight="900" class="on-color">好投資</text>
+          <text x="280" y="214" text-anchor="middle" font-size="13">財報分析找左邊，估值找右邊，兩個都要</text>
+        </svg>`, caption: '大家都知道的好公司，價格常常已經很高；這一卷的前半部找好公司，後半部判斷價格。' },
+        { type: 'heading', id: 'circle', text: '深入：從能力圈開始' },
+        '巴菲特常用「[[能力圈]]」形容自己只投資看得懂的公司。對一般人來說，能力圈通常和工作有關：你比較了解自己產業的競爭、景氣與技術變化。但這也有陷阱：自己的工作和持股在同一產業，景氣不好時會同時受傷（第三部 4-2）。所以能力圈是研究的起點，不是集中投資的理由。',
+        { type: 'callout', variant: 'tip', title: '這一卷的例子', body: ['全卷用同一家虛構的「甲公司」：營收 100 億、股數 10 億股、股價 30 元。數字是為了說明而設計的，不代表任何真實公司。'] },
+      ],
+    },
+    mistakes: [
+      { wrong: '只看自己的股票漲了多少。', why: '可能落後同期間的指數。', right: '和指數的總報酬比較至少 3–5 年。' },
+      { wrong: '以為好公司就是好投資。', why: '價格可能已經反映了好消息。', right: '同時看公司品質與價格。' },
+      { wrong: '在能力圈外選股。', why: '看不懂的產業，判斷容易出錯。', right: '從自己懂的開始，但避免和工作過度集中。' },
+    ],
+    keypoints: [
+      '選個股的成本：時間、集中風險、機會成本。',
+      '用同市場指數的總報酬當基準，至少比 3–5 年。',
+      '好投資 ＝ 好公司 ＋ 好價格。',
+    ],
+    sources: ['sharpe-1991', 'mops'],
+  },
+});
+</script>

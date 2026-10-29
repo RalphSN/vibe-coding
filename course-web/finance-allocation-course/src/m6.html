@@ -1,0 +1,95 @@
+<script>
+/* ==========================================================================
+   模組 6：退休與提領
+   ========================================================================== */
+defineTerms({
+  '提領率': { en: 'withdrawal rate', def: '退休第一年從投資組合提領的金額佔組合的比例；之後每年依通膨調整金額。', example: '1,000 萬 × 4% ＝ 第一年提 40 萬。', lesson: '6-1' },
+  '4% 法則': { en: '4% rule', def: '源自 Bengen 1994 年用美國歷史資料的研究：第一年提 4%、之後依通膨調整，股債組合在歷史上可以撐至少 30 年。', example: '每年要花 40 萬 → 需要約 1,000 萬。', lesson: '6-1' },
+  '所得替代率': { en: 'replacement rate', def: '退休後每月收入佔退休前收入的比例。', example: '退休前月薪 6 萬、退休後每月 3.6 萬 → 60%。', lesson: '6-1' },
+});
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '用提領率估算退休需要的資產',
+      '說出 4% 法則的來源、假設與限制',
+      '把勞保、勞退與自己的投資放在一起規劃',
+    ],
+    analogy: {
+      text: ['退休金像是一口井：工作時往井裡注水（儲蓄與投資），退休後每年從井裡打水上來用（提領）。井水本身也會慢慢湧出新水（投資報酬）。問題是：每年打多少水，井才不會在你還需要的時候乾掉？', '財務規劃師 William Bengen 在 1994 年用美國的歷史股債資料回答這個問題：第一年提領組合的 4%，之後每年依通膨調整金額，在他測試的所有歷史期間裡，股債組合都至少撐了 30 年。後來這被稱為 [[4% 法則]]。'],
+      limit: ['井水的湧出量可以觀察；投資報酬未來是多少沒人知道。4% 來自美國的歷史資料與特定假設，換一個國家、一段期間或更長的退休時間，安全的[[提領率]]可能更低。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="退休需要的資產：每年支出扣掉勞保年金等固定收入後的缺口，除以提領率；例如每年支出 60 萬、年金 24 萬，缺口 36 萬，用 4% 提領率需要 900 萬">
+        <rect x="20" y="30" width="250" height="60" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="145" y="66" text-anchor="middle" font-size="15" font-weight="900" class="on-color">每年支出 60 萬</text>
+        <rect x="290" y="30" width="250" height="60" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="415" y="66" text-anchor="middle" font-size="15" font-weight="900" class="on-color">− 年金等固定收入 24 萬</text>
+        <rect x="120" y="120" width="320" height="56" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="280" y="154" text-anchor="middle" font-size="16" font-weight="900" class="on-color">缺口 36 萬 ÷ 4% ＝ 900 萬</text>
+        <path d="M145 90 L220 120 M415 90 L340 120" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="214" text-anchor="middle" font-size="14">提領率 4% ＝ 缺口 × 25</text>
+        <text x="280" y="242" text-anchor="middle" font-size="13">提領率 3.5% ≈ 缺口 × 28.6；3% ≈ 缺口 × 33.3</text>
+      </svg>`,
+      caption: '第一部 1-3 的「存到 25 年份的生活費」，就是 4% 提領率的倒數。',
+    },
+    define: [
+      { term: '提領率', en: 'withdrawal rate', def: '第一年提領的比例。', example: '4%。' },
+      { term: '4% 法則', en: '4% rule', def: 'Bengen 1994 的歷史研究。', example: '撐至少 30 年。' },
+      { term: '所得替代率', en: 'replacement', def: '退休後收入 ÷ 退休前收入。', example: '60%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '退休目標與達成年數（以今天的錢計，實質報酬，實際計算）', sliders: [
+          { id: 'spend', label: '退休後每年支出', min: 200000, max: 3000000, step: 10000, value: 600000, unit: '元' },
+          { id: 'pension', label: '勞保年金等每年固定收入（估計）', min: 0, max: 1500000, step: 10000, value: 240000, unit: '元' },
+          { id: 'wr', label: '提領率', min: 2.5, max: 5, step: 0.25, value: 3.5, unit: '%' },
+          { id: 'have', label: '目前的退休資產', min: 0, max: 30000000, step: 50000, value: 1000000, unit: '元' },
+          { id: 'save', label: '每年投入', min: 0, max: 2000000, step: 10000, value: 240000, unit: '元' },
+          { id: 'real', label: '實質年報酬（扣通膨）', min: 0, max: 7, step: 0.5, value: 4, unit: '%' },
+        ], compute: (v) => {
+          const gap = Math.max(0, v.spend - v.pension);
+          const target = gap / (v.wr / 100);
+          let bal = v.have; let years = 0;
+          while (bal < target && years < 80) { bal = bal * (1 + v.real / 100) + v.save; years += 1; }
+          return { rows: [
+            { label: '每年要靠投資支應的缺口', value: `${gap.toLocaleString()} 元`, ratio: Math.min(1, gap / v.spend) },
+            { label: '目標資產（缺口 ÷ 提領率）', value: `${Math.round(target).toLocaleString()} 元`, ratio: Math.min(1, target / 60000000) },
+            { label: '依目前的投入，約需', value: years >= 80 ? '80 年以上' : `${years} 年`, ratio: Math.min(1, years / 50) },
+          ], note: '預設：每年支出 60 萬、年金 24 萬，用 3.5% 提領率，目標約 1,029 萬；目前 100 萬、每年投入 24 萬、實質報酬 4%，約 22 年。實質報酬已扣除通膨，所以所有金額都是今天的購買力。' };
+        } } },
+        { type: 'heading', id: 'bengen', text: '4% 法則的假設與限制' },
+        { type: 'table', head: ['假設', '限制'], rows: [
+          ['美國的歷史股債報酬（1926 年起）', '其他國家的歷史報酬多半較低；未來不一定像過去'],
+          ['退休期間 30 年', '更早退休、活得更久，就要更低的提領率（Bengen 認為 3% 能撐約 50 年）'],
+          ['股票 50%–75% 的組合', '股票太少的組合撐不了那麼久'],
+          ['每年依通膨調整、不因市場改變支出', '實際上多數人會在壞年份少花一點，這反而能提高可持續性'],
+          ['不含費用與稅', '每年 1% 的費用，大約就要從提領率裡扣掉'],
+        ], caption: 'Bengen 本人後來把安全提領率調高到 4.5% 以上；也有研究認為依現今的評價與利率應該更保守。合理的做法是用 3%–4% 之間的區間規劃，並保留調整支出的彈性。' },
+        { type: 'heading', id: 'taiwan', text: '台灣的三層退休保障' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="台灣受僱勞工的退休收入三層：勞保老年給付是社會保險，勞工退休金個人專戶由雇主每月提繳 6% 並可自提最多 6%，第三層是自己的投資">
+          ${[['第一層：勞保老年給付', '社會保險，依投保薪資與年資', 'm0', 500], ['第二層：勞退個人專戶', '雇主提繳 6%＋自提最多 6%', 'm2', 420], ['第三層：自己的投資', '這個系列講的全部', 'm3', 340]].map(([a, b, c, w], i) => `<rect x="${280 - w / 2}" y="${170 - i * 66}" width="${w}" height="58" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="280" y="${196 - i * 66}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="280" y="${216 - i * 66}" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="236" text-anchor="middle" font-size="12">可以在勞保局網站查詢自己的投保年資與勞退個人專戶累積金額</text>
+        </svg>`, caption: '公教人員、自營作業者、無業者的制度不同；第一、二層能提供多少，請依自己的身分與勞保局試算。' },
+        '勞退自提有一個明確的稅務好處：依勞動部說明，每月工資 6% 以內的自願提繳，不計入當年度的薪資所得課稅。代價是這筆錢要到退休（目前規定 60 歲）才能領，而且由勞動基金運用、你無法自己選擇配置。邊際稅率越高，自提的稅務好處越明顯；但仍要先完成預備金與高利債的處理（第一部 6-1）。',
+        { type: 'heading', id: 'flex', text: '深入：讓提領更有彈性' },
+        { type: 'list', items: [
+          '**壞年份少提一點**：市場大跌的那幾年，暫時不依通膨加碼、或少提 5%–10%，能明顯降低提早用完的機率。',
+          '**保留一到兩年的現金**：退休後把一到兩年的生活費放在現金，大跌時先用現金，不必在低點賣股票（第三部 3-1 的順序風險）。',
+          '**延後請領年金**：有些制度延後請領可以提高每月金額，等於買了一份「活得越久越划算」的保障，細節以勞保局規定為準。',
+        ] },
+        { type: 'heading', id: 'bucket-retire', text: '深入：退休後的分桶' },
+        '退休後也可以用 1-3 的分桶：短期桶放一到兩年的生活費（現金、定存），中期桶放三到七年（以債券為主），長期桶放其餘（以股票為主）。每年從長期桶的獲利或再平衡中補充短期桶；遇到大跌的年份，就先用短期與中期桶過生活，等市場恢復再補。這個做法本質上和再平衡一樣，只是用「生活費」的角度讓它更容易執行。',
+      ],
+    },
+    mistakes: [
+      { wrong: '把 4% 當成保證安全的數字。', why: '它來自美國歷史，且假設 30 年。', right: '用 3%–4% 的區間，並保留調整支出的彈性。' },
+      { wrong: '用名目報酬算退休目標。', why: '通膨會吃掉購買力。', right: '用實質報酬、以今天的錢計算。' },
+      { wrong: '忽略勞保與勞退能提供的部分。', why: '目標會被高估或低估。', right: '先到勞保局查詢試算。' },
+    ],
+    keypoints: [
+      '退休目標 ＝（支出 − 固定收入）÷ 提領率。',
+      '4% 來自美國歷史與 30 年假設，用 3%–4% 較穩。',
+      '勞退自提 6% 內不計入當年度薪資所得。',
+    ],
+    sources: ['bengen-1994', 'labor-pension-6', 'ubs-2026'],
+  },
+});
+</script>

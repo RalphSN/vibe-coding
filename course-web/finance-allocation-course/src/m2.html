@@ -1,0 +1,177 @@
+<script>
+/* ==========================================================================
+   模組 2：投入方式
+   ========================================================================== */
+defineTerms({
+  '單筆投入': { en: 'lump-sum investing', def: '手上有一筆錢時，一次全部投入。', example: '年終 30 萬一次買進。', lesson: '2-1' },
+  '定期定額': { en: 'dollar-cost averaging', def: '每隔固定時間投入固定金額；價格低時買到較多單位，價格高時買到較少。', example: '每月 5 日投入 1 萬。', lesson: '2-1' },
+  '平均成本': { en: 'average cost', def: '總投入金額除以總共買到的單位數。', example: '投入 3 萬、買到 310 單位 → 平均每單位約 96.8 元。', lesson: '2-1' },
+  '零股': { en: 'odd lot', def: '不滿一張（1,000 股）的股票，可以用股為單位買賣。', example: '買 15 股。', lesson: '2-2' },
+  '最低手續費': { en: 'minimum commission', def: '券商每筆交易收取的最低金額；小額交易時，實際費率可能遠高於牌告費率。', example: '每筆最低 1 元或 20 元，依券商而定。', lesson: '2-2' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說明單筆與分批投入的期望差異',
+      '用 Vanguard 的研究理解「分批只是延後承擔風險」',
+      '知道定期定額真正的價值在哪裡',
+    ],
+    analogy: {
+      text: ['想像你要從岸邊走進一個水溫適中的游泳池。一次跳下去（[[單筆投入]]）最快開始游；一步一步走下去（分批投入）比較不會被冷到，但待在岸上的時間比較長。如果池水平均來說越來越暖（市場長期向上），待在岸上越久，錯過的就越多。', 'Vanguard 2012 年的研究用美國、英國、澳洲的歷史資料比較：單筆投入大約在三分之二的期間勝過分批投入。研究的結論是：分批投入並沒有消除風險，只是把承擔風險的時間往後延。'],
+      limit: ['游泳池的比喻假設你手上已經有一筆錢。大多數上班族沒有一大筆錢，而是每個月領薪水；這時[[定期定額]]不是「選擇」，而是收入的自然節奏。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="手上有一筆錢時的兩種做法：單筆投入讓全部的錢立刻參與市場；分批投入讓部分資金在等待期間留在現金，期望報酬較低但遺憾較小">
+        <text x="140" y="26" text-anchor="middle" font-size="15" font-weight="900">單筆投入</text>
+        <text x="420" y="26" text-anchor="middle" font-size="15" font-weight="900">分 6 個月投入</text>
+        <rect x="60" y="50" width="160" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="140" y="130" text-anchor="middle" font-size="14" font-weight="900" class="on-color">第 1 天全部投入</text>
+        ${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="${330 + i * 30}" y="${200 - (i + 1) * 25}" width="26" height="${(i + 1) * 25}" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><rect x="${330 + i * 30}" y="50" width="26" height="${150 - (i + 1) * 25}" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>`).join('')}
+        <text x="420" y="222" text-anchor="middle" font-size="12">深色：已投入　淺色：還在現金</text>
+        <text x="280" y="252" text-anchor="middle" font-size="13">期望報酬：單筆較高（約三分之二的期間勝出）；遺憾：分批較小</text>
+      </svg>`,
+      caption: '分批期間還在現金的那一部分，期望報酬低於市場；這就是分批投入的平均成本。',
+    },
+    define: [
+      { term: '單筆投入', en: 'lump sum', def: '一次投入。', example: '年終 30 萬。' },
+      { term: '定期定額', en: 'DCA', def: '固定時間投入固定金額。', example: '每月 1 萬。' },
+      { term: '平均成本', en: 'average cost', def: '總投入 ÷ 總單位數。', example: '96.8 元。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '分批投入的期望成本與最壞情況（簡化試算）', sliders: [
+          { id: 'amt', label: '手上的一筆錢', min: 100000, max: 20000000, step: 100000, value: 1000000, unit: '元' },
+          { id: 'months', label: '分幾個月投入', min: 2, max: 36, step: 1, value: 12, unit: '個月' },
+          { id: 'rm', label: '市場預期年報酬', min: 0, max: 10, step: 0.5, value: 6, unit: '%' },
+          { id: 'rc', label: '等待期間的現金利率', min: 0, max: 5, step: 0.1, value: 1.7, unit: '%' },
+          { id: 'crash', label: '假設投入後馬上跌', min: 0, max: 50, step: 5, value: 30, unit: '%' },
+        ], compute: (v) => {
+          const avgWait = (v.months - 1) / 2;
+          const cost = v.amt * (v.rm - v.rc) / 100 * avgWait / 12;
+          const lumpLoss = v.amt * v.crash / 100;
+          const dcaLoss = (v.amt / v.months) * v.crash / 100;
+          return { rows: [
+            { label: '分批的期望成本（平均在現金的時間）', value: `約 ${Math.round(cost).toLocaleString()} 元`, ratio: Math.min(1, cost / (v.amt * 0.1)) },
+            { label: '單筆：投入後馬上下跌的帳面損失', value: `${Math.round(lumpLoss).toLocaleString()} 元`, ratio: Math.min(1, lumpLoss / v.amt) },
+            { label: '分批：第一筆投入後馬上下跌的帳面損失', value: `${Math.round(dcaLoss).toLocaleString()} 元`, ratio: Math.min(1, dcaLoss / v.amt) },
+          ], note: '預設：100 萬分 12 個月，期望上大約少賺 2 萬；換來的是「如果明天就大跌 30%」時，帳面只少 2.5 萬而不是 30 萬。要不要付這個成本，取決於你能不能承受一次投入後馬上大跌的遺憾。' };
+        } } },
+        { type: 'heading', id: 'average-cost', text: '定期定額的平均成本' },
+        '固定金額投入時，價格低的月份買到較多單位，價格高的月份買到較少，所以[[平均成本]]會低於這段期間價格的簡單平均。這是數學上一定成立的結果，但它並不代表報酬一定比較好：它只是讓「持續投入」這件事對價格波動不那麼敏感。',
+        { type: 'table', head: ['月份', '價格', '投入', '買到單位'], rows: [
+          ['1', '100', '1 萬', '100'],
+          ['2', '80', '1 萬', '125'],
+          ['3', '125', '1 萬', '80'],
+          ['合計', '簡單平均約 101.7', '3 萬', '305'],
+        ], caption: '平均成本 ＝ 30,000 ÷ 305 ≈ 98.4 元，低於價格的簡單平均（約 101.7）。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="定期定額的真正價值：自動化、不用判斷時機、和薪水節奏一致、降低遺憾與情緒干擾">
+          ${[['自動化', '設定一次就持續'], ['不必擇時', '不用猜高低點'], ['跟著薪水', '每月領、每月投'], ['降低遺憾', '大跌時繼續買']].map(([a, b], i) => `<rect x="${12 + i * 137}" y="40" width="125" height="130" style="fill:var(--m${i + 1})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="95" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 137}" y="125" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="205" text-anchor="middle" font-size="13">定期定額的價值主要在行為，而不在報酬率</text>
+        </svg>`, caption: '對每月領薪水的人來說，定期定額就是「領到錢就投入」，等於每一筆都是單筆投入。' },
+        { type: 'heading', id: 'middle', text: '深入：折衷做法' },
+        '如果手上有一大筆錢、又擔心一次投入的遺憾，常見的折衷是：先投入一半，剩下的在 6 到 12 個月內分批投入；或是先決定好分批的時程，不因為市場漲跌而改變。最不好的做法，是「等跌了再買」：市場可能一直沒跌到你等的價位，錢就一直放在現金裡。',
+        { type: 'heading', id: 'regret', text: '深入：遺憾也是一種成本' },
+        '從純數學看，單筆投入的期望值較高；但人不是只看期望值。如果一次投入後馬上遇到大跌，讓你從此不敢投資，那麼數學上較好的選擇，實際結果反而最差。行為經濟學稱之為「預期後悔」：人會為了避免將來後悔，選擇期望值較低的做法。這不是錯，只要你知道自己為了什麼付出這個成本，並且把分批的時程固定下來，不再因為市場變化而改變。',
+        { type: 'table', head: ['你的狀況', '比較適合'], rows: [
+          ['有過大跌時賣出的經驗', '分批，時程寫死'],
+          ['已經有投資經驗、能承受波動', '單筆或先投一半'],
+          ['每月領薪水，沒有大筆資金', '定期定額就是自然的單筆投入'],
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '以為定期定額一定比單筆好。', why: '歷史上單筆約三分之二的期間勝出。', right: '把分批當作降低遺憾的成本。' },
+      { wrong: '等「跌下來」再投入。', why: '可能永遠等不到，錢一直放在現金。', right: '事先決定分批時程並照做。' },
+      { wrong: '市場大跌時暫停定期定額。', why: '正好放棄了以低價買進的機會。', right: '扣款照常，必要時檢查預備金。' },
+    ],
+    keypoints: [
+      '單筆投入的期望報酬較高，分批只是延後承擔風險。',
+      '定期定額的平均成本較低，價值主要在行為。',
+      '一大筆錢可以折衷：先投一半、其餘照時程分批。',
+    ],
+    sources: ['vanguard-dca', 'ubs-2026'],
+  },
+
+  '2-2': {
+    goals: [
+      '說出在台灣執行定期定額的方式',
+      '算出小額投入的實際手續費率',
+      '設計扣款日與加碼的規則',
+    ],
+    analogy: {
+      text: ['定期定額像是訂閱：設定一次，每個月自動送到。真正要注意的是「運費」：如果每次只買一點點東西、運費卻固定，運費佔的比例就很高。', '在台灣，[[零股]]交易與券商的定期定額服務讓小額投資變得容易，但每家券商的[[最低手續費]]與折扣不同；投入金額太小時，手續費的比例可能遠高於牌告的 0.1425%。'],
+      limit: ['訂閱的運費通常一目了然；券商的費用常寫在活動條款或費率表裡，而且會隨活動調整，要自己查清楚。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="定期定額的流程：薪水入帳，自動轉到交割帳戶，券商在扣款日自動買進，持股累積；每年檢查一次比例與費用">
+        ${[['薪水入帳', 'm0'], ['轉到交割帳戶', 'm1'], ['扣款日自動買', 'm2'], ['持股累積', 'm3']].map(([t, c], i) => `<rect x="${12 + i * 137}" y="60" width="125" height="80" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="106" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text>`).join('')}
+        ${[0, 1, 2].map((i) => `<path d="M${137 + i * 137} 100 L${149 + i * 137} 100" class="stroke-ink" stroke-width="3"/>`).join('')}
+        <path d="M486 140 L486 190 L74 190 L74 140" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+        <text x="280" y="215" text-anchor="middle" font-size="13" font-weight="900">每年一次：檢查比例、費用、扣款金額</text>
+      </svg>`,
+      caption: '扣款日放在發薪日之後一兩天，確保帳戶有錢；餘額不足的扣款失敗，常常就是中斷的開始。',
+    },
+    define: [
+      { term: '零股', en: 'odd lot', def: '不滿一張的股票。', example: '15 股。' },
+      { term: '最低手續費', en: 'minimum commission', def: '每筆最低收費。', example: '1 元或 20 元。' },
+      { term: '定期定額', en: 'DCA', def: '固定時間投入固定金額。', example: '每月 5 日。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '小額投入的實際手續費率（實際計算，費率與最低手續費請依你的券商填）', sliders: [
+          { id: 'amt', label: '每次投入金額', min: 1000, max: 100000, step: 500, value: 3000, unit: '元' },
+          { id: 'disc', label: '手續費折扣（牌告 0.1425% 的幾折）', min: 1, max: 10, step: 0.5, value: 6, unit: '折' },
+          { id: 'min', label: '每筆最低手續費', min: 0, max: 20, step: 1, value: 1, unit: '元' },
+          { id: 'times', label: '每月扣款次數', min: 1, max: 4, step: 1, value: 1, unit: '次' },
+        ], compute: (v) => {
+          const fee = Math.max(v.min, Math.floor(v.amt * 0.001425 * v.disc / 10));
+          const rate = fee / v.amt * 100;
+          const year = fee * v.times * 12;
+          return { rows: [
+            { label: '每筆手續費', value: `${fee} 元`, ratio: Math.min(1, fee / 50) },
+            { label: '實際費率', value: `${rate.toFixed(3)}%`, ratio: Math.min(1, rate / 1) },
+            { label: '一年的手續費', value: `${year.toLocaleString()} 元`, ratio: Math.min(1, year / 5000) },
+          ], note: '手續費以 0.1425% × 折扣計算，不足最低手續費時收最低（各券商計算與取整方式不同）。最低手續費 20 元時，每次投入 3,000 元的實際費率約 0.67%，是牌告的近 5 倍；把扣款合併成每月一次較大的金額，比例就會下降。' };
+        } } },
+        { type: 'heading', id: 'rules', text: '設計自己的規則' },
+        { type: 'table', head: ['規則', '建議', '理由'], rows: [
+          ['扣款日', '發薪日後一兩天', '確保帳戶有錢，避免扣款失敗'],
+          ['金額', '依預算的儲蓄額（第一部 1-3）', '投資是儲蓄的去處，不是另外擠出來的錢'],
+          ['加薪時', '同步提高扣款金額', '對抗生活膨脹（第一部 2-2）'],
+          ['大跌時', '照常扣款，不暫停', '暫停等於放棄低價買進'],
+          ['年終、獎金', '依意外之財規則分配，再依配置投入', '避免整筆被花掉或閒置'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="中斷的代價：每月投入 1 萬、年報酬 6%、20 年；持續不中斷約 462 萬；中間停 3 年約 381 萬">
+          <rect x="60" y="40" width="200" height="140" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="160" y="96" text-anchor="middle" font-size="16" font-weight="900" class="on-color">不中斷</text>
+          <text x="160" y="126" text-anchor="middle" font-size="16" font-weight="900" class="on-color">約 462 萬</text>
+          <rect x="300" y="70" width="200" height="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="400" y="116" text-anchor="middle" font-size="16" font-weight="900" class="on-color">第 6–8 年暫停</text>
+          <text x="400" y="146" text-anchor="middle" font-size="16" font-weight="900" class="on-color">約 381 萬</text>
+          <text x="280" y="210" text-anchor="middle" font-size="13">每月 1 萬、年報酬 6%、20 年（簡化試算）</text>
+        </svg>`, caption: '少投入 36 萬，結果卻少了約 81 萬：暫停的那幾年，錯過的是之後十幾年的複利。' },
+        { type: 'heading', id: 'odd-lot', text: '深入：零股與整張' },
+        '零股交易讓小額投資人可以買高價的股票或 ETF，但流動性通常比整張差，買賣價差可能較大；盤中零股與盤後零股的撮合方式也不同。用券商的定期定額服務時，通常由券商依設定的金額代為下單，細節（撮合時段、是否可以設定多檔、費用）以各券商說明為準。',
+        { type: 'heading', id: 'automation', text: '深入：自動化的三個層次' },
+        { type: 'table', head: ['層次', '做法', '效果'], rows: [
+          ['薪水分流', '發薪日自動轉帳到投資用的交割帳戶（第一部 2-1）', '投資的錢先被移走，不會被花掉'],
+          ['自動買進', '券商的定期定額或自動申購', '不必每次做決定'],
+          ['自動提高', '每年加薪時固定調高扣款金額', '儲蓄率隨收入一起成長'],
+        ], caption: '三個層次都設好之後，你唯一需要做的，是不要去關掉它。' },
+        '研究行為的人常說：預設值的力量很大。把「持續投入」設成預設，把「停止投入」變成需要主動去做的事，就能讓惰性站在你這一邊。',
+      ],
+    },
+    mistakes: [
+      { wrong: '每次投入很小的金額，又有較高的最低手續費。', why: '實際費率可能是牌告的好幾倍。', right: '合併成每月一次較大的金額。' },
+      { wrong: '扣款日設在發薪日前。', why: '餘額不足造成扣款失敗。', right: '設在發薪日後一兩天。' },
+      { wrong: '大跌時暫停扣款。', why: '錯過低價，中斷的代價會複利放大。', right: '照常扣款。' },
+    ],
+    keypoints: [
+      '小額投入要看最低手續費與實際費率。',
+      '扣款日在發薪後；加薪同步加碼；大跌不暫停。',
+      '暫停 3 年，20 年後可能少掉兩倍以上的投入額。',
+    ],
+    sources: ['tw-tax-fee', 'vanguard-dca'],
+  },
+});
+</script>

@@ -1,0 +1,204 @@
+<script>
+/* ==========================================================================
+   模組 2：預算與花錢的行為
+   ========================================================================== */
+defineTerms({
+  '預算': { en: 'budget', def: '在錢花出去之前，先決定每一類最多花多少；是事前的分配，不是事後的檢討。', example: '伙食 9,000、交通 2,000、娛樂 3,000。', lesson: '2-1' },
+  '零基預算': { en: 'zero-based budgeting', def: '把每一塊收入都事先指派用途（包含儲蓄），讓「收入 − 所有分配 ＝ 0」。', example: '4.5 萬全部分到各類別，沒有「剩下的」。', lesson: '2-1' },
+  '帳戶分流': { en: 'account splitting', def: '用不同帳戶裝不同用途的錢，讓帳戶本身就是預算。', example: '薪轉 → 生活帳戶、儲蓄帳戶、偶發帳戶。', lesson: '2-1' },
+  '心理帳戶': { en: 'mental accounting', def: '人會在心裡把錢依來源或用途分開記，對不同「帳戶」的錢有不同的花法，即使錢本身沒有差別。', example: '年終獎金比薪水更容易被花掉。', lesson: '2-2' },
+  '生活膨脹': { en: 'lifestyle inflation', def: '收入增加後，支出跟著增加，儲蓄率沒有改善。', example: '加薪 5,000，換了更貴的房子和手機方案。', lesson: '2-2' },
+  '享樂適應': { en: 'hedonic adaptation', def: '生活條件變好之後，幸福感很快回到原本的水準，新的享受變成基本需求。', example: '換新車的興奮幾個月後就消失。', lesson: '2-2' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '照六個步驟做出第一份預算',
+      '比較零基預算、比例法與帳戶分流',
+      '超支時用正確的方式調整',
+    ],
+    analogy: {
+      text: ['出國旅行前，你會先把錢分好：住宿多少、交通多少、吃飯多少、伴手禮多少。到了當地，看哪一包快用完就省一點，而不是最後一天才發現信用卡刷爆。', '[[預算]]就是把這套做法用在每個月。記帳（1-2）是回頭看，預算是往前看；兩個一起用，才知道計畫和實際差在哪裡。'],
+      limit: ['旅行只有幾天，計畫可以很精確；生活每個月都會有變化，所以預算要留一點彈性，並且每個月微調。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="帳戶分流：薪資入帳到薪轉帳戶，發薪日自動分到儲蓄帳戶、偶發支出帳戶與生活帳戶；生活帳戶綁定日常付款，用完就是這個月的上限">
+        <rect x="200" y="16" width="160" height="56" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="280" y="50" text-anchor="middle" font-size="16" font-weight="900" class="on-color">薪轉帳戶</text>
+        <path d="M280 72 L280 100 M90 100 L470 100 M90 100 L90 130 M280 100 L280 130 M470 100 L470 130" fill="none" class="stroke-ink" stroke-width="3"/>
+        ${[['儲蓄帳戶', '不綁卡、不常看', 'm2', 10], ['偶發支出帳戶', '年總額 ÷ 12', 'm1', 200], ['生活帳戶', '綁日常付款', 'm3', 390]].map(([a, b, c, x]) => `<rect x="${x}" y="130" width="160" height="76" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 80}" y="164" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="${x + 80}" y="188" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="244" text-anchor="middle" font-size="14" font-weight="900">發薪日自動轉帳，生活帳戶的餘額就是這個月還能花的錢</text>
+      </svg>`,
+      caption: '帳戶分流讓「預算」不必靠每天記得：錢在哪個帳戶，就決定了它能拿來做什麼。',
+    },
+    define: [
+      { term: '預算', en: 'budget', def: '事前決定每類最多花多少。', example: '伙食 9,000。' },
+      { term: '零基預算', en: 'zero-based budgeting', def: '每一塊錢都先指派用途。', example: '收入 − 分配 ＝ 0。' },
+      { term: '帳戶分流', en: 'account splitting', def: '用帳戶裝不同用途的錢。', example: '三個帳戶。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'steps', text: '六個步驟做出第一份預算' },
+        { type: 'list', ordered: true, items: [
+          '**定收入基準**：用實領的可支配所得；收入不固定就用過去一年較低的月份（1-1）。',
+          '**先扣儲蓄與還債**：先付給自己（1-3），還有高利債的話，加碼還款也放這裡（5-1）。',
+          '**列出固定支出**：房租、貸款、保費月繳、電信、訂閱；這些通常不能當月改。',
+          '**放入偶發準備**：一年的偶發支出 ÷ 12（1-1）。',
+          '**分配變動支出**：伙食、交通、娛樂、購物；參考過去三個月記帳的平均。',
+          '**留一點緩衝**：約 3–5% 的「雜支」，給漏掉的小東西，避免一超支就整個放棄。',
+        ] },
+        { type: 'widget', name: 'knobs', props: { title: '零基預算：把每一塊錢都分配出去（實際計算）', sliders: [
+          { id: 'inc', label: '每月可支配所得', min: 20000, max: 150000, step: 1000, value: 45000, unit: '元' },
+          { id: 'save', label: '儲蓄（先付給自己）', min: 0, max: 60000, step: 500, value: 9000, unit: '元' },
+          { id: 'fix', label: '固定支出（房租、保費、電信）', min: 0, max: 80000, step: 500, value: 16000, unit: '元' },
+          { id: 'irr', label: '偶發準備', min: 0, max: 20000, step: 500, value: 4000, unit: '元' },
+          { id: 'var', label: '變動支出（伙食、交通、娛樂）', min: 0, max: 80000, step: 500, value: 14000, unit: '元' },
+        ], compute: (v) => {
+          const left = v.inc - v.save - v.fix - v.irr - v.var;
+          return { rows: [
+            { label: '還沒分配的錢', value: `${left.toLocaleString()} 元`, ratio: Math.min(1, Math.abs(left) / 20000) },
+            { label: '儲蓄率', value: `${((v.save / v.inc) * 100).toFixed(1)}%`, ratio: Math.min(1, v.save / v.inc / 0.5) },
+            { label: '固定支出佔比', value: `${((v.fix / v.inc) * 100).toFixed(1)}%`, ratio: Math.min(1, v.fix / v.inc) },
+          ], note: left > 0 ? `還有 ${left.toLocaleString()} 元沒有用途：零基預算要求把它分出去，例如當作雜支緩衝、加到儲蓄或加碼還債。` : left < 0 ? '分配超過收入：先砍變動支出，不行再看固定支出，最後才降低儲蓄。' : '剛好分配完：每一塊錢都有工作。' };
+        } } },
+        { type: 'heading', id: 'methods', text: '三種預算法比較' },
+        { type: 'table', head: ['方法', '核心想法', '適合', '要注意'], rows: [
+          ['零基預算', '每一塊錢都先指派用途', '想精準掌握、收入變化不大的人', '每月要花一點時間重新分配'],
+          ['比例法（50/30/20）', '只控制三大類的比例', '剛開始、不想管細節', '高房租城市很難達到 50%'],
+          ['帳戶分流', '帳戶就是預算，用完就停', '容易超支、不想每天記帳', '帳戶多，要設定自動轉帳'],
+        ], caption: '最常見也最好用的組合：用零基預算決定金額，用帳戶分流執行，用反推法（1-2）月底檢查。' },
+        { type: 'heading', id: 'overspend', text: '超支了怎麼辦' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="超支時的調整順序：先從同月其他變動類別移過來，再用雜支緩衝，然後下個月調整預算，最後才動用儲蓄">
+          ${[['1 移其他類別', '這個月少吃一次大餐', 'm2'], ['2 用雜支緩衝', '那 3–5% 就是為此留的', 'm3'], ['3 調整下月預算', '連續超支代表預算不實際', 'm1'], ['4 才動儲蓄', '真的是意外才這樣做', 'm4']].map(([a, b, c], i) => `<rect x="20" y="${16 + i * 54}" width="520" height="46" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="40" y="${45 + i * 54}" font-size="15" font-weight="900" class="on-color">${a}</text><text x="520" y="${45 + i * 54}" text-anchor="end" font-size="13" class="on-color">${b}</text>`).join('')}
+        </svg>`, caption: '預算失敗最常見的原因不是超支，而是超支一次就整個放棄。調整是預算的一部分。' },
+        '連續三個月同一類都超支，代表那個數字本來就不合理：要嘛提高那一類、從別類挪，要嘛真的改變習慣。硬撐一個不實際的數字，只會讓你討厭預算。',
+        { type: 'callout', variant: 'tip', title: '給「想要」留位置', body: ['預算裡完全沒有娛樂與購物的空間，通常撐不了多久。把真正在乎的事（例如旅行、運動、學習）明確放進預算，反而更容易守住其他類別。'] },
+        { type: 'heading', id: 'irregular-income', text: '深入：收入不固定時的預算法' },
+        '接案、業務、自營的人，最難的是「不知道這個月會進來多少」。一個常見的做法是「用上個月的收入過這個月」：',
+        { type: 'list', ordered: true, items: [
+          '開一個「收入緩衝帳戶」，所有收入先進這裡。',
+          '每月 1 日，從緩衝帳戶轉出一筆「固定月薪」到生活帳戶，金額是過去一年較低月份的水準。',
+          '收入好的月份，多的錢留在緩衝帳戶；收入差的月份，從緩衝帳戶照樣發薪。',
+          '緩衝帳戶累積超過 2–3 個月的固定月薪後，超出的部分再拿去補預備金或還債。',
+        ] },
+        '這樣做把「收入不穩」轉換成「緩衝帳戶的水位起伏」，生活本身就能用固定金額規劃。緩衝帳戶和緊急預備金是兩個不同的帳戶：前者處理正常的收入波動，後者處理真正的意外。',
+        { type: 'heading', id: 'time-units', text: '深入：預算的時間單位' },
+        { type: 'table', head: ['單位', '適合的類別', '理由'], rows: [
+          ['週', '伙食、零用', '一個月太長，容易前半月花太多；一週的數字比較好掌握'],
+          ['月', '固定支出、儲蓄', '和薪水、帳單的週期一致'],
+          ['年', '旅遊、禮金、保費、3C', '一年才發生幾次，用年度總額控制比較準'],
+        ], caption: '同一份預算可以混用：月預算裡的伙食，再除以 4 變成週預算，執行起來更容易。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '預算定得很嚴格，第一個月就超支然後放棄。', why: '不切實際的數字撐不久。', right: '用過去三個月的平均起步，每月微調。' },
+      { wrong: '超支時直接挪用儲蓄。', why: '儲蓄被當成預備的變動支出，就永遠存不起來。', right: '先從其他變動類別與雜支緩衝調整。' },
+      { wrong: '沒有偶發準備，年繳費用來時整個打亂。', why: '偶發支出幾乎一定會來。', right: '預算裡固定放「年總額 ÷ 12」。' },
+    ],
+    keypoints: [
+      '預算是事前分配：先儲蓄，再固定，再變動。',
+      '帳戶分流讓預算不靠意志力執行。',
+      '超支先挪類別，連續超支就修正預算。',
+    ],
+    sources: ['fsc-moneywise'],
+  },
+
+  '2-2': {
+    goals: [
+      '說出心理帳戶如何影響花錢方式',
+      '比較「小額高頻」與「大石頭」支出的實際影響',
+      '用加薪分配規則對抗生活膨脹',
+    ],
+    analogy: {
+      text: ['同樣是 1,000 元，路上撿到的和辛苦加班賺來的，你花起來的心情不一樣；用現金付和用手機一感應付，痛的程度也不一樣。錢本身沒有差別，差別在你心裡把它放在哪一個抽屜。', '行為經濟學家 Richard Thaler 稱這為[[心理帳戶]]。它不全然是壞事（分帳戶正是在利用它），但如果不知道它存在，就會被它牽著走。'],
+      limit: ['抽屜的比喻只說明「分開記」的現象；實際的心理機制更複雜，還包括付款方式、時間點、金額大小等因素。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="心理帳戶示意：薪水、年終獎金、退稅、撿到的錢在心裡被放進不同的罐子，越像意外之財的罐子越容易被花掉">
+        ${[['薪水', '最謹慎', 'm0', 160], ['年終獎金', '比較敢花', 'm1', 120], ['退稅、中獎', '最容易花掉', 'm4', 80]].map(([a, b, c, h], i) => `<rect x="${40 + i * 170}" y="${200 - h}" width="140" height="${h}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${110 + i * 170}" y="${200 - h + 30}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="${110 + i * 170}" y="${200 - h + 54}" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="230" text-anchor="middle" font-size="14" font-weight="900">都是新臺幣，花法卻不一樣</text>
+        <text x="280" y="252" text-anchor="middle" font-size="12">罐子高度表示「留下來的傾向」（示意）</text>
+      </svg>`,
+      caption: 'Thaler（1999）：心理帳戶是人們組織、評估、追蹤財務活動的一套心理操作；它讓「錢可以互相替代」這件事在實際行為中不成立。',
+    },
+    define: [
+      { term: '心理帳戶', en: 'mental accounting', def: '依來源或用途在心裡把錢分開。', example: '獎金比較敢花。' },
+      { term: '生活膨脹', en: 'lifestyle inflation', def: '收入增加，支出跟著增加。', example: '加薪就換房。' },
+      { term: '享樂適應', en: 'hedonic adaptation', def: '新享受很快變成基本需求。', example: '新車的興奮消失。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'mental', text: '心理帳戶的三個常見現象' },
+        { type: 'table', head: ['現象', '例子', '怎麼利用或避開'], rows: [
+          ['依來源分', '年終、退稅、紅包被當成「額外的錢」花掉', '意外之財先套用固定比例：例如一半還債或儲蓄'],
+          ['依付款方式分', '刷卡、行動支付比付現金更不痛', '設定刷卡通知；大額消費前等 24 小時'],
+          ['一邊借一邊存', '存款放 1% 定存，同時背 15% 卡債', '把兩個帳戶看成同一個人：先還高利債（4-3）'],
+        ], caption: '「付款的痛感」在行為經濟學中常被討論（例如 Prelec 與 Loewenstein 1998 年的研究）；結論是付款越無感，越容易多花。' },
+        { type: 'heading', id: 'latte', text: '小額高頻 vs. 大石頭' },
+        '「少喝一杯咖啡就能致富」是常見說法，它對了一半：小額高頻的支出累積起來確實可觀，但一個月的房租、車貸、保險規劃，常常一個決定就勝過一整年的咖啡。兩個都該看，順序是先搬大石頭。',
+        { type: 'widget', name: 'knobs', props: { title: '每天的小錢 vs. 每月的大石頭（實際計算，不含投資報酬）', sliders: [
+          { id: 'daily', label: '每天的小額花費（飲料、零食）', min: 0, max: 300, step: 10, value: 80, unit: '元' },
+          { id: 'days', label: '每個月有幾天', min: 0, max: 31, step: 1, value: 22, unit: '天' },
+          { id: 'big', label: '大石頭每月可省（換房租、換方案）', min: 0, max: 20000, step: 500, value: 4000, unit: '元' },
+        ], compute: (v) => {
+          const smallYear = v.daily * v.days * 12;
+          const bigYear = v.big * 12;
+          return { rows: [
+            { label: '小額：一年', value: `${smallYear.toLocaleString()} 元`, ratio: Math.min(1, smallYear / 240000) },
+            { label: '小額：十年', value: `${(smallYear * 10).toLocaleString()} 元`, ratio: Math.min(1, smallYear * 10 / 2400000) },
+            { label: '大石頭：一年', value: `${bigYear.toLocaleString()} 元`, ratio: Math.min(1, bigYear / 240000) },
+            { label: '大石頭：十年', value: `${(bigYear * 10).toLocaleString()} 元`, ratio: Math.min(1, bigYear * 10 / 2400000) },
+          ], note: '預設：每天 80 元、一個月 22 天，一年約 2.1 萬；房租每月少 4,000，一年 4.8 萬，而且只需要做一次決定。兩個加起來，十年就是約 69 萬。' };
+        } } },
+        { type: 'heading', id: 'inflation', text: '生活膨脹與享樂適應' },
+        '加薪後換更好的房子、更貴的手機方案、更常外食，每一項單獨看都合理，加起來卻讓儲蓄率原地踏步。更麻煩的是[[享樂適應]]：新的生活水準很快變成「正常」，回不去，等到收入下降時就特別痛。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="兩條路徑：收入每年成長，甲的支出跟著同幅度成長，儲蓄的差距維持很小；乙把每次加薪的一半存起來，收入與支出之間的差距越拉越大">
+          <line x1="50" y1="210" x2="530" y2="210" class="stroke-ink" stroke-width="2"/><line x1="50" y1="20" x2="50" y2="210" class="stroke-ink" stroke-width="2"/>
+          <path d="M50 150 L530 40" fill="none" style="stroke:var(--m0)" stroke-width="4"/><text x="526" y="34" text-anchor="end" font-size="13" font-weight="900">收入</text>
+          <path d="M50 165 L530 60" fill="none" style="stroke:var(--m4)" stroke-width="4" stroke-dasharray="10 5"/><text x="526" y="82" text-anchor="end" font-size="13" font-weight="900">甲：支出跟著漲</text>
+          <path d="M50 165 L530 110" fill="none" style="stroke:var(--m2)" stroke-width="4"/><text x="526" y="132" text-anchor="end" font-size="13" font-weight="900">乙：加薪的一半存下</text>
+          <text x="290" y="236" text-anchor="middle" font-size="13">時間 →</text>
+        </svg>`, caption: '兩人收入一樣。差別只在每次加薪時，多出來的錢有沒有先分一半到儲蓄。' },
+        { type: 'widget', name: 'knobs', props: { title: '加薪分配規則：加薪後的儲蓄率（實際計算）', sliders: [
+          { id: 'inc', label: '加薪前月實領', min: 20000, max: 150000, step: 1000, value: 45000, unit: '元' },
+          { id: 's', label: '加薪前儲蓄率', min: 0, max: 60, step: 1, value: 15, unit: '%' },
+          { id: 'raise', label: '加薪幅度', min: 0, max: 50, step: 1, value: 10, unit: '%' },
+          { id: 'keep', label: '加薪部分拿去儲蓄的比例', min: 0, max: 100, step: 5, value: 50, unit: '%' },
+        ], compute: (v) => {
+          const saveBefore = v.inc * v.s / 100;
+          const extra = v.inc * v.raise / 100;
+          const newInc = v.inc + extra;
+          const saveAfter = saveBefore + extra * v.keep / 100;
+          return { rows: [
+            { label: '加薪後月實領', value: `${Math.round(newInc).toLocaleString()} 元`, ratio: Math.min(1, newInc / 225000) },
+            { label: '加薪後每月儲蓄', value: `${Math.round(saveAfter).toLocaleString()} 元`, ratio: Math.min(1, saveAfter / 100000) },
+            { label: '加薪後儲蓄率', value: `${((saveAfter / newInc) * 100).toFixed(1)}%`, ratio: Math.min(1, saveAfter / newInc) },
+            { label: '生活費仍然增加', value: `${Math.round(extra * (1 - v.keep / 100)).toLocaleString()} 元`, ratio: Math.min(1, extra * (1 - v.keep / 100) / 20000) },
+          ], note: '預設：加薪 10%、存一半，儲蓄率從 15% 升到約 18.2%，生活費也多了 2,250 元。每次加薪都這樣做，儲蓄率會一路往上，而且生活仍在變好。' };
+        } } },
+        { type: 'callout', variant: 'tip', title: '三個實用的小設計', body: ['**意外之財規則**：獎金、退稅、紅包，事先決定比例（例如 50% 儲蓄或還債、50% 自由花）。', '**24 小時規則**：非必要、超過某個金額（例如 3,000 元）的購物，先放購物車等一天。', '**訂閱盤點**：每季看一次信用卡帳單上的定期扣款，取消三個月沒用的。'] },
+        { type: 'heading', id: 'more-biases', text: '深入：另外三個常見的花錢偏誤' },
+        { type: 'table', head: ['偏誤', '是什麼', '例子', '對策'], rows: [
+          ['錨定', '第一個看到的數字影響後面的判斷', '原價 5,000、特價 2,990，就覺得賺到', '問「如果它一直是 2,990，我會買嗎？」'],
+          ['沉沒成本', '因為已經花了錢，就繼續投入', '健身房年費繳了，不想去也不退；分期買的東西不想用也捨不得賣', '只看「從現在起」的成本與好處'],
+          ['社會比較', '用身邊的人決定自己的「正常」', '朋友都換新手機、出國，自己不做好像落後', '用自己的目標與預算當基準'],
+        ] },
+        { type: 'heading', id: 'value', text: '深入：花錢的價值不是一樣的' },
+        '有研究者主張，同樣的錢花在「經驗」（旅行、學習、和重要的人相處）或「替別人花」上，帶來的滿足常比花在物品上持久；也有研究指出，花錢「買時間」（把討厭的家務外包）可以提升生活滿意度。這些結論在不同族群上的強度不一，但提供了一個好問題：這筆錢，會讓我的生活在一個月後仍然比較好嗎？',
+        '預算的目的不是把每一類都壓到最低，而是把錢從「不太在乎的地方」移到「真正在乎的地方」。記帳時在每筆花費旁邊標一個 ✓ 或 ✗（值得、不值得），三個月後就會看到很清楚的模式。',
+      ],
+    },
+    mistakes: [
+      { wrong: '把獎金、退稅當成可以全部花掉的「額外的錢」。', why: '錢沒有來源之分，這是心理帳戶的陷阱。', right: '事先決定意外之財的分配比例。' },
+      { wrong: '只盯小額花費，忽略房租、車貸這種大石頭。', why: '大石頭一個決定的影響可能勝過一整年小錢。', right: '先搬大石頭，再處理小額高頻。' },
+      { wrong: '一邊存低利定存，一邊背高利卡債。', why: '兩邊其實是同一個人的錢。', right: '先用存款（保留預備金）還掉高利債。' },
+    ],
+    keypoints: [
+      '錢沒有來源之分，但心裡會分；知道它，才能利用它。',
+      '先搬大石頭，再處理小額高頻。',
+      '加薪時先把一部分自動存下，對抗生活膨脹。',
+    ],
+    sources: ['thaler-1999', 'fsc-moneywise'],
+  },
+});
+</script>

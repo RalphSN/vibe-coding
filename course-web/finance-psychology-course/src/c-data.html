@@ -1,0 +1,133 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: '理財系列・第六部｜投資心理',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-29',
+  version: 'v1',
+};
+
+/* 理財系列六卷：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: '理財系列',
+  current: 'fin-6',
+  volumes: [
+    { id: 'fin-1', vol: '第一部', title: '個人財務', href: '../finance-personal-course/index.html' },
+    { id: 'fin-2', vol: '第二部', title: '風險保障', href: '../finance-insurance-course/index.html' },
+    { id: 'fin-3', vol: '第三部', title: '投資核心', href: '../finance-investing-course/index.html' },
+    { id: 'fin-4', vol: '第四部', title: '配置與稅費', href: '../finance-allocation-course/index.html' },
+    { id: 'fin-5', vol: '第五部', title: '財報與估值', href: '../finance-valuation-course/index.html' },
+    { id: 'fin-6', vol: '第六部', title: '投資心理', href: '../finance-psychology-course/index.html' },
+  ],
+};
+
+/* 全書主軸：從偏誤到對策的六個環節；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '行為缺口', note: '輸在行為，不是知識', color: 'var(--m0)' },
+    { label: '損失', note: '怕賠、捨不得認賠', color: 'var(--m1)' },
+    { label: '過度', note: '自信、交易、從眾', color: 'var(--m2)' },
+    { label: '市場情緒', note: '泡沫與恐慌', color: 'var(--m3)' },
+    { label: '環境設計', note: '自動化、預設值', color: 'var(--m4)' },
+    { label: '規則', note: '寫下來、照著做', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0], 1: [0, 1, 2], 2: [1], 3: [2], 4: [3], 5: [4, 5], 6: [0, 1, 2, 3, 4, 5] },
+  byLesson: { '5-2': [5], '5-3': [4] },
+};
+
+/* 首頁主視覺：知道 vs 做到（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="知道與做到之間的缺口：前五卷給了知識，這一卷處理行為；損失趨避、過度自信、追高殺低把報酬拉低，環境設計與規則把它拉回來">
+  <rect x="30" y="30" width="230" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
+  <text x="145" y="78" text-anchor="middle" font-size="20" font-weight="900" class="on-color">知道</text>
+  <text x="145" y="108" text-anchor="middle" font-size="14" class="on-color">第一到五部的知識</text>
+  <rect x="300" y="30" width="230" height="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+  <text x="415" y="78" text-anchor="middle" font-size="20" font-weight="900" class="on-color">做到</text>
+  <text x="415" y="108" text-anchor="middle" font-size="14" class="on-color">真的照計畫執行</text>
+  <path d="M260 85 L300 85" class="stroke-ink" stroke-width="4"/>
+  ${[['損失趨避', 'm1'], ['過度自信', 'm5'], ['追高殺低', 'm3']].map(([t, c], i) => `<rect x="${40 + i * 165}" y="190" width="150" height="60" style="fill:var(--${c})" class="stroke-ink" stroke-width="4"/><text x="${115 + i * 165}" y="227" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${t}</text>`).join('')}
+  <text x="280" y="176" text-anchor="middle" font-size="15" font-weight="900">中間的缺口</text>
+  <rect x="80" y="300" width="400" height="80" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+  <text x="280" y="336" text-anchor="middle" font-size="18" font-weight="900" class="on-color">環境設計＋規則</text>
+  <text x="280" y="362" text-anchor="middle" font-size="14" class="on-color">不靠意志力，讓正確的事變成預設</text>
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '起點：|輸在行為，不是知識', short: '起點', desc: '投資人報酬為什麼長期低於自己買的基金；行為缺口的大小與來源。', lessons: [
+    ['0-1', '行為缺口'],
+  ]},
+  { id: 1, title: '大腦的|兩套系統', short: '大腦', desc: '快思與慢想、捷思法與偏誤：為什麼聰明人也會在投資上犯同樣的錯。', lessons: [
+    ['1-1', '快思、慢想|與偏誤地圖'],
+  ]},
+  { id: 2, title: '損失|與後悔', short: '損失', desc: '損失趨避、處分效應、後悔與沉沒成本：為什麼賣掉賺錢的、抱著賠錢的。', lessons: [
+    ['2-1', '損失趨避'],
+    ['2-2', '處分效應：|賣贏留輸'],
+    ['2-3', '後悔、沉沒成本|與不作為'],
+  ]},
+  { id: 3, title: '過度自信|與從眾', short: '過度', desc: '過度自信與過度交易、追高殺低與從眾、錨定與確認偏誤。', lessons: [
+    ['3-1', '過度自信|與過度交易'],
+    ['3-2', '追高殺低|與從眾'],
+    ['3-3', '錨定、確認偏誤|與故事'],
+  ]},
+  { id: 4, title: '市場的情緒', short: '情緒', desc: '泡沫與恐慌的循環，以及大跌之後要多久才回得來。', lessons: [
+    ['4-1', '泡沫|與恐慌'],
+  ]},
+  { id: 5, title: '對策：|設計環境與規則', short: '對策', desc: '自動化與預設值、事先寫好的規則與檢查清單、資訊飲食與看帳戶的頻率。', lessons: [
+    ['5-1', '自動化|與預設值'],
+    ['5-2', '規則|與檢查清單'],
+    ['5-3', '資訊飲食|與看盤頻率'],
+  ]},
+  { id: 6, title: '把六卷串起來', short: '總結', desc: '理財系列六卷的一頁地圖：從記帳到心理，每一步做什麼。', lessons: [
+    ['6-1', '理財系列|一頁地圖'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

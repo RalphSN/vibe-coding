@@ -1,0 +1,253 @@
+<script>
+/* ==========================================================================
+   模組 5：對策：設計環境與規則
+   ========================================================================== */
+defineTerms({
+  '預設值': { en: 'default', def: '不做任何選擇時會發生的事；人傾向維持預設，所以把好的行為設成預設，就能讓多數人做對。', example: '薪水入帳自動轉入投資帳戶。', lesson: '5-1' },
+  '承諾機制': { en: 'commitment device', def: '冷靜時先做好約束，讓未來的自己比較難違反計畫。', example: '事先同意「以後每次加薪，提撥率自動提高」。', lesson: '5-1' },
+  '冷卻期': { en: 'cooling-off period', def: '想做重大決定時，強制等待一段時間再執行，讓系統二有機會介入。', example: '想賣出時先等 48 小時。', lesson: '5-2' },
+  '短視損失趨避': { en: 'myopic loss aversion', def: '損失趨避加上太常檢查結果：看得越頻繁，看到虧損的次數越多，越覺得投資很痛苦。', example: '每天看帳戶，一年有一半的日子是賠的。', lesson: '5-3' },
+});
+
+/* 標準常態分布的累積機率（Abramowitz–Stegun 近似，誤差 < 1e-6） */
+function normCdf(z) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(z / Math.SQRT2));
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(z * z) / 2);
+  return z >= 0 ? 0.5 * (1 + erf) : 0.5 * (1 - erf);
+}
+
+const CHECK_FREQ = [
+  { label: '每天', perYear: 252 },
+  { label: '每週', perYear: 52 },
+  { label: '每月', perYear: 12 },
+  { label: '每季', perYear: 4 },
+  { label: '每年', perYear: 1 },
+];
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '說出預設值為什麼比意志力有效',
+      '設定自動轉帳與自動提高提撥',
+      '算出自動提高儲蓄率的長期差距',
+    ],
+    analogy: {
+      text: ['想少吃零食，最有效的方法不是每次都忍住，而是家裡不買零食。這就是環境設計：讓錯的事變難、對的事變成[[預設值]]。意志力像手機電池，用一天就會沒電；環境設計一次做好，之後每天都有效。', 'Thaler 與 Benartzi 設計的「明天存更多」（Save More Tomorrow）計畫，讓員工事先承諾：以後每次加薪，退休提撥率自動提高。在第一家實施的公司，參加者的提撥率從約 3.5% 提高到約 13.6%，前後約 40 個月。這是一個[[承諾機制]]：用損失趨避（加薪時才提高，所以實領不會減少）與惰性（不做任何事就會繼續）幫自己做對的事。'],
+      limit: ['這個研究的參加者是自願選擇的，可能本來就比較有意願存錢；美國勞動部的評析也指出這個限制，所以效果的大小不能直接套用到每個人身上。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="意志力與環境設計的比較：意志力每一次都要重新決定，越到後面越容易失敗；環境設計一次設定好，之後自動執行">
+        <rect x="20" y="30" width="250" height="200" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="145" y="64" text-anchor="middle" font-size="18" font-weight="900" class="on-color">靠意志力</text>
+        ${['每個月重新決定要不要投', '大跌時要忍住不賣', '大漲時要忍住不追', '越累越容易失敗'].map((t, i) => `<text x="145" y="${102 + i * 30}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+        <rect x="290" y="30" width="250" height="200" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="415" y="64" text-anchor="middle" font-size="18" font-weight="900" class="on-color">靠環境設計</text>
+        ${['薪水入帳自動扣款', '帳戶 app 移到第二頁', '加薪自動提高提撥', '一次設定，之後自動'].map((t, i) => `<text x="415" y="${102 + i * 30}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+        <text x="280" y="258" text-anchor="middle" font-size="13">讓「什麼都不做」的結果，就是正確的結果</text>
+      </svg>`,
+      caption: '先付錢給自己（第一部）就是最基本的預設值：薪水一入帳，先自動轉到儲蓄與投資，剩下的才拿來花。',
+    },
+    define: [
+      { term: '預設值', en: 'default', def: '不選擇時會發生的事。', example: '自動扣款。' },
+      { term: '承諾機制', en: 'commitment device', def: '冷靜時先約束未來的自己。', example: '加薪自動提高提撥。' },
+      { term: '損失趨避', en: 'loss aversion', def: '損失的痛大於獲利的快樂。', example: '加薪時才提高，實領不減少。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '固定儲蓄率 vs 每次加薪自動提高（實際計算）', sliders: [
+          { id: 'salary', label: '目前年薪', min: 300000, max: 3000000, step: 50000, value: 600000, unit: '元' },
+          { id: 'start', label: '目前儲蓄投資率', min: 1, max: 30, step: 1, value: 5, unit: '%' },
+          { id: 'step', label: '每年加薪時提高', min: 0, max: 3, step: 0.5, value: 1, unit: '個百分點' },
+          { id: 'cap', label: '提高到上限', min: 5, max: 40, step: 1, value: 15, unit: '%' },
+          { id: 'years', label: '年數', min: 5, max: 40, step: 1, value: 20, unit: '年' },
+        ], compute: (v) => {
+          const simulate = (stepUp) => {
+            let salary = v.salary; let rate = v.start; let balance = 0;
+            for (let y = 0; y < v.years; y++) { balance = (balance + salary * rate / 100) * 1.05; salary *= 1.03; rate = Math.min(v.cap, rate + stepUp); }
+            return { balance, rate };
+          };
+          const fixed = simulate(0); const auto = simulate(v.step);
+          return { rows: [
+            { label: '固定儲蓄率：期末', value: `${Math.round(fixed.balance).toLocaleString()} 元`, ratio: fixed.balance / Math.max(fixed.balance, auto.balance) },
+            { label: '自動提高：期末', value: `${Math.round(auto.balance).toLocaleString()} 元`, ratio: auto.balance / Math.max(fixed.balance, auto.balance) },
+            { label: '最後的儲蓄率', value: `${auto.rate}%`, ratio: auto.rate / 40 },
+          ], note: '假設每年加薪 3%、投資年報酬 5%。預設：年薪 60 萬、從 5% 開始每年提高 1 個百分點到 15%，20 年後約 318 萬；維持 5% 約 133 萬。因為每次只提高加薪的一部分，實領的錢仍然每年增加，感覺不到損失。' };
+        } } },
+        { type: 'heading', id: 'setup', text: '可以馬上做的環境設計' },
+        { type: 'table', head: ['設計', '怎麼做', '對抗的偏誤'], rows: [
+          ['自動扣款', '薪水入帳日隔天，自動轉入投資帳戶或定期定額', '拖延、擇時'],
+          ['自動提高', '每次加薪或年終，把一半的增加額加進定期定額', '生活水準上升吃掉加薪'],
+          ['提高摩擦', '交易 app 移出首頁、關閉推播、不存密碼', '衝動交易、過度看盤'],
+          ['分開帳戶', '緊急預備金、投資、生活費放不同帳戶', '心理帳戶混用'],
+          ['降低選擇', '核心部位只用一兩檔指數型基金', '過度自信、選擇困難'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="摩擦的方向：對的事降低摩擦，例如自動扣款；錯的事提高摩擦，例如把交易 app 藏起來、關掉推播">
+          <rect x="30" y="40" width="240" height="130" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="150" y="86" text-anchor="middle" font-size="16" font-weight="900" class="on-color">對的事：降低摩擦</text>
+          <text x="150" y="118" text-anchor="middle" font-size="12" class="on-color">自動扣款、自動再投入</text>
+          <rect x="290" y="40" width="240" height="130" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="410" y="86" text-anchor="middle" font-size="16" font-weight="900" class="on-color">錯的事：提高摩擦</text>
+          <text x="410" y="118" text-anchor="middle" font-size="12" class="on-color">藏起 app、關推播、登出</text>
+          <text x="280" y="204" text-anchor="middle" font-size="13">多一個步驟，就多一次讓系統二介入的機會</text>
+        </svg>`, caption: '提高摩擦不是禁止交易，而是讓衝動有時間冷卻。' },
+        { type: 'heading', id: 'nudge', text: '深入：推力與自動加入' },
+        'Thaler 與 Sunstein 把這類設計稱為推力（nudge）：不禁止任何選擇，只是改變選擇呈現的方式與預設值。最有名的例子是退休金計畫的自動加入：從「要自己申請才加入」改成「自動加入、不要的人可以退出」，參加率就大幅提高。對個人來說，你可以當自己的「選擇設計師」：把每個月的投資、每年的再平衡、每次加薪的提撥，都設成不用想就會發生的預設。',
+      ],
+    },
+    mistakes: [
+      { wrong: '每個月手動決定要不要投、投多少。', why: '每次決定都受情緒影響。', right: '設定自動扣款。' },
+      { wrong: '加薪後生活水準跟著全部提高。', why: '儲蓄率永遠停在原地。', right: '加薪時自動提高一部分提撥。' },
+      { wrong: '把交易 app 放在手機首頁、開推播。', why: '降低衝動交易的摩擦。', right: '移出首頁、關推播。' },
+    ],
+    keypoints: [
+      '環境設計一次做好，比每次靠意志力有效。',
+      '加薪時自動提高儲蓄率，實領仍增加。',
+      '對的事降低摩擦，錯的事提高摩擦。',
+    ],
+    sources: ['smart-2004', 'thaler-1999'],
+  },
+
+  '5-2': {
+    goals: [
+      '寫一份自己的投資政策書',
+      '設定冷卻期與交易前檢查清單',
+      '知道規則在什麼時候可以修改',
+    ],
+    analogy: {
+      text: ['飛機駕駛員有上萬小時的經驗，起飛前仍然要照檢查清單逐項確認。不是因為他們不懂，而是因為人在壓力與例行公事中，一定會漏掉事情。投資也一樣：最需要清單的時刻，正是你覺得自己最不需要它的時候。', '這一課要寫的是一份投資政策書：一頁紙，寫下你的目標、配置、再平衡規則與「大跌時我會怎麼做」。它在冷靜時由系統二寫成，在激動時替系統二發言。搭配[[冷卻期]]，讓任何臨時起意的重大買賣都要先等一等。'],
+      limit: ['檢查清單防得住漏掉的步驟，防不住一開始就錯的計畫；所以政策書本身要建立在前五卷的知識上，並定期檢討。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="規則的三層：投資政策書寫下目標與配置，每年檢討一次；再平衡規則寫下何時調整；交易前檢查清單與冷卻期處理每一次臨時起意的買賣">
+        ${[['投資政策書', '目標、配置、大跌時怎麼做', '每年檢討一次', 'm0', 30], ['再平衡規則', '偏離幾個百分點就調整', '照日曆或門檻執行', 'm3', 110], ['檢查清單＋冷卻期', '臨時起意的買賣先過關', '每次交易前', 'm4', 190]].map(([a, b, c, col, y]) => `<rect x="40" y="${y}" width="480" height="66" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="60" y="${y + 28}" font-size="16" font-weight="900" class="on-color">${a}</text><text x="60" y="${y + 52}" font-size="12" class="on-color">${b}</text><text x="500" y="${y + 40}" text-anchor="end" font-size="12" class="on-color">${c}</text>`).join('')}
+      </svg>`,
+      caption: '越上層的規則改得越少；越下層的規則用得越頻繁。',
+    },
+    define: [
+      { term: '冷卻期', en: 'cooling-off period', def: '重大決定前強制等待。', example: '先等 48 小時。' },
+      { term: '承諾機制', en: 'commitment device', def: '冷靜時先約束自己。', example: '寫下規則。' },
+      { term: '系統二', en: 'System 2', def: '緩慢、費力的推理。', example: '寫政策書。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'ips', text: '投資政策書範本（一頁）' },
+        { type: 'table', head: ['欄位', '範例'], rows: [
+          ['目標', '25 年後退休，每年需要約 60 萬元生活費（第四部 6-1）'],
+          ['配置', '股票 70%（全球指數）、債券 30%（投資等級債券指數）'],
+          ['每月投入', '薪水的 15%，入帳隔天自動扣款'],
+          ['再平衡', '每年生日檢查；任一資產偏離目標超過 5 個百分點就調回'],
+          ['個股上限', '個股合計不超過總資產 10%，單一個股不超過 3%（第五部 5-1）'],
+          ['大跌時', '不賣出；照常投入；偏離超過門檻就再平衡'],
+          ['什麼時候可以改', '人生重大事件（結婚、生子、換工作、離退休 10 年內），不因行情改'],
+        ] },
+        { type: 'widget', name: 'checklist', props: { key: 'pre-trade', items: [
+          '這筆交易在我的投資政策書裡嗎？還是臨時起意？',
+          '我的情緒溫度正常嗎？（1-1 的溫度計）',
+          '如果是賣出：我是因為價格跌了，還是因為當初買進的理由不成立了？（2-2）',
+          '如果是買進：我是因為大家都在買，還是它符合我的配置？（3-2）',
+          '我寫得出三個反對理由嗎？（3-3）',
+          '這筆交易的手續費、證交稅與稅負算過了嗎？（第四部）',
+          '已經等過 48 小時冷卻期了嗎？',
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="冷卻期的作用：衝動出現時情緒最高，48 小時後情緒下降，系統二才有機會重新評估">
+          <path d="M60 60 C 140 60, 180 150, 300 170 C 400 185, 460 185, 520 185" fill="none" style="stroke:var(--m4)" stroke-width="4"/>
+          <circle cx="60" cy="60" r="8" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/>
+          <text x="70" y="44" font-size="13" font-weight="900">衝動出現：情緒最高</text>
+          <circle cx="420" cy="183" r="8" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/>
+          <text x="420" y="166" text-anchor="middle" font-size="13" font-weight="900">48 小時後再決定</text>
+          <text x="280" y="214" text-anchor="middle" font-size="12">示意圖：情緒通常會隨時間下降</text>
+        </svg>`, caption: '大部分「一定要現在做」的投資決定，等兩天都不會怎樣；真的會怎樣的，通常也不是你該追的機會。' },
+        { type: 'heading', id: 'letter', text: '深入：寫給大跌時的自己' },
+        '在市場平靜時，寫一封信給未來的自己：「當你讀到這封信，市場可能跌了 30%。記得我們為什麼這樣配置：這筆錢 20 年內不會用到；緊急預備金還在；過去每一次大跌最後都回來了；賣出會把帳面損失變成真實損失。請照政策書做，然後關掉 app。」把它存在投資帳戶旁邊。這是一個簡單的承諾機制：用冷靜時的自己，去說服激動時的自己。',
+        { type: 'heading', id: 'change', text: '深入：規則什麼時候可以改' },
+        { type: 'table', head: ['可以改', '不應該改'], rows: [
+          ['結婚、生子、買房', '因為最近漲很多'],
+          ['收入大幅改變、換工作', '因為最近跌很多'],
+          ['離退休剩 10 年以內，逐步降低風險', '因為新聞說要崩盤'],
+          ['發現原本的規則根本做不到（例如投入金額太高）', '因為朋友賺了很多'],
+        ], caption: '判斷原則：因為「自己的人生」改變而改，可以；因為「市場」改變而改，通常是偏誤。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '投資規則只放在腦袋裡。', why: '激動時系統一會改寫它。', right: '寫成一頁的投資政策書。' },
+      { wrong: '看到機會就立刻下單。', why: '情緒最高時判斷最差。', right: '先過檢查清單，等 48 小時。' },
+      { wrong: '因為行情改變就修改規則。', why: '規則的價值就在不隨行情改變。', right: '只在人生改變時修改。' },
+    ],
+    keypoints: [
+      '投資政策書：冷靜時寫下，激動時照做。',
+      '交易前檢查清單＋48 小時冷卻期。',
+      '因人生改變而改規則，不因市場改變而改。',
+    ],
+    sources: ['kt-1979', 'odean-1998'],
+  },
+
+  '5-3': {
+    goals: [
+      '說明短視損失趨避',
+      '算出看帳戶的頻率和「看到虧損」的次數',
+      '設計自己的資訊飲食',
+    ],
+    analogy: {
+      text: ['如果每天量體重，你會發現體重每天都在上上下下，有一半的日子比前一天重；即使三個月下來確實瘦了，每天量的人會比每月量的人沮喪得多。投資帳戶也一樣：看得越頻繁，看到的越是雜訊，而不是趨勢。', 'Benartzi 與 Thaler 把這叫做[[短視損失趨避]]：人對損失特別敏感（2-1），又太常檢查結果，於是覺得股票的風險大得難以忍受。他們用這個解釋為什麼股票長期報酬明明比債券高很多，很多人卻不願意持有。'],
+      limit: ['體重的上下起伏通常很小；股票的短期起伏很大，大跌時的痛也是真實的。少看不會讓風險消失，只是讓你不被雜訊牽著走。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="看帳戶的頻率與看到虧損的機率：假設年報酬 7%、波動 18%，每天看約 49% 的日子是虧損，每月看約 46%，每年看約 35%，每五年看約 20%">
+        ${[['每天', 49.1], ['每週', 47.9], ['每月', 45.7], ['每年', 35.4], ['每五年', 20.0]].map(([t, p], i) => `<rect x="${40 + i * 100}" y="${220 - p * 3.6}" width="70" height="${p * 3.6}" style="fill:var(--m${i < 3 ? 4 : 2})" class="stroke-ink" stroke-width="3"/><text x="${75 + i * 100}" y="${212 - p * 3.6}" text-anchor="middle" font-size="13" font-weight="900">${p}%</text><text x="${75 + i * 100}" y="242" text-anchor="middle" font-size="13">${t}</text>`).join('')}
+        <text x="280" y="266" text-anchor="middle" font-size="12">看到「比上次少」的機率（常態分布近似，年報酬 7%、年波動 18%）</text>
+      </svg>`,
+      caption: '每天看帳戶，幾乎每兩天就有一天是賠的；加上損失的痛約是獲利的兩倍，天天看的人會覺得投資是一件痛苦的事。',
+    },
+    define: [
+      { term: '短視損失趨避', en: 'myopic loss aversion', def: '損失趨避加上太常檢查。', example: '天天看帳戶。' },
+      { term: '損失趨避', en: 'loss aversion', def: '損失的痛大於獲利的快樂。', example: '約兩倍。' },
+      { term: '近因偏誤', en: 'recency', def: '把最近的事看太重。', example: '昨天跌就覺得會一直跌。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '看帳戶的頻率：一年看到幾次虧損（實際計算）', sliders: [
+          { id: 'freq', label: '看帳戶頻率（1 每天、2 每週、3 每月、4 每季、5 每年）', min: 1, max: 5, step: 1, value: 1 },
+          { id: 'mu', label: '年報酬', min: 2, max: 12, step: 0.5, value: 7, unit: '%' },
+          { id: 'sigma', label: '年波動（標準差）', min: 5, max: 30, step: 1, value: 18, unit: '%' },
+        ], compute: (v) => {
+          const f = CHECK_FREQ[v.freq - 1]; const t = 1 / f.perYear;
+          const mu = Math.log(1 + v.mu / 100); const sigma = v.sigma / 100;
+          const pLoss = normCdf(-(mu * t) / (sigma * Math.sqrt(t)));
+          return { rows: [
+            { label: `${f.label}看一次：看到虧損的機率`, value: `${(pLoss * 100).toFixed(1)}%`, ratio: pLoss },
+            { label: '一年看到虧損的次數', value: `${(pLoss * f.perYear).toFixed(1)} 次（共看 ${f.perYear} 次）`, ratio: Math.min(1, pLoss * f.perYear / 130) },
+          ], note: '預設：每天看，約 49.1% 的日子是虧損，一年約 124 次。改成每月看，約 5.5 次；每年看，只有約 0.4 次（35.4%）。報酬沒有改變，只是看的頻率改變了你的感受。' };
+        } } },
+        { type: 'heading', id: 'diet', text: '設計自己的資訊飲食' },
+        { type: 'table', head: ['資訊', '建議頻率', '理由'], rows: [
+          ['投資帳戶的總值', '每月或每季一次', '每天的變動幾乎都是雜訊'],
+          ['再平衡檢查', '每年一次（或門檻觸發）', '照規則做，不照心情做'],
+          ['個股的財報（有個股的話）', '每季財報公布時', '看基本面，不看每日股價'],
+          ['每日財經新聞、社群討論', '盡量少', '放大近因偏誤與從眾'],
+          ['投資政策書', '每年一次，或人生重大事件時', '確認規則還適合自己'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="訊號與雜訊：短期的價格變動大部分是雜訊；長期的趨勢與公司的基本面才是訊號；看得越頻繁，雜訊占的比例越高">
+          <polyline points="30,120 50,100 70,135 90,95 110,140 130,105 150,125 170,90 190,130 210,85 230,115 250,80" fill="none" style="stroke:var(--m4)" stroke-width="3"/>
+          <text x="140" y="180" text-anchor="middle" font-size="14" font-weight="900">每天看：大多是雜訊</text>
+          <path d="M310 150 L530 70" style="stroke:var(--m2)" stroke-width="4"/>
+          <text x="420" y="180" text-anchor="middle" font-size="14" font-weight="900">拉長看：看到趨勢</text>
+          <text x="280" y="212" text-anchor="middle" font-size="12">示意圖：兩邊是同一段報酬，只是觀察的距離不同</text>
+        </svg>`, caption: '短期的波動和長期的方向，用同一筆資料卻給你完全不同的感受。' },
+        { type: 'heading', id: 'experiment', text: '深入：實驗裡的證據' },
+        'Thaler、Tversky、Kahneman 與 Schwartz 做過一個實驗：讓受試者在股票與債券兩種基金之間分配資金，有的組看到的是每次的短期結果，有的組看到的是彙總過的長期結果。看短期結果的那組，最後放在股票的比例明顯比較低，賺得也比較少。資訊本身沒有變，只是呈現的頻率不同，決定就不同。這也是為什麼很多長期投資人刻意把帳戶 app 刪掉，只在固定時間登入。',
+      ],
+    },
+    mistakes: [
+      { wrong: '每天看帳戶，覺得自己在「關心投資」。', why: '看到的大多是雜訊，放大損失趨避。', right: '每月或每季看一次。' },
+      { wrong: '用每日新聞決定買賣。', why: '新聞放大近因偏誤與從眾。', right: '照規則與財報做決定。' },
+      { wrong: '以為少看就是不負責任。', why: '負責任是照規則做，不是一直看。', right: '設定固定的檢查日。' },
+    ],
+    keypoints: [
+      '每天看帳戶，約一半的日子是虧損。',
+      '看的頻率改變感受，不改變報酬。',
+      '資訊飲食：帳戶每月、再平衡每年、新聞盡量少。',
+    ],
+    sources: ['myopic-1995', 'myopia-1997'],
+  },
+});
+</script>

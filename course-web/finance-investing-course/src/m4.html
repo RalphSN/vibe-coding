@@ -1,0 +1,188 @@
+<script>
+/* ==========================================================================
+   模組 4：分散
+   ========================================================================== */
+defineTerms({
+  '分散': { en: 'diversification', def: '把資金分配到彼此不完全同步漲跌的資產上，讓整體的波動小於單一資產。', example: '持有數百家公司的指數基金。', lesson: '4-1' },
+  '相關係數': { en: 'correlation', def: '兩個資產的漲跌有多同步，範圍 −1 到 ＋1；越低，放在一起分散效果越好。', example: '同產業的兩檔股票相關係數常很高。', lesson: '4-1' },
+  '系統性風險': { en: 'systematic risk', def: '影響整個市場、無法靠分散消除的風險，例如景氣衰退、利率大幅變動。', example: '金融危機時大部分股票一起下跌。', lesson: '4-1' },
+  '個別風險': { en: 'idiosyncratic risk', def: '只影響單一公司或產業的風險，可以靠分散大幅降低。', example: '某家公司財報造假。', lesson: '4-1' },
+  '本土偏誤': { en: 'home bias', def: '投資人傾向把大部分資金放在自己國家的市場，即使它只佔全球很小的一部分。', example: '資產幾乎全部是台股。', lesson: '4-2' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '用相關係數解釋分散為什麼有效',
+      '分辨可分散與不可分散的風險',
+      '說出分散的極限在哪裡',
+    ],
+    analogy: {
+      text: ['賣雨傘的和賣冰淇淋的合夥開店：晴天冰淇淋賣得好，雨天雨傘賣得好。單看任何一家，收入都隨天氣大起大落；合在一起，收入就穩定多了。這就是[[分散]]：兩者的漲跌方向不同步（[[相關係數]]低），放在一起波動就變小。', '經濟學家 Harry Markowitz 在 1952 年用數學說明了這件事，也指出它的極限：證券的報酬彼此相關，所以分散能降低波動，卻不能消除全部的風險。'],
+      limit: ['雨傘和冰淇淋的相關係數接近 −1；真實的股票之間大多是正相關，尤其在危機時，原本不太相關的資產常常一起下跌。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="持有股票數量與組合波動度的關係：一檔股票時波動最大，增加到 20 到 30 檔後下降速度變慢，最後趨近一個無法再降的底線，那是系統性風險">
+        <line x1="60" y1="230" x2="530" y2="230" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="230" class="stroke-ink" stroke-width="2"/>
+        <path d="${Array.from({ length: 40 }, (_, i) => { const n = i + 1; const s = 40 * Math.sqrt(1 / n + (1 - 1 / n) * 0.3); return `${i ? 'L' : 'M'}${(60 + i * 12).toFixed(1)} ${(230 - s * 5).toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+        <line x1="60" y1="${(230 - 21.9 * 5).toFixed(1)}" x2="530" y2="${(230 - 21.9 * 5).toFixed(1)}" style="stroke:var(--m4)" stroke-width="3" stroke-dasharray="8 5"/>
+        <text x="525" y="${(230 - 21.9 * 5 - 8).toFixed(1)}" text-anchor="end" font-size="13" font-weight="900">系統性風險：分散不掉</text>
+        <text x="200" y="70" font-size="13" font-weight="900">個別風險：越分散越少</text>
+        <text x="295" y="254" text-anchor="middle" font-size="13">持有的股票數 →</text>
+      </svg>`,
+      caption: '假設每檔股票波動 40%、彼此相關係數 0.3：1 檔 40%，10 檔約 24%，30 檔約 23%，無限多檔約 22%。',
+    },
+    define: [
+      { term: '相關係數', en: 'correlation', def: '漲跌的同步程度。', example: '−1 到 ＋1。' },
+      { term: '系統性風險', en: 'systematic risk', def: '分散不掉的市場風險。', example: '金融危機。' },
+      { term: '個別風險', en: 'idiosyncratic risk', def: '可以分散掉的單一公司風險。', example: '財報造假。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'two-assets', text: '兩個資產的組合' },
+        '兩個資產各佔一半時，組合的波動取決於它們各自的波動，以及相關係數。只要相關係數小於 1，組合的波動就會小於兩者的加權平均，這是分散帶來的「免費」好處：降低風險，卻不必降低平均報酬。',
+        { type: 'widget', name: 'knobs', props: { title: '兩個資產的組合波動（實際計算）', sliders: [
+          { id: 'sa', label: '資產 A 的波動度', min: 1, max: 50, step: 1, value: 20, unit: '%' },
+          { id: 'sb', label: '資產 B 的波動度', min: 1, max: 50, step: 1, value: 20, unit: '%' },
+          { id: 'rho', label: '相關係數', min: -1, max: 1, step: 0.05, value: 0.3 },
+          { id: 'w', label: 'A 佔的比例', min: 0, max: 100, step: 5, value: 50, unit: '%' },
+        ], compute: (v) => {
+          const w = v.w / 100; const a = v.sa / 100; const b = v.sb / 100;
+          const sp = Math.sqrt(w * w * a * a + (1 - w) ** 2 * b * b + 2 * w * (1 - w) * v.rho * a * b);
+          const naive = w * a + (1 - w) * b;
+          return { rows: [
+            { label: '加權平均的波動（沒有分散效果時）', value: `${(naive * 100).toFixed(1)}%`, ratio: Math.min(1, naive / 0.5) },
+            { label: '組合實際的波動', value: `${(sp * 100).toFixed(1)}%`, ratio: Math.min(1, sp / 0.5) },
+            { label: '分散省下的波動', value: `${((naive - sp) * 100).toFixed(1)} 個百分點`, ratio: Math.min(1, (naive - sp) / 0.5) },
+          ], note: '預設兩個資產都是 20%、相關係數 0.3、各半：組合約 16.1%。把相關係數拉到 1，分散效果完全消失；拉到 −1，可以做到幾乎沒有波動（真實世界很少見）。' };
+        } } },
+        { type: 'heading', id: 'n-stocks', text: '持有幾檔才夠' },
+        { type: 'widget', name: 'knobs', props: { title: '持有 N 檔等權重股票的組合波動（實際計算）', sliders: [
+          { id: 'n', label: '持有幾檔', min: 1, max: 200, step: 1, value: 10, unit: '檔' },
+          { id: 's', label: '單一股票的波動度', min: 10, max: 80, step: 1, value: 40, unit: '%' },
+          { id: 'rho', label: '股票之間的平均相關係數', min: 0, max: 1, step: 0.05, value: 0.3 },
+        ], compute: (v) => {
+          const sp = v.s * Math.sqrt(1 / v.n + (1 - 1 / v.n) * v.rho);
+          const floor = v.s * Math.sqrt(v.rho);
+          return { rows: [
+            { label: '組合波動度', value: `${sp.toFixed(1)}%`, ratio: sp / v.s },
+            { label: '無限多檔的下限（系統性風險）', value: `${floor.toFixed(1)}%`, ratio: floor / v.s },
+            { label: '還能再分散掉的部分', value: `${(sp - floor).toFixed(1)} 個百分點`, ratio: (sp - floor) / v.s },
+          ], note: '預設 10 檔約 24.3%，離下限 21.9% 已經很近。相關係數越高（例如都是同一產業），下限越高，分散的效果越有限；這也是為什麼要跨產業、跨國家、跨資產（下一課）。' };
+        } } },
+        { type: 'heading', id: 'compensation', text: '為什麼分散掉的風險沒有報酬' },
+        '[[個別風險]]可以靠分散幾乎消除，所以市場不需要為它付補償：如果某個風險不花成本就能消除，願意承擔它的人就拿不到額外報酬。真正有[[風險溢酬]]的，是分散不掉的[[系統性風險]]。推論是：集中押注少數股票，承擔了更多風險，期望報酬卻不一定比較高。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="總風險等於系統性風險加個別風險；系統性風險有風險溢酬作為補償，個別風險可以靠分散消除，所以沒有補償">
+          <rect x="40" y="40" width="300" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="190" y="72" text-anchor="middle" font-size="15" font-weight="900" class="on-color">系統性風險</text><text x="190" y="96" text-anchor="middle" font-size="12" class="on-color">有補償（風險溢酬）</text>
+          <rect x="340" y="40" width="180" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="430" y="72" text-anchor="middle" font-size="15" font-weight="900" class="on-color">個別風險</text><text x="430" y="96" text-anchor="middle" font-size="12" class="on-color">沒有補償</text>
+          <text x="280" y="30" text-anchor="middle" font-size="14" font-weight="900">一檔股票的總風險</text>
+          <text x="280" y="160" text-anchor="middle" font-size="14">分散的目的：把沒有補償的那一塊消除</text>
+          <text x="280" y="190" text-anchor="middle" font-size="14">留下有補償的那一塊</text>
+        </svg>`, caption: '這是現代投資組合理論的核心結論之一，也是指數化投資（模組 6）的理論基礎。' },
+        { type: 'heading', id: 'crisis', text: '深入：危機時相關係數會上升' },
+        '平時看起來不太相關的股票，在恐慌時常常一起下跌，因為大家同時想把股票換成現金。這使得「只靠多買幾檔股票」的分散，在最需要的時候效果最弱。比較可靠的分散，是加入行為本質不同的資產，例如高品質債券與現金。UBS 的長期年鑑指出，自 1900 年以來，股票與債券都曾單獨出現實質跌幅超過 70% 的情況，但 60／40 的股債組合從高點到低點的跌幅從未超過 50%。',
+        { type: 'table', head: ['分散的工具', '平時', '危機時'], rows: [
+          ['多買幾檔同國股票', '降低個別風險', '常一起下跌，效果有限'],
+          ['跨國股票', '降低單一國家風險', '全球性危機時也會同步下跌'],
+          ['高品質債券', '降低整體波動', '常是緩衝，但高通膨時期例外'],
+          ['現金', '幾乎不波動', '提供流動性與再平衡的彈藥'],
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '買了十檔同產業的股票就以為分散了。', why: '相關係數很高，分散效果有限。', right: '跨產業、跨國家、跨資產。' },
+      { wrong: '以為分散可以消除所有風險。', why: '系統性風險分散不掉。', right: '用資產配置（股債比例）控制剩下的風險。' },
+      { wrong: '集中押注少數股票，期待更高報酬。', why: '個別風險沒有補償。', right: '除非有真正的資訊優勢，否則分散。' },
+    ],
+    keypoints: [
+      '相關係數小於 1，組合波動就小於加權平均。',
+      '個別風險能分散掉，系統性風險不能。',
+      '分散掉的風險沒有補償，所以不必承擔。',
+    ],
+    sources: ['markowitz-1952', 'ubs-2026-summary'],
+  },
+
+  '4-2': {
+    goals: [
+      '列出四個分散的維度',
+      '說明本土偏誤與集中的代價',
+      '知道什麼是「過度分散」',
+    ],
+    analogy: {
+      text: ['理財有句老話：「不要把雞蛋放在同一個籃子裡。」但如果所有籃子都放在同一台車上，車翻了雞蛋還是全破。真正的分散，要問的是：這些籃子會不會因為同一件事一起出問題？', '這一課把分散拆成四個維度：公司、產業、國家、資產類別，以及常被忽略的第五個：時間與你自己的收入來源。'],
+      limit: ['籃子和車的比喻很直觀，但真實世界的「同一台車」往往在危機時才看得出來：平時不太相關的資產，在恐慌時可能同步下跌。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="分散的四個維度：公司、產業、國家、資產類別；由內到外，越外層的分散能處理越大的風險">
+        ${[['資產類別：股、債、現金', 250, 'm1'], ['國家：台灣、美國、其他', 195, 'm3'], ['產業：科技、金融、民生…', 140, 'm2'], ['公司', 80, 'm4']].map(([t, r, c]) => `<circle cx="280" cy="140" r="${r * 0.52}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/>`).join('')}
+        <text x="280" y="145" text-anchor="middle" font-size="14" font-weight="900" class="on-color">公司</text>
+        <text x="280" y="86" text-anchor="middle" font-size="13" font-weight="900" class="on-color">產業</text>
+        <text x="280" y="56" text-anchor="middle" font-size="13" font-weight="900" class="on-color">國家</text>
+        <text x="280" y="27" text-anchor="middle" font-size="13" font-weight="900" class="on-color">資產類別</text>
+        <text x="280" y="276" text-anchor="middle" font-size="13">越外層，處理的風險越大</text>
+      </svg>`,
+      caption: '只分散公司，擋不住產業衰退；只分散產業，擋不住單一國家的危機；只持有股票，擋不住整個股市大跌。',
+    },
+    define: [
+      { term: '分散', en: 'diversification', def: '分到不同步的資產上。', example: '指數基金。' },
+      { term: '本土偏誤', en: 'home bias', def: '過度集中在本國市場。', example: '只買台股。' },
+      { term: '相關係數', en: 'correlation', def: '漲跌的同步程度。', example: '危機時常變高。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'home', text: '本土偏誤：台灣投資人的特殊情況' },
+        '台灣股市佔全球股市的比重只有個位數百分比，而且產業高度集中在半導體與電子。2025 年台灣 50 指數含息報酬 37.5%、加權含息 29.5%，近十年表現也很亮眼。好的過去容易讓人覺得「台股就夠了」，但集中在單一國家、單一產業，意味著承擔了更多可以分散掉的風險。',
+        { type: 'table', head: ['集中在哪裡', '風險'], rows: [
+          ['單一國家', '政治、匯率、經濟衰退集中衝擊'],
+          ['單一產業', '產業循環、技術變化、地緣政治'],
+          ['少數幾家大公司', '指數本身的權重已高度集中時，「買指數」也可能不夠分散'],
+          ['和自己工作同一產業', '景氣差時，工作與投資同時受傷（下面的人力資本）'],
+        ], caption: '這不是說不能投資台股，而是說：它應該是全球分散組合中的一部分，比重是你有意識地決定的。' },
+        { type: 'widget', name: 'knobs', props: { title: '集中的代價：最大的一筆部位跌掉時，總資產少多少（實際計算）', sliders: [
+          { id: 'total', label: '總投資資產', min: 100000, max: 20000000, step: 100000, value: 2000000, unit: '元' },
+          { id: 'weight', label: '最大的一筆部位佔比', min: 1, max: 100, step: 1, value: 40, unit: '%' },
+          { id: 'drop', label: '它下跌', min: 10, max: 100, step: 5, value: 50, unit: '%' },
+        ], compute: (v) => {
+          const loss = v.total * v.weight / 100 * v.drop / 100;
+          const lossPct = loss / v.total;
+          const recover = (1 / (1 - lossPct) - 1) * 100;
+          return { rows: [
+            { label: '總資產減少', value: `${Math.round(loss).toLocaleString()} 元（${(lossPct * 100).toFixed(1)}%）`, ratio: lossPct },
+            { label: '剩下', value: `${Math.round(v.total - loss).toLocaleString()} 元`, ratio: 1 - lossPct },
+            { label: '要漲回來需要', value: `＋${recover.toFixed(1)}%`, ratio: Math.min(1, recover / 100) },
+          ], note: '預設：單一部位佔 40%、跌一半，總資產少 20%，要漲 25% 才回本。同樣的事件，部位只佔 5% 時，總資產只少 2.5%。' };
+        } } },
+        { type: 'heading', id: 'human-capital', text: '深入：別忘了你自己的收入' },
+        '第一部 1-4 提過人力資本：你未來的薪水也是一種資產，而且常常是最大的那一個。如果你在科技業工作，又把大部分投資放在科技股，景氣不好時可能同時失去工作和投資的價值。分散時要把收入來源也算進去：和工作越相關的產業，投資比重越要節制。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="過度分散的情況：持有很多檔重疊度很高的基金，看起來很分散，實際上大部分持股相同，只是付了更多費用、增加管理難度">
+          ${[0, 1, 2, 3].map((i) => `<circle cx="${150 + i * 70}" cy="110" r="70" style="fill:var(--m${i + 1})" class="stroke-ink" stroke-width="3" opacity="0.75"/>`).join('')}
+          <text x="255" y="115" text-anchor="middle" font-size="14" font-weight="900">大量重疊</text>
+          <text x="280" y="210" text-anchor="middle" font-size="13">四檔基金，持股八成相同：費用多付了，分散沒有變多</text>
+        </svg>`, caption: '「過度分散」通常不是持有太多公司，而是持有太多重疊的基金。少數幾檔涵蓋面廣的低成本指數基金，往往就足夠了。' },
+        { type: 'heading', id: 'time', text: '深入：時間上的分散' },
+        '一次把一大筆錢投入市場，結果會受進場時點影響；分批投入可以降低「剛好買在高點」的遺憾，但數學上，由於股票長期向上的機率較高，一次投入的平均結果常常比分批好。兩者的取捨與定期定額的細節，在第四部說明。',
+        { type: 'heading', id: 'fx', text: '深入：投資海外的匯率' },
+        '投資海外資產，報酬會多一個來源：匯率。以新臺幣計算的報酬約等於「當地報酬 ＋ 外幣對新臺幣的升貶」。外幣升值時加分，貶值時扣分。長期來看匯率波動有一部分會相互抵銷，但短期可能很大；也因為這樣，海外股票本身就帶來一部分貨幣的分散。',
+        { type: 'table', head: ['情況', '以新臺幣計的報酬'], rows: [
+          ['海外股市 ＋10%、外幣對新臺幣升值 5%', '約 ＋15.5%'],
+          ['海外股市 ＋10%、外幣對新臺幣貶值 5%', '約 ＋4.5%'],
+          ['海外股市 −10%、外幣對新臺幣升值 5%', '約 −5.5%'],
+        ], caption: '計算方式：(1 ＋ 當地報酬) ×（1 ＋ 匯率變化）− 1。' },
+        { type: 'heading', id: 'global-weight', text: '深入：全球市值權重' },
+        '如果完全不做任何判斷，最「中性」的股票配置，是依各國股市市值的比例持有全球股票；以美國為首的已開發市場佔了大部分，美國單一國家就超過一半。很多人會在這個基礎上，依自己的偏好與熟悉程度，有意識地多配一點本國股票。重點不在比例是多少，而在比例是你想清楚之後決定的，而不是只因為熟悉。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只投資自己國家的股市。', why: '本土偏誤讓風險集中。', right: '把本國當作全球組合的一部分。' },
+      { wrong: '投資集中在和自己工作相同的產業。', why: '景氣差時收入與投資同時受傷。', right: '把人力資本也算進分散。' },
+      { wrong: '買很多檔重疊的基金。', why: '費用變多，分散沒有增加。', right: '少數幾檔涵蓋面廣的低成本基金。' },
+    ],
+    keypoints: [
+      '分散四個維度：公司、產業、國家、資產類別。',
+      '台灣投資人要特別注意本土與產業集中。',
+      '把自己的收入來源也算進分散。',
+    ],
+    sources: ['tw50-2025', 'markowitz-1952', 'ubs-2026'],
+  },
+});
+</script>

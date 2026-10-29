@@ -1,0 +1,130 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: '理財系列・第五部｜財報與估值',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-29',
+  version: 'v1',
+};
+
+/* 理財系列六卷：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: '理財系列',
+  current: 'fin-5',
+  volumes: [
+    { id: 'fin-1', vol: '第一部', title: '個人財務', href: '../finance-personal-course/index.html' },
+    { id: 'fin-2', vol: '第二部', title: '風險保障', href: '../finance-insurance-course/index.html' },
+    { id: 'fin-3', vol: '第三部', title: '投資核心', href: '../finance-investing-course/index.html' },
+    { id: 'fin-4', vol: '第四部', title: '配置與稅費', href: '../finance-allocation-course/index.html' },
+    { id: 'fin-5', vol: '第五部', title: '財報與估值', href: '../finance-valuation-course/index.html' },
+    { id: 'fin-6', vol: '第六部', title: '投資心理', href: '../finance-psychology-course/index.html' },
+  ],
+};
+
+/* 全書主軸：分析一家公司的六個問題；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '賺多少', note: '損益表', color: 'var(--m0)' },
+    { label: '有什麼', note: '資產負債表', color: 'var(--m1)' },
+    { label: '現金', note: '現金流量表', color: 'var(--m2)' },
+    { label: '品質', note: '比率與警訊', color: 'var(--m3)' },
+    { label: '值多少', note: '估值', color: 'var(--m4)' },
+    { label: '大環境', note: '利率與景氣', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [0, 1, 2], 2: [3], 3: [4], 4: [5], 5: [0, 1, 2, 3, 4, 5] },
+  byLesson: { '1-1': [0], '1-2': [1], '1-3': [2] },
+};
+
+/* 首頁主視覺：從財報到估值的路（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="分析一家公司的路：三大財報回答賺多少、有什麼、現金從哪來；財務比率檢查品質；估值回答值多少；利率與景氣決定大環境">
+  ${[['損益表', '賺多少', 'm0', 30], ['資產負債表', '有什麼、欠什麼', 'm1', 205], ['現金流量表', '現金從哪來', 'm2', 380]].map(([a, b, c, x]) => `<rect x="${x}" y="20" width="150" height="110" style="fill:var(--${c})" class="stroke-ink" stroke-width="4"/><text x="${x + 75}" y="68" text-anchor="middle" font-size="18" font-weight="900" class="on-color">${a}</text><text x="${x + 75}" y="96" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+  <path d="M105 130 L280 170 M280 130 L280 170 M455 130 L280 170" class="stroke-ink" stroke-width="4"/>
+  <rect x="130" y="170" width="300" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
+  <text x="280" y="212" text-anchor="middle" font-size="18" font-weight="900" class="on-color">財務比率：品質與警訊</text>
+  <path d="M280 240 L280 270" class="stroke-ink" stroke-width="4"/>
+  <rect x="130" y="270" width="300" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
+  <text x="280" y="312" text-anchor="middle" font-size="18" font-weight="900" class="on-color">估值：值多少錢</text>
+  <rect x="30" y="360" width="500" height="46" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+  <text x="280" y="390" text-anchor="middle" font-size="16" font-weight="900" class="on-color">大環境：利率與景氣循環</text>
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '起點：|選個股之前', short: '起點', desc: '選個股要付出什麼、和指數比較的基準，以及這一卷能幫你做什麼、不能做什麼。', lessons: [
+    ['0-1', '選個股|之前'],
+  ]},
+  { id: 1, title: '三大財報', short: '財報', desc: '損益表、資產負債表、現金流量表各回答什麼問題，以及它們怎麼連在一起、去哪裡找。', lessons: [
+    ['1-1', '損益表：|賺多少'],
+    ['1-2', '資產負債表：|有什麼、欠什麼'],
+    ['1-3', '現金流量表：|現金從哪來'],
+    ['1-4', '三表的連結|與資料來源'],
+  ]},
+  { id: 2, title: '財務比率', short: '比率', desc: '獲利能力、杜邦分析、財務健康與常見的會計警訊。', lessons: [
+    ['2-1', '獲利能力|與 ROE'],
+    ['2-2', '財務健康|與警訊'],
+  ]},
+  { id: 3, title: '估值', short: '估值', desc: '本益比、其他倍數、現金流折現與安全邊際：價格和價值之間的距離。', lessons: [
+    ['3-1', '本益比'],
+    ['3-2', '其他|估值倍數'],
+    ['3-3', '現金流折現'],
+    ['3-4', '安全邊際|與估值陷阱'],
+  ]},
+  { id: 4, title: '利率|與景氣循環', short: '景氣', desc: '利率怎麼影響股價、景氣循環與指標、產業循環與景氣循環股。', lessons: [
+    ['4-1', '利率|與股價'],
+    ['4-2', '景氣循環|與指標'],
+    ['4-3', '產業循環|與循環股'],
+  ]},
+  { id: 5, title: '把它串起來', short: '串起來', desc: '一套個股分析的流程，以及個股在整體組合裡應該佔多少。', lessons: [
+    ['5-1', '個股分析|的流程'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

@@ -1,0 +1,205 @@
+<script>
+/* ==========================================================================
+   模組 3：緊急預備金
+   ========================================================================== */
+defineTerms({
+  '必要支出': { en: 'essential expenses', def: '失去收入時仍然必須付的錢：居住、伙食、交通、保費、貸款月付、基本通訊與醫療。', example: '月支出 4 萬，其中必要支出 2.8 萬。', lesson: '3-1' },
+  '流動性風險': { en: 'liquidity risk', def: '需要現金時，資產無法及時、不虧損地換成現金的風險。', example: '股市大跌時剛好失業，只能低價賣股票。', lesson: '3-1' },
+  '實質利率': { en: 'real interest rate', def: '名目利率扣掉通膨率，代表購買力實際增加多少。', example: '定存 1.7%、通膨 2.7% → 實質約 −1%。', lesson: '3-2' },
+  '定存單': { en: 'time deposit', def: '約定期間的存款；利率通常比活存高，提前解約利息會打折或改按較低利率計算。', example: '一年期定存。', lesson: '3-2' },
+  '定存梯': { en: 'deposit ladder', def: '把一筆錢拆成到期日錯開的幾張定存，每隔一段時間就有一張到期可以動用。', example: '每個月存一張一年期，一年後每月都有一張到期。', lesson: '3-2' },
+});
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出緊急預備金真正要防的是哪一種風險',
+      '用必要支出與收入穩定度決定要存幾個月',
+      '分辨什麼是緊急、什麼不是',
+    ],
+    analogy: {
+      text: ['車子的備胎平常完全用不到，佔空間又「浪費錢」。但爆胎那一刻，有備胎是換個輪子繼續開；沒有備胎，就是在高速公路上叫高價拖吊。', '[[緊急預備金]]就是財務的備胎。它防的不是意外本身，而是意外發生時，你被迫在最差的時間點做最差的決定：用 15% 的卡債周轉、跟親友借錢，或在股市大跌時賣掉投資。'],
+      limit: ['備胎只能用一次就要換；預備金用掉之後，要重新存回來（3-2），而且失業這種「意外」可能持續好幾個月。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="同樣遇到失業三個月：有預備金的人動用存款、照常繳款、找到工作後再補回；沒有預備金的人刷信用卡周轉，產生循環利息，找到工作後還要還債與利息">
+        <rect x="200" y="12" width="160" height="44" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="280" y="40" text-anchor="middle" font-size="15" font-weight="900" class="on-color">失業 3 個月</text>
+        <path d="M240 56 L140 90 M320 56 L420 90" class="stroke-ink" stroke-width="3"/>
+        ${[['有預備金', ['動用存款付必要支出', '照常繳款，信用不受影響', '找到工作後慢慢補回'], 'm3', 20], ['沒有預備金', ['刷卡、借信貸周轉', '每月被抽 15% 循環利息', '找到工作後還在還債'], 'm4', 290]].map(([t, lines, c, x]) => `<rect x="${x}" y="90" width="250" height="170" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 125}" y="124" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${t}</text>${lines.map((l, i) => `<text x="${x + 125}" y="${162 + i * 30}" text-anchor="middle" font-size="13" class="on-color">${l}</text>`).join('')}`).join('')}
+      </svg>`,
+      caption: '意外本身兩人一樣；差別在之後幾年要不要為這次意外付利息。',
+    },
+    define: [
+      { term: '緊急預備金', en: 'emergency fund', def: '應付失業與突發大額支出的現金。', example: '3–6 個月必要支出。' },
+      { term: '必要支出', en: 'essential expenses', def: '沒有收入也必須付的錢。', example: '房租、伙食、保費。' },
+      { term: '流動性風險', en: 'liquidity risk', def: '要用錢時換不成現金的風險。', example: '低點被迫賣股。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'base', text: '用「必要支出」算，不是總支出' },
+        '失業時，你會自然砍掉旅遊、購物、聚餐；不能砍的是房租、伙食、交通、保費、貸款月付、基本通訊。把這些加起來，就是[[必要支出]]。用它來算預備金，目標比較實際，也比較快存到。',
+        { type: 'table', head: ['算進必要支出', '不算'], rows: [
+          ['房租或房貸月付、管理費', '旅遊、娛樂'],
+          ['伙食（以在家吃為主估算）', '外食聚餐的部分'],
+          ['交通、水電瓦斯、基本通訊', '升級的手機方案、訂閱'],
+          ['保費、貸款與卡債的每月最低還款', '加碼還款、投資扣款'],
+          ['孝親費、子女教育等扶養支出', '可以暫停的課程'],
+        ] },
+        { type: 'heading', id: 'months', text: '要存幾個月：看收入有多容易中斷' },
+        '3–6 個月是最常見的建議，但它不是固定數字，而是依「收入多容易中斷、中斷後多久能恢復、有沒有人跟你一起扛」調整。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="預備金月數的光譜：雙薪且工作穩定約 3 個月，單一收入或有扶養約 6 個月，接案、業務、自營或產業波動大約 9 到 12 個月">
+          <line x1="40" y1="110" x2="520" y2="110" class="stroke-ink" stroke-width="4"/>
+          ${[['3 個月', '雙薪、工作穩定', 'm2', 80], ['6 個月', '單一收入、有扶養', 'm3', 250], ['9–12 個月', '接案、業務、自營', 'm4', 450]].map(([a, b, c, x]) => `<circle cx="${x}" cy="110" r="16" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x}" y="72" text-anchor="middle" font-size="17" font-weight="900">${a}</text><text x="${x}" y="152" text-anchor="middle" font-size="13" font-weight="900">${b}</text>`).join('')}
+          <text x="40" y="200" font-size="13">收入越穩定、越多人分擔 ←</text>
+          <text x="520" y="200" text-anchor="end" font-size="13">→ 收入越不穩、越難找到下一份</text>
+        </svg>`, caption: '其他會往右移的因素：產業景氣循環明顯、年紀較大找工作較慢、有慢性病或家人需要照顧、沒有足夠的保險（第二部）。' },
+        { type: 'widget', name: 'knobs', props: { title: '我的預備金目標（實際計算，月數是經驗法則）', sliders: [
+          { id: 'ess', label: '每月必要支出', min: 10000, max: 100000, step: 1000, value: 28000, unit: '元' },
+          { id: 'earners', label: '家裡有收入的人數', min: 1, max: 3, step: 1, value: 1 },
+          { id: 'stable', label: '收入穩定度（1 很不穩、3 很穩）', min: 1, max: 3, step: 1, value: 2 },
+          { id: 'deps', label: '需要扶養的人數', min: 0, max: 5, step: 1, value: 0 },
+          { id: 'have', label: '目前可動用的存款', min: 0, max: 1500000, step: 10000, value: 60000, unit: '元' },
+        ], compute: (v) => {
+          let months = { 1: 9, 2: 6, 3: 4 }[v.stable];
+          if (v.earners >= 2) months -= 1;
+          months += Math.min(2, v.deps);
+          months = Math.max(3, Math.min(12, months));
+          const target = months * v.ess;
+          const covered = v.have / v.ess;
+          return { rows: [
+            { label: '建議月數', value: `${months} 個月`, ratio: months / 12 },
+            { label: '目標金額', value: `${target.toLocaleString()} 元`, ratio: Math.min(1, target / 1200000) },
+            { label: '目前撐得了', value: `${covered.toFixed(1)} 個月`, ratio: Math.min(1, covered / months) },
+            { label: '還差', value: `${Math.max(0, target - v.have).toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, target - v.have) / target) },
+          ], note: '規則：很不穩 9 個月、普通 6 個月、很穩 4 個月；雙薪減 1 個月、每扶養一人加 1 個月（最多加 2），結果限制在 3–12 個月。這是起點，依自己的狀況再調。' };
+        } } },
+        { type: 'heading', id: 'what-counts', text: '什麼算緊急' },
+        { type: 'table', head: ['算緊急（可以動用）', '不算（應該有別的帳戶）'], rows: [
+          ['失業、減薪、無法工作', '年繳保費、稅金（偶發支出帳戶，1-1）'],
+          ['自己或家人的醫療支出', '旅遊、換手機'],
+          ['機車、汽車維修才能上班', '「限時特價」'],
+          ['房子漏水、家電壞掉影響生活', '投資「好機會」'],
+        ], caption: '三個問題判斷：是意外嗎？是必要的嗎？是急的嗎？三個都是「是」才動用。' },
+        { type: 'callout', variant: 'tip', title: '預備金不是投資', body: ['預備金的報酬率很低，常常輸給通膨（下一課），這是它的「保費」。它的價值在於讓你不必在最糟的時候賣資產或借高利貸。', '把它和投資帳戶分開；看到它「閒著」就想拿去投資，是最常見的錯誤之一。'] },
+        { type: 'heading', id: 'with-insurance', text: '深入：預備金、就業保險與商業保險的分工' },
+        '預備金不是唯一的安全網。台灣受僱勞工有就業保險：依勞動部說明，非自願離職、退保前 3 年內保險年資合計滿 1 年、到公立就業服務機構辦理求職登記等條件都符合時，可以請領失業給付，每月約為離職前 6 個月平均月投保薪資的 60%，一般最長 6 個月（45 歲以上或領有身心障礙證明者最長 9 個月），扶養眷屬另有加給。',
+        { type: 'table', head: ['安全網', '能處理', '不能處理'], rows: [
+          ['緊急預備金', '各種短期意外：失業、維修、醫療自付額', '長期失能、重大疾病的龐大支出'],
+          ['就業保險失業給付', '符合資格的非自願失業', '自願離職、接案者、等待期；金額通常低於原本收入'],
+          ['商業保險（第二部）', '低機率、高損失：重病、失能、身故', '小額、常發生的支出（自己付比較划算）'],
+        ], caption: '失業給付的條件與金額以勞動部最新規定為準。它是「部分」替代收入，預備金要補上差額與等待期間。' },
+        { type: 'heading', id: 'probability', text: '深入：為什麼「不太會發生」還是要準備' },
+        '一年內失業、大病、車禍的機率，單看每一項都不高。但預備金要防的是「這些事件裡至少發生一件」，而且時間拉長到十年、二十年，至少遇到一次的機率會變得很高。預備金的設計目標，不是讓你在每一個意外裡都毫髮無傷，而是讓任何一個意外都不至於演變成長期的債務。',
+      ],
+    },
+    mistakes: [
+      { wrong: '用總支出算，目標大到存不到就放棄。', why: '失業時可以砍掉非必要支出。', right: '用必要支出算。' },
+      { wrong: '所有人都存 6 個月。', why: '收入穩定度、扶養人數差很多。', right: '依收入多容易中斷調整，3–12 個月。' },
+      { wrong: '把信用卡額度當成預備金。', why: '那是借錢，而且利率可能是 15%。', right: '預備金必須是自己的現金。' },
+    ],
+    keypoints: [
+      '預備金防的是「被迫在最差時間點做決定」。',
+      '用必要支出 × 月數，月數看收入多容易中斷。',
+      '意外、必要、急，三個都是才動用。',
+    ],
+    sources: ['mol-unemployment', 'cfpb-savings', 'banking-act-47-1', 'fsc-moneywise'],
+  },
+
+  '3-2': {
+    goals: [
+      '用安全、流動、報酬三個條件挑預備金的存放處',
+      '算出預備金放在定存時的實質報酬',
+      '用小目標、自動化與補回規則把預備金存起來',
+    ],
+    analogy: {
+      text: ['滅火器要放在廚房門口，不是鎖在倉庫的保險箱裡，也不是拿去換成一幅「會增值」的畫。它唯一的工作是：需要的時候，馬上拿得到、一定能用。', '預備金的存放處也只看三件事，而且有先後順序：先安全（不會虧損）、再流動（幾天內拿得到）、最後才是報酬。三者不可能同時最好。'],
+      limit: ['滅火器放著不會變少；錢放著會被通膨慢慢吃掉。所以在安全與流動的前提下，報酬還是值得顧一下，只是不能本末倒置。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="安全、流動、報酬的三角：活期存款安全且流動但報酬最低，定存安全且報酬稍高但提前解約有損失，股票報酬最高但不安全也不適合當預備金">
+        <path d="M280 30 L80 230 L480 230 Z" fill="none" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="22" text-anchor="middle" font-size="15" font-weight="900">安全（不虧損）</text>
+        <text x="70" y="256" text-anchor="middle" font-size="15" font-weight="900">流動（馬上拿到）</text>
+        <text x="490" y="256" text-anchor="middle" font-size="15" font-weight="900">報酬</text>
+        <circle cx="180" cy="150" r="14" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="200" y="146" font-size="14" font-weight="900">活存、數位帳戶</text>
+        <circle cx="300" cy="170" r="14" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="320" y="174" font-size="14" font-weight="900">定存</text>
+        <circle cx="440" cy="215" r="14" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="430" y="196" text-anchor="end" font-size="14" font-weight="900">股票（不適合）</text>
+      </svg>`,
+      caption: '預備金放在三角形的左上：安全與流動優先。報酬只在這個範圍內比較。',
+    },
+    define: [
+      { term: '實質利率', en: 'real interest rate', def: '名目利率 − 通膨率。', example: '約 −1%。' },
+      { term: '定存單', en: 'time deposit', def: '約定期間的存款。', example: '一年期。' },
+      { term: '定存梯', en: 'deposit ladder', def: '到期日錯開的多張定存。', example: '每月一張到期。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'options', text: '可以放哪裡' },
+        { type: 'table', head: ['存放處', '安全', '流動', '報酬', '注意'], rows: [
+          ['一般活存', '高（存款保險保障範圍內）', '最高，隨時提領', '最低', '放 1 個月左右的必要支出'],
+          ['數位帳戶、高利活存', '高', '高', '較高', '高利率常有金額上限與期限，到期要檢查'],
+          ['定期存款', '高', '中：提前解約利息打折或改按較低利率', '中', '適合放預備金的「後段」'],
+          ['貨幣市場基金', '中：不保本，但波動很小', '中：贖回要幾天', '中', '不是存款，沒有存款保險'],
+          ['股票、股票基金', '低：可能大跌', '中', '長期較高', '不適合當預備金'],
+        ], caption: '臺灣銀行 2026 年 10 月的牌告：一年～未滿二年一般金額定期儲蓄存款機動利率 1.715%。各銀行利率不同、也會調整，以存款當下為準。' },
+        { type: 'heading', id: 'real', text: '通膨會吃掉預備金嗎？' },
+        '會，而且要坦然接受。主計總處公布 2026 年 9 月消費者物價指數（CPI）年增 2.73%，前三季平均約 1.94%。定存 1.7% 左右，[[實質利率]]大約是 −1% 到 0%：預備金的購買力每年會縮水一點點。這是預備金的「保費」，換來的是需要時一定拿得到。',
+        { type: 'widget', name: 'knobs', props: { title: '預備金一年後的購買力（實際計算）', sliders: [
+          { id: 'amt', label: '預備金金額', min: 50000, max: 1000000, step: 10000, value: 200000, unit: '元' },
+          { id: 'rate', label: '存款年利率', min: 0, max: 3, step: 0.05, value: 1.7, unit: '%' },
+          { id: 'cpi', label: '通膨率', min: 0, max: 5, step: 0.05, value: 2.7, unit: '%' },
+        ], compute: (v) => {
+          const nominal = v.amt * (1 + v.rate / 100);
+          const realValue = nominal / (1 + v.cpi / 100);
+          const realRate = ((1 + v.rate / 100) / (1 + v.cpi / 100) - 1) * 100;
+          return { rows: [
+            { label: '一年後帳戶裡的錢', value: `${Math.round(nominal).toLocaleString()} 元`, ratio: Math.min(1, nominal / 1050000) },
+            { label: '換算成今天的購買力', value: `${Math.round(realValue).toLocaleString()} 元`, ratio: Math.min(1, realValue / 1050000) },
+            { label: '實質利率', value: `${realRate.toFixed(2)}%`, ratio: Math.min(1, Math.abs(realRate) / 5) },
+            { label: '購買力一年變化', value: `${Math.round(realValue - v.amt).toLocaleString()} 元`, ratio: Math.min(1, Math.abs(realValue - v.amt) / 50000) },
+          ], note: '預設 20 萬、利率 1.7%、通膨 2.7%：一年後購買力約少 1,950 元。對照 3-1：若因為沒有預備金而背上 20 萬卡債，一年利息可能是 3 萬。' };
+        } } },
+        { type: 'heading', id: 'ladder', text: '分層存放：前段活存、後段定存' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="預備金分兩層：第一層一個月放活存隨時可用，第二層其餘月份放定存或定存梯，到期日錯開">
+          <rect x="20" y="40" width="140" height="150" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="90" y="100" text-anchor="middle" font-size="16" font-weight="900" class="on-color">第一層</text>
+          <text x="90" y="126" text-anchor="middle" font-size="13" class="on-color">1 個月・活存</text>
+          <text x="90" y="150" text-anchor="middle" font-size="13" class="on-color">當天可用</text>
+          ${[0, 1, 2, 3, 4].map((i) => `<rect x="${180 + i * 74}" y="${40 + i * 10}" width="66" height="${150 - i * 10}" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="${213 + i * 74}" y="${120 + i * 5}" text-anchor="middle" font-size="12" font-weight="900" class="on-color">第 ${i + 2} 月</text>`).join('')}
+          <text x="365" y="28" text-anchor="middle" font-size="14" font-weight="900">第二層：定存或到期錯開的定存梯</text>
+          <text x="280" y="220" text-anchor="middle" font-size="13">第一層用掉時，第二層還有時間解約或等到期</text>
+        </svg>`, caption: '真正的緊急狀況很少第一天就需要全部的錢；分層讓大部分預備金能拿到比較好的利率。' },
+        { type: 'heading', id: 'build', text: '怎麼存起來' },
+        { type: 'list', ordered: true, items: [
+          '**先設小目標**：美國消費者金融保護局（CFPB）的「Start Small, Save Up」就是鼓勵先從小額開始。先存到「一個月必要支出」，比一開始就盯著 6 個月容易持續。',
+          '**自動化**：發薪日自動轉帳到預備金帳戶（先付給自己，1-3）。',
+          '**意外之財加速**：年終、退稅的一部分直接放進預備金，直到存滿（2-2）。',
+          '**存滿之後**：每月原本存預備金的錢，改流向還債或投資，但預備金帳戶本身不要動。',
+          '**用掉之後**：把「補回預備金」排回第一優先，補滿前暫停加碼投資。',
+        ] },
+        { type: 'callout', variant: 'tip', title: '還在背高利債時怎麼辦', body: ['常見做法是兩段式：先存一個月必要支出的「小預備金」，接著全力還信用卡、信貸這類高利債，還完再把預備金補到完整的月數。', '理由：沒有任何預備金，一有意外又會刷卡；但存太多預備金卻放著 15% 的卡債不還，等於每年白付利息差。完整的優先順序在 6-1。'] },
+        { type: 'heading', id: 'deposit-insurance', text: '深入：存款保險保障什麼' },
+        '台灣的存款保險由中央存款保險公司辦理。自 2011 年起，每一存款人在每一家要保機構的存款本金加利息，合計最高保障新臺幣 300 萬元，範圍包含新臺幣與外幣存款。預備金放在一般銀行的存款裡，金額通常在這個範圍內。',
+        { type: 'list', items: [
+          '保障是「每人、每家要保機構」分開計算；預備金超過 300 萬時，可以分散在不同銀行。',
+          '基金、股票、保險不是存款，不在存款保險範圍內；貨幣市場基金也不是存款。',
+          '要保機構的名單與保障範圍，以中央存款保險公司公告為準。',
+        ] },
+        { type: 'heading', id: 'promo', text: '深入：高利活存的條件' },
+        '數位帳戶的「高利活存」常見三種條件：只有一定金額內適用優惠利率、優惠有期限、要搭配其他行為（例如薪轉、刷卡、新戶）。這些都不是問題，只是要知道優惠何時結束，並在年度健檢（6-1）時重新比較；為了多一點利息頻繁搬家，花的時間與風險（帳戶太多、忘記密碼、詐騙簡訊）也要算進去。',
+      ],
+    },
+    mistakes: [
+      { wrong: '把預備金拿去買股票，「反正放著也是放著」。', why: '需要錢的時候常常就是市場不好的時候。', right: '預備金只放安全、流動的地方。' },
+      { wrong: '為了多一點利息，把全部預備金鎖在長天期定存。', why: '提前解約會有利息損失，也可能拖延時間。', right: '前段活存，後段定存或定存梯。' },
+      { wrong: '用掉之後沒有補回來。', why: '下一次意外就沒有緩衝。', right: '補回預備金排回第一優先。' },
+    ],
+    keypoints: [
+      '安全 ＞ 流動 ＞ 報酬，報酬只在前兩者內比較。',
+      '預備金的實質報酬常是負的，這是它的保費。',
+      '先存一個月，自動化，存滿後別動，用掉就補。',
+    ],
+    sources: ['cdic', 'bot-rates', 'cpi-2026-09', 'cfpb-savings'],
+  },
+});
+</script>

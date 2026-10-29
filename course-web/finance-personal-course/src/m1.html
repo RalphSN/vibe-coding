@@ -1,0 +1,411 @@
+<script>
+/* ==========================================================================
+   模組 1：看見你的錢
+   ========================================================================== */
+defineTerms({
+  '可支配所得': { en: 'disposable income', def: '收入扣掉稅、社會保險等非自願支出後，真正能自己決定怎麼用的錢。', example: '薪資單上的「實領」比較接近這個數字。', lesson: '1-1' },
+  '固定支出': { en: 'fixed expenses', def: '每個月金額幾乎一樣、短期內很難改變的支出。', example: '房租、貸款月付、電信月租、保費月繳。', lesson: '1-1' },
+  '變動支出': { en: 'variable expenses', def: '金額隨生活選擇每月變動的支出。', example: '外食、購物、娛樂、交通費。', lesson: '1-1' },
+  '偶發支出': { en: 'irregular expenses', def: '一年只出現一兩次、但幾乎一定會發生的支出；最常讓預算破功。', example: '年繳保費、所得稅、牌照稅、過年紅包、換手機。', lesson: '1-1' },
+  '反推法': { en: 'reverse budgeting', def: '不逐筆記錄，而是用「期初存款 ＋ 收入 − 期末存款」反推這段時間總共花了多少。', example: '月初 10 萬、收入 5 萬、月底 11 萬 → 花了 4 萬。', lesson: '1-2' },
+  '收支比': { en: 'expense-to-income ratio', def: '支出除以收入；越低代表每賺 100 元花掉的越少。', example: '收入 5 萬、支出 4 萬 → 收支比 80%。', lesson: '1-3' },
+  '儲蓄率': { en: 'savings rate', def: '（收入 − 支出）÷ 收入，也就是 1 − 收支比。', example: '收支比 80% → 儲蓄率 20%。', lesson: '1-3' },
+  '先付給自己': { en: 'pay yourself first', def: '薪水一入帳就先把要存的錢轉走，剩下的才拿來生活，而不是「花剩的才存」。', example: '發薪日自動轉帳 20% 到另一個帳戶。', lesson: '1-3' },
+  '資產負債表': { en: 'balance sheet', def: '把某一天擁有的資產與欠的負債並排列出來的表；兩者相減就是淨值。', example: '左邊：存款、股票、機車；右邊：學貸、卡費。', lesson: '1-4' },
+  '流動性': { en: 'liquidity', def: '一項資產多快、多少損失能換成現金。', example: '活存流動性最高；房子最低。', lesson: '1-4' },
+  '負債比': { en: 'debt-to-asset ratio', def: '總負債除以總資產；越高代表資產裡越多是借來的。', example: '資產 500 萬、負債 300 萬 → 60%。', lesson: '1-4' },
+});
+
+const FIXVAR_SVG = `<svg viewBox="0 0 560 300" role="img" aria-label="支出的兩個軸：固定或變動、必要或想要，分成四格；固定且必要是房租與保費，變動且必要是伙食與交通，固定但想要是訂閱與會員，變動且想要是購物與娛樂">
+  <text x="300" y="22" text-anchor="middle" font-size="14" font-weight="900">固定 ←　　　　　→ 變動</text>
+  <text x="25" y="100" text-anchor="middle" font-size="14" font-weight="900">必要</text><text x="25" y="230" text-anchor="middle" font-size="14" font-weight="900">想要</text>
+  ${[['房租、房貸、保費', '最難改，影響最大', 'm4', 50, 36], ['伙食、交通、水電', '可以省，但有底線', 'm3', 300, 36], ['訂閱、會員、分期', '最容易被忘記', 'm1', 50, 166], ['購物、娛樂、旅遊', '最有彈性', 'm2', 300, 166]].map(([a, b, c, x, y]) => `<rect x="${x}" y="${y}" width="240" height="118" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 120}" y="${y + 52}" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${x + 120}" y="${y + 80}" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
+</svg>`;
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '從薪資總額一路算到可支配所得',
+      '用「固定／變動 × 必要／想要」兩個軸分類支出',
+      '把偶發支出攤成每個月要準備的錢',
+    ],
+    analogy: {
+      text: ['公司有三張報表，其中一張叫現金流量表：錢從營業、投資、借貸三個管道進出。家庭其實也一樣，只是大部分人只看「薪水入帳」和「帳戶餘額」兩個數字，中間發生什麼全靠感覺。', '這一課把中間攤開：薪資扣掉什麼才變成[[可支配所得]]，花出去的錢又可以怎麼分類。分類不是為了記得漂亮，而是找出哪一格最值得動手。'],
+      limit: ['公司的報表有會計準則；家庭沒有，所以分類方式自己定，只要前後一致、能幫你做決定就好。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="薪資的流向：薪資總額扣掉勞健保自付額、勞退自提與預扣稅，剩下可支配所得；可支配所得再分成固定支出、變動支出、偶發支出準備與儲蓄">
+        <rect x="20" y="20" width="520" height="44" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="280" y="48" text-anchor="middle" font-size="16" font-weight="900" class="on-color">薪資總額（勞動契約上的數字）</text>
+        <rect x="380" y="76" width="160" height="44" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="460" y="104" text-anchor="middle" font-size="13" font-weight="900" class="on-color">勞健保、預扣稅等</text>
+        <rect x="20" y="76" width="350" height="44" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="195" y="104" text-anchor="middle" font-size="16" font-weight="900" class="on-color">可支配所得（實領）</text>
+        ${[['固定', 'm4', 20, 100], ['變動', 'm3', 124, 90], ['偶發準備', 'm1', 218, 70], ['儲蓄', 'm2', 292, 78]].map(([t, c, x, w]) => `<rect x="${x}" y="150" width="${w - 4}" height="60" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + (w - 4) / 2}" y="186" text-anchor="middle" font-size="13" font-weight="900" class="on-color">${t}</text>`).join('')}
+        <path d="M195 120 L195 150" class="stroke-ink" stroke-width="3"/>
+        <text x="195" y="240" text-anchor="middle" font-size="13">能自己決定的，只有下面這一排</text>
+        <text x="460" y="150" text-anchor="middle" font-size="12">（多數不能自己決定）</text>
+      </svg>`,
+      caption: '比例是示意。所有預算與比例，都應該用「可支配所得」計算，而不是薪資總額。',
+    },
+    define: [
+      { term: '可支配所得', en: 'disposable income', def: '扣掉稅與社會保險後可自由使用的錢。', example: '薪資單的實領。' },
+      { term: '固定支出', en: 'fixed expenses', def: '每月金額幾乎不變。', example: '房租、保費。' },
+      { term: '偶發支出', en: 'irregular expenses', def: '一年一兩次但一定會來。', example: '年繳保費、稅。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'income', text: '收入的三個問題' },
+        '看收入時，問三個問題就夠：多少是真的能用的？有多穩定？什麼時候進來？',
+        { type: 'table', head: ['問題', '為什麼重要', '例子'], rows: [
+          ['能用多少', '預算要用實領算，不然每個月都「莫名其妙不夠」', '月薪 5 萬，實領可能只有 4.5 萬上下'],
+          ['多穩定', '收入越不穩，預備金要越多（3-1）', '業務獎金、接案、加班費都屬於不穩定'],
+          ['什麼時候進來', '年終、三節獎金不該攤進每月生活費', '把獎金當成「年度」的錢，先分配再花'],
+        ], caption: '收入不固定的人：用過去 12 個月「最低的那幾個月」當作預算基準，多出來的月份先補預備金。' },
+        '台灣的平均數字可以當參考座標：主計總處 2025 年家庭收支調查，平均每戶可支配所得約 121 萬、消費支出約 92 萬，平均每戶存下約 29 萬。平均值會被高所得家庭拉高，中位數（約 102 萬）比較接近一般家庭。',
+        { type: 'heading', id: 'expense', text: '支出的兩個軸' },
+        { type: 'svg', svg: FIXVAR_SVG, caption: '左上那一格（固定且必要）通常佔支出最大塊，改一次就影響每一個月；右下那一格最常被罵，但金額往往沒有想像中大。' },
+        '把支出放進四格之後，就知道該從哪裡下手。房租或車貸這種「大石頭」改一次，效果可能勝過一整年少喝幾杯飲料；「固定但想要」那一格（訂閱、會員、無息分期）則最容易默默累積，因為它們不需要每次做決定。',
+        { type: 'heading', id: 'irregular', text: '偶發支出：預算最常破功的地方' },
+        '很多人覺得「這個月特別不夠」，其實是年繳保費、所得稅、牌照稅、過年紅包、換手機這類一年才出現一次的支出。它們不是意外，只是不在每個月出現。做法是把一年的總額除以 12，每個月先存進一個專用帳戶，時間到了直接從那裡付。',
+        { type: 'widget', name: 'knobs', props: { title: '偶發支出攤成每月準備金（實際計算）', sliders: [
+          { id: 'ins', label: '年繳保費', min: 0, max: 100000, step: 1000, value: 24000, unit: '元／年' },
+          { id: 'tax', label: '所得稅補繳、牌照稅、燃料費', min: 0, max: 60000, step: 1000, value: 8000, unit: '元／年' },
+          { id: 'gift', label: '過年紅包、婚喪喜慶', min: 0, max: 80000, step: 1000, value: 20000, unit: '元／年' },
+          { id: 'trip', label: '旅遊、換 3C、家電', min: 0, max: 150000, step: 1000, value: 40000, unit: '元／年' },
+        ], compute: (v) => {
+          const year = v.ins + v.tax + v.gift + v.trip;
+          return { rows: [
+            { label: '一年總共', value: `${year.toLocaleString()} 元`, ratio: Math.min(1, year / 390000) },
+            { label: '每月要先存', value: `${Math.round(year / 12).toLocaleString()} 元`, ratio: Math.min(1, year / 12 / 32500) },
+            { label: '佔月實領 4.5 萬的比例', value: `${((year / 12 / 45000) * 100).toFixed(1)}%`, ratio: Math.min(1, year / 12 / 45000) },
+          ], note: '預設值一年約 9.2 萬，平均每月要 7,667 元。如果沒有事先準備，這些錢就會在某幾個月突然把預算打爆，然後被誤以為是「意外」。' };
+        } } },
+        { type: 'heading', id: 'statement', text: '家庭版的現金流量表' },
+        { type: 'table', head: ['區塊', '流入', '流出', '這一卷在哪裡講'], rows: [
+          ['生活（營業）', '薪資、獎金、接案', '固定、變動、偶發支出', '1-1、2-1'],
+          ['投資', '利息、股利、賣出', '買入、定存', '第三部'],
+          ['借貸（融資）', '借款撥款', '還本金、付利息', '模組 4、5'],
+        ], caption: '注意：還房貸時，利息是支出，本金卻是在把負債變少；這個差別在 1-3 和 1-4 會用到。' },
+        { type: 'heading', id: 'seasonality', text: '深入：一年的現金流有季節性' },
+        '家庭現金流不是每個月一樣的直線。台灣有幾個固定的「繳費月」，以及固定的「入帳月」；把它們畫在一年的月曆上，就知道哪幾個月會特別緊。',
+        { type: 'table', head: ['月份', '常見的流入', '常見的流出'], rows: [
+          ['1–2 月', '年終獎金（依公司）', '過年紅包、年貨、旅遊'],
+          ['4 月', '—', '汽車與一定排氣量以上機車的使用牌照稅'],
+          ['5 月', '—', '綜合所得稅申報與繳納、房屋稅'],
+          ['7 月', '可能的所得稅退稅', '汽車燃料使用費（依車種與地方規定）'],
+          ['11 月', '—', '地價稅'],
+          ['不固定', '三節獎金、績效獎金', '年繳保費、換季衣物、家電汰換'],
+        ], caption: '開徵月份以 2026 年地方稅務機關公告的慣例為準；實際金額與期限以你收到的稅單為準。' },
+        { type: 'heading', id: 'income-kinds', text: '深入：收入的種類決定了它有多可靠' },
+        { type: 'table', head: ['種類', '例子', '可靠程度', '預算怎麼用'], rows: [
+          ['固定薪資', '月薪', '高', '當作預算基準'],
+          ['變動薪資', '加班費、業績獎金', '中', '只把「保底」放進預算，其餘當加碼'],
+          ['執行業務、接案', '設計、翻譯、顧問', '低到中', '用過去 12 個月最低的幾個月當基準'],
+          ['資產收入', '利息、股利、租金', '依資產而定', '先再投入，不當生活費（除非已退休）'],
+          ['一次性收入', '退稅、紅包、中獎', '不可預期', '套用意外之財規則（2-2）'],
+        ] },
+        '收入越不可靠，預算就越要保守、預備金越要多（3-1）。很多接案者的問題不是賺得少，而是把好月份的收入當成常態，在壞月份借錢周轉。',
+      ],
+    },
+    mistakes: [
+      { wrong: '用薪資總額做預算。', why: '勞健保與預扣稅會先被扣掉。', right: '用實領的可支配所得。' },
+      { wrong: '把年終、獎金當成每月收入的一部分。', why: '它們不穩定，一旦沒有就會入不敷出。', right: '獎金先分配：補預備金、還高利債、偶發支出。' },
+      { wrong: '把年繳保費、稅當成「意外支出」。', why: '它們每年都會來，只是不是每月。', right: '年總額 ÷ 12，每月先存進專用帳戶。' },
+    ],
+    keypoints: [
+      '所有比例都用可支配所得計算。',
+      '固定且必要的「大石頭」改一次影響最大。',
+      '偶發支出攤成每月準備金，就不再是意外。',
+    ],
+    sources: ['tax-calendar', 'household-2025', 'fsc-moneywise'],
+  },
+
+  '1-2': {
+    goals: [
+      '說出記帳真正要回答的三個問題',
+      '比較逐筆記帳、反推法、分帳戶三種方法',
+      '正確處理信用卡與分期的記帳時間點',
+    ],
+    analogy: {
+      text: ['減重的人第一件事通常是站上體重計，而不是先挑健身房。沒有數字，就不知道問題在哪裡，也不知道做的事有沒有效。記帳就是財務的體重計。', '但體重計不需要一天量十次，記帳也不需要記到每一塊錢都對得上。它的目的是回答三個問題：錢主要花去哪裡？哪些花費自己其實不太在乎？每個月大概存得下多少？能回答這三題，就夠了。'],
+      limit: ['體重計量完數字就結束；記帳的數字要拿來「做決定」（下一課的收支比、2-1 的預算），只記不看等於白記。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="記帳的循環：記錄、分類、月底結算、看三個數字、調整下個月的預算，再回到記錄">
+        ${[['記錄', 'm0'], ['分類', 'm1'], ['月結', 'm2'], ['看三個數字', 'm3'], ['調整', 'm5']].map(([t, c], i) => `<rect x="${12 + i * 110}" y="50" width="96" height="70" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${60 + i * 110}" y="91" text-anchor="middle" font-size="${t.length > 3 ? 13 : 16}" font-weight="900" class="on-color">${t}</text>`).join('')}
+        ${[0, 1, 2, 3].map((i) => `<path d="M${108 + i * 110} 85 L${122 + i * 110} 85" class="stroke-ink" stroke-width="3"/>`).join('')}
+        <path d="M500 120 L500 170 L60 170 L60 120" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+        <text x="280" y="200" text-anchor="middle" font-size="13">三個數字：總支出、前三大類別、這個月存下多少</text>
+      </svg>`,
+      caption: '記帳只是循環的第一步；真正改變財務的是「看數字、調整」那兩格。',
+    },
+    define: [
+      { term: '反推法', en: 'reverse budgeting', def: '期初 ＋ 收入 − 期末 ＝ 總支出。', example: '花了 4 萬。' },
+      { term: '變動支出', en: 'variable expenses', def: '隨選擇變動的支出。', example: '外食、購物。' },
+      { term: '現金流', en: 'cash flow', def: '一段時間的流入減流出。', example: '每月 ＋1 萬。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'methods', text: '三種方法，各適合誰' },
+        { type: 'table', head: ['方法', '怎麼做', '優點', '缺點', '適合'], rows: [
+          ['逐筆記帳', '每筆都記：日期、金額、類別、付款方式', '細節最多，看得到小額高頻的花費', '最花力氣，最容易半途而廢', '剛開始的前 3 個月'],
+          ['反推法', '只記月初、月底存款與收入，反推總支出', '幾乎不花時間，永遠不會「漏記」', '看不到錢花去哪一類', '已經知道自己習慣、只想追蹤總數'],
+          ['分帳戶（信封法）', '每類預算一個帳戶或電子錢包，花完就停', '不用記帳也能控制', '要開多個帳戶，彈性較低', '容易超支、想要硬性限制的人'],
+        ], caption: '可以組合：前 3 個月逐筆記帳找出習慣，之後改用反推法追總數，再對最容易超支的一兩類用分帳戶。' },
+        '逐筆記帳要記多細？類別控制在 8 到 12 個就好：太少看不出問題，太多會在「這筆算娛樂還是社交」上浪費時間。常見的分法是：居住、伙食、交通、通訊與訂閱、保險、醫療、學習、娛樂與社交、購物、孝親與禮金、偶發支出。',
+        { type: 'heading', id: 'reverse', text: '反推法：用存款變化抓出漏記' },
+        { type: 'widget', name: 'knobs', props: { title: '反推總支出，比對記帳有沒有漏（實際計算）', sliders: [
+          { id: 'start', label: '月初所有帳戶合計', min: 0, max: 500000, step: 1000, value: 120000, unit: '元' },
+          { id: 'inc', label: '本月收入', min: 0, max: 150000, step: 1000, value: 45000, unit: '元' },
+          { id: 'end', label: '月底所有帳戶合計', min: 0, max: 600000, step: 1000, value: 128000, unit: '元' },
+          { id: 'logged', label: '記帳 app 裡記到的支出', min: 0, max: 150000, step: 500, value: 31000, unit: '元' },
+        ], compute: (v) => {
+          const spent = v.start + v.inc - v.end;
+          const gap = spent - v.logged;
+          return { rows: [
+            { label: '反推的實際支出', value: `${spent.toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, spent) / 150000) },
+            { label: '沒記到的金額', value: `${gap.toLocaleString()} 元`, ratio: Math.min(1, Math.abs(gap) / 20000) },
+            { label: '漏記比例', value: spent > 0 ? `${((gap / spent) * 100).toFixed(1)}%` : '—', ratio: spent > 0 ? Math.min(1, Math.abs(gap) / spent) : 0 },
+          ], note: '「所有帳戶」要包含現金、電子支付餘額，並扣掉信用卡已刷未繳的金額，否則數字會失真。漏記比例超過 10%，通常是小額現金或電子支付沒記。' };
+        } } },
+        { type: 'heading', id: 'timing', text: '信用卡與分期：什麼時候算花掉' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="同一筆刷卡的三個時間點：刷卡日、帳單結帳日、扣款日；記帳應該記在刷卡日">
+          <line x1="40" y1="100" x2="520" y2="100" class="stroke-ink" stroke-width="3"/>
+          ${[['10/5', '刷卡日', '記在這天', 80, 'm3'], ['10/25', '結帳日', '帳單產生', 280, 'm1'], ['11/10', '繳款截止', '錢真的扣走', 470, 'm4']].map(([d, a, b, x, c]) => `<circle cx="${x}" cy="100" r="12" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x}" y="72" text-anchor="middle" font-size="15" font-weight="900" class="mono">${d}</text><text x="${x}" y="140" text-anchor="middle" font-size="15" font-weight="900">${a}</text><text x="${x}" y="164" text-anchor="middle" font-size="13">${b}</text>`).join('')}
+          <text x="280" y="200" text-anchor="middle" font-size="13">決定花錢的是刷卡那一刻，不是扣款那一天</text>
+        </svg>`, caption: '用「扣款日」記帳，會讓這個月看起來很省、下個月莫名很窮。日期以你自己的帳單為準。' },
+        '分期付款也是同樣道理：買一台 3 萬元的手機分 12 期，消費是在買的那一刻發生的。記帳時可以記成「購物 3 萬」，另外把未繳的 2.75 萬當成負債（1-4）；不要每個月只記 2,500，否則你會一直以為自己買得起更多。',
+        { type: 'heading', id: 'read', text: '月底只看三個數字' },
+        { type: 'list', ordered: true, items: [
+          '總支出：和上個月比，是增加還是減少？原因是偶發支出，還是習慣改變？',
+          '前三大類別：通常佔總支出的一半以上；要調整就從這裡下手。',
+          '這個月存下多少：收入 − 支出，下一課會把它變成儲蓄率。',
+        ] },
+        { type: 'callout', variant: 'tip', title: '記帳不是懲罰', body: ['記帳的目的是看見，不是罪惡感。看到某一類很高，問的是「這筆花費帶給我的價值，值不值得這個價格」，而不是「我怎麼這麼不節制」。', '願意花在自己真正在乎的事情上，是預算設計的一部分（2-1）。'] },
+        { type: 'heading', id: 'categories', text: '深入：好的分類能回答問題' },
+        '分類的目的是讓數字能回答你想問的問題。所以先想問題，再定分類。例如你想知道「通勤成本多少」，就把捷運、油錢、停車、機車保養放在同一類，而不是分散在「交通」「車」「停車」三個地方。',
+        { type: 'list', items: [
+          '**互斥**：一筆錢只該屬於一類；同樣的東西永遠記在同一類。',
+          '**有決策意義**：如果某一類的數字變大，你會做什麼不同的事？不會的話，可以合併。',
+          '**大類固定、小類彈性**：大類一年都不要改，才能跨月比較；小類可以視需要增加。',
+        ] },
+        { type: 'heading', id: 'automation', text: '深入：讓記帳自動一點' },
+        { type: 'table', head: ['工具', '怎麼幫忙', '要注意'], rows: [
+          ['電子發票載具', '消費紀錄自動歸戶，可以匯入記帳 app 或試算表', '現金、小店、轉帳不會出現'],
+          ['銀行與信用卡通知', '每筆刷卡、扣款即時推播', '只看不記，月底仍要整理'],
+          ['記帳 app', '分類、圖表、預算提醒', '注意 app 要求的權限與資料去向'],
+          ['試算表', '彈性最高，可以自己算儲蓄率、淨值', '要自己維護'],
+        ], caption: '自動化的目標是「不用記也知道大概」，不是完全不看；每月一次的整理仍然必要。' },
+        '最常被漏掉的是三種錢：現金、電子支付錢包裡的小額消費、朋友之間的轉帳（例如代墊）。月底用反推法對一次總數，就能抓到它們。',
+      ],
+    },
+    mistakes: [
+      { wrong: '記帳記到每一塊錢都要對得上，結果兩週就放棄。', why: '記帳的價值在趨勢，不在精確。', right: '類別 8–12 個，漏一點用反推法校正。' },
+      { wrong: '信用卡用扣款日記帳。', why: '花錢的決定發生在刷卡當下。', right: '記在刷卡日；分期記全額並列為負債。' },
+      { wrong: '只記不看。', why: '數字沒有拿來做決定就沒有用。', right: '月底看總支出、前三大類、存下多少。' },
+    ],
+    keypoints: [
+      '記帳回答三題：去哪、值不值、存多少。',
+      '前 3 個月逐筆記，之後可以改反推法。',
+      '刷卡與分期都記在消費的那一刻。',
+    ],
+    sources: ['fsc-moneywise', 'household-2025'],
+  },
+
+  '1-3': {
+    goals: [
+      '算出自己的收支比與儲蓄率',
+      '用「每年存下幾個月生活費」理解儲蓄率的意義',
+      '說出「先付給自己」為什麼比「花剩再存」有效',
+    ],
+    analogy: {
+      text: ['油耗比油箱大小更重要：一台車油箱很大但每公里耗油很兇，跑不遠；油箱小但省油的車，反而能開得更久。收入像油箱，[[收支比]]像油耗。', '[[儲蓄率]]是收支比的另一面：每賺 100 元留下多少。它同時決定兩件事：你存錢的速度，以及你「需要多少錢才能生活」。'],
+      limit: ['車子的油耗大多是固定的；收支比卻可以靠調整生活方式改變，而且收入變高時，它常常會不知不覺跟著變差（2-2 的生活膨脹）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 230" role="img" aria-label="收入 100 元的分法：收支比 80% 代表花 80 元、存 20 元，儲蓄率 20%">
+        <rect x="20" y="50" width="416" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="228" y="92" text-anchor="middle" font-size="18" font-weight="900" class="on-color">支出 80 元（收支比 80%）</text>
+        <rect x="436" y="50" width="104" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="488" y="84" text-anchor="middle" font-size="16" font-weight="900" class="on-color">存 20 元</text>
+        <text x="488" y="106" text-anchor="middle" font-size="13" class="on-color">儲蓄率 20%</text>
+        <text x="280" y="34" text-anchor="middle" font-size="15" font-weight="900">每賺 100 元（可支配所得）</text>
+        <text x="280" y="160" text-anchor="middle" font-size="15" class="mono">收支比 ＝ 支出 ÷ 收入</text>
+        <text x="280" y="190" text-anchor="middle" font-size="15" class="mono">儲蓄率 ＝ (收入 − 支出) ÷ 收入 ＝ 1 − 收支比</text>
+      </svg>`,
+      caption: '兩個指標其實是同一件事的兩面；習慣看哪一個都可以，重點是用可支配所得算。',
+    },
+    define: [
+      { term: '收支比', en: 'expense-to-income ratio', def: '支出 ÷ 收入。', example: '80%。' },
+      { term: '儲蓄率', en: 'savings rate', def: '1 − 收支比。', example: '20%。' },
+      { term: '先付給自己', en: 'pay yourself first', def: '先存再花。', example: '發薪日自動轉帳。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'benchmark', text: '多少才算夠？' },
+        { type: 'table', head: ['儲蓄率', '狀態', '說明'], rows: [
+          ['負的', '入不敷出', '正在吃老本或借錢，最優先處理'],
+          ['0–10%', '脆弱', '遇到一次大額支出就可能要借錢'],
+          ['10–20%', '起步', '能慢慢建立預備金，但進度不快'],
+          ['20% 以上', '穩健', '常見的目標；50/30/20 法則裡的「20」'],
+          ['30–50% 以上', '加速', '多數提早財務自由的人落在這裡'],
+        ], caption: '區間是經驗法則，不是規定。台灣 2025 年家庭平均儲蓄率約 24%，但低所得家庭已連續多年是負儲蓄，平均數字不代表每個家庭。' },
+        '50/30/20 法則（Elizabeth Warren 與 Amelia Warren Tyagi 在 2005 年的書中提出）把可支配所得分成三份：50% 必要支出、30% 想要的支出、20% 儲蓄與還債。它是起點，不是標準答案：住在房租很高的城市，必要支出常常超過 50%，這時就要用其他兩格去平衡。',
+        { type: 'heading', id: 'two-effects', text: '儲蓄率的兩個效果' },
+        '提高儲蓄率，會同時推動兩件事：存得更快（分子變大），而且需要的錢變少（分母變小，因為你習慣的生活更省）。把它換成「每工作一年，存下幾個月的生活費」就很直觀：儲蓄率 s 時，每年存下的錢可以支撐 s ÷ (1 − s) 年的生活。',
+        { type: 'widget', name: 'knobs', props: { title: '收支比、儲蓄率，以及每年存下幾個月生活費（實際計算）', sliders: [
+          { id: 'inc', label: '每月可支配所得', min: 20000, max: 200000, step: 1000, value: 45000, unit: '元' },
+          { id: 'exp', label: '每月支出（含偶發攤提）', min: 10000, max: 200000, step: 1000, value: 36000, unit: '元' },
+        ], compute: (v) => {
+          const ratio = v.exp / v.inc;
+          const s = 1 - ratio;
+          const months = s > 0 ? (s / (1 - s)) * 12 : 0;
+          return { rows: [
+            { label: '收支比', value: `${(ratio * 100).toFixed(1)}%`, ratio: Math.min(1, ratio) },
+            { label: '儲蓄率', value: `${(s * 100).toFixed(1)}%`, ratio: Math.max(0, s) },
+            { label: '每年存下幾個月的生活費', value: s > 0 ? `${months.toFixed(1)} 個月` : '0（入不敷出）', ratio: Math.min(1, months / 24) },
+            { label: '存滿 6 個月預備金要', value: s > 0 ? `${(6 / months * 12).toFixed(1)} 個月` : '存不到', ratio: s > 0 ? Math.min(1, (6 / months) / 3) : 1 },
+          ], note: '儲蓄率 20%：每年存下 3 個月生活費，存滿 6 個月預備金要 2 年。儲蓄率 50%：每年存下 12 個月，半年就存滿。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="儲蓄率與每年存下的生活費月數的曲線：10% 是 1.3 個月，20% 是 3 個月，30% 是 5.1 個月，50% 是 12 個月；越往右越陡">
+          <line x1="60" y1="200" x2="520" y2="200" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="200" class="stroke-ink" stroke-width="2"/>
+          <path d="${Array.from({ length: 51 }, (_, i) => { const s = i / 100; const m = (s / (1 - s)) * 12; return `${i ? 'L' : 'M'}${(60 + s * 800).toFixed(1)} ${(200 - m * 14).toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+          ${[[0.1, '1.3'], [0.2, '3'], [0.3, '5.1'], [0.5, '12']].map(([s, t]) => { const m = (s / (1 - s)) * 12; return `<circle cx="${60 + s * 800}" cy="${(200 - m * 14).toFixed(1)}" r="6" style="fill:var(--m5)" class="stroke-ink" stroke-width="2"/><text x="${60 + s * 800 - 10}" y="${(200 - m * 14 - 10).toFixed(1)}" text-anchor="end" font-size="13" font-weight="900">${t} 個月</text><text x="${60 + s * 800}" y="220" text-anchor="middle" font-size="13" class="mono">${s * 100}%</text>`; }).join('')}
+          <text x="290" y="238" text-anchor="middle" font-size="13">儲蓄率</text>
+          <text x="30" y="110" text-anchor="middle" font-size="13" transform="rotate(-90 30 110)">每年存下幾個月</text>
+        </svg>`, caption: '曲線不是直線：從 10% 提高到 20% 多存 1.7 個月，從 40% 提高到 50% 多存 4 個月。' },
+        { type: 'heading', id: 'pay-first', text: '先付給自己' },
+        { type: 'table', head: ["花剩再存","先付給自己"], rows: [["收入 → 生活 → 月底看剩多少","收入 → 自動轉走 20% → 剩下的生活"],["每個月都在決定「要不要存」","只需要決定一次"],["意外支出直接吃掉儲蓄","生活費自然縮到剩下的範圍"],["**結果**：大多數月份「剛好沒剩」。","**結果**：儲蓄變成固定支出，不靠意志力。"]], caption: "同樣的人、同樣的薪水，順序不同" },
+        { type: 'callout', variant: 'tip', title: '差在哪裡', body: ["支出會膨脹到填滿可用的錢；先移走的錢不在眼前，就不會被花掉。","把轉帳設在發薪日當天或隔天，並轉到不常用、沒有綁卡的帳戶。"] },
+        { type: 'heading', id: 'debt-count', text: '還債算不算儲蓄？' },
+        '還款裡的「本金」會讓負債變少、淨值變高，效果和存錢一樣；「利息」則是付給銀行的成本，屬於支出。所以計算儲蓄率時，可以把每月還的本金加回儲蓄，利息留在支出。房貸初期每期大部分是利息，越後期本金比例越高。',
+        { type: 'heading', id: 'fi-math', text: '深入：儲蓄率決定了要工作多久' },
+        '把 1-3 的公式再往前推一步：假設你想存到 25 年份的生活費（這是常見的「財務自由」粗估，第四部會講它的來源與限制），而且先不計投資報酬，需要工作的年數是 25 ×（1 − s）÷ s。',
+        { type: 'table', head: ['儲蓄率', '每年存下幾年的生活費', '存到 25 年份要幾年（不計報酬）'], rows: [
+          ['10%', '0.11 年', '225 年'],
+          ['20%', '0.25 年', '100 年'],
+          ['30%', '0.43 年', '約 58 年'],
+          ['50%', '1 年', '25 年'],
+          ['70%', '2.33 年', '約 11 年'],
+        ], caption: '不計報酬是刻意的：它顯示「光靠存」需要多久。第三部會把複利加進來，年數會大幅縮短，但儲蓄率仍然是最主要的變數。' },
+        { type: 'heading', id: 'pitfalls', text: '深入：儲蓄率的三個盲點' },
+        { type: 'list', items: [
+          '**分母要一致**：有人用薪資總額算、有人用實領算，同一個人數字可以差好幾個百分點；自己固定用可支配所得。',
+          '**看年，不看月**：偶發支出與年終獎金會讓單月的儲蓄率大起大落，用滾動 12 個月的總數算比較準。',
+          '**存下來的錢要有去處**：存在活存一直沒動，雖然淨值增加，但會被通膨侵蝕；存滿預備金之後，多的錢要依優先順序（6-1）安排。',
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '收入一增加就覺得財務變好。', why: '支出常跟著收入一起長，儲蓄率沒變。', right: '加薪時先把增加的一半調進自動儲蓄。' },
+      { wrong: '把 50/30/20 當成必須達到的標準。', why: '房租高、有家人要照顧時，必要支出常超過 50%。', right: '當起點，看自己的儲蓄率趨勢有沒有變好。' },
+      { wrong: '把還款全部算支出。', why: '本金是把負債變少，等於在增加淨值。', right: '本金算儲蓄，利息算支出。' },
+    ],
+    keypoints: [
+      '儲蓄率 ＝ 1 − 收支比，用可支配所得算。',
+      '儲蓄率 s：每年存下 s ÷ (1 − s) 年的生活費。',
+      '先付給自己：發薪日自動轉走，再用剩下的生活。',
+    ],
+    sources: ['household-2025', 'fsc-moneywise'],
+  },
+
+  '1-4': {
+    goals: [
+      '列出自己的資產負債表並算出淨值',
+      '用市值、解約金等正確方式估價',
+      '用流動性與負債比判斷資產結構',
+    ],
+    analogy: {
+      text: ['現金流是錄影，[[資產負債表]]是拍照：它不管這個月賺多少，只問「此時此刻，你擁有的東西值多少、欠了多少」。', '同樣淨值 100 萬的兩個人，一個是 100 萬存款，一個是 300 萬的房子扣掉 200 萬房貸，生活的彈性完全不同。所以除了淨值，還要看資產的[[流動性]]與[[負債比]]。'],
+      limit: ['照片只代表拍的那一刻；股票、房價每天在變，淨值也會跟著晃動。追蹤的是長期趨勢，不是每天的數字。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="資產負債表：左邊是資產，分成流動資產、投資資產、使用資產；右邊是負債，分成短期與長期；資產減負債等於淨值">
+        <rect x="20" y="20" width="250" height="40" class="fill-surface stroke-ink" stroke-width="3"/><text x="145" y="46" text-anchor="middle" font-size="16" font-weight="900">資產（擁有的）</text>
+        <rect x="290" y="20" width="250" height="40" class="fill-surface stroke-ink" stroke-width="3"/><text x="415" y="46" text-anchor="middle" font-size="16" font-weight="900">負債與淨值</text>
+        ${[['流動：現金、活存、定存', 'm0', 70, 50], ['投資：股票、基金、解約金', 'm2', 126, 60], ['使用：自住房、車（會折舊）', 'm1', 192, 70]].map(([t, c, y, h]) => `<rect x="20" y="${y}" width="250" height="${h - 6}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="145" y="${y + h / 2 + 2}" text-anchor="middle" font-size="13" font-weight="900" class="on-color">${t}</text>`).join('')}
+        <rect x="290" y="70" width="250" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="415" y="97" text-anchor="middle" font-size="13" font-weight="900" class="on-color">短期：卡費、分期未繳</text>
+        <rect x="290" y="120" width="250" height="60" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="415" y="155" text-anchor="middle" font-size="13" font-weight="900" class="on-color">長期：房貸、車貸、學貸</text>
+        <rect x="290" y="186" width="250" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="415" y="226" text-anchor="middle" font-size="16" font-weight="900" class="on-color">淨值 ＝ 資產 − 負債</text>
+      </svg>`,
+      caption: '左右兩邊的總和一定相等：資產 ＝ 負債 ＋ 淨值。淨值可以是負的（例如剛畢業、學貸大於存款）。',
+    },
+    define: [
+      { term: '資產負債表', en: 'balance sheet', def: '某一天的資產與負債並列。', example: '左資產、右負債。' },
+      { term: '流動性', en: 'liquidity', def: '多快能換成現金。', example: '活存最高。' },
+      { term: '負債比', en: 'debt-to-asset ratio', def: '總負債 ÷ 總資產。', example: '60%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'value', text: '怎麼估價：用「現在賣掉能拿到多少」' },
+        { type: 'table', head: ['項目', '用什麼數字', '常見錯誤'], rows: [
+          ['存款、定存', '帳戶餘額（定存可加計已產生的利息）', '—'],
+          ['股票、基金', '今天的市值', '用買進成本，會高估或低估'],
+          ['儲蓄險、投資型保單', '今天的解約金（保單價值）', '用保額或已繳保費，通常高估'],
+          ['汽機車', '中古行情', '用買價；車子每年都在折舊'],
+          ['自住房', '保守的市價，或乾脆另外列', '把自住房的增值當成可以花的錢'],
+          ['信用卡', '已刷未繳的全部金額，不只最低應繳', '只算這期帳單'],
+          ['分期、貸款', '剩下的本金', '只算每月月付'],
+        ], caption: '原則：資產往保守估，負債往完整算。這樣算出來的淨值，才是真的可以依靠的數字。' },
+        { type: 'widget', name: 'knobs', props: { title: '簡易資產負債表：淨值、流動月數、負債比（實際計算）', sliders: [
+          { id: 'cash', label: '現金、活存、定存', min: 0, max: 2000000, step: 10000, value: 150000, unit: '元' },
+          { id: 'inv', label: '股票、基金、保單解約金', min: 0, max: 5000000, step: 10000, value: 100000, unit: '元' },
+          { id: 'use', label: '車、自住房（保守市價）', min: 0, max: 20000000, step: 50000, value: 50000, unit: '元' },
+          { id: 'debt', label: '所有負債剩餘本金', min: 0, max: 15000000, step: 10000, value: 250000, unit: '元' },
+          { id: 'exp', label: '每月必要支出', min: 10000, max: 100000, step: 1000, value: 30000, unit: '元' },
+        ], compute: (v) => {
+          const assets = v.cash + v.inv + v.use;
+          const nw = assets - v.debt;
+          return { rows: [
+            { label: '總資產', value: `${assets.toLocaleString()} 元`, ratio: Math.min(1, assets / 5000000) },
+            { label: '淨值', value: `${nw.toLocaleString()} 元`, ratio: Math.min(1, Math.abs(nw) / 5000000) },
+            { label: '流動資產撐得了', value: `${(v.cash / v.exp).toFixed(1)} 個月`, ratio: Math.min(1, v.cash / v.exp / 12) },
+            { label: '負債比', value: assets ? `${((v.debt / assets) * 100).toFixed(1)}%` : '—', ratio: assets ? Math.min(1, v.debt / assets) : 1 },
+          ], note: '預設像剛工作幾年、還有學貸的人：淨值約 5 萬，流動資產撐 5 個月。淨值是負的不可怕，重要的是每季、每年有沒有往上走。' };
+        } } },
+        { type: 'heading', id: 'ratios', text: '兩個結構指標' },
+        { type: 'list', items: [
+          '**流動資產 ÷ 每月必要支出**：撐得了幾個月，就是緊急預備金的水位（模組 3）。資產很多但這個數字很低，代表「有錢但沒現金」。',
+          '**負債比 ＝ 總負債 ÷ 總資產**：有房貸的家庭常在 40–60%，這本身不一定危險；危險的是負債裡有很多高利率的消費性債務，或每月還款壓力太大（5-2）。',
+        ] },
+        { type: 'heading', id: 'growth', text: '淨值怎麼長大' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="淨值變化的三個來源：儲蓄與還本金讓淨值增加，資產增值讓淨值增加，折舊與資產下跌讓淨值減少">
+          <rect x="20" y="150" width="120" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="80" y="181" text-anchor="middle" font-size="14" font-weight="900">年初淨值</text>
+          <rect x="160" y="80" width="110" height="120" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="215" y="134" text-anchor="middle" font-size="14" font-weight="900" class="on-color">＋ 儲蓄</text><text x="215" y="156" text-anchor="middle" font-size="12" class="on-color">（含還本金）</text>
+          <rect x="290" y="110" width="110" height="90" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="345" y="160" text-anchor="middle" font-size="14" font-weight="900" class="on-color">＋ 資產增值</text>
+          <rect x="420" y="150" width="120" height="50" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="480" y="181" text-anchor="middle" font-size="14" font-weight="900" class="on-color">− 折舊、下跌</text>
+          <text x="280" y="40" text-anchor="middle" font-size="14" font-weight="900">年底淨值 ＝ 年初 ＋ 儲蓄 ＋ 增值 − 折舊</text>
+        </svg>`, caption: '剛開始的十年，淨值主要靠儲蓄長大；資產夠大之後，增值的影響才會超過每年存的錢（第三部的複利）。' },
+        '這也解釋了為什麼「先把儲蓄率做起來」比「找高報酬」重要：本金 10 萬時，報酬率多 5% 只多 5,000 元；儲蓄率多 5% 卻可能每年多存好幾萬。',
+        { type: 'callout', variant: 'tip', title: '多久算一次', body: ['淨值每季或每半年算一次就夠，太常看只會被市場波動影響心情。', '建議固定在同一天（例如每季最後一天）記下來，畫成一條線，看趨勢。'] },
+        { type: 'heading', id: 'human-capital', text: '深入：最大的資產不在表上' },
+        '對剛工作的人來說，最大的資產通常不在資產負債表上，而是「未來能賺的錢」，經濟學稱為人力資本（human capital）。例如一個 25 歲、年收 60 萬、還要工作 40 年的人，未來薪資的總和遠大於他現在的存款。',
+        '這帶出兩個推論。第一，年輕時淨值是負的（例如學貸）不代表財務失敗，因為人力資本還沒變現。第二，人力資本會因為生病、失能、身故而消失，這正是保險要保護的東西（第二部）；而進修、累積能力，則是在讓這項資產增值。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="一生中人力資本與金融資本的消長：年輕時人力資本很大、金融資本很小；隨著工作與儲蓄，人力資本逐漸轉換成金融資本；退休時人力資本接近零，主要靠金融資本生活">
+          <line x1="50" y1="210" x2="530" y2="210" class="stroke-ink" stroke-width="2"/><line x1="50" y1="20" x2="50" y2="210" class="stroke-ink" stroke-width="2"/>
+          <path d="M50 40 C 200 60, 350 140, 460 205 L 530 208" fill="none" style="stroke:var(--m1)" stroke-width="4"/>
+          <path d="M50 205 C 200 195, 350 110, 460 60 L 530 80" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+          <text x="70" y="34" font-size="13" font-weight="900">人力資本（未來收入）</text>
+          <text x="470" y="52" text-anchor="end" font-size="13" font-weight="900">金融資本（淨值）</text>
+          <text x="80" y="232" font-size="13">開始工作</text><text x="460" y="232" text-anchor="middle" font-size="13">退休</text>
+        </svg>`, caption: '示意圖。理財的長期任務，就是把會隨時間消失的人力資本，逐步轉換成能自己產生收入的金融資本。' },
+        { type: 'heading', id: 'asset-kinds', text: '深入：會生錢的資產與會吃錢的資產' },
+        { type: 'table', head: ['類型', '例子', '持有時的現金流'], rows: [
+          ['生錢', '定存、債券、股票、出租的房子', '帶來利息、股利、租金'],
+          ['不生也不吃', '現金（但會被通膨吃掉）', '幾乎為 0'],
+          ['吃錢', '自用車、自住房（管理費、稅、維修）', '每年要付持有成本'],
+        ], caption: '自住房和車子都可能是必要的，只是要清楚：它們在資產負債表上有價值，在現金流量表上卻是支出。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '用保額或已繳保費當保單的價值。', why: '提前解約只能拿回解約金，前幾年常低於已繳保費。', right: '用今天的解約金。' },
+      { wrong: '把自住房的增值當成可以花的錢。', why: '不賣房就拿不到；賣了也還要住。', right: '自住房另外列，看「扣掉自住房」的淨值。' },
+      { wrong: '負債只算這期帳單或每月月付。', why: '淨值看的是全部欠款。', right: '算所有負債的剩餘本金。' },
+    ],
+    keypoints: [
+      '淨值 ＝ 資產 − 負債，資產保守估、負債完整算。',
+      '流動月數看緩衝，負債比看結構。',
+      '前期淨值靠儲蓄長大，資產大了才靠增值。',
+    ],
+    sources: ['fsc-moneywise', 'household-2025'],
+  },
+});
+</script>

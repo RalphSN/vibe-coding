@@ -1,0 +1,427 @@
+<script>
+/* ==========================================================================
+   模組 3：四大險種：各保什麼
+   ========================================================================== */
+defineTerms({
+  '定期壽險': { en: 'term life insurance', def: '只在約定期間內（例如 20 年）身故才理賠；期滿沒事就結束，沒有返還，保費因此便宜。', example: '保到孩子大學畢業、房貸還完。', lesson: '3-1' },
+  '終身壽險': { en: 'whole life insurance', def: '保障到終身，一定會給付（只是早晚），所以保費比定期壽險貴很多，並累積保單價值。', example: '常用於遺產規劃。', lesson: '3-1' },
+  '受益人': { en: 'beneficiary', def: '保險事故發生時，有權領取保險金的人。', example: '壽險受益人填配偶與子女。', lesson: '3-1' },
+  '實支實付': { en: 'expense reimbursement', def: '醫療險的一種：在限額內，依實際花費的醫療費用理賠。', example: '雜費限額 20 萬，實際自費 12 萬 → 理賠 12 萬。', lesson: '3-2' },
+  '日額給付': { en: 'daily cash benefit', def: '醫療險的一種：依住院天數乘以約定的每日金額給付，與實際花多少無關。', example: '日額 2,000 元 × 住院 5 天 ＝ 1 萬。', lesson: '3-2' },
+  '等待期': { en: 'waiting period', def: '契約生效後的一段時間內，因疾病發生的事故不理賠；用來避免帶病投保。', example: '醫療險常見 30 天、重大疾病常見 90 天。', lesson: '3-2' },
+  '一次金': { en: 'lump-sum benefit', def: '符合條件時一次給付一筆約定金額，用途不限。', example: '確診符合定義的癌症，給付 100 萬。', lesson: '3-3' },
+  '重大傷病': { en: 'catastrophic illness', def: '健保認定的重大傷病證明範圍；以它為理賠依據的保險，涵蓋範圍較廣。', example: '22 大類、數百種疾病。', lesson: '3-3' },
+  '意外': { en: 'accident', def: '保險上指「非由疾病引起之外來突發事故」，三個條件要同時符合。', example: '車禍、跌倒撞傷；中風跌倒不算。', lesson: '3-4' },
+  '失能等級': { en: 'disability grade', def: '依失能程度與保險金給付表分為 1 到 11 級，級數越小越嚴重、給付比例越高。', example: '第 1 級 100%，第 11 級 5%。', lesson: '3-4' },
+  '長期照顧狀態': { en: 'long-term care status', def: '長照險的理賠條件：日常生活活動有 3 項以上無法自理，或有認知功能障礙，且需定期重新認定。', example: '進食、移位、如廁、沐浴、平地行走、更衣。', lesson: '3-5' },
+  '失能扶助金': { en: 'disability annuity', def: '失能險在符合約定失能等級時，按月或按年給付的金額，用來替代收入與支付照顧。', example: '每月給付 3 萬，最多給付若干年。', lesson: '3-5' },
+});
+
+const DISABILITY_PCT = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 5];
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '分辨定期壽險與終身壽險的用途',
+      '用需求法算出壽險保額缺口',
+      '說明受益人與保險金的基本規則',
+    ],
+    analogy: {
+      text: ['壽險買的不是「你的命值多少錢」，而是「你不在了以後，靠你收入生活的人還需要多少錢」。單身、沒有人靠你養，壽險需求可能接近 0；剛買房、孩子還小的主要收入者，需求可能是好幾百萬到上千萬。', '所以壽險是跟著「責任」走的保險。責任最重的那幾十年，用便宜的[[定期壽險]]就能涵蓋；[[終身壽險]]保證一定會賠，代價是貴很多的保費。'],
+      limit: ['人的價值當然無法用錢衡量；這裡算的只是「財務上的責任」，也就是家人在你不在時的生活缺口。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="壽險需求隨時間的變化：孩子出生、買房時責任最高，之後隨著房貸減少、孩子長大而下降；定期壽險覆蓋責任高峰的那段時間">
+        <line x1="50" y1="220" x2="530" y2="220" class="stroke-ink" stroke-width="2"/><line x1="50" y1="20" x2="50" y2="220" class="stroke-ink" stroke-width="2"/>
+        <path d="M50 210 L120 200 L170 60 L260 70 L360 130 L450 200 L530 214" fill="none" style="stroke:var(--m1)" stroke-width="4"/>
+        <rect x="160" y="40" width="250" height="180" fill="none" style="stroke:var(--m2)" stroke-width="4" stroke-dasharray="10 6"/>
+        <text x="285" y="34" text-anchor="middle" font-size="14" font-weight="900">定期壽險覆蓋這段</text>
+        <text x="170" y="236" text-anchor="middle" font-size="12">孩子出生、買房</text>
+        <text x="420" y="236" text-anchor="middle" font-size="12">孩子獨立、房貸還完</text>
+        <text x="58" y="34" font-size="13" font-weight="900">家人需要的錢</text>
+      </svg>`,
+      caption: '需求的曲線是示意。重點是：壽險需求有高峰，而且會下降；保障期間對準高峰，比保終身划算得多。',
+    },
+    define: [
+      { term: '定期壽險', en: 'term life', def: '只保一段期間，便宜。', example: '保 20 年。' },
+      { term: '終身壽險', en: 'whole life', def: '保終身，貴。', example: '遺產規劃。' },
+      { term: '受益人', en: 'beneficiary', def: '領保險金的人。', example: '配偶、子女。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'need', text: '需求法：算出家人需要多少' },
+        { type: 'widget', name: 'knobs', props: { title: '壽險保額缺口（需求法，實際計算）', sliders: [
+          { id: 'debt', label: '要清償的負債（房貸、其他貸款）', min: 0, max: 20000000, step: 100000, value: 6000000, unit: '元' },
+          { id: 'living', label: '家人每年需要的生活費（扣掉配偶收入後）', min: 0, max: 2000000, step: 10000, value: 360000, unit: '元' },
+          { id: 'years', label: '要支撐幾年（到最小的孩子獨立）', min: 0, max: 30, step: 1, value: 15, unit: '年' },
+          { id: 'edu', label: '子女教育金', min: 0, max: 5000000, step: 50000, value: 1000000, unit: '元' },
+          { id: 'have', label: '可動用的存款與投資', min: 0, max: 20000000, step: 50000, value: 800000, unit: '元' },
+          { id: 'cover', label: '已有的壽險保額（含團保）', min: 0, max: 20000000, step: 100000, value: 1000000, unit: '元' },
+        ], compute: (v) => {
+          const need = v.debt + v.living * v.years + v.edu + 300000;
+          const gap = need - v.have - v.cover;
+          return { rows: [
+            { label: '家人需要的錢（含喪葬 30 萬）', value: `${need.toLocaleString()} 元`, ratio: Math.min(1, need / 30000000) },
+            { label: '已有的資源', value: `${(v.have + v.cover).toLocaleString()} 元`, ratio: Math.min(1, (v.have + v.cover) / 30000000) },
+            { label: '保額缺口', value: gap > 0 ? `${gap.toLocaleString()} 元` : '沒有缺口', ratio: Math.min(1, Math.max(0, gap) / 30000000) },
+          ], note: '預設：房貸 600 萬、每年生活費 36 萬 × 15 年、教育金 100 萬，扣掉存款 80 萬與既有保額 100 萬，缺口約 1,090 萬。這裡不計通膨與投資報酬，是保守的粗估；生活費年數也可以用「到配偶能獨立負擔」來估。' };
+        } } },
+        '另一個常見的粗估是「所得替代法」：年收入 × 需要替代的年數。它簡單，但忽略了負債與已有資源；需求法比較貼近真實情況。',
+        { type: 'heading', id: 'term-vs-whole', text: '定期 vs 終身：差在哪裡' },
+        { type: 'table', head: ['', '定期壽險', '終身壽險'], rows: [
+          ['保障期間', '約定期間（例如 10、20、30 年）', '終身'],
+          ['一定會賠嗎', '期間內身故才賠', '一定會賠，只是早晚'],
+          ['保費', '便宜：同樣保額常只有終身型的一小部分', '貴：包含「一定要賠」的成本與保單價值'],
+          ['保單價值', '通常沒有或很少', '會累積，可以解約或保單借款'],
+          ['適合', '責任高峰期的家庭保障', '遺產規劃、預留稅源等特定目的'],
+        ], caption: '保費差距依年齡、性別與商品而不同；投保前請比較同保額、同期間的報價。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="同樣的保費預算：買終身壽險只能買到較低的保額；買定期壽險可以買到高很多的保額，在責任高峰期保護家人">
+          <text x="140" y="30" text-anchor="middle" font-size="15" font-weight="900">同樣的年保費</text>
+          <rect x="60" y="150" width="160" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="140" y="186" text-anchor="middle" font-size="14" font-weight="900" class="on-color">終身：保額較低</text>
+          <rect x="320" y="50" width="160" height="160" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="400" y="126" text-anchor="middle" font-size="14" font-weight="900" class="on-color">定期：保額高很多</text><text x="400" y="150" text-anchor="middle" font-size="12" class="on-color">但只保一段時間</text>
+          <text x="280" y="234" text-anchor="middle" font-size="13">高度表示保額（示意）；家庭保障要的是「責任期間內的高保額」</text>
+        </svg>`, caption: '「買定期、差額自己投資」是常見的主張：用省下的保費投資，期滿時保障需求下降、資產也長大了。它的前提是你真的會把差額存下來投資（第三部）。' },
+        { type: 'heading', id: 'beneficiary', text: '深入：受益人與保險金' },
+        { type: 'list', items: [
+          '**指定受益人**：保險法第 112 條規定，約定在被保險人死亡時給付給指定受益人的保險金額，不得作為被保險人的遺產。指定受益人能讓保險金直接給到你想照顧的人。',
+          '**沒有指定時**：保險金可能成為遺產，依繼承程序處理，時間較長。',
+          '**定期更新**：結婚、離婚、生子後，記得檢查受益人是否仍符合你的意思（5-2）。',
+          '**稅務例外**：實務上若有明顯規避稅負的情況，稅捐機關可能依實質課稅原則處理；高資產的遺產規劃請找專業人士。',
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '沒有人依靠你的收入，卻買高額壽險。', why: '壽險保的是家人的財務缺口。', right: '單身時先補失能與醫療。' },
+      { wrong: '用終身壽險做家庭保障，結果保額不夠。', why: '同樣保費，定期壽險保額高很多。', right: '責任期間用定期壽險對準高峰。' },
+      { wrong: '保額用感覺決定。', why: '負債、生活費、教育金加起來常比想像大。', right: '用需求法算缺口。' },
+    ],
+    keypoints: [
+      '壽險保的是家人的財務缺口，跟著責任走。',
+      '責任高峰期用定期壽險，同樣保費保額高很多。',
+      '指定受益人，保險金原則上不列入遺產。',
+    ],
+    sources: ['ins-act-64', 'fsc-moneywise'],
+  },
+
+  '3-2': {
+    goals: [
+      '分辨實支實付與日額給付的差別',
+      '說出醫療險常見的限額、等待期與除外',
+      '用自費缺口決定醫療險要補多少',
+    ],
+    analogy: {
+      text: ['[[實支實付]]像公司的報帳：拿收據來，在額度內花多少補多少。[[日額給付]]像出差的固定津貼：住一天給一天的錢，不管實際花多少。', '健保時代最大的醫療缺口是自費醫材、新藥與病房差額（2-1），這些金額和天數不一定有關；所以多數規劃會以實支實付補自費，再用日額補收入與雜支。'],
+      limit: ['報帳有上限、也有不能報的項目；醫療險同樣有各項限額與除外責任，「理賠多少」永遠以條款為準。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="同一次住院兩種醫療險的理賠：實支實付依收據在限額內補實際自費；日額給付依住院天數乘以日額，和實際花費無關">
+        <text x="140" y="26" text-anchor="middle" font-size="15" font-weight="900">實支實付</text>
+        <text x="420" y="26" text-anchor="middle" font-size="15" font-weight="900">日額給付</text>
+        <rect x="40" y="40" width="200" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="140" y="76" text-anchor="middle" font-size="13" font-weight="900">收據：自費 12 萬</text>
+        <rect x="40" y="130" width="200" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="140" y="166" text-anchor="middle" font-size="13" font-weight="900" class="on-color">在限額內補 12 萬</text>
+        <rect x="320" y="40" width="200" height="60" class="fill-surface stroke-ink" stroke-width="3"/><text x="420" y="76" text-anchor="middle" font-size="13" font-weight="900">住院 5 天 × 日額 2,000</text>
+        <rect x="320" y="130" width="200" height="60" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="420" y="166" text-anchor="middle" font-size="13" font-weight="900" class="on-color">給付 1 萬</text>
+        <path d="M140 100 L140 130 M420 100 L420 130" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="232" text-anchor="middle" font-size="13">自費金額大、天數短的現代醫療，實支實付比較對得上</text>
+      </svg>`,
+      caption: '數字是示意。實支實付的「雜費限額」是最重要的一個數字，要對照自費醫材與新藥的價格來看。',
+    },
+    define: [
+      { term: '實支實付', en: 'reimbursement', def: '依實際花費在限額內理賠。', example: '補 12 萬。' },
+      { term: '日額給付', en: 'daily benefit', def: '天數 × 日額。', example: '1 萬。' },
+      { term: '等待期', en: 'waiting period', def: '生效後一段期間疾病不賠。', example: '30 天。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '同一次住院：實支實付 vs 日額（實際計算，限額依保單填）', sliders: [
+          { id: 'days', label: '住院天數', min: 1, max: 60, step: 1, value: 5, unit: '天' },
+          { id: 'self', label: '健保外的自費（醫材、藥物、病房差額）', min: 0, max: 1000000, step: 5000, value: 120000, unit: '元' },
+          { id: 'limit', label: '實支實付的雜費限額', min: 0, max: 600000, step: 10000, value: 200000, unit: '元' },
+          { id: 'daily', label: '日額保險的每日金額', min: 0, max: 5000, step: 100, value: 2000, unit: '元' },
+        ], compute: (v) => {
+          const reimb = Math.min(v.self, v.limit);
+          const dailyPay = v.days * v.daily;
+          const uncovered = Math.max(0, v.self - reimb - dailyPay);
+          return { rows: [
+            { label: '實支實付理賠', value: `${reimb.toLocaleString()} 元`, ratio: Math.min(1, reimb / Math.max(1, v.self)) },
+            { label: '日額理賠', value: `${dailyPay.toLocaleString()} 元`, ratio: Math.min(1, dailyPay / Math.max(1, v.self)) },
+            { label: '兩張都有時還要自己付', value: `${uncovered.toLocaleString()} 元`, ratio: Math.min(1, uncovered / Math.max(1, v.self)) },
+          ], note: '把自費拉到 50 萬、天數維持 5 天：日額只給 1 萬，實支實付也被 20 萬限額卡住。這正是重大疾病一次金（3-3）要補的部分。' };
+        } } },
+        { type: 'heading', id: 'terms', text: '醫療險條款要看的五個地方' },
+        { type: 'table', head: ['項目', '看什麼', '為什麼'], rows: [
+          ['雜費（住院醫療費用）限額', '一次住院最多補多少', '自費醫材、藥物主要從這裡出'],
+          ['手術費限額與給付方式', '依手術表倍數，還是實支', '門診手術是否也給付'],
+          ['病房費限額', '每日上限', '單人房差額能補多少'],
+          ['等待期與除外', '[[等待期]]天數、哪些情況不賠', '投保前已有的疾病通常不賠（保險法第 127 條）'],
+          ['保證續保與年齡上限', '能續保到幾歲、會不會因理賠被拒續', '一年期附約常有續保條件'],
+        ] },
+        { type: 'heading', id: 'indemnity', text: '深入：損害填補原則與「副本理賠」' },
+        '實支實付本質上是「補償實際損失」，所以理論上不應該讓人因生病而賺錢。過去曾有人買多張實支實付、用收據副本在多家公司重複申請。主管機關自 2019 年起限制每人投保實支實付的張數（不溯及既往），2023 年底後回歸損害填補原則，多數新保單只接受正本收據。已經持有的舊保單，依當初的條款辦理。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="醫療險的定位：預備金處理門診與小額自費；實支實付處理住院自費醫材與藥物；日額處理住院期間的雜支與收入；重大疾病一次金處理長期治療與收入中斷">
+          ${[['預備金', '門診、小額自費', 'm3'], ['實支實付', '住院自費醫材、藥', 'm2'], ['日額', '住院雜支、收入', 'm1'], ['重疾一次金', '長期治療、收入中斷', 'm4']].map(([a, b, c], i) => `<rect x="${12 + i * 137}" y="${110 - i * 22}" width="125" height="${80 + i * 22}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="${140 - i * 22}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 137}" y="${164 - i * 22}" text-anchor="middle" font-size="11" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="212" text-anchor="middle" font-size="13">事故越嚴重，越往右邊的工具才扛得住</text>
+        </svg>`, caption: '不是每一種都要買；依預算從最可能造成大額缺口的開始補。' },
+        { type: 'heading', id: 'renewal', text: '深入：保證續保與終身型醫療' },
+        '醫療險常以一年期附約的形式附加在主約上，保費便宜，但有兩個關鍵條款：能不能「保證續保」（不因理賠或健康變差而被拒絕續保），以及續保的年齡上限。沒有保證續保的附約，最怕在你最需要的時候（例如罹病後）被拒絕續保。',
+        { type: 'table', head: ['形式', '優點', '要注意'], rows: [
+          ['一年期附約（保證續保）', '保費低，能隨年齡調整', '保費隨年齡上升；確認續保年齡上限'],
+          ['一年期附約（非保證續保）', '保費最低', '可能在理賠後被拒絕續保'],
+          ['終身醫療（主約）', '保證保到終身、保費多半平準', '給付內容固定，幾十年後可能跟不上醫療型態'],
+        ], caption: '醫療型態變化很快（住院天數變短、門診手術與自費新藥變多），所以很多人選擇一年期、可保證續保的實支實付，搭配重大疾病一次金，而不是押寶一張固定內容的終身醫療。' },
+        '另一個要看的是「門診手術」：許多過去必須住院的手術，現在當天回家即可。條款若只給付住院手術，就可能錯過這一塊。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只買日額型醫療險。', why: '現代醫療住院天數短、自費金額大，日額常補不足。', right: '用實支實付補自費，日額視預算加強。' },
+      { wrong: '只看保費，不看雜費限額。', why: '限額太低，遇到大額自費時幫助有限。', right: '對照常見自費醫材與藥物的價格看限額。' },
+      { wrong: '以為投保前的病也能理賠。', why: '投保時已在疾病中，該疾病不負給付責任。', right: '在健康時投保，並據實告知（5-1）。' },
+    ],
+    keypoints: [
+      '實支實付補實際自費，日額依天數給付。',
+      '最重要的是雜費限額、等待期與續保條件。',
+      '實支實付回歸損害填補，新保單多只收正本。',
+    ],
+    sources: ['reimburse', 'ins-act-127', 'nhi-copay'],
+  },
+
+  '3-3': {
+    goals: [
+      '分辨重大疾病、特定傷病與重大傷病險',
+      '說明一次金為什麼重要',
+      '估算重病時需要的一次金額度',
+    ],
+    analogy: {
+      text: ['醫療險像是幫你付醫院帳單；重大疾病類的保險則像一筆「暫停工作的生活費」。罹患癌症或中風之後，真正讓家庭吃緊的，常常不是醫院帳單，而是一年半載不能工作、還要有人照顧。', '這類保險多半是[[一次金]]：確診符合定義就給一筆錢，用途不限，可以拿去付新藥、請看護，或撐過休養期的房貸。'],
+      limit: ['「確診」不等於「符合定義」：每一種疾病在條款裡都有嚴格的定義與程度要求，理賠以條款為準。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="三種重病保險的範圍：重大疾病險範圍最窄、保費最低；特定傷病險居中；重大傷病險以健保重大傷病證明為準，範圍最廣、保費最高">
+        <ellipse cx="280" cy="140" rx="250" ry="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <ellipse cx="250" cy="150" rx="170" ry="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+        <ellipse cx="220" cy="160" rx="100" ry="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="220" y="166" text-anchor="middle" font-size="14" font-weight="900" class="on-color">重大疾病</text>
+        <text x="365" y="120" text-anchor="middle" font-size="14" font-weight="900" class="on-color">特定傷病</text>
+        <text x="460" y="70" text-anchor="middle" font-size="14" font-weight="900" class="on-color">重大傷病</text>
+        <text x="280" y="252" text-anchor="middle" font-size="12">範圍越廣，保費通常越高</text>
+      </svg>`,
+      caption: '示意圖；實際涵蓋的疾病與定義以條款為準。',
+    },
+    define: [
+      { term: '一次金', en: 'lump sum', def: '一次給付、用途不限。', example: '100 萬。' },
+      { term: '重大傷病', en: 'catastrophic illness', def: '依健保重大傷病證明。', example: '22 類。' },
+      { term: '等待期', en: 'waiting period', def: '生效後一段期間不賠。', example: '90 天。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'types', text: '三種重病保險的比較' },
+        { type: 'table', head: ['類型', '理賠依據', '範圍', '注意'], rows: [
+          ['重大疾病險', '條款列出的疾病與定義；2016 年起分甲型（7 項）與乙型（含輕度，共 11 項）', '最窄', '甲型門檻較嚴，乙型多了輕度項目'],
+          ['特定傷病險', '條款列出的特定疾病清單', '居中', '各家清單不同'],
+          ['重大傷病險', '取得健保重大傷病證明（22 大類、數百種疾病）', '最廣', '保費較高；部分項目可能除外'],
+          ['癌症險', '確診符合定義的癌症', '只保癌症', '有一次金型、也有住院手術等分項給付型'],
+        ], caption: '這類保險常有等待期（例如 90 天），等待期內確診不理賠。各類細節以保單條款為準。' },
+        { type: 'widget', name: 'knobs', props: { title: '重病一次金要多少（實際計算）', sliders: [
+          { id: 'months', label: '治療與休養期間', min: 3, max: 36, step: 1, value: 12, unit: '個月' },
+          { id: 'income', label: '每月收入損失', min: 0, max: 200000, step: 1000, value: 45000, unit: '元' },
+          { id: 'treat', label: '健保外自費治療（新藥等）', min: 0, max: 3000000, step: 50000, value: 600000, unit: '元' },
+          { id: 'care', label: '照顧與其他每月支出', min: 0, max: 80000, step: 1000, value: 15000, unit: '元' },
+          { id: 'fund', label: '可以動用的預備金', min: 0, max: 2000000, step: 10000, value: 200000, unit: '元' },
+        ], compute: (v) => {
+          const need = v.months * (v.income + v.care) + v.treat;
+          const gap = Math.max(0, need - v.fund);
+          return { rows: [
+            { label: '收入損失＋照顧', value: `${(v.months * (v.income + v.care)).toLocaleString()} 元`, ratio: Math.min(1, v.months * (v.income + v.care) / 5000000) },
+            { label: '自費治療', value: `${v.treat.toLocaleString()} 元`, ratio: Math.min(1, v.treat / 3000000) },
+            { label: '扣掉預備金後的一次金缺口', value: `${gap.toLocaleString()} 元`, ratio: Math.min(1, gap / 5000000) },
+          ], note: '預設：休養一年、每月收入損失 4.5 萬、照顧 1.5 萬、自費治療 60 萬，扣掉預備金 20 萬，缺口約 112 萬。常見的建議是一次金至少涵蓋 1–3 年的收入，這個試算就是在幫你把它換成數字。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="重病的財務衝擊時間線：確診時有自費治療的大額支出，接下來幾個月到幾年收入中斷，同時有照顧費用；一次金在確診時給付，可以支撐整段期間">
+          <line x1="40" y1="110" x2="520" y2="110" class="stroke-ink" stroke-width="3"/>
+          <circle cx="80" cy="110" r="12" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="80" y="80" text-anchor="middle" font-size="14" font-weight="900">確診</text>
+          <rect x="100" y="130" width="400" height="30" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="300" y="150" text-anchor="middle" font-size="13" font-weight="900" class="on-color">收入中斷＋照顧費用</text>
+          <rect x="60" y="170" width="120" height="30" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="120" y="190" text-anchor="middle" font-size="12" font-weight="900" class="on-color">自費治療</text>
+          <text x="80" y="40" text-anchor="middle" font-size="13" font-weight="900">一次金在這裡給付</text>
+          <path d="M80 48 L80 96" class="stroke-ink" stroke-width="3"/>
+        </svg>`, caption: '醫療險在治療時逐筆理賠；一次金在一開始就給一筆錢，正好對上最需要現金的時候。' },
+        { type: 'heading', id: 'cancer-split', text: '深入：癌症險的兩種設計' },
+        '早期的癌症險多是「分項給付」：住院一天給多少、手術給多少、化療一次給多少。現代癌症治療越來越多在門診進行、住院天數短，但標靶或免疫治療的自費很高；這時分項給付型可能理賠不多，一次金型或實支實付的雜費限額比較能對應。檢視舊保單時，這是值得留意的地方。',
+        { type: 'heading', id: 'definition', text: '深入：為什麼「定義」決定一切' },
+        '重大疾病險的每個項目都有醫學定義與程度門檻。以心肌梗塞為例，條款可能要求同時符合典型胸痛、心電圖變化、心肌酵素升高等多項條件；腦中風則常要求在一段時間後仍有一定程度的神經功能障礙。乙型多出來的「輕度」項目，就是為了涵蓋門檻較低的情況。',
+        { type: 'list', items: [
+          '**看項目，也看程度**：同樣叫「中風」，甲型與乙型的給付條件不同。',
+          '**看給付方式**：輕度與重度是否分開給付、給付比例多少、給付後保單是否終止。',
+          '**看除外**：投保前已有的疾病、等待期內確診的情況通常不賠。',
+          '**比較時用同一張表**：把幾張保單的定義放在一起看，而不是看廣告上的項目數。',
+        ] },
+        '重大傷病險以健保的重大傷病證明為準，範圍廣、判定較明確，這是它保費較高的原因；但也要確認條款是否把某些重大傷病類別除外。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為「得了癌症」就一定理賠。', why: '要符合條款的定義，且過了等待期。', right: '投保前看清楚定義、等待期與除外。' },
+      { wrong: '只想到醫藥費，忘了收入中斷。', why: '治療與休養期的收入損失常比醫藥費大。', right: '一次金至少涵蓋一段期間的收入與照顧。' },
+      { wrong: '舊的分項型癌症險就覺得夠了。', why: '現代治療住院短、自費高，分項給付可能理賠有限。', right: '用一次金或實支實付補強。' },
+    ],
+    keypoints: [
+      '重大疾病、特定傷病、重大傷病：範圍由窄到廣。',
+      '一次金用途不限，用來撐過收入中斷與自費治療。',
+      '理賠看條款定義與等待期，不是看診斷名稱。',
+    ],
+    sources: ['ci-types', 'ins-act-127', 'nhi-copay'],
+  },
+
+  '3-4': {
+    goals: [
+      '用三個要件判斷什麼算「意外」',
+      '看懂失能等級與給付比例',
+      '知道意外險適合補哪一塊',
+    ],
+    analogy: {
+      text: ['保險上的[[意外]]有一個嚴格的定義：「非由疾病引起之外來突發事故」，三個條件要同時成立。騎車被撞是意外；在家中風跌倒，起因是疾病，就不是。', '意外險便宜，是因為它只保這一種原因造成的傷害。它很適合補「意外造成的失能與身故」，但不能取代疾病的保障，因為大多數的失能與死亡其實是疾病造成的。'],
+      limit: ['生活中的「意外」包含很多情況；保險上的意外只有三要件都成立的那一種，扭傷、閃到腰這類由身體內在因素造成的情況，常不被認定為外來。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="意外的三個要件：非疾病、外來、突發，三者同時成立才是保險上的意外；例子：車禍符合；中風跌倒因為是疾病引起而不符合">
+        ${[['非疾病', '不是身體內的疾病引起', 'm2'], ['外來', '來自身體以外的力量', 'm3'], ['突發', '突然、無法預期', 'm1']].map(([a, b, c], i) => `<circle cx="${150 + i * 130}" cy="110" r="78" style="fill:var(--${c})" class="stroke-ink" stroke-width="3" opacity="0.92"/><text x="${150 + i * 130}" y="${i === 1 ? 70 : 110}" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text>`).join('')}
+        <text x="280" y="122" text-anchor="middle" font-size="14" font-weight="900" class="on-color">意外</text>
+        <text x="280" y="222" text-anchor="middle" font-size="13">車禍、跌落、燙傷 → 通常符合</text>
+        <text x="280" y="246" text-anchor="middle" font-size="13">中風跌倒、心肌梗塞 → 疾病引起，不符合</text>
+      </svg>`,
+      caption: '三個圓的交集才是保險上的意外。實際認定以條款與個案事實為準。',
+    },
+    define: [
+      { term: '意外', en: 'accident', def: '非疾病、外來、突發。', example: '車禍。' },
+      { term: '失能等級', en: 'disability grade', def: '1 到 11 級，1 級最嚴重。', example: '11 級給付 5%。' },
+      { term: '保額', en: 'sum assured', def: '給付基準。', example: '300 萬。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'grade', text: '失能等級與給付比例' },
+        '意外險的失能保險金，依「失能程度與保險金給付表」分成 11 級：第 1 級最嚴重，給付保額的 100%；之後每級遞減，第 11 級給付 5%。每一級底下列出具體的失能項目（例如視力、上肢、下肢、器官功能）。',
+        { type: 'widget', name: 'knobs', props: { title: '失能等級 → 理賠金額（實際計算，比例依示範條款常見的級距）', sliders: [
+          { id: 'sum', label: '意外險保額', min: 1000000, max: 20000000, step: 100000, value: 3000000, unit: '元' },
+          { id: 'grade', label: '失能等級（1 最嚴重）', min: 1, max: 11, step: 1, value: 6 },
+        ], compute: (v) => {
+          const pct = DISABILITY_PCT[v.grade - 1];
+          return { rows: [
+            { label: '給付比例', value: `${pct}%`, ratio: pct / 100 },
+            { label: '理賠金額', value: `${((v.sum * pct) / 100).toLocaleString()} 元`, ratio: pct / 100 },
+          ], note: '第 6 級給付 50%：保額 300 萬就是 150 萬。實際的級距、項目與比例以你的保單附表為準；同一事故造成多項失能時，另有合併計算的規則。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="失能等級給付比例的長條圖：第 1 級 100%，第 2 級 90%，依序遞減，第 10 級 10%，第 11 級 5%">
+          <line x1="40" y1="190" x2="530" y2="190" class="stroke-ink" stroke-width="2"/>
+          ${DISABILITY_PCT.map((p, i) => `<rect x="${48 + i * 44}" y="${190 - p * 1.6}" width="34" height="${p * 1.6}" style="fill:var(--${i < 3 ? 'm4' : i < 7 ? 'm3' : 'm2'})" class="stroke-ink" stroke-width="2"/><text x="${65 + i * 44}" y="${182 - p * 1.6}" text-anchor="middle" font-size="11" class="mono">${p}%</text><text x="${65 + i * 44}" y="210" text-anchor="middle" font-size="12">${i + 1}</text>`).join('')}
+          <text x="280" y="228" text-anchor="middle" font-size="13">失能等級（1 最嚴重）</text>
+        </svg>`, caption: '2019 年金管會同意在第 11 級增列鼻機能障礙項目，給付 5%；這張表會隨時間增修。' },
+        { type: 'heading', id: 'role', text: '意外險適合補什麼' },
+        { type: 'table', head: ['保障', '意外險能做', '意外險不能做'], rows: [
+          ['身故', '意外身故時給付保額', '疾病身故（要靠壽險）'],
+          ['失能', '意外造成的失能依等級給付', '疾病造成的失能（要靠失能險，3-5）'],
+          ['醫療', '意外醫療附約補意外的治療費', '疾病住院（要靠醫療險）'],
+        ], caption: '意外險便宜、核保相對簡單，是很好的補強；但因為只保意外，絕對不能當成唯一的保障。職業不同費率也不同，換工作時要通知保險公司。' },
+        { type: 'heading', id: 'occupation', text: '深入：職業類別與通知義務' },
+        '意外險依職業分成不同類別，風險越高的工作保費越高，部分工作甚至不承保。投保後如果換到風險較高的工作，應該通知保險公司調整；沒有通知，事故發生時理賠可能依比例減少或產生爭議。換工作時，把「通知保險公司」放進待辦清單。',
+        { type: 'heading', id: 'medical-rider', text: '深入：意外醫療附約' },
+        '意外險常搭配兩種醫療附約：意外醫療實支實付（依收據補意外造成的醫療費用）與意外住院日額。前者對門診的骨折、縫合、復健特別有用，因為這些情況常常不需要住院，一般的住院醫療險可能不賠。',
+        { type: 'table', head: ['情況', '一般住院醫療險', '意外醫療實支實付'], rows: [
+          ['騎車摔車，門診縫合', '多半不賠（沒有住院）', '在限額內補實際費用'],
+          ['骨折開刀住院', '依條款理賠', '可補自費醫材等差額（依條款）'],
+          ['運動扭傷、閃到腰', '多半不賠', '可能不符合「外來」，依條款與個案認定'],
+        ] },
+        '因為意外險與附約的保費相對便宜，常被當成「入門保單」。這沒有問題，只要記得：它補的是意外這一個原因，疾病的部分要另外安排。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為所有「突然發生」的事都算意外。', why: '要同時符合非疾病、外來、突發。', right: '疾病引起的事故要靠壽險、醫療與失能險。' },
+      { wrong: '只買意外險就覺得保障夠了。', why: '多數失能與身故是疾病造成的。', right: '意外險當補強，疾病保障另外規劃。' },
+      { wrong: '換工作沒有通知保險公司。', why: '職業類別影響費率與理賠。', right: '職業變動時主動通知。' },
+    ],
+    keypoints: [
+      '意外 ＝ 非疾病 ＋ 外來 ＋ 突發。',
+      '失能分 11 級，1 級 100%、11 級 5%。',
+      '意外險便宜，但只能當補強。',
+    ],
+    sources: ['accident-def', 'disability-table'],
+  },
+
+  '3-5': {
+    goals: [
+      '分辨失能險與長照險的理賠條件',
+      '算出長期失能的收入與照顧缺口',
+      '知道為什麼失能常被稱為「比身故更大的風險」',
+    ],
+    analogy: {
+      text: ['身故時，家人失去你的收入；失能時，家人失去你的收入，還要多付照顧你的費用。所以從家庭財務的角度看，長期失能的衝擊往往比身故更大。', '處理這個風險的有兩種保險：失能險依[[失能等級]]給付，看的是器官與身體功能受損的程度；長照險依[[長期照顧狀態]]給付，看的是日常生活能不能自理。兩者常可互補。'],
+      limit: ['這裡談的是財務；失能與長照對生活品質、家人照顧的負擔，遠遠不只是錢的問題。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="身故與失能對家庭現金流的影響：身故時收入歸零、支出略減；失能時收入歸零、支出還增加照顧費，缺口更大">
+        <text x="140" y="26" text-anchor="middle" font-size="15" font-weight="900">身故</text>
+        <text x="420" y="26" text-anchor="middle" font-size="15" font-weight="900">長期失能</text>
+        <rect x="60" y="50" width="70" height="150" class="fill-bg stroke-ink" stroke-width="3"/><text x="95" y="220" text-anchor="middle" font-size="12">收入：0</text>
+        <rect x="150" y="80" width="70" height="120" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="185" y="220" text-anchor="middle" font-size="12">支出略減</text>
+        <rect x="340" y="50" width="70" height="150" class="fill-bg stroke-ink" stroke-width="3"/><text x="375" y="220" text-anchor="middle" font-size="12">收入：0</text>
+        <rect x="430" y="30" width="70" height="170" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="465" y="220" text-anchor="middle" font-size="12">支出＋照顧</text>
+        <text x="280" y="250" text-anchor="middle" font-size="13">同樣失去收入，失能時支出還會增加</text>
+      </svg>`,
+      caption: '示意比例。照顧費用依失能程度、在家照顧或機構照顧而差異很大。',
+    },
+    define: [
+      { term: '失能扶助金', en: 'disability annuity', def: '按月或按年的失能給付。', example: '每月 3 萬。' },
+      { term: '長期照顧狀態', en: 'LTC status', def: '6 項日常活動 3 項以上無法自理，或認知障礙。', example: '需定期複評。' },
+      { term: '失能等級', en: 'disability grade', def: '1 到 11 級。', example: '扶助金的等級門檻依保單約定。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'compare', text: '失能險 vs 長照險' },
+        { type: 'table', head: ['', '失能險', '長照險'], rows: [
+          ['理賠依據', '失能程度與保險金給付表（1–11 級）', '長期照顧狀態：進食、移位、如廁、沐浴、平地行走、更衣 6 項中 3 項以上無法自理，或認知功能障礙'],
+          ['看的是', '身體器官、功能受損的程度', '日常生活能不能自理'],
+          ['給付方式', '常見一次金加上按月扶助金', '常見一次金加上按月照護金'],
+          ['複評', '失能狀態通常不需定期複評', '需定期（每半年或每年）重新認定'],
+          ['常見特性', '判定較客觀，保障範圍通常較廣', '更貼近「需要人照顧」的情況，例如失智'],
+        ], caption: '以上整理自業界與媒體的說明；各公司條款（尤其是認知功能障礙的判定、扶助金的給付等級門檻）差異很大，以保單為準。' },
+        { type: 'widget', name: 'knobs', props: { title: '長期失能的財務缺口（實際計算，不含通膨與投資報酬）', sliders: [
+          { id: 'income', label: '每月收入', min: 20000, max: 300000, step: 1000, value: 50000, unit: '元' },
+          { id: 'care', label: '每月照顧費用', min: 0, max: 100000, step: 1000, value: 35000, unit: '元' },
+          { id: 'years', label: '失能持續年數', min: 1, max: 40, step: 1, value: 10, unit: '年' },
+          { id: 'social', label: '社會保險每月可能的給付', min: 0, max: 50000, step: 500, value: 0, unit: '元' },
+          { id: 'benefit', label: '失能扶助金（保單）每月', min: 0, max: 100000, step: 1000, value: 20000, unit: '元' },
+        ], compute: (v) => {
+          const monthlyGap = v.income + v.care - v.social - v.benefit;
+          const total = Math.max(0, monthlyGap) * 12 * v.years;
+          return { rows: [
+            { label: '每月需要（收入替代＋照顧）', value: `${(v.income + v.care).toLocaleString()} 元`, ratio: Math.min(1, (v.income + v.care) / 400000) },
+            { label: '每月缺口', value: `${monthlyGap.toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, monthlyGap) / 400000) },
+            { label: '整段期間的缺口', value: `${total.toLocaleString()} 元`, ratio: Math.min(1, total / 50000000) },
+          ], note: '預設：月收入 5 萬、照顧 3.5 萬、失能 10 年，每月扶助金 2 萬，缺口仍有每月 6.5 萬、10 年共 780 萬。這也是為什麼年輕、收入高、有家人要養的人，最需要檢查失能保障。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="失能保障的組合：勞保失能給付是地基，意外險補意外造成的失能，失能險補疾病與意外造成的失能並提供按月扶助金，長照險補需要長期照顧的狀態">
+          ${[['勞保失能給付', '地基（依投保薪資與年資）', 'm0'], ['意外險', '只補意外造成的失能', 'm3'], ['失能險', '疾病＋意外，常有按月扶助金', 'm4'], ['長照險', '需要長期照顧時', 'm1']].map(([a, b, c], i) => `<rect x="20" y="${12 + i * 50}" width="520" height="44" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="36" y="${40 + i * 50}" font-size="15" font-weight="900" class="on-color">${a}</text><text x="524" y="${40 + i * 50}" text-anchor="end" font-size="13" class="on-color">${b}</text>`).join('')}
+        </svg>`, caption: '不必每一種都買；先確認勞保與既有保單能給付多少，再補最大的缺口。' },
+        { type: 'heading', id: 'probability', text: '深入：為什麼失能容易被忽略' },
+        '身故的情境大家想像得到，失能卻很少被認真討論：它沒有明確的「發生日」，可能是中風後的半身不遂、車禍後的長期復健，或是慢慢加重的失智。它也不是只有老年人會遇到。加上失能險、長照險在台灣的投保普及度遠不如壽險與醫療險，於是成了最常見的保障缺口之一。檢視保單時，第一個問題可以是：「如果我明天失能、十年不能工作，家裡每個月的錢從哪裡來？」',
+        { type: 'heading', id: 'government-ltc', text: '深入：政府長照與商業保險的分工' },
+        '台灣有政府的長期照顧服務（常稱長照 2.0），提供居家服務、日間照顧、喘息服務、輔具與交通接送等，依失能程度與家庭經濟狀況提供補助，民眾負擔一部分費用。它解決的是「照顧服務從哪裡來」，但不會替代失去的收入，也不一定涵蓋全部的照顧時數與費用。',
+        { type: 'table', head: ['來源', '提供什麼', '不提供什麼'], rows: [
+          ['政府長照服務', '照顧、喘息、輔具、交通等服務與補助', '收入替代；超出補助額度的部分'],
+          ['勞保失能給付', '依投保薪資與年資的現金給付', '持續的照顧費用'],
+          ['失能險、長照險', '一次金與按月給付，用途不限', '理賠條件以外的情況'],
+        ], caption: '政府服務的申請資格與補助額度以衛福部長照專線（1966）與地方照管中心的說明為準。' },
+        '規劃時的順序可以是：先了解政府能提供哪些服務、自己大概要負擔多少，再用預備金與保險補「收入」與「自付照顧費」兩個缺口。',
+      ],
+    },
+    mistakes: [
+      { wrong: '有壽險就覺得家人有保障了。', why: '失能時沒有身故理賠，還多了照顧費。', right: '另外檢查失能保障。' },
+      { wrong: '以為失能險和長照險一樣。', why: '一個看失能等級，一個看日常生活能否自理。', right: '依條款比較理賠條件與給付方式。' },
+      { wrong: '只靠意外險處理失能。', why: '疾病造成的失能，意外險不賠。', right: '用失能險涵蓋疾病與意外。' },
+    ],
+    keypoints: [
+      '失能 ＝ 失去收入 ＋ 增加照顧費，衝擊常大於身故。',
+      '失能險看失能等級；長照險看 6 項日常活動或認知障礙。',
+      '用「每月缺口 × 年數」估算需要的保障。',
+    ],
+    sources: ['ltc-vs-di', 'disability-table', 'mol-unemployment'],
+  },
+});
+</script>

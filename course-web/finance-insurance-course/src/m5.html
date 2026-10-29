@@ -1,0 +1,194 @@
+<script>
+/* ==========================================================================
+   模組 5：買與用
+   ========================================================================== */
+defineTerms({
+  '據實說明義務': { en: 'duty of disclosure', def: '投保時對保險公司書面詢問的事項（例如病史）要如實回答；違反時保險公司可能解除契約。', example: '要保書問「過去五年是否住院」，要照實填。', lesson: '5-1' },
+  '契約撤銷權': { en: 'free-look period', def: '二年期以上的個人人身保險，收到保單翌日起 10 日內可以撤銷契約，已繳保費全額退還。', example: '收到保單後發現不符需求，10 日內書面撤銷。', lesson: '5-1' },
+  '要保人': { en: 'policyholder', def: '和保險公司簽約、負責繳保費的人；擁有解約、變更等權利。', example: '父母幫孩子投保時，父母是要保人。', lesson: '5-1' },
+  '被保險人': { en: 'insured', def: '保險事故發生在他身上才會理賠的人。', example: '壽險的被保險人身故，保險金給受益人。', lesson: '5-1' },
+  '保單健檢': { en: 'policy review', def: '定期把所有保單攤開，對照目前的責任與需求，檢查保障缺口、重複與過時的部分。', example: '結婚、生子、買房、換工作時都該做一次。', lesson: '5-2' },
+  '金融消費評議': { en: 'financial ombudsman', def: '金融消費者和金融機構有爭議、申訴沒有解決時，可以向金融消費評議中心申請的爭議處理機制。', example: '理賠被拒、對結果不服。', lesson: '5-2' },
+});
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '照五個步驟規劃自己的保障',
+      '說出告知義務與二年規則的意思',
+      '在 10 日撤銷期內檢查保單',
+    ],
+    analogy: {
+      text: ['買保險像是簽一份長達數十年的合約，而且真正「使用」它的那一天，可能是你最無力處理細節的時候（重病、失能，或是你已經不在）。所以簽約前多花的每一個小時，都是在幫未來的自己和家人省麻煩。', '這一課把投保拆成五個步驟，並說明最容易出問題的兩件事：[[據實說明義務]]與[[契約撤銷權]]。'],
+      limit: ['合約條文是固定的；實際理賠還會牽涉醫療事實與認定，總會有灰色地帶。把規則弄清楚，是降低爭議，而不是保證不會有爭議。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="保障規劃的五個步驟：盤點已有的保障、算出缺口、依優先順序選險種、比較條款與保費、投保後十日內檢查">
+        ${[['1 盤點', '社保、團保、舊保單', 'm0'], ['2 算缺口', '身故、失能、重病', 'm4'], ['3 排順序', '先補扛不起的', 'm1'], ['4 比條款', '定義、限額、保費', 'm2'], ['5 十日檢查', '撤銷期內再看一次', 'm3']].map(([a, b, c], i) => `<rect x="${10 + i * 110}" y="50" width="100" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${60 + i * 110}" y="100" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${a}</text><text x="${60 + i * 110}" y="128" text-anchor="middle" font-size="10" class="on-color">${b}</text>`).join('')}
+        ${[0, 1, 2, 3].map((i) => `<path d="M${110 + i * 110} 110 L${120 + i * 110} 110" class="stroke-ink" stroke-width="3"/>`).join('')}
+        <text x="280" y="210" text-anchor="middle" font-size="13">先從「我已經有什麼」開始，而不是「業務推薦什麼」</text>
+      </svg>`,
+      caption: '第 1、2 步可以用 2-1、3-1、3-3、3-5 的試算；第 3 步參考 1-2 的優先順序。',
+    },
+    define: [
+      { term: '據實說明義務', en: 'duty of disclosure', def: '如實回答書面詢問。', example: '病史照實填。' },
+      { term: '契約撤銷權', en: 'free-look', def: '收到保單 10 日內可撤銷。', example: '全額退費。' },
+      { term: '要保人', en: 'policyholder', def: '簽約、繳費的人。', example: '父母幫孩子保。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'disclosure', text: '告知義務與「二年」' },
+        '保險法第 64 條規定：訂約時，要保人對保險公司的書面詢問應據實說明；如果隱匿、遺漏或不實說明，足以影響保險公司對風險的估計，保險公司可以解除契約，即使事故已經發生也一樣（除非能證明事故和未說明的事實無關）。這個解除權在保險公司知道原因後 1 個月內、且契約訂立後 2 年內才能行使。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="告知義務的時間線：投保時據實說明；訂約後兩年內，若發現未據實告知，保險公司可以解除契約；兩年後不能解除契約，但投保時已有的疾病，依保險法第一二七條仍然不賠">
+          <line x1="40" y1="100" x2="520" y2="100" class="stroke-ink" stroke-width="3"/>
+          <circle cx="60" cy="100" r="10" class="fill-surface stroke-ink" stroke-width="3"/><text x="60" y="76" text-anchor="middle" font-size="13" font-weight="900">投保</text>
+          <rect x="70" y="110" width="200" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="170" y="136" text-anchor="middle" font-size="13" font-weight="900" class="on-color">2 年內：可能被解約</text>
+          <circle cx="270" cy="100" r="10" class="fill-surface stroke-ink" stroke-width="3"/><text x="270" y="76" text-anchor="middle" font-size="13" font-weight="900">滿 2 年</text>
+          <rect x="280" y="110" width="230" height="40" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="395" y="136" text-anchor="middle" font-size="13" font-weight="900" class="on-color">不能解約，但…</text>
+          <text x="395" y="180" text-anchor="middle" font-size="13">投保前已有的疾病仍不賠（第 127 條）</text>
+          <text x="280" y="215" text-anchor="middle" font-size="13" font-weight="900">「撐過兩年就沒事」是錯的</text>
+        </svg>`, caption: '保險法第 127 條：訂約時被保險人已在疾病或妊娠中，保險公司對該疾病或分娩不負給付責任。最安全的做法永遠是據實填寫。' },
+        { type: 'heading', id: 'cancel', text: '十日撤銷期' },
+        '依主管機關對人身保險商品的審查規定與示範條款，二年期以上的個人人身保險，要保人可以在收到保單翌日起 10 日內，以書面撤銷契約，保險公司要無息退還已繳保費；撤銷生效前若發生保險事故，仍視為沒有撤銷。2018 年曾有把撤銷期延長為 14 天的修法草案，最新狀態以保單條款為準。',
+        { type: 'widget', name: 'checklist', props: { key: 'free-look', items: [
+          '要保人、被保險人、受益人寫的是正確的人',
+          '保額、保障期間、繳費年期和你當初理解的一樣',
+          '主約與附約的保障內容、限額，和建議書一致',
+          '等待期與除外責任，你都看過了',
+          '健康告知的內容全部據實，沒有被別人代填',
+          '如果是儲蓄型或投資型：解約金表、費用表你看過了',
+          '簽收日期寫的是實際收到的日期（撤銷期從隔天算）',
+        ] } },
+        { type: 'heading', id: 'payment', text: '年繳、月繳差多少' },
+        { type: 'widget', name: 'knobs', props: { title: '月繳的隱含成本（實際計算，請填保單上的年繳與月繳保費）', sliders: [
+          { id: 'annual', label: '年繳保費', min: 1000, max: 200000, step: 500, value: 20000, unit: '元' },
+          { id: 'monthly', label: '月繳保費（每月）', min: 100, max: 20000, step: 10, value: 1760, unit: '元' },
+        ], compute: (v) => {
+          const total = v.monthly * 12;
+          const extra = total - v.annual;
+          let lo = 0; let hi = 2;
+          for (let i = 0; i < 100; i += 1) {
+            const m = (lo + hi) / 2; const r = m / 12;
+            let pv = 0; for (let k = 0; k < 12; k += 1) pv += v.monthly / (1 + r) ** k;
+            if (pv > v.annual) lo = m; else hi = m;
+          }
+          return { rows: [
+            { label: '月繳一年總共', value: `${total.toLocaleString()} 元`, ratio: Math.min(1, total / (v.annual * 1.3)) },
+            { label: '比年繳多付', value: `${extra.toLocaleString()} 元（${((extra / v.annual) * 100).toFixed(1)}%）`, ratio: Math.min(1, Math.max(0, extra) / (v.annual * 0.3)) },
+            { label: '相當於借款年利率', value: `${(((lo + hi) / 2) * 100).toFixed(1)}%`, ratio: Math.min(1, (lo + hi) / 2 / 0.3) },
+          ], note: '月繳等於保險公司借錢給你、讓你分期付。預設的數字只是示意；用你自己保單的費率填進去，如果換算出來的利率比你的定存或貸款高，有預備金的人改年繳比較划算。' };
+        } } },
+        { type: 'heading', id: 'roles', text: '深入：要保人、被保險人、受益人' },
+        { type: 'table', head: ['角色', '是誰', '要注意'], rows: [
+          ['[[要保人]]', '簽約、繳費、擁有保單權利（解約、變更）', '保單價值屬於要保人；要保人身故時，保單可能成為其遺產'],
+          ['[[被保險人]]', '事故發生在他身上才理賠', '健康告知是針對被保險人'],
+          ['受益人', '領取保險金的人', '身故受益人建議具名指定，並隨人生變化更新'],
+        ], caption: '同一張保單三個角色可以是不同的人；牽涉到贈與、遺產時，安排方式會影響稅務，金額大時請找專業人士。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '健康告知「小病不用寫」或讓業務員代填。', why: '未據實說明可能被解約，理賠時才發現。', right: '照書面詢問如實填寫，自己確認。' },
+      { wrong: '以為撐過兩年就什麼都能賠。', why: '投保前已有的疾病依第 127 條仍不賠。', right: '投保時據實告知，接受加費或除外。' },
+      { wrong: '收到保單就收起來。', why: '錯過 10 日撤銷期。', right: '收到後立刻用清單檢查一次。' },
+    ],
+    keypoints: [
+      '先盤點、算缺口，再選險種、比條款。',
+      '據實說明；兩年後不能解約，但既往症仍不賠。',
+      '收到保單 10 日內可撤銷，用清單檢查。',
+    ],
+    sources: ['ins-act-64', 'ins-act-127', 'cancel-10'],
+  },
+
+  '5-2': {
+    goals: [
+      '知道理賠需要準備什麼、注意哪些時限',
+      '理賠有爭議時，依序找哪些管道',
+      '每年做一次保單健檢',
+    ],
+    analogy: {
+      text: ['保單就像家裡的滅火器：買了不代表安全，還要知道放在哪、怎麼用、有沒有過期。很多家庭的問題不是沒有保險，而是出事時找不到保單、不知道保了什麼、也不知道要準備哪些文件。', '這一課處理的是「使用」保險：理賠的準備、有爭議時的管道，以及每年一次的[[保單健檢]]。'],
+      limit: ['滅火器的使用方式全世界都一樣；理賠則依保單條款與個案事實認定，有時需要和保險公司來回溝通，甚至申請評議。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="理賠爭議的處理順序：先向保險公司申請與申訴，未解決再向金融消費評議中心申請評議，最後才是訴訟">
+        ${[['1 保險公司', '申請理賠、申訴', 'm2'], ['2 評議中心', '申請金融消費評議', 'm3'], ['3 法院', '訴訟', 'm4']].map(([a, b, c], i) => `<rect x="${20 + i * 180}" y="60" width="160" height="110" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${100 + i * 180}" y="106" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${100 + i * 180}" y="134" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+        ${[0, 1].map((i) => `<path d="M${180 + i * 180} 115 L${200 + i * 180} 115" class="stroke-ink" stroke-width="3"/>`).join('')}
+        <text x="280" y="210" text-anchor="middle" font-size="13">評議中心對消費者不收費；多數爭議在前兩步就能處理</text>
+      </svg>`,
+      caption: '申訴與評議的期限、程序以金融消費者保護法與評議中心的說明為準。',
+    },
+    define: [
+      { term: '保單健檢', en: 'policy review', def: '定期檢查缺口與重複。', example: '人生變動時做。' },
+      { term: '金融消費評議', en: 'ombudsman', def: '申訴未解決時的爭議處理。', example: '理賠被拒。' },
+      { term: '受益人', en: 'beneficiary', def: '領保險金的人。', example: '要具名指定。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'claim', text: '理賠前的準備' },
+        { type: 'table', head: ['事故', '常見需要的文件'], rows: [
+          ['住院、手術', '診斷證明書、醫療費用收據（實支實付通常要正本）、出院病摘'],
+          ['重大疾病、癌症', '診斷證明書、病理或檢查報告（依條款定義要求）'],
+          ['意外', '診斷證明書、事故經過說明，必要時有警方或相關紀錄'],
+          ['失能', '失能診斷書（依失能程度表）、相關檢查報告'],
+          ['身故', '死亡證明書、除戶戶籍謄本、受益人身分證明'],
+        ], caption: '每家保險公司的要求略有不同；住院時就先問清楚，出院前一次把證明開齊，可以省掉很多往返。' },
+        '保險金的請求權也有時效：保險法規定，由保險契約所生的權利，自得為請求之日起經過 2 年不行使而消滅。出事後別拖，尤其是家人可能不知道有保單時，更要事先整理。',
+        { type: 'heading', id: 'summary', text: '一張表看完家裡的保障' },
+        { type: 'widget', name: 'knobs', props: { title: '保障總表：需要 vs 已有（實際計算，單位萬元）', sliders: [
+          { id: 'lifeNeed', label: '身故：需要（3-1 算出的）', min: 0, max: 3000, step: 10, value: 1200, unit: '萬' },
+          { id: 'lifeHave', label: '身故：已有保額', min: 0, max: 3000, step: 10, value: 300, unit: '萬' },
+          { id: 'diNeed', label: '失能：需要（3-5 算出的）', min: 0, max: 3000, step: 10, value: 800, unit: '萬' },
+          { id: 'diHave', label: '失能：已有', min: 0, max: 3000, step: 10, value: 100, unit: '萬' },
+          { id: 'ciNeed', label: '重病一次金：需要（3-3 算出的）', min: 0, max: 1000, step: 5, value: 110, unit: '萬' },
+          { id: 'ciHave', label: '重病一次金：已有', min: 0, max: 1000, step: 5, value: 30, unit: '萬' },
+        ], compute: (v) => {
+          const gaps = [['身故', v.lifeNeed - v.lifeHave], ['失能', v.diNeed - v.diHave], ['重病', v.ciNeed - v.ciHave]];
+          const worst = gaps.map(([n, g], i) => [n, g / Math.max(1, [v.lifeNeed, v.diNeed, v.ciNeed][i])]).sort((a, b) => b[1] - a[1])[0];
+          return { rows: [
+            ...gaps.map(([n, g], i) => ({ label: `${n}缺口`, value: g > 0 ? `${g} 萬` : '已足夠', ratio: Math.min(1, Math.max(0, g) / Math.max(1, [v.lifeNeed, v.diNeed, v.ciNeed][i])) })),
+            { label: '缺口比例最大', value: worst[1] > 0 ? worst[0] : '都已足夠', ratio: Math.max(0, worst[1]) },
+          ], note: '把三種大事故並排看，常會發現：保單很多，缺口卻集中在失能。補的順序參考 1-2：先補缺口比例最大、又最扛不起的那一項。' };
+        } } },
+        { type: 'heading', id: 'review', text: '每年一次的保單健檢' },
+        { type: 'widget', name: 'checklist', props: { key: 'policy-review', items: [
+          '把所有保單（含團保）列成一張表：被保險人、險種、保額、期間、年保費',
+          '身故、失能、重病三大缺口重新算一次（家庭、房貸、收入有變時特別重要）',
+          '受益人仍然正確（結婚、離婚、生子之後）',
+          '附約的續保條件與年齡上限，有沒有快到期的',
+          '儲蓄型、投資型保單：看解約金與帳戶價值，算一次 IRR 或總報酬',
+          '投資型保單：帳戶價值是否足以支付危險保險費',
+          '換工作、職業類別改變時，通知意外險的保險公司',
+          '讓家人知道保單放在哪裡、理賠找誰',
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="需要做保單健檢的人生事件：結婚、生子、買房、換工作、離婚、子女獨立、退休">
+          ${['結婚', '生子', '買房', '換工作', '離婚', '子女獨立', '退休'].map((t, i) => `<circle cx="${50 + i * 77}" cy="100" r="34" style="fill:var(--m${i % 6})" class="stroke-ink" stroke-width="3"/><text x="${50 + i * 77}" y="105" text-anchor="middle" font-size="${t.length > 2 ? 12 : 14}" font-weight="900" class="on-color">${t}</text>`).join('')}
+          <text x="280" y="180" text-anchor="middle" font-size="14" font-weight="900">除了每年一次，遇到這些事件也要做</text>
+        </svg>`, caption: '責任變了，保障就要跟著變；過去買的保單，可能已經不符合現在的需要。' },
+        { type: 'heading', id: 'old', text: '深入：舊保單要不要解約' },
+        '發現舊保單不理想時，先不要急著解約：解約可能有損失、而且你現在的年齡與健康狀況，不一定能用相同條件買到新的保障。比較穩的做法是「先買新的、確定核保通過，再處理舊的」；儲蓄型的舊保單則可以考慮減額繳清或展期等選項（依條款），而不一定要直接解約。',
+        { type: 'heading', id: 'family-file', text: '深入：給家人的一頁保單說明' },
+        '最常見的理賠問題之一，是家人根本不知道有哪些保單。建議做一頁簡單的說明，放在家人找得到的地方：',
+        { type: 'list', ordered: true, items: [
+          '每張保單的保險公司、保單號碼、被保險人、險種、保額。',
+          '各家保險公司的客服電話、理賠申請方式。',
+          '發生事故時要準備的文件（上面的表）。',
+          '你的業務員或經紀人聯絡方式（如果有）。',
+          '最後更新日期；每年健檢時一併更新。',
+        ] },
+        '台灣也有可以查詢自己或親屬保單資訊的管道（例如壽險公會的保單查詢服務），家人不清楚有哪些保單時可以利用；查詢的資格與方式以壽險公會的說明為準。',
+      ],
+    },
+    mistakes: [
+      { wrong: '出事後才開始找保單、問要什麼文件。', why: '家人可能不知道保單，文件也可能來回補。', right: '平時整理保單總表，住院時先問清楚要的文件。' },
+      { wrong: '理賠被拒就放棄。', why: '還有申訴與評議的管道。', right: '先向保險公司申訴，未解決再申請評議。' },
+      { wrong: '發現舊保單不好就直接解約。', why: '可能有損失，新保單也不一定買得到。', right: '先買新的並通過核保，再處理舊的。' },
+    ],
+    keypoints: [
+      '理賠文件住院時就問清楚；請求權有時效。',
+      '爭議依序：保險公司 → 評議中心 → 法院。',
+      '每年健檢，人生事件發生時也要做。',
+    ],
+    sources: ['foi', 'ins-act-65', 'ins-act-64'],
+  },
+});
+</script>

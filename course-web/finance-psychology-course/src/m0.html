@@ -1,0 +1,83 @@
+<script>
+/* ==========================================================================
+   模組 0：起點：輸在行為，不是知識
+   ========================================================================== */
+defineTerms({
+  '行為缺口': { en: 'behavior gap', def: '投資人實際拿到的報酬，低於他所買的基金或市場本身報酬的差距；主要來自買賣的時機與頻率。', example: '基金年報酬 9.9%，投資人平均只拿到 8.7%。', lesson: '0-1' },
+  '金額加權報酬': { en: 'dollar-weighted return', def: '考慮每一筆錢投入與取出時間的報酬；追高殺低會讓它低於基金公告的報酬。', example: '在高點大量買進，金額加權報酬就會被拉低。', lesson: '0-1' },
+  '偏誤': { en: 'bias', def: '在特定情境下，判斷系統性地偏離理性或統計上最佳的方向；不是偶爾犯錯，而是一再朝同一方向犯錯。', example: '總是太快賣掉賺錢的股票。', lesson: '1-1' },
+});
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出行為缺口有多大',
+      '理解為什麼「基金報酬」和「投資人報酬」不一樣',
+      '知道這一卷的目標：不是消除偏誤，而是繞過它',
+    ],
+    analogy: {
+      text: ['一班公車從 A 站開到 B 站，全程平均時速 50 公里。但有些乘客在塞車時下車改走路，到了不塞的路段又搭回來，結果他們平均的速度只有 40 公里。公車沒有變慢，是乘客的上下車時機讓自己變慢了。', '投資也是這樣。Morningstar 統計截至 2025 年底的 10 年：美國基金與 ETF 本身平均每年報酬約 9.9%，但投資在這些基金裡的錢，平均每年只賺到約 8.7%。差的約 1.2 個百分點，就是[[行為缺口]]：同樣的基金，因為在漲多時買、在跌深時賣，投資人拿到的比基金本身少。'],
+      limit: ['公車的比喻假設下車一定比較慢；實際上有些人的進出時機可能剛好對，但平均起來，研究一再發現投資人的時機是負的。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="行為缺口：基金本身每年報酬約 9.9%，投資人平均每年約 8.7%，差約 1.2 個百分點；10 年下來，1 元分別變成約 2.57 元與 2.30 元">
+        <rect x="80" y="${210 - 9.9 * 15}" width="150" height="${9.9 * 15}" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="155" y="${200 - 9.9 * 15}" text-anchor="middle" font-size="16" font-weight="900">基金本身 9.9%</text>
+        <rect x="330" y="${210 - 8.7 * 15}" width="150" height="${8.7 * 15}" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="405" y="${200 - 8.7 * 15}" text-anchor="middle" font-size="16" font-weight="900">投資人 8.7%</text>
+        <text x="155" y="236" text-anchor="middle" font-size="13">10 年：1 元 → 約 2.57 元</text>
+        <text x="405" y="236" text-anchor="middle" font-size="13">10 年：1 元 → 約 2.30 元</text>
+        <text x="280" y="262" text-anchor="middle" font-size="13" font-weight="900">Morningstar Mind the Gap 2025（美國、截至 2025 年底的 10 年）</text>
+      </svg>`,
+      caption: '基金報酬是「一直持有」的結果；投資人報酬是[[金額加權報酬]]，反映了真實的買賣時機。',
+    },
+    define: [
+      { term: '行為缺口', en: 'behavior gap', def: '投資人報酬低於基金報酬的差距。', example: '約 1.2 個百分點。' },
+      { term: '金額加權報酬', en: 'dollar-weighted', def: '考慮進出時機的報酬。', example: '追高會拉低它。' },
+      { term: '偏誤', en: 'bias', def: '系統性地朝同一方向犯錯。', example: '賣贏留輸。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '行為缺口的長期代價（實際計算）', sliders: [
+          { id: 'amt', label: '投資金額', min: 100000, max: 20000000, step: 100000, value: 1000000, unit: '元' },
+          { id: 'r', label: '工具本身的年報酬', min: 0, max: 12, step: 0.1, value: 7, unit: '%' },
+          { id: 'gap', label: '行為缺口', min: 0, max: 5, step: 0.1, value: 1.2, unit: '個百分點' },
+          { id: 'years', label: '年數', min: 1, max: 40, step: 1, value: 30, unit: '年' },
+        ], compute: (v) => {
+          const a = v.amt * (1 + v.r / 100) ** v.years; const b = v.amt * (1 + (v.r - v.gap) / 100) ** v.years;
+          return { rows: [
+            { label: '一直持有', value: `${Math.round(a).toLocaleString()} 元`, ratio: 1 },
+            { label: '有行為缺口', value: `${Math.round(b).toLocaleString()} 元`, ratio: b / a },
+            { label: '少拿', value: `${Math.round(a - b).toLocaleString()} 元（${((1 - b / a) * 100).toFixed(0)}%）`, ratio: 1 - b / a },
+          ], note: '預設：100 萬、7%、缺口 1.2 個百分點、30 年，少拿約 29%。這個缺口和第三部的費用一樣，是每年複利的漏損；而且它完全來自自己的行為。' };
+        } } },
+        { type: 'heading', id: 'taiwan', text: '台灣的研究：散戶每年落後市場約 3.8 個百分點' },
+        'Barber、Lee、Liu、Odean 用台灣證券交易所 1995 到 1999 年的完整交易資料研究：台灣散戶的整體投資組合，每年大約落後市場 3.8 個百分點，總損失約相當於台灣 GDP 的 2.2%；其中大約三分之二來自交易成本（手續費、證交稅），其餘來自買賣的時機。同一段期間，法人整體每年大約勝過市場 1.5 個百分點。',
+        { type: 'table', head: ['研究', '發現'], rows: [
+          ['Morningstar 2025（美國基金與 ETF）', '投資人每年比自己買的基金少賺約 1.2 個百分點'],
+          ['Barber、Odean 2000（美國券商帳戶）', '交易最頻繁的家戶年報酬 11.4%，同期市場 17.9%'],
+          ['Barber 等 2009（台灣全體交易）', '散戶整體每年落後市場約 3.8 個百分點'],
+          ['Barber 等 2020（台灣當沖）', '當沖整體績效為負，多數人不賺錢，卻仍持續交易'],
+        ], caption: '不同國家、不同時期、不同方法，結論的方向一致：多數人的交易行為讓報酬變差。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="這一卷的方法：不是靠意志力消除偏誤，而是先認識偏誤，再用環境設計與規則繞過它">
+          ${[['1 認識偏誤', '知道自己會在哪裡犯錯', 'm1'], ['2 設計環境', '讓錯的事變難、對的事變成預設', 'm3'], ['3 寫下規則', '冷靜時決定、激動時照做', 'm4']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="40" width="165" height="130" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="92" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="124" text-anchor="middle" font-size="11" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="205" text-anchor="middle" font-size="13">知道偏誤不會讓它消失；但能讓你提前做好防護</text>
+        </svg>`, caption: '研究偏誤的學者自己也承認：知道了，還是會犯。所以這一卷的重點在後面兩步。' },
+        { type: 'heading', id: 'knowledge', text: '深入：為什麼知識不夠' },
+        '前五卷給了你很多正確的知識：分散、低成本、長期持有、再平衡。但這些知識都是在冷靜時學的；真正做決定的時刻，常常是市場大跌、新聞恐慌、朋友都在賺錢的時候。那時候大腦用的是另一套系統（下一課），它不太理會你學過什麼。所以投資成果的關鍵，常常不是「知道什麼」，而是「在情緒最強的時候，會不會照計畫做」。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為自己的報酬就是基金公告的報酬。', why: '進出時機會讓實際報酬不同。', right: '用自己的實際投入與現值計算金額加權報酬。' },
+      { wrong: '以為多學一點就能避免犯錯。', why: '情緒強的時候，知識常常派不上用場。', right: '用環境設計與規則繞過偏誤。' },
+      { wrong: '以為交易越勤奮，報酬越好。', why: '研究顯示交易越頻繁，報酬越差。', right: '減少交易，照計畫做。' },
+    ],
+    keypoints: [
+      '投資人平均每年少賺自己買的基金約 1.2 個百分點。',
+      '台灣散戶整體每年落後市場約 3.8 個百分點。',
+      '缺口來自行為，對策是環境與規則，不是意志力。',
+    ],
+    sources: ['morningstar-gap', 'taiwan-2009', 'barber-odean-2000'],
+  },
+});
+</script>

@@ -1,0 +1,200 @@
+<script>
+/* ==========================================================================
+   模組 4：保險 ≠ 投資
+   ========================================================================== */
+defineTerms({
+  '儲蓄險': { en: 'endowment / savings insurance', def: '以累積保單價值、到期或一定年後領回為主要目的的壽險；保障成分通常很低。', example: '6 年繳費、第 20 年領回。', lesson: '4-1' },
+  'IRR': { en: 'internal rate of return', def: '內部報酬率：把每一筆繳費與領回的時間點都考慮進去，換算成「每年複利多少 %」；比較不同儲蓄工具時用它。', example: '總報酬 50%，但 IRR 可能只有約 2.3%。', lesson: '4-1' },
+  '解約金': { en: 'cash surrender value', def: '提前終止保單時能拿回的金額；前幾年通常低於已繳保費。', example: '繳了 3 年 30 萬，解約只拿回 22 萬。', lesson: '4-1' },
+  '宣告利率': { en: 'declared rate', def: '利率變動型保單每期由保險公司宣告的利率，會變動、不保證。', example: '今年宣告 2.5%，明年可能調整。', lesson: '4-1' },
+  '投資型保單': { en: 'investment-linked insurance', def: '保費扣除各項費用後放進投資帳戶，帳戶價值隨所選標的漲跌；投資風險由保戶承擔。', example: '連結基金或 ETF 的變額壽險。', lesson: '4-2' },
+  '危險保險費': { en: 'cost of insurance', def: '投資型保單每月從帳戶扣除、用來支付壽險保障的費用；依年齡與淨危險保額計算，年紀越大越貴。', example: '40 歲時每月幾百元，70 歲時可能數千元。', lesson: '4-2' },
+  '資產撥回': { en: 'asset distribution', def: '類全委投資型保單定期撥給保戶的金額；可能來自收益，也可能來自本金。', example: '每月撥回 0.5%，帳戶淨值卻在下降。', lesson: '4-2' },
+});
+
+function fvPayments(P, n, T, r) { let s = 0; for (let k = 0; k < n; k += 1) s += P * (1 + r) ** (T - k); return s; }
+function solveIrr(P, n, T, V) { let lo = -0.5; let hi = 0.5; for (let i = 0; i < 200; i += 1) { const m = (lo + hi) / 2; if (fvPayments(P, n, T, m) > V) hi = m; else lo = m; } return (lo + hi) / 2; }
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '用 IRR 算出儲蓄險的真實年化報酬',
+      '看懂解約金曲線與流動性代價',
+      '說出利變型與外幣保單多出來的風險',
+    ],
+    analogy: {
+      text: ['朋友說：「這張保單繳 60 萬，20 年後領 90 萬，賺 50%！」聽起來很多，但 50% 花了 20 年，而且錢是分 6 年慢慢繳進去的。把它換成「每年複利幾 %」，才能和定存、債券、指數基金公平比較。這個數字叫 [[IRR]]。', '[[儲蓄險]]本身不是壞東西：它強迫儲蓄、本金相對有保障。問題在於它常被當成「投資」或「保障」來賣，而它在兩方面都不是最好的工具。'],
+      limit: ['IRR 只衡量報酬；儲蓄險還有流動性差、提前解約虧損、保障很低等特性，要一起看。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="儲蓄險的解約金曲線：前幾年解約金低於累計已繳保費，經過一段時間才超過；越早解約損失越大">
+        <line x1="60" y1="230" x2="530" y2="230" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="230" class="stroke-ink" stroke-width="2"/>
+        <path d="M60 210 L120 170 L180 130 L240 90 L300 70 L360 70 L420 70 L480 70 L530 70" fill="none" style="stroke:var(--m7)" stroke-width="4" stroke-dasharray="10 6"/>
+        <path d="M60 228 L120 205 L180 170 L240 128 L300 96 L360 78 L420 62 L480 48 L530 36" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+        <text x="300" y="60" font-size="13" font-weight="900">累計已繳保費</text>
+        <text x="420" y="30" font-size="13" font-weight="900">解約金</text>
+        <line x1="380" y1="40" x2="380" y2="230" class="stroke-ink" stroke-width="2" stroke-dasharray="4 4"/>
+        <text x="380" y="250" text-anchor="middle" font-size="12">損益兩平</text>
+        <text x="200" y="250" text-anchor="middle" font-size="12">這段解約會虧本金</text>
+      </svg>`,
+      caption: '示意曲線。兩條線交會的年份，就是「至少要放這麼久才不虧」；每張保單不同，要看保單的解約金表。',
+    },
+    define: [
+      { term: 'IRR', en: 'IRR', def: '考慮時間的年化報酬。', example: '約 2.3%。' },
+      { term: '解約金', en: 'surrender value', def: '提前解約能拿回的錢。', example: '前幾年低於已繳。' },
+      { term: '宣告利率', en: 'declared rate', def: '利變型保單的變動利率。', example: '不保證。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'irr', text: '算出真實的年化報酬' },
+        { type: 'widget', name: 'knobs', props: { title: '儲蓄險 IRR 計算器（每年年初繳費，實際計算）', sliders: [
+          { id: 'p', label: '每年保費', min: 10000, max: 1000000, step: 10000, value: 100000, unit: '元' },
+          { id: 'n', label: '繳費年數', min: 1, max: 20, step: 1, value: 6, unit: '年' },
+          { id: 't', label: '第幾年底領回', min: 1, max: 40, step: 1, value: 20, unit: '年' },
+          { id: 'v', label: '領回金額（看保單的解約金或滿期表）', min: 10000, max: 20000000, step: 10000, value: 900000, unit: '元' },
+          { id: 'dep', label: '對照：定存或其他工具的年利率', min: 0, max: 8, step: 0.05, value: 1.7, unit: '%' },
+        ], compute: (v) => {
+          const paid = v.p * v.n;
+          if (v.t < v.n) return { rows: [{ label: '設定有誤', value: '領回年份要大於等於繳費年數', ratio: 1 }], note: '' };
+          const r = solveIrr(v.p, v.n, v.t, v.v);
+          const alt = fvPayments(v.p, v.n, v.t, v.dep / 100);
+          return { rows: [
+            { label: '總共繳', value: `${paid.toLocaleString()} 元`, ratio: Math.min(1, paid / v.v) },
+            { label: '帳面總報酬', value: `${(((v.v - paid) / paid) * 100).toFixed(1)}%`, ratio: Math.min(1, Math.abs(v.v - paid) / paid) },
+            { label: 'IRR（年化）', value: `${(r * 100).toFixed(2)}%`, ratio: Math.min(1, Math.abs(r) / 0.08) },
+            { label: `同樣繳法放在 ${v.dep}% 的工具`, value: `${Math.round(alt).toLocaleString()} 元`, ratio: Math.min(1, alt / Math.max(v.v, alt)) },
+          ], note: '預設：繳 6 年共 60 萬、第 20 年領 90 萬，帳面報酬 50%，IRR 約 2.34%。拿它和定存、通膨（2026 年 9 月 CPI 年增 2.73%）比較，才知道它到底賺多少。' };
+        } } },
+        '這個例子的 IRR 和臺灣銀行一年期以上定存（約 1.7%）相比略高，但還要扣掉兩個代價：20 年間錢幾乎不能動（提前解約可能虧本），以及這段期間通膨若高於 IRR，實質購買力仍可能減少。',
+        { type: 'heading', id: 'risks', text: '三種常被忽略的風險' },
+        { type: 'table', head: ['風險', '是什麼', '怎麼看'], rows: [
+          ['流動性', '前幾年解約金低於已繳保費', '看解約金表，確認至少要放幾年才不虧'],
+          ['利率', '利率變動型的[[宣告利率]]不保證；預定利率則鎖住，可能錯過升息', '業務展示的通常是假設宣告利率不變的結果'],
+          ['匯率', '外幣保單用外幣計價，換回新臺幣時有匯率損益', '外幣保單的 IRR 要另外考慮匯率；需求熱的時候尤其要冷靜'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="儲蓄險、定存、指數化投資的比較：儲蓄險本金相對有保障但流動性差、報酬低；定存流動性較好、報酬低；指數化投資長期報酬較高但會波動">
+          ${[['儲蓄險', ['本金相對保障', '流動性差', '報酬低'], 'm1'], ['定存', ['本金保障', '流動性中等', '報酬低'], 'm2'], ['指數化投資', ['會波動', '流動性好', '長期報酬較高'], 'm3']].map(([a, items, c], i) => `<rect x="${15 + i * 182}" y="20" width="165" height="180" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="56" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text>${items.map((t, j) => `<text x="${97 + i * 182}" y="${100 + j * 32}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}`).join('')}
+          <text x="280" y="222" text-anchor="middle" font-size="13">沒有一種同時最好；投資的部分在第三部詳細說明</text>
+        </svg>`, caption: '儲蓄險適合的情況很窄：確定這筆錢很多年都不會動、又真的需要強迫儲蓄的人。' },
+        { type: 'heading', id: 'sales', text: '深入：常見的銷售話術怎麼拆' },
+        { type: 'table', head: ['話術', '要問的問題'], rows: [
+          ['「保本又有保障」', '保障的保額是多少？和同樣保費的定期壽險比呢？'],
+          ['「20 年後領回 150%」', 'IRR 是多少？第 3、5、10 年解約能拿回多少？'],
+          ['「宣告利率比定存高」', '過去十年的宣告利率怎麼變？最低保證是多少？'],
+          ['「美元保單利率比較高」', '匯率變動 10% 時，換回新臺幣的 IRR 是多少？'],
+        ], caption: '能清楚回答這些問題、並給你書面資料的業務員，才值得繼續談。' },
+        { type: 'heading', id: 'inflation', text: '深入：長期合約裡的通膨' },
+        '儲蓄險的領回金額是名目金額：20 年後的 90 萬，購買力和今天的 90 萬不同。假設這 20 年平均通膨 2%，20 年後的 90 萬，大約只等於今天的 60 萬左右，也就是你當初繳進去的總金額。',
+        { type: 'table', head: ['平均通膨', '20 年後 90 萬約等於今天的'], rows: [
+          ['1%', '約 74 萬'],
+          ['2%', '約 61 萬'],
+          ['3%', '約 50 萬'],
+        ], caption: '計算方式：90 萬 ÷（1 ＋ 通膨）的 20 次方。這就是「保本」的另一面：名目上保本，實質上不一定。' },
+        '這不是說儲蓄險一定不好，而是提醒：比較工具時要用同一把尺。IRR 減掉通膨，才是實質報酬；IRR 如果長期低於通膨，等於用一份流動性很差的合約，換取購買力慢慢下降。',
+      ],
+    },
+    mistakes: [
+      { wrong: '用「總報酬率」比較儲蓄險和其他工具。', why: '沒考慮時間與分期繳費。', right: '一律換算成 IRR 再比較。' },
+      { wrong: '把可能會用到的錢拿去買儲蓄險。', why: '提前解約前幾年會虧本金。', right: '只用很多年確定不會動的錢。' },
+      { wrong: '把儲蓄險當成保障。', why: '保障成分通常很低。', right: '保障用定期壽險、失能、醫療處理。' },
+    ],
+    keypoints: [
+      '比報酬一律用 IRR，不看總報酬率。',
+      '看解約金表：至少要放幾年才不虧。',
+      '利變型看宣告利率，外幣保單看匯率。',
+    ],
+    sources: ['bot-rates', 'cpi-2026-09', 'fsc-moneywise'],
+  },
+
+  '4-2': {
+    goals: [
+      '列出投資型保單的五類費用',
+      '說明危險保險費為什麼會隨年齡吃掉帳戶',
+      '看懂類全委保單的「撥回」可能來自本金',
+    ],
+    analogy: {
+      text: ['[[投資型保單]]像是一個套裝行程：保險和投資綁在一起賣，看起來方便，但每個環節都有一筆費用。把同樣的行程拆開自己訂（買定期壽險，加上自己投資低成本的指數基金），常常更便宜、也更透明。', '它最容易被誤解的地方有兩個：保障的成本（[[危險保險費]]）會隨年齡上升、從投資帳戶裡扣；以及類全委保單的[[資產撥回]]看起來像配息，卻可能是把你自己的本金還給你。'],
+      limit: ['套裝行程也有它的價值（例如強迫投資、某些稅務或傳承安排）；這一課只是讓你看清楚價格，不是說它一定不能買。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="投資型保單的錢怎麼流：保費先扣前置費用，進入投資帳戶；帳戶每月被扣保單管理費與危險保險費；投資標的本身還有內扣費用；提前解約另有解約費用">
+        <rect x="200" y="12" width="160" height="44" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="280" y="40" text-anchor="middle" font-size="15" font-weight="900" class="on-color">你繳的保費</text>
+        <path d="M280 56 L280 80" class="stroke-ink" stroke-width="3"/>
+        <rect x="380" y="62" width="160" height="40" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="460" y="88" text-anchor="middle" font-size="13" font-weight="900" class="on-color">前置費用</text>
+        <rect x="140" y="80" width="280" height="110" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="120" text-anchor="middle" font-size="16" font-weight="900" class="on-color">投資帳戶</text>
+        <text x="280" y="148" text-anchor="middle" font-size="12" class="on-color">標的的內扣費用在淨值裡</text>
+        <rect x="20" y="210" width="160" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="100" y="237" text-anchor="middle" font-size="13" font-weight="900" class="on-color">保單管理費</text>
+        <rect x="200" y="210" width="160" height="44" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="280" y="237" text-anchor="middle" font-size="13" font-weight="900" class="on-color">危險保險費</text>
+        <rect x="380" y="210" width="160" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="460" y="237" text-anchor="middle" font-size="13" font-weight="900" class="on-color">解約費用</text>
+        <path d="M200 190 L100 210 M280 190 L280 210 M360 190 L460 210" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="280" text-anchor="middle" font-size="13">每一項都會讓帳戶的實際報酬低於標的本身的報酬</text>
+      </svg>`,
+      caption: '各項費用的名稱與收取方式依商品而不同；保單的「費用表」是投保前一定要看的頁面。',
+    },
+    define: [
+      { term: '投資型保單', en: 'investment-linked', def: '保險加投資帳戶，風險自負。', example: '變額壽險。' },
+      { term: '危險保險費', en: 'cost of insurance', def: '保障成本，隨年齡上升。', example: '從帳戶扣。' },
+      { term: '資產撥回', en: 'distribution', def: '可能來自本金的撥付。', example: '淨值下降仍撥回。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'fees', text: '五類費用' },
+        { type: 'table', head: ['費用', '怎麼收', '影響'], rows: [
+          ['前置費用', '從保費中先扣一定比例，常集中在前幾年', '前幾年真正進入投資的錢變少'],
+          ['保單管理費', '每月固定金額', '帳戶小時影響比例大'],
+          ['危險保險費', '依年齡與淨危險保額每月扣除', '年紀越大越貴，可能侵蝕帳戶'],
+          ['投資標的費用', '基金或全委帳戶本身的管理費，反映在淨值', '長期複利下影響很大'],
+          ['解約費用', '前幾年解約收取', '降低提前離開的彈性'],
+        ] },
+        { type: 'widget', name: 'knobs', props: { title: '投資型保單 vs 定期壽險＋自己投資（簡化試算，費用請依保單費用表填）', sliders: [
+          { id: 'prem', label: '每年投入', min: 10000, max: 500000, step: 10000, value: 120000, unit: '元' },
+          { id: 'years', label: '投入年數', min: 5, max: 40, step: 1, value: 20, unit: '年' },
+          { id: 'ret', label: '投資標的的年報酬（扣費用前）', min: -5, max: 12, step: 0.5, value: 5, unit: '%' },
+          { id: 'front', label: '前置費用率（前 5 年）', min: 0, max: 60, step: 1, value: 30, unit: '%' },
+          { id: 'admin', label: '保單管理費', min: 0, max: 300, step: 10, value: 100, unit: '元／月' },
+          { id: 'coi', label: '第一年危險保險費（每年增加 6%）', min: 0, max: 50000, step: 500, value: 6000, unit: '元' },
+          { id: 'fundfee', label: '標的內扣費用', min: 0, max: 3, step: 0.1, value: 1.5, unit: '%／年' },
+          { id: 'term', label: '對照：定期壽險年保費', min: 0, max: 50000, step: 500, value: 6000, unit: '元' },
+        ], compute: (v) => {
+          let ilp = 0; let self = 0;
+          for (let y = 0; y < v.years; y += 1) {
+            const net = v.prem * (1 - (y < 5 ? v.front / 100 : 0));
+            const coi = v.coi * 1.06 ** y;
+            ilp = (ilp + net - v.admin * 12 - coi) * (1 + v.ret / 100 - v.fundfee / 100);
+            self = (self + v.prem - v.term) * (1 + v.ret / 100 - 0.003);
+          }
+          return { rows: [
+            { label: '投資型保單帳戶價值', value: `${Math.round(Math.max(0, ilp)).toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, ilp) / Math.max(ilp, self, 1)) },
+            { label: '定期壽險＋自己投資（內扣 0.3%）', value: `${Math.round(self).toLocaleString()} 元`, ratio: Math.min(1, self / Math.max(ilp, self, 1)) },
+            { label: '差距', value: `${Math.round(self - ilp).toLocaleString()} 元`, ratio: Math.min(1, Math.abs(self - ilp) / Math.max(ilp, self, 1)) },
+          ], note: '兩邊用同樣的標的報酬、同樣的總投入，只差在費用與保障的買法。假設很簡化（費用每年結算一次、定期壽險保費固定），只用來感受量級；實際請用保單的費用表與自己的報價試算。' };
+        } } },
+        { type: 'heading', id: 'coi', text: '危險保險費：年紀越大，扣得越兇' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="危險保險費隨年齡上升的曲線：年輕時很低，60 歲以後快速增加；如果投資虧損讓帳戶變小，扣費可能讓帳戶歸零，需要補繳保費才能維持保障">
+          <line x1="60" y1="200" x2="530" y2="200" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="200" class="stroke-ink" stroke-width="2"/>
+          <path d="${Array.from({ length: 48 }, (_, i) => { const age = 30 + i; const c = 0.6 * 1.085 ** (age - 30); return `${i ? 'L' : 'M'}${(60 + i * 9.8).toFixed(1)} ${(200 - Math.min(170, c * 3.2)).toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m4)" stroke-width="4"/>
+          ${[30, 45, 60, 75].map((a) => `<text x="${60 + (a - 30) * 9.8}" y="220" text-anchor="middle" font-size="12" class="mono">${a} 歲</text>`).join('')}
+          <text x="80" y="36" font-size="13" font-weight="900">每年的危險保險費（示意）</text>
+        </svg>`, caption: '金管會提醒：若投資虧損使保單帳戶價值不足以支付保障費用，需要補繳保費，否則保單可能停效。曲線形狀是示意，實際依各公司費率表。' },
+        { type: 'heading', id: 'distribution', text: '撥回不等於報酬' },
+        '類全委投資型保單常標榜「每月撥回」。撥回的錢可能來自投資收益，也可能直接來自你的本金；如果帳戶淨值一路下跌、撥回卻照樣發，就是在把本金還給你，而不是賺錢。金管會曾規定，類全委帳戶單位淨值低於成立當日 8 成時不得提供資產撥回，2026 年也再次提醒消費者：投資風險由保戶承擔、配息可能來自本金。',
+        { type: 'callout', variant: 'tip', title: '看撥回時只看一個數字', body: ['總報酬 ＝ 期末帳戶淨值 ＋ 累計撥回 − 累計投入。撥回再高，總報酬是負的就是虧損。'] },
+        { type: 'heading', id: 'when', text: '深入：什麼情況可以考慮' },
+        '投資型保單的費用比自己組合高，但不是完全沒有用途：例如真的需要強迫自己長期投入、或在特定的傳承、稅務安排中有需要。這些情況請在了解完整費用、找不賣這個商品的專業人士確認後再決定；對多數只想要「保障加投資」的人來說，拆開來買通常更便宜、也更容易隨人生階段調整。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看「連結的基金報酬」。', why: '保單帳戶還要扣前置、管理、危險保費等費用。', right: '用帳戶價值與總費用判斷。' },
+      { wrong: '把撥回當成獲利。', why: '撥回可能來自本金。', right: '算總報酬：淨值＋撥回−投入。' },
+      { wrong: '以為保障永遠有效。', why: '帳戶不足以支付危險保費時要補繳。', right: '定期檢查帳戶價值與扣費。' },
+    ],
+    keypoints: [
+      '五類費用：前置、管理、危險保費、標的內扣、解約。',
+      '危險保險費隨年齡上升，可能吃掉帳戶。',
+      '撥回不等於報酬；拆開買通常更便宜。',
+    ],
+    sources: ['ilp-warning', 'fsc-moneywise'],
+  },
+});
+</script>

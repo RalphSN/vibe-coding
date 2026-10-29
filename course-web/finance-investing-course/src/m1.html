@@ -1,0 +1,193 @@
+<script>
+/* ==========================================================================
+   模組 1：時間與複利
+   ========================================================================== */
+defineTerms({
+  '複利': { en: 'compound interest', def: '把每期產生的報酬加回本金，下一期連報酬也一起產生報酬；成長的速度會越來越快。', example: '10 萬、年報酬 6%、30 年 → 約 57 萬。', lesson: '1-1' },
+  '終值': { en: 'future value', def: '一筆錢（或一連串投入）在某個報酬率下，到未來某一天會變成多少。', example: '每月 5,000、6%、30 年的終值約 502 萬。', lesson: '1-1' },
+  '現值': { en: 'present value', def: '未來的一筆錢，用某個報酬率折算回今天值多少；未來越遠、報酬率越高，現值越低。', example: '20 年後的 100 萬，用 6% 折算約 31 萬。', lesson: '1-2' },
+  '機會成本': { en: 'opportunity cost', def: '選擇做一件事時，放棄的另一個最好選擇的價值。', example: '今天多花 10 萬，放棄的是它 30 年後可能變成的 57 萬。', lesson: '1-2' },
+  '定期定額': { en: 'regular investing', def: '每隔固定時間投入固定金額；在這一卷用來說明「持續投入」的累積效果，第四部會詳細討論。', example: '每月 5,000 元。', lesson: '1-1' },
+});
+
+const FV_MONTHLY = (pmt, r, years) => { const i = r / 12; const n = years * 12; return i === 0 ? pmt * n : pmt * ((1 + i) ** n - 1) / i; };
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '用公式與 72 法則估算複利成長',
+      '算出定期投入的終值',
+      '說出複利的三個變數：本金、報酬率、時間',
+    ],
+    analogy: {
+      text: ['在雪地上滾雪球：一開始雪球很小，滾一圈只沾到一點雪；雪球越大，每滾一圈沾上的雪越多。[[複利]]就是這樣，報酬加回本金之後，下一期會在更大的基礎上產生報酬。', '雪球要變大，需要三樣東西：一開始的雪球（本金）、夠濕夠黏的雪（報酬率），以及夠長的坡道（時間）。三者之中，一般人最能掌握的，其實是坡道的長度。'],
+      limit: ['雪球不會倒退；投資報酬會有負的年份，實際的成長路徑是上下起伏的，複利公式算的是「平均報酬率」下的結果（模組 3）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="單利與複利的成長比較：10 萬元年報酬 6%，單利 30 年成為 28 萬，複利 30 年成為約 57 萬；兩條線一開始很接近，後期差距越拉越大">
+        <line x1="60" y1="230" x2="530" y2="230" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="230" class="stroke-ink" stroke-width="2"/>
+        <path d="${Array.from({ length: 31 }, (_, y) => `${y ? 'L' : 'M'}${(60 + y * 15.5).toFixed(1)} ${(230 - (10 + 0.6 * y) * 3.4).toFixed(1)}`).join(' ')}" fill="none" style="stroke:var(--m1)" stroke-width="4"/>
+        <path d="${Array.from({ length: 31 }, (_, y) => `${y ? 'L' : 'M'}${(60 + y * 15.5).toFixed(1)} ${(230 - 10 * 1.06 ** y * 3.4).toFixed(1)}`).join(' ')}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+        <text x="525" y="${(230 - 57.4 * 3.4 - 8).toFixed(0)}" text-anchor="end" font-size="13" font-weight="900">複利：約 57 萬</text>
+        <text x="525" y="${(230 - 28 * 3.4 - 8).toFixed(0)}" text-anchor="end" font-size="13" font-weight="900">單利：28 萬</text>
+        <text x="295" y="254" text-anchor="middle" font-size="13">年 →（0 到 30 年）</text>
+        <text x="66" y="36" font-size="13" font-weight="900">10 萬元、年報酬 6%</text>
+      </svg>`,
+      caption: '前十年兩條線幾乎重疊，這是很多人放棄的原因；複利的威力集中在後半段。',
+    },
+    define: [
+      { term: '複利', en: 'compounding', def: '報酬加回本金再產生報酬。', example: '57 萬。' },
+      { term: '終值', en: 'future value', def: '未來會變成多少。', example: '502 萬。' },
+      { term: '定期定額', en: 'regular investing', def: '固定時間投入固定金額。', example: '每月 5,000。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'formula', text: '兩個公式就夠' },
+        { type: 'table', head: ['情況', '公式', '例子'], rows: [
+          ['一筆錢', '終值 ＝ 本金 ×（1 ＋ r）^年數', '10 萬 × 1.06^30 ≈ 57.4 萬'],
+          ['每月固定投入', '終值 ＝ 每月金額 × [（1 ＋ i）^n − 1] ÷ i（i ＝ 年報酬 ÷ 12，n ＝ 月數）', '每月 5,000、6%、30 年 ≈ 502 萬'],
+          ['72 法則', '翻倍年數 ≈ 72 ÷ 年報酬率（%）', '6% 約 12 年翻倍'],
+        ], caption: '第一部 4-1 用同樣的數學算卡債；複利在存錢時是朋友，在借錢時是敵人。' },
+        { type: 'widget', name: 'knobs', props: { title: '複利計算器：一筆錢＋每月投入（實際計算，假設報酬率固定）', sliders: [
+          { id: 'lump', label: '一開始投入', min: 0, max: 5000000, step: 10000, value: 100000, unit: '元' },
+          { id: 'pmt', label: '每月投入', min: 0, max: 100000, step: 500, value: 5000, unit: '元' },
+          { id: 'r', label: '年報酬率', min: 0, max: 12, step: 0.5, value: 6, unit: '%' },
+          { id: 'years', label: '年數', min: 1, max: 50, step: 1, value: 30, unit: '年' },
+        ], compute: (v) => {
+          const lumpFv = v.lump * (1 + v.r / 100) ** v.years;
+          const pmtFv = FV_MONTHLY(v.pmt, v.r / 100, v.years);
+          const total = lumpFv + pmtFv;
+          const paid = v.lump + v.pmt * 12 * v.years;
+          return { rows: [
+            { label: '總共投入', value: `${Math.round(paid).toLocaleString()} 元`, ratio: Math.min(1, paid / Math.max(total, 1)) },
+            { label: '期末價值', value: `${Math.round(total).toLocaleString()} 元`, ratio: 1 },
+            { label: '其中來自報酬', value: `${Math.round(total - paid).toLocaleString()} 元（${total ? ((1 - paid / total) * 100).toFixed(0) : 0}%）`, ratio: total ? Math.max(0, 1 - paid / total) : 0 },
+            { label: '72 法則：翻倍年數', value: v.r > 0 ? `約 ${(72 / v.r).toFixed(1)} 年` : '不會翻倍', ratio: v.r > 0 ? Math.min(1, 72 / v.r / 40) : 1 },
+          ], note: '預設：一開始 10 萬、每月 5,000、6%、30 年，期末約 560 萬，其中超過一半來自報酬。把年數改成 15 年，期末只剩約 170 萬：時間減半，結果卻少了七成。' };
+        } } },
+        { type: 'heading', id: 'three-vars', text: '三個變數，哪一個最重要' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="複利的三個變數：本金靠儲蓄率，報酬率靠資產配置與費用，時間靠越早開始；一般人最能控制的是儲蓄率與時間">
+          ${[['本金', '靠儲蓄率（第一部）', '可控', 'm0'], ['報酬率', '靠配置與費用（模組 5、6）', '部分可控', 'm2'], ['時間', '靠越早開始、不要中斷', '最可控', 'm3']].map(([a, b, c, col], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="150" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="80" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="112" text-anchor="middle" font-size="12" class="on-color">${b}</text><text x="${97 + i * 182}" y="150" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${c}</text>`).join('')}
+          <text x="280" y="214" text-anchor="middle" font-size="13">報酬率最難控制，卻是最多人花時間研究的那一個</text>
+        </svg>`, caption: '市場給的報酬你無法決定；你能決定的是投入多少、多早開始、付多少費用、會不會中途停下來。' },
+        { type: 'heading', id: 'average', text: '深入：平均報酬與實際報酬' },
+        '複利公式用的是固定報酬率，但實際報酬每年不同。要注意一個數學事實：上下波動會讓「算術平均」高於實際的「幾何平均」（年化報酬）。例如第一年 ＋50%、第二年 −50%，算術平均是 0%，但 100 元會變成 75 元，年化報酬約 −13.4%。波動越大，兩者差越多；這也是為什麼降低不必要的波動（分散，模組 4）本身就有價值。',
+        { type: 'heading', id: 'frequency', text: '深入：複利的頻率' },
+        '同樣標示「年利率 6%」，每年計息一次、每月一次、每天一次，結果會略有不同：計息越頻繁，實際的年化報酬越高。銀行廣告的「年利率」和實際的「年化收益」常常是兩個不同的數字。',
+        { type: 'table', head: ['計息方式（名目年利率 6%）', '實際年化'], rows: [
+          ['每年一次', '6.00%'],
+          ['每月一次', '約 6.17%'],
+          ['每天一次', '約 6.18%'],
+          ['連續複利（理論極限）', '約 6.18%'],
+        ], caption: '差距不大，但比較存款或貸款時要用同一個基準；第一部 4-1 的總費用年百分率就是為了解決這個問題。' },
+        { type: 'heading', id: 'rule-of', text: '深入：72 法則從哪裡來' },
+        '翻倍年數的精確答案是 ln 2 ÷ ln(1 ＋ r)。ln 2 約 0.693，報酬率不高時 ln(1 ＋ r) 約等於 r，所以翻倍年數約 69.3 ÷ 報酬率（%）。用 72 是因為它能被 2、3、4、6、8、9、12 整除，心算方便，而且在 6%–10% 附近反而更準。同樣的方法可以算「三倍」：約 110 ÷ 報酬率。',
+      ],
+    },
+    mistakes: [
+      { wrong: '前幾年看到成長很慢就放棄。', why: '複利的效果集中在後半段。', right: '用 20 年以上的尺度看。' },
+      { wrong: '只研究報酬率，忽略投入金額與時間。', why: '報酬率最難控制。', right: '先提高儲蓄率、及早開始。' },
+      { wrong: '用算術平均報酬率代入複利公式。', why: '波動會讓實際年化報酬低於算術平均。', right: '用年化（幾何平均）報酬率。' },
+    ],
+    keypoints: [
+      '終值 ＝ 本金 ×（1 ＋ r）^年數；72 ÷ r ≈ 翻倍年數。',
+      '複利的威力集中在後半段，時間最可控。',
+      '波動會讓實際年化報酬低於算術平均。',
+    ],
+    sources: ['ubs-2026', 'fsc-moneywise'],
+  },
+
+  '1-2': {
+    goals: [
+      '比較早開始與晚開始的差距',
+      '用現值理解「今天的一塊錢」',
+      '把一次消費換算成它的機會成本',
+    ],
+    analogy: {
+      text: ['種樹最好的時間是二十年前，其次是現在。同樣一棵樹苗，早十年種下，十年後你看到的是已經能遮陰的大樹；晚十年種，十年後只有一根細枝。', '投資也一樣：投入的金額相同，早開始的人多了十年的複利。這一課用數字說明「早十年」到底值多少，以及反過來，今天花掉的一筆錢，[[機會成本]]是多少。'],
+      limit: ['樹長大後不會突然縮小；投資在任何十年之間都可能遇到大跌，所以「早開始」的好處是長期平均的結果，不是保證。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="甲從 25 歲投資到 35 歲就停止投入，乙從 35 歲投資到 65 歲；同樣年報酬 6%，甲只投入 60 萬，65 歲時約 493 萬；乙投入 180 萬，65 歲時約 502 萬，兩人幾乎一樣">
+        <rect x="40" y="40" width="480" height="70" class="fill-bg stroke-ink" stroke-width="3"/>
+        <rect x="40" y="40" width="96" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="88" y="80" text-anchor="middle" font-size="13" font-weight="900" class="on-color">投入 10 年</text>
+        <text x="330" y="80" text-anchor="middle" font-size="13" font-weight="900">停止投入，只讓它滾</text>
+        <text x="40" y="30" font-size="14" font-weight="900">甲：25–35 歲每月 5,000，共 60 萬 → 65 歲約 493 萬</text>
+        <rect x="40" y="160" width="480" height="70" class="fill-bg stroke-ink" stroke-width="3"/>
+        <rect x="136" y="160" width="384" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+        <text x="328" y="200" text-anchor="middle" font-size="13" font-weight="900" class="on-color">投入 30 年</text>
+        <text x="40" y="150" font-size="14" font-weight="900">乙：35–65 歲每月 5,000，共 180 萬 → 65 歲約 502 萬</text>
+        <text x="280" y="258" text-anchor="middle" font-size="13">年報酬 6%、按月複利的假設；甲用三分之一的本金，達到幾乎一樣的結果</text>
+      </svg>`,
+      caption: '這不是建議投資十年就停，而是說明：越早投入的每一塊錢，複利的時間越長，價值越高。',
+    },
+    define: [
+      { term: '現值', en: 'present value', def: '未來的錢折算回今天。', example: '約 31 萬。' },
+      { term: '機會成本', en: 'opportunity cost', def: '放棄的最好選擇的價值。', example: '57 萬。' },
+      { term: '複利', en: 'compounding', def: '報酬再產生報酬。', example: '越早越好。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '早開始 vs 晚開始（實際計算，每月同樣金額、同樣報酬率）', sliders: [
+          { id: 'pmt', label: '每月投入', min: 1000, max: 50000, step: 500, value: 5000, unit: '元' },
+          { id: 'r', label: '年報酬率', min: 0, max: 10, step: 0.5, value: 6, unit: '%' },
+          { id: 'early', label: '早的人幾歲開始', min: 20, max: 45, step: 1, value: 25, unit: '歲' },
+          { id: 'delay', label: '晚的人晚幾年', min: 1, max: 20, step: 1, value: 10, unit: '年' },
+          { id: 'end', label: '都投入到幾歲', min: 50, max: 70, step: 1, value: 65, unit: '歲' },
+        ], compute: (v) => {
+          const yA = v.end - v.early; const yB = Math.max(0, yA - v.delay);
+          const a = FV_MONTHLY(v.pmt, v.r / 100, yA); const b = FV_MONTHLY(v.pmt, v.r / 100, yB);
+          return { rows: [
+            { label: `早開始：投入 ${yA} 年`, value: `${Math.round(a).toLocaleString()} 元`, ratio: 1 },
+            { label: `晚 ${v.delay} 年：投入 ${yB} 年`, value: `${Math.round(b).toLocaleString()} 元`, ratio: a ? b / a : 0 },
+            { label: '差距', value: `${Math.round(a - b).toLocaleString()} 元`, ratio: a ? (a - b) / a : 0 },
+            { label: '晚的人每月要投入多少才追得上', value: yB > 0 ? `${Math.round(v.pmt * a / Math.max(1, b)).toLocaleString()} 元` : '追不上', ratio: yB > 0 ? Math.min(1, a / b / 4) : 1 },
+          ], note: '預設：25 歲開始到 65 歲約 996 萬；晚 10 年開始約 502 萬，差了將近一半。晚開始的人每月要投入約 9,900 元才能追上，接近兩倍。' };
+        } } },
+        { type: 'heading', id: 'pv', text: '現值：未來的錢值多少' },
+        '複利的反方向是折現：未來的一筆錢，用某個報酬率倒算回今天值多少，就是[[現值]]。現值 ＝ 未來金額 ÷（1 ＋ r）^年數。20 年後的 100 萬，用 6% 折算約 31 萬。這個概念在後面會反覆出現：債券價格（5-2）、股票估值（第五部）、保險的保額（第二部）都在算現值。',
+        { type: 'widget', name: 'knobs', props: { title: '今天的消費，換算成未來的機會成本（實際計算）', sliders: [
+          { id: 'spend', label: '今天的一筆消費', min: 1000, max: 2000000, step: 1000, value: 100000, unit: '元' },
+          { id: 'r', label: '如果拿去投資的年報酬率', min: 0, max: 10, step: 0.5, value: 6, unit: '%' },
+          { id: 'years', label: '距離退休幾年', min: 1, max: 45, step: 1, value: 30, unit: '年' },
+        ], compute: (v) => {
+          const fut = v.spend * (1 + v.r / 100) ** v.years;
+          return { rows: [
+            { label: '退休時可能變成', value: `${Math.round(fut).toLocaleString()} 元`, ratio: Math.min(1, fut / (v.spend * 15)) },
+            { label: '倍數', value: `${(fut / v.spend).toFixed(1)} 倍`, ratio: Math.min(1, fut / v.spend / 15) },
+          ], note: '預設：今天的 10 萬，30 年後約 57 萬。這不是說不能花錢，而是讓你在做大額決定時，看見它在時間軸上的完整價格（第一部 2-2 的大石頭）。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="同一筆錢在時間軸上的兩個方向：往未來是複利，算終值；往今天是折現，算現值">
+          <line x1="60" y1="110" x2="500" y2="110" class="stroke-ink" stroke-width="3"/>
+          <circle cx="100" cy="110" r="14" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="100" y="152" text-anchor="middle" font-size="14" font-weight="900">今天：31 萬</text>
+          <circle cx="460" cy="110" r="14" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="460" y="152" text-anchor="middle" font-size="14" font-weight="900">20 年後：100 萬</text>
+          <path d="M120 90 Q 280 30 440 90" fill="none" style="stroke:var(--m2)" stroke-width="3"/><text x="280" y="44" text-anchor="middle" font-size="13" font-weight="900">複利 × 1.06^20</text>
+          <path d="M440 130 Q 280 190 120 130" fill="none" style="stroke:var(--m3)" stroke-width="3"/><text x="280" y="196" text-anchor="middle" font-size="13" font-weight="900">折現 ÷ 1.06^20</text>
+        </svg>`, caption: '終值與現值是同一條路的兩個方向；用的報酬率越高，未來的錢在今天就越不值錢。' },
+        { type: 'heading', id: 'delay-cost', text: '深入：每晚一年，要多存多少' },
+        '假設目標是「每月 5,000 元、年報酬 6%、投入 40 年」的結果（約 996 萬）。晚開始的人要達到同樣的目標，每月必須投入更多：',
+        { type: 'table', head: ['晚幾年開始', '每月需要投入', '是原本的幾倍'], rows: [
+          ['0 年', '5,000 元', '1.0'],
+          ['1 年', '約 5,341 元', '1.07'],
+          ['5 年', '約 6,989 元', '1.4'],
+          ['10 年', '約 9,913 元', '2.0'],
+          ['15 年', '約 14,369 元', '2.9'],
+        ], caption: '延遲的代價不是線性的：晚 5 年要多 40%，晚 15 年要將近三倍。這也是第一部強調「先存一點也好」的原因。' },
+        '這張表也有反過來的意義：如果你已經晚了，不必氣餒，因為能補救的方式有三個：提高每月投入（儲蓄率）、延後需要用錢的時間、或接受較小的目標。三者都比「追求更高報酬」可靠。',
+      ],
+    },
+    mistakes: [
+      { wrong: '等「有更多錢」再開始投資。', why: '少的錢也能先累積時間。', right: '先用小金額開始，收入增加再加碼。' },
+      { wrong: '中途停止投入很多年。', why: '中斷的那幾年，等於從複利坡道上移除最長的一段。', right: '遇到困難時降低金額，盡量不要完全停止。' },
+      { wrong: '只看消費的標價。', why: '忽略了它在未來的機會成本。', right: '大額決定時，換算成退休時的價值看一次。' },
+    ],
+    keypoints: [
+      '同樣的投入，早十年開始的結果可能接近兩倍。',
+      '現值 ＝ 未來金額 ÷（1 ＋ r）^年數。',
+      '大額消費要看它的機會成本。',
+    ],
+    sources: ['fsc-moneywise', 'ubs-2026'],
+  },
+});
+</script>

@@ -1,0 +1,158 @@
+<script>
+/* ==========================================================================
+   模組 3：再平衡
+   ========================================================================== */
+defineTerms({
+  '配置漂移': { en: 'allocation drift', def: '各資產漲跌幅不同，比例逐漸偏離原本的目標。', example: '股票大漲後從 60% 變成 75%。', lesson: '3-1' },
+  '定期再平衡': { en: 'calendar rebalancing', def: '固定時間（例如每年一次）把比例調回目標。', example: '每年 1 月檢查並調整。', lesson: '3-2' },
+  '門檻再平衡': { en: 'threshold rebalancing', def: '比例偏離目標超過設定的幅度時才調整。', example: '偏離 5 個百分點以上才調。', lesson: '3-2' },
+  '現金流再平衡': { en: 'cash-flow rebalancing', def: '用新投入的錢（或提領）優先買進比例不足的資產，盡量不賣出。', example: '股票比例太高時，新錢全部買債券。', lesson: '3-2' },
+});
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說明配置為什麼會漂移',
+      '說出再平衡真正的目的：控制風險',
+      '理解再平衡「買低賣高」的機制與限制',
+    ],
+    analogy: {
+      text: ['開車時方向盤即使握得很穩，車子也會因為路面慢慢偏離車道，所以要不時做小幅修正。投資組合也一樣：股票和債券的漲跌不同，比例會慢慢偏離目標，這叫[[配置漂移]]。', '不修正的話，一個原本 60／40 的組合，經過幾年股市上漲，可能悄悄變成 80／20；你承擔的風險比自己選擇的高很多，卻沒有意識到。[[再平衡]]就是把車子拉回車道。'],
+      limit: ['開車偏離一點點就要修正；投資組合偏離一點點沒關係，太頻繁的調整反而增加成本與稅（下一課）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="不再平衡時的配置漂移：一開始股票 60%，股票每年 8%、債券每年 2%，10 年後股票比例約 73%，20 年後約 83%">
+        ${[['一開始', 60], ['10 年後', 73], ['20 年後', 83]].map(([t, s], i) => `<rect x="${50 + i * 170}" y="40" width="130" height="180" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><rect x="${50 + i * 170}" y="${40 + 180 * (1 - s / 100)}" width="130" height="${180 * s / 100}" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${115 + i * 170}" y="${40 + 180 * (1 - s / 100) + 30}" text-anchor="middle" font-size="16" font-weight="900" class="on-color">股 ${s}%</text><text x="${115 + i * 170}" y="244" text-anchor="middle" font-size="14" font-weight="900">${t}</text>`).join('')}
+        <text x="280" y="266" text-anchor="middle" font-size="12">假設股票每年 8%、債券每年 2%、完全不調整</text>
+      </svg>`,
+      caption: '漂移最常發生在股市長期上漲之後，也就是風險最容易被低估的時候。',
+    },
+    define: [
+      { term: '配置漂移', en: 'drift', def: '比例偏離目標。', example: '60% → 75%。' },
+      { term: '再平衡', en: 'rebalancing', def: '調回目標比例。', example: '賣股買債。' },
+      { term: '股債比', en: 'stock-bond ratio', def: '股票與債券的比例。', example: '60／40。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '不再平衡，比例會漂到哪裡（實際計算，假設每年報酬固定）', sliders: [
+          { id: 's0', label: '一開始的股票比例', min: 10, max: 90, step: 5, value: 60, unit: '%' },
+          { id: 'rs', label: '股票年報酬', min: -10, max: 15, step: 0.5, value: 8, unit: '%' },
+          { id: 'rb', label: '債券年報酬', min: -5, max: 8, step: 0.5, value: 2, unit: '%' },
+          { id: 'years', label: '經過幾年', min: 1, max: 30, step: 1, value: 10, unit: '年' },
+        ], compute: (v) => {
+          const s = v.s0 * (1 + v.rs / 100) ** v.years;
+          const b = (100 - v.s0) * (1 + v.rb / 100) ** v.years;
+          const w = s / (s + b);
+          return { rows: [
+            { label: '現在的股票比例', value: `${(w * 100).toFixed(1)}%`, ratio: w },
+            { label: '偏離目標', value: `${((w * 100) - v.s0).toFixed(1)} 個百分點`, ratio: Math.min(1, Math.abs(w * 100 - v.s0) / 30) },
+          ], note: '預設 60%、股 8%、債 2%、10 年後約 73%。如果股票的波動度約 18%，股票比例從 60% 升到 73%，組合的波動大約也會增加兩成以上。' };
+        } } },
+        { type: 'heading', id: 'purpose', text: '再平衡的目的是控制風險' },
+        '常聽到「再平衡可以提高報酬」，但更準確的說法是：再平衡讓你的風險維持在自己選擇的水準。在股票長期報酬高於債券的世界裡，不再平衡的組合因為股票比例越來越高，長期報酬可能反而較高，但風險也高很多；再平衡的價值，是讓你不會在不知不覺中承擔了承受不了的風險，然後在大跌時被迫賣出。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="再平衡的機制：股票漲多時賣一些、買進債券；股票大跌時賣一些債券、買進股票；結果是紀律性地賣高買低">
+          <rect x="20" y="30" width="250" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="68" text-anchor="middle" font-size="16" font-weight="900" class="on-color">股票大漲之後</text>
+          <text x="145" y="104" text-anchor="middle" font-size="13" class="on-color">股票比例太高</text>
+          <text x="145" y="134" text-anchor="middle" font-size="14" font-weight="900" class="on-color">賣一些股票、買債券</text>
+          <rect x="290" y="30" width="250" height="150" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="68" text-anchor="middle" font-size="16" font-weight="900" class="on-color">股票大跌之後</text>
+          <text x="415" y="104" text-anchor="middle" font-size="13" class="on-color">股票比例太低</text>
+          <text x="415" y="134" text-anchor="middle" font-size="14" font-weight="900" class="on-color">賣一些債券、買股票</text>
+          <text x="280" y="208" text-anchor="middle" font-size="13">規則替你做了情緒上最難的事：在恐慌時買進</text>
+        </svg>`, caption: '大跌時買進股票，是心理上最難做的事；事先寫好規則，讓它變成機械性的動作。' },
+        { type: 'heading', id: 'behavior', text: '深入：再平衡是行為工具' },
+        '從第六部的角度看，再平衡最大的價值在行為：它強迫你在市場最樂觀時減碼、最悲觀時加碼，正好和多數人的直覺相反。也因為違反直覺，很多人寫了規則卻做不到。實用的做法是把規則寫得很具體（日期、門檻、要買賣哪一檔），並且只在預定的時間看，不在新聞最吵的時候看。',
+        { type: 'heading', id: 'momentum', text: '深入：不再平衡的人在賭什麼' },
+        '不再平衡，等於讓表現好的資產比例越來越大。在股票長期上漲的時期，這常常帶來更高的報酬；但它的本質是：你的風險會隨著上漲越來越高，而且是在市場最樂觀、估值通常最高的時候。再平衡則是承認自己不知道接下來誰會表現好，所以維持一開始決定的風險。兩者都可以有理由，但後者和「寫下計畫、照計畫做」的精神一致。',
+        { type: 'table', head: ['', '不再平衡', '定期再平衡'], rows: [
+          ['股票長期上漲時', '報酬可能較高，風險越來越大', '報酬可能較低，風險維持'],
+          ['大跌時', '跌得較多（股票比例已經變高）', '跌得較少，且有規則在低點買'],
+          ['心理', '越漲越覺得安全', '違反直覺，需要紀律'],
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '設定好比例後就再也不看。', why: '漂移會讓風險不知不覺升高。', right: '每年至少檢查一次。' },
+      { wrong: '把再平衡當成提高報酬的技巧。', why: '主要目的是維持風險水準。', right: '用它控制風險與行為。' },
+      { wrong: '大跌時跳過再平衡。', why: '正好放棄了低價買進。', right: '照規則執行。' },
+    ],
+    keypoints: [
+      '比例會漂移，漲多的資產比例越來越高。',
+      '再平衡的目的：維持你選擇的風險。',
+      '它讓你紀律性地賣高買低。',
+    ],
+    sources: ['vanguard-rebal', 'ubs-2026'],
+  },
+
+  '3-2': {
+    goals: [
+      '比較定期、門檻、現金流三種再平衡方法',
+      '用新投入的錢再平衡，減少賣出',
+      '估算再平衡的成本',
+    ],
+    analogy: {
+      text: ['澆花有三種做法：每週固定澆一次（[[定期再平衡]]）、看到土乾了才澆（[[門檻再平衡]]）、或是每次本來就要澆水時，多給乾的那盆一點（[[現金流再平衡]]）。三種都能讓花活得好；差別在你花多少力氣、會不會澆太多。', 'Vanguard 的研究用 1926–2009 年的美國股債資料比較，發現沒有「最佳」的頻率或門檻；重要的是有一套規則並持續執行。'],
+      limit: ['澆水沒有成本；投資的再平衡會產生手續費、證交稅，在某些情況下還有稅，所以「不要太頻繁」很重要。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="三種再平衡方法：定期，每年固定時間調整；門檻，偏離超過設定幅度才調整；現金流，用新投入的錢買比例不足的資產；可以組合使用">
+        ${[['定期', '每年固定一天', '簡單、容易記得', 'm1'], ['門檻', '偏離 ±5 個百分點才調', '交易次數較少', 'm3'], ['現金流', '新錢買不足的那一邊', '幾乎不用賣、成本最低', 'm2']].map(([a, b, c, col], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="170" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="76" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="112" text-anchor="middle" font-size="12" class="on-color">${b}</text><text x="${97 + i * 182}" y="150" text-anchor="middle" font-size="12" class="on-color">${c}</text>`).join('')}
+        <text x="280" y="236" text-anchor="middle" font-size="13">常見組合：每年檢查一次，偏離超過門檻才調，優先用新錢調</text>
+      </svg>`,
+      caption: '門檻的幅度（例如 5 個百分點）是常見的實務設定，不是研究得出的最佳值。',
+    },
+    define: [
+      { term: '定期再平衡', en: 'calendar', def: '固定時間調整。', example: '每年 1 月。' },
+      { term: '門檻再平衡', en: 'threshold', def: '偏離超過幅度才調。', example: '±5 個百分點。' },
+      { term: '現金流再平衡', en: 'cash-flow', def: '用新錢買不足的。', example: '新錢買債。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '用新投入的錢再平衡（實際計算）', sliders: [
+          { id: 'stock', label: '目前股票部位', min: 0, max: 10000000, step: 10000, value: 750000, unit: '元' },
+          { id: 'bond', label: '目前債券部位', min: 0, max: 10000000, step: 10000, value: 250000, unit: '元' },
+          { id: 'target', label: '目標股票比例', min: 0, max: 100, step: 5, value: 60, unit: '%' },
+          { id: 'cash', label: '這次新投入的錢', min: 0, max: 2000000, step: 10000, value: 120000, unit: '元' },
+        ], compute: (v) => {
+          const total = v.stock + v.bond + v.cash;
+          const targetStock = total * v.target / 100;
+          const toStock = Math.min(v.cash, Math.max(0, targetStock - v.stock));
+          const stockAfter = v.stock + toStock;
+          const needSell = Math.max(0, stockAfter - targetStock);
+          return { rows: [
+            { label: '目前股票比例', value: `${((v.stock / Math.max(1, v.stock + v.bond)) * 100).toFixed(1)}%`, ratio: v.stock / Math.max(1, v.stock + v.bond) },
+            { label: '新錢買不足的一邊後', value: `股票 ${((stockAfter / total) * 100).toFixed(1)}%（買股 ${Math.round(toStock).toLocaleString()}、買債 ${Math.round(v.cash - toStock).toLocaleString()}）`, ratio: stockAfter / total },
+            { label: '要完全回到目標，還需賣出股票', value: `${Math.round(needSell).toLocaleString()} 元`, ratio: Math.min(1, needSell / total) },
+          ], note: '預設：股 75 萬、債 25 萬（股票 75%），目標 60%，新錢 12 萬全部買債券後股票約 67%；要完全回到 60% 還需要賣約 8 萬股票。可以選擇只用新錢逐步調整，或在門檻超過時才賣出。' };
+        } } },
+        { type: 'heading', id: 'cost', text: '再平衡的成本' },
+        { type: 'table', head: ['成本', '說明', '怎麼降低'], rows: [
+          ['手續費', '每次買賣都要付', '減少次數、合併成一次'],
+          ['證交稅', '賣出時才收：股票 0.3%、股票型 ETF 0.1%', '優先用新錢買進，減少賣出'],
+          ['買賣價差', '流動性差的工具價差大', '用成交量足夠的工具、限價單'],
+          ['稅與健保（海外）', '部分市場賣出有資本利得稅；台灣個人買賣上市股票的證券交易所得目前停徵', '依各市場規定'],
+        ], caption: '這也是「一檔涵蓋股債的基金」的優點之一：基金在內部自動再平衡，你不需要自己賣出。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="一個實用的再平衡流程：每年固定一天檢查；偏離小於門檻不動；偏離大於門檻，先用新錢與股利調整；仍不夠才賣出">
+          ${[['每年固定一天檢查', 'm0'], ['偏離 < 門檻：不動', 'm2'], ['偏離 ≥ 門檻：先用新錢', 'm3'], ['仍不夠：才賣出', 'm4']].map(([t, c], i) => `<rect x="20" y="${14 + i * 50}" width="520" height="42" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="280" y="${41 + i * 50}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${t}</text>`).join('')}
+        </svg>`, caption: '把這四行寫進你的一頁執行計畫（7-1），每年照做。' },
+        { type: 'heading', id: 'dividends', text: '深入：配息也可以用來再平衡' },
+        '配息型的基金或 ETF 每年發出的現金，也可以當作再平衡的新錢：直接拿去買比例不足的那一邊，而不是自動買回原本那一檔。這樣在不賣出的情況下，就能修正一部分的漂移。',
+        { type: 'heading', id: 'bands', text: '深入：門檻設多寬' },
+        '門檻太窄（例如偏離 1 個百分點就調），交易次數多、成本高；太寬（例如 20 個百分點），風險可能偏離很遠才處理。實務上常見的是 5 個百分點左右，或用「相對」的門檻：例如目標 20% 的資產，偏離超過目標的四分之一（5 個百分點）才調；目標 60% 的資產，偏離 5–10 個百分點才調。Vanguard 的研究提醒我們，精確的數字沒有那麼重要，重要的是規則固定、照著做。',
+      ],
+    },
+    mistakes: [
+      { wrong: '每個月都再平衡。', why: '成本增加，研究上沒有明顯好處。', right: '每年檢查一次，搭配門檻。' },
+      { wrong: '一偏離就賣出。', why: '產生不必要的稅費。', right: '先用新錢與配息調整。' },
+      { wrong: '沒有寫下規則。', why: '情緒會讓你在該做時做不到。', right: '把日期、門檻、步驟寫下來。' },
+    ],
+    keypoints: [
+      '沒有最佳頻率，有規則並持續執行最重要。',
+      '優先用新錢與配息再平衡，減少賣出。',
+      '每年檢查一次，偏離超過門檻才調。',
+    ],
+    sources: ['vanguard-rebal', 'tw-tax-fee'],
+  },
+});
+</script>
