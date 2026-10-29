@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Git 規範新增「Push 失敗」：Windows 上遇到 `SSL peer certificate or SSH remote key was not OK` 時改用 `git -c http.sslBackend=schannel` 重試，禁止關掉 `http.sslVerify`。
+
 ### Changed
 
 - `bookshelf-portal`：同一系列的書在書櫃上用同一高度；`titlePhrases` 每個詞組限制長度（中文 ≤ 7 字、英文 ≤ 14 字元）。

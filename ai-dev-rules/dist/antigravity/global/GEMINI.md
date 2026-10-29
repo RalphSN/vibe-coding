@@ -170,6 +170,10 @@
 - 合併前先跑過專案的驗證（見「測試與驗證」），0 個錯誤才合併。
 - 只新增檔案或新網站、沒有改到現有內容時，使用者授權過就可以直接合併；有改到現有內容時，先回報差異再問。
 
+### Push 失敗
+
+- Windows 上 push、pull 出現 `SSL peer certificate or SSH remote key was not OK`（公司網路的 SSL 檢查）時，改用 `git -c http.sslBackend=schannel push` 重試；不要設 `http.sslVerify false`。
+
 ### 禁止
 
 - 不 force push（`--force`、`-f`、`--force-with-lease` 都算）。
