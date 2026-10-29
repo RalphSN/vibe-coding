@@ -1,0 +1,166 @@
+<script>
+/* ==========================================================================
+   模組 2：財務比率
+   ========================================================================== */
+defineTerms({
+  'ROE': { en: 'return on equity', def: '股東權益報酬率：稅後淨利 ÷ 股東權益；股東每投入 1 元，一年賺多少。', example: '15.2 ÷ 90 ≈ 16.9%。', lesson: '2-1' },
+  '杜邦分析': { en: 'DuPont analysis', def: '把 ROE 拆成淨利率 × 資產週轉率 × 權益乘數，看 ROE 是靠獲利、效率還是槓桿。', example: '15.2% × 0.67 × 1.67 ≈ 16.9%。', lesson: '2-1' },
+  '資產週轉率': { en: 'asset turnover', def: '營收 ÷ 總資產；每 1 元資產一年創造多少營收。', example: '100 ÷ 150 ≈ 0.67。', lesson: '2-1' },
+  '權益乘數': { en: 'equity multiplier', def: '總資產 ÷ 股東權益；越高代表用越多負債放大。', example: '150 ÷ 90 ≈ 1.67。', lesson: '2-1' },
+  '利息保障倍數': { en: 'interest coverage', def: '營業利益 ÷ 利息費用；本業賺的錢夠付幾次利息。', example: '20 ÷ 1 ＝ 20 倍。', lesson: '2-2' },
+  '應收帳款天數': { en: 'days sales outstanding', def: '應收帳款 ÷ 營收 × 365；平均多少天才收到貨款。', example: '15 ÷ 100 × 365 ≈ 55 天。', lesson: '2-2' },
+  '存貨天數': { en: 'days inventory outstanding', def: '存貨 ÷ 銷貨成本 × 365；存貨平均放多久才賣掉。', example: '12 ÷ 60 × 365 ≈ 73 天。', lesson: '2-2' },
+  '董監質押': { en: 'pledged shares by insiders', def: '董事、監察人把持股拿去質押借款；比例很高時，股價大跌可能引發斷頭賣壓。', example: '質押比 60% 以上常被視為警訊。', lesson: '2-2' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '用三個獲利率比較同產業的公司',
+      '用杜邦分析拆解 ROE',
+      '分辨「好的高 ROE」與「靠槓桿的高 ROE」',
+    ],
+    analogy: {
+      text: ['兩家麵店一年都賺 100 萬。一家老闆只投入 200 萬開店，另一家投入了 1,000 萬。顯然前者比較會用錢：每投入 1 元一年賺 0.5 元，後者只有 0.1 元。這就是 [[ROE]]：股東的錢有沒有被用得很有效率。', '但高 ROE 有三種來源：每碗麵賺得多（淨利率高）、翻桌率高（[[資產週轉率]]高）、或是大部分的錢是借來的（[[權益乘數]]高）。[[杜邦分析]]就是把 ROE 拆成這三塊，看它靠的是什麼。'],
+      limit: ['麵店的投入很容易算；公司的股東權益受會計處理、買回庫藏股、虧損等影響，ROE 有時會因為權益變小而「看起來」很高。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="杜邦分析：ROE 等於淨利率乘以資產週轉率乘以權益乘數；甲公司 15.2% 乘以 0.67 乘以 1.67 約等於 16.9%">
+        ${[['淨利率', '15.2%', '每 1 元營收賺多少', 'm1'], ['資產週轉率', '0.67', '資產用得多有效率', 'm2'], ['權益乘數', '1.67', '用了多少槓桿', 'm4']].map(([a, b, c, col], i) => `<rect x="${15 + i * 150}" y="50" width="130" height="130" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${80 + i * 150}" y="96" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="${80 + i * 150}" y="126" text-anchor="middle" font-size="18" font-weight="900" class="on-color">${b}</text><text x="${80 + i * 150}" y="156" text-anchor="middle" font-size="10" class="on-color">${c}</text>`).join('')}
+        ${[0, 1].map((i) => `<text x="${152 + i * 150}" y="122" text-anchor="middle" font-size="22" font-weight="900">×</text>`).join('')}
+        <text x="472" y="122" font-size="22" font-weight="900">＝</text>
+        <rect x="490" y="80" width="60" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="520" y="110" text-anchor="middle" font-size="12" font-weight="900" class="on-color">ROE</text><text x="520" y="132" text-anchor="middle" font-size="13" font-weight="900" class="on-color">16.9%</text>
+        <text x="280" y="220" text-anchor="middle" font-size="13">同樣的 ROE，靠第一、二項比靠第三項穩健</text>
+      </svg>`,
+      caption: '淨利率 ＝ 淨利 ÷ 營收；資產週轉率 ＝ 營收 ÷ 資產；權益乘數 ＝ 資產 ÷ 權益。三者相乘，營收與資產會互相抵銷，剩下淨利 ÷ 權益。',
+    },
+    define: [
+      { term: 'ROE', en: 'ROE', def: '淨利 ÷ 股東權益。', example: '16.9%。' },
+      { term: '杜邦分析', en: 'DuPont', def: '拆成三個比率。', example: '獲利、效率、槓桿。' },
+      { term: '權益乘數', en: 'equity multiplier', def: '資產 ÷ 權益。', example: '1.67。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '杜邦分析計算器（實際計算）', sliders: [
+          { id: 'nm', label: '淨利率', min: -10, max: 50, step: 0.5, value: 15.2, unit: '%' },
+          { id: 'at', label: '資產週轉率', min: 0.1, max: 3, step: 0.05, value: 0.67, unit: '次' },
+          { id: 'em', label: '權益乘數', min: 1, max: 15, step: 0.05, value: 1.67, unit: '倍' },
+        ], compute: (v) => {
+          const roe = v.nm * v.at * v.em;
+          const debtRatio = (1 - 1 / v.em) * 100;
+          const roa = v.nm * v.at;
+          return { rows: [
+            { label: 'ROA（淨利 ÷ 資產）', value: `${roa.toFixed(1)}%`, ratio: Math.min(1, Math.abs(roa) / 30) },
+            { label: 'ROE', value: `${roe.toFixed(1)}%`, ratio: Math.min(1, Math.abs(roe) / 40) },
+            { label: '隱含的負債比', value: `${debtRatio.toFixed(0)}%`, ratio: debtRatio / 100 },
+          ], note: '預設甲公司：ROE 約 17%（比率四捨五入後）。只把權益乘數拉到 5（負債比 80%），ROE 變成約 51%，但本業沒有任何改善，風險卻大很多。銀行的權益乘數天生很高，所以看銀行要用不同的標準。' };
+        } } },
+        { type: 'heading', id: 'margins', text: '獲利率要和同業比' },
+        { type: 'table', head: ['產業類型（示意）', '毛利率', '資產週轉率', 'ROE 主要靠'], rows: [
+          ['軟體、品牌', '高', '中', '淨利率'],
+          ['零售、通路', '低', '高', '週轉率'],
+          ['代工、製造', '中低', '中', '效率與規模'],
+          ['銀行、金融', '不適用', '低', '槓桿'],
+        ], caption: '示意的方向，不是精確數字。跨產業比較獲利率意義不大；同產業內比較、看自己的趨勢才有用。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="兩家 ROE 都是 20% 的公司：甲靠高淨利率、低槓桿；乙靠低淨利率、高槓桿；景氣反轉時，乙的 ROE 會跌得多很多">
+          <rect x="40" y="40" width="230" height="140" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="155" y="76" text-anchor="middle" font-size="16" font-weight="900" class="on-color">A 公司 ROE 20%</text>
+          <text x="155" y="108" text-anchor="middle" font-size="13" class="on-color">淨利率高、槓桿 1.3 倍</text>
+          <text x="155" y="140" text-anchor="middle" font-size="13" class="on-color">景氣差時較穩</text>
+          <rect x="290" y="40" width="230" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="405" y="76" text-anchor="middle" font-size="16" font-weight="900" class="on-color">B 公司 ROE 20%</text>
+          <text x="405" y="108" text-anchor="middle" font-size="13" class="on-color">淨利率低、槓桿 4 倍</text>
+          <text x="405" y="140" text-anchor="middle" font-size="13" class="on-color">景氣差時大幅下滑</text>
+        </svg>`, caption: '同樣的 ROE，品質可能完全不同。' },
+        { type: 'heading', id: 'stable', text: '深入：看趨勢，不看單一年度' },
+        '一年的 ROE 很高，可能只是景氣高峰；連續五到十年都穩定在高水準，才比較可能代表公司有某種競爭優勢（品牌、技術、規模、轉換成本）。反過來，ROE 持續下滑，即使目前數字還不錯，也值得追問原因：是產業變得更競爭，還是公司把錢投入了報酬較低的地方？',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看 ROE 高低。', why: '可能是靠高槓桿撐起來的。', right: '用杜邦分析看 ROE 的來源。' },
+      { wrong: '跨產業比較毛利率。', why: '不同產業的結構差很多。', right: '和同業、和自己的歷史比。' },
+      { wrong: '用一年的 ROE 判斷競爭力。', why: '可能只是景氣高峰。', right: '看五到十年的穩定度。' },
+    ],
+    keypoints: [
+      'ROE ＝ 淨利率 × 資產週轉率 × 權益乘數。',
+      '靠獲利與效率的 ROE，比靠槓桿的穩健。',
+      '同業比較、看多年趨勢。',
+    ],
+    sources: ['mops', 'fsc-moneywise'],
+  },
+
+  '2-2': {
+    goals: [
+      '用利息保障倍數判斷償債能力',
+      '用應收帳款與存貨天數看營運資金',
+      '列出常見的財務與治理警訊',
+    ],
+    analogy: {
+      text: ['健康檢查不只看體重，還看血壓、血糖、膽固醇：體重正常的人也可能血管已經出問題。財報也是：獲利看起來很好的公司，可能應收帳款越來越收不回來，或存貨堆積如山。', '這一課的比率就是財務的「抽血報告」。它們不會告訴你股價會怎麼走，但可以幫你避開最明顯的地雷。'],
+      limit: ['健檢的正常值有醫學標準；財務比率的「正常」很依產業而定，警訊也只是需要追問的線索，不是定論。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="營運資金的循環：買進原料變成存貨，平均 73 天賣出；賣出後變成應收帳款，平均 55 天收回現金；付給供應商的應付帳款平均 61 天；現金循環天數約 67 天">
+        <circle cx="280" cy="135" r="95" fill="none" class="stroke-ink" stroke-width="3"/>
+        ${[['現金', 280, 40, 'm2'], ['存貨 73 天', 440, 135, 'm3'], ['應收帳款 55 天', 280, 230, 'm4'], ['付供應商 61 天', 120, 135, 'm1']].map(([t, x, y, c]) => `<rect x="${x - 70}" y="${y - 22}" width="140" height="44" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x}" y="${y + 6}" text-anchor="middle" font-size="13" font-weight="900" class="on-color">${t}</text>`).join('')}
+        <text x="280" y="140" text-anchor="middle" font-size="14" font-weight="900">現金循環 ≈ 67 天</text>
+      </svg>`,
+      caption: '現金循環天數 ＝ 存貨天數 ＋ 應收帳款天數 − 應付帳款天數。越長，公司越需要資金周轉。',
+    },
+    define: [
+      { term: '利息保障倍數', en: 'interest coverage', def: '營業利益 ÷ 利息。', example: '20 倍。' },
+      { term: '應收帳款天數', en: 'DSO', def: '平均多久收到錢。', example: '55 天。' },
+      { term: '存貨天數', en: 'DIO', def: '存貨平均放多久。', example: '73 天。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '財務健康檢查（單位：億元，實際計算）', sliders: [
+          { id: 'op', label: '營業利益', min: -20, max: 100, step: 0.5, value: 20 },
+          { id: 'int', label: '利息費用', min: 0.1, max: 30, step: 0.1, value: 1 },
+          { id: 'rev', label: '營收', min: 10, max: 500, step: 5, value: 100 },
+          { id: 'cogs', label: '銷貨成本', min: 5, max: 450, step: 5, value: 60 },
+          { id: 'ar', label: '應收帳款', min: 0, max: 200, step: 0.5, value: 15 },
+          { id: 'inv', label: '存貨', min: 0, max: 200, step: 0.5, value: 12 },
+          { id: 'ap', label: '應付帳款', min: 0, max: 200, step: 0.5, value: 10 },
+        ], compute: (v) => {
+          const cov = v.op / v.int; const dso = v.ar / v.rev * 365; const dio = v.inv / v.cogs * 365; const dpo = v.ap / v.cogs * 365;
+          return { rows: [
+            { label: '利息保障倍數', value: `${cov.toFixed(1)} 倍`, ratio: Math.min(1, Math.max(0, cov) / 20) },
+            { label: '應收帳款天數', value: `${dso.toFixed(0)} 天`, ratio: Math.min(1, dso / 180) },
+            { label: '存貨天數', value: `${dio.toFixed(0)} 天`, ratio: Math.min(1, dio / 180) },
+            { label: '現金循環天數', value: `${(dso + dio - dpo).toFixed(0)} 天`, ratio: Math.min(1, Math.max(0, dso + dio - dpo) / 180) },
+          ], note: '預設甲公司：利息保障 20 倍、收款約 55 天、存貨約 73 天、現金循環約 67 天。把應收帳款拉到 40：收款天數變成約 146 天，營收「賺到了」，錢卻遲遲收不回來，這是最常見的財報警訊之一。' };
+        } } },
+        { type: 'heading', id: 'flags', text: '常見的警訊清單' },
+        { type: 'table', head: ['警訊', '可能代表'], rows: [
+          ['應收帳款成長遠快於營收', '放寬收款條件衝業績，或營收認列有問題'],
+          ['存貨大增、營收沒增', '產品賣不掉，未來可能跌價損失'],
+          ['營業現金流長期低於淨利', '獲利沒有變成現金（1-3）'],
+          ['利息保障倍數持續下降、低於 3 倍', '本業賺的錢快付不起利息'],
+          ['頻繁更換會計師、財報延遲公告', '內部控制或帳務可能有問題'],
+          ['大額、複雜的關係人交易', '利益可能被移轉'],
+          ['董監持股低、質押比高', '經營者與股東利益不一致；股價大跌時可能有斷頭賣壓'],
+          ['一再現金增資，但獲利沒有成長', '用股東的錢補洞'],
+        ], caption: '任何一項都不是定論，而是需要追問的線索：去看附註、公司說明、同業的情況。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="財報檢查的三個層次：先看數字的趨勢，再看比率的異常，最後看治理與附註；每一層都在問：這個數字背後的故事合不合理">
+          ${[['1 趨勢', '營收、獲利、現金流', 'm2'], ['2 比率', '天數、倍數、獲利率', 'm3'], ['3 治理', '附註、質押、關係人', 'm4']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="40" width="165" height="130" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="92" text-anchor="middle" font-size="18" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="122" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="205" text-anchor="middle" font-size="13">每一層都在問：這個數字背後的故事合不合理？</text>
+        </svg>`, caption: '避開地雷比挑到飆股更重要：一檔股票跌 80%，要漲 400% 才回得來（第三部 3-1）。' },
+        { type: 'heading', id: 'pledge', text: '深入：台灣特有的資料' },
+        '台灣的公開資訊觀測站除了財報，還有很多治理相關的資料：董監事持股與[[董監質押]]比例、內部人持股轉讓申報、重大訊息、股東會年報。這些資料是免費、公開的，對個人投資人來說是很好的「第二層檢查」：財報看起來沒問題，但經營者正在大量質押或申報轉讓持股，就值得多問一句為什麼。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看獲利，不看應收與存貨。', why: '獲利可能只是帳面上的。', right: '追蹤天數的變化。' },
+      { wrong: '把一個警訊當成定論。', why: '可能有合理的原因。', right: '當作追問的線索，去看附註與說明。' },
+      { wrong: '忽略治理資料。', why: '經營者的行為常比數字更早透露問題。', right: '看質押、持股轉讓與重大訊息。' },
+    ],
+    keypoints: [
+      '利息保障倍數看償債；應收與存貨天數看營運資金。',
+      '應收成長快於營收、存貨大增，是常見警訊。',
+      '治理資料（質押、轉讓、關係人）是第二層檢查。',
+    ],
+    sources: ['mops', 'fsc-moneywise'],
+  },
+});
+</script>

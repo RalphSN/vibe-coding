@@ -1,0 +1,393 @@
+<script>
+/* ==========================================================================
+   模組 4：債務的本質
+   ========================================================================== */
+defineTerms({
+  '本金': { en: 'principal', def: '借來的那筆錢本身，不含利息。', example: '借 30 萬，本金就是 30 萬。', lesson: '4-1' },
+  '年利率': { en: 'annual interest rate', def: '一年要付多少比例的利息；銀行報價通常是名目年利率。', example: '年利率 8%：借 100 元一年利息約 8 元。', lesson: '4-1' },
+  '總費用年百分率': { en: 'APR (total cost)', def: '把利息加上開辦費、帳管費等所有費用，換算成一個年百分率；比較貸款時看這個，而不是廣告上的最低利率。', example: '利率 2.88%，加上費用後總費用年百分率可能超過 4%。', lesson: '4-1' },
+  '本息平均攤還': { en: 'amortizing loan', def: '每期繳一樣的金額，前期大多是利息、後期大多是本金；房貸、信貸最常見的還法。', example: '30 萬、8%、5 年：每月約 6,083 元。', lesson: '4-1' },
+  '槓桿': { en: 'leverage', def: '用借來的錢放大能動用的資金；賺的時候放大獲利，賠的時候也放大虧損。', example: '自備 200 萬、貸款 800 萬買 1,000 萬的房子。', lesson: '4-2' },
+  '消費性債務': { en: 'consumer debt', def: '為了消費（而不是取得資產或提升收入能力）而借的錢。', example: '用信用卡分期買手機、旅遊刷卡未繳清。', lesson: '4-2' },
+  '最低應繳金額': { en: 'minimum payment', def: '信用卡帳單上「至少要繳」的金額；只繳這個不算逾期，但沒繳的部分會產生循環利息。', example: '一般消費 2.5 萬，最低應繳約 2,500 元起。', lesson: '4-3' },
+  '預借現金': { en: 'cash advance', def: '用信用卡直接借出現金；通常要付手續費，而且從借出當天就開始計息、沒有免息期。', example: '每筆一定比例加上固定金額的手續費。', lesson: '4-3' },
+  '違約金': { en: 'late fee', def: '沒有在期限內繳足最低應繳金額時，銀行收的費用；和循環利息分開計算。', example: '最多連收 3 期，上限 300、400、500 元。', lesson: '4-3' },
+  '聯徵': { en: 'JCIC credit report', def: '財團法人金融聯合徵信中心的信用報告；銀行審核貸款與信用卡時會查詢。', example: '個人信用評分 200～800 分。', lesson: '4-4' },
+  '額度使用率': { en: 'credit utilization', def: '信用卡已使用的金額佔總額度的比例。', example: '總額度 10 萬、已刷 6 萬 → 60%。', lesson: '4-4' },
+});
+
+const LOAN_PAY = (P, annual, years) => { const r = annual / 12; const n = years * 12; return r === 0 ? P / n : (P * r) / (1 - (1 + r) ** -n); };
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '分辨單利、複利與本息平均攤還',
+      '用總費用年百分率比較不同的貸款',
+      '算出一筆貸款的月付與總利息',
+    ],
+    analogy: {
+      text: ['借錢就像租東西：租車要付租金，借錢要付的「租金」就是利息。租金用「每年多少 %」來報價，就是[[年利率]]。', '但租車行還可能收清潔費、保險費、手續費；比較時要看「全部加起來每年多少」，而不是只看廣告上的日租價。借錢也一樣，要看[[總費用年百分率]]。'],
+      limit: ['租車到期把車還回去就結束；借錢除了還[[本金]]，利息還可能「利上加利」，所以時間越長，差距越大。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="本息平均攤還的月付組成：每期金額一樣，前期大部分是利息、本金很少；隨時間利息部分越來越少，本金部分越來越多">
+        <line x1="50" y1="210" x2="530" y2="210" class="stroke-ink" stroke-width="2"/>
+        ${Array.from({ length: 10 }, (_, i) => { const interestH = 120 * (1 - i / 10) ** 1.4 + 8; return `<rect x="${60 + i * 46}" y="${50}" width="38" height="${160 - interestH}" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><rect x="${60 + i * 46}" y="${210 - interestH}" width="38" height="${interestH}" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/>`; }).join('')}
+        <text x="60" y="36" font-size="14" font-weight="900">每期繳一樣多</text>
+        <rect x="330" y="20" width="16" height="16" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="352" y="33" font-size="13">本金</text>
+        <rect x="410" y="20" width="16" height="16" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="432" y="33" font-size="13">利息</text>
+        <text x="290" y="236" text-anchor="middle" font-size="13">第 1 期 → 最後一期</text>
+      </svg>`,
+      caption: '示意比例。利息是「剩餘本金 × 月利率」，前期剩餘本金大，所以利息佔大部分；提前還款最省利息的時間也是前期。',
+    },
+    define: [
+      { term: '年利率', en: 'annual interest rate', def: '一年的利息比例。', example: '8%。' },
+      { term: '總費用年百分率', en: 'APR', def: '利息加所有費用的年百分率。', example: '比較貸款看這個。' },
+      { term: '本息平均攤還', en: 'amortizing loan', def: '每期繳一樣、利息遞減。', example: '房貸、信貸。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'simple-compound', text: '單利與複利' },
+        '單利只對本金算利息；複利則會把已經產生的利息加回本金，下一期連利息也要算利息。存錢時複利是朋友，借錢時是敵人。信用卡循環利息就是按日、對未繳餘額計息，沒有繳的利息會滾進下一期的餘額（4-3）。',
+        { type: 'table', head: ['', '公式', '借 10 萬、年利率 15%、3 年不還'], rows: [
+          ['單利', '本金 × 利率 × 年數', '利息 4.5 萬'],
+          ['每年複利', '本金 ×（1 ＋ 利率）^年數 − 本金', '利息約 5.2 萬'],
+          ['72 法則', '72 ÷ 年利率 ≈ 翻倍年數', '約 4.8 年翻倍（精確是 5 年）'],
+        ], caption: '72 法則是心算工具：利率越高越不準，但足以感受「15% 的債大約 5 年就會滾成兩倍」。' },
+        { type: 'heading', id: 'amortize', text: '月付怎麼算' },
+        '本息平均攤還的月付公式是：月付 ＝ 本金 × r ÷ (1 − (1 ＋ r)^−n)，其中 r 是月利率（年利率 ÷ 12），n 是總期數。不需要背，下面的試算就是用這個公式。',
+        { type: 'widget', name: 'knobs', props: { title: '貸款試算：月付與總利息（本息平均攤還，實際計算）', sliders: [
+          { id: 'p', label: '借款金額', min: 10000, max: 10000000, step: 10000, value: 300000, unit: '元' },
+          { id: 'rate', label: '年利率', min: 0, max: 16, step: 0.1, value: 8, unit: '%' },
+          { id: 'years', label: '期數（年）', min: 1, max: 40, step: 1, value: 5, unit: '年' },
+          { id: 'fee', label: '開辦費等一次性費用', min: 0, max: 20000, step: 500, value: 0, unit: '元' },
+        ], compute: (v) => {
+          const m = LOAN_PAY(v.p, v.rate / 100, v.years);
+          const total = m * v.years * 12;
+          const interest = total - v.p;
+          return { rows: [
+            { label: '每月還款', value: `${Math.round(m).toLocaleString()} 元`, ratio: Math.min(1, m / 60000) },
+            { label: '總利息', value: `${Math.round(interest).toLocaleString()} 元`, ratio: Math.min(1, interest / v.p) },
+            { label: '總共要付（含費用）', value: `${Math.round(total + v.fee).toLocaleString()} 元`, ratio: Math.min(1, (total + v.fee) / (v.p * 2)) },
+            { label: '利息加費用佔本金', value: `${(((interest + v.fee) / v.p) * 100).toFixed(1)}%`, ratio: Math.min(1, (interest + v.fee) / v.p) },
+          ], note: '30 萬、8%、5 年：每月約 6,083 元，總利息約 6.5 萬。同樣 30 萬改成 15%：月付約 7,137 元，總利息約 12.8 萬，接近兩倍。' };
+        } } },
+        { type: 'heading', id: 'apr', text: '比較貸款：看總費用年百分率' },
+        '廣告上的「最低 x%」通常是條件最好的客戶、或只有前幾期的優惠。台灣的信用貸款依銀行公開揭露，年利率大約從 3% 到 15%、加上費用後的總費用年百分率大約 4% 到 16%；同一家銀行對不同的人，差距可以到好幾倍。',
+        { type: 'table', head: ["方案 A","方案 B"], rows: [["前 3 期利率 0.01%","全期利率 5.8%"],["第 4 期起 6.5%","開辦費 3,000 元"],["開辦費 9,000 元","沒有提前還款違約金"],["**結果**：廣告數字漂亮，但總費用年百分率可能比較高。","**結果**：看起來普通，總成本可能比較低。"]], caption: "兩個貸款方案，哪個便宜？" },
+        { type: 'callout', variant: 'tip', title: '差在哪裡', body: ["只比較同一個指標：總費用年百分率（銀行依法要揭露）。","也要看提前清償違約金：打算提早還的人，這條很重要。"] },
+        { type: 'heading', id: 'nominal-real', text: '名目利率與實質利率' },
+        '3-2 提過存款的實質利率；借款也一樣：名目利率 2.3% 的房貸，在通膨 2% 左右的時期，實質負擔接近 0。這是低利房貸常被稱為「好債」的原因之一，但只在通膨持續、你的收入也跟著成長時才成立。',
+        { type: 'heading', id: 'rate-parts', text: '深入：利率是怎麼組成的' },
+        '任何一筆借款的利率，可以拆成兩部分：沒有風險時的資金成本，加上「借給你」的風險貼水。前者大致跟著央行政策利率與市場利率走；後者看的是你還不出來的可能性，以及借款有沒有擔保品。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="利率的組成：每一種借款的利率都是基準利率加上風險貼水；房貸有房子擔保、風險貼水最小；信貸沒有擔保、風險貼水較大；信用卡循環無擔保且使用者風險較高、貼水最大">
+          ${[['房貸', 0.25, 'm2'], ['信貸', 0.6, 'm3'], ['卡債', 1, 'm4']].map(([t, r, c], i) => `<rect x="${60 + i * 160}" y="${200 - 50}" width="110" height="50" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><rect x="${60 + i * 160}" y="${150 - 120 * r}" width="110" height="${120 * r}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${115 + i * 160}" y="230" text-anchor="middle" font-size="15" font-weight="900">${t}</text>`).join('')}
+          <text x="40" y="180" text-anchor="end" font-size="12">基準</text>
+          <text x="280" y="20" text-anchor="middle" font-size="14" font-weight="900">上：風險貼水　下：基準利率（示意）</text>
+        </svg>`, caption: '信用卡循環利率高，不是因為銀行比較貪心，而是無擔保、使用者違約風險高、還有營運成本。這也代表：你的信用越好，能拿到的貼水越小（4-4）。' },
+        { type: 'heading', id: 'daily', text: '深入：按日計息' },
+        '信用卡循環利息與很多貸款都是按日計算：年利率 ÷ 365 × 天數 × 餘額。所以「早幾天還」也有意義，尤其是卡債：每提早一天，就少一天的利息。也因為按日計息，月中多還一筆，比月底才還省一點。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看廣告最低利率。', why: '前幾期優惠、開辦費會讓實際成本更高。', right: '比較總費用年百分率。' },
+      { wrong: '只看月付金額，拉長期數讓月付變小。', why: '期數越長，總利息越多。', right: '同時看月付與總利息。' },
+      { wrong: '以為每期的本金和利息比例都一樣。', why: '前期利息佔大部分。', right: '提前還款越早做，省下的利息越多。' },
+    ],
+    keypoints: [
+      '比較貸款看總費用年百分率，不看廣告最低利率。',
+      '本息平均攤還：前期多利息，提前還款越早越省。',
+      '72 ÷ 利率 ≈ 翻倍年數，借錢時也適用。',
+    ],
+    sources: ['taishin-loan', 'mortgage-2026', 'cpi-2026-09'],
+  },
+
+  '4-2': {
+    goals: [
+      '用四個問題判斷一筆債是好債還是壞債',
+      '說出槓桿如何同時放大獲利與虧損',
+      '把常見的台灣借款依利率與用途排序',
+    ],
+    analogy: {
+      text: ['刀子本身沒有好壞：廚師用它做菜，用錯就會受傷。債務也是工具：用低成本的錢買一個會產生收入、或長期保值的東西，是「好用的刀」；用高成本的錢買一個馬上貶值、而且不必要的東西，就是「割到自己」。', '所以「好債 vs 壞債」不是看債的名字，而是看這筆錢的成本、用途、能不能負擔。房貸可以是好債，也可以因為借太多而變成壓垮你的壞債。'],
+      limit: ['刀子不會自己變鈍或變利；債務的「好壞」會隨利率、收入、資產價格變化。今天的好債，升息或失業後可能變成壞債。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="債務的兩個軸：橫軸是利率高低，縱軸是用途能否產生收入或保值；左上是低利且產生價值的好債，右下是高利且用於消費的壞債">
+        <line x1="60" y1="240" x2="530" y2="240" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="240" class="stroke-ink" stroke-width="2"/>
+        <text x="295" y="262" text-anchor="middle" font-size="13" font-weight="900">利率：低 → 高</text>
+        <text x="34" y="80" text-anchor="middle" font-size="12" font-weight="900">產生</text><text x="34" y="96" text-anchor="middle" font-size="12" font-weight="900">價值</text><text x="34" y="190" text-anchor="middle" font-size="12" font-weight="900">消費</text>
+        <rect x="70" y="30" width="220" height="95" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="180" y="70" text-anchor="middle" font-size="15" font-weight="900" class="on-color">較好的債</text><text x="180" y="96" text-anchor="middle" font-size="12" class="on-color">自住房貸、學貸</text>
+        <rect x="300" y="30" width="220" height="95" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="410" y="70" text-anchor="middle" font-size="15" font-weight="900" class="on-color">要小心</text><text x="410" y="96" text-anchor="middle" font-size="12" class="on-color">高利借款投資、創業</text>
+        <rect x="70" y="135" width="220" height="95" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="180" y="175" text-anchor="middle" font-size="15" font-weight="900" class="on-color">可以但別多</text><text x="180" y="201" text-anchor="middle" font-size="12" class="on-color">零利率分期、車貸</text>
+        <rect x="300" y="135" width="220" height="95" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="410" y="175" text-anchor="middle" font-size="15" font-weight="900" class="on-color">壞債</text><text x="410" y="201" text-anchor="middle" font-size="12" class="on-color">卡債循環、預借現金</text>
+      </svg>`,
+      caption: '每一格都還要加上第三個問題：每月還款你負擔得起嗎？負擔不起，左上角的房貸也會變成壞債。',
+    },
+    define: [
+      { term: '槓桿', en: 'leverage', def: '用借來的錢放大資金。', example: '自備 2 成買房。' },
+      { term: '消費性債務', en: 'consumer debt', def: '為消費而借的錢。', example: '卡債、消費分期。' },
+      { term: '總費用年百分率', en: 'APR', def: '利息加費用的年百分率。', example: '比較貸款用。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'four', text: '判斷一筆債的四個問題' },
+        { type: 'list', ordered: true, items: [
+          '**用途**：這筆錢買到的東西，會產生收入、提升賺錢能力，或長期保值嗎？還是買了就開始貶值？',
+          '**成本**：總費用年百分率是多少？和這個東西能帶來的報酬比，哪個高？',
+          '**可負擔**：每月還款佔收入多少？收入中斷 6 個月還繳得出來嗎？（5-2）',
+          '**期限**：還款期間有沒有比這個東西的使用年限更長？（例如用 5 年信貸買只用 2 年的手機）',
+        ] },
+        { type: 'heading', id: 'spectrum', text: '台灣常見借款的利率光譜' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="常見借款的利率光譜：房貸約 2 到 3 percent，信貸約 3 到 15 percent，信用卡循環與現金卡最高 15 percent，民間借貸與地下錢莊可能更高且有法律風險">
+          <line x1="40" y1="130" x2="520" y2="130" class="stroke-ink" stroke-width="4"/>
+          ${[0, 5, 10, 15].map((p) => `<line x1="${40 + p * 26}" y1="122" x2="${40 + p * 26}" y2="138" class="stroke-ink" stroke-width="3"/><text x="${40 + p * 26}" y="158" text-anchor="middle" font-size="13" class="mono">${p}%</text>`).join('')}
+          <rect x="${40 + 2 * 26}" y="70" width="${1 * 26}" height="44" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="${40 + 2.5 * 26}" y="60" text-anchor="middle" font-size="13" font-weight="900">房貸</text>
+          <rect x="${40 + 3 * 26}" y="180" width="${12 * 26}" height="36" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="${40 + 9 * 26}" y="204" text-anchor="middle" font-size="13" font-weight="900" class="on-color">信用貸款（依信用條件差很多）</text>
+          <rect x="${40 + 13 * 26}" y="70" width="${2 * 26}" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${40 + 14 * 26}" y="60" text-anchor="middle" font-size="13" font-weight="900">卡債、現金卡（上限 15%）</text>
+          <text x="520" y="100" text-anchor="end" font-size="12">民間借貸：更高、有法律風險 →</text>
+        </svg>`, caption: '房貸：五大銀行新承做平均約 2.3%（2026 年初）；信貸：以銀行揭露為例約 3%～15%；卡債與現金卡：銀行法上限年利率 15%（2015 年 9 月起）。' },
+        { type: 'heading', id: 'leverage', text: '槓桿：放大鏡兩面都放大' },
+        { type: 'widget', name: 'knobs', props: { title: '自備款與貸款：資產漲跌對自有資金的影響（實際計算，不含利息與費用）', sliders: [
+          { id: 'price', label: '資產價格', min: 1000000, max: 30000000, step: 100000, value: 10000000, unit: '元' },
+          { id: 'down', label: '自備款比例', min: 5, max: 100, step: 5, value: 20, unit: '%' },
+          { id: 'move', label: '資產價格變動', min: -40, max: 40, step: 1, value: -10, unit: '%' },
+        ], compute: (v) => {
+          const own = v.price * v.down / 100;
+          const change = v.price * v.move / 100;
+          const ownAfter = own + change;
+          return { rows: [
+            { label: '自有資金', value: `${own.toLocaleString()} 元`, ratio: Math.min(1, own / 30000000) },
+            { label: '資產增減', value: `${change.toLocaleString()} 元`, ratio: Math.min(1, Math.abs(change) / 12000000) },
+            { label: '自有資金的報酬率', value: `${((change / own) * 100).toFixed(1)}%`, ratio: Math.min(1, Math.abs(change / own)) },
+            { label: '變動後的自有資金', value: `${ownAfter.toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, ownAfter) / 30000000) },
+          ], note: '自備 2 成時，資產跌 10%，自有資金就少一半（−50%）；跌 20%，自備款全部歸零，但貸款一毛都不會少。槓桿倍數 ＝ 1 ÷ 自備比例。' };
+        } } },
+        { type: 'heading', id: 'traps', text: '看起來像好債的陷阱' },
+        { type: 'table', head: ['情況', '為什麼危險'], rows: [
+          ['零利率分期', '本身不一定有利息，但讓「買得起」的門檻變低，容易同時背好幾筆；遲繳時通常會產生費用或利息'],
+          ['借信貸投資', '投資報酬不確定，貸款利息卻是確定的；跌的時候還要每月繳款'],
+          ['以貸養貸、房貸增貸消費', '把短期消費變成長期負債，總利息被拉長'],
+          ['買車剛好用到上限', '車子折舊快，貸款期間可能出現「車比債便宜」'],
+        ] },
+        { type: 'callout', variant: 'tip', title: '一句話判斷', body: ['如果這個東西你沒辦法用存款買，又不會讓你未來賺更多，那它通常就是你現在還不該買的東西。'] },
+        { type: 'heading', id: 'time-preference', text: '深入：借錢消費，是在付錢換「提早」' },
+        '借錢買一樣東西，本質上是付一筆費用，讓你提早擁有它。差別只在：這個「提早」值多少錢？用 15% 的卡債買一台 3 萬元的手機、兩年還完，大約要多付 4,900 元利息；等於是付 4,900 元，換取「現在就用、而不是存幾個月再買」。',
+        '這筆費用有時是值得的：例如工作需要一台電腦，晚三個月買會損失收入。但大部分消費性借款，買到的「提早」其實沒有那麼值錢；而且借錢讓未來的收入被預先占用，未來的你選擇會變少。',
+        { type: 'heading', id: 'bnpl', text: '深入：先買後付與帳單分期' },
+        { type: 'table', head: ['形式', '看起來', '實際上要看'], rows: [
+          ['商品 0 利率分期', '總價一樣，分次付', '有沒有手續費；遲繳的費用；是否讓你同時背太多筆'],
+          ['帳單分期', '大額帳單分幾期繳', '分期利率或手續費，換算成總費用年百分率常不低'],
+          ['先買後付（BNPL）', '結帳時選擇之後再付', '遲繳規則、是否回報信用紀錄、多個平台同時使用'],
+        ], caption: '判斷方法都一樣：換算總成本，並問自己「不分期我買得起嗎」。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '房貸、學貸一定是好債。', why: '借超過負擔能力，好債也會壓垮現金流。', right: '同時看成本、用途、負擔與期限。' },
+      { wrong: '零利率分期等於免費。', why: '它降低了消費門檻，並占用未來的現金流。', right: '分期前問：不分期我買得起嗎？' },
+      { wrong: '只看槓桿放大獲利的那一面。', why: '虧損也等比例放大，貸款不會因資產下跌而變少。', right: '用最壞情況試算自有資金會剩多少。' },
+    ],
+    keypoints: [
+      '好壞看用途、成本、可負擔、期限，不看名稱。',
+      '卡債與現金卡上限 15%，是成本最高的正規借款。',
+      '槓桿倍數 ＝ 1 ÷ 自備比例，漲跌都放大。',
+    ],
+    sources: ['mortgage-2026', 'taishin-loan', 'banking-act-47-1'],
+  },
+
+  '4-3': {
+    goals: [
+      '說出信用卡從刷卡到循環利息的完整流程',
+      '算出只繳最低應繳金額要多久才還得完',
+      '說明為什麼還卡債等於一筆穩賺 15% 的投資',
+    ],
+    analogy: {
+      text: ['信用卡像一個「先吃後付」的餐廳：只要在帳單期限內全部付清，吃飯不用多付一毛錢，還可能有回饋。可是只要沒付清，沒付的部分就開始按天收「延後付款費」，這就是[[循環利息]]，年利率最高可以到 15%。', '投資人常追求每年 5–8% 的報酬，同時卻放著一筆 15% 的卡債沒還。這就像一邊用水桶舀水，一邊讓水管以兩倍速度往外漏。'],
+      limit: ['餐廳的「延後付款費」通常是固定金額；循環利息會隨餘額與時間累積，而且還會疊加違約金與手續費，代價更難感受。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="信用卡的時間線：刷卡入帳、結帳日產生帳單、繳款截止日；全額繳清就沒有利息；只繳部分則未繳金額從各筆入帳日開始計算循環利息">
+        <line x1="30" y1="80" x2="530" y2="80" class="stroke-ink" stroke-width="3"/>
+        ${[['刷卡入帳', 70], ['結帳日', 240], ['繳款截止', 400]].map(([t, x]) => `<circle cx="${x}" cy="80" r="10" class="fill-surface stroke-ink" stroke-width="3"/><text x="${x}" y="58" text-anchor="middle" font-size="14" font-weight="900">${t}</text>`).join('')}
+        <path d="M400 92 L400 120 M160 120 L470 120 M160 120 L160 140 M470 120 L470 140" fill="none" class="stroke-ink" stroke-width="3"/>
+        <rect x="40" y="140" width="240" height="100" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="160" y="176" text-anchor="middle" font-size="16" font-weight="900" class="on-color">全額繳清</text>
+        <text x="160" y="204" text-anchor="middle" font-size="13" class="on-color">不用付利息</text>
+        <rect x="300" y="140" width="240" height="100" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="420" y="176" text-anchor="middle" font-size="16" font-weight="900" class="on-color">只繳部分或最低</text>
+        <text x="420" y="204" text-anchor="middle" font-size="13" class="on-color">未繳部分從入帳日起計息</text>
+        <text x="420" y="226" text-anchor="middle" font-size="12" class="on-color">（計息方式依各銀行約定）</text>
+      </svg>`,
+      caption: '「免息期」只屬於全額繳清的人。一旦開始循環，你等於在用最高 15% 的利率借錢。',
+    },
+    define: [
+      { term: '循環利息', en: 'revolving interest', def: '未繳清餘額的利息，上限年利率 15%。', example: '欠 10 萬一年約 1.5 萬。' },
+      { term: '最低應繳金額', en: 'minimum payment', def: '至少要繳、才不算逾期的金額。', example: '約一般消費的 10% 起。' },
+      { term: '違約金', en: 'late fee', def: '沒繳足最低應繳時的費用。', example: '300、400、500 元。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'rules', text: '台灣的規則' },
+        { type: 'table', head: ['項目', '規定或常見做法', '狀態'], rows: [
+          ['循環信用利率上限', '自 2015 年 9 月 1 日起，信用卡循環信用利率與現金卡利率，年利率不得超過 15%（銀行法第 47-1 條）', '法律條文'],
+          ['各人的利率', '銀行依信用狀況分級訂定差別利率，最高 15%', '依約定條款'],
+          ['最低應繳金額', '常見組成：當期一般消費約 10%、預借現金與前期未清償約 5%，再加上分期本息、超過額度的金額、利息與費用；有的銀行另有最低金額', '依各銀行約定條款'],
+          ['違約金', '未繳足最低應繳時收取，最多連收 3 期，各期上限 300、400、500 元；當期應繳 1,000 元以下不收', '金管會規定（媒體報導）'],
+          ['預借現金', '要付手續費（常見是每筆一定比例加固定金額），而且沒有免息期', '依各銀行約定條款'],
+        ], caption: '15% 是利息上限，不包含違約金與手續費。你自己的數字，以信用卡帳單與約定條款為準。' },
+        { type: 'heading', id: 'minimum', text: '只繳最低應繳：要還多久？' },
+        { type: 'widget', name: 'knobs', props: { title: '卡債還款試算（實際計算；最低應繳簡化為「餘額 × 比例 ＋ 當月利息」，並有最低金額）', sliders: [
+          { id: 'bal', label: '目前卡債餘額', min: 10000, max: 500000, step: 5000, value: 100000, unit: '元' },
+          { id: 'apr', label: '循環利率（年）', min: 5, max: 15, step: 0.5, value: 15, unit: '%' },
+          { id: 'pct', label: '最低應繳的本金比例', min: 2, max: 10, step: 1, value: 5, unit: '%' },
+          { id: 'extra', label: '每月多繳', min: 0, max: 20000, step: 500, value: 0, unit: '元' },
+        ], compute: (v) => {
+          let b = v.bal; let months = 0; let interest = 0;
+          while (b > 0.5 && months < 600) {
+            const i = (b * v.apr) / 100 / 12;
+            interest += i;
+            const pay = Math.min(Math.max(1000, (b * v.pct) / 100 + i) + v.extra, b + i);
+            b = b + i - pay;
+            months += 1;
+          }
+          return { rows: [
+            { label: '要還幾個月', value: months >= 600 ? '超過 50 年' : `${months} 個月（約 ${(months / 12).toFixed(1)} 年）`, ratio: Math.min(1, months / 120) },
+            { label: '總共付的利息', value: `${Math.round(interest).toLocaleString()} 元`, ratio: Math.min(1, interest / v.bal) },
+            { label: '第一個月的利息', value: `${Math.round((v.bal * v.apr) / 100 / 12).toLocaleString()} 元`, ratio: Math.min(1, (v.bal * v.apr) / 100 / 12 / 6250) },
+          ], note: '10 萬、15%、只繳最低：約 54 個月（4.5 年），利息約 2.3 萬。每月多繳 2,000 元：縮短到 24 個月，利息約 1.3 萬。實際最低應繳的算法依銀行而不同，這裡只用來感受量級。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="兩條卡債餘額下降曲線：只繳最低時下降越來越慢、拖了 54 個月；每月多繳 2000 元時約 24 個月就歸零">
+          <line x1="50" y1="200" x2="530" y2="200" class="stroke-ink" stroke-width="2"/><line x1="50" y1="20" x2="50" y2="200" class="stroke-ink" stroke-width="2"/>
+          <path d="${(() => { let b = 100000; const pts = []; for (let m = 0; m <= 54; m += 1) { pts.push(`${m ? 'L' : 'M'}${(50 + m * 8.5).toFixed(1)} ${(200 - b / 100000 * 170).toFixed(1)}`); const i = b * 0.15 / 12; const pay = Math.min(Math.max(1000, b * 0.05 + i), b + i); b = Math.max(0, b + i - pay); } return pts.join(' '); })()}" fill="none" style="stroke:var(--m4)" stroke-width="4"/>
+          <path d="${(() => { let b = 100000; const pts = []; for (let m = 0; m <= 24; m += 1) { pts.push(`${m ? 'L' : 'M'}${(50 + m * 8.5).toFixed(1)} ${(200 - b / 100000 * 170).toFixed(1)}`); const i = b * 0.15 / 12; const pay = Math.min(Math.max(1000, b * 0.05 + i) + 2000, b + i); b = Math.max(0, b + i - pay); } return pts.join(' '); })()}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+          <text x="470" y="186" text-anchor="end" font-size="13" font-weight="900">只繳最低：54 個月</text>
+          <text x="260" y="120" font-size="13" font-weight="900">每月多繳 2,000：24 個月</text>
+          <text x="290" y="226" text-anchor="middle" font-size="13">月份 →</text>
+        </svg>`, caption: '只繳最低時，最低應繳隨餘額一起變小，所以後期幾乎都在付最低金額，尾巴拖得很長。' },
+        { type: 'heading', id: 'enemy', text: '為什麼是投資報酬的天敵' },
+        '還掉一塊錢 15% 的卡債，等於拿到一筆「每年 15%、零風險、不用繳稅」的報酬。很少有投資能穩定做到這樣。反過來，放著卡債去投資，投資要每年穩定超過 15% 才划得來，而且投資有虧損的可能，卡債利息卻每天確定在算。',
+        { type: 'table', head: ["拿去投資","先還卡債"], rows: [["投資報酬：不確定，可能是 −20% 到 ＋20%","卡債歸零，每年省下約 1.5 萬"],["卡債利息：確定每年約 1.5 萬","信用紀錄開始好轉（4-4）"],["市場下跌時，兩邊一起痛","之後把原本的還款金額改拿去投資"],["**結果**：要贏過 15% 才划算，而且還得承擔風險。","**結果**：確定的 15%，同時降低整體風險。"]], caption: "手上有 10 萬，同時欠 10 萬卡債" },
+        { type: 'callout', variant: 'tip', title: '差在哪裡', body: ["比較的不是「投資報酬率」，而是「投資報酬率 vs. 債務利率」。","預備金仍要保留一個月左右（3-2），其餘先清高利債。"] },
+        { type: 'callout', variant: 'tip', title: '信用卡的正確用法', body: ['設定自動扣繳「全額」，不是最低應繳。', '只刷「本來就會用現金付、而且已經有錢付」的東西；回饋是用卡的獎勵，不是消費的理由。', '一旦發現自己開始循環，先停用那張卡，把它當成卡債處理（模組 5）。'] },
+        { type: 'heading', id: 'rewards', text: '深入：回饋的數學' },
+        '信用卡回饋通常是消費金額的 0.5% 到幾 %。對全額繳清的人，這是真正的折扣；但只要有一個月循環，回饋就被利息吃光。用最簡單的比較：1% 的回饋，抵不過一個月的 15% 年利率循環（約 1.25%）。',
+        { type: 'table', head: ['情況', '一年刷 30 萬、回饋 1%', '結果'], rows: [
+          ['每月全額繳清', '回饋約 3,000 元', '淨賺 3,000 元'],
+          ['平均有 5 萬在循環、利率 15%', '回饋約 3,000 元，利息約 7,500 元', '淨虧約 4,500 元'],
+          ['為了回饋多刷 5 萬「本來不買」的東西', '多拿回饋 500 元', '多花 5 萬，淨虧約 4.95 萬'],
+        ] },
+        { type: 'heading', id: 'two-cards', text: '深入：為什麼很多人「不小心」開始循環' },
+        { type: 'list', items: [
+          '**自動扣繳設成最低應繳**：一開始就設錯，每月默默循環。',
+          '**帳戶餘額不足**：自動扣款失敗，又沒注意通知。',
+          '**大額消費「下個月再說」**：以為下期收入進來就能補上，結果又有新支出。',
+          '**卡太多張**：截止日分散，忘記其中一張。',
+        ] },
+        '每一種都有簡單的系統對策：自動扣繳設「全額」、扣款帳戶保留一點緩衝、大額消費前先確認錢已經在帳戶裡、卡片數量減到自己記得住的範圍。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只繳最低應繳，覺得「有在還」就好。', why: '大部分錢在付利息，尾巴會拖好幾年。', right: '至少固定多繳，或改用較低利率的方式處理（5-3）。' },
+      { wrong: '用預借現金周轉。', why: '有手續費，而且從借出當天就計息。', right: '真的需要現金時先動用預備金。' },
+      { wrong: '有卡債時還在投資或存定存。', why: '幾乎沒有安全的投資能穩定贏過 15%。', right: '保留一個月預備金，其餘先還卡債。' },
+    ],
+    keypoints: [
+      '全額繳清才有免息期；循環利率上限年利率 15%。',
+      '只繳最低：10 萬大約要拖 4 年半。',
+      '還卡債 ＝ 穩賺 15% 的投資。',
+    ],
+    sources: ['banking-act-47-1', 'min-payment', 'late-fee'],
+  },
+
+  '4-4': {
+    goals: [
+      '說出聯徵信用評分的範圍與主要影響因素',
+      '用額度使用率與繳款紀錄維持良好信用',
+      '知道信用紀錄會影響哪些人生大事',
+    ],
+    analogy: {
+      text: ['信用像是一份長期的工作推薦信：寫推薦信的不是你的朋友，而是每一筆你借過、還過的錢。銀行沒辦法認識你，只能看這份紀錄來決定要不要借你、用多少利率借你。', '在台灣，這份紀錄主要放在[[聯徵]]中心。它沒有好壞的「標籤」，只有一筆筆的事實：準時還了嗎？借了多少？額度用掉幾成？最近是不是到處申請？'],
+      limit: ['推薦信可以重寫；信用紀錄裡的事實不能刪，只能用之後的好紀錄慢慢讓它變得不重要。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="影響聯徵信用評分的主要因素：繳款紀錄、負債與額度使用率、信用歷史長度、最近的申請與查詢；評分範圍 200 到 800 分">
+        <rect x="200" y="100" width="160" height="70" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="132" text-anchor="middle" font-size="16" font-weight="900" class="on-color">信用評分</text>
+        <text x="280" y="156" text-anchor="middle" font-size="13" class="on-color mono">200～800</text>
+        ${[['繳款紀錄', '有沒有遲繳、循環', 'm2', 20, 20], ['負債與使用率', '額度用掉幾成', 'm3', 380, 20], ['信用歷史長度', '和銀行往來多久', 'm1', 20, 190], ['申請與查詢', '短期內密集申請', 'm4', 380, 190]].map(([a, b, c, x, y]) => `<rect x="${x}" y="${y}" width="160" height="60" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 80}" y="${y + 26}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${a}</text><text x="${x + 80}" y="${y + 47}" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+        <path d="M180 50 L200 110 M380 50 L360 110 M180 220 L200 160 M380 220 L360 160" class="stroke-ink" stroke-width="3"/>
+      </svg>`,
+      caption: '聯徵沒有公開完整的評分模型與權重；這四個因素是業界普遍的說法。',
+    },
+    define: [
+      { term: '聯徵', en: 'JCIC', def: '金融聯合徵信中心的信用報告。', example: '200～800 分。' },
+      { term: '額度使用率', en: 'utilization', def: '已用金額 ÷ 總額度。', example: '60%。' },
+      { term: '循環利息', en: 'revolving interest', def: '未繳清的利息。', example: '最高 15%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'score', text: '分數怎麼讀' },
+        { type: 'list', items: [
+          '個人信用評分落在 200 到 800 分之間，分數越高代表信用品質越好。',
+          '200 分是固定評分，代表有信用不良紀錄（例如嚴重遲繳、呆帳）。',
+          '和銀行往來資料太少時，可能出現「暫時無法評分」，常被稱為「信用小白」。',
+          '本人自己向聯徵申請信用報告，不會影響分數；金融機構因為你申請貸款而查詢，則可能被納入考量。',
+        ] },
+        { type: 'heading', id: 'factors', text: '會拉低分數的行為' },
+        { type: 'table', head: ['行為', '為什麼', '怎麼做比較好'], rows: [
+          ['信用卡或貸款遲繳', '最直接的「沒有守約」證據', '設定自動扣繳'],
+          ['長期只繳最低、動用循環', '代表資金吃緊', '全額繳清；有卡債先處理（模組 5）'],
+          ['預借現金', '常被視為急需現金的訊號', '用預備金代替'],
+          ['額度使用率很高', '刷到快滿，代表依賴借貸', '把使用率控制在較低水準'],
+          ['短期內向多家銀行申請', '看起來像到處借錢', '一次只申請真正需要的'],
+        ], caption: '以上整理自銀行與理財網站的公開說明；各銀行的審核標準也不同。' },
+        { type: 'widget', name: 'knobs', props: { title: '額度使用率試算（實際計算）', sliders: [
+          { id: 'limit', label: '所有信用卡總額度', min: 10000, max: 1000000, step: 10000, value: 150000, unit: '元' },
+          { id: 'used', label: '目前已刷、未繳的金額', min: 0, max: 1000000, step: 1000, value: 45000, unit: '元' },
+        ], compute: (v) => {
+          const u = Math.min(1, v.used / v.limit);
+          const level = u < 0.3 ? '較低，通常不會是問題' : u < 0.7 ? '偏高，留意不要再增加' : '很高，可能被視為依賴借貸';
+          return { rows: [
+            { label: '額度使用率', value: `${(u * 100).toFixed(1)}%`, ratio: u },
+            { label: '判讀（經驗法則）', value: level, ratio: u },
+          ], note: '30% 這類門檻是業界常見的經驗說法，不是聯徵公布的標準。重點是：全額繳清的人，使用率在帳單繳完後就會回到 0。' };
+        } } },
+        { type: 'heading', id: 'why', text: '信用影響的不只是能不能借' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="信用紀錄影響的事：房貸能不能核准與利率、信用貸款的利率、信用卡額度，以及部分工作或租屋的審核">
+          ${[['房貸', '核准與利率', 'm2'], ['信用貸款', '利率差好幾倍', 'm3'], ['信用卡', '核卡與額度', 'm1'], ['其他', '部分租屋、工作審核', 'm5']].map(([a, b, c], i) => `<rect x="${12 + i * 137}" y="40" width="125" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="92" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 137}" y="120" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="196" text-anchor="middle" font-size="13">同樣借 800 萬、30 年：利率差 0.5%，總利息差距可達數十萬</text>
+        </svg>`, caption: '信用好壞最終反映在「利率」上；利率又會被期數放大成很大的金額（4-1）。' },
+        { type: 'heading', id: 'build', text: '從零開始建立信用' },
+        { type: 'list', ordered: true, items: [
+          '有穩定收入後，申請一張自己用得到的信用卡（不必追求多張）。',
+          '只刷日常必要、本來就會付的支出，設定自動扣繳全額。',
+          '長時間維持這張卡，讓信用歷史變長；不常用的舊卡不一定要急著剪掉。',
+          '需要借款時，先比較再申請，避免短時間密集送件。',
+        ] },
+        { type: 'callout', variant: 'tip', title: '查自己的信用報告', body: ['本人可以向聯徵中心申請自己的信用報告（臨櫃、郵寄或線上），確認有沒有錯誤紀錄。發現錯誤時，向通報資料的金融機構提出更正。'] },
+        { type: 'heading', id: 'identity', text: '深入：信用紀錄也需要保護' },
+        '信用紀錄記在你的身分底下，所以身分被冒用時，別人借的錢也可能出現在你的報告上。保護方式和保護帳戶密碼類似：',
+        { type: 'list', items: [
+          '不把身分證、健保卡、存摺照片傳給不認識的人，包括「貸款代辦」「求職」。',
+          '不借名給別人申請貸款、手機門號或信用卡；名義上是你，債就是你的。',
+          '定期申請自己的信用報告，看有沒有不認識的查詢或帳戶。',
+          '接到自稱銀行、檢警、存保公司要你提供資料或轉帳的電話與簡訊，一律掛掉，自己查官方電話回撥。',
+        ] },
+        { type: 'heading', id: 'repair', text: '深入：信用受損之後' },
+        '遲繳、協商、呆帳這類紀錄不能刪除，只能停止新的負面紀錄，並用一段時間的準時還款讓它「變舊」。實務上能做的是：先把所有帳戶恢復準時繳款、降低額度使用率、避免短期密集申請。時間本身就是修復信用最主要的工具。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為從不用信用卡、從不借錢，信用就最好。', why: '沒有紀錄時銀行無從評估。', right: '用一張卡、全額繳清，累積紀錄。' },
+      { wrong: '以為查自己的信用報告會扣分。', why: '本人查詢不納入評分。', right: '定期查，確認沒有錯誤。' },
+      { wrong: '短時間到處申請貸款比較利率。', why: '密集的申請查詢可能被視為資金急迫。', right: '先用銀行的試算與揭露比較，再挑少數送件。' },
+    ],
+    keypoints: [
+      '聯徵評分 200～800 分，200 分代表有不良紀錄。',
+      '準時全額繳款，是最重要的信用行為。',
+      '信用好壞最後反映在利率，期數會把差距放大。',
+    ],
+    sources: ['jcic-score', 'banking-act-47-1', 'fsc-moneywise'],
+  },
+});
+</script>

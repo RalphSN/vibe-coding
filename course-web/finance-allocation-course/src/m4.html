@@ -1,0 +1,176 @@
+<script>
+/* ==========================================================================
+   模組 4：費用
+   ========================================================================== */
+defineTerms({
+  '總費用率': { en: 'total expense ratio', def: '基金一年內從資產中扣除的所有費用（經理費、保管費及其他）佔平均資產的比例；比只看經理費完整。', example: '經理費 0.15%＋保管費 0.03%＋其他 → 總費用率 0.2%。', lesson: '4-1' },
+  '申購手續費': { en: 'front-end load', def: '買進共同基金時，銷售機構收取的一次性費用；常有折扣。', example: '牌告 3%，打 3 折後 0.9%。', lesson: '4-1' },
+  '換匯成本': { en: 'FX cost', def: '台幣換外幣、外幣換回台幣時，銀行買賣匯率之間的價差，以及匯款的手續費。', example: '每次換匯約損失 0.1%–0.5%（依銀行與幣別）。', lesson: '4-1' },
+  '週轉率': { en: 'turnover', def: '一年內買賣的金額佔資產的比例；越高，交易成本與稅越高。', example: '主動基金週轉率 100%：一年換一次所有持股。', lesson: '4-1' },
+});
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '列出投資的每一層費用',
+      '分辨一次性成本與持續成本',
+      '算出自己一年的總成本',
+    ],
+    analogy: {
+      text: ['買機票時，票價只是開始：還有燃油附加費、行李費、選位費、刷卡手續費。真正的成本是全部加起來。投資也一樣，[[總費用率]]、[[申購手續費]]、交易手續費、證交稅、[[換匯成本]]，每一層都很小，加起來卻可能吃掉一大塊報酬。', '費用是投資裡少數「確定」的東西：報酬不確定，但費用一定會被扣。所以每降低一點費用，都等於確定地提高一點報酬（第三部 6-2）。'],
+      limit: ['機票的費用會清楚列在結帳頁；投資的持續成本（內扣費用）是從淨值裡默默扣掉的，不會寄帳單給你，所以更容易被忽略。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="投資費用的兩類：一次性成本包含申購手續費、交易手續費、證交稅、換匯成本；持續成本包含基金內扣的總費用率、平台或帳戶管理費；持有越久，持續成本的影響越大">
+        <rect x="20" y="20" width="250" height="220" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+        <text x="145" y="56" text-anchor="middle" font-size="17" font-weight="900" class="on-color">一次性成本</text>
+        ${['申購手續費（共同基金）', '交易手續費（股票、ETF）', '證交稅（賣出時）', '換匯成本（海外）'].map((t, i) => `<text x="145" y="${96 + i * 34}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+        <rect x="290" y="20" width="250" height="220" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="415" y="56" text-anchor="middle" font-size="17" font-weight="900" class="on-color">持續成本</text>
+        ${['總費用率（內扣）', '帳戶、平台管理費', '投資型保單的各項費用', '高週轉帶來的隱性交易成本'].map((t, i) => `<text x="415" y="${96 + i * 34}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+        <text x="280" y="266" text-anchor="middle" font-size="13">交易越頻繁，左邊越重；持有越久，右邊越重</text>
+      </svg>`,
+      caption: '長期投資人最該盯的是右邊；短線交易者則常被左邊吃掉。',
+    },
+    define: [
+      { term: '總費用率', en: 'TER', def: '一年的全部內扣費用。', example: '0.2%。' },
+      { term: '申購手續費', en: 'load', def: '買基金時的一次性費用。', example: '3% 打折。' },
+      { term: '換匯成本', en: 'FX cost', def: '匯差加匯費。', example: '0.1%–0.5%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '我一年的總成本（實際計算，數字請依你的工具與券商填）', sliders: [
+          { id: 'amt', label: '投資金額', min: 100000, max: 20000000, step: 100000, value: 2000000, unit: '元' },
+          { id: 'ter', label: '加權總費用率', min: 0, max: 3, step: 0.05, value: 0.3, unit: '%' },
+          { id: 'turn', label: '一年賣出的比例（週轉）', min: 0, max: 200, step: 5, value: 10, unit: '%' },
+          { id: 'tax', label: '賣出時的證交稅率', min: 0, max: 0.3, step: 0.1, value: 0.1, unit: '%' },
+          { id: 'fee', label: '買賣手續費率（含折扣）', min: 0, max: 0.1425, step: 0.0025, value: 0.0855, unit: '%' },
+          { id: 'fx', label: '一年換匯的金額比例與成本', min: 0, max: 1, step: 0.05, value: 0, unit: '%' },
+        ], compute: (v) => {
+          const terCost = v.amt * v.ter / 100;
+          const trade = v.amt * v.turn / 100;
+          const tradeCost = trade * (v.tax + v.fee * 2) / 100;
+          const fxCost = v.amt * v.fx / 100;
+          const total = terCost + tradeCost + fxCost;
+          return { rows: [
+            { label: '內扣費用', value: `${Math.round(terCost).toLocaleString()} 元`, ratio: Math.min(1, terCost / (v.amt * 0.03)) },
+            { label: '交易手續費＋證交稅', value: `${Math.round(tradeCost).toLocaleString()} 元`, ratio: Math.min(1, tradeCost / (v.amt * 0.03)) },
+            { label: '換匯', value: `${Math.round(fxCost).toLocaleString()} 元`, ratio: Math.min(1, fxCost / (v.amt * 0.03)) },
+            { label: '一年總成本', value: `${Math.round(total).toLocaleString()} 元（${((total / v.amt) * 100).toFixed(3)}%）`, ratio: Math.min(1, total / (v.amt * 0.03)) },
+          ], note: '預設：200 萬、總費用率 0.3%、一年賣 10%（股票型 ETF 證交稅 0.1%、手續費 6 折），一年總成本約 6,500 元，其中九成以上是內扣。把週轉拉到 200%：交易成本變成主角。' };
+        } } },
+        { type: 'heading', id: 'where', text: '去哪裡找這些數字' },
+        { type: 'table', head: ['費用', '在哪裡看'], rows: [
+          ['ETF、基金的總費用率', '基金年報、公開說明書、投信網站的「費用率」或「總費用率」'],
+          ['申購手續費、轉換費', '銷售通路（銀行、券商、基金平台）的費率表'],
+          ['交易手續費折扣、最低手續費', '券商的費率表與活動條款'],
+          ['證交稅', '股票 0.3%、股票型 ETF 0.1%（賣出時）；債券 ETF 目前免證交稅至 2026 年底'],
+          ['換匯成本', '銀行牌告的買入、賣出匯率差，以及匯出、匯入手續費'],
+        ], caption: '債券 ETF 免證交稅的期限可能延長或結束，以主管機關公告為準。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="費用的層層疊加：一檔主動基金可能有申購手續費、較高的總費用率、高週轉的交易成本；透過銀行信託買還可能有信託管理費；加總後每年可能超過 2%">
+          ${[['總費用率', 1.5, 'm4'], ['高週轉的交易成本', 0.3, 'm5'], ['信託、平台管理費', 0.2, 'm1'], ['申購手續費（攤提）', 0.3, 'm3']].reduce((acc, [t, p, c], i) => { const x = acc.x; acc.html += `<rect x="${x}" y="80" width="${p * 200}" height="70" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + p * 100}" y="${i % 2 ? 175 : 70}" text-anchor="middle" font-size="12" font-weight="900">${t}</text>`; acc.x += p * 200; return acc; }, { x: 40, html: '' }).html}
+          <text x="280" y="210" text-anchor="middle" font-size="13" font-weight="900">加起來每年可能超過 2%（示意）</text>
+        </svg>`, caption: '示意比例，實際依產品與通路。相較之下，低成本指數 ETF 的總費用率常在 0.1%–0.5% 之間。' },
+        { type: 'heading', id: 'hidden', text: '深入：看不到的成本' },
+        '除了列出來的費用，還有兩種看不到的成本：一是[[週轉率]]高的基金，在內部頻繁買賣產生的交易成本，它不一定包含在總費用率裡；二是買賣價差，流動性差的工具，買進價和賣出價之間的差距就是一種成本。兩者都說明了同一件事：交易越少、工具越大眾，成本越低。',
+        { type: 'heading', id: 'channel', text: '深入：同一檔基金，不同通路的成本' },
+        { type: 'table', head: ['通路', '可能的費用'], rows: [
+          ['投信直營', '申購手續費常有優惠，帳戶管理簡單'],
+          ['基金平台', '申購手續費低，部分有平台費'],
+          ['銀行（特定金錢信託）', '申購手續費、信託管理費（例如每年一定比例）、轉換費'],
+          ['券商（ETF）', '只有交易手續費與賣出證交稅，沒有申購手續費'],
+        ], caption: '費率以各通路公告為準。同一檔基金，透過不同通路買，一年的總成本可能差很多。' },
+        '比較時，把一次性的費用攤到預計持有的年數，再加上每年的持續費用，就是每年的總成本。持有越久，一次性費用攤得越薄，持續費用越重要。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看經理費。', why: '保管費與其他費用也會被扣。', right: '看總費用率。' },
+      { wrong: '忽略申購手續費與信託管理費。', why: '透過銀行買基金常多出好幾層。', right: '把每一層加起來比較。' },
+      { wrong: '頻繁交易。', why: '手續費與證交稅會累積。', right: '長期持有，依規則再平衡。' },
+    ],
+    keypoints: [
+      '費用分一次性與持續性，長期投資盯持續性。',
+      '總費用率比經理費完整；看不到的週轉與價差也算。',
+      '費用是少數確定的事：降低它等於確定提高報酬。',
+    ],
+    sources: ['tw-tax-fee', 'etf-0050-fee'],
+  },
+
+  '4-2': {
+    goals: [
+      '比較不同投資工具的長期總成本',
+      '把費用差換算成長期少拿的金額',
+      '知道低成本之外還要看什麼',
+    ],
+    analogy: {
+      text: ['同一條路，可以搭高鐵、客運或自己開車：目的地一樣，花費與舒適度不同。投資工具也是：同樣是「持有全球股票」，可以透過低成本 ETF、銀行通路的主動基金、或投資型保單的連結標的，最後拿到的報酬卻因為一路上的費用而差很多。', '這一課把它們放在同一張表上，用同樣的市場報酬計算，只比較費用。'],
+      limit: ['交通工具的差異還有時間與便利；投資工具除了費用，也有服務、紀律、稅務安排上的差異，但費用是最容易量化、也最確定的那一塊。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="同樣市場報酬 6%、30 年、每年投入 12 萬，不同總成本的結果：年成本 0.3% 約 900 萬，1.5% 約 732 萬，2.5% 約 619 萬">
+        ${[['低成本 ETF（0.3%）', 900, 'm2'], ['一般主動基金（1.5%）', 732, 'm3'], ['多層費用（2.5%）', 619, 'm4']].map(([t, v, c], i) => `<rect x="${60 + i * 160}" y="${220 - v / 5}" width="120" height="${v / 5}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${120 + i * 160}" y="${210 - v / 5}" text-anchor="middle" font-size="15" font-weight="900">約 ${v} 萬</text><text x="${120 + i * 160}" y="242" text-anchor="middle" font-size="12">${t}</text>`).join('')}
+        <text x="280" y="20" text-anchor="middle" font-size="13" font-weight="900">每年投入 12 萬、市場報酬 6%、30 年（年底投入的簡化計算）</text>
+      </svg>`,
+      caption: '投入一樣是 360 萬；差別全部來自費用。',
+    },
+    define: [
+      { term: '總持有成本', en: 'TCO', def: '所有成本加總。', example: '0.3% vs 2.5%。' },
+      { term: '總費用率', en: 'TER', def: '一年的內扣費用。', example: '1.5%。' },
+      { term: '申購手續費', en: 'load', def: '買進時的費用。', example: '攤提到每年。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '同樣投入、同樣市場報酬，只差在年成本（實際計算）', sliders: [
+          { id: 'pmt', label: '每年投入', min: 10000, max: 1000000, step: 10000, value: 120000, unit: '元' },
+          { id: 'r', label: '市場年報酬（扣費用前）', min: 0, max: 12, step: 0.5, value: 6, unit: '%' },
+          { id: 'years', label: '年數', min: 1, max: 40, step: 1, value: 30, unit: '年' },
+          { id: 'c1', label: '工具 A 年成本', min: 0, max: 3, step: 0.05, value: 0.3, unit: '%' },
+          { id: 'c2', label: '工具 B 年成本', min: 0, max: 4, step: 0.1, value: 1.5, unit: '%' },
+        ], compute: (v) => {
+          const fv = (c) => { const g = (v.r - c) / 100; return g === 0 ? v.pmt * v.years : v.pmt * (((1 + g) ** v.years - 1) / g); };
+          const a = fv(v.c1); const b = fv(v.c2);
+          return { rows: [
+            { label: '總投入', value: `${(v.pmt * v.years).toLocaleString()} 元`, ratio: Math.min(1, v.pmt * v.years / Math.max(a, b)) },
+            { label: '工具 A', value: `${Math.round(a).toLocaleString()} 元`, ratio: Math.min(1, a / Math.max(a, b)) },
+            { label: '工具 B', value: `${Math.round(b).toLocaleString()} 元`, ratio: Math.min(1, b / Math.max(a, b)) },
+            { label: 'B 比 A 少', value: `${Math.round(a - b).toLocaleString()} 元（${((1 - b / a) * 100).toFixed(1)}%）`, ratio: Math.min(1, Math.abs(a - b) / Math.max(a, b)) },
+          ], note: '預設：每年 12 萬、6%、30 年，0.3% 約 900 萬、1.5% 約 732 萬，少了約 168 萬，接近總投入 360 萬的一半。' };
+        } } },
+        { type: 'heading', id: 'more-than-cost', text: '低成本之外還要看什麼' },
+        { type: 'table', head: ['面向', '問題'], rows: [
+          ['分散', '涵蓋的國家、產業、公司數量夠不夠？（第三部 4-2）'],
+          ['追蹤品質', '長期追蹤誤差是否穩定地小？（第三部 6-2）'],
+          ['規模與流動性', '規模夠大、不容易下市？成交量足夠、價差小？'],
+          ['稅與健保', '配息方式會帶來多少股利所得稅與二代健保？（模組 5）'],
+          ['自己的行為', '這個工具會不會讓你更想頻繁交易？'],
+        ], caption: '最便宜的不一定是最適合的；但在條件相近時，費用低的那個幾乎總是比較好的選擇。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="費用差距隨時間擴大：第 10 年差距很小，第 20 年明顯，第 30 年非常大；複利讓費用的影響越來越大">
+          <line x1="60" y1="180" x2="530" y2="180" class="stroke-ink" stroke-width="2"/>
+          ${[[10, 9], [20, 51], [30, 168]].map(([y, gap], i) => `<rect x="${110 + i * 140}" y="${180 - gap * 0.7}" width="90" height="${gap * 0.7}" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${155 + i * 140}" y="${172 - gap * 0.7}" text-anchor="middle" font-size="14" font-weight="900">約 ${gap} 萬</text><text x="${155 + i * 140}" y="202" text-anchor="middle" font-size="13">第 ${y} 年</text>`).join('')}
+          <text x="295" y="22" text-anchor="middle" font-size="13" font-weight="900">0.3% 與 1.5% 的累積差距（每年投入 12 萬、6%）</text>
+        </svg>`, caption: '前十年幾乎看不出差別，這正是高費用工具容易被接受的原因。' },
+        { type: 'heading', id: 'advice', text: '深入：為建議付費' },
+        '有時候付費是值得的：例如請一位不賣商品、按時數或固定費用收費的顧問，幫你訂出配置與稅務規劃，並在你想恐慌賣出時拉住你。差別在於：為「建議與紀律」付一筆明確的費用，和在不知情的情況下，每年從資產裡被扣 2%，是兩件不同的事。',
+        { type: 'heading', id: 'robo', text: '深入：機器人理財與代操' },
+        '機器人理財通常幫你決定配置、自動投入與再平衡，收取每年一定比例的管理費，加上底層 ETF 的費用。它的價值在於「自動化與紀律」，這對容易被情緒影響的人可能值得；評估時要把管理費加上底層費用，和自己用兩三檔 ETF 執行的成本比較，再問自己：多付的這部分，換到的行為改善值不值得。',
+        { type: 'list', items: [
+          '總成本 ＝ 平台管理費 ＋ 底層基金的總費用率 ＋ 交易與換匯成本。',
+          '確認配置是否符合你在 1-1 決定的股債比。',
+          '確認是否能隨時贖回、有沒有解約或轉出費用。',
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '覺得 1% 的費用差很小。', why: '30 年下來可能少掉總投入的一半以上。', right: '換算成長期金額來比較。' },
+      { wrong: '只比較費用，不看分散與追蹤品質。', why: '最便宜不一定最適合。', right: '條件相近時才以費用決勝。' },
+      { wrong: '為了「服務」付出看不見的高費用。', why: '費用藏在淨值裡，難以評估價值。', right: '需要建議時，付明確、透明的費用。' },
+    ],
+    keypoints: [
+      '同樣市場報酬，0.3% 與 1.5% 三十年可差約 170 萬。',
+      '費用差距前十年不明顯，後期越來越大。',
+      '條件相近時，選費用低的。',
+    ],
+    sources: ['etf-0050-fee', 'tw-tax-fee'],
+  },
+});
+</script>

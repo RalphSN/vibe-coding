@@ -1,0 +1,87 @@
+<script>
+/* ==========================================================================
+   模組 0：起點：保險在財務裡的位置
+   ========================================================================== */
+defineTerms({
+  '風險': { en: 'risk', def: '未來可能發生、而且會造成損失的不確定事件。', example: '生病、意外、失能、過早身故。', lesson: '0-1' },
+  '風險管理': { en: 'risk management', def: '面對風險的四種方法：避免、降低、自留、轉移；保險只是「轉移」的其中一種。', example: '戴安全帽是降低，買意外險是轉移。', lesson: '0-1' },
+  '風險轉移': { en: 'risk transfer', def: '付出一筆確定的小成本（保費），把不確定的大損失交給別人承擔。', example: '每年繳 3,000 元，換取意外失能時的理賠。', lesson: '0-1' },
+  '風險自留': { en: 'risk retention', def: '自己承擔損失，通常用存款或預備金支付。', example: '感冒看診的自付額自己付。', lesson: '0-1' },
+  '保險': { en: 'insurance', def: '許多人各付一筆保費形成共同基金，少數發生事故的人從基金中得到理賠的契約安排。', example: '壽險、醫療險、意外險。', lesson: '1-1' },
+});
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '說出風險管理的四種方法，以及保險屬於哪一種',
+      '用「頻率 × 嚴重度」判斷風險該怎麼處理',
+      '知道社會保險、預備金、商業保險各自的分工',
+    ],
+    analogy: {
+      text: ['開車上路有很多[[風險]]。你可以不開車（避免）、繫安全帶慢慢開（降低）、小擦撞自己付修理費（自留），或買車險讓保險公司賠大事故（轉移）。沒有人只靠其中一種方法。', '個人財務也一樣。[[保險]]只是[[風險管理]]的四種方法之一，而且是要付費的那一種。所以第一個問題永遠不是「該買哪一張保單」，而是「這個風險，應該用哪一種方法處理」。'],
+      limit: ['開車的風險大多看得見；人身風險（重病、失能）常常是發生了才知道有多嚴重，所以更需要事先想清楚。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="風險管理的四種方法：避免、降低、自留、轉移；保險屬於轉移，而且是要付費的轉移">
+        ${[['避免', '不做這件事', '不從事極限運動', 'm2'], ['降低', '減少機率或損失', '健康檢查、安全帽', 'm3'], ['自留', '自己付', '預備金付小額醫療', 'm1'], ['轉移', '交給別人承擔', '買保險（要付保費）', 'm4']].map(([a, b, c, col], i) => `<rect x="${12 + i * 137}" y="40" width="125" height="200" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="90" text-anchor="middle" font-size="22" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 137}" y="130" text-anchor="middle" font-size="13" class="on-color">${b}</text><text x="${74 + i * 137}" y="200" text-anchor="middle" font-size="12" class="on-color">${c}</text>`).join('')}
+        <text x="280" y="275" text-anchor="middle" font-size="14" font-weight="900">保險只是第四種；前三種通常更便宜</text>
+      </svg>`,
+      caption: '先問能不能避免、能不能降低、自己扛不扛得起；三個都不行，才輪到保險。',
+    },
+    define: [
+      { term: '風險管理', en: 'risk management', def: '避免、降低、自留、轉移。', example: '戴安全帽、買保險。' },
+      { term: '風險轉移', en: 'risk transfer', def: '用確定的小成本換掉不確定的大損失。', example: '保費換理賠。' },
+      { term: '風險自留', en: 'risk retention', def: '自己承擔損失。', example: '預備金付小額醫療。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'matrix', text: '頻率 × 嚴重度：四格決定處理方式' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 300" role="img" aria-label="風險矩陣：橫軸是發生頻率，縱軸是損失嚴重度；高頻低損自留，低頻低損自留，高頻高損避免或降低，低頻高損轉移也就是保險">
+          <line x1="60" y1="270" x2="530" y2="270" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="270" class="stroke-ink" stroke-width="2"/>
+          <text x="295" y="294" text-anchor="middle" font-size="13" font-weight="900">發生頻率：低 → 高</text>
+          <text x="34" y="80" text-anchor="middle" font-size="12" font-weight="900">損失</text><text x="34" y="96" text-anchor="middle" font-size="12" font-weight="900">大</text>
+          <text x="34" y="214" text-anchor="middle" font-size="12" font-weight="900">損失</text><text x="34" y="230" text-anchor="middle" font-size="12" font-weight="900">小</text>
+          ${[['轉移：買保險', '重病、失能、身故、重大意外', 'm4', 70, 30], ['避免或降低', '高風險活動、不健康習慣', 'm5', 300, 30], ['自留', '偶爾的小傷、小病', 'm2', 70, 150], ['自留＋降低', '感冒、牙齒保健、小擦撞', 'm1', 300, 150]].map(([a, b, c, x, y]) => `<rect x="${x}" y="${y}" width="220" height="110" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 110}" y="${y + 50}" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${x + 110}" y="${y + 78}" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+        </svg>`, caption: '保險最有價值的是左上角：很少發生，但一發生就會讓財務崩潰的事。右下角的小損失買保險，通常是用保費換回更少的錢。' },
+        '這張圖解釋了為什麼「什麼都保一點」常常不划算：保險公司要支付理賠、營運成本與利潤，所以保費的期望值一定大於你平均能拿回的理賠（1-1）。把錢花在小損失的保險上，等於花較貴的價格「預付」自己本來就付得起的費用。',
+        { type: 'heading', id: 'layers', text: '三層分工' },
+        { type: 'table', head: ['層', '處理什麼', '這個系列在哪裡講'], rows: [
+          ['緊急預備金', '小額、常發生、短期的損失：自付額、短期失業、維修', '第一部 模組 3'],
+          ['社會保險', '每個人都要有的基本保障：全民健保、勞保、就業保險', '2-1'],
+          ['商業保險', '低機率、高損失：身故、重病、重大意外、失能', '模組 3'],
+        ], caption: '這三層是互補的：預備金越充足，商業保險就可以只保真正的大事故，保費也越省。' },
+        { type: 'widget', name: 'knobs', props: { title: '這個風險該自留還是轉移？（期望損失 vs 你承受得起的範圍，實際計算）', sliders: [
+          { id: 'p', label: '一年內發生的機率', min: 0.1, max: 30, step: 0.1, value: 0.1, unit: '%' },
+          { id: 'loss', label: '發生時的損失', min: 5000, max: 10000000, step: 5000, value: 2000000, unit: '元' },
+          { id: 'fund', label: '你的緊急預備金', min: 0, max: 2000000, step: 10000, value: 200000, unit: '元' },
+          { id: 'premium', label: '轉移這個風險的年保費', min: 0, max: 100000, step: 500, value: 3000, unit: '元' },
+        ], compute: (v) => {
+          const expected = (v.p / 100) * v.loss;
+          const ratio = v.loss / Math.max(1, v.fund);
+          const verdict = v.loss <= v.fund * 0.5 ? '損失在預備金範圍內：傾向自留' : ratio > 3 ? '損失遠超過預備金：傾向轉移（保險）' : '介於兩者：看保費與自己的風險承受度';
+          return { rows: [
+            { label: '每年的期望損失（機率 × 損失）', value: `${Math.round(expected).toLocaleString()} 元`, ratio: Math.min(1, expected / 100000) },
+            { label: '保費比期望損失多', value: `${Math.round(v.premium - expected).toLocaleString()} 元`, ratio: Math.min(1, Math.abs(v.premium - expected) / 100000) },
+            { label: '損失是預備金的幾倍', value: `${ratio.toFixed(1)} 倍`, ratio: Math.min(1, ratio / 10) },
+            { label: '判斷', value: verdict, ratio: Math.min(1, ratio / 3) },
+          ], note: '預設：0.1% 機率損失 200 萬，期望損失 2,000 元；保費 3,000 元比期望值多 1,000 元，這就是附加費用（1-1）。但損失是預備金的 10 倍，自留會讓財務崩潰，這才是值得付這 1,000 元的理由。' };
+        } } },
+        { type: 'heading', id: 'taiwan', text: '台灣人的保險現況' },
+        '台灣是保險非常普及的地方：2024 年人壽與年金保險的投保率約 262.68%，平均每人超過兩張半保單。但「張數多」不等於「保障夠」：常見的情況是儲蓄型保單很多，真正保大事故的失能、重病、定期壽險保額卻不足。這一卷的目標，就是讓你看得出這兩者的差別。',
+        { type: 'callout', variant: 'tip', title: '這一卷不做的事', body: ['不推薦任何保險公司或商品，也不比較特定保單。', '條款與理賠以你的保單為準；法規與數字以 2026 年 10 月查證的資料為準，每課最後列出處。'] },
+      ],
+    },
+    mistakes: [
+      { wrong: '把保險當成風險管理的唯一方法。', why: '避免、降低、自留通常更便宜。', right: '先問能不能避免、降低、自留，最後才轉移。' },
+      { wrong: '小病小痛都想用保險處理。', why: '保費期望值高於理賠，小損失自己付比較划算。', right: '小損失用預備金，保險留給大損失。' },
+      { wrong: '保單張數多就覺得保障夠。', why: '很多是儲蓄型，真正的大事故保障可能不足。', right: '看「發生大事故時能拿到多少」。' },
+    ],
+    keypoints: [
+      '風險管理有四種：避免、降低、自留、轉移。',
+      '保險只處理低機率、高損失的風險。',
+      '預備金、社會保險、商業保險三層分工。',
+    ],
+    sources: ['penetration', 'fsc-moneywise'],
+  },
+});
+</script>

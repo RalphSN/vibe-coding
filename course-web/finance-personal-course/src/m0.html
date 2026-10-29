@@ -1,0 +1,120 @@
+<script>
+/* ==========================================================================
+   模組 0：起點：個人財務是一套系統
+   ========================================================================== */
+defineTerms({
+  '現金流': { en: 'cash flow', def: '一段時間內流進來與流出去的錢；流入減流出就是這段時間存下（或透支）的錢。', example: '月收入 5 萬、月支出 4 萬 → 每月現金流 ＋1 萬。', lesson: '1-1' },
+  '淨值': { en: 'net worth', def: '某一個時間點，你擁有的全部資產減掉全部負債。', example: '存款 30 萬、機車 3 萬、學貸 20 萬 → 淨值 13 萬。', lesson: '1-4' },
+  '緊急預備金': { en: 'emergency fund', def: '專門留給失業、受傷、突發大額支出的錢，放在隨時拿得到、不會虧損的地方。', example: '3–6 個月的必要生活費。', lesson: '3-1' },
+  '循環利息': { en: 'revolving interest', def: '信用卡帳單沒有繳清時，未繳的部分從入帳日起每天計算的利息；台灣法定上限年利率 15%。', example: '欠 10 萬、年利率 15% → 一年利息約 1.5 萬。', lesson: '4-3' },
+});
+
+const SYSTEM_SVG = `<svg viewBox="0 0 560 300" role="img" aria-label="個人財務的四個部分：現金流是每個月的流量，淨值是某一天的存量，緊急預備金是緩衝，債務是倒流的水管；現金流的剩餘累積成淨值，債務的利息會抽走現金流">
+  <rect x="20" y="30" width="230" height="100" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/>
+  <text x="135" y="68" text-anchor="middle" font-size="18" font-weight="900" class="on-color">現金流（流量）</text>
+  <text x="135" y="96" text-anchor="middle" font-size="14" class="on-color">每個月：收入 − 支出</text>
+  <rect x="310" y="30" width="230" height="100" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+  <text x="425" y="68" text-anchor="middle" font-size="18" font-weight="900" class="on-color">淨值（存量）</text>
+  <text x="425" y="96" text-anchor="middle" font-size="14" class="on-color">某一天：資產 − 負債</text>
+  <path d="M250 80 L310 80" class="stroke-ink" stroke-width="4"/><text x="280" y="70" text-anchor="middle" font-size="12" font-weight="900">累積</text>
+  <rect x="20" y="180" width="230" height="90" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+  <text x="135" y="218" text-anchor="middle" font-size="18" font-weight="900" class="on-color">緊急預備金（緩衝）</text>
+  <text x="135" y="244" text-anchor="middle" font-size="14" class="on-color">意外來時不必借錢</text>
+  <rect x="310" y="180" width="230" height="90" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+  <text x="425" y="218" text-anchor="middle" font-size="18" font-weight="900" class="on-color">債務（倒流）</text>
+  <text x="425" y="244" text-anchor="middle" font-size="14" class="on-color">利息每月抽走現金流</text>
+  <path d="M135 130 L135 180 M425 180 L425 150 L200 150 L200 130" fill="none" class="stroke-ink" stroke-width="3" stroke-dasharray="8 5"/>
+</svg>`;
+
+defineLessons({
+  '0-1': {
+    goals: [
+      '分辨「流量」（現金流）與「存量」（淨值）',
+      '說出個人財務四個部分怎麼互相影響',
+      '知道理財系列六卷的順序為什麼這樣排',
+    ],
+    analogy: {
+      text: ['把財務想成家裡的水塔：每個月流進來的水是收入，水龍頭流出去的是支出，塔裡現在有多少水是[[淨值]]。水塔旁邊有一桶備用水（[[緊急預備金]]），停水時不用去跟鄰居借。', '債務像一根接反的水管：借來的那一刻水位變高，但之後每個月都會倒抽一點水回去（利息）。抽得越兇（像信用卡[[循環利息]]），就越難把塔裝滿。'],
+      limit: ['水不會自己變多，錢放對地方卻會（投資報酬，第三部）；水也不會變質，錢卻會被通膨慢慢稀釋（3-2）。'],
+    },
+    model: {
+      svg: SYSTEM_SVG,
+      caption: '流量（每個月）與存量（某一天）是兩種不同的帳。大部分理財問題，都是把兩者搞混。',
+    },
+    define: [
+      { term: '現金流', en: 'cash flow', def: '一段時間的流入減流出。', example: '每月 ＋1 萬。' },
+      { term: '淨值', en: 'net worth', def: '某一天的資產減負債。', example: '13 萬。' },
+      { term: '緊急預備金', en: 'emergency fund', def: '應付意外的現金緩衝。', example: '3–6 個月必要支出。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'why-system', text: '為什麼要當成一套系統看' },
+        '很多人學理財是從「該買哪一檔」開始，這等於在漏水的水塔上加裝漂亮的水龍頭。投資報酬每年多 1–2%，抵不過一張每年 15% 的卡債；沒有預備金，市場一跌又剛好失業，就只能在低點賣掉投資來付房租。',
+        '所以這一卷的順序是：先看見錢（記帳、現金流），再算比例（收支比、儲蓄率），再看存量（淨值），接著建立緩衝（預備金），最後處理倒流（債務）。這幾件事做好，第二部以後的保險與投資才有地基。',
+        { type: 'table', head: ['部分', '回答的問題', '時間單位', '這一卷的模組'], rows: [
+          ['現金流', '每個月錢從哪來、去哪裡？', '一段期間（月、年）', '1、2'],
+          ['淨值', '我現在到底有多少？', '某一天', '1-4'],
+          ['緊急預備金', '出事時撐得住幾個月？', '月數', '3'],
+          ['債務', '我每個月被抽走多少？還要多久？', '利率、期數', '4、5'],
+        ] },
+        { type: 'heading', id: 'stock-flow', text: '流量與存量：最常搞混的地方' },
+        '「我月薪 6 萬」是流量，「我有 50 萬存款」是存量。兩者不能直接比較，也不能互相代替：月薪高但每月花光，淨值不會長；淨值高但沒有現金流（例如只有一間自住房），遇到失業一樣會周轉不靈。',
+        { type: 'table', head: ["月薪 8 萬","月薪 4.5 萬"], rows: [["每月花 7.8 萬","每月花 3.5 萬"],["信用卡分期 3 筆","沒有消費性負債"],["存款 5 萬","存款 40 萬"],["**結果**：每月只多 2,000 元；失業 1 個月就要動用信用卡。","**結果**：每月多 1 萬；失業 11 個月內不用借錢。"]], caption: "兩個人，誰的財務比較健康？" },
+        { type: 'callout', variant: 'tip', title: '差在哪裡', body: ["收入是起點，留下來的才是財務健康的來源。","下一課開始，所有指標都在看「留下多少」與「撐得多久」。"] },
+        { type: 'widget', name: 'knobs', props: { title: '水塔模型：每月留下多少、撐得了多久（實際計算）', sliders: [
+          { id: 'inc', label: '每月稅後收入', min: 20000, max: 150000, step: 1000, value: 45000, unit: '元' },
+          { id: 'exp', label: '每月支出', min: 10000, max: 150000, step: 1000, value: 35000, unit: '元' },
+          { id: 'cash', label: '現有存款', min: 0, max: 1000000, step: 10000, value: 100000, unit: '元' },
+          { id: 'debt', label: '每月還債（含利息）', min: 0, max: 50000, step: 500, value: 0, unit: '元' },
+        ], compute: (v) => {
+          const flow = v.inc - v.exp - v.debt;
+          const months = v.cash / (v.exp + v.debt);
+          return { rows: [
+            { label: '每月現金流', value: `${flow.toLocaleString()} 元`, ratio: Math.min(1, Math.abs(flow) / 50000) },
+            { label: '一年後存款（不含利息）', value: `${Math.max(0, v.cash + flow * 12).toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, v.cash + flow * 12) / 1600000) },
+            { label: '沒有收入時撐得了', value: `${months.toFixed(1)} 個月`, ratio: Math.min(1, months / 12) },
+          ], note: flow < 0 ? '現金流是負的：每個月都在吃老本或借錢，這是第一優先要處理的事。' : '「撐得了幾個月」就是緊急預備金的概念（模組 3）：同樣的存款，支出越高撐得越短。' };
+        } } },
+        { type: 'heading', id: 'series', text: '理財系列六卷的順序' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="理財系列六卷像蓋房子：第一部個人財務是地基，第二部風險保障是牆，第三部投資核心與第四部配置與稅費是樓層，第五部財報與估值是選個股才需要的頂樓，第六部投資心理貫穿全部">
+          <rect x="60" y="190" width="400" height="44" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="260" y="218" text-anchor="middle" font-size="15" font-weight="900" class="on-color">第一部 個人財務（地基）</text>
+          <rect x="80" y="140" width="360" height="44" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="260" y="168" text-anchor="middle" font-size="15" font-weight="900" class="on-color">第二部 風險保障（牆）</text>
+          <rect x="100" y="90" width="160" height="44" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="180" y="118" text-anchor="middle" font-size="14" font-weight="900" class="on-color">第三部 投資核心</text>
+          <rect x="260" y="90" width="160" height="44" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="340" y="118" text-anchor="middle" font-size="14" font-weight="900" class="on-color">第四部 配置與稅費</text>
+          <rect x="160" y="40" width="200" height="44" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="260" y="68" text-anchor="middle" font-size="14" font-weight="900" class="on-color">第五部 財報與估值</text>
+          <rect x="480" y="40" width="60" height="194" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="510" y="137" text-anchor="middle" font-size="14" font-weight="900" class="on-color" transform="rotate(-90 510 137)">第六部 投資心理</text>
+          <text x="260" y="24" text-anchor="middle" font-size="13">頂樓只有要選個股的人才需要</text>
+        </svg>`, caption: '地基沒打好就加蓋樓層，一點風吹草動就會倒。投資心理（第六部）不是最後一層，而是每一層都會遇到。' },
+        { type: 'callout', variant: 'tip', title: '這一卷不做的事', body: ['不推薦任何銀行、信用卡或金融商品；只講判斷的原理與台灣的規則。', '利率、法規以 2026 年 10 月查證的資料為準，每課最後列出處；你自己的契約條款永遠優先。'] },
+        { type: 'heading', id: 'three-horizons', text: '深入：財務的三個時間尺度' },
+        '同一筆錢，放在不同的時間尺度上看，答案會不一樣。很多財務焦慮來自用錯尺度：拿長期的錢應付短期的事（股票賣在低點付房租），或用短期的心情做長期的決定（一個月沒存到錢就覺得這輩子完了）。',
+        { type: 'table', head: ['尺度', '問題', '工具', '在這一卷'], rows: [
+          ['短期（本月）', '這個月夠不夠用？', '預算、帳戶分流', '模組 1、2'],
+          ['中期（半年到三年）', '遇到意外撐不撐得住？要還的債多久還完？', '預備金、還債計畫', '模組 3、5'],
+          ['長期（十年以上）', '淨值有沒有持續長大？', '儲蓄率、投資、保險', '1-3、1-4，以及第二部以後'],
+        ], caption: '每一種錢都要放在對應時間尺度的工具裡：短期的錢不碰風險，長期的錢不怕短期波動。' },
+        { type: 'heading', id: 'life-cycle', text: '深入：人生階段與財務重心' },
+        '經濟學的「生命週期假說」（life-cycle hypothesis）認為，人會在工作年數裡存錢，把消費平均分配到一生，包括退休後沒有收入的年數。不必完全照這套理論生活，但它解釋了一件事：年輕時的收入不全是「現在的錢」，有一部分其實屬於未來的自己。',
+        { type: 'table', head: ['階段', '常見狀況', '財務重心'], rows: [
+          ['學生、剛畢業', '收入低、可能有學貸、淨值接近 0 或負', '建立記帳與信用紀錄、先存一個月預備金'],
+          ['工作前幾年', '收入成長快、生活方式剛定型', '把儲蓄率做起來、清掉消費性債務、對抗生活膨脹'],
+          ['成家、買房', '固定支出大增、可能背房貸', '預備金加到 6 個月以上、做壓力測試、補足保障'],
+          ['中年', '收入高峰、照顧上下兩代', '淨值累積、檢查保障缺口、退休規劃'],
+          ['接近退休', '收入即將停止', '降低負債、規劃提領順序（第四部）'],
+        ], caption: '這一卷的觀念每個階段都用得到；差別在於比重。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '把收入高當成財務健康。', why: '收入是流入，留下多少才決定淨值會不會長。', right: '看「每月留下多少」與「撐得了幾個月」。' },
+      { wrong: '一開始就研究投資標的。', why: '高利債的成本、沒有預備金的風險，都會吃掉投資報酬。', right: '先看見現金流、建立緩衝、處理高利債。' },
+      { wrong: '把淨值和現金流混在一起看。', why: '一個是某一天的存量，一個是一段時間的流量。', right: '每月看現金流，每季或每年看一次淨值。' },
+    ],
+    keypoints: [
+      '現金流是流量，淨值是存量。',
+      '預備金是緩衝，高利債是倒流的水管。',
+      '先打地基（這一卷），再談保險與投資。',
+    ],
+    sources: ['household-2025', 'banking-act-47-1', 'fsc-moneywise'],
+  },
+});
+</script>

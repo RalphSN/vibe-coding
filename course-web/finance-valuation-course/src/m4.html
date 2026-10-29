@@ -1,0 +1,207 @@
+<script>
+/* ==========================================================================
+   模組 4：利率與景氣循環
+   ========================================================================== */
+defineTerms({
+  '政策利率': { en: 'policy rate', def: '中央銀行設定的基準利率；台灣常以重貼現率代表，影響銀行的存放款利率。', example: '2026 年 6 月重貼現率維持 2%。', lesson: '4-1' },
+  '股票風險溢酬': { en: 'equity risk premium', def: '股票的預期報酬高於無風險利率的部分；常用盈餘殖利率減公債殖利率粗略估計。', example: '5.1% − 1.8% ≈ 3.3%。', lesson: '4-1' },
+  '景氣循環': { en: 'business cycle', def: '經濟活動在擴張、高峰、收縮、谷底之間反覆起伏的現象。', example: '擴張期企業獲利成長，收縮期獲利下滑。', lesson: '4-2' },
+  '景氣對策信號': { en: 'business cycle indicator lights', def: '國發會每月公布的景氣燈號：以 9 項指標計分，分成紅、黃紅、綠、黃藍、藍五種燈號。', example: '2026 年 4 月 39 分，紅燈。', lesson: '4-2' },
+  'PMI': { en: 'purchasing managers index', def: '採購經理人指數：調查企業採購經理對訂單、生產、庫存等的看法；高於 50 代表擴張。', example: 'PMI 52 → 製造業擴張。', lesson: '4-2' },
+  '殖利率曲線倒掛': { en: 'yield curve inversion', def: '短期公債殖利率高於長期；常被視為景氣可能放緩的訊號，但時間落差不一定。', example: '2 年期高於 10 年期。', lesson: '4-2' },
+  '景氣循環股': { en: 'cyclical stock', def: '獲利隨景氣或產業循環大幅起伏的公司，例如原物料、航運、記憶體、面板。', example: '高峰時 EPS 很高，谷底時虧損。', lesson: '4-3' },
+});
+
+function gordonPrice(d0, g, r) { return r > g ? d0 * (1 + g) / (r - g) : null; }
+function cycleLight(score) { return score >= 38 ? '紅燈（熱絡）' : score >= 32 ? '黃紅燈（轉向）' : score >= 23 ? '綠燈（穩定）' : score >= 17 ? '黃藍燈（轉向）' : '藍燈（低迷）'; }
+
+defineLessons({
+  '4-1': {
+    goals: [
+      '說明利率上升為什麼會壓低股價',
+      '用股利折現模型感受利率的影響',
+      '用盈餘殖利率與公債殖利率比較股票的相對吸引力',
+    ],
+    analogy: {
+      text: ['如果銀行定存利率是 1%，一張每年配 5% 的股票看起來很吸引人；如果定存利率變成 5%，同樣的股票就沒那麼特別了，大家願意付的價格自然會下降。利率是所有資產的「對照組」。', '從估值的角度看，利率影響的是[[折現率]]：未來的現金流要折回今天，利率越高，未來的錢在今天越不值錢（第三部 1-2）。對獲利主要在遙遠未來的高成長公司，影響最大。'],
+      limit: ['利率上升不一定伴隨股價下跌：如果升息是因為景氣很好、企業獲利大增，獲利成長可能抵銷折現率上升的影響。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="利率影響股價的三條路：折現率上升讓未來現金流現值下降；企業借款成本上升壓低獲利；債券與存款變得相對有吸引力，資金從股票移出">
+        ${[['折現率上升', '未來的錢在今天變少', 'm4'], ['借款成本上升', '利息費用增加、獲利下降', 'm5'], ['相對吸引力', '債券與存款變得更有吸引力', 'm1']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="140" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="82" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="116" text-anchor="middle" font-size="11" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="210" text-anchor="middle" font-size="14" font-weight="900">利率上升 → 三條路都對股價不利（其他條件不變時）</text>
+        <text x="280" y="236" text-anchor="middle" font-size="12">「其他條件不變」很重要：現實中景氣與獲利也同時在變</text>
+      </svg>`,
+      caption: '央行 2026 年 6 月理監事會維持重貼現率 2%，已連續 9 季不變；之後的決議以央行公告為準。',
+    },
+    define: [
+      { term: '政策利率', en: 'policy rate', def: '央行設定的基準利率。', example: '重貼現率 2%。' },
+      { term: '股票風險溢酬', en: 'ERP', def: '股票預期報酬 − 無風險利率。', example: '約 3.3%。' },
+      { term: '折現率', en: 'discount rate', def: '折回今天用的報酬率。', example: '8%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '股利折現模型：要求報酬變動對股價的影響（實際計算）', sliders: [
+          { id: 'd', label: '今年每股股利', min: 0.1, max: 20, step: 0.1, value: 0.8, unit: '元' },
+          { id: 'g', label: '股利長期成長率', min: 0, max: 7, step: 0.5, value: 4, unit: '%' },
+          { id: 'r0', label: '原本的要求報酬', min: 3, max: 15, step: 0.5, value: 8, unit: '%' },
+          { id: 'up', label: '利率上升使要求報酬增加', min: 0, max: 3, step: 0.25, value: 1, unit: '個百分點' },
+        ], compute: (v) => {
+          const p0 = gordonPrice(v.d, v.g / 100, v.r0 / 100);
+          const p1 = gordonPrice(v.d, v.g / 100, (v.r0 + v.up) / 100);
+          if (!p0 || !p1) return { rows: [{ label: '設定有誤', value: '要求報酬要大於成長率', ratio: 1 }], note: '' };
+          return { rows: [
+            { label: '原本的合理股價', value: `${p0.toFixed(1)} 元`, ratio: Math.min(1, p0 / 100) },
+            { label: '升息後的合理股價', value: `${p1.toFixed(1)} 元`, ratio: Math.min(1, p1 / 100) },
+            { label: '變化', value: `${(((p1 / p0) - 1) * 100).toFixed(1)}%`, ratio: Math.min(1, Math.abs(p1 / p0 - 1) * 2) },
+          ], note: '預設：要求報酬從 8% 升到 9%，合理股價從 20.8 元降到約 16.6 元，跌了約 20%。把成長率拉到 6%：同樣升 1 個百分點，跌幅變成約 33%；成長越高的公司，對利率越敏感。' };
+        } } },
+        { type: 'heading', id: 'erp', text: '股票和債券的相對吸引力' },
+        '一個粗略的比較方法：用整體市場的[[盈餘殖利率]]（本益比的倒數）減去 10 年期公債殖利率，得到大約的[[股票風險溢酬]]。差距越大，股票相對債券越有吸引力；差距很小甚至為負，代表承擔股票風險的額外補償很少。這不是擇時工具，但能幫助你理解為什麼利率大幅變動時，股市的評價也會跟著變。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="盈餘殖利率與公債殖利率的差距：市場本益比 20 倍時盈餘殖利率 5%，公債 1.8% 時差距 3.2 個百分點；公債升到 4% 時差距縮小到 1 個百分點">
+          ${[['公債 1.8%', 1.8, 'm2', 80], ['公債 4%', 4, 'm4', 330]].map(([t, y, c, x]) => `<rect x="${x}" y="${180 - 5 * 25}" width="70" height="${5 * 25}" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><rect x="${x + 80}" y="${180 - y * 25}" width="70" height="${y * 25}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 35}" y="${170 - 5 * 25}" text-anchor="middle" font-size="12" font-weight="900">盈餘 5%</text><text x="${x + 115}" y="${170 - y * 25}" text-anchor="middle" font-size="12" font-weight="900">${t}</text><text x="${x + 75}" y="205" text-anchor="middle" font-size="13" font-weight="900">差距 ${(5 - y).toFixed(1)} 個百分點</text>`).join('')}
+        </svg>`, caption: '同樣的股市評價（本益比 20 倍），利率不同，相對吸引力就不同。' },
+        { type: 'heading', id: 'duration', text: '深入：股票也有「存續期間」' },
+        '第三部 5-2 說過，期限越長的債券對利率越敏感。股票也類似：價值主要來自很遠的未來的公司（高成長、尚未獲利），就像長天期債券，利率變動時價格變化很大；價值主要來自近期穩定現金流的公司（成熟、高配息），就像短天期債券，對利率比較不敏感。這解釋了為什麼升息時，成長股常常跌得比較多。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為升息一定讓股市下跌。', why: '若同時伴隨獲利成長，影響可能被抵銷。', right: '同時看利率與獲利的變化。' },
+      { wrong: '用利率變化預測短期股價。', why: '市場常常提前反映預期。', right: '理解機制，不拿來擇時。' },
+      { wrong: '忽略不同公司對利率的敏感度不同。', why: '高成長公司像長天期債券。', right: '檢查組合是否過度集中在利率敏感的股票。' },
+    ],
+    keypoints: [
+      '利率上升：折現率上升、借款成本上升、債券更有吸引力。',
+      '成長越高的公司，對利率越敏感。',
+      '盈餘殖利率 − 公債殖利率，粗略看股票的相對吸引力。',
+    ],
+    sources: ['cbc-2026-06', 'tw-bond-2026', 'cape'],
+  },
+
+  '4-2': {
+    goals: [
+      '說出景氣循環的四個階段',
+      '讀懂國發會的景氣對策信號',
+      '知道景氣指標能說明什麼、不能預測什麼',
+    ],
+    analogy: {
+      text: ['景氣像四季：春天（復甦）萬物開始生長，夏天（擴張到高峰）最熱鬧，秋天（趨緩）開始轉涼，冬天（收縮到谷底）最冷清，然後又是春天。只是經濟的季節沒有固定的長度，有時夏天很長，有時冬天來得很突然。', '台灣的國發會每月公布[[景氣對策信號]]，用 9 項指標計分，以紅、黃紅、綠、黃藍、藍五種燈號表示目前的景氣溫度。'],
+      limit: ['四季可以準確預告；景氣的轉折很難預測，而且股市常常比景氣早反應：景氣最熱的時候，股市可能已經開始下跌。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="景氣循環的四個階段：復甦、擴張、趨緩、收縮；股市通常比實體經濟早幾個月反應，在景氣谷底前就開始上漲，在景氣高峰前就開始下跌">
+        <path d="${Array.from({ length: 61 }, (_, i) => { const x = 40 + i * 8; const y = 140 - 70 * Math.sin((i / 60) * Math.PI * 2 - Math.PI / 2); return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+        <path d="${Array.from({ length: 61 }, (_, i) => { const x = 40 + i * 8; const y = 140 - 60 * Math.sin((i / 60) * Math.PI * 2 - Math.PI / 2 + 0.6); return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m4)" stroke-width="3" stroke-dasharray="8 5"/>
+        ${[['谷底', 40, 225], ['復甦', 160, 160], ['高峰', 280, 60], ['趨緩', 400, 130]].map(([t, x, y]) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="13" font-weight="900">${t}</text>`).join('')}
+        <text x="520" y="40" text-anchor="end" font-size="12" font-weight="900">實線：景氣　虛線：股市（較早反應）</text>
+      </svg>`,
+      caption: '示意圖。股市反映的是對未來的預期，所以常比景氣數據早幾個月轉向。',
+    },
+    define: [
+      { term: '景氣循環', en: 'business cycle', def: '擴張與收縮的反覆。', example: '四個階段。' },
+      { term: '景氣對策信號', en: 'indicator lights', def: '國發會的景氣燈號。', example: '9 項指標。' },
+      { term: 'PMI', en: 'PMI', def: '採購經理人指數。', example: '50 為分界。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '景氣對策信號：分數對應的燈號（實際計算）', sliders: [
+          { id: 'score', label: '綜合判斷分數（9–45）', min: 9, max: 45, step: 1, value: 39, unit: '分' },
+        ], compute: (v) => ({ rows: [
+          { label: '燈號', value: cycleLight(v.score), ratio: (v.score - 9) / 36 },
+        ], note: '區間：紅燈 38–45、黃紅燈 32–37、綠燈 23–31、黃藍燈 17–22、藍燈 9–16。2026 年 4 月是 39 分紅燈（連續第五顆）。燈號描述的是「現在」的景氣溫度，不是對股市的預測。' }) } },
+        { type: 'heading', id: 'indicators', text: '常見的景氣指標' },
+        { type: 'table', head: ['指標', '性質', '看什麼'], rows: [
+          ['景氣對策信號', '綜合（國發會每月）', '目前景氣的冷熱'],
+          ['領先指標', '領先（國發會）', '未來幾個月的方向'],
+          ['PMI', '領先（調查）', '高於 50 擴張、低於 50 收縮'],
+          ['外銷訂單、出口', '台灣特別重要', '外需的強弱'],
+          ['失業率', '落後', '景氣變化之後才反映'],
+          ['殖利率曲線', '市場訊號', '倒掛常被視為衰退前兆，但時間落差很大'],
+        ], caption: '沒有任何單一指標能準確預測景氣轉折；它們的價值在於幫你理解「現在處在什麼位置」。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="五種燈號與分數：藍燈 9 到 16，黃藍燈 17 到 22，綠燈 23 到 31，黃紅燈 32 到 37，紅燈 38 到 45">
+          ${[['藍燈', '9–16', 'm1'], ['黃藍燈', '17–22', 'm2'], ['綠燈', '23–31', 'm3'], ['黃紅燈', '32–37', 'm5'], ['紅燈', '38–45', 'm4']].map(([a, b, c], i) => `<circle cx="${70 + i * 105}" cy="90" r="40" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${70 + i * 105}" y="96" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${a}</text><text x="${70 + i * 105}" y="158" text-anchor="middle" font-size="13" class="mono">${b} 分</text>`).join('')}
+          <text x="280" y="200" text-anchor="middle" font-size="13">低迷 ←　　　　　　　→ 熱絡</text>
+        </svg>`, caption: '燈號的顏色是國發會的命名；這裡的配色只是示意，不代表實際顏色。' },
+        { type: 'heading', id: 'timing', text: '深入：為什麼不用景氣來擇時' },
+        '一個常見的想法是「藍燈買、紅燈賣」。問題在於：股市常比景氣早反應，燈號是事後計算的；藍燈可能持續好幾個月，紅燈也可能持續很久；而且每一次循環的長度與深度都不同。對長期投資人來說，理解景氣循環最大的用處，是在藍燈的悲觀氣氛裡不恐慌賣出、在紅燈的樂觀氣氛裡不加碼追高，也就是依照第四部的再平衡規則行事。',
+      ],
+    },
+    mistakes: [
+      { wrong: '藍燈買、紅燈賣。', why: '股市常提前反應，燈號是事後的。', right: '用再平衡規則，而不是燈號擇時。' },
+      { wrong: '用單一指標判斷景氣。', why: '每個指標都有雜訊與落差。', right: '綜合多個指標看方向。' },
+      { wrong: '看到殖利率倒掛就全部賣出。', why: '倒掛與衰退之間的時間落差很大且不固定。', right: '當作背景資訊，不當交易訊號。' },
+    ],
+    keypoints: [
+      '景氣：復甦、擴張、趨緩、收縮；股市常提前反應。',
+      '景氣對策信號：9 項指標，9–45 分，五種燈號。',
+      '景氣指標用來理解位置，不用來擇時。',
+    ],
+    sources: ['cycle-signal', 'cycle-2026', 'cbc-2026-06'],
+  },
+
+  '4-3': {
+    goals: [
+      '辨認景氣循環股與它的獲利型態',
+      '說出循環股的本益比為什麼會「反著看」',
+      '用正常化獲利估值',
+    ],
+    analogy: {
+      text: ['賣冰的店，夏天一個月賺 50 萬，冬天可能虧錢。如果你在夏天用「一個月 50 萬 × 12」去估這家店的價值，一定會付太多；在冬天用「虧錢」去估，又會覺得它一文不值。正確的做法是用一整年、甚至好幾年的平均。', '[[景氣循環股]]就是這樣的公司：記憶體、面板、航運、鋼鐵、原物料。台灣有很多產業高度循環，看這類公司時，最常犯的錯誤就是用單一年度的獲利算本益比。'],
+      limit: ['冰店的季節是固定的；產業循環的長度、高度每次都不一樣，「正常化獲利」本身就是一個估計。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="循環股的本益比反著看：獲利高峰時 EPS 5 元、股價 40 元，本益比只有 8 倍看起來很便宜；獲利谷底時 EPS 0.5 元、股價 30 元，本益比 60 倍看起來很貴；用正常化 EPS 2.5 元，兩者分別是 16 倍與 12 倍">
+        ${[['高峰', 5, 40, 'm4', 60], ['谷底', 0.5, 30, 'm1', 320]].map(([t, eps, p, c, x]) => `<rect x="${x}" y="30" width="180" height="170" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + 90}" y="64" text-anchor="middle" font-size="17" font-weight="900" class="on-color">獲利${t}</text><text x="${x + 90}" y="96" text-anchor="middle" font-size="13" class="on-color">EPS ${eps}、股價 ${p}</text><text x="${x + 90}" y="128" text-anchor="middle" font-size="15" font-weight="900" class="on-color">本益比 ${(p / eps).toFixed(0)} 倍</text><text x="${x + 90}" y="160" text-anchor="middle" font-size="12" class="on-color">正常化（EPS 2.5）：${(p / 2.5).toFixed(0)} 倍</text>`).join('')}
+        <text x="280" y="236" text-anchor="middle" font-size="13">高峰時本益比最低、看起來最便宜，往往正是風險最高的時候</text>
+      </svg>`,
+      caption: '虛構的例子。正常化 EPS 用的是一整個循環的平均，例如過去 5–10 年。',
+    },
+    define: [
+      { term: '景氣循環股', en: 'cyclical', def: '獲利隨循環大幅起伏。', example: '記憶體、航運。' },
+      { term: '本益比', en: 'P/E', def: '股價 ÷ EPS。', example: '高峰時最低。' },
+      { term: '景氣循環', en: 'cycle', def: '擴張與收縮的反覆。', example: '產業循環。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '單年 EPS vs 正常化 EPS 的本益比（實際計算）', sliders: [
+          { id: 'price', label: '目前股價', min: 1, max: 300, step: 1, value: 40, unit: '元' },
+          { id: 'eps', label: '今年 EPS', min: -5, max: 30, step: 0.1, value: 5, unit: '元' },
+          { id: 'avg', label: '過去一個循環的平均 EPS', min: 0.1, max: 30, step: 0.1, value: 2.5, unit: '元' },
+        ], compute: (v) => {
+          const pe = v.eps > 0 ? v.price / v.eps : null;
+          const npe = v.price / v.avg;
+          return { rows: [
+            { label: '用今年 EPS 的本益比', value: pe ? `${pe.toFixed(1)} 倍` : '虧損，無法計算', ratio: pe ? Math.min(1, pe / 60) : 1 },
+            { label: '用正常化 EPS 的本益比', value: `${npe.toFixed(1)} 倍`, ratio: Math.min(1, npe / 60) },
+            { label: '今年 EPS 是平均的幾倍', value: `${(v.eps / v.avg).toFixed(1)} 倍`, ratio: Math.min(1, Math.abs(v.eps / v.avg) / 4) },
+          ], note: '預設：今年 EPS 是平均的 2 倍，用今年算本益比只有 8 倍，用正常化 EPS 是 16 倍。今年 EPS 遠高於平均時，「低本益比」很可能是獲利高峰的訊號，而不是便宜。' };
+        } } },
+        { type: 'heading', id: 'inventory', text: '產業循環的常見原因：庫存與產能' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="產業循環：需求增加導致產品漲價、獲利大增，於是業者擴充產能、客戶囤貨；新產能開出後供給過剩、客戶去化庫存，價格下跌、獲利大減，業者停止擴產，然後需求再次超過供給">
+          ${[['需求增加', 280, 30, 'm2'], ['漲價、獲利大增', 470, 100, 'm3'], ['擴產、囤貨', 400, 200, 'm4'], ['供過於求、跌價', 160, 200, 'm5'], ['停止擴產、去庫存', 90, 100, 'm1']].map(([t, x, y, c]) => `<rect x="${x - 75}" y="${y - 20}" width="150" height="40" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x}" y="${y + 6}" text-anchor="middle" font-size="12" font-weight="900" class="on-color">${t}</text>`).join('')}
+          <path d="M355 40 L420 80 M470 120 L440 180 M325 200 L235 200 M110 180 L95 120 M130 80 L205 40" class="stroke-ink" stroke-width="3"/>
+        </svg>`, caption: '每個參與者在自己的位置上都很理性（賺錢就擴產、跌價就停產），合起來卻放大了循環。' },
+        { type: 'table', head: ['階段', '財報上常見的樣子', '股價常見的反應'], rows: [
+          ['谷底', '虧損或微利、存貨高、本益比很高或無法計算', '常在最壞的財報出來前就開始上漲'],
+          ['復甦', '營收與毛利率回升', '上漲'],
+          ['高峰', '創紀錄的獲利、本益比很低', '常在財報最好的時候開始下跌'],
+          ['下滑', '庫存增加、毛利率下降', '下跌'],
+        ], caption: '這是常見的模式，不是規律；每一次循環的長度與高度都不同。' },
+        { type: 'heading', id: 'tw', text: '深入：台灣的循環性產業' },
+        '台灣上市公司中，電子零組件、記憶體、面板、被動元件、航運、鋼鐵、塑化等產業都有明顯的循環性；半導體整體也受庫存循環影響。投資這類公司，比估值更重要的往往是判斷「現在在循環的哪個位置」，而這正是最難判斷的事。對多數人來說，用指數持有這些產業，讓循環在整體組合裡互相抵銷，比單押某一家更穩健。',
+      ],
+    },
+    mistakes: [
+      { wrong: '在獲利高峰時因為本益比低而買進循環股。', why: '高峰的獲利不會持續。', right: '用正常化獲利估值。' },
+      { wrong: '在谷底時因為虧損而認為公司沒有價值。', why: '循環會反轉。', right: '看資產負債表能不能撐過谷底。' },
+      { wrong: '以為自己能精準判斷循環位置。', why: '循環的長度與高度每次不同。', right: '控制部位，或用指數持有。' },
+    ],
+    keypoints: [
+      '循環股的本益比要反著看：高峰最低、谷底最高。',
+      '用一整個循環的平均 EPS 估值。',
+      '產業循環來自庫存與產能的放大效果。',
+    ],
+    sources: ['cycle-signal', 'mops'],
+  },
+});
+</script>

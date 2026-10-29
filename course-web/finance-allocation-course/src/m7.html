@@ -1,0 +1,101 @@
+<script>
+/* ==========================================================================
+   模組 7：把它串起來
+   ========================================================================== */
+defineTerms({
+  '執行計畫': { en: 'execution plan', def: '把配置、投入、再平衡、費用、稅與檢查時間寫成一頁，讓每年照著做。', example: '股 70／債 30、每月 1 萬、每年 1 月再平衡。', lesson: '7-1' },
+});
+
+defineLessons({
+  '7-1': {
+    goals: [
+      '寫出自己的一頁執行計畫',
+      '排出一年的財務行事曆',
+      '知道哪些情況才需要修改計畫',
+    ],
+    analogy: {
+      text: ['食譜的價值在於：今天的你照著做，結果會和寫下它的那一天差不多。投資的[[執行計畫]]也是這樣：冷靜時寫下比例、投入方式、再平衡規則，之後不論市場多吵，照著做就好。', '這一課把前面所有的步驟收成一頁，並排進一年的行事曆，讓這一卷的內容變成每年只要花幾個小時的例行公事。'],
+      limit: ['食譜很少需要改；人生會變（結婚、生子、換工作、接近退休），計畫要跟著變。但「市場漲跌」不在需要修改計畫的理由裡。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="一年的財務行事曆：每月自動投入；1 月檢查配置與再平衡；5 月報稅並比較股利計稅方式；年中看二代健保與配息；每年一次完整檢查保險與預備金">
+        ${[['每月', '自動扣款投入', 'm0'], ['1 月', '檢查配置、再平衡、更新淨值', 'm2'], ['5 月', '報稅：股利計稅方式、海外所得', 'm4'], ['配息時', '看補充保費、配息拿去再平衡', 'm3'], ['每年一次', '預備金、保險、計畫本身', 'm5']].map(([a, b, c], i) => `<rect x="20" y="${14 + i * 54}" width="520" height="46" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="36" y="${43 + i * 54}" font-size="15" font-weight="900" class="on-color">${a}</text><text x="524" y="${43 + i * 54}" text-anchor="end" font-size="13" class="on-color">${b}</text>`).join('')}
+      </svg>`,
+      caption: '一年真正需要動手的時間大約只有幾個小時；其餘時間交給自動化。',
+    },
+    define: [
+      { term: '執行計畫', en: 'execution plan', def: '一頁的做法與規則。', example: '70／30、每月 1 萬。' },
+      { term: '再平衡', en: 'rebalancing', def: '調回目標比例。', example: '每年 1 月。' },
+      { term: '資產配置', en: 'allocation', def: '各資產的比例。', example: '股 70／債 30。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'template', text: '一頁執行計畫：逐項填寫' },
+        { type: 'widget', name: 'checklist', props: { key: 'execution-plan', items: [
+          '目標與分桶：每個目標的金額、時間、放在哪個桶（1-3）',
+          '股債比：依能力、意願、需要決定的比例，並做過跌幅測試（1-1）',
+          '工具：兩到三檔涵蓋面廣、總費用率低的基金或 ETF（1-2、4-2）',
+          '投入：扣款日、金額、加薪時的加碼規則（2-2）',
+          '一筆錢的處理：一次投入或分幾個月，時程寫死（2-1）',
+          '再平衡：檢查日期、偏離門檻、先用新錢的順序（3-2）',
+          '費用：每年檢查一次總費用率與手續費（4-1）',
+          '稅：每年 5 月比較股利合併與分開計稅，確認海外所得（5-2、5-4）',
+          '退休：目前估計的目標資產與達成年數（6-1）',
+          '不做的事：大跌不賣、看新聞不加碼、不追逐主題型商品',
+        ] } },
+        { type: 'heading', id: 'when-change', text: '什麼時候才改計畫' },
+        { type: 'table', head: ['應該檢查並可能修改', '不應該因此修改'], rows: [
+          ['結婚、離婚、生子', '股市大漲或大跌'],
+          ['換工作、收入大幅變動', '新聞、名人、社群的預測'],
+          ['買房、還清房貸', '某檔基金最近績效特別好'],
+          ['接近目標的用錢時間', '朋友賺了很多'],
+          ['稅制或制度改變（例如二代健保改制）', '「這次不一樣」的感覺'],
+        ] },
+        { type: 'widget', name: 'knobs', props: { title: '這一年花在財務上的時間（實際計算，估計值）', sliders: [
+          { id: 'monthly', label: '每月確認扣款', min: 0, max: 60, step: 5, value: 10, unit: '分鐘' },
+          { id: 'jan', label: '1 月檢查與再平衡', min: 0, max: 6, step: 0.5, value: 2, unit: '小時' },
+          { id: 'tax', label: '5 月報稅與比較', min: 0, max: 6, step: 0.5, value: 2, unit: '小時' },
+          { id: 'review', label: '年度保險與預備金檢查', min: 0, max: 6, step: 0.5, value: 2, unit: '小時' },
+        ], compute: (v) => {
+          const hours = v.monthly * 12 / 60 + v.jan + v.tax + v.review;
+          return { rows: [
+            { label: '一年合計', value: `${hours.toFixed(1)} 小時`, ratio: Math.min(1, hours / 40) },
+            { label: '平均每週', value: `${(hours * 60 / 52).toFixed(0)} 分鐘`, ratio: Math.min(1, hours * 60 / 52 / 60) },
+          ], note: '預設一年約 8 小時，平均每週不到 10 分鐘。花更多時間不一定更好：看得越頻繁，越容易做出情緒化的決定（第六部）。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="接下來：第五部財報與估值，只有想選個股的人才需要；第六部投資心理，每個人都需要，因為多數人輸給市場的原因是行為">
+          <rect x="30" y="40" width="230" height="140" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="86" text-anchor="middle" font-size="17" font-weight="900" class="on-color">第五部</text>
+          <text x="145" y="116" text-anchor="middle" font-size="15" font-weight="900" class="on-color">財報與估值</text>
+          <text x="145" y="148" text-anchor="middle" font-size="12" class="on-color">想選個股才需要</text>
+          <rect x="300" y="40" width="230" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="86" text-anchor="middle" font-size="17" font-weight="900" class="on-color">第六部</text>
+          <text x="415" y="116" text-anchor="middle" font-size="15" font-weight="900" class="on-color">投資心理</text>
+          <text x="415" y="148" text-anchor="middle" font-size="12" class="on-color">每個人都需要</text>
+        </svg>`, caption: '這一卷讓計畫可以執行；第六部處理的是「明明有計畫卻做不到」的那一部分。' },
+        { type: 'heading', id: 'example', text: '深入：一份填好的範例' },
+        { type: 'table', head: ['項目', '範例（30 歲、單身、年薪 80 萬）'], rows: [
+          ['目標', '退休（30 年後）；5 年後買房頭期款 200 萬'],
+          ['分桶', '頭期款：短中期桶，股票 20%；退休：長期桶，股票 80%'],
+          ['工具', '全球股票 ETF、台股 ETF、債券 ETF 各一檔'],
+          ['投入', '每月 6 日扣款：退休桶 1.2 萬、頭期款桶 1 萬；加薪時各加一半'],
+          ['再平衡', '每年 1 月檢查，偏離 5 個百分點以上先用新錢調'],
+          ['稅', '每年 5 月比較股利計稅方式；確認海外所得未達 100 萬'],
+          ['不做的事', '大跌不停扣、不賣；不買槓桿型與主題型 ETF'],
+        ], caption: '範例只用來示範格式，不是建議。你的比例、金額與工具要依自己的狀況決定。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '計畫只存在腦中。', why: '情緒激動時記不清楚，也容易被說服。', right: '寫成一頁，放在找得到的地方。' },
+      { wrong: '因為市場漲跌修改計畫。', why: '這正是計畫要防止的事。', right: '只在人生大事或制度改變時修改。' },
+      { wrong: '花大量時間盯盤與研究。', why: '增加情緒化決定的機會。', right: '依行事曆，每年幾個小時。' },
+    ],
+    keypoints: [
+      '一頁計畫：目標、比例、工具、投入、再平衡、費用、稅、不做的事。',
+      '每月自動化，每年 1 月檢查、5 月報稅。',
+      '人生大事才改計畫，市場漲跌不改。',
+    ],
+    sources: ['vanguard-rebal', 'tax-115', 'nhi-supp'],
+  },
+});
+</script>

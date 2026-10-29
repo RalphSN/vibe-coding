@@ -1,0 +1,98 @@
+<script>
+/* ==========================================================================
+   模組 2：社會保險：地基
+   ========================================================================== */
+defineTerms({
+  '社會保險': { en: 'social insurance', def: '由政府辦理、依法強制參加的保險；保費依收入計算，目的在提供每個人基本保障。', example: '全民健保、勞保、就業保險。', lesson: '2-1' },
+  '部分負擔': { en: 'copayment', def: '使用健保就醫時，由病人自己支付的一部分費用。', example: '醫學中心門診藥費超過 100 元，自付 20%、最多 300 元。', lesson: '2-1' },
+  '自費項目': { en: 'out-of-pocket items', def: '健保不給付、或只給付一部分，差額要病人自己付的醫療項目。', example: '病房差額、部分特殊材料、部分新藥。', lesson: '2-1' },
+  '失業給付': { en: 'unemployment benefit', def: '就業保險在非自願離職時，依投保薪資發給的部分收入替代。', example: '平均月投保薪資的 60%。', lesson: '2-1' },
+  '保障缺口': { en: 'protection gap', def: '發生事故時實際需要的錢，減去社會保險、既有保單與存款能支應的部分。', example: '需要 500 萬，現有 200 萬 → 缺口 300 萬。', lesson: '2-1' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出全民健保、勞保、就業保險各管什麼',
+      '找出健保之外最常見的醫療自費缺口',
+      '用「需要 − 已有」算出保障缺口',
+    ],
+    analogy: {
+      text: ['蓋房子要先打地基。台灣每個人都有的地基是全民健保；有工作的人再加上勞保與就業保險。這些[[社會保險]]保費不高、而且依法一定要有，是最划算的保障。', '商業保險是蓋在地基上的牆。要知道牆該蓋多厚，得先知道地基能撐多少；否則容易重複買（地基已經有的），或漏掉真正的缺口（地基沒有的）。'],
+      limit: ['地基蓋好就不太變；社會保險的給付條件與金額會隨法規調整，也和你的工作身分有關（受僱、自營、無業）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="台灣社會保險的分工：全民健保處理醫療費用，勞保處理傷病、失能、老年與死亡的現金給付，就業保險處理非自願失業，職業災害保險處理工作造成的傷病">
+        ${[['全民健保', '醫療費用', '所有人', 'm0'], ['勞保', '傷病、失能、老年、死亡的現金給付', '受僱或加保勞工', 'm1'], ['就業保險', '非自願失業', '受僱勞工', 'm3'], ['職災保險', '因工作造成的傷病', '受僱勞工', 'm4']].map(([a, b, c, col], i) => `<rect x="20" y="${16 + i * 66}" width="520" height="58" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="36" y="${44 + i * 66}" font-size="16" font-weight="900" class="on-color">${a}</text><text x="36" y="${64 + i * 66}" font-size="12" class="on-color">${b}</text><text x="524" y="${50 + i * 66}" text-anchor="end" font-size="13" font-weight="900" class="on-color">${c}</text>`).join('')}
+      </svg>`,
+      caption: '適用對象以實際投保身分為準。自營作業者、無業者可能在國民年金或職業工會投保，保障項目與受僱勞工不同。',
+    },
+    define: [
+      { term: '社會保險', en: 'social insurance', def: '政府辦理的強制保險。', example: '健保、勞保。' },
+      { term: '部分負擔', en: 'copayment', def: '健保就醫自付的部分。', example: '藥費 20%。' },
+      { term: '保障缺口', en: 'protection gap', def: '需要 − 已有。', example: '300 萬。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'nhi', text: '全民健保：大部分的醫療費用' },
+        '健保涵蓋大部分的門診、住院、手術與藥物，病人只付[[部分負擔]]。2023 年 7 月起的新制主要調整門診藥品與急診的部分負擔：',
+        { type: 'table', head: ['項目', '醫學中心、區域醫院', '地區醫院、基層診所'], rows: [
+          ['門診藥品：藥費 100 元以下', '10 元', '免'],
+          ['門診藥品：藥費 101 元以上', '20%，最多 300 元', '20%，最多 200 元'],
+          ['急診', '醫學中心 750 元、區域醫院 400 元', '依層級而定'],
+        ], caption: '重大傷病、低收入戶等維持免部分負擔。細節以衛福部與健保署公告為準。' },
+        '所以真正的醫療財務風險，不太在部分負擔，而在健保之外的[[自費項目]]：',
+        { type: 'table', head: ['常見自費', '為什麼會有', '金額特性'], rows: [
+          ['病房差額', '想住單人或雙人房，健保只給付健保房', '依天數累積'],
+          ['特殊醫材', '健保給付基本款，較新的材料要補差額', '一次性、可能數萬到數十萬'],
+          ['部分新藥、標靶與免疫治療', '尚未納入給付，或給付有條件限制', '可能非常高，是重病時最大的缺口'],
+          ['看護、交通、營養', '健保不給付', '依住院與休養時間累積'],
+          ['收入中斷', '住院、休養期間不能工作', '常被忽略，往往比醫療費更大'],
+        ] },
+        { type: 'widget', name: 'knobs', props: { title: '一次住院的健保外支出（實際計算，金額請依實際報價填）', sliders: [
+          { id: 'days', label: '住院天數', min: 1, max: 60, step: 1, value: 7, unit: '天' },
+          { id: 'room', label: '病房差額', min: 0, max: 8000, step: 100, value: 2500, unit: '元／天' },
+          { id: 'material', label: '自費醫材、藥物', min: 0, max: 1000000, step: 5000, value: 80000, unit: '元' },
+          { id: 'care', label: '看護', min: 0, max: 4000, step: 100, value: 2800, unit: '元／天' },
+          { id: 'income', label: '每天損失的收入', min: 0, max: 10000, step: 100, value: 1500, unit: '元／天' },
+          { id: 'rest', label: '出院後休養', min: 0, max: 180, step: 1, value: 14, unit: '天' },
+        ], compute: (v) => {
+          const room = v.days * v.room;
+          const care = v.days * v.care;
+          const income = (v.days + v.rest) * v.income;
+          const total = room + v.material + care + income;
+          return { rows: [
+            { label: '病房差額', value: `${room.toLocaleString()} 元`, ratio: Math.min(1, room / 200000) },
+            { label: '自費醫材、藥物', value: `${v.material.toLocaleString()} 元`, ratio: Math.min(1, v.material / 1000000) },
+            { label: '看護', value: `${care.toLocaleString()} 元`, ratio: Math.min(1, care / 200000) },
+            { label: '收入損失（住院＋休養）', value: `${income.toLocaleString()} 元`, ratio: Math.min(1, income / 500000) },
+            { label: '合計', value: `${total.toLocaleString()} 元`, ratio: Math.min(1, total / 1500000) },
+          ], note: '預設 7 天住院加 14 天休養：約 14.9 萬，其中收入損失 3.15 萬、看護 1.96 萬。很多人只想到醫藥費；收入與照顧的成本，才是失能與重病時真正會拖垮財務的部分（3-3、3-5）。' };
+        } } },
+        { type: 'heading', id: 'labor', text: '勞保與就業保險：現金給付' },
+        '勞保提供的是現金給付：普通傷病、失能、老年、死亡等情況，依投保薪資與年資計算。就業保險則處理非自願失業：依勞動部說明，符合非自願離職、退保前 3 年內保險年資合計滿 1 年、辦理求職登記等條件時，[[失業給付]]每月約為離職前 6 個月平均月投保薪資的 60%，一般最長 6 個月（45 歲以上或領有身心障礙證明者最長 9 個月），扶養眷屬每人加給 10%、最多 20%。',
+        { type: 'callout', variant: 'tip', title: '社會保險的兩個特性', body: ['**依投保薪資計算**：投保薪資有上限，高收入者的替代率會比較低；以實際投保薪資為準，可以在勞保局查詢自己的投保紀錄。', '**有資格與等待條件**：例如失業給付要非自願離職、要辦理求職登記。它是地基，不是全部。'] },
+        { type: 'heading', id: 'gap', text: '算出保障缺口' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="保障缺口的算法：事故發生時需要的錢，減去社會保險給付、既有保單與可動用存款，剩下的就是要用商業保險補的缺口">
+          <rect x="20" y="40" width="520" height="56" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="280" y="74" text-anchor="middle" font-size="16" font-weight="900" class="on-color">事故發生時需要的錢</text>
+          ${[['社會保險', 'm0', 20, 140], ['既有保單', 'm1', 160, 120], ['存款', 'm3', 280, 110], ['缺口', 'm4', 390, 150]].map(([t, c, x, w]) => `<rect x="${x}" y="120" width="${w}" height="56" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${x + w / 2}" y="154" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${t}</text>`).join('')}
+          <text x="280" y="214" text-anchor="middle" font-size="14" font-weight="900">缺口才是商業保險要補的部分</text>
+        </svg>`, caption: '每一種事故（身故、失能、重病）各算一次。3-1 與 3-5 有具體的試算。' },
+        { type: 'heading', id: 'group', text: '深入：公司團保怎麼看' },
+        '很多公司會幫員工投保團體保險（壽險、意外、醫療）。它是很好的加分，但有兩個限制：保額通常不高、而且離職就結束。最危險的時刻往往是「離職後、還沒找到工作時生病」，這時團保已經沒了，新的保單也可能因為健康狀況買不到。所以團保適合拿來補強，基本保障最好自己另外有。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為有健保就不需要任何醫療規劃。', why: '健保之外的自費與收入中斷，是重病時最大的開銷。', right: '用預備金與醫療、重疾保險補健保之外的缺口。' },
+      { wrong: '重複買健保已經涵蓋的項目。', why: '保費花在地基已有的保障上。', right: '先看健保給付什麼，再補缺口。' },
+      { wrong: '只靠公司團保。', why: '保額有限，離職就結束。', right: '團保當補強，基本保障自己另外有。' },
+    ],
+    keypoints: [
+      '健保處理醫療費，勞保與就保處理現金給付。',
+      '最大的缺口是自費項目與收入中斷。',
+      '保障缺口 ＝ 需要 − 社保 − 既有保單 − 存款。',
+    ],
+    sources: ['nhi-copay', 'mol-unemployment', 'fsc-moneywise'],
+  },
+});
+</script>

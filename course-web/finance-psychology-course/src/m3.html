@@ -1,0 +1,229 @@
+<script>
+/* ==========================================================================
+   模組 3：過度自信與從眾
+   ========================================================================== */
+defineTerms({
+  '過度自信': { en: 'overconfidence', def: '高估自己的知識、判斷的準確度或控制力。', example: '多數駕駛人覺得自己的開車技術高於平均。', lesson: '3-1' },
+  '控制錯覺': { en: 'illusion of control', def: '以為自己能影響其實由機率決定的結果。', example: '多看盤、多研究，就以為能掌握短期漲跌。', lesson: '3-1' },
+  '從眾': { en: 'herding', def: '跟著大多數人的行動做決定，而不是依據自己的分析。', example: '身邊的人都在買某檔股票，自己也跟著買。', lesson: '3-2' },
+  'FOMO': { en: 'fear of missing out', def: '害怕錯過別人都在賺的機會，因而在價格已經大漲後追進。', example: '朋友說某個主題漲了一倍，趕快買。', lesson: '3-2' },
+  '錨定': { en: 'anchoring', def: '判斷被一開始看到的數字綁住，即使那個數字和決定無關。', example: '「以前漲到 100 元，現在 60 元很便宜」。', lesson: '3-3' },
+  '確認偏誤': { en: 'confirmation bias', def: '傾向尋找、相信支持自己看法的資訊，忽略反對的證據。', example: '買了某檔股票後，只看利多新聞。', lesson: '3-3' },
+});
+
+/* 3-2 用的虛構市場：10 年的年報酬（%） */
+const MARKET_PATH = [18, 25, 30, -32, -8, 20, 15, 12, -18, 22];
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '說出過度自信在投資上的三種樣子',
+      '用研究數據說明過度交易的代價',
+      '算出自己的交易頻率吃掉多少報酬',
+    ],
+    analogy: {
+      text: ['問一群駕駛人「你的開車技術比平均好嗎？」，大多數人會說是；但不可能大多數人都高於平均。這就是[[過度自信]]，它在投資上特別昂貴：覺得自己看得準，就會更頻繁地交易、押更集中的部位。', 'Barber 與 Odean 分析美國六萬多個家戶的帳戶（1991–1996）：交易最頻繁的那一群，年報酬約 11.4%，同期市場約 17.9%。他們的論文標題就是結論：「交易對你的財富有害」。'],
+      limit: ['開車的過度自信主要害到自己與他人的安全；投資的過度自信看起來只影響自己的帳戶，但由於報酬的回饋很慢，常常好幾年才發現代價。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="過度自信的三種樣子：高估準確度，以為能預測漲跌；高估控制力，以為多看盤就能掌握；高估自己的特別，以為贏過大多數人；結果都是交易太多與部位太集中">
+        ${[['高估準確度', '「我看得出會漲」', 'm1'], ['控制錯覺', '「多看盤就能掌握」', 'm3'], ['高於平均', '「我比大部分人厲害」', 'm5']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="80" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="112" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+        <path d="M97 150 L280 190 M280 150 L280 190 M462 150 L280 190" class="stroke-ink" stroke-width="3"/>
+        <rect x="140" y="190" width="280" height="50" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="280" y="221" text-anchor="middle" font-size="15" font-weight="900" class="on-color">交易太多、部位太集中</text>
+      </svg>`,
+      caption: 'Barber 與 Odean（2001）也發現，單身男性的交易比單身女性多約 67%，年化風險調整後淨報酬少約 2.3 個百分點；作者把它解釋為過度自信的差異。',
+    },
+    define: [
+      { term: '過度自信', en: 'overconfidence', def: '高估自己的判斷。', example: '高於平均。' },
+      { term: '控制錯覺', en: 'illusion of control', def: '以為能控制機率的結果。', example: '多看盤。' },
+      { term: '行為缺口', en: 'behavior gap', def: '投資人報酬低於工具報酬。', example: '來自交易時機。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '交易頻率吃掉多少報酬（台股成本，實際計算）', sliders: [
+          { id: 'amt', label: '投資金額', min: 100000, max: 20000000, step: 100000, value: 1000000, unit: '元' },
+          { id: 'turn', label: '一年週轉率（賣出金額 ÷ 資產）', min: 0, max: 1000, step: 10, value: 200, unit: '%' },
+          { id: 'disc', label: '手續費折扣', min: 1, max: 10, step: 0.5, value: 6, unit: '折' },
+          { id: 'tax', label: '證交稅（股票 0.3%、ETF 0.1%）', min: 0.1, max: 0.3, step: 0.2, value: 0.3, unit: '%' },
+          { id: 'years', label: '年數', min: 1, max: 30, step: 1, value: 20, unit: '年' },
+        ], compute: (v) => {
+          const roundTrip = (0.1425 * v.disc / 10) * 2 + v.tax;
+          const drag = v.turn / 100 * roundTrip;
+          const base = v.amt * 1.07 ** v.years; const after = v.amt * (1 + (7 - drag) / 100) ** v.years;
+          return { rows: [
+            { label: '每次買賣一來一回的成本', value: `${roundTrip.toFixed(3)}%`, ratio: Math.min(1, roundTrip / 0.6) },
+            { label: '每年被吃掉的報酬', value: `${drag.toFixed(2)} 個百分點`, ratio: Math.min(1, drag / 7) },
+            { label: `${v.years} 年後（假設市場 7%）`, value: `${Math.round(after).toLocaleString()} 元（不交易 ${Math.round(base).toLocaleString()}）`, ratio: Math.min(1, after / base) },
+          ], note: '預設：一年週轉 200%（等於一年把所有持股換兩次），光是手續費與證交稅每年就吃掉約 0.94 個百分點，還沒算買賣時機的損失。台灣的研究也指出，散戶落後市場的部分約三分之二來自交易成本。' };
+        } } },
+        { type: 'heading', id: 'daytrade', text: '台灣的當沖研究' },
+        'Barber、Lee、Liu、Odean 等人用台灣 1992 到 2006 年的資料研究當沖交易者：當沖者整體的績效是負的，多數人不賺錢，而且很多人在持續虧損後仍然繼續交易。作者的解讀是：這和過度自信、以及「選擇性地記住賺錢的經驗」一致，而不是理性地在學習自己的能力。',
+        { type: 'table', head: ['過度自信的表現', '對策'], rows: [
+          ['頻繁交易', '把交易次數與成本記錄下來，每年檢視'],
+          ['集中押注', '設定單一個股上限（第五部 5-1）'],
+          ['覺得自己能擇時', '用定期定額與再平衡規則取代判斷'],
+          ['只記得賺錢的交易', '寫交易日誌：買進理由、結果、事後檢討'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="運氣與實力：短期的成功很容易被歸因於實力，失敗被歸因於運氣；長期的紀錄才能分辨兩者">
+          <rect x="30" y="40" width="240" height="130" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="150" y="86" text-anchor="middle" font-size="16" font-weight="900" class="on-color">賺錢時</text>
+          <text x="150" y="118" text-anchor="middle" font-size="13" class="on-color">「是我判斷得好」</text>
+          <rect x="290" y="40" width="240" height="130" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="410" y="86" text-anchor="middle" font-size="16" font-weight="900" class="on-color">賠錢時</text>
+          <text x="410" y="118" text-anchor="middle" font-size="13" class="on-color">「是運氣不好、市場不理性」</text>
+          <text x="280" y="204" text-anchor="middle" font-size="13">這種歸因方式，會讓過度自信越來越強</text>
+        </svg>`, caption: '心理學稱為自利歸因。交易日誌能打破它：把當時的理由寫下來，事後才能誠實地比對。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '覺得多看盤、多交易就能多賺。', why: '研究顯示交易越多，報酬越差。', right: '減少交易，照規則執行。' },
+      { wrong: '把賺錢歸功於自己，把賠錢歸咎於運氣。', why: '讓過度自信越來越強。', right: '寫交易日誌，誠實比對。' },
+      { wrong: '短期賺錢就加大部位。', why: '短期的成功可能只是運氣。', right: '維持部位上限，看長期紀錄。' },
+    ],
+    keypoints: [
+      '交易最頻繁的家戶年報酬 11.4%，市場 17.9%。',
+      '過度自信讓人交易太多、押得太集中。',
+      '交易日誌與部位上限，是過度自信的解藥。',
+    ],
+    sources: ['barber-odean-2000', 'barber-odean-2001', 'daytrade-2020'],
+  },
+
+  '3-2': {
+    goals: [
+      '說明追高殺低為什麼會降低報酬',
+      '理解從眾與 FOMO 的心理',
+      '比較穩定投入與追逐趨勢的結果',
+    ],
+    analogy: {
+      text: ['餐廳門口大排長龍，很多人會覺得「一定好吃」而跟著排，即使不知道為什麼。這是[[從眾]]：用別人的行為當作資訊。在不確定的環境裡，這是合理的捷徑；但在股市裡，大家都在買的時候，價格通常已經很高了。', '[[FOMO]]（害怕錯過）讓人在大漲之後追進；損失趨避讓人在大跌之後殺出。兩者加起來，就是追高殺低：在高點投入最多錢、在低點投入最少甚至賣出。這正是行為缺口最主要的來源。'],
+      limit: ['排隊的餐廳通常真的不錯；但股價大漲之後，未來的預期報酬常常已經被提前反映了，跟著排隊不一定吃得到。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="追高殺低的循環：價格上漲，新聞與身邊的人都在討論，FOMO 讓人加碼買進；價格下跌，恐慌與損失趨避讓人賣出；結果是買在高點、賣在低點">
+        <path d="M40 200 C 120 200, 160 60, 260 50 C 360 40, 380 210, 520 200" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+        <circle cx="250" cy="50" r="9" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="250" y="30" text-anchor="middle" font-size="13" font-weight="900">FOMO：大量買進</text>
+        <circle cx="440" cy="190" r="9" style="fill:var(--m5)" class="stroke-ink" stroke-width="2"/><text x="440" y="230" text-anchor="middle" font-size="13" font-weight="900">恐慌：賣出</text>
+        <text x="110" y="230" text-anchor="middle" font-size="12">低點時沒人討論</text>
+        <text x="280" y="254" text-anchor="middle" font-size="12">示意圖：情緒最強的時候，正是價格最極端的時候</text>
+      </svg>`,
+      caption: '基金本身的報酬是「一直持有」；投資人在高點投入最多、低點撤出，就拿不到那個報酬（0-1）。',
+    },
+    define: [
+      { term: '從眾', en: 'herding', def: '跟著多數人行動。', example: '排隊效應。' },
+      { term: 'FOMO', en: 'FOMO', def: '害怕錯過而追進。', example: '大漲後追。' },
+      { term: '近因偏誤', en: 'recency', def: '以為最近的趨勢會持續。', example: '連漲就追。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '同一段虛構的 10 年行情、同樣的預算：穩定投入 vs 追高殺低（實際計算）', sliders: [
+          { id: 'base', label: '每年的投資預算', min: 10000, max: 1000000, step: 10000, value: 100000, unit: '元' },
+          { id: 'panic', label: '前一年下跌後，賣出持股的比例', min: 0, max: 100, step: 10, value: 50, unit: '%' },
+        ], compute: (v) => {
+          let steady = 0; let chaser = 0; let cash = 0;
+          MARKET_PATH.forEach((r, i) => {
+            const prev = i ? MARKET_PATH[i - 1] : 0;
+            steady += v.base; cash += v.base;
+            if (prev < 0) { const sold = chaser * v.panic / 100; chaser -= sold; cash += sold; }
+            else if (prev > 15) { chaser += cash; cash = 0; }
+            else { chaser += v.base; cash -= v.base; }
+            steady *= 1 + r / 100; chaser *= 1 + r / 100; cash *= 1.015;
+          });
+          const chaserTotal = chaser + cash; const paid = v.base * MARKET_PATH.length;
+          return { rows: [
+            { label: '穩定投入：期末', value: `${Math.round(steady).toLocaleString()} 元`, ratio: 1 },
+            { label: '追高殺低：期末（含現金）', value: `${Math.round(chaserTotal).toLocaleString()} 元`, ratio: Math.min(1, chaserTotal / steady) },
+            { label: '兩者都投入', value: `${paid.toLocaleString()} 元`, ratio: Math.min(1, paid / steady) },
+          ], note: `虛構的 10 年年報酬：${MARKET_PATH.join('%、')}%。追高者的規則：前一年下跌，就停止投入（錢放 1.5% 現金）並賣出部分持股；前一年大漲超過 15%，就把累積的現金全部投入；其他年份照常投入。預設賣出 50% 時，追高者期末約 1,135,604 元，穩定投入者約 1,324,964 元，少了約 14%。即使把賣出比例設成 0（約 1,271,120 元），光是「跌了就停投、漲了才追」，結果仍然落後。` };
+        } } },
+        { type: 'heading', id: 'sources', text: 'FOMO 從哪裡來' },
+        { type: 'table', head: ['來源', '為什麼會放大 FOMO'], rows: [
+          ['社群與通訊群組', '只看得到別人賺錢的截圖，看不到虧損'],
+          ['新聞標題', '「創新高」「錯過這波就沒了」吸引點閱'],
+          ['身邊的人', '同事、朋友的成功故事最有說服力'],
+          ['帳戶 app 的推播', '每一次價格變動都在提醒你「有事發生」'],
+        ], caption: '倖存者偏差：你聽到的，大多是賺錢的人在說話；賠錢的人通常沉默。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="對抗追高殺低的三個工具：定期定額讓投入不受情緒影響，再平衡規則讓你在大漲時減碼、大跌時加碼，冷卻期讓衝動的決定延後 48 小時">
+          ${[['定期定額', '投入不看行情', 'm2'], ['再平衡規則', '漲多減、跌深加', 'm3'], ['48 小時冷卻', '衝動的買賣先等', 'm1']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="40" width="165" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="92" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="122" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="196" text-anchor="middle" font-size="13">三個工具的共同點：讓行為不依賴當下的情緒</text>
+        </svg>`, caption: '模組 5 會把這些工具變成具體的設定。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '看到大家都在賺就跟進。', why: '價格常已反映，追進的是高點。', right: '照原本的配置與定期定額。' },
+      { wrong: '大跌時停投或賣出。', why: '在低點撤出，錯過反彈。', right: '再平衡規則讓你在低點加碼。' },
+      { wrong: '用社群上的成功故事判斷機會。', why: '只看得到倖存者。', right: '看完整的數據與自己的計畫。' },
+    ],
+    keypoints: [
+      '追高殺低：高點投入最多、低點撤出。',
+      'FOMO 與從眾讓人在情緒最強時做決定。',
+      '定期定額、再平衡、冷卻期，讓行為不看情緒。',
+    ],
+    sources: ['morningstar-gap', 'taiwan-2009'],
+  },
+
+  '3-3': {
+    goals: [
+      '辨認錨定、確認偏誤與敘事謬誤',
+      '用「反方論點」檢查自己的判斷',
+      '知道新聞與故事如何影響投資決定',
+    ],
+    analogy: {
+      text: ['逛街時看到「原價 5,000，特價 2,990」，你會覺得賺到；如果它一直都標 2,990，你可能根本不會多看一眼。那個 5,000 就是[[錨定]]：一個和真正價值無關的數字，卻牢牢綁住了判斷。', '投資裡的錨很多：過去的高點、自己的買進價、分析師的目標價。另外兩個常見的偏誤是[[確認偏誤]]（只看支持自己的資訊）與敘事謬誤（被好聽的故事說服，而忽略數字）。'],
+      limit: ['商品的原價有時真的代表價值；股價的過去高點常常只是那時候的市場情緒，並不代表現在應該值多少。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="三種判斷陷阱：錨定被無關的數字綁住，確認偏誤只看支持自己的資訊，敘事謬誤被好故事說服而忽略數字">
+        ${[['錨定', '「以前 100 元」', '問：這個數字和未來有關嗎？', 'm1'], ['確認偏誤', '只看利多', '問：反方最有力的論點是什麼？', 'm3'], ['敘事謬誤', '好故事＝好投資', '問：數字支持這個故事嗎？', 'm4']].map(([a, b, c, col], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="190" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="72" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="108" text-anchor="middle" font-size="12" class="on-color">${b}</text><text x="${97 + i * 182}" y="170" text-anchor="middle" font-size="10" class="on-color">${c}</text>`).join('')}
+      </svg>`,
+      caption: '每一個陷阱都有一個對應的問題；把問題寫進第五部的分析清單裡。',
+    },
+    define: [
+      { term: '錨定', en: 'anchoring', def: '被無關的數字綁住。', example: '過去高點。' },
+      { term: '確認偏誤', en: 'confirmation bias', def: '只看支持自己的資訊。', example: '只看利多。' },
+      { term: '從眾', en: 'herding', def: '跟著多數人。', example: '排隊效應。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '錨定的距離 vs 價值的距離（實際計算）', sliders: [
+          { id: 'high', label: '過去的高點', min: 10, max: 500, step: 1, value: 100, unit: '元' },
+          { id: 'price', label: '現在的股價', min: 1, max: 500, step: 1, value: 60, unit: '元' },
+          { id: 'value', label: '你用財報估計的價值（第五部）', min: 1, max: 500, step: 1, value: 45, unit: '元' },
+        ], compute: (v) => ({ rows: [
+          { label: '距離過去高點', value: `${(((v.price / v.high) - 1) * 100).toFixed(0)}%（看起來「便宜」）`, ratio: Math.min(1, Math.abs(v.price / v.high - 1)) },
+          { label: '距離估計價值', value: `${(((v.price / v.value) - 1) * 100).toFixed(0)}%`, ratio: Math.min(1, Math.abs(v.price / v.value - 1)) },
+          { label: '判斷依據應該是', value: v.price <= v.value ? '低於估計價值' : '仍高於估計價值', ratio: v.price <= v.value ? 0.3 : 1 },
+        ], note: '預設：比高點跌了 40%，看起來很便宜；但仍比估計價值高約 33%。過去的高點只代表那時候的市場情緒，不代表現在的價值。' }) } },
+        { type: 'heading', id: 'wheel', text: '深入：輪盤實驗' },
+        'Tversky 與 Kahneman（1974）讓受試者先看一個轉出 10 或 65 的輪盤，再估計「非洲國家在聯合國會員國中占幾 %」。輪盤的數字明明和問題無關，看到 10 的那組估計的中位數約 25%，看到 65 的那組約 45%。投資裡的錨更有說服力，因為過去的價格「看起來」和股票有關；但對未來的報酬來說，它和輪盤一樣無關。',
+        { type: 'heading', id: 'devil', text: '用「反方論點」對抗確認偏誤' },
+        { type: 'list', ordered: true, items: [
+          '寫下你買進（或想買進）的三個理由。',
+          '寫下最有力的三個反對理由；找不到就去看看空方的分析或公司的風險說明。',
+          '問自己：什麼證據出現時，我會改變看法？（這就是第五部的「代表我錯了」）',
+          '持有期間，刻意每季讀一篇和你看法相反的分析。',
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="好故事與好投資的距離：故事吸引人，例如新技術、新市場；但投資報酬取決於價格是否已經反映了故事，以及公司能否真的賺到錢">
+          <rect x="30" y="40" width="160" height="130" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="110" y="100" text-anchor="middle" font-size="15" font-weight="900" class="on-color">好故事</text><text x="110" y="126" text-anchor="middle" font-size="11" class="on-color">新技術、新市場</text>
+          <rect x="200" y="40" width="160" height="130" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="100" text-anchor="middle" font-size="15" font-weight="900" class="on-color">能賺到錢嗎</text><text x="280" y="126" text-anchor="middle" font-size="11" class="on-color">競爭、獲利模式</text>
+          <rect x="370" y="40" width="160" height="130" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="450" y="100" text-anchor="middle" font-size="15" font-weight="900" class="on-color">價格反映了嗎</text><text x="450" y="126" text-anchor="middle" font-size="11" class="on-color">估值（第五部）</text>
+          <text x="280" y="204" text-anchor="middle" font-size="13">三格都通過，好故事才可能是好投資</text>
+        </svg>`, caption: '改變世界的技術，不一定讓早期的投資人賺錢：競爭者眾多、價格過早反映，都會讓好故事變成壞投資。' },
+        { type: 'heading', id: 'media', text: '深入：新聞的結構' },
+        '財經新聞需要每天都有東西可寫，所以它傾向用一個原因解釋每一次漲跌（「因為某某消息，股市大跌」），即使當天的漲跌很可能只是雜訊。這會強化敘事謬誤：讓人以為市場的每一個變動都有清楚的原因、而且可以預測。對長期投資人來說，大部分的每日新聞都可以不看（5-3）。',
+      ],
+    },
+    mistakes: [
+      { wrong: '用過去的高點判斷便宜。', why: '高點只是過去的情緒。', right: '用估計的價值判斷。' },
+      { wrong: '只讀支持自己看法的分析。', why: '確認偏誤讓你看不到風險。', right: '刻意找最有力的反方論點。' },
+      { wrong: '因為故事很好就買。', why: '價格可能已經反映了故事。', right: '故事、獲利、價格三格都檢查。' },
+    ],
+    keypoints: [
+      '錨定：過去的價格不是現在的價值。',
+      '確認偏誤：寫下反方論點與改變看法的條件。',
+      '好故事要通過「能賺錢」與「價格合理」兩關。',
+    ],
+    sources: ['tk-1974', 'thaler-1999'],
+  },
+});
+</script>

@@ -1,0 +1,103 @@
+<script>
+/* ==========================================================================
+   模組 2：通膨
+   ========================================================================== */
+defineTerms({
+  '通膨': { en: 'inflation', def: '一般物價持續上漲；同樣的錢能買的東西變少，也就是購買力下降。', example: '2026 年 9 月 CPI 年增 2.73%。', lesson: '2-1' },
+  'CPI': { en: 'consumer price index', def: '消費者物價指數：追蹤一籃子家庭常買的商品與服務價格；它的年增率就是常說的通膨率。', example: '主計總處每月公布。', lesson: '2-1' },
+  '名目報酬': { en: 'nominal return', def: '沒有扣掉通膨的報酬，也就是帳面上的數字。', example: '定存利率 1.7%。', lesson: '2-1' },
+  '實質報酬': { en: 'real return', def: '扣掉通膨之後的報酬，代表購買力真正增加多少；約等於名目報酬減通膨率。', example: '名目 1.7%、通膨 2.7% → 實質約 −1%。', lesson: '2-1' },
+  '購買力': { en: 'purchasing power', def: '一筆錢能買到多少東西。', example: '20 年後的 100 萬，購買力可能只剩今天的 58 萬。', lesson: '2-1' },
+});
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '換算名目報酬與實質報酬',
+      '算出一筆錢在通膨下的購買力',
+      '說明「不投資」本身也有風險',
+    ],
+    analogy: {
+      text: ['把冰塊放在室溫下，就算你什麼都不做，它也會慢慢變小。現金在[[通膨]]下就是這樣：帳戶裡的數字沒變，能買的東西卻一年比一年少。', '所以談報酬時，真正重要的是[[實質報酬]]：扣掉通膨之後，[[購買力]]有沒有增加。帳面上賺 2%，物價漲 3%，其實是變窮了。'],
+      limit: ['冰塊融化的速度很穩定；通膨會隨時期變化，有的年份接近 0，有的年份超過 5%，而且每個家庭感受到的通膨也不同（房租、教育、醫療漲幅各不一樣）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="100 萬元在不同通膨率下 20 年後的購買力：通膨 1% 剩約 82 萬，2% 剩約 67 萬，2.73% 剩約 58 萬，4% 剩約 46 萬">
+        ${[[1, 82], [2, 67.3], [2.73, 58.4], [4, 45.6]].map(([inf, v], i) => `<rect x="${40 + i * 125}" y="${230 - v * 2}" width="100" height="${v * 2}" style="fill:var(--m${i + 1})" class="stroke-ink" stroke-width="3"/><text x="${90 + i * 125}" y="${222 - v * 2}" text-anchor="middle" font-size="14" font-weight="900">${v.toFixed(0)} 萬</text><text x="${90 + i * 125}" y="252" text-anchor="middle" font-size="13" class="mono">通膨 ${inf}%</text>`).join('')}
+        <text x="280" y="22" text-anchor="middle" font-size="14" font-weight="900">今天的 100 萬，20 年後的購買力</text>
+      </svg>`,
+      caption: '計算方式：100 萬 ÷（1 ＋ 通膨率）^20。2.73% 是 2026 年 9 月的單月年增率，不代表未來 20 年的平均。',
+    },
+    define: [
+      { term: '通膨', en: 'inflation', def: '物價持續上漲。', example: '2.73%。' },
+      { term: '名目報酬', en: 'nominal return', def: '帳面報酬。', example: '1.7%。' },
+      { term: '實質報酬', en: 'real return', def: '扣掉通膨的報酬。', example: '約 −1%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'fisher', text: '名目與實質的換算' },
+        '精確的換算是：（1 ＋ 實質）＝（1 ＋ 名目）÷（1 ＋ 通膨）。數字小的時候，用「實質 ≈ 名目 − 通膨」就夠準確。主計總處公布 2026 年 9 月 [[CPI]] 年增率 2.73%，前三季平均約 1.94%；而臺灣銀行一年以上定存利率約 1.7%。也就是說，2026 年把錢放在定存，實質報酬大約在 −1% 到 0% 之間。',
+        { type: 'widget', name: 'knobs', props: { title: '名目、實質與購買力（實際計算）', sliders: [
+          { id: 'amt', label: '金額', min: 10000, max: 10000000, step: 10000, value: 1000000, unit: '元' },
+          { id: 'nominal', label: '名目年報酬', min: -5, max: 12, step: 0.1, value: 1.7, unit: '%' },
+          { id: 'inf', label: '平均通膨率', min: 0, max: 8, step: 0.1, value: 2, unit: '%' },
+          { id: 'years', label: '年數', min: 1, max: 50, step: 1, value: 20, unit: '年' },
+        ], compute: (v) => {
+          const real = ((1 + v.nominal / 100) / (1 + v.inf / 100) - 1) * 100;
+          const nominalEnd = v.amt * (1 + v.nominal / 100) ** v.years;
+          const realEnd = nominalEnd / (1 + v.inf / 100) ** v.years;
+          return { rows: [
+            { label: '實質年報酬', value: `${real.toFixed(2)}%`, ratio: Math.min(1, Math.abs(real) / 10) },
+            { label: '期末帳面金額', value: `${Math.round(nominalEnd).toLocaleString()} 元`, ratio: Math.min(1, nominalEnd / (v.amt * 5)) },
+            { label: '換算成今天的購買力', value: `${Math.round(realEnd).toLocaleString()} 元`, ratio: Math.min(1, realEnd / (v.amt * 5)) },
+            { label: '購買力變化', value: `${(((realEnd / v.amt) - 1) * 100).toFixed(1)}%`, ratio: Math.min(1, Math.abs(realEnd / v.amt - 1)) },
+          ], note: '預設：100 萬放 1.7% 的定存 20 年、平均通膨 2%，帳面變成約 140 萬，購買力卻只剩約 94 萬。把名目報酬拉到 6%：購買力約 216 萬，實質報酬約 3.9%。' };
+        } } },
+        { type: 'heading', id: 'not-investing', text: '不投資也是一種風險' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="兩種風險的取捨：投資有價格波動的風險，不投資有購買力被通膨侵蝕的風險；短期需要的錢怕波動，長期的錢怕通膨">
+          <rect x="20" y="30" width="250" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="70" text-anchor="middle" font-size="17" font-weight="900" class="on-color">投資的風險</text>
+          <text x="145" y="102" text-anchor="middle" font-size="13" class="on-color">價格上下波動</text>
+          <text x="145" y="130" text-anchor="middle" font-size="13" class="on-color">短期可能虧損</text>
+          <text x="145" y="160" text-anchor="middle" font-size="12" class="on-color">→ 短期要用的錢怕這個</text>
+          <rect x="290" y="30" width="250" height="150" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="70" text-anchor="middle" font-size="17" font-weight="900" class="on-color">不投資的風險</text>
+          <text x="415" y="102" text-anchor="middle" font-size="13" class="on-color">購買力慢慢流失</text>
+          <text x="415" y="130" text-anchor="middle" font-size="13" class="on-color">看起來很安全</text>
+          <text x="415" y="160" text-anchor="middle" font-size="12" class="on-color">→ 長期的錢怕這個</text>
+          <text x="280" y="214" text-anchor="middle" font-size="13" font-weight="900">依錢的用途與時間，選擇要承擔哪一種</text>
+        </svg>`, caption: '預備金（第一部）承擔的是通膨風險，換取安全與流動；退休金這類長期的錢，承擔的是波動風險，換取跑贏通膨的機會。' },
+        { type: 'heading', id: 'personal', text: '深入：你的通膨不一定是 CPI' },
+        'CPI 是一籃子平均的物價，每個家庭實際面對的通膨不同：租屋族受房租影響大，有學齡子女的家庭受教育費用影響大，年長者受醫療費用影響大。規劃長期目標（例如子女教育金、退休金）時，可以為不同用途用不同的通膨假設，而不是全部套同一個數字。',
+        { type: 'table', head: ['資產', '對抗通膨的方式', '限制'], rows: [
+          ['現金、定存', '幾乎沒有，實質報酬常在 0 附近或為負', '安全與流動性最好'],
+          ['債券', '固定利息，通膨意外上升時不利', '抗通膨能力有限'],
+          ['股票', '企業可以調漲售價、獲利隨物價成長', '短期可能和通膨同時下跌'],
+          ['不動產', '租金與房價長期常隨物價上升', '流動性差、集中風險高'],
+        ], caption: '沒有任何一種資產在所有通膨情境下都表現好；這也是資產配置（第四部）要混合不同資產的原因之一。' },
+        { type: 'heading', id: 'history', text: '深入：長期通膨有多大' },
+        'UBS 的長期年鑑指出，1900 到 2025 年美國通膨年均約 2.9%，這意味著 1900 年的 1 美元，購買力相當於今天的約 38 美元。這是在全球標準下「相對溫和」的通膨；有些國家曾經歷惡性通膨，貨幣幾乎失去價值。',
+        { type: 'table', head: ['情境', '對各資產的大致影響'], rows: [
+          ['溫和、穩定的通膨', '股票通常能跟上；現金與債券的實質報酬偏低'],
+          ['通膨意外升高', '債券與現金受傷；股票短期也可能下跌'],
+          ['停滯性通膨（低成長＋高通膨）', '股債可能同時表現差，是最難應付的情境'],
+          ['通縮', '現金與高品質債券的實質價值上升；股票與不動產受傷'],
+        ], caption: '這是大致的方向，不是每次都成立。沒有單一資產能應付所有情境，這是分散（模組 4）與配置（第四部）的理由。' },
+        { type: 'heading', id: 'money-illusion', text: '深入：貨幣幻覺' },
+        '人們習慣用名目數字思考，這叫貨幣幻覺：加薪 2% 覺得開心，卻沒注意物價漲了 3%；房價十年漲五成覺得賺很多，卻沒扣掉同期的通膨與持有成本。做長期規劃時，最簡單的對策是：所有的目標、報酬、薪資都換成「今天的錢」來想。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看名目報酬。', why: '通膨會吃掉購買力。', right: '一律換算成實質報酬比較。' },
+      { wrong: '覺得放定存就沒有風險。', why: '長期下來購買力會下降。', right: '短期的錢放定存，長期的錢要考慮跑贏通膨。' },
+      { wrong: '所有長期目標都套用同一個通膨率。', why: '房租、教育、醫療的漲幅不同。', right: '依用途設定不同的通膨假設。' },
+    ],
+    keypoints: [
+      '實質報酬 ≈ 名目報酬 − 通膨。',
+      '2026 年定存的實質報酬大約在 −1% 到 0%。',
+      '短期的錢怕波動，長期的錢怕通膨。',
+    ],
+    sources: ['cpi-2026-09', 'bot-rates', 'ubs-2026'],
+  },
+});
+</script>

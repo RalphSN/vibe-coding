@@ -1,0 +1,230 @@
+<script>
+/* ==========================================================================
+   模組 2：損失與後悔
+   ========================================================================== */
+defineTerms({
+  '損失趨避': { en: 'loss aversion', def: '同樣金額的損失帶來的痛苦，大於獲利帶來的快樂；研究估計大約是兩倍左右。', example: '賠 1,000 元的痛，約等於賺 2,000 多元的快樂。', lesson: '2-1' },
+  '展望理論': { en: 'prospect theory', def: 'Kahneman 與 Tversky 提出的決策理論：人用「相對於參考點的得失」評價結果，而且對損失比對獲利敏感。', example: '用買進價當參考點。', lesson: '2-1' },
+  '參考點': { en: 'reference point', def: '判斷「賺」或「賠」的基準；常常是買進價格，而不是對未來最有意義的數字。', example: '「還沒回到我買的價錢」。', lesson: '2-1' },
+  '處分效應': { en: 'disposition effect', def: '傾向太早賣掉賺錢的投資、太久抱著賠錢的投資。', example: '賺 10% 就賣，賠 30% 還在等回本。', lesson: '2-2' },
+  '沉沒成本': { en: 'sunk cost', def: '已經付出、不論未來怎麼做都拿不回來的成本；理性的決定不應該被它影響。', example: '當初買進的價格。', lesson: '2-3' },
+  '後悔趨避': { en: 'regret aversion', def: '為了避免將來後悔，選擇不行動或拖延決定。', example: '怕買在高點，所以一直不投資。', lesson: '2-3' },
+});
+
+function prospectValue(x) { return x >= 0 ? x ** 0.88 : -2.25 * (-x) ** 0.88; }
+
+defineLessons({
+  '2-1': {
+    goals: [
+      '說出損失趨避的大小',
+      '用展望理論解釋「明明期望值為正，卻不想參加」',
+      '理解損失趨避在投資上的兩種代價',
+    ],
+    analogy: {
+      text: ['在路上撿到 1,000 元，你會開心一陣子；掉了 1,000 元，你可能懊惱一整天。同樣的金額，損失的感受比獲利強烈得多。這就是[[損失趨避]]。', 'Kahneman 與 Tversky 在 1979 年提出[[展望理論]]，1992 年估計的參數顯示：損失的權重大約是獲利的 2.25 倍。後續研究的估計有很大差異，但「大約兩倍左右」是常見的結論。'],
+      limit: ['2.25 是實驗中的整體估計，每個人不同，同一個人在不同情境也不同；它說明的是方向與大致的量級。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="展望理論的價值函數：橫軸是相對參考點的得失，縱軸是感受；獲利那一側較平緩，損失那一側較陡，同樣 1,000 元，損失的感受約是獲利的 2.25 倍">
+        <line x1="40" y1="135" x2="520" y2="135" class="stroke-ink" stroke-width="2"/><line x1="280" y1="15" x2="280" y2="255" class="stroke-ink" stroke-width="2"/>
+        <path d="${Array.from({ length: 41 }, (_, i) => { const x = -2000 + i * 100; const y = prospectValue(x); return `${i ? 'L' : 'M'}${(280 + x * 0.12).toFixed(1)} ${(135 - y * 0.06).toFixed(1)}`; }).join(' ')}" fill="none" style="stroke:var(--m4)" stroke-width="4"/>
+        <text x="500" y="${(135 - prospectValue(1800) * 0.06 - 10).toFixed(0)}" text-anchor="end" font-size="13" font-weight="900">獲利：較平緩</text>
+        <text x="60" y="${(135 - prospectValue(-1800) * 0.06 + 4).toFixed(0)}" font-size="13" font-weight="900">損失：較陡</text>
+        <text x="520" y="152" text-anchor="end" font-size="12">得失 →</text>
+        <text x="288" y="28" font-size="12">感受 ↑</text>
+      </svg>`,
+      caption: '曲線用 Tversky 與 Kahneman 1992 的參數（α ＝ 0.88、λ ＝ 2.25）畫出。[[參考點]]在原點，通常是你的買進價。',
+    },
+    define: [
+      { term: '損失趨避', en: 'loss aversion', def: '損失的痛大於獲利的快樂。', example: '約兩倍。' },
+      { term: '展望理論', en: 'prospect theory', def: '相對參考點評價得失。', example: '1979。' },
+      { term: '參考點', en: 'reference point', def: '判斷賺賠的基準。', example: '買進價。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '擲硬幣：期望值 vs 感受（展望理論參數，實際計算）', sliders: [
+          { id: 'win', label: '正面贏', min: 100, max: 5000, step: 100, value: 2000, unit: '元' },
+          { id: 'lose', label: '反面輸', min: 100, max: 5000, step: 100, value: 1000, unit: '元' },
+        ], compute: (v) => {
+          const ev = 0.5 * v.win - 0.5 * v.lose;
+          const felt = 0.5 * prospectValue(v.win) + 0.5 * prospectValue(-v.lose);
+          let lo = v.lose; let hi = v.lose * 10;
+          for (let i = 0; i < 60; i += 1) { const m = (lo + hi) / 2; if (0.5 * prospectValue(m) + 0.5 * prospectValue(-v.lose) > 0) hi = m; else lo = m; }
+          return { rows: [
+            { label: '期望值（數學）', value: `${ev.toLocaleString()} 元`, ratio: Math.min(1, Math.abs(ev) / 2500) },
+            { label: '感受值（展望理論）', value: `${felt.toFixed(0)}（${felt > 0 ? '願意參加' : '不想參加'}）`, ratio: Math.min(1, Math.abs(felt) / 1000) },
+            { label: '贏多少才願意參加', value: `約 ${Math.round(lo).toLocaleString()} 元`, ratio: Math.min(1, lo / 5000) },
+          ], note: '預設：贏 2,000、輸 1,000，期望值 ＋500 元，但在展望理論的參數下仍然「不想參加」；輸 1,000 時，要贏約 2,500 元才願意。投資股票就像不斷參加期望值為正的擲硬幣，損失趨避讓很多人寧願不參加。' };
+        } } },
+        { type: 'heading', id: 'costs', text: '損失趨避在投資上的兩種代價' },
+        { type: 'table', head: ['代價', '行為', '結果'], rows: [
+          ['太保守', '把長期的錢放在定存，不敢投資', '長期被通膨侵蝕（第三部 2-1）'],
+          ['在最差的時候賣', '大跌時痛苦難耐，賣掉換回安心', '把暫時的下跌變成永久的損失（第三部 3-1）'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="同樣的事實，兩種框架：說成「十次有六次賺錢」比較願意投資；說成「十次有四次賠錢」比較不願意；事實完全一樣">
+          <rect x="30" y="40" width="240" height="120" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="150" y="92" text-anchor="middle" font-size="16" font-weight="900" class="on-color">「十年中六年上漲」</text>
+          <text x="150" y="124" text-anchor="middle" font-size="12" class="on-color">比較願意投資</text>
+          <rect x="290" y="40" width="240" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="410" y="92" text-anchor="middle" font-size="16" font-weight="900" class="on-color">「十年中四年下跌」</text>
+          <text x="410" y="124" text-anchor="middle" font-size="12" class="on-color">比較不願意投資</text>
+          <text x="280" y="196" text-anchor="middle" font-size="13">事實一樣，框架不同，感受就不同</text>
+        </svg>`, caption: '這叫框架效應。知道它的存在，可以刻意用兩種說法各看一次同一件事。' },
+        { type: 'heading', id: 'portfolio', text: '深入：看整體，不看單筆' },
+        '損失趨避會在「單獨看每一筆」時特別強：十檔投資裡有三檔虧損，眼睛會一直盯著那三檔。但真正重要的是整體組合的結果。這也是指數化與資產配置在心理上的好處：你看到的是一個整體的數字，而不是一堆有賺有賠的個別部位；漲跌互相抵銷，損失趨避被觸發的機會就少很多。',
+      ],
+    },
+    mistakes: [
+      { wrong: '因為怕賠錢，長期的錢全部放定存。', why: '長期的確定損失是購買力被侵蝕。', right: '依用錢時間配置（第四部 1-3）。' },
+      { wrong: '大跌時為了停止痛苦而賣出。', why: '把暫時的下跌變成永久的損失。', right: '事先設定能承受的配置。' },
+      { wrong: '盯著組合裡虧損的那幾筆。', why: '放大損失趨避。', right: '看整體組合的結果。' },
+    ],
+    keypoints: [
+      '損失的痛大約是同額獲利快樂的兩倍。',
+      '損失趨避讓人太保守，或在最差的時候賣出。',
+      '看整體組合、換個框架，降低它的影響。',
+    ],
+    sources: ['kt-1979', 'tk-1992'],
+  },
+
+  '2-2': {
+    goals: [
+      '說出處分效應是什麼',
+      '理解「等回本再賣」為什麼不合理',
+      '用「今天會不會買」重新評估持股',
+    ],
+    analogy: {
+      text: ['花園裡有兩株植物：一株長得很好，一株快枯死了。很多人的做法是把長得好的剪下來送人，留著快枯死的那株，期待它有一天會好起來。這就是投資上的[[處分效應]]：太早賣掉賺錢的、太久抱著賠錢的。', 'Odean 在 1998 年分析約一萬個券商帳戶，發現投資人實現獲利的傾向明顯高於實現損失。背後的原因，就是上一課的損失趨避與[[參考點]]：賣掉賺錢的會鎖住「我賺了」的快樂，賣掉賠錢的會確認「我賠了」的痛苦。'],
+      limit: ['植物的好壞看得出來；股票漲跌不代表好壞，有時候賣掉漲多的、留下跌深的反而是對的（例如依再平衡規則）。問題在於「依據是什麼」。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="處分效應：同一個帳戶裡，賺錢的部位很快被賣掉鎖住獲利；賠錢的部位一直被持有，等待回到買進價">
+        <rect x="30" y="40" width="240" height="160" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="150" y="80" text-anchor="middle" font-size="17" font-weight="900" class="on-color">賺錢的部位</text>
+        <text x="150" y="116" text-anchor="middle" font-size="13" class="on-color">「先落袋為安」</text>
+        <text x="150" y="150" text-anchor="middle" font-size="14" font-weight="900" class="on-color">→ 太早賣出</text>
+        <rect x="290" y="40" width="240" height="160" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="410" y="80" text-anchor="middle" font-size="17" font-weight="900" class="on-color">賠錢的部位</text>
+        <text x="410" y="116" text-anchor="middle" font-size="13" class="on-color">「等回本再賣」</text>
+        <text x="410" y="150" text-anchor="middle" font-size="14" font-weight="900" class="on-color">→ 抱得太久</text>
+        <text x="280" y="236" text-anchor="middle" font-size="13">兩個決定的依據都是「買進價」，而不是未來</text>
+      </svg>`,
+      caption: '市場不知道你的買進價。一檔股票未來會漲還是跌，和你當初用多少錢買它無關。',
+    },
+    define: [
+      { term: '處分效應', en: 'disposition effect', def: '賣贏留輸。', example: '等回本。' },
+      { term: '參考點', en: 'reference point', def: '判斷賺賠的基準。', example: '買進價。' },
+      { term: '損失趨避', en: 'loss aversion', def: '損失比獲利更痛。', example: '約兩倍。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '「等回本」需要多久（實際計算）', sliders: [
+          { id: 'loss', label: '目前虧損', min: 5, max: 90, step: 5, value: 40, unit: '%' },
+          { id: 'r', label: '之後每年的報酬', min: 1, max: 20, step: 1, value: 7, unit: '%' },
+        ], compute: (v) => {
+          const need = 1 / (1 - v.loss / 100) - 1;
+          const years = Math.log(1 / (1 - v.loss / 100)) / Math.log(1 + v.r / 100);
+          return { rows: [
+            { label: '回到買進價需要上漲', value: `${(need * 100).toFixed(0)}%`, ratio: Math.min(1, need / 4) },
+            { label: '以這個報酬率需要', value: `約 ${years.toFixed(1)} 年`, ratio: Math.min(1, years / 30) },
+          ], note: '預設：虧 40%、每年 7%，要漲 67%、約 7.5 年才回本。而且這假設它之後每年都有 7%；如果這檔股票的前景已經變差，可能永遠回不來。「回本」本身不是一個投資理由。' };
+        } } },
+        { type: 'heading', id: 'question', text: '一個問題取代買進價' },
+        '面對任何一筆持股，問自己：「如果我今天手上是現金，會用現在的價格買進它嗎？」如果會，就繼續持有；如果不會，那麼繼續持有，其實就是每天都在「重新買進」一個你不想買的東西。這個問題把[[參考點]]從過去的買進價，移回到對未來的判斷。',
+        { type: 'table', head: ['常見說法', '背後的偏誤', '換成這個問題'], rows: [
+          ['「等回本再賣」', '把買進價當參考點', '今天會用這個價格買它嗎？'],
+          ['「先賣掉賺錢的，落袋為安」', '想鎖住獲利的快樂', '依配置或論點，該賣的是哪一筆？'],
+          ['「沒賣就沒賠」', '心理帳戶', '帳上的價值就是現在的真實價值'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="依規則決定賣出：依再平衡規則、依投資論點是否失效、依需要用錢；不依買進價">
+          ${[['再平衡規則', '比例偏離時（第四部）', 'm2'], ['論點失效', '「代表我錯了」的條件（第五部）', 'm3'], ['需要用錢', '目標到了（第四部 1-3）', 'm1']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="40" width="165" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="90" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="120" text-anchor="middle" font-size="11" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="196" text-anchor="middle" font-size="13" font-weight="900">賣出的理由只有這三種，沒有「回本了」</text>
+        </svg>`, caption: '用規則決定賣出，買進價就不再重要。' },
+        { type: 'heading', id: 'tax', text: '深入：處分效應的另一個代價' },
+        '在有資本利得稅的市場（例如美國），賣掉賺錢的要繳稅、賣掉賠錢的可以抵稅，處分效應等於反過來做：該延後繳稅的提早繳了，能節稅的卻沒用到。Odean 的研究也發現，投資人在 12 月比較願意實現虧損，正是因為稅務的考量。台灣個人買賣上市股票的證券交易所得目前停徵，這個稅務角度較不明顯，但「賣贏留輸」對組合品質的影響是一樣的。',
+      ],
+    },
+    mistakes: [
+      { wrong: '「等回本再賣」。', why: '市場不知道你的買進價。', right: '問：今天會用這個價格買它嗎？' },
+      { wrong: '賺錢就急著賣。', why: '可能賣掉的是最好的部位。', right: '依配置或論點決定。' },
+      { wrong: '以為沒賣就沒賠。', why: '帳上的價值就是真實的價值。', right: '用現值看整體組合。' },
+    ],
+    keypoints: [
+      '處分效應：太早賣贏、太久抱輸。',
+      '「回本」不是投資理由；問今天會不會買。',
+      '賣出依規則：再平衡、論點失效、需要用錢。',
+    ],
+    sources: ['odean-1998', 'kt-1979'],
+  },
+
+  '2-3': {
+    goals: [
+      '說出沉沒成本與後悔趨避的影響',
+      '分辨「作為」與「不作為」的後悔',
+      '用事先的決定降低後悔的影響',
+    ],
+    analogy: {
+      text: ['買了一張不能退的電影票，看了半小時發現很難看。理性的選擇是離開去做別的事，因為票錢不論留不留下來都拿不回來（[[沉沒成本]]）；但很多人會說「都付錢了，看完吧」，結果再浪費一個半小時。', '投資裡也一樣：已經投入的錢、已經花的研究時間、已經說出口的看法，都讓人很難放手。另一個相關的心理是[[後悔趨避]]：為了不要將來後悔，乾脆不做決定，例如「怕買在高點」所以一直不投資。'],
+      limit: ['電影票的價值很清楚；投資的「繼續持有」有時是對的。重點不是一定要賣，而是讓決定只看未來、不看已經付出的。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="做決定時應該看的與不該看的：已經付出的買進價、研究時間、說過的話是沉沒成本，不該影響；未來的前景、機會成本、是否符合配置才該影響">
+        <rect x="30" y="30" width="240" height="190" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
+        <text x="150" y="64" text-anchor="middle" font-size="16" font-weight="900" class="on-color">不該影響決定</text>
+        ${['買進價', '已花的研究時間', '對別人說過的看法', '已經付的手續費'].map((t, i) => `<text x="150" y="${102 + i * 30}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+        <rect x="290" y="30" width="240" height="190" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="410" y="64" text-anchor="middle" font-size="16" font-weight="900" class="on-color">應該影響決定</text>
+        ${['未來的前景與價值', '這筆錢的其他用途', '是否符合配置', '論點是否仍成立'].map((t, i) => `<text x="410" y="${102 + i * 30}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+        <text x="280" y="248" text-anchor="middle" font-size="13">左邊都已經發生了，無法改變</text>
+      </svg>`,
+      caption: '決定只能影響未來；所以只有和未來有關的資訊，才應該進入決定。',
+    },
+    define: [
+      { term: '沉沒成本', en: 'sunk cost', def: '已付出、拿不回來的成本。', example: '買進價。' },
+      { term: '後悔趨避', en: 'regret aversion', def: '為了避免後悔而不行動。', example: '一直不投資。' },
+      { term: '參考點', en: 'reference point', def: '判斷賺賠的基準。', example: '買進價。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '繼續持有 vs 換成指數：只看未來（實際計算）', sliders: [
+          { id: 'value', label: '這筆持股現在的市值', min: 10000, max: 10000000, step: 10000, value: 300000, unit: '元' },
+          { id: 'cost', label: '當初的買進成本（沉沒）', min: 10000, max: 10000000, step: 10000, value: 500000, unit: '元' },
+          { id: 'rStock', label: '你對它未來的合理預期年報酬', min: -10, max: 20, step: 0.5, value: 3, unit: '%' },
+          { id: 'rIndex', label: '指數的合理預期年報酬', min: 0, max: 12, step: 0.5, value: 6, unit: '%' },
+          { id: 'years', label: '年數', min: 1, max: 30, step: 1, value: 10, unit: '年' },
+        ], compute: (v) => {
+          const keep = v.value * (1 + v.rStock / 100) ** v.years;
+          const swap = v.value * (1 - 0.004) * (1 + v.rIndex / 100) ** v.years;
+          return { rows: [
+            { label: '繼續持有的期望結果', value: `${Math.round(keep).toLocaleString()} 元`, ratio: Math.min(1, keep / Math.max(keep, swap)) },
+            { label: '換成指數（扣約 0.4% 交易成本）', value: `${Math.round(swap).toLocaleString()} 元`, ratio: Math.min(1, swap / Math.max(keep, swap)) },
+            { label: '當初的成本對結果的影響', value: '0 元', ratio: 0 },
+          ], note: `當初花了多少，完全不在計算裡；改動「買進成本」這根拉桿，結果一點都不會變。決定只取決於你對未來的預期。` };
+        } } },
+        { type: 'heading', id: 'regret', text: '作為與不作為的後悔' },
+        { type: 'table', head: ['', '作為的後悔', '不作為的後悔'], rows: [
+          ['例子', '買了之後跌了', '沒買，後來大漲'],
+          ['短期感受', '通常比較強烈', '比較弱'],
+          ['造成的行為', '不敢再做決定', '追高（怕再錯過）'],
+          ['對策', '事先寫好規則，決定是規則做的', '定期定額，不必判斷時機'],
+        ], caption: '後悔讓人在「動」與「不動」之間來回擺盪；把決定交給事先寫好的規則，你就不必為每一次的結果負責到睡不著。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="事前驗屍的做法：買進前想像一年後這筆投資虧了很多，寫下三個可能的原因；這些原因就是要追蹤的警訊">
+          ${[['1 想像', '一年後這筆投資慘賠', 'm1'], ['2 寫下原因', '列出三個最可能的理由', 'm3'], ['3 變成警訊', '持有期間追蹤這些理由', 'm4']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="40" width="165" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="90" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="120" text-anchor="middle" font-size="11" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="196" text-anchor="middle" font-size="13">事前驗屍（pre-mortem）：在情緒介入之前，先想好怎樣算失敗</text>
+        </svg>`, caption: '這和第五部的「代表我錯了的條件」是同一件事：事先決定，事後照做。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '因為已經投入很多，所以繼續加碼。', why: '已投入的是沉沒成本。', right: '只看未來的前景與配置。' },
+      { wrong: '怕買在高點，一直不投資。', why: '不作為也有代價。', right: '用定期定額或分批時程。' },
+      { wrong: '每次虧損都怪自己判斷錯。', why: '好的決定也可能有壞結果。', right: '評估決定的過程，而不是單次的結果。' },
+    ],
+    keypoints: [
+      '沉沒成本不該影響決定：只看未來。',
+      '後悔讓人在不敢動與追高之間擺盪。',
+      '用事前驗屍與規則，把決定交給冷靜的自己。',
+    ],
+    sources: ['kt-1979', 'odean-1998'],
+  },
+});
+</script>

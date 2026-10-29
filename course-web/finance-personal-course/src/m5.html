@@ -1,0 +1,310 @@
+<script>
+/* ==========================================================================
+   模組 5：還債與負債管理
+   ========================================================================== */
+defineTerms({
+  '雪崩法': { en: 'debt avalanche', def: '每筆債都先繳最低，多出來的錢全部拿去還「利率最高」的那筆；數學上總利息最少。', example: '先還 15% 的卡債，再還 9% 的信貸。', lesson: '5-1' },
+  '雪球法': { en: 'debt snowball', def: '每筆債都先繳最低，多出來的錢全部拿去還「餘額最小」的那筆；比較快看到一筆債消失。', example: '先還掉 3 萬的分期，再還 12 萬的卡債。', lesson: '5-1' },
+  '負債收入比': { en: 'debt-to-income ratio (DTI)', def: '每月所有債務還款 ÷ 每月收入；衡量還款壓力。', example: '月收 5 萬、每月還 1.5 萬 → 30%。', lesson: '5-2' },
+  'DBR22': { en: 'debt burden ratio 22', def: '金管會對無擔保債務的規範：在所有金融機構的無擔保債務（信用卡、現金卡、信貸）總額，原則上不宜超過平均月收入的 22 倍。', example: '月收入 4 萬 → 無擔保債務上限約 88 萬。', lesson: '5-2' },
+  '壓力測試': { en: 'stress test', def: '假設利率上升、收入下降，看還款是否仍然負擔得起。', example: '房貸利率 ＋1%、收入 −20%。', lesson: '5-2' },
+  '債務整合': { en: 'debt consolidation', def: '用一筆利率較低的新貸款，一次還清多筆高利債，之後只還一筆。', example: '用 7% 信貸還掉 15% 的卡債。', lesson: '5-3' },
+  '前置協商': { en: 'pre-negotiation', def: '依消費者債務清理條例，對金融機構負債者在聲請更生或清算前，先向最大債權金融機構請求協商還款方案。', example: '協商成立後只對最大債權銀行繳款。', lesson: '5-3' },
+  '更生': { en: 'debt rehabilitation', def: '經法院裁定，依還款計畫在一定期間內清償部分債務，履行完畢後其餘債務免責的程序。', example: '有固定收入、但無力全額清償的人。', lesson: '5-3' },
+});
+
+const DEBTS_DEMO = [
+  { n: '分期', b: 30000, r: 0.06, min: 1500 },
+  { n: '卡債', b: 120000, r: 0.15, min: 3000 },
+  { n: '信貸', b: 250000, r: 0.09, min: 5190 },
+];
+function payoffPlan(order, extra) {
+  const debts = DEBTS_DEMO.map((d) => ({ ...d }));
+  const budget = debts.reduce((s, d) => s + d.min, 0) + extra;
+  let month = 0; let interest = 0; const done = {};
+  while (debts.some((d) => d.b > 0.5) && month < 600) {
+    month += 1;
+    debts.forEach((d) => { if (d.b > 0) { const i = (d.b * d.r) / 12; interest += i; d.b += i; } });
+    let left = budget;
+    debts.forEach((d) => { if (d.b > 0) { const p = Math.min(d.min, d.b); d.b -= p; left -= p; } });
+    // 繳完所有最低後，剩下的錢依策略集中還一筆；已還清那筆的最低金額自動滾到下一筆
+    debts.filter((d) => d.b > 0).sort(order).forEach((d) => { if (left > 0) { const p = Math.min(left, d.b); d.b -= p; left -= p; } });
+    debts.forEach((d) => { if (d.b <= 0.5 && !done[d.n]) { done[d.n] = month; d.b = 0; } });
+  }
+  return { month, interest, done };
+}
+
+defineLessons({
+  '5-1': {
+    goals: [
+      '照步驟執行雪崩法或雪球法',
+      '比較兩種方法的利息差與心理差',
+      '依自己的狀況選擇或混合',
+    ],
+    analogy: {
+      text: ['打掃一間很亂的房間：有人先清最髒、最會發臭的角落（影響最大）；有人先把小東西收好，看到地板一塊一塊露出來，才有力氣繼續。兩種都能把房間清乾淨，差別在過程。', '還多筆債也一樣。[[雪崩法]]先還利率最高的，總利息最少；[[雪球法]]先還餘額最小的，最快看到一筆債消失。研究顯示人天生傾向後者，即使它在數學上比較貴。'],
+      limit: ['打掃先後不會改變總工作量；還債先後會改變總利息，而且利率差越大，選錯順序的代價越高。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="兩種還債順序：雪崩法依利率由高到低排序卡債、信貸、分期；雪球法依餘額由小到大排序分期、卡債、信貸；兩者都是先繳每筆的最低，再把多的錢集中還第一順位">
+        <text x="140" y="26" text-anchor="middle" font-size="16" font-weight="900">雪崩法：利率高的先</text>
+        <text x="420" y="26" text-anchor="middle" font-size="16" font-weight="900">雪球法：餘額小的先</text>
+        ${[['卡債 15%', 'm4'], ['信貸 9%', 'm3'], ['分期 6%', 'm2']].map(([t, c], i) => `<rect x="40" y="${44 + i * 64}" width="200" height="52" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="140" y="${76 + i * 64}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${i + 1}. ${t}</text>`).join('')}
+        ${[['分期 3 萬', 'm2'], ['卡債 12 萬', 'm4'], ['信貸 25 萬', 'm3']].map(([t, c], i) => `<rect x="320" y="${44 + i * 64}" width="200" height="52" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="420" y="${76 + i * 64}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${i + 1}. ${t}</text>`).join('')}
+        <text x="280" y="250" text-anchor="middle" font-size="13">兩者共同點：每筆都繳最低，多的錢集中打第一順位；還清一筆，它的月付就滾去下一筆</text>
+      </svg>`,
+      caption: '同一組債務，兩種方法只差在「多出來的錢先給誰」。',
+    },
+    define: [
+      { term: '雪崩法', en: 'avalanche', def: '先還利率最高的。', example: '利息最少。' },
+      { term: '雪球法', en: 'snowball', def: '先還餘額最小的。', example: '最快看到成果。' },
+      { term: '最低應繳金額', en: 'minimum payment', def: '每筆都要先繳的部分。', example: '避免違約金。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'steps', text: '共同的五個步驟' },
+        { type: 'list', ordered: true, items: [
+          '列出所有債務：餘額、利率（總費用年百分率）、每月最低還款。',
+          '停止新增：有循環的信用卡先停用，不再增加任何一筆。',
+          '決定每月能拿出的還債總額：所有最低還款 ＋ 額外加碼（來自預算 2-1）。',
+          '每筆都繳最低，額外的錢全部集中在第一順位。',
+          '還清一筆後，把它原本的月付加到下一筆（像雪球越滾越大），總還款額不要縮水。',
+        ] },
+        { type: 'widget', name: 'knobs', props: { title: '同一組債務：雪崩法 vs 雪球法（分期 3 萬 6%、卡債 12 萬 15%、信貸 25 萬 9%；實際計算）', sliders: [
+          { id: 'extra', label: '每月在最低還款之外加碼', min: 0, max: 20000, step: 500, value: 3000, unit: '元' },
+        ], compute: (v) => {
+          const av = payoffPlan((a, b) => b.r - a.r, v.extra);
+          const sn = payoffPlan((a, b) => a.b - b.b, v.extra);
+          const firstAv = Math.min(...Object.values(av.done));
+          const firstSn = Math.min(...Object.values(sn.done));
+          return { rows: [
+            { label: '雪崩法：還清所有債', value: `${av.month} 個月，利息 ${Math.round(av.interest).toLocaleString()} 元`, ratio: Math.min(1, av.month / 60) },
+            { label: '雪球法：還清所有債', value: `${sn.month} 個月，利息 ${Math.round(sn.interest).toLocaleString()} 元`, ratio: Math.min(1, sn.month / 60) },
+            { label: '雪球法多付的利息', value: `${Math.round(sn.interest - av.interest).toLocaleString()} 元`, ratio: Math.min(1, (sn.interest - av.interest) / 5000) },
+            { label: '第一筆債消失：雪崩 / 雪球', value: `第 ${firstAv} 個月 / 第 ${firstSn} 個月`, ratio: Math.min(1, firstSn / Math.max(1, firstAv)) },
+          ], note: '每月加碼 3,000 元：兩者都 37 個月還完，雪球法多付約 2,100 元利息，但第 7 個月就消滅第一筆債；雪崩法要到第 22 個月。加碼為 0 時兩者完全一樣：沒有額外的錢，順序就沒有意義。' };
+        } } },
+        { type: 'heading', id: 'research', text: '研究怎麼說' },
+        { type: 'table', head: ['研究', '發現', '對你的意義'], rows: [
+          ['Amar 等（2011）', '受試者一再傾向先還小額債務，即使大額的利率比較高', '你「想先還小的」是正常的直覺，但要知道它的成本'],
+          ['Gal 與 McShane（2012）', '用債務協商公司的實際資料，研究「還清個別帳戶」與最終還清全部債務的關係', '看到一筆筆債消失，可能幫助人堅持下去'],
+        ], caption: '研究只說明了人類的傾向與關聯，不代表雪球法對每個人都比較好。' },
+        { type: 'heading', id: 'choose', text: '怎麼選' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="選擇方法的判斷：如果各筆利率差距大，選雪崩法；如果利率差不多，或你過去常常半途而廢，選雪球法；也可以混合：先清掉一兩筆很小的建立信心，再改用雪崩法">
+          <rect x="180" y="12" width="200" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="280" y="43" text-anchor="middle" font-size="15" font-weight="900">各筆利率差很多嗎？</text>
+          <path d="M220 62 L120 100 M340 62 L440 100" class="stroke-ink" stroke-width="3"/>
+          <text x="150" y="88" font-size="13" font-weight="900">是</text><text x="400" y="88" font-size="13" font-weight="900">否</text>
+          <rect x="20" y="100" width="220" height="64" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="130" y="128" text-anchor="middle" font-size="15" font-weight="900" class="on-color">雪崩法</text><text x="130" y="150" text-anchor="middle" font-size="12" class="on-color">利息差距大，值得</text>
+          <rect x="320" y="100" width="220" height="64" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="430" y="128" text-anchor="middle" font-size="15" font-weight="900" class="on-color">雪球法</text><text x="430" y="150" text-anchor="middle" font-size="12" class="on-color">差不多，就選好堅持的</text>
+          <rect x="120" y="186" width="320" height="52" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="280" y="210" text-anchor="middle" font-size="14" font-weight="900" class="on-color">混合：先清一兩筆很小的，再改雪崩</text><text x="280" y="229" text-anchor="middle" font-size="12" class="on-color">適合過去常半途而廢的人</text>
+        </svg>`, caption: '最差的方法是沒有方法：平均分散多繳，或想到哪還到哪。' },
+        { type: 'callout', variant: 'tip', title: '0% 分期怎麼排', body: ['真正 0 利率、沒有手續費的分期，照期繳就好，不必提前還；多的錢拿去打有利息的債。', '但要確認「0%」是否只是前幾期，以及遲繳時會不會產生費用或利息。'] },
+        { type: 'heading', id: 'emotion', text: '深入：還債是心理工程' },
+        '背債的人常伴隨羞恥感與逃避：不打開帳單、不接銀行電話、不想算總共欠多少。這些反應很正常，但會讓問題在看不見的地方變大。研究者把「看到一筆債消失」的效果稱為小勝利（small victories），雪球法的價值就在這裡：它用很快的成果，換你持續做下去的動力。',
+        { type: 'list', items: [
+          '把所有債務寫在同一張表上，每還清一筆就劃掉。',
+          '把「債務總額」畫成一條往下的線，每月更新一次。',
+          '告訴一個信任的人你的計畫，定期回報進度。',
+          '設定還清後的小獎勵，但金額要在預算裡。',
+        ] },
+        { type: 'heading', id: 'family', text: '深入：家人之間的債' },
+        '向家人借錢或替家人擔保，常讓財務問題和關係問題纏在一起。幾個原則：借給家人的錢，最好當成「可能拿不回來」的金額；不替任何人當保證人或借名，除非你願意、也有能力替他全部還；家人之間借款也寫下金額、期限與還法，避免日後各說各話。',
+      ],
+    },
+    mistakes: [
+      { wrong: '把多的錢平均分給每一筆債。', why: '集中火力才能更快消滅一筆、滾出更大的雪球。', right: '每筆繳最低，額外的錢集中在第一順位。' },
+      { wrong: '還清一筆後，把省下的月付拿去花。', why: '雪球就不會變大，速度大幅變慢。', right: '總還款額維持不變，滾到下一筆。' },
+      { wrong: '還債期間繼續刷有循環的卡。', why: '一邊還一邊借，永遠還不完。', right: '先停用，把它當成要消滅的債。' },
+    ],
+    keypoints: [
+      '每筆繳最低，額外的錢集中打第一順位。',
+      '雪崩法利息最少；雪球法最快看到成果。',
+      '還清一筆，月付滾到下一筆，總還款額不縮水。',
+    ],
+    sources: ['amar-2011', 'gal-2012', 'banking-act-47-1'],
+  },
+
+  '5-2': {
+    goals: [
+      '算出自己的負債收入比',
+      '說明 DBR22 對無擔保借款的限制',
+      '用壓力測試檢查一筆新貸款負不負擔得起',
+    ],
+    analogy: {
+      text: ['背包可以裝很多東西，但走得遠不遠，取決於重量和你的體力比例，而不是背包有多大。銀行願意借你的額度，就像背包的容量；你能不能長期背著走，要看每月還款佔收入多少。', '[[負債收入比]]衡量的就是這個比例。銀行在核貸時也會看，但銀行願意借，不代表你應該借到上限。'],
+      limit: ['背包重了可以中途放下；房貸、信貸簽了就是好幾年，中途要減輕通常要付出代價（提前清償違約金、賣房的成本）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="每月收入的分配：所有債務的月還款佔一段，剩下的是生活與儲蓄；負債收入比越高，剩下能用的越少，遇到意外越容易出問題">
+        ${[[0.2, '20%：輕鬆', 'm2'], [0.35, '35%：吃緊', 'm3'], [0.5, '50%：危險', 'm4']].map(([p, t, c], i) => `<rect x="20" y="${30 + i * 70}" width="520" height="48" class="fill-bg stroke-ink" stroke-width="3"/><rect x="20" y="${30 + i * 70}" width="${520 * p}" height="48" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${28 + 520 * p}" y="${60 + i * 70}" font-size="14" font-weight="900">${t}</text>`).join('')}
+        <text x="280" y="236" text-anchor="middle" font-size="13">有顏色的是每月還款；白色是剩下給生活、保險與儲蓄的</text>
+      </svg>`,
+      caption: '區間是經驗法則，不是規定。同樣 35%，收入穩定、有預備金的人比收入不穩、沒預備金的人安全得多。',
+    },
+    define: [
+      { term: '負債收入比', en: 'DTI', def: '每月還款 ÷ 月收入。', example: '30%。' },
+      { term: 'DBR22', en: 'DBR 22', def: '無擔保債務不宜超過月收入 22 倍。', example: '月收 4 萬 → 88 萬。' },
+      { term: '壓力測試', en: 'stress test', def: '假設升息、減薪再算一次。', example: '利率 ＋1%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'two-ratios', text: '兩種比例，看的東西不同' },
+        { type: 'table', head: ['指標', '算法', '看什麼', '說明'], rows: [
+          ['負債收入比（DTI）', '每月所有還款 ÷ 月收入', '每月的現金流壓力', '經驗上，總還款控制在月收入三分之一左右比較從容'],
+          ['DBR22', '無擔保債務總額 ÷ 平均月收入', '能不能再借信貸、辦卡', '金管會規範原則上不宜超過 22 倍；房貸、車貸等有擔保的不算'],
+          ['負債比', '總負債 ÷ 總資產', '資產結構（1-4）', '有房貸的家庭常偏高，要配合現金流一起看'],
+        ], caption: 'DBR22 源自 2005 年前後的雙卡風暴；實務上很多銀行核的倍數比 22 倍更保守。' },
+        { type: 'widget', name: 'knobs', props: { title: '我的還款壓力（實際計算）', sliders: [
+          { id: 'inc', label: '每月收入', min: 20000, max: 200000, step: 1000, value: 50000, unit: '元' },
+          { id: 'secured', label: '有擔保貸款月付（房貸、車貸）', min: 0, max: 100000, step: 500, value: 12000, unit: '元' },
+          { id: 'unsecMonthly', label: '無擔保月付（信貸、卡債）', min: 0, max: 50000, step: 500, value: 5000, unit: '元' },
+          { id: 'unsecBal', label: '無擔保債務總餘額', min: 0, max: 3000000, step: 10000, value: 300000, unit: '元' },
+        ], compute: (v) => {
+          const dti = (v.secured + v.unsecMonthly) / v.inc;
+          const dbr = v.unsecBal / v.inc;
+          return { rows: [
+            { label: '負債收入比', value: `${(dti * 100).toFixed(1)}%`, ratio: Math.min(1, dti) },
+            { label: '每月還款後剩下', value: `${(v.inc - v.secured - v.unsecMonthly).toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, v.inc - v.secured - v.unsecMonthly) / v.inc) },
+            { label: '無擔保債務 ÷ 月收入', value: `${dbr.toFixed(1)} 倍（規範上限 22 倍）`, ratio: Math.min(1, dbr / 22) },
+          ], note: '預設：月收 5 萬、每月還 1.7 萬，負債收入比 34%；無擔保 30 萬是月收入的 6 倍，離 22 倍還很遠，但「能借」不等於「該借」。' };
+        } } },
+        { type: 'heading', id: 'stress', text: '壓力測試：最壞情況還繳得出來嗎' },
+        '借錢前，用三個情境再算一次：利率上升 1–2 個百分點（房貸、信貸多半是機動利率）、收入減少 20%、家裡多一個要扶養的人。如果任一個情境讓負債收入比超過一半，或讓你必須動用預備金才能繳款，這筆貸款就太大了。',
+        { type: 'widget', name: 'knobs', props: { title: '房貸壓力測試（本息平均攤還，實際計算）', sliders: [
+          { id: 'loan', label: '房貸金額', min: 1000000, max: 20000000, step: 100000, value: 8000000, unit: '元' },
+          { id: 'rate', label: '目前利率', min: 1, max: 5, step: 0.05, value: 2.3, unit: '%' },
+          { id: 'years', label: '年期', min: 10, max: 40, step: 1, value: 30, unit: '年' },
+          { id: 'inc', label: '家庭月收入', min: 30000, max: 300000, step: 1000, value: 100000, unit: '元' },
+          { id: 'up', label: '假設利率上升', min: 0, max: 3, step: 0.25, value: 1, unit: '個百分點' },
+          { id: 'cut', label: '假設收入減少', min: 0, max: 50, step: 5, value: 20, unit: '%' },
+        ], compute: (v) => {
+          const now = LOAN_PAY(v.loan, v.rate / 100, v.years);
+          const stressed = LOAN_PAY(v.loan, (v.rate + v.up) / 100, v.years);
+          const incStressed = v.inc * (1 - v.cut / 100);
+          return { rows: [
+            { label: '現在的月付', value: `${Math.round(now).toLocaleString()} 元（${((now / v.inc) * 100).toFixed(1)}%）`, ratio: Math.min(1, now / v.inc) },
+            { label: '升息後月付', value: `${Math.round(stressed).toLocaleString()} 元`, ratio: Math.min(1, stressed / v.inc) },
+            { label: '升息＋減薪後佔收入', value: `${((stressed / incStressed) * 100).toFixed(1)}%`, ratio: Math.min(1, stressed / incStressed) },
+          ], note: '預設：800 萬、2.3%、30 年，月付約 3.08 萬，佔月收入 10 萬的 31%；利率 ＋1%、收入 −20% 時，月付約 3.5 萬，佔收入約 44%。房價負擔能力是內政部定期公布的指標之一，台北市長期落在「負擔能力過低」等級。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="三個壓力情境：利率上升、收入減少、支出增加；任一情境讓還款超過收入一半，或必須動用預備金，就代表借太多">
+          ${[['利率 ＋1～2%', '機動利率會調整', 'm3'], ['收入 −20%', '減班、轉職、育兒', 'm4'], ['支出增加', '多一個人要扶養', 'm1']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="30" width="165" height="100" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="72" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="100" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="170" text-anchor="middle" font-size="14" font-weight="900">任一情境讓還款 ＞ 收入一半，或要動用預備金</text>
+          <text x="280" y="196" text-anchor="middle" font-size="14" font-weight="900">→ 這筆貸款太大了</text>
+        </svg>`, caption: '借錢時看的是好日子；還錢的那幾年，一定會遇到壞日子。' },
+        { type: 'heading', id: 'rent-buy', text: '深入：還款能力不只看比例' },
+        '負債收入比是一個比例，但真正決定能不能撐住的，是「繳完所有還款與必要支出後，還剩多少絕對金額」。月收 3 萬、還款佔 30%，剩 2.1 萬要支付全部生活；月收 15 萬、還款佔 40%，仍剩 9 萬。所以低收入家庭的負債比例要更保守，高收入家庭也不能只看比例，因為他們的固定支出往往也比較高。',
+        { type: 'table', head: ['檢查項目', '標準（經驗法則）'], rows: [
+          ['所有還款 ÷ 月收入', '三分之一左右比較從容；超過一半要警覺'],
+          ['還款與必要支出之後的剩餘', '至少還能維持儲蓄與偶發準備'],
+          ['預備金能支付的還款月數', '收入中斷時，還款至少能繳 6 個月'],
+          ['機動利率的貸款', '利率 ＋1～2 個百分點仍能負擔'],
+        ] },
+        { type: 'heading', id: 'irregular-debt', text: '深入：收入不固定的人借錢' },
+        '接案、業務、自營的人，銀行的核貸條件通常比較嚴，自己也更該保守：用過去一兩年最低的收入水準算負債收入比，並在借款前先把預備金加到 9–12 個月（3-1）。收入好的時候提前還款，比收入好的時候增貸安全得多。',
+      ],
+    },
+    mistakes: [
+      { wrong: '銀行核准多少就借多少。', why: '銀行看的是風險控管，不是你的生活品質。', right: '用自己的負債收入比與壓力測試決定。' },
+      { wrong: '只用現在的利率算房貸。', why: '機動利率會調整，期間長達數十年。', right: '至少用 ＋1 個百分點再算一次。' },
+      { wrong: '只看無擔保倍數離 22 倍很遠，就覺得很安全。', why: 'DBR 不包含房貸、車貸的月付壓力。', right: '同時看負債收入比。' },
+    ],
+    keypoints: [
+      '負債收入比看每月壓力，三分之一左右比較從容。',
+      'DBR22：無擔保債務原則上不超過月收入 22 倍。',
+      '借錢前做壓力測試：升息、減薪、支出增加。',
+    ],
+    sources: ['dbr22', 'mortgage-2026', 'moi-affordability'],
+  },
+
+  '5-3': {
+    goals: [
+      '判斷債務整合（轉貸）什麼時候有用',
+      '說出前置協商、前置調解、更生與清算的關係',
+      '分辨正式管道與高收費的代辦陷阱',
+    ],
+    analogy: {
+      text: ['身體出狀況，先自己調整作息；不行就看門診；再嚴重才住院開刀。每一層的代價與效果都不同，跳過前面直接開刀不對，硬撐不看醫生也不對。', '債務也有這樣的分層：自己調整預算與還款順序（5-1）、和銀行談更低的利率或[[債務整合]]、依法申請[[前置協商]]，最後才是法院的[[更生]]或清算。重點是：越早處理，能用的選項越多。'],
+      limit: ['看醫生通常沒有副作用；走到協商、更生，會在信用紀錄留下註記，之後一段時間借款、辦卡都會受限。但比起拖到無法收拾，這是可以承受的代價。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 290" role="img" aria-label="處理債務的四層：自己調整預算與還款順序；向銀行申請降息或債務整合；依消費者債務清理條例向最大債權銀行前置協商或向法院、調解委員會前置調解；最後是法院的更生或清算">
+        ${[['1 自己調整', '預算、停卡、雪崩或雪球（5-1）', 'm2', 480], ['2 和銀行談', '降息、轉貸、債務整合', 'm3', 420], ['3 前置協商／調解', '消債條例第 151 條', 'm1', 360], ['4 更生或清算', '法院程序', 'm4', 300]].map(([a, b, c, w], i) => `<rect x="${280 - w / 2}" y="${20 + i * 66}" width="${w}" height="56" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="280" y="${44 + i * 66}" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="280" y="${64 + i * 66}" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="284" text-anchor="middle" font-size="13">越往下，對信用的影響越大；越早處理，越能停在上面幾層</text>
+      </svg>`,
+      caption: '每一層都可以找法律扶助基金會免費諮詢；不需要付錢給代辦。',
+    },
+    define: [
+      { term: '債務整合', en: 'debt consolidation', def: '用低利新貸款還清多筆高利債。', example: '7% 信貸還 15% 卡債。' },
+      { term: '前置協商', en: 'pre-negotiation', def: '向最大債權金融機構請求協商。', example: '消債條例第 151 條。' },
+      { term: '更生', en: 'rehabilitation', def: '依法院認可的計畫清償部分債務。', example: '履行完畢後其餘免責。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'consolidate', text: '債務整合：用低利債換高利債' },
+        '如果信用條件還不錯，可以向銀行申請利率較低的信用貸款，一次還清多張卡的循環餘額。之後只要還一筆、利率也比較低。它有效的前提只有一個：舊的卡不能再刷出新的循環，否則等於債務加倍。',
+        { type: 'widget', name: 'knobs', props: { title: '卡債轉成信貸划不划算（實際計算，都用本息平均攤還比較）', sliders: [
+          { id: 'bal', label: '卡債餘額', min: 20000, max: 1000000, step: 10000, value: 200000, unit: '元' },
+          { id: 'card', label: '卡債利率', min: 5, max: 15, step: 0.5, value: 15, unit: '%' },
+          { id: 'loan', label: '新信貸利率', min: 2, max: 15, step: 0.25, value: 7, unit: '%' },
+          { id: 'fee', label: '信貸開辦費等費用', min: 0, max: 20000, step: 500, value: 5000, unit: '元' },
+          { id: 'years', label: '打算幾年還完', min: 1, max: 7, step: 1, value: 3, unit: '年' },
+        ], compute: (v) => {
+          const cardPay = LOAN_PAY(v.bal, v.card / 100, v.years);
+          const loanPay = LOAN_PAY(v.bal, v.loan / 100, v.years);
+          const cardInt = cardPay * v.years * 12 - v.bal;
+          const loanCost = loanPay * v.years * 12 - v.bal + v.fee;
+          return { rows: [
+            { label: '維持卡債：月付 / 總利息', value: `${Math.round(cardPay).toLocaleString()} / ${Math.round(cardInt).toLocaleString()} 元`, ratio: Math.min(1, cardInt / v.bal) },
+            { label: '轉信貸：月付 / 利息加費用', value: `${Math.round(loanPay).toLocaleString()} / ${Math.round(loanCost).toLocaleString()} 元`, ratio: Math.min(1, loanCost / v.bal) },
+            { label: '省下', value: `${Math.round(cardInt - loanCost).toLocaleString()} 元`, ratio: Math.min(1, Math.max(0, cardInt - loanCost) / v.bal) },
+          ], note: '預設：20 萬卡債 15% 改成 7% 信貸、3 年還完，扣掉 5,000 元費用仍省下約 2.2 萬。前提是舊卡不再循環，而且比較的是總費用年百分率。' };
+        } } },
+        { type: 'heading', id: 'statutory', text: '還不起時的法定管道' },
+        { type: 'table', head: ['管道', '向誰申請', '重點'], rows: [
+          ['個別協商', '各家銀行', '自己和銀行談延長期數或降息；各銀行條件不同'],
+          ['前置協商', '最大債權金融機構', '消債條例第 151 條：對金融機構負債者，聲請更生或清算前應先協商；成立後通常只對最大債權銀行繳款'],
+          ['前置調解', '住所地法院或鄉鎮市區調解委員會', '與前置協商二擇一'],
+          ['更生', '法院', '有固定收入、無法全額清償；依法院認可的方案還一部分，履行完畢後其餘免責'],
+          ['清算', '法院', '變賣財產清償；有一定的生活與職業限制'],
+        ], caption: '協商成立後，各銀行會停止既有的信用卡額度、不能再申辦新卡或貸款，並在聯徵留下註記。細節與資格以法條、法院與銀行公會的說明為準。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="正式管道與代辦陷阱的比較：正式管道向銀行、法院、法律扶助基金會申請，免費或費用低；代辦或債務整合公司常收取高額手續費、要求交出存摺或提款卡，甚至涉及詐騙">
+          <rect x="20" y="20" width="250" height="190" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="52" text-anchor="middle" font-size="16" font-weight="900" class="on-color">正式管道</text>
+          ${['自己向銀行、法院申請', '法律扶助基金會免費諮詢', '銀行公會有債務協商窗口', '費用透明或免費'].map((t, i) => `<text x="145" y="${88 + i * 30}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+          <rect x="290" y="20" width="250" height="190" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="52" text-anchor="middle" font-size="16" font-weight="900" class="on-color">要小心的代辦</text>
+          ${['收取高額手續費或「成功費」', '要你交出存摺、提款卡、密碼', '保證「一定過件」「降到 0%」', '要你先付錢才能辦'].map((t, i) => `<text x="415" y="${88 + i * 30}" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
+        </svg>`, caption: '前置協商要由債務人本人向銀行提出，不需要透過代辦。遇到要求交出帳戶或先付費的，直接拒絕。' },
+        { type: 'callout', variant: 'tip', title: '先做的三件事', body: ['列出所有債務的餘額、利率、月付與逾期狀況。', '算出扣掉必要生活費後，每月真正能還多少。', '帶著這兩張表，找法律扶助基金會或銀行的協商窗口諮詢，再決定走哪一層。'] },
+        { type: 'heading', id: 'compare-court', text: '深入：更生與清算的差別' },
+        { type: 'table', head: ['', '更生', '清算'], rows: [
+          ['適合誰', '有固定或可預期的收入，但無法依原條件還清', '沒有足夠收入可以支撐還款計畫'],
+          ['怎麼還', '依法院認可的更生方案，在一定期間內清償一部分', '財產變價後分配給債權人'],
+          ['財產', '原則上可以保有，用收入還款', '除生活必需外，原則上要拿來清償'],
+          ['之後的限制', '履行完畢前須依方案生活', '程序中與之後一段期間，在職業與生活上有一定限制'],
+        ], caption: '這是概要；實際的條件、限制與程序細節，以消費者債務清理條例與法院的說明為準，並建議先向法律扶助基金會諮詢。' },
+        { type: 'heading', id: 'early', text: '深入：什麼時候該開始求助' },
+        { type: 'list', items: [
+          '連續兩個月只能繳最低應繳。',
+          '開始用一張卡的預借現金或新信貸去繳另一筆債（以債養債）。',
+          '所有還款加起來超過月收入的一半，而且看不到改善。',
+          '已經有一筆以上的逾期，接到催收。',
+        ] },
+        '出現任何一項，就是從「自己調整」往下一層走的時候。越早，能談的空間越大；拖到法院程序，選項最少、代價最高。',
+      ],
+    },
+    mistakes: [
+      { wrong: '轉貸還清卡債後，又把卡刷出新的循環。', why: '債務總額變成兩倍。', right: '轉貸同時停用或降低舊卡額度。' },
+      { wrong: '付錢給代辦或債務整合公司處理協商。', why: '前置協商可由本人免費申請，代辦常收高額費用。', right: '直接找銀行、法院或法律扶助基金會。' },
+      { wrong: '拖到完全繳不出來才處理。', why: '逾期越久，違約金、利息與信用損害越大。', right: '發現只能繳最低時就開始處理。' },
+    ],
+    keypoints: [
+      '債務整合有效的前提：舊卡不再循環。',
+      '對金融機構負債，聲請更生或清算前要先前置協商或調解。',
+      '正式管道可以自己申請，不需要付錢給代辦。',
+    ],
+    sources: ['debt-act-151', 'laf', 'taishin-loan'],
+  },
+});
+</script>

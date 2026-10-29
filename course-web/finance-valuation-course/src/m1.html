@@ -1,0 +1,327 @@
+<script>
+/* ==========================================================================
+   模組 1：三大財報
+   ========================================================================== */
+defineTerms({
+  '損益表': { en: 'income statement', def: '一段期間內的收入、成本與費用，最後算出淨利；回答「這段時間賺了多少」。', example: '營收 100 億 → 淨利 15.2 億。', lesson: '1-1' },
+  '毛利': { en: 'gross profit', def: '營收減去直接的銷貨成本。', example: '營收 100、成本 60 → 毛利 40。', lesson: '1-1' },
+  '營業利益': { en: 'operating income', def: '毛利減去營業費用（研發、行銷、管理），代表本業賺多少。', example: '毛利 40 − 費用 20 ＝ 20。', lesson: '1-1' },
+  'EPS': { en: 'earnings per share', def: '每股盈餘：稅後淨利除以流通在外股數。', example: '淨利 15.2 億 ÷ 10 億股 ＝ 1.52 元。', lesson: '1-1' },
+  '資產負債表': { en: 'balance sheet', def: '某一天公司擁有的資產、欠的負債與股東權益；資產 ＝ 負債 ＋ 股東權益。', example: '資產 150、負債 60、權益 90。', lesson: '1-2' },
+  '股東權益': { en: "shareholders' equity", def: '資產減去負債後，屬於股東的部分；也叫淨值。', example: '150 − 60 ＝ 90 億。', lesson: '1-2' },
+  '流動比率': { en: 'current ratio', def: '流動資產 ÷ 流動負債；衡量一年內到期的債務有沒有足夠的短期資產支應。', example: '50 ÷ 30 ≈ 1.67。', lesson: '1-2' },
+  '現金流量表': { en: 'cash flow statement', def: '一段期間內現金實際的流入與流出，分成營業、投資、籌資三類。', example: '營業現金流 20.2 億。', lesson: '1-3' },
+  '自由現金流': { en: 'free cash flow', def: '營業活動現金流減去資本支出；公司可以自由用來配息、還債或再投資的現金。', example: '20.2 − 10 ＝ 10.2 億。', lesson: '1-3' },
+  '月營收': { en: 'monthly revenue', def: '台灣上市櫃公司每月公告的營業收入；次月 10 日前公告，是追蹤營運最即時的資料。', example: '9 月營收在 10 月 10 日前公告。', lesson: '1-4' },
+});
+
+defineLessons({
+  '1-1': {
+    goals: [
+      '從營收一路算到 EPS',
+      '分辨毛利、營業利益與淨利的意義',
+      '看出本業與業外的差別',
+    ],
+    analogy: {
+      text: ['開一家飲料店：一個月賣了 100 萬（營收），原料與杯子花了 60 萬（銷貨成本），剩下 40 萬是[[毛利]]；再扣掉房租、薪水、廣告 20 萬，剩下 20 萬是[[營業利益]]，代表「賣飲料這件事」本身賺多少。', '如果這個月還收到一筆保險理賠、或付了貸款利息，那是業外收支；最後扣掉稅，才是淨利。[[損益表]]就是把這一路的加加減減，依固定格式寫下來。'],
+      limit: ['飲料店的錢大多是現收現付；公司的營收常是賒帳（應收帳款），損益表上「賺到」的錢不一定已經收到現金（1-3）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 300" role="img" aria-label="甲公司的損益表瀑布：營收 100 億，減銷貨成本 60 億得毛利 40 億，減營業費用 20 億得營業利益 20 億，減利息 1 億得稅前 19 億，減所得稅 3.8 億得淨利 15.2 億，除以 10 億股得 EPS 1.52 元">
+        ${[['營收', 100, 0, 'm0'], ['− 成本', 60, 40, 'm7'], ['毛利', 40, 0, 'm1'], ['− 費用', 20, 20, 'm7'], ['營業利益', 20, 0, 'm2'], ['− 利息', 1, 19, 'm7'], ['− 稅', 3.8, 15.2, 'm7'], ['淨利', 15.2, 0, 'm3']].map(([t, h, base, c], i) => `<rect x="${20 + i * 66}" y="${240 - (base + h) * 2}" width="56" height="${Math.max(2, h * 2)}" style="fill:var(--${c})" class="stroke-ink" stroke-width="2"/><text x="${48 + i * 66}" y="${232 - (base + h) * 2}" text-anchor="middle" font-size="12" font-weight="900">${h}</text><text x="${48 + i * 66}" y="262" text-anchor="middle" font-size="11">${t}</text>`).join('')}
+        <text x="280" y="290" text-anchor="middle" font-size="13" font-weight="900">EPS ＝ 15.2 億 ÷ 10 億股 ＝ 1.52 元（單位：億元）</text>
+      </svg>`,
+      caption: '每一層扣掉的東西不同：毛利看產品競爭力，營業利益看本業經營，淨利還包含業外與稅。',
+    },
+    define: [
+      { term: '損益表', en: 'income statement', def: '一段期間賺多少。', example: '淨利 15.2 億。' },
+      { term: '營業利益', en: 'operating income', def: '本業賺多少。', example: '20 億。' },
+      { term: 'EPS', en: 'EPS', def: '每股賺多少。', example: '1.52 元。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '損益表計算器（單位：億元，實際計算）', sliders: [
+          { id: 'rev', label: '營收', min: 10, max: 500, step: 5, value: 100 },
+          { id: 'gm', label: '毛利率', min: 5, max: 80, step: 1, value: 40, unit: '%' },
+          { id: 'opex', label: '營業費用率（佔營收）', min: 0, max: 60, step: 1, value: 20, unit: '%' },
+          { id: 'nonop', label: '業外收支（正為收入）', min: -20, max: 20, step: 0.5, value: -1 },
+          { id: 'tax', label: '有效稅率', min: 0, max: 30, step: 1, value: 20, unit: '%' },
+          { id: 'shares', label: '股數（億股）', min: 1, max: 50, step: 0.5, value: 10 },
+        ], compute: (v) => {
+          const gross = v.rev * v.gm / 100;
+          const op = gross - v.rev * v.opex / 100;
+          const pretax = op + v.nonop;
+          const net = pretax > 0 ? pretax * (1 - v.tax / 100) : pretax;
+          return { rows: [
+            { label: '毛利', value: `${gross.toFixed(1)} 億（${v.gm}%）`, ratio: Math.min(1, Math.max(0, gross) / v.rev) },
+            { label: '營業利益', value: `${op.toFixed(1)} 億（營益率 ${((op / v.rev) * 100).toFixed(1)}%）`, ratio: Math.min(1, Math.max(0, op) / v.rev) },
+            { label: '稅後淨利', value: `${net.toFixed(2)} 億（淨利率 ${((net / v.rev) * 100).toFixed(1)}%）`, ratio: Math.min(1, Math.max(0, net) / v.rev) },
+            { label: 'EPS', value: `${(net / v.shares).toFixed(2)} 元`, ratio: Math.min(1, Math.max(0, net / v.shares) / 10) },
+          ], note: '預設就是甲公司：EPS 1.52 元。把業外收支拉到 ＋15（例如賣掉一塊土地）：EPS 跳到約 2.8 元，但本業（營業利益）完全沒變；這種一次性的獲利不能當成常態。' };
+        } } },
+        { type: 'heading', id: 'core', text: '本業與業外：看營業利益' },
+        { type: 'table', head: ['項目', '例子', '持續性'], rows: [
+          ['營業利益（本業）', '賣產品、提供服務', '通常較可持續'],
+          ['利息收支', '存款利息、借款利息', '跟著資本結構與利率'],
+          ['投資收益', '持有其他公司的股權', '依被投資公司而定'],
+          ['處分利益或損失', '賣土地、賣廠房、賣子公司', '一次性，不應外推'],
+          ['匯兌損益', '外幣資產負債的匯率變動', '隨匯率波動，可正可負'],
+        ], caption: '一家公司 EPS 突然大增，先看是不是業外的一次性收入；估值（模組 3）應該用可持續的獲利。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="三個獲利率的意義：毛利率反映產品的定價能力與成本；營業利益率反映本業經營效率；淨利率還包含業外與稅">
+          ${[['毛利率', '產品競爭力', 'm1', 40], ['營業利益率', '本業效率', 'm2', 20], ['淨利率', '最後留下', 'm3', 15.2]].map(([a, b, c, p], i) => `<rect x="${40 + i * 170}" y="${180 - p * 3.4}" width="140" height="${p * 3.4}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${110 + i * 170}" y="${172 - p * 3.4}" text-anchor="middle" font-size="15" font-weight="900">${p}%</text><text x="${110 + i * 170}" y="200" text-anchor="middle" font-size="13" font-weight="900">${a}</text><text x="${110 + i * 170}" y="216" text-anchor="middle" font-size="11">${b}</text>`).join('')}
+        </svg>`, caption: '甲公司的三個獲利率。獲利率要和同產業比較才有意義：軟體業的毛利率和代工業天差地遠（2-1）。' },
+        { type: 'heading', id: 'eps-trap', text: '深入：EPS 的兩個陷阱' },
+        { type: 'list', items: [
+          '**股數會變**：公司增資、發員工認股權、可轉債轉換，股數增加，同樣的淨利攤到每股就變少（稀釋）；買回庫藏股則相反。比較不同年度的 EPS 時要注意股數。',
+          '**只看一季**：很多產業有淡旺季，單季 EPS 要和去年同季比，或看近四季加總（第五部常用的「近四季 EPS」）。',
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '只看 EPS 成長。', why: '可能來自業外的一次性收入。', right: '先看營業利益是否成長。' },
+      { wrong: '單季 EPS 和上一季比較。', why: '淡旺季會造成誤判。', right: '和去年同季比，或看近四季。' },
+      { wrong: '忽略股數變化。', why: '增資會稀釋每股盈餘。', right: '注意股本與股數的變動。' },
+    ],
+    keypoints: [
+      '營收 → 毛利 → 營業利益 → 淨利 → EPS。',
+      '營業利益代表本業；業外一次性收入不能外推。',
+      'EPS 要注意股數變化與季節性。',
+    ],
+    sources: ['mops', 'report-deadline'],
+  },
+
+  '1-2': {
+    goals: [
+      '讀懂資產、負債、股東權益的結構',
+      '用流動比率與負債比判斷財務彈性',
+      '說出帳面價值和市場價值的差別',
+    ],
+    analogy: {
+      text: ['第一部的個人資產負債表，同樣適用在公司：左邊是公司擁有的（現金、存貨、廠房設備），右邊是錢從哪裡來（借來的負債、股東出的錢與累積的盈餘）。兩邊一定相等：資產 ＝ 負債 ＋ [[股東權益]]。', '[[資產負債表]]是一張照片，只代表某一天。它回答的問題是：這家公司的底子穩不穩？一年內要還的錢，手上的短期資產夠不夠付？借的錢佔多少？'],
+      limit: ['照片裡的資產多半以「歷史成本」入帳：十年前買的土地可能早就漲了好幾倍，品牌、技術、人才這些最值錢的東西，常常根本不在表上。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="甲公司的資產負債表：資產 150 億，其中流動資產 50 億、非流動資產 100 億；負債 60 億，其中流動負債 30 億、非流動負債 30 億；股東權益 90 億">
+        <text x="145" y="24" text-anchor="middle" font-size="15" font-weight="900">資產 150</text>
+        <text x="415" y="24" text-anchor="middle" font-size="15" font-weight="900">負債 60 ＋ 權益 90</text>
+        <rect x="20" y="36" width="250" height="${50 * 1.5}" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="145" y="${36 + 37}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">流動資產 50</text>
+        <rect x="20" y="${36 + 75}" width="250" height="${100 * 1.5}" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="145" y="${36 + 75 + 75}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">廠房設備等 100</text>
+        <rect x="290" y="36" width="250" height="${30 * 1.5}" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="415" y="${36 + 27}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">流動負債 30</text>
+        <rect x="290" y="${36 + 45}" width="250" height="${30 * 1.5}" style="fill:var(--m5)" class="stroke-ink" stroke-width="3"/><text x="415" y="${36 + 45 + 27}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">長期負債 30</text>
+        <rect x="290" y="${36 + 90}" width="250" height="${90 * 1.5}" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="415" y="${36 + 90 + 70}" text-anchor="middle" font-size="14" font-weight="900" class="on-color">股東權益 90</text>
+      </svg>`,
+      caption: '單位：億元。每股淨值 ＝ 股東權益 ÷ 股數 ＝ 90 ÷ 10 ＝ 9 元。',
+    },
+    define: [
+      { term: '資產負債表', en: 'balance sheet', def: '某一天的資產、負債、權益。', example: '150 ＝ 60 ＋ 90。' },
+      { term: '股東權益', en: 'equity', def: '資產 − 負債。', example: '90 億。' },
+      { term: '流動比率', en: 'current ratio', def: '流動資產 ÷ 流動負債。', example: '1.67。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '資產負債表的健康檢查（單位：億元，實際計算）', sliders: [
+          { id: 'ca', label: '流動資產', min: 1, max: 300, step: 1, value: 50 },
+          { id: 'cl', label: '流動負債', min: 1, max: 300, step: 1, value: 30 },
+          { id: 'nca', label: '非流動資產', min: 0, max: 500, step: 5, value: 100 },
+          { id: 'ltl', label: '長期負債', min: 0, max: 500, step: 5, value: 30 },
+          { id: 'shares', label: '股數（億股）', min: 1, max: 50, step: 0.5, value: 10 },
+        ], compute: (v) => {
+          const assets = v.ca + v.nca; const liab = v.cl + v.ltl; const eq = assets - liab;
+          return { rows: [
+            { label: '流動比率', value: `${(v.ca / v.cl).toFixed(2)}`, ratio: Math.min(1, v.ca / v.cl / 3) },
+            { label: '負債比（負債 ÷ 資產）', value: `${((liab / assets) * 100).toFixed(1)}%`, ratio: Math.min(1, liab / assets) },
+            { label: '股東權益', value: `${eq.toFixed(1)} 億`, ratio: Math.min(1, Math.max(0, eq) / assets) },
+            { label: '每股淨值', value: `${(eq / v.shares).toFixed(2)} 元`, ratio: Math.min(1, Math.max(0, eq / v.shares) / 50) },
+          ], note: '預設：流動比率約 1.67、負債比 40%、每股淨值 9 元。流動比率低於 1，代表一年內要還的錢比短期資產多，需要依賴借新還舊或營運現金。負債比的合理範圍依產業差很多：銀行天生高，軟體業通常低。' };
+        } } },
+        { type: 'heading', id: 'items', text: '要特別看的幾個項目' },
+        { type: 'table', head: ['項目', '為什麼要看', '警訊'], rows: [
+          ['現金', '能不能撐過壞年份', '現金一直減少，又沒有對應的投資'],
+          ['應收帳款', '已認列營收、但還沒收到的錢', '成長速度遠快於營收（2-2）'],
+          ['存貨', '還沒賣掉的產品與原料', '存貨大增而營收沒增，可能有跌價風險'],
+          ['商譽', '併購時付出高於帳面價值的部分', '金額很大時，未來可能減損'],
+          ['短期借款', '一年內到期的借款', '短期借款佔比高，景氣差時再融資困難'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="帳面價值與市場價值：每股淨值 9 元是會計上的帳面價值；股價 30 元是市場價值；差距反映市場對未來獲利、品牌、技術的期待">
+          <rect x="80" y="${180 - 9 * 5}" width="140" height="${9 * 5}" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="150" y="${172 - 9 * 5}" text-anchor="middle" font-size="15" font-weight="900">每股淨值 9 元</text>
+          <rect x="340" y="${180 - 30 * 5}" width="140" height="${30 * 5}" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="410" y="${172 - 30 * 5}" text-anchor="middle" font-size="15" font-weight="900">股價 30 元</text>
+          <text x="280" y="205" text-anchor="middle" font-size="13">差距 ＝ 市場對未來獲利、品牌、技術的期待（3-2 的股價淨值比）</text>
+        </svg>`, caption: '帳面價值是過去投入的累積；市場價值是對未來的預期。兩者差多少，取決於公司能用股東的錢賺多少（ROE，2-1）。' },
+        { type: 'heading', id: 'equity-parts', text: '深入：股東權益由什麼組成' },
+        { type: 'table', head: ['項目', '來源', '看什麼'], rows: [
+          ['股本', '股東當初投入的錢（面額部分）', '股本變大可能是增資或配股，會稀釋每股盈餘'],
+          ['資本公積', '發行新股時溢價的部分等', '大量增資會讓它變大'],
+          ['保留盈餘', '歷年賺的錢減去發出的股利', '持續累積代表公司靠本業長大'],
+          ['其他權益', '匯率換算、金融資產評價等', '波動大時要看原因'],
+        ], caption: '一家公司的股東權益主要靠「保留盈餘」長大，比靠一再增資長大健康得多。' },
+        '另一個常被忽略的項目是庫藏股：公司買回自己的股票，會讓股東權益變小、股數變少。這通常對每股盈餘與 ROE 有利，但如果用借來的錢大量買回，負債比就會上升（2-1 的權益乘數）。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看資產很大就覺得公司很穩。', why: '可能大部分是借來的。', right: '同時看負債比與股東權益。' },
+      { wrong: '負債比用同一個標準比所有產業。', why: '金融業與科技業的結構完全不同。', right: '和同產業比較。' },
+      { wrong: '以為每股淨值就是公司真正的價值。', why: '帳上資產多以歷史成本計，無形價值多不在表上。', right: '把淨值當作參考，搭配獲利能力看。' },
+    ],
+    keypoints: [
+      '資產 ＝ 負債 ＋ 股東權益。',
+      '流動比率看短期償債，負債比看資本結構。',
+      '帳面價值是過去，市場價值是對未來的期待。',
+    ],
+    sources: ['mops', 'fsc-moneywise'],
+  },
+
+  '1-3': {
+    goals: [
+      '分辨營業、投資、籌資三種現金流',
+      '算出自由現金流',
+      '用「現金流 vs 淨利」檢查盈餘品質',
+    ],
+    analogy: {
+      text: ['損益表說你這個月「賺了」10 萬，但如果其中 8 萬是客戶欠著還沒付，你的錢包裡其實只多了 2 萬。對公司來說，帳面獲利和真正收到的現金之間的落差，可能決定它撐不撐得下去。', '[[現金流量表]]只記錄現金真正的進出，分成三類：做生意（營業）、買賣設備與投資（投資）、借錢還錢與配息（籌資）。俗話說「獲利是意見，現金是事實」。'],
+      limit: ['現金流量表很可靠，但也會有短期波動：例如公司為了旺季先囤貨，營業現金流會暫時變差，不一定是壞事。要看多年的趨勢。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="甲公司的現金流：營業活動淨利 15.2 加上折舊 8 減去營運資金增加 3，得營業現金流 20.2；投資活動資本支出 10；自由現金流 10.2，可以配息、還債或再投資">
+        <rect x="20" y="30" width="250" height="150" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="145" y="62" text-anchor="middle" font-size="16" font-weight="900" class="on-color">營業現金流 20.2</text>
+        <text x="145" y="96" text-anchor="middle" font-size="13" class="on-color">淨利 15.2</text>
+        <text x="145" y="122" text-anchor="middle" font-size="13" class="on-color">＋ 折舊 8（不用付現）</text>
+        <text x="145" y="148" text-anchor="middle" font-size="13" class="on-color">− 應收、存貨增加 3</text>
+        <rect x="290" y="30" width="250" height="70" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="415" y="72" text-anchor="middle" font-size="15" font-weight="900" class="on-color">− 資本支出 10</text>
+        <rect x="290" y="110" width="250" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/>
+        <text x="415" y="152" text-anchor="middle" font-size="16" font-weight="900" class="on-color">自由現金流 10.2</text>
+        <text x="280" y="216" text-anchor="middle" font-size="13">自由現金流可以：配息、買回股票、還債、併購、存起來</text>
+        <text x="280" y="244" text-anchor="middle" font-size="12">單位：億元（簡化的間接法）</text>
+      </svg>`,
+      caption: '折舊是會計上把設備成本分攤到各年的費用，當年不需要付出現金，所以要加回來。',
+    },
+    define: [
+      { term: '現金流量表', en: 'cash flow statement', def: '現金真正的進出。', example: '三類活動。' },
+      { term: '自由現金流', en: 'FCF', def: '營業現金流 − 資本支出。', example: '10.2 億。' },
+      { term: '損益表', en: 'income statement', def: '帳面上賺多少。', example: '淨利 15.2。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '現金流與盈餘品質（單位：億元，實際計算）', sliders: [
+          { id: 'ni', label: '稅後淨利', min: -20, max: 100, step: 0.5, value: 15.2 },
+          { id: 'da', label: '折舊與攤銷', min: 0, max: 50, step: 0.5, value: 8 },
+          { id: 'wc', label: '應收帳款與存貨增加', min: -20, max: 50, step: 0.5, value: 3 },
+          { id: 'capex', label: '資本支出', min: 0, max: 80, step: 0.5, value: 10 },
+          { id: 'div', label: '發放的現金股利', min: 0, max: 50, step: 0.5, value: 8 },
+        ], compute: (v) => {
+          const ocf = v.ni + v.da - v.wc; const fcf = ocf - v.capex;
+          return { rows: [
+            { label: '營業現金流', value: `${ocf.toFixed(1)} 億`, ratio: Math.min(1, Math.max(0, ocf) / 100) },
+            { label: '營業現金流 ÷ 淨利', value: v.ni > 0 ? `${(ocf / v.ni).toFixed(2)} 倍` : '淨利為負', ratio: v.ni > 0 ? Math.min(1, ocf / v.ni / 2) : 0 },
+            { label: '自由現金流', value: `${fcf.toFixed(1)} 億`, ratio: Math.min(1, Math.max(0, fcf) / 100) },
+            { label: '股利 ÷ 自由現金流', value: fcf > 0 ? `${((v.div / fcf) * 100).toFixed(0)}%` : '自由現金流為負', ratio: fcf > 0 ? Math.min(1, v.div / fcf) : 1 },
+          ], note: '預設：營業現金流約是淨利的 1.33 倍，自由現金流 10.2 億、配息 8 億約佔 78%。把應收與存貨增加拉到 20：營業現金流只剩 3.2 億、低於淨利，這是盈餘品質變差的警訊。配息長期超過自由現金流，可能靠借錢在發。' };
+        } } },
+        { type: 'heading', id: 'three', text: '三種現金流的組合' },
+        { type: 'table', head: ['營業', '投資', '籌資', '常見的情況'], rows: [
+          ['＋', '−', '−', '成熟的好公司：本業賺現金，再投資，同時配息或還債'],
+          ['＋', '−', '＋', '成長期：本業有賺，但擴張需要更多資金'],
+          ['−', '−', '＋', '新創或困境：本業燒錢，靠借錢或增資撐'],
+          ['−', '＋', '＋', '警訊：本業燒錢，靠賣資產與借錢度日'],
+        ], caption: '單一年度不代表全部；看三到五年的組合比較有意義。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="盈餘品質的檢查：連續多年營業現金流大於或接近淨利，盈餘品質較好；營業現金流長期低於淨利，帳面獲利可能沒有變成現金">
+          <line x1="60" y1="180" x2="530" y2="180" class="stroke-ink" stroke-width="2"/>
+          ${[1, 2, 3, 4, 5].map((y) => `<rect x="${60 + (y - 1) * 92}" y="${180 - 15 * 6}" width="34" height="${15 * 6}" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><rect x="${96 + (y - 1) * 92}" y="${180 - [20, 19, 21, 8, 5][y - 1] * 6}" width="34" height="${[20, 19, 21, 8, 5][y - 1] * 6}" style="fill:var(--m${y > 3 ? 4 : 2})" class="stroke-ink" stroke-width="2"/><text x="${96 + (y - 1) * 92}" y="200" text-anchor="middle" font-size="12">第 ${y} 年</text>`).join('')}
+          <text x="80" y="30" font-size="13" font-weight="900">左：淨利　右：營業現金流</text>
+          <text x="420" y="60" text-anchor="middle" font-size="13" font-weight="900">第 4、5 年：獲利沒變成現金</text>
+        </svg>`, caption: '虛構的例子。淨利穩定、營業現金流卻突然掉下來，要去看應收帳款與存貨（2-2）。' },
+        { type: 'heading', id: 'capex', text: '深入：資本支出的兩種' },
+        '資本支出可以粗分為兩種：維持性（汰換老舊設備，讓公司維持現在的規模）與成長性（擴廠、新產線，讓公司變大）。一家快速擴張的公司，自由現金流可能是負的，這不一定是壞事；重要的是這些投資未來能不能帶來足夠的報酬。判斷方式之一是看幾年後的營收與營業現金流，是否跟著資本支出一起成長。',
+        { type: 'table', head: ['情況', '自由現金流', '要問的問題'], rows: [
+          ['成熟公司、維持性支出為主', '穩定為正', '股利與買回是否在自由現金流範圍內'],
+          ['擴張期、大量成長性支出', '可能為負', '過去的投資有沒有帶來成長'],
+          ['營收衰退仍大量支出', '為負', '是否把錢投入報酬越來越低的地方'],
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '只看淨利，不看現金流。', why: '帳面獲利可能沒有收到現金。', right: '比較營業現金流與淨利。' },
+      { wrong: '看到營業現金流一年轉差就恐慌。', why: '可能是旺季前備貨等正常波動。', right: '看三到五年的趨勢。' },
+      { wrong: '以為高配息一定是好公司。', why: '配息可能超過自由現金流，靠借錢在發。', right: '比較股利與自由現金流。' },
+    ],
+    keypoints: [
+      '現金流分營業、投資、籌資三類。',
+      '自由現金流 ＝ 營業現金流 − 資本支出。',
+      '營業現金流長期低於淨利，是盈餘品質警訊。',
+    ],
+    sources: ['mops', 'fsc-moneywise'],
+  },
+
+  '1-4': {
+    goals: [
+      '說出三張報表如何連在一起',
+      '知道台灣上市櫃公司財報與月營收的公告時間',
+      '用月營收的年增率與月增率追蹤營運',
+    ],
+    analogy: {
+      text: ['三張報表像同一部電影的三個鏡頭：損益表拍「這一季發生了什麼」，現金流量表拍「錢實際怎麼流動」，資產負債表拍「季末的那一刻停在哪裡」。三個鏡頭說的是同一個故事，數字之間一定對得起來。', '台灣的上市櫃公司除了季報，還每月公告[[月營收]]，這是全世界少見的高頻率資料，讓投資人能更即時地追蹤營運。'],
+      limit: ['電影的鏡頭是導演選的；財報的數字也有會計估計與管理階層的判斷（例如折舊年限、呆帳提列），同樣的事實可以有不同的呈現。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="三表的連結：損益表的淨利流入資產負債表的保留盈餘；也是現金流量表營業活動的起點；現金流量表的期末現金等於資產負債表上的現金">
+        <rect x="20" y="30" width="160" height="90" style="fill:var(--m0)" class="stroke-ink" stroke-width="3"/><text x="100" y="70" text-anchor="middle" font-size="15" font-weight="900" class="on-color">損益表</text><text x="100" y="96" text-anchor="middle" font-size="12" class="on-color">淨利 15.2</text>
+        <rect x="380" y="30" width="160" height="90" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="460" y="70" text-anchor="middle" font-size="15" font-weight="900" class="on-color">現金流量表</text><text x="460" y="96" text-anchor="middle" font-size="12" class="on-color">期末現金</text>
+        <rect x="190" y="170" width="180" height="90" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/><text x="280" y="208" text-anchor="middle" font-size="15" font-weight="900" class="on-color">資產負債表</text><text x="280" y="234" text-anchor="middle" font-size="12" class="on-color">保留盈餘、現金</text>
+        <path d="M180 75 L380 75" class="stroke-ink" stroke-width="3"/><text x="280" y="66" text-anchor="middle" font-size="12" font-weight="900">淨利是營業現金流的起點</text>
+        <path d="M100 120 L220 170" class="stroke-ink" stroke-width="3"/><text x="120" y="160" font-size="12" font-weight="900">淨利 − 股利 → 保留盈餘</text>
+        <path d="M460 120 L340 170" class="stroke-ink" stroke-width="3"/><text x="440" y="160" text-anchor="end" font-size="12" font-weight="900">期末現金 ＝ 帳上現金</text>
+      </svg>`,
+      caption: '這些連結讓財報很難只造假其中一張：數字要同時在三張表上對得起來。',
+    },
+    define: [
+      { term: '月營收', en: 'monthly revenue', def: '次月 10 日前公告的營收。', example: '9 月營收。' },
+      { term: '財報', en: 'financial statements', def: '季報與年報。', example: '公開資訊觀測站。' },
+      { term: '自由現金流', en: 'FCF', def: '營業現金流 − 資本支出。', example: '10.2 億。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'calendar', text: '台灣上市公司的公告時間（一般公司）' },
+        { type: 'table', head: ['資料', '公告期限'], rows: [
+          ['月營收', '次月 10 日前'],
+          ['第一季財報', '5 月 15 日前'],
+          ['第二季財報', '8 月 14 日前'],
+          ['第三季財報', '11 月 14 日前'],
+          ['年度財報', '次年 3 月 31 日前'],
+        ], caption: '金控、銀行、保險等行業的期限不同；遇假日可能順延。所有資料都可以在公開資訊觀測站查詢。' },
+        { type: 'widget', name: 'knobs', props: { title: '月營收的年增率與月增率（單位：億元，實際計算）', sliders: [
+          { id: 'now', label: '本月營收', min: 1, max: 100, step: 0.5, value: 9.5 },
+          { id: 'last', label: '上月營收', min: 1, max: 100, step: 0.5, value: 8 },
+          { id: 'ly', label: '去年同月營收', min: 1, max: 100, step: 0.5, value: 8.5 },
+          { id: 'ytd', label: '今年累計（含本月）', min: 1, max: 1000, step: 1, value: 80 },
+          { id: 'lytd', label: '去年同期累計', min: 1, max: 1000, step: 1, value: 74 },
+        ], compute: (v) => {
+          const mom = (v.now / v.last - 1) * 100; const yoy = (v.now / v.ly - 1) * 100; const cum = (v.ytd / v.lytd - 1) * 100;
+          return { rows: [
+            { label: '月增率（和上月比）', value: `${mom.toFixed(1)}%`, ratio: Math.min(1, Math.abs(mom) / 50) },
+            { label: '年增率（和去年同月比）', value: `${yoy.toFixed(1)}%`, ratio: Math.min(1, Math.abs(yoy) / 50) },
+            { label: '累計年增率', value: `${cum.toFixed(1)}%`, ratio: Math.min(1, Math.abs(cum) / 50) },
+          ], note: '預設：月增 18.8%、年增 11.8%、累計年增 8.1%。有淡旺季的產業，月增率常常只是季節性；年增率與累計年增率比較能看出趨勢。' };
+        } } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="追蹤一家公司的頻率：每月看月營收，每季看財報，每年看年報與股東會資料；重大訊息隨時公告">
+          ${[['每月', '月營收年增率', 'm0'], ['每季', '毛利率、營益率、現金流', 'm2'], ['每年', '年報、股利政策、展望', 'm3'], ['隨時', '重大訊息', 'm4']].map(([a, b, c], i) => `<rect x="${12 + i * 137}" y="40" width="125" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="90" text-anchor="middle" font-size="18" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 137}" y="120" text-anchor="middle" font-size="11" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="196" text-anchor="middle" font-size="13">持有個股，就要持續追蹤；這是選個股的「時間成本」</text>
+        </svg>`, caption: '月營收只告訴你賣了多少，不告訴你賺了多少；毛利率與費用要等季報。' },
+        { type: 'heading', id: 'notes', text: '深入：別跳過附註' },
+        '財報的附註常比主表更重要：會計政策（例如收入何時認列）、重大的訴訟與承諾、關係人交易、各項資產的評價方式，都寫在附註裡。會計師的查核意見也值得看一眼：標準的「無保留意見」最常見；若出現保留意見、或強調事項，就要特別留意原因。',
+      ],
+    },
+    mistakes: [
+      { wrong: '用月增率判斷趨勢。', why: '淡旺季會造成很大的月變化。', right: '看年增率與累計年增率。' },
+      { wrong: '只看月營收就判斷獲利。', why: '營收增加不一定代表毛利增加。', right: '搭配季報的毛利率與費用。' },
+      { wrong: '只看主表、不看附註與查核意見。', why: '重要的風險常寫在附註裡。', right: '至少看會計政策、關係人交易與查核意見。' },
+    ],
+    keypoints: [
+      '三表連結：淨利 → 保留盈餘、營業現金流；期末現金 ＝ 帳上現金。',
+      '月營收次月 10 日前，季報 5/15、8/14、11/14，年報 3/31。',
+      '月營收看年增率；附註與查核意見不要跳過。',
+    ],
+    sources: ['report-deadline', 'report-rules', 'mops'],
+  },
+});
+</script>

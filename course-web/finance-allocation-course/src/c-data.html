@@ -1,0 +1,127 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: '理財系列・第四部｜配置與稅費',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-29',
+  version: 'v1',
+};
+
+/* 理財系列六卷：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: '理財系列',
+  current: 'fin-4',
+  volumes: [
+    { id: 'fin-1', vol: '第一部', title: '個人財務', href: '../finance-personal-course/index.html' },
+    { id: 'fin-2', vol: '第二部', title: '風險保障', href: '../finance-insurance-course/index.html' },
+    { id: 'fin-3', vol: '第三部', title: '投資核心', href: '../finance-investing-course/index.html' },
+    { id: 'fin-4', vol: '第四部', title: '配置與稅費', href: '../finance-allocation-course/index.html' },
+    { id: 'fin-5', vol: '第五部', title: '財報與估值', href: '../finance-valuation-course/index.html' },
+    { id: 'fin-6', vol: '第六部', title: '投資心理', href: '../finance-psychology-course/index.html' },
+  ],
+};
+
+/* 全書主軸：從觀念到執行的六個步驟；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '配置', note: '股債比與目標', color: 'var(--m0)' },
+    { label: '投入', note: '單筆或定期定額', color: 'var(--m1)' },
+    { label: '再平衡', note: '回到目標比例', color: 'var(--m2)' },
+    { label: '費用', note: '每一層成本', color: 'var(--m3)' },
+    { label: '稅', note: '台灣的稅與二代健保', color: 'var(--m4)' },
+    { label: '提領', note: '要存多少、怎麼用', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [0], 2: [1], 3: [2], 4: [3], 5: [4], 6: [5], 7: [0, 1, 2, 3, 4, 5] },
+  byLesson: {},
+};
+
+/* 首頁主視覺：執行的流程（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="從觀念到執行的六個步驟：決定配置、選擇投入方式、定期再平衡、壓低費用、處理台灣的稅與二代健保、規劃退休提領">
+  ${[['1 配置', '股債比怎麼定', 'm0'], ['2 投入', '單筆或定期定額', 'm1'], ['3 再平衡', '回到目標比例', 'm2'], ['4 費用', '每一層成本加起來', 'm3'], ['5 稅', '股利、二代健保、海外所得', 'm4'], ['6 提領', '要存多少才夠', 'm5']].map(([a, b, c], i) => `<rect x="${30 + (i % 2) * 255}" y="${20 + Math.floor(i / 2) * 130}" width="245" height="115" style="fill:var(--${c})" class="stroke-ink" stroke-width="4"/><text x="${152 + (i % 2) * 255}" y="${70 + Math.floor(i / 2) * 130}" text-anchor="middle" font-size="22" font-weight="900" class="on-color">${a}</text><text x="${152 + (i % 2) * 255}" y="${100 + Math.floor(i / 2) * 130}" text-anchor="middle" font-size="14" class="on-color">${b}</text>`).join('')}
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '起點：|從觀念到執行', short: '起點', desc: '配置、投入、再平衡、費用、稅、提領：第三部的觀念變成一套可以照做的流程。', lessons: [
+    ['0-1', '從觀念|到執行'],
+  ]},
+  { id: 1, title: '資產配置', short: '配置', desc: '股債比怎麼決定、常見的配置範本與全球分散，以及依目標與時間分桶。', lessons: [
+    ['1-1', '股債比|怎麼決定'],
+    ['1-2', '配置範本|與全球分散'],
+    ['1-3', '目標|與時間分桶'],
+  ]},
+  { id: 2, title: '投入方式', short: '投入', desc: '單筆與定期定額的取捨，以及台灣定期定額的實務與成本。', lessons: [
+    ['2-1', '單筆|vs 定期定額'],
+    ['2-2', '定期定額|的實務'],
+  ]},
+  { id: 3, title: '再平衡', short: '再平衡', desc: '比例為什麼會漂移、再平衡的三種方法與成本。', lessons: [
+    ['3-1', '為什麼|要再平衡'],
+    ['3-2', '怎麼|再平衡'],
+  ]},
+  { id: 4, title: '費用', short: '費用', desc: '內扣費用、手續費、證交稅、匯費與銷售費：把每一層成本加起來比較。', lessons: [
+    ['4-1', '費用|的總清單'],
+    ['4-2', '比較工具|的總成本'],
+  ]},
+  { id: 5, title: '台灣的稅|與二代健保', short: '稅', desc: '綜合所得稅、股利的兩種計稅方式、二代健保補充保費，以及投資海外的稅。', lessons: [
+    ['5-1', '綜合所得稅|的基本'],
+    ['5-2', '股利所得：|合併還是分開'],
+    ['5-3', '二代健保|補充保費'],
+    ['5-4', '海外投資|的稅'],
+  ]},
+  { id: 6, title: '退休與提領', short: '提領', desc: '要存多少才夠、4% 法則的來源與限制，以及台灣的勞保與勞退。', lessons: [
+    ['6-1', '要存多少|才夠'],
+  ]},
+  { id: 7, title: '把它串起來', short: '串起來', desc: '把配置、投入、再平衡、費用與稅寫成一頁執行計畫。', lessons: [
+    ['7-1', '一頁|執行計畫'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>

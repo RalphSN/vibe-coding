@@ -1,0 +1,129 @@
+<script>
+/* ==========================================================================
+   模組 6：把它串起來
+   ========================================================================== */
+defineTerms({
+  '財務優先順序': { en: 'financial order of operations', def: '有限的錢先用在哪裡的順序；原則是先處理「代價最高、最不可逆」的風險。', example: '先小預備金，再還高利債，再補滿預備金。', lesson: '6-1' },
+  '資金成本': { en: 'cost of capital', def: '用一筆錢做某件事時，放棄的另一個選擇的報酬；有債務時，還債的報酬就是那筆債的利率。', example: '有 15% 卡債時，任何投資都要贏過 15% 才划算。', lesson: '6-1' },
+});
+
+const LADDER = [
+  ['看見現金流', '記帳 3 個月，現金流轉正（模組 1、2）', 'm0'],
+  ['小預備金', '先存 1 個月必要支出（3-2）', 'm3'],
+  ['所有債都繳最低', '避免違約金與信用受損（4-3、4-4）', 'm1'],
+  ['清掉高利債', '卡債、預借現金、高利信貸（模組 5）', 'm4'],
+  ['補滿預備金', '3–12 個月必要支出（3-1）', 'm3'],
+  ['基本保障', '醫療、意外、失能、壽險（第二部）', 'm2'],
+  ['長期投資', '中低利債與投資並行（第三、四部）', 'm5'],
+];
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '照七個步驟排出自己的財務優先順序',
+      '用資金成本判斷「先還債還是先投資」',
+      '每年用一張清單做一次財務健檢',
+    ],
+    analogy: {
+      text: ['急診室不是先處理最早到的病人，而是先處理最危險的：止血優先於骨折，骨折優先於感冒。資源有限時，順序就是策略。', '個人財務也一樣。錢有限，所以要先處理代價最高、最難挽回的問題：現金流是負的（持續失血）、沒有任何緩衝（一有意外就借高利貸）、高利債（每天在流失），然後才是保障與投資。這就是[[財務優先順序]]。'],
+      limit: ['急診的分級標準是固定的；每個人的財務狀況不同，順序可以微調（例如公司有退休金提撥配合時，可以和還債同時做）。但「先止血」的原則不變。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 330" role="img" aria-label="財務優先順序的七個階梯：看見現金流、小預備金、所有債都繳最低、清掉高利債、補滿預備金、基本保障、長期投資">
+        ${LADDER.map(([a, b, c], i) => `<rect x="${20 + i * 30}" y="${290 - (i + 1) * 40}" width="${520 - i * 30}" height="36" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${32 + i * 30}" y="${314 - (i + 1) * 40}" font-size="14" font-weight="900" class="on-color">${i + 1} ${a}</text><text x="528" y="${314 - (i + 1) * 40}" text-anchor="end" font-size="12" class="on-color">${b}</text>`).join('')}
+        <text x="280" y="318" text-anchor="middle" font-size="13">從下往上走；上一階穩了，才把多的錢往上一階送</text>
+      </svg>`,
+      caption: '第一部處理第 1 到第 5 階；第二部（風險保障）是第 6 階；投資從第三部開始。',
+    },
+    define: [
+      { term: '財務優先順序', en: 'order of operations', def: '有限的錢先用在哪裡。', example: '七個階梯。' },
+      { term: '資金成本', en: 'cost of capital', def: '放棄的另一個選擇的報酬。', example: '卡債 15%。' },
+      { term: '緊急預備金', en: 'emergency fund', def: '應付意外的現金緩衝。', example: '3–12 個月。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'heading', id: 'why-order', text: '為什麼是這個順序' },
+        { type: 'table', head: ['階梯', '如果跳過會怎樣'], rows: [
+          ['1 看見現金流', '不知道問題在哪，後面每一步都只是猜'],
+          ['2 小預備金', '還債途中一有意外，又刷卡回去'],
+          ['3 都繳最低', '違約金、信用紀錄受損，未來借款更貴'],
+          ['4 清高利債', '每年穩定流失 15% 左右，任何投資都很難追上'],
+          ['5 補滿預備金', '投資遇到下跌又剛好失業，只能低點賣出'],
+          ['6 基本保障', '一場大病或意外就讓前面全部歸零（第二部）'],
+          ['7 長期投資', '—'],
+        ] },
+        { type: 'heading', id: 'debt-or-invest', text: '先還債還是先投資：比較資金成本' },
+        '還清一筆債，等於拿到「那筆債的利率」的確定報酬。所以判斷方式很單純：把債務利率和你對投資「合理、保守」的長期報酬期望相比，再把投資的不確定性考慮進去。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="依債務利率決定：高於約 8 percent 的債優先還清；介於通膨與 8 percent 之間的債，可以照常還款並同時投資；低於通膨的低利債，不必急著提前還">
+          <line x1="40" y1="120" x2="520" y2="120" class="stroke-ink" stroke-width="4"/>
+          ${[[0, '0%'], [2.5, '約通膨'], [8, '約 8%'], [15, '15%']].map(([p, t]) => `<line x1="${40 + p * 32}" y1="110" x2="${40 + p * 32}" y2="130" class="stroke-ink" stroke-width="3"/><text x="${40 + p * 32}" y="150" text-anchor="middle" font-size="13" class="mono">${t}</text>`).join('')}
+          <rect x="40" y="56" width="${2.5 * 32}" height="44" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="${40 + 1.25 * 32}" y="84" text-anchor="middle" font-size="12" font-weight="900" class="on-color">不急著還</text>
+          <rect x="${40 + 2.5 * 32}" y="56" width="${5.5 * 32}" height="44" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="${40 + 5.25 * 32}" y="84" text-anchor="middle" font-size="13" font-weight="900" class="on-color">照常還＋同時投資</text>
+          <rect x="${40 + 8 * 32}" y="56" width="${7 * 32}" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${40 + 11.5 * 32}" y="84" text-anchor="middle" font-size="13" font-weight="900" class="on-color">優先還清</text>
+          <text x="280" y="196" text-anchor="middle" font-size="13">8% 是經驗分界，不是規則；越不喜歡風險，分界可以往左移</text>
+        </svg>`, caption: '房貸（約 2.3%）通常落在左邊或中間；信用卡循環（最高 15%）永遠在右邊。' },
+        { type: 'widget', name: 'knobs', props: { title: '我現在在第幾階？（依輸入判斷下一步，實際計算）', sliders: [
+          { id: 'flow', label: '每月現金流（收入 − 支出）', min: -20000, max: 50000, step: 1000, value: 5000, unit: '元' },
+          { id: 'ess', label: '每月必要支出', min: 10000, max: 100000, step: 1000, value: 28000, unit: '元' },
+          { id: 'cash', label: '可動用存款', min: 0, max: 1500000, step: 10000, value: 40000, unit: '元' },
+          { id: 'high', label: '利率 8% 以上的債務餘額', min: 0, max: 1000000, step: 10000, value: 60000, unit: '元' },
+          { id: 'target', label: '你的預備金目標月數', min: 3, max: 12, step: 1, value: 6, unit: '個月' },
+        ], compute: (v) => {
+          const months = v.cash / v.ess;
+          let step; let next;
+          if (v.flow <= 0) { step = 1; next = '現金流不是正的：先用預算（2-1）把每月收支轉正。'; }
+          else if (months < 1) { step = 2; next = `先存到 1 個月必要支出，還差 ${Math.round(v.ess - v.cash).toLocaleString()} 元。`; }
+          else if (v.high > 0) { step = 4; next = `每筆繳最低，多的錢集中還高利債；以每月 ${v.flow.toLocaleString()} 元計，約 ${Math.ceil(v.high / v.flow)} 個月（未含利息）。`; }
+          else if (months < v.target) { step = 5; next = `補滿預備金到 ${v.target} 個月，還差 ${Math.round(v.ess * v.target - v.cash).toLocaleString()} 元。`; }
+          else { step = 6; next = '地基完成：接著檢查基本保障（第二部），再開始長期投資。'; }
+          return { rows: [
+            { label: '目前在第幾階', value: `第 ${step} 階：${LADDER[step - 1][0]}`, ratio: step / 7 },
+            { label: '預備金撐得了', value: `${months.toFixed(1)} 個月`, ratio: Math.min(1, months / v.target) },
+          ], note: next };
+        } } },
+        { type: 'heading', id: 'checkup', text: '每年一次的財務健檢' },
+        '選一個固定的日子（例如生日或年底），花一個下午走完下面的清單。勾選狀態只存在這台電腦的瀏覽器裡。',
+        { type: 'widget', name: 'checklist', props: { key: 'annual-checkup', items: [
+          '用反推法或記帳 app 算出過去一年的總支出、前三大類別（1-2）',
+          '算出今年的儲蓄率，和去年比（1-3）',
+          '更新資產負債表，記下今年的淨值（1-4）',
+          '更新偶發支出清單與每月準備金（1-1）',
+          '確認預備金月數仍符合目前的工作與家庭狀況（3-1）',
+          '檢查預備金的存放處：高利活存的優惠是否到期、定存是否到期（3-2）',
+          '列出所有債務的餘額與利率，確認還款順序（5-1）',
+          '算負債收入比；有機動利率貸款的，做一次壓力測試（5-2）',
+          '申請一次自己的聯徵信用報告，確認沒有錯誤（4-4）',
+          '盤點訂閱與定期扣款，取消不用的（2-2）',
+          '檢查保單與受益人是否還符合現況（第二部）',
+        ] } },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="財務檢查的頻率：每天不用看；每月看三個數字；每季更新淨值；每年做一次完整健檢">
+          ${[['每天', '不用看', 'm7'], ['每月', '三個數字（1-2）', 'm0'], ['每季', '淨值、預備金', 'm2'], ['每年', '完整健檢清單', 'm5']].map(([a, b, c], i) => `<rect x="${12 + i * 137}" y="${120 - i * 26}" width="125" height="${70 + i * 26}" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="${152 - i * 26}" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 137}" y="${176 - i * 26}" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="212" text-anchor="middle" font-size="13">看太少會失控，看太多會焦慮；固定節奏最省力</text>
+        </svg>`, caption: '每天盯帳戶或股價，只會讓情緒影響決定（第六部 投資心理）。' },
+        { type: 'heading', id: 'next', text: '接下來：第二部 風險保障' },
+        '這一卷處理的是「可預期」的錢：每個月的收支、偶發支出、債務。但有些風險預備金扛不住：重大疾病、失能、身故。這些是保險的工作，也是第二部要講的：壽險、醫療、意外、失能險各保什麼，以及為什麼「保險不等於投資」。',
+        { type: 'heading', id: 'match', text: '深入：公司提撥與「免費的錢」' },
+        '有些制度會讓「先投資」比「先還債」划算：例如雇主會依你自願提撥的金額再加碼（配合提撥）。台灣的勞工退休金個人自願提撥，可以在一定上限內從當年度個人綜合所得總額中全數扣除，有稅負上的好處；細節與上限會在第四部說明。遇到這類條件時，可以在還債的同時保留自願提撥，但高利卡債仍然要優先處理。',
+        { type: 'heading', id: 'stage', text: '深入：不同人生階段的順序微調' },
+        { type: 'table', head: ['狀況', '調整'], rows: [
+          ['收入很不穩定', '第 2 階的小預備金放大到 2–3 個月再開始加速還債'],
+          ['有家人要扶養', '第 6 階（保障）提前，至少先補足基本的壽險與醫療'],
+          ['有低利房貸、無其他債', '第 4 階不適用；直接補滿預備金、檢查保障，再開始投資'],
+          ['即將有大額支出（結婚、生產、買車）', '先為它開一個專用帳戶，不要動用預備金'],
+        ], caption: '原則不變：先止血、先建緩衝、先清最貴的債；調整的只是每一階的比重。' },
+      ],
+    },
+    mistakes: [
+      { wrong: '有卡債時就開始定期定額投資。', why: '很難穩定贏過 15% 的債務成本。', right: '先清高利債，再把同樣金額轉去投資。' },
+      { wrong: '一次想同時完成每一階。', why: '錢被分散，每一件都進展很慢。', right: '一次集中一階，上一階穩了再往上。' },
+      { wrong: '健檢只做一次就再也不看。', why: '收入、家庭、利率都會變。', right: '固定每年一次，用同一張清單。' },
+    ],
+    keypoints: [
+      '順序：現金流 → 小預備金 → 繳最低 → 高利債 → 補滿預備金 → 保障 → 投資。',
+      '還債的報酬 ＝ 債務利率；8% 以上優先還。',
+      '每月看三個數字，每年做一次健檢。',
+    ],
+    sources: ['banking-act-47-1', 'mortgage-2026', 'cfpb-savings'],
+  },
+});
+</script>

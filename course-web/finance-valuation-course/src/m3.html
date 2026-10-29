@@ -1,0 +1,356 @@
+<script>
+/* ==========================================================================
+   模組 3：估值
+   ========================================================================== */
+defineTerms({
+  '本益比': { en: 'price-to-earnings ratio', def: '股價 ÷ 每股盈餘；市場願意為每 1 元獲利付多少錢。', example: '30 ÷ 1.52 ≈ 19.7 倍。', lesson: '3-1' },
+  '盈餘殖利率': { en: 'earnings yield', def: '每股盈餘 ÷ 股價，也就是本益比的倒數；可以和債券殖利率比較。', example: '1.52 ÷ 30 ≈ 5.1%。', lesson: '3-1' },
+  '股價淨值比': { en: 'price-to-book ratio', def: '股價 ÷ 每股淨值；常用在金融、資產密集的產業。', example: '30 ÷ 9 ≈ 3.3 倍。', lesson: '3-2' },
+  '股利殖利率': { en: 'dividend yield', def: '每股現金股利 ÷ 股價。', example: '0.8 ÷ 30 ≈ 2.7%。', lesson: '3-2' },
+  'PEG': { en: 'price/earnings-to-growth', def: '本益比 ÷ 盈餘年成長率（%）；把成長納入本益比的粗略比較。', example: '本益比 20、成長 10% → PEG 2。', lesson: '3-2' },
+  '企業價值': { en: 'enterprise value', def: '市值 ＋ 負債 − 現金；買下整家公司（含它的債）實際要付的價格。', example: '300 ＋ 60 − 20 ＝ 340 億。', lesson: '3-2' },
+  '現金流折現': { en: 'discounted cash flow', def: '把公司未來每一年的自由現金流，用要求報酬率折算回今天再加總，估計公司的價值。', example: 'DCF。', lesson: '3-3' },
+  '折現率': { en: 'discount rate', def: '把未來的錢折回今天用的報酬率；通常是投資人對這項投資要求的報酬，風險越高越高。', example: '9%。', lesson: '3-3' },
+  '終值': { en: 'terminal value', def: '預測期之後所有年度的價值，通常用穩定成長的公式一次估算；常佔總價值的大部分。', example: '佔 DCF 的七成以上。', lesson: '3-3' },
+  '安全邊際': { en: 'margin of safety', def: '只在價格明顯低於估計價值時才買，用折扣保護自己不被估錯傷害；概念來自 Benjamin Graham。', example: '估計值 40 元，30 元以下才買。', lesson: '3-4' },
+  '價值陷阱': { en: 'value trap', def: '看起來很便宜（本益比低），但便宜是因為獲利即將衰退或公司有結構性問題。', example: '產業被新技術取代的公司。', lesson: '3-4' },
+});
+
+function dcfValue(fcf, growth, years, termGrowth, rate, netDebt, shares) {
+  let pv = 0; let f = fcf;
+  for (let t = 1; t <= years; t += 1) { f *= 1 + growth; pv += f / (1 + rate) ** t; }
+  const tv = (f * (1 + termGrowth)) / (rate - termGrowth);
+  const tvPv = tv / (1 + rate) ** years;
+  const ev = pv + tvPv;
+  return { ev, tvShare: tvPv / ev, perShare: (ev - netDebt) / shares };
+}
+
+defineLessons({
+  '3-1': {
+    goals: [
+      '算出本益比與盈餘殖利率',
+      '說出本益比的高低反映了什麼預期',
+      '用配息率、要求報酬與成長率推出合理本益比',
+    ],
+    analogy: {
+      text: ['買一家每年穩定賺 100 萬的店，你願意付多少？付 1,000 萬，等於 10 年回本；付 2,000 萬，等於 20 年。這個「回本年數」就是[[本益比]]的直覺：股價 ÷ 每股盈餘。', '大家願意付 20 年的價格，通常是因為相信這家店的獲利會成長；只願意付 8 年，可能是覺得它的獲利會萎縮，或風險很高。所以本益比本身不是「貴」或「便宜」，而是市場對未來的預期。'],
+      limit: ['回本年數的比喻假設獲利不變；實際上獲利會成長或衰退，而且股東不會拿到全部的盈餘（有一部分被保留再投資）。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 260" role="img" aria-label="本益比與盈餘殖利率：甲公司股價 30 元、EPS 1.52 元，本益比約 19.7 倍，盈餘殖利率約 5.1%；和 10 年期公債殖利率約 1.8% 比較，差距約 3.3 個百分點">
+        <rect x="30" y="40" width="230" height="120" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="145" y="80" text-anchor="middle" font-size="16" font-weight="900" class="on-color">本益比</text>
+        <text x="145" y="112" text-anchor="middle" font-size="22" font-weight="900" class="on-color">19.7 倍</text>
+        <text x="145" y="140" text-anchor="middle" font-size="12" class="on-color">30 ÷ 1.52</text>
+        <rect x="300" y="40" width="230" height="120" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+        <text x="415" y="80" text-anchor="middle" font-size="16" font-weight="900" class="on-color">盈餘殖利率</text>
+        <text x="415" y="112" text-anchor="middle" font-size="22" font-weight="900" class="on-color">5.1%</text>
+        <text x="415" y="140" text-anchor="middle" font-size="12" class="on-color">1.52 ÷ 30</text>
+        <text x="280" y="204" text-anchor="middle" font-size="14">對照：台灣 10 年期公債殖利率約 1.8%（2026 年 7 月）</text>
+        <text x="280" y="232" text-anchor="middle" font-size="14">股票多出的約 3.3 個百分點，是承擔風險的預期補償</text>
+      </svg>`,
+      caption: '盈餘殖利率和債券殖利率的差距常被用來粗略比較股票的相對吸引力；它不是精確的預期報酬。',
+    },
+    define: [
+      { term: '本益比', en: 'P/E', def: '股價 ÷ EPS。', example: '19.7 倍。' },
+      { term: '盈餘殖利率', en: 'earnings yield', def: 'EPS ÷ 股價。', example: '5.1%。' },
+      { term: 'EPS', en: 'EPS', def: '每股盈餘。', example: '1.52 元。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '本益比與「合理本益比」（穩定成長的簡化模型，實際計算）', sliders: [
+          { id: 'price', label: '股價', min: 1, max: 200, step: 0.5, value: 30, unit: '元' },
+          { id: 'eps', label: '近四季 EPS', min: 0.1, max: 20, step: 0.01, value: 1.52, unit: '元' },
+          { id: 'payout', label: '配息率（股利 ÷ 盈餘）', min: 0, max: 100, step: 1, value: 53, unit: '%' },
+          { id: 'r', label: '你要求的報酬率', min: 4, max: 15, step: 0.5, value: 8, unit: '%' },
+          { id: 'g', label: '長期穩定成長率', min: 0, max: 7, step: 0.5, value: 4, unit: '%' },
+        ], compute: (v) => {
+          const pe = v.price / v.eps;
+          const ok = v.r > v.g;
+          const fair = ok ? (v.payout / 100) * (1 + v.g / 100) / ((v.r - v.g) / 100) : null;
+          return { rows: [
+            { label: '目前本益比', value: `${pe.toFixed(1)} 倍`, ratio: Math.min(1, pe / 50) },
+            { label: '盈餘殖利率', value: `${((1 / pe) * 100).toFixed(2)}%`, ratio: Math.min(1, 1 / pe / 0.15) },
+            { label: '依假設的合理本益比', value: ok ? `${fair.toFixed(1)} 倍` : '成長率要低於要求報酬', ratio: ok ? Math.min(1, fair / 50) : 1 },
+            { label: '對應的合理股價', value: ok ? `${(fair * v.eps).toFixed(1)} 元` : '—', ratio: ok ? Math.min(1, fair * v.eps / 200) : 0 },
+          ], note: '預設：要求 8%、穩定成長 4%、配息率 53%，合理本益比約 13.8 倍、約 20.9 元；市場價 30 元隱含了比 4% 更高的成長預期。把成長率改成 5%：合理本益比跳到約 18.6 倍。成長假設差一點，結論差很多。' };
+        } } },
+        { type: 'heading', id: 'drivers', text: '本益比高低的三個原因' },
+        { type: 'table', head: ['本益比較高，可能因為', '本益比較低，可能因為'], rows: [
+          ['預期獲利會快速成長', '預期獲利會衰退'],
+          ['獲利很穩定、風險低', '風險高、獲利波動大'],
+          ['利率低，未來的錢折現後比較值錢（4-1）', '利率高'],
+          ['市場情緒樂觀', '市場情緒悲觀'],
+        ], caption: '「低本益比 ＝ 便宜」是最常見的誤解：它可能只是市場正確地預期獲利要下滑（3-4 的價值陷阱、4-3 的循環股）。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="本益比的分子分母：股價是市場決定的，EPS 可以用過去四季、今年預估或明年預估；用不同的 EPS 算出的本益比會差很多">
+          ${[['近四季 EPS', '已發生，最客觀', 'm2'], ['今年預估 EPS', '部分已知', 'm3'], ['明年預估 EPS', '最依賴假設', 'm4']].map(([a, b, c], i) => `<rect x="${15 + i * 182}" y="40" width="165" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${97 + i * 182}" y="92" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${97 + i * 182}" y="122" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
+          <text x="280" y="196" text-anchor="middle" font-size="13">比較本益比時，要確認用的是同一種 EPS</text>
+        </svg>`, caption: '新聞說「本益比只有 12 倍」時，常用的是明年的預估 EPS；預估錯了，本益比就不是 12 倍。' },
+        { type: 'heading', id: 'market-pe', text: '深入：整個市場的本益比' },
+        '本益比也可以用在整個市場：把指數成分股的總市值除以總盈餘。經濟學家 Robert Shiller 與 John Campbell 提出用「過去 10 年經通膨調整的平均盈餘」計算本益比（CAPE），以平滑景氣循環的影響。他們發現，CAPE 越低，之後 10 到 20 年的股市報酬傾向越高；但 Shiller 本人也提醒，它不是擇時工具，短期幾乎沒有預測力。',
+        { type: 'table', head: ['用途', '適合', '不適合'], rows: [
+          ['市場本益比（或 CAPE）', '設定長期報酬的合理期待（第四部 6-1 的提領率）', '決定這個月要不要買'],
+          ['個股本益比', '和同業、和自己的歷史比較', '跨產業直接比較'],
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '本益比低就是便宜。', why: '可能反映獲利即將衰退。', right: '同時看成長、風險與產業位置。' },
+      { wrong: '混用不同期間的 EPS 比較本益比。', why: '過去與預估的 EPS 可能差很多。', right: '確認用的是同一種 EPS。' },
+      { wrong: '忽略合理本益比對成長假設的敏感度。', why: '成長率差 1% 結論就差很多。', right: '用幾組假設看範圍，而不是單一數字。' },
+    ],
+    keypoints: [
+      '本益比 ＝ 股價 ÷ EPS；倒數是盈餘殖利率。',
+      '本益比反映成長、風險、利率與情緒。',
+      '合理本益比對成長假設非常敏感。',
+    ],
+    sources: ['tw-bond-2026', 'cape'],
+  },
+
+  '3-2': {
+    goals: [
+      '說出股價淨值比、殖利率、PEG、EV/EBITDA 的用途',
+      '依產業選擇適合的估值倍數',
+      '知道每個倍數的盲點',
+    ],
+    analogy: {
+      text: ['評估一間房子，可以看每坪單價、租金報酬率、或和附近成交價比較。每一種方法適合不同的情況：看投資房，租金報酬率最重要；看自住房，每坪單價和地段比較直觀。', '估值倍數也是：本益比適合穩定獲利的公司；[[股價淨值比]]適合資產很重要的金融業；[[股利殖利率]]適合重視現金回饋的成熟公司；[[企業價值]]倍數則能比較負債結構不同的公司。'],
+      limit: ['房價有附近的成交紀錄可以參考；倍數比較的是「市場現在怎麼定價同類公司」，如果整個產業都被高估，比較出來的「便宜」也只是相對便宜。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 280" role="img" aria-label="甲公司的四個估值倍數：股價淨值比約 3.3 倍，股利殖利率約 2.7%，PEG 約 2.0（假設成長 10%），EV/EBITDA 約 12.1 倍">
+        ${[['股價淨值比', '3.3 倍', '30 ÷ 9', 'm1'], ['股利殖利率', '2.7%', '0.8 ÷ 30', 'm2'], ['PEG', '2.0', '19.7 ÷ 10', 'm3'], ['EV/EBITDA', '12.1 倍', '340 ÷ 28', 'm4']].map(([a, b, c, col], i) => `<rect x="${12 + i * 137}" y="40" width="125" height="150" style="fill:var(--${col})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 137}" y="82" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 137}" y="122" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${b}</text><text x="${74 + i * 137}" y="156" text-anchor="middle" font-size="12" class="on-color">${c}</text>`).join('')}
+        <text x="280" y="230" text-anchor="middle" font-size="13">EV ＝ 市值 300 ＋ 負債 60 − 現金 20；EBITDA ＝ 營業利益 20 ＋ 折舊 8</text>
+        <text x="280" y="256" text-anchor="middle" font-size="12">單位：億元；PEG 假設 EPS 年成長 10%</text>
+      </svg>`,
+      caption: '同一家公司用不同倍數看，結論可能不同；重點是用適合的倍數，和同業、和自己的歷史比較。',
+    },
+    define: [
+      { term: '股價淨值比', en: 'P/B', def: '股價 ÷ 每股淨值。', example: '3.3 倍。' },
+      { term: 'PEG', en: 'PEG', def: '本益比 ÷ 成長率。', example: '2.0。' },
+      { term: '企業價值', en: 'EV', def: '市值 ＋ 負債 − 現金。', example: '340 億。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '估值倍數計算器（甲公司為預設，實際計算）', sliders: [
+          { id: 'price', label: '股價', min: 1, max: 200, step: 0.5, value: 30, unit: '元' },
+          { id: 'eps', label: 'EPS', min: 0.1, max: 20, step: 0.01, value: 1.52, unit: '元' },
+          { id: 'bvps', label: '每股淨值', min: 1, max: 100, step: 0.5, value: 9, unit: '元' },
+          { id: 'dps', label: '每股現金股利', min: 0, max: 15, step: 0.1, value: 0.8, unit: '元' },
+          { id: 'g', label: 'EPS 預期年成長', min: 1, max: 40, step: 1, value: 10, unit: '%' },
+        ], compute: (v) => {
+          const pe = v.price / v.eps;
+          return { rows: [
+            { label: '本益比', value: `${pe.toFixed(1)} 倍`, ratio: Math.min(1, pe / 50) },
+            { label: '股價淨值比', value: `${(v.price / v.bvps).toFixed(2)} 倍`, ratio: Math.min(1, v.price / v.bvps / 10) },
+            { label: '股利殖利率', value: `${((v.dps / v.price) * 100).toFixed(2)}%`, ratio: Math.min(1, v.dps / v.price / 0.1) },
+            { label: 'PEG', value: `${(pe / v.g).toFixed(2)}`, ratio: Math.min(1, pe / v.g / 4) },
+            { label: '隱含 ROE（淨值比 ÷ 本益比）', value: `${((v.eps / v.bvps) * 100).toFixed(1)}%`, ratio: Math.min(1, v.eps / v.bvps / 0.4) },
+          ], note: '股價淨值比 ÷ 本益比 ＝ EPS ÷ 每股淨值 ＝ ROE。所以高 ROE 的公司，自然會有較高的股價淨值比；比較淨值比時，要一起看 ROE（2-1）。' };
+        } } },
+        { type: 'heading', id: 'which', text: '哪一種倍數適合哪一種公司' },
+        { type: 'table', head: ['倍數', '適合', '盲點'], rows: [
+          ['本益比', '獲利穩定的公司', '虧損或循環高峰時失真'],
+          ['股價淨值比', '銀行、保險、資產密集產業', '無形資產多的公司（軟體、品牌）淨值很低'],
+          ['股利殖利率', '成熟、穩定配息的公司', '股價大跌會讓殖利率「看起來」很高；配息不一定持續'],
+          ['PEG', '成長型公司', '成長率是預估，錯一點結論就差很多'],
+          ['EV/EBITDA', '比較負債結構不同的公司', '忽略資本支出，資本密集的公司會看起來太便宜'],
+          ['股價營收比', '還沒獲利的成長公司', '完全不看獲利能力'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="高殖利率的兩種可能：一是股利穩定、股價合理；二是股價因為壞消息大跌，殖利率被動變高，但股利可能即將減少">
+          <rect x="30" y="40" width="240" height="140" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="150" y="80" text-anchor="middle" font-size="15" font-weight="900" class="on-color">殖利率 6%：好的情況</text>
+          <text x="150" y="112" text-anchor="middle" font-size="12" class="on-color">獲利穩定、配息率合理</text>
+          <text x="150" y="138" text-anchor="middle" font-size="12" class="on-color">自由現金流足以支應</text>
+          <rect x="290" y="40" width="240" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="410" y="80" text-anchor="middle" font-size="15" font-weight="900" class="on-color">殖利率 6%：陷阱</text>
+          <text x="410" y="112" text-anchor="middle" font-size="12" class="on-color">股價因壞消息大跌</text>
+          <text x="410" y="138" text-anchor="middle" font-size="12" class="on-color">去年的股利，今年可能發不出</text>
+        </svg>`, caption: '殖利率用的是「過去」的股利與「現在」的價格；要問的是未來的股利能不能維持（1-3 的股利 ÷ 自由現金流）。' },
+        { type: 'heading', id: 'history', text: '深入：和自己的歷史比較' },
+        '除了和同業比較，另一個常用的方法是和公司自己的歷史比較：例如過去十年本益比大多在 12 到 20 倍之間，現在 25 倍，代表市場目前比平常樂觀。這個方法有一個前提：公司的本質沒有改變。如果公司已經從成熟期進入新的成長期（或反過來），歷史區間就不再適用。',
+        { type: 'list', items: [
+          '**區間比單點重要**：看過去的高、低與中位數，而不是只看平均。',
+          '**注意結構性改變**：產業轉型、商業模式改變、利率環境大幅變化，都會讓歷史區間失效。',
+          '**搭配基本面**：本益比在區間低點，但獲利正在下滑，可能只是價值陷阱（3-4）。',
+        ] },
+      ],
+    },
+    mistakes: [
+      { wrong: '所有公司都用本益比。', why: '虧損、循環、金融業的本益比會失真。', right: '依產業選適合的倍數。' },
+      { wrong: '只看殖利率高低。', why: '股價大跌也會讓殖利率變高。', right: '確認股利能否持續。' },
+      { wrong: '用 EV/EBITDA 比較資本密集的公司。', why: '它忽略了大量的資本支出。', right: '搭配自由現金流看。' },
+    ],
+    keypoints: [
+      '依產業選倍數：金融看淨值比、成熟看殖利率、成長看 PEG。',
+      '股價淨值比 ÷ 本益比 ＝ ROE。',
+      '每一種倍數都有盲點，要搭配現金流與同業比較。',
+    ],
+    sources: ['mops', 'cape'],
+  },
+
+  '3-3': {
+    goals: [
+      '說出現金流折現的四個輸入',
+      '動手做一次簡化的 DCF',
+      '理解為什麼終值與折現率主導結果',
+    ],
+    analogy: {
+      text: ['一棵果樹值多少錢？不是看它現在多高，而是看它未來每年能結多少果子，再把未來的收成折算回今天的價值（第三部 1-2 的現值）。[[現金流折現]]就是用同樣的邏輯估計一家公司的價值：未來每一年的自由現金流，用[[折現率]]折回今天，再加總。', '它是理論上最完整的估值方法，因為股東最終拿到的就是公司產生的現金。但它的問題也很明顯：未來十年、二十年的現金流，誰也算不準。'],
+      limit: ['果樹的收成相對穩定；公司的現金流受競爭、技術、景氣影響很大。所以 DCF 的價值不在「算出一個正確答案」，而在讓你看清楚：現在的股價隱含了什麼樣的假設。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="現金流折現的結構：未來五年每年的自由現金流各自折現加總，加上第五年之後所有年度的終值折現；甲公司的例子中，終值佔總價值約七成四">
+        ${[1, 2, 3, 4, 5].map((t) => { const f = 10.2 * 1.08 ** t; const pv = f / 1.09 ** t; return `<rect x="${30 + (t - 1) * 70}" y="${200 - f * 6}" width="50" height="${f * 6}" style="fill:var(--m1)" class="stroke-ink" stroke-width="2"/><rect x="${30 + (t - 1) * 70 + 10}" y="${200 - pv * 6}" width="30" height="${pv * 6}" style="fill:var(--m2)" class="stroke-ink" stroke-width="2"/><text x="${55 + (t - 1) * 70}" y="220" text-anchor="middle" font-size="12">第 ${t} 年</text>`; }).join('')}
+        <rect x="400" y="40" width="130" height="160" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+        <text x="465" y="110" text-anchor="middle" font-size="15" font-weight="900" class="on-color">終值折現</text>
+        <text x="465" y="136" text-anchor="middle" font-size="13" class="on-color">約佔 74%</text>
+        <text x="200" y="40" text-anchor="middle" font-size="12" font-weight="900">淺色：未來的現金流　深色：折回今天</text>
+        <text x="280" y="254" text-anchor="middle" font-size="13">自由現金流 10.2 億、前 5 年成長 8%、之後 2%、折現率 9%</text>
+      </svg>`,
+      caption: '前五年的現金流只佔總價值約四分之一；大部分價值來自「五年之後」，也是最不確定的部分。',
+    },
+    define: [
+      { term: '現金流折現', en: 'DCF', def: '未來現金流折回今天加總。', example: '每股約 15 元。' },
+      { term: '折現率', en: 'discount rate', def: '要求的報酬率。', example: '9%。' },
+      { term: '終值', en: 'terminal value', def: '預測期之後的價值。', example: '約佔 74%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '簡化 DCF（兩階段成長，單位：億元，實際計算）', sliders: [
+          { id: 'fcf', label: '目前的自由現金流', min: 1, max: 100, step: 0.5, value: 10.2 },
+          { id: 'g', label: '前 5 年每年成長', min: -10, max: 30, step: 1, value: 8, unit: '%' },
+          { id: 'tg', label: '之後的永續成長', min: 0, max: 4, step: 0.5, value: 2, unit: '%' },
+          { id: 'r', label: '折現率', min: 5, max: 15, step: 0.5, value: 9, unit: '%' },
+          { id: 'netDebt', label: '淨負債（負債 − 現金）', min: -100, max: 200, step: 5, value: 40 },
+          { id: 'shares', label: '股數（億股）', min: 1, max: 50, step: 0.5, value: 10 },
+        ], compute: (v) => {
+          if (v.r <= v.tg) return { rows: [{ label: '設定有誤', value: '折現率要大於永續成長', ratio: 1 }], note: '' };
+          const d = dcfValue(v.fcf, v.g / 100, 5, v.tg / 100, v.r / 100, v.netDebt, v.shares);
+          return { rows: [
+            { label: '企業價值', value: `${d.ev.toFixed(1)} 億`, ratio: Math.min(1, d.ev / 1000) },
+            { label: '終值佔的比例', value: `${(d.tvShare * 100).toFixed(0)}%`, ratio: d.tvShare },
+            { label: '每股價值', value: `${d.perShare.toFixed(1)} 元`, ratio: Math.min(1, Math.max(0, d.perShare) / 100) },
+            { label: '和股價 30 元比較', value: `${(((d.perShare / 30) - 1) * 100).toFixed(0)}%`, ratio: Math.min(1, Math.abs(d.perShare / 30 - 1)) },
+          ], note: '預設：每股約 15.2 元，終值佔約 74%，比股價 30 元低一半。這不代表股價一定錯：可能市場預期前 5 年成長遠高於 8%。試著找出「讓每股價值等於 30 元」需要的成長率，就知道股價隱含了什麼預期。' };
+        } } },
+        { type: 'heading', id: 'sensitivity', text: '敏感度：小改假設，結果大變' },
+        { type: 'table', head: ['折現率 ＼ 永續成長', '1%', '2%', '3%'], rows: [
+          ['8%', '15.8', '18.4', '22.1'],
+          ['9%', '13.3', '15.2', '17.7'],
+          ['10%', '11.3', '12.7', '14.5'],
+        ], caption: '甲公司的每股價值（元），其他假設不變。折現率與永續成長各改 1 個百分點，結果從 11 元到 22 元，差了一倍。這就是為什麼 DCF 要看範圍，不看單一數字。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="DCF 的正確用法：不是算出一個目標價，而是反推現在的股價隱含了多高的成長，再判斷這個預期合不合理">
+          <rect x="30" y="40" width="230" height="130" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="84" text-anchor="middle" font-size="15" font-weight="900" class="on-color">容易誤用</text>
+          <text x="145" y="116" text-anchor="middle" font-size="12" class="on-color">調假設直到算出想要的目標價</text>
+          <rect x="300" y="40" width="230" height="130" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="84" text-anchor="middle" font-size="15" font-weight="900" class="on-color">比較好的用法</text>
+          <text x="415" y="116" text-anchor="middle" font-size="12" class="on-color">反推股價隱含的成長率</text>
+          <text x="415" y="138" text-anchor="middle" font-size="12" class="on-color">再問：這個預期合理嗎？</text>
+        </svg>`, caption: '反推的好處是：你不需要假裝自己能準確預測未來，只需要判斷市場的預期是否過度樂觀或悲觀。' },
+        { type: 'heading', id: 'reverse', text: '深入：反推隱含成長率的做法' },
+        { type: 'list', ordered: true, items: [
+          '固定折現率（例如 9%）與永續成長（例如 2%）。',
+          '調整前 5 年的成長率，直到每股價值等於目前的股價。',
+          '得到的成長率，就是「市場價格隱含的成長預期」。',
+          '問自己：這家公司過去的成長率是多少？產業的成長空間有多大？這個預期合理、保守還是過度樂觀？',
+        ] },
+        '以甲公司為例，用上面的試算器把成長率往上調，大約要每年 22%–23% 的成長，每股價值才會接近 30 元。如果甲公司過去五年的自由現金流每年只成長 5% 左右，那麼 30 元的價格就隱含了相當樂觀的預期。這個判斷不需要你預測未來，只需要比較「市場的預期」和「公司的過去與產業的現實」。',
+      ],
+    },
+    mistakes: [
+      { wrong: '把 DCF 算出的單一數字當成目標價。', why: '假設稍微改變，結果就差很多。', right: '用多組假設看範圍。' },
+      { wrong: '永續成長率設得很高。', why: '長期不可能高於整體經濟成長。', right: '永續成長通常設在 0%–3%。' },
+      { wrong: '用淨利代替自由現金流。', why: '忽略了資本支出與營運資金。', right: '用自由現金流。' },
+    ],
+    keypoints: [
+      'DCF ＝ 未來自由現金流折回今天加總。',
+      '終值常佔七成以上，折現率與永續成長主導結果。',
+      '最好的用法：反推股價隱含的成長預期。',
+    ],
+    sources: ['mops', 'fsc-moneywise'],
+  },
+
+  '3-4': {
+    goals: [
+      '說出安全邊際的意義與用法',
+      '辨認常見的估值陷阱',
+      '把估值變成一個可執行的買進規則',
+    ],
+    analogy: {
+      text: ['工程師設計一座橋，如果預期最大載重是 10 噸，會設計成能承受 30 噸。多出來的不是浪費，而是為了應付計算錯誤、材料瑕疵、意外的狀況。Benjamin Graham 把這個概念用在投資上，稱為[[安全邊際]]。', '估值永遠會有誤差（上一課的敏感度表）。安全邊際的做法是：只在價格明顯低於你估計的價值時才買，讓估錯的時候仍有緩衝。'],
+      limit: ['橋的載重可以用物理計算；公司的價值是估計值，安全邊際能降低估錯的傷害，但不能保證一定不會虧損，尤其是遇到[[價值陷阱]]時。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 250" role="img" aria-label="安全邊際：估計價值的區間是 12 到 22 元，中間值約 15 元；要求 30% 的安全邊際，買進價約 10.6 元以下；目前股價 30 元，遠高於估計區間">
+        <line x1="40" y1="130" x2="520" y2="130" class="stroke-ink" stroke-width="3"/>
+        ${[0, 10, 20, 30, 40].map((p) => `<line x1="${40 + p * 12}" y1="122" x2="${40 + p * 12}" y2="138" class="stroke-ink" stroke-width="2"/><text x="${40 + p * 12}" y="158" text-anchor="middle" font-size="12" class="mono">${p}</text>`).join('')}
+        <rect x="${40 + 12 * 12}" y="90" width="${10 * 12}" height="30" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="${40 + 17 * 12}" y="80" text-anchor="middle" font-size="13" font-weight="900">估計價值 12–22 元</text>
+        <circle cx="${40 + 10.6 * 12}" cy="130" r="9" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="${40 + 10.6 * 12}" y="190" text-anchor="middle" font-size="13" font-weight="900">買進價 ≈ 10.6</text>
+        <circle cx="${40 + 30 * 12}" cy="130" r="9" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="${40 + 30 * 12}" y="190" text-anchor="middle" font-size="13" font-weight="900">股價 30</text>
+        <text x="280" y="232" text-anchor="middle" font-size="13">中間值 15.2 元 × (1 − 30%) ≈ 10.6 元</text>
+      </svg>`,
+      caption: '甲公司的估計區間來自上一課的敏感度表。照這個規則，目前的股價不符合買進條件。',
+    },
+    define: [
+      { term: '安全邊際', en: 'margin of safety', def: '價格低於價值的折扣。', example: '30%。' },
+      { term: '價值陷阱', en: 'value trap', def: '因為會變差而便宜。', example: '被取代的產業。' },
+      { term: '估值', en: 'valuation', def: '估計值多少錢。', example: '12–22 元。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '把估值變成買進規則（實際計算）', sliders: [
+          { id: 'low', label: '估計價值：保守', min: 1, max: 200, step: 0.5, value: 12, unit: '元' },
+          { id: 'mid', label: '估計價值：中間', min: 1, max: 200, step: 0.5, value: 15.2, unit: '元' },
+          { id: 'high', label: '估計價值：樂觀', min: 1, max: 300, step: 0.5, value: 22, unit: '元' },
+          { id: 'mos', label: '要求的安全邊際', min: 0, max: 60, step: 5, value: 30, unit: '%' },
+          { id: 'price', label: '目前股價', min: 1, max: 300, step: 0.5, value: 30, unit: '元' },
+        ], compute: (v) => {
+          const buy = v.mid * (1 - v.mos / 100);
+          const verdict = v.price <= buy ? '符合買進條件' : v.price <= v.mid ? '低於中間值，但安全邊際不足' : v.price <= v.high ? '高於中間值，只在樂觀假設下合理' : '高於樂觀估計';
+          return { rows: [
+            { label: '買進價上限', value: `${buy.toFixed(1)} 元`, ratio: Math.min(1, buy / 300) },
+            { label: '目前股價相對中間值', value: `${(((v.price / v.mid) - 1) * 100).toFixed(0)}%`, ratio: Math.min(1, Math.abs(v.price / v.mid - 1)) },
+            { label: '判斷', value: verdict, ratio: Math.min(1, v.price / Math.max(1, v.high)) },
+          ], note: '安全邊際要多大，取決於你對估計有多大把握：產業穩定、你很熟悉的公司可以小一點；變化快、你不熟的公司要大一點。' };
+        } } },
+        { type: 'heading', id: 'traps', text: '常見的估值陷阱' },
+        { type: 'table', head: ['陷阱', '為什麼危險'], rows: [
+          ['價值陷阱：便宜是因為會變差', '產業被取代、競爭加劇，未來獲利會持續下滑'],
+          ['用高峰的獲利估值', '循環股在高峰時本益比最低，看起來最便宜（4-3）'],
+          ['一次性收益灌高 EPS', '業外收入不會重複出現（1-1）'],
+          ['忽略稀釋', '大量發行新股、可轉債、員工認股，每股價值被攤薄'],
+          ['錨定在過去的高價', '「以前 100 元，現在 50 元很便宜」，但基本面可能已經改變'],
+          ['相對估值的陷阱', '和同業比較便宜，但整個產業可能都被高估'],
+        ] },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="估值與時間：即使估得對，市場也可能很久才反映；便宜的可能更便宜，貴的可能更貴；所以估值要搭配持有的耐心與部位上限">
+          <line x1="60" y1="180" x2="530" y2="180" class="stroke-ink" stroke-width="2"/>
+          <line x1="60" y1="90" x2="530" y2="90" style="stroke:var(--m2)" stroke-width="3" stroke-dasharray="8 5"/><text x="525" y="82" text-anchor="end" font-size="13" font-weight="900">估計價值</text>
+          <path d="M60 140 L120 155 L180 150 L240 165 L300 140 L360 120 L420 100 L480 92 L530 88" fill="none" style="stroke:var(--m4)" stroke-width="4"/>
+          <text x="200" y="200" text-anchor="middle" font-size="12">買進後可能先跌</text>
+          <text x="440" y="130" text-anchor="middle" font-size="12">很久之後才接近價值</text>
+        </svg>`, caption: '示意圖。估得對不代表馬上會對；這也是個股部位要有上限的原因（5-1）。' },
+        { type: 'heading', id: 'graham', text: '深入：安全邊際的三個來源' },
+        { type: 'table', head: ['來源', '說明'], rows: [
+          ['價格', '用明顯低於估計價值的價格買進，這是最直接的安全邊際'],
+          ['資產負債表', '低負債、充足現金的公司，遇到壞年份比較撐得住'],
+          ['商業模式', '有定價能力、客戶黏著度高的公司，獲利比較不容易大幅下滑'],
+        ], caption: '只有價格便宜、但負債很高或商業模式脆弱的公司，便宜可能只是陷阱；三個來源同時存在時，安全邊際最可靠。' },
+        '安全邊際也有代價：要求越高，能買到的機會越少，錢可能長時間放在現金或指數裡。這不是壞事；對多數人來說，「找不到符合條件的個股時就留在指數」，本身就是很好的預設行為。',
+      ],
+    },
+    mistakes: [
+      { wrong: '估出價值就馬上買。', why: '估值有誤差，沒有緩衝。', right: '要求安全邊際。' },
+      { wrong: '只因為跌很多就認為便宜。', why: '基本面可能已經改變。', right: '重新估值，不看過去的價格。' },
+      { wrong: '估得對就期待股價很快反映。', why: '市場可能很久才修正。', right: '設定部位上限，保有耐心。' },
+    ],
+    keypoints: [
+      '安全邊際：價格明顯低於估計價值才買。',
+      '小心價值陷阱、高峰獲利、一次性收益與稀釋。',
+      '估得對也可能很久才反映，部位要有上限。',
+    ],
+    sources: ['cape', 'mops'],
+  },
+});
+</script>

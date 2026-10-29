@@ -1,0 +1,190 @@
+<script>
+/* ==========================================================================
+   模組 6：主動 vs 被動
+   ========================================================================== */
+defineTerms({
+  '主動管理': { en: 'active management', def: '試圖透過選股、擇時，取得比市場更好的報酬；通常費用較高、交易較頻繁。', example: '主動型股票基金。', lesson: '6-1' },
+  '被動管理': { en: 'passive management', def: '不嘗試打敗市場，而是用低成本持有整個市場（追蹤指數）。', example: '指數型 ETF。', lesson: '6-1' },
+  'ETF': { en: 'exchange-traded fund', def: '在證券交易所掛牌、可以像股票一樣買賣的基金；很多 ETF 追蹤特定指數。', example: '追蹤台灣 50 指數的 ETF。', lesson: '6-2' },
+  '內扣費用': { en: 'expense ratio', def: '基金每年從資產中直接扣除的費用（經理費、保管費等），反映在淨值裡，不會另外寄帳單。', example: '0.1% 到 2% 不等。', lesson: '6-2' },
+  '追蹤誤差': { en: 'tracking error', def: '指數型基金的報酬和它追蹤的指數之間的差距；費用、現金部位、交易成本都會造成。', example: '指數漲 10%，ETF 漲 9.8%。', lesson: '6-2' },
+});
+
+defineLessons({
+  '6-1': {
+    goals: [
+      '用 Sharpe 的算術說明主動投資的平均結果',
+      '讀懂長期的主動基金績效數據',
+      '說出主動投資在什麼情況下可能有價值',
+    ],
+    analogy: {
+      text: ['一場考試全班平均 70 分。如果班上一半同學靠補習（要付學費），另一半自己讀，而全班平均仍然是 70 分，那麼扣掉學費之後，補習那一半的「淨成績」平均一定比較差。', '經濟學家 William Sharpe 在 1991 年用這個邏輯說明：在扣除成本之前，[[主動管理]]的平均報酬必然等於市場報酬（因為主動投資人加總起來就是市場的一部分）；扣除較高的成本之後，主動投資的平均就一定落後[[被動管理]]。'],
+      limit: ['考試分數不會因為補習的人變多而改變分布；市場裡主動投資人的行為會影響價格。後來的研究（例如 Pedersen 2018）指出這個算術有一些隱含假設，但它對「平均而言」的結論仍被廣泛接受。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="Sharpe 的算術：市場報酬等於主動投資人平均報酬與被動投資人報酬的加權平均；扣成本前兩者相等；主動的成本較高，所以扣成本後主動的平均較低">
+        <rect x="40" y="30" width="480" height="60" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/><text x="280" y="66" text-anchor="middle" font-size="16" font-weight="900" class="on-color">市場報酬（例如 8%）</text>
+        <rect x="40" y="110" width="230" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="155" y="138" text-anchor="middle" font-size="14" font-weight="900" class="on-color">主動：扣成本前 8%</text><text x="155" y="158" text-anchor="middle" font-size="12" class="on-color">（平均）</text>
+        <rect x="290" y="110" width="230" height="60" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="405" y="138" text-anchor="middle" font-size="14" font-weight="900" class="on-color">被動：扣成本前 8%</text><text x="405" y="158" text-anchor="middle" font-size="12" class="on-color">（就是市場）</text>
+        <rect x="40" y="190" width="230" height="50" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/><text x="155" y="221" text-anchor="middle" font-size="14" font-weight="900" class="on-color">− 成本 1.5% ＝ 6.5%</text>
+        <rect x="290" y="190" width="230" height="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="405" y="221" text-anchor="middle" font-size="14" font-weight="900" class="on-color">− 成本 0.2% ＝ 7.8%</text>
+      </svg>`,
+      caption: '數字是示意。這個結論說的是「平均」：個別的主動基金可以贏，但事先挑出哪些會贏非常困難。',
+    },
+    define: [
+      { term: '主動管理', en: 'active', def: '試圖打敗市場。', example: '選股、擇時。' },
+      { term: '被動管理', en: 'passive', def: '低成本持有市場。', example: '指數 ETF。' },
+      { term: '內扣費用', en: 'expense ratio', def: '每年從資產中扣的費用。', example: '0.1%–2%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: 'Sharpe 的算術（實際計算）', sliders: [
+          { id: 'mkt', label: '市場報酬（扣成本前）', min: -20, max: 30, step: 0.5, value: 8, unit: '%' },
+          { id: 'activeCost', label: '主動投資的平均成本（費用＋交易）', min: 0, max: 4, step: 0.1, value: 1.5, unit: '%' },
+          { id: 'passiveCost', label: '被動投資的成本', min: 0, max: 1, step: 0.05, value: 0.2, unit: '%' },
+          { id: 'years', label: '年數', min: 1, max: 40, step: 1, value: 20, unit: '年' },
+        ], compute: (v) => {
+          const a = v.mkt - v.activeCost; const p = v.mkt - v.passiveCost;
+          const aEnd = (1 + a / 100) ** v.years; const pEnd = (1 + p / 100) ** v.years;
+          return { rows: [
+            { label: '主動的平均淨報酬', value: `${a.toFixed(2)}%／年`, ratio: Math.min(1, Math.max(0, a) / 30) },
+            { label: '被動的淨報酬', value: `${p.toFixed(2)}%／年`, ratio: Math.min(1, Math.max(0, p) / 30) },
+            { label: `${v.years} 年後 100 萬變成（主動平均）`, value: `${Math.round(aEnd * 1e6).toLocaleString()} 元`, ratio: Math.min(1, aEnd / Math.max(aEnd, pEnd)) },
+            { label: `${v.years} 年後 100 萬變成（被動）`, value: `${Math.round(pEnd * 1e6).toLocaleString()} 元`, ratio: Math.min(1, pEnd / Math.max(aEnd, pEnd)) },
+          ], note: '不論市場漲跌，平均的主動投資人都落後成本差那麼多。20 年下來，每年 1.3% 的成本差，讓 100 萬的結果相差約 97 萬。' };
+        } } },
+        { type: 'heading', id: 'spiva', text: '長期數據：多數主動基金落後' },
+        'S&P Dow Jones Indices 每年發布 SPIVA 報告，比較主動基金與對應指數。2025 年的美國報告顯示，79% 的主動型大型股基金當年落後 S&P 500。期間拉長，落後的比例更高：第三方引用同一份報告的長期數據，10 年約 86%、15 年約 90%、20 年約 93%。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 240" role="img" aria-label="美國大型股主動基金落後 S&P 500 的比例：1 年 79%，10 年約 86%，15 年約 90%，20 年約 93%；期間越長，落後比例越高">
+          <line x1="60" y1="200" x2="530" y2="200" class="stroke-ink" stroke-width="2"/>
+          ${[['1 年', 79], ['10 年', 85.6], ['15 年', 89.9], ['20 年', 92.9]].map(([t, p], i) => `<rect x="${80 + i * 115}" y="${200 - p * 1.8}" width="80" height="${p * 1.8}" style="fill:var(--m${i + 1})" class="stroke-ink" stroke-width="3"/><text x="${120 + i * 115}" y="${192 - p * 1.8}" text-anchor="middle" font-size="14" font-weight="900">${p}%</text><text x="${120 + i * 115}" y="222" text-anchor="middle" font-size="13">${t}</text>`).join('')}
+          <text x="295" y="22" text-anchor="middle" font-size="14" font-weight="900">落後 S&amp;P 500 的主動大型股基金比例（截至 2025 年底）</text>
+        </svg>`, caption: '1 年數字來自 SPIVA 2025 年報告（媒體引用），10–20 年為第三方整理同一份報告的數據；美國以外的市場結果不完全相同，但長期多數落後的模式相當普遍。' },
+        { type: 'heading', id: 'persistence', text: '為什麼不挑「過去的贏家」就好' },
+        '直覺的做法是：找過去績效最好的基金。問題在於績效的持續性很低，過去幾年的前段班，之後幾年常常回到平均或落後；SPIVA 也另外發布「持續性報告」追蹤這件事。加上主動基金的費用與交易成本是確定的，而超額報酬是不確定的，長期下來成本的影響會越來越明顯。',
+        { type: 'table', head: ['主動投資可能有價值的情況', '原因'], rows: [
+          ['市場效率較低的領域', '資訊較少、研究覆蓋較少，專業分析可能有優勢'],
+          ['費用夠低的主動策略', '成本差距小，算術上的劣勢也小'],
+          ['你明確知道自己在做什麼、願意承擔落後', '例如作為核心指數部位之外的一小部分'],
+        ], caption: '即使在這些情況，也要事先決定比重與評估標準，而不是因為「最近表現很好」才加碼（第六部的追高心理）。' },
+        { type: 'heading', id: 'index-rules', text: '深入：指數本身也有規則' },
+        '「被動」不代表沒有選擇：每個指數都有編製規則，決定納入哪些公司、各佔多少權重、多久調整一次。最常見的是市值加權（公司越大權重越高），它的好處是不需要頻繁交易、反映市場整體的看法；缺點是少數大公司權重很高時，指數本身會變得集中。',
+        { type: 'table', head: ['加權方式', '特性'], rows: [
+          ['市值加權', '最接近「整個市場」，交易成本低；大公司權重高'],
+          ['等權重', '小公司權重相對提高，需要較頻繁的調整'],
+          ['股利或因子加權', '依股利、價值、動能等規則選股，本質上帶有主動的判斷'],
+        ], caption: '選擇非市值加權的指數，等於做了一個主動的選擇；這可以，但要知道自己選了什麼、為什麼。' },
+        { type: 'heading', id: 'skill-luck', text: '深入：運氣與實力很難分開' },
+        '一檔基金連續三年贏過市場，可能是實力，也可能是運氣。在上千檔基金裡，光靠運氣就會有一部分連續贏好幾年。統計上要區分兩者，通常需要非常長的績效紀錄，而那時候經理人可能已經換人、規模也變了。這是「事先挑出贏家」很困難的根本原因。',
+      ],
+    },
+    mistakes: [
+      { wrong: '以為付較高的費用就能買到較好的報酬。', why: '平均而言，費用越高淨報酬越低。', right: '把費用當作確定的負報酬。' },
+      { wrong: '挑過去一年績效最好的基金。', why: '績效持續性很低。', right: '看成本、看策略，不追逐近期績效。' },
+      { wrong: '把「打敗市場」當作投資的目標。', why: '目標是達成你自己的財務目標。', right: '用低成本拿到市場報酬，專心在儲蓄率與配置。' },
+    ],
+    keypoints: [
+      '扣成本前主動平均等於市場，扣成本後一定落後。',
+      '期間越長，落後市場的主動基金比例越高。',
+      '過去的贏家不一定是未來的贏家。',
+    ],
+    sources: ['sharpe-1991', 'spiva-2025', 'spiva-longrun'],
+  },
+
+  '6-2': {
+    goals: [
+      '算出內扣費用在長期造成的差距',
+      '說出挑選指數型 ETF 要看的五件事',
+      '知道指數化投資的限制與常見誤解',
+    ],
+    analogy: {
+      text: ['指數化投資像是買下整座果園，而不是每年猜哪一棵樹會結最多果子。你拿到的是整座果園的平均收成，不會是最好的那一棵，也不會是最差的那一棵。', '既然拿的是平均，剩下唯一能控制、而且影響很大的，就是「管理果園的費用」：[[內扣費用]]每年只差 1%，三十年下來，收成的差距可能超過三分之一。'],
+      limit: ['整座果園也可能遇到天災（市場大跌）；指數化投資消除的是挑錯樹的風險，不是整體的市場風險。'],
+    },
+    model: {
+      svg: `<svg viewBox="0 0 560 270" role="img" aria-label="100 萬元、市場年報酬 6%、30 年，不同內扣費用的結果：費用 0.2% 約 543 萬，費用 1.5% 約 375 萬，差距約 168 萬">
+        <line x1="60" y1="230" x2="530" y2="230" class="stroke-ink" stroke-width="2"/><line x1="60" y1="20" x2="60" y2="230" class="stroke-ink" stroke-width="2"/>
+        <path d="${Array.from({ length: 31 }, (_, y) => `${y ? 'L' : 'M'}${(60 + y * 15.5).toFixed(1)} ${(230 - 1.058 ** y * 36).toFixed(1)}`).join(' ')}" fill="none" style="stroke:var(--m2)" stroke-width="4"/>
+        <path d="${Array.from({ length: 31 }, (_, y) => `${y ? 'L' : 'M'}${(60 + y * 15.5).toFixed(1)} ${(230 - 1.045 ** y * 36).toFixed(1)}`).join(' ')}" fill="none" style="stroke:var(--m4)" stroke-width="4"/>
+        <text x="520" y="${(230 - 5.43 * 36 - 8).toFixed(0)}" text-anchor="end" font-size="13" font-weight="900">費用 0.2%：約 543 萬</text>
+        <text x="520" y="${(230 - 3.75 * 36 + 20).toFixed(0)}" text-anchor="end" font-size="13" font-weight="900">費用 1.5%：約 375 萬</text>
+        <text x="295" y="254" text-anchor="middle" font-size="13">年 →（0 到 30 年），市場年報酬 6%</text>
+      </svg>`,
+      caption: '費用是每年從資產裡扣，所以它也會複利：差 1.3% 看起來很小，30 年後的差距是約 168 萬。',
+    },
+    define: [
+      { term: 'ETF', en: 'ETF', def: '可以在交易所買賣的基金。', example: '追蹤指數。' },
+      { term: '內扣費用', en: 'expense ratio', def: '每年從資產扣除的費用。', example: '0.2%。' },
+      { term: '追蹤誤差', en: 'tracking error', def: '和指數報酬的差距。', example: '−0.2%。' },
+    ],
+    examples: {
+      blocks: [
+        { type: 'widget', name: 'knobs', props: { title: '費用的長期影響（實際計算）', sliders: [
+          { id: 'amt', label: '投入金額', min: 100000, max: 20000000, step: 100000, value: 1000000, unit: '元' },
+          { id: 'r', label: '市場年報酬（扣費用前）', min: 0, max: 12, step: 0.5, value: 6, unit: '%' },
+          { id: 'feeA', label: '低成本：內扣費用', min: 0, max: 1, step: 0.05, value: 0.2, unit: '%' },
+          { id: 'feeB', label: '高成本：內扣費用', min: 0, max: 3, step: 0.1, value: 1.5, unit: '%' },
+          { id: 'years', label: '年數', min: 1, max: 50, step: 1, value: 30, unit: '年' },
+        ], compute: (v) => {
+          const a = v.amt * (1 + (v.r - v.feeA) / 100) ** v.years;
+          const b = v.amt * (1 + (v.r - v.feeB) / 100) ** v.years;
+          const gross = v.amt * (1 + v.r / 100) ** v.years;
+          return { rows: [
+            { label: '沒有任何費用', value: `${Math.round(gross).toLocaleString()} 元`, ratio: 1 },
+            { label: '低成本', value: `${Math.round(a).toLocaleString()} 元`, ratio: a / gross },
+            { label: '高成本', value: `${Math.round(b).toLocaleString()} 元`, ratio: b / gross },
+            { label: '高成本少拿的比例', value: `${((1 - b / a) * 100).toFixed(1)}%`, ratio: 1 - b / a },
+          ], note: '預設：100 萬、6%、30 年。低成本約 543 萬、高成本約 375 萬，高成本少了約 31%。費用越高、時間越長，差距越大。' };
+        } } },
+        { type: 'heading', id: 'choose', text: '挑選指數型 ETF 的五件事' },
+        { type: 'table', head: ['看什麼', '為什麼', '注意'], rows: [
+          ['追蹤的指數', '決定你持有什麼（哪些國家、產業、多少公司）', '「高股息」「主題型」指數的分散程度與規則差很多'],
+          ['總費用率', '每年確定的負報酬', '看年報或公開說明書的「總費用率」，不只看經理費'],
+          ['追蹤誤差', '實際報酬和指數差多少', '長期穩定地小，代表管理得好'],
+          ['規模與成交量', '規模太小可能下市，成交量太小買賣價差大', '用限價單交易'],
+          ['配息與稅', '配息會產生稅與二代健保（第四部）', '累積型與配息型在台灣的選擇有限'],
+        ], caption: '以 0050 為例，2025 年 1 月起改採依規模分級的費率，依當時規模估算經理費約 0.11%、保管費約 0.03%；同類型 ETF 的費用差異可以很大，實際以公開說明書與年報為準。這裡只是舉例，不是推薦。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="投資一檔 ETF 的成本：一次性的成本是買賣手續費與賣出時的證交稅；持續的成本是每年的內扣費用；長期持有時，內扣費用的影響最大">
+          <rect x="20" y="30" width="250" height="160" style="fill:var(--m1)" class="stroke-ink" stroke-width="3"/>
+          <text x="145" y="64" text-anchor="middle" font-size="16" font-weight="900" class="on-color">一次性成本</text>
+          <text x="145" y="98" text-anchor="middle" font-size="13" class="on-color">買賣手續費（上限 0.1425%）</text>
+          <text x="145" y="126" text-anchor="middle" font-size="13" class="on-color">賣出證交稅：股票型 ETF 0.1%</text>
+          <text x="145" y="160" text-anchor="middle" font-size="12" class="on-color">交易越頻繁越高</text>
+          <rect x="290" y="30" width="250" height="160" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
+          <text x="415" y="64" text-anchor="middle" font-size="16" font-weight="900" class="on-color">持續成本</text>
+          <text x="415" y="98" text-anchor="middle" font-size="13" class="on-color">內扣費用（每年）</text>
+          <text x="415" y="126" text-anchor="middle" font-size="13" class="on-color">追蹤誤差</text>
+          <text x="415" y="160" text-anchor="middle" font-size="12" class="on-color">持有越久影響越大</text>
+          <text x="280" y="218" text-anchor="middle" font-size="13">長期投資人要盯的是右邊；短線交易者被左邊吃掉</text>
+        </svg>`, caption: '一般股票賣出時的證交稅是 0.3%。稅費細節與二代健保補充保費，在第四部詳細說明。' },
+        { type: 'heading', id: 'myths', text: '指數化投資的常見誤解' },
+        { type: 'list', items: [
+          '**「指數基金不會虧」**：它會跟著市場一起跌，只是不會因為挑錯股票而額外虧。',
+          '**「所有 ETF 都是被動、低成本」**：主題型、槓桿型、反向型 ETF 的規則與風險差很多，有些並不適合長期持有。',
+          '**「指數化就是買台灣 50」**：那只是一個國家的大型股；完整的分散還包括其他國家與債券（4-2）。',
+          '**「被動投資什麼都不用做」**：仍然要決定配置比例、定期再平衡、控制自己的行為（第四、六部）。',
+        ] },
+        { type: 'heading', id: 'leveraged', text: '深入：槓桿與反向 ETF 為什麼不適合長抱' },
+        '槓桿型與反向型 ETF 追求的是「單日」報酬的倍數，每天重新調整。在來回震盪的市場裡，這會造成損耗：假設指數連續十次「漲 10%、再跌 10%」，指數本身大約剩下原來的 90%；兩倍槓桿的 ETF 每天漲 20%、跌 20%，卻大約只剩 66%。',
+        { type: 'table', head: ['連續十次「＋10%、−10%」', '結果'], rows: [
+          ['原型指數', '約 90.4%'],
+          ['兩倍槓桿（＋20%、−20%）', '約 66.5%'],
+        ], caption: '指數最後只跌了不到一成，兩倍槓桿卻跌了約三分之一。這類產品是給短期交易用的工具，規則寫在公開說明書裡。' },
+        { type: 'heading', id: 'dividend-etf', text: '深入：市值型與高股息型 ETF' },
+        '台灣投資人很熟悉高股息 ETF。它和市值型 ETF 的差別不在「哪個比較會賺」，而在指數規則：高股息 ETF 依股利相關條件選股與調整，持股會偏向特定產業，換股也比較頻繁；市值型則大致依公司規模持有。兩者都可以是組合的一部分，判斷時用 5-1 的總報酬觀念，並把稅與二代健保（第四部）一起算進去。',
+      ],
+    },
+    mistakes: [
+      { wrong: '只看經理費，不看總費用率。', why: '保管費與其他費用也會從資產裡扣。', right: '看年報或公開說明書的總費用率。' },
+      { wrong: '把高股息、主題型 ETF 當成完整的分散。', why: '指數規則可能讓持股集中在特定產業。', right: '先確認指數涵蓋什麼。' },
+      { wrong: '頻繁買賣 ETF。', why: '手續費與證交稅會累積。', right: '長期持有，依規則再平衡。' },
+    ],
+    keypoints: [
+      '費用每年複利：差 1.3%，30 年少約三成。',
+      '挑 ETF：指數、總費用率、追蹤誤差、規模、配息與稅。',
+      '指數化消除挑錯股的風險，不消除市場風險。',
+    ],
+    sources: ['etf-0050-fee', 'tw-tax-fee', 'sharpe-1991'],
+  },
+});
+</script>

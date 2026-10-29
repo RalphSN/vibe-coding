@@ -1,0 +1,136 @@
+<script>
+/* ==========================================================================
+   課程資料：模組與單元清單。標題用 | 標出可以換行的詞組邊界。
+   單元內容由後面各模組的 defineLessons() 區塊補上。
+   ========================================================================== */
+const SITE = {
+  name: '理財系列・第一部｜個人財務',
+  updated: '2026 年 10 月',
+  verifiedOn: '2026-10-29',
+  version: 'v1',
+};
+
+/* 理財系列六卷：每本課程網站共用這份清單，做好的卷填 href，還沒做的留 null（顯示「製作中」） */
+const SERIES = {
+  name: '理財系列',
+  current: 'fin-1',
+  volumes: [
+    { id: 'fin-1', vol: '第一部', title: '個人財務', href: '../finance-personal-course/index.html' },
+    { id: 'fin-2', vol: '第二部', title: '風險保障', href: '../finance-insurance-course/index.html' },
+    { id: 'fin-3', vol: '第三部', title: '投資核心', href: '../finance-investing-course/index.html' },
+    { id: 'fin-4', vol: '第四部', title: '配置與稅費', href: '../finance-allocation-course/index.html' },
+    { id: 'fin-5', vol: '第五部', title: '財報與估值', href: '../finance-valuation-course/index.html' },
+    { id: 'fin-6', vol: '第六部', title: '投資心理', href: '../finance-psychology-course/index.html' },
+  ],
+};
+
+/* 全書主軸：個人財務的六個環節；byModule 是預設，byLesson 逐課覆寫 */
+const JOURNEY = {
+  stages: [
+    { label: '看見', note: '記帳、現金流', color: 'var(--m0)' },
+    { label: '比例', note: '收支比、儲蓄率', color: 'var(--m1)' },
+    { label: '淨值', note: '資產減負債', color: 'var(--m2)' },
+    { label: '緩衝', note: '緊急預備金', color: 'var(--m3)' },
+    { label: '債務', note: '利率與信用', color: 'var(--m4)' },
+    { label: '順序', note: '先做哪一件', color: 'var(--m5)' },
+  ],
+  byModule: { 0: [0, 1, 2, 3, 4, 5], 1: [0, 1, 2], 2: [1], 3: [3], 4: [4], 5: [4], 6: [5] },
+  byLesson: { '1-1': [0], '1-2': [0], '1-3': [1], '1-4': [2], '2-2': [0, 1] },
+};
+
+/* 首頁主視覺：錢從收入流進來，分流到支出、預備金、還債、未來（結構圖，不是動畫） */
+const HERO_SVG = `<svg viewBox="0 0 560 420" role="img" aria-label="個人財務的水管圖：每月收入流進來，先分出儲蓄與還債，剩下才是生活支出；儲蓄先填滿緊急預備金，滿了才流向投資">
+  <rect x="180" y="16" width="200" height="64" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
+  <text x="280" y="56" text-anchor="middle" font-size="22" font-weight="900" class="on-color">每月收入</text>
+  <path d="M280 80 L280 120 M120 120 L440 120 M120 120 L120 160 M280 120 L280 160 M440 120 L440 160" class="stroke-ink" stroke-width="4" fill="none"/>
+  ${[['先存起來', 'm3', 40], ['還高利債', 'm4', 200], ['生活支出', 'm2', 360]].map(([t, c, x]) => `<rect x="${x}" y="160" width="160" height="64" style="fill:var(--${c})" class="stroke-ink" stroke-width="4"/><text x="${x + 80}" y="200" text-anchor="middle" font-size="19" font-weight="900" class="on-color">${t}</text>`).join('')}
+  <path d="M120 224 L120 264" class="stroke-ink" stroke-width="4"/>
+  <rect x="30" y="264" width="180" height="70" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
+  <text x="120" y="296" text-anchor="middle" font-size="17" font-weight="900" class="on-color">緊急預備金</text>
+  <text x="120" y="320" text-anchor="middle" font-size="14" class="on-color">3–6 個月生活費</text>
+  <path d="M210 299 L260 299 L260 370" class="stroke-ink" stroke-width="4" fill="none" stroke-dasharray="10 6"/>
+  <rect x="200" y="350" width="330" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
+  <text x="365" y="384" text-anchor="middle" font-size="16" font-weight="900">滿了才流向保險與投資（第二部起）</text>
+</svg>`;
+
+const COURSES = [
+  { id: 0, title: '起點：|個人財務是一套系統', short: '起點', desc: '現金流、淨值、緩衝、債務四件事彼此牽動；先看全貌，再一件一件拆開。', lessons: [
+    ['0-1', '個人財務|是一套系統'],
+  ]},
+  { id: 1, title: '看見你的錢', short: '看見', desc: '收入與現金流、記帳的方法與原理、收支比與儲蓄率、資產負債表與淨值。', lessons: [
+    ['1-1', '收入、支出|與現金流'],
+    ['1-2', '記帳：|方法與原理'],
+    ['1-3', '收支比|與儲蓄率'],
+    ['1-4', '資產負債表|與淨值'],
+  ]},
+  { id: 2, title: '預算|與花錢的行為', short: '預算', desc: '預算是事前的分配，不是事後的檢討；再看心理帳戶、固定支出與生活膨脹。', lessons: [
+    ['2-1', '預算的設計：|先分配再花'],
+    ['2-2', '花錢的心理：|心理帳戶與生活膨脹'],
+  ]},
+  { id: 3, title: '緊急預備金', short: '預備金', desc: '為什麼是 3–6 個月、怎麼依自己的狀況調整，以及放在哪裡、怎麼存、用掉後怎麼補。', lessons: [
+    ['3-1', '緊急預備金：|為什麼、要多少'],
+    ['3-2', '預備金|放哪裡、怎麼存'],
+  ]},
+  { id: 4, title: '債務的本質', short: '債務', desc: '利息怎麼算、好債與壞債怎麼分、信用卡循環利率為什麼是投資報酬的天敵、信用紀錄怎麼來。', lessons: [
+    ['4-1', '利息|怎麼算'],
+    ['4-2', '好債|與壞債'],
+    ['4-3', '信用卡循環利息：|報酬的天敵'],
+    ['4-4', '信用紀錄|與聯徵'],
+  ]},
+  { id: 5, title: '還債|與負債管理', short: '還債', desc: '雪崩法與雪球法、負債比與可負擔性，以及卡債真的還不起時的正式管道。', lessons: [
+    ['5-1', '還債順序：|雪崩法與雪球法'],
+    ['5-2', '負債比|與可負擔性'],
+    ['5-3', '還不起的時候：|協商與求助'],
+  ]},
+  { id: 6, title: '把它串起來', short: '串起來', desc: '個人財務的優先順序、每年一次的健檢，以及接到第二部（風險保障）的路。', lessons: [
+    ['6-1', '優先順序|與年度健檢'],
+  ]},
+];
+
+/** 中英文交界的斷點要補回空格，例如「Claude Code|與 Cowork」→「Claude Code 與 Cowork」 */
+function needsSpaceBetween(left, right) {
+  const latinEnd = /[A-Za-z0-9.)]$/;
+  const latinStart = /^[A-Za-z0-9(`]/;
+  const hanEnd = /\p{Script=Han}$/u;
+  const hanStart = /^\p{Script=Han}/u;
+  return (latinEnd.test(left) && hanStart.test(right)) || (hanEnd.test(left) && latinStart.test(right));
+}
+function splitPhrases(text) { return String(text).split('|'); }
+/** 去掉 | 斷點的純文字：給 <title>、搜尋、aria-label 用 */
+function plainTitle(text) {
+  return splitPhrases(text).reduce((out, phrase) => (out && needsSpaceBetween(out, phrase) ? `${out} ${phrase}` : out + phrase), '');
+}
+
+/* 由 COURSES 展開的單元清單與索引 */
+const LESSONS = [];
+const LESSON_BY_ID = {};
+COURSES.forEach((mod) => {
+  mod.lessons = mod.lessons.map(([id, title], i) => {
+    const lesson = { id, title, plain: plainTitle(title), moduleId: mod.id, index: i, content: null };
+    LESSONS.push(lesson);
+    LESSON_BY_ID[id] = lesson;
+    return lesson;
+  });
+});
+
+/** 由各模組的資料區塊呼叫，把內容掛到對應的單元上 */
+function defineLessons(map) {
+  Object.entries(map).forEach(([id, content]) => {
+    if (!LESSON_BY_ID[id]) throw new Error(`defineLessons：找不到單元 ${id}`);
+    LESSON_BY_ID[id].content = content;
+  });
+}
+
+/** 術語表：key 是內文中 [[key]] 的寫法；{ en, def, example?, lesson? } */
+const GLOSSARY = {};
+function defineTerms(map) {
+  Object.entries(map).forEach(([key, term]) => {
+    if (GLOSSARY[key]) console.warn('術語重複定義，保留第一個：', key);
+    else GLOSSARY[key] = term;
+  });
+}
+
+/** 參考資料：頁尾列表與單元來源共用 */
+const SOURCES = {};
+function defineSources(map) { Object.assign(SOURCES, map); }
+</script>
