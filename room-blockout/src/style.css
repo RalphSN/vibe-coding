@@ -1,0 +1,135 @@
+:root {
+  --accent: #1fb6d5;
+  --accent-ink: #062a33;
+  --confirm: #34c759;
+  --confirm-ink: #04310f;
+  --glass: rgba(28, 28, 30, 0.86);
+  --glass-hover: rgba(255, 255, 255, 0.14);
+  --ink: #1d1d1f;
+  --ok: #2e7d32;
+  --bad: #c62828;
+  --warn: #8a5a00;
+  --warn-bg: #ffcc00;
+  --z-overlay: 1100;   /* 要蓋過 lil-gui 面板（z-index 1001） */
+}
+#actionbar, #hint, #readout { z-index: var(--z-overlay); }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #eef0f2; font-family: system-ui, "Noto Sans TC", sans-serif; }
+canvas { display: block; touch-action: none; }
+
+#hud {
+  position: fixed; left: 12px; bottom: 12px;
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 10px 12px; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9); color: #222;
+  font-size: 13px; line-height: 1.5; pointer-events: none;
+}
+#hud h1 { font-size: 14px; margin: 0 0 4px; }
+#hud ul { margin: 0; padding-left: 18px; }
+#status { margin-top: 6px; font-weight: 600; }
+#status.ok { color: var(--ok); }
+#status.bad { color: var(--bad); }
+#status.warn { color: var(--warn); }
+
+/* 選取後跟著家具的浮動選單（參考模擬類遊戲的物件選單） */
+#actionbar {
+  position: fixed; left: 0; top: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+#actionbar.visible { opacity: 1; pointer-events: auto; }
+.bar, .size-panel {
+  background: var(--glass); color: #fff;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.bar { display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 999px; }
+.bar .name { padding: 0 10px 0 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.icon-btn {
+  position: relative; display: grid; place-items: center;
+  width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: #fff; cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.icon-btn svg { width: 20px; height: 20px; }
+.icon-btn:hover { background: var(--glass-hover); }
+.icon-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.icon-btn.confirm { background: var(--confirm); color: var(--confirm-ink); }
+.icon-btn.confirm:hover { background: #2fb350; }
+.icon-btn::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 10px); left: 50%;
+  padding: 4px 8px; border-radius: 6px;
+  background: var(--ink); color: #fff; font-size: 12px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transform: translate(-50%, 4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.icon-btn:hover::after, .icon-btn:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+
+.angle { display: flex; align-items: center; gap: 2px; padding: 0 2px; font-size: 13px; }
+.angle input {
+  width: 48px; height: 32px; box-sizing: border-box; border: 0; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12); color: #fff;
+  font: 600 13px system-ui, sans-serif; text-align: center;
+  -moz-appearance: textfield;
+}
+.angle input::-webkit-inner-spin-button, .angle input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.angle input:hover { background: rgba(255, 255, 255, 0.24); }
+.angle input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.size-panel { display: grid; gap: 6px; padding: 10px 12px; border-radius: 14px; font-size: 13px; }
+.size-panel[hidden] { display: none; }
+.size-row { display: grid; grid-template-columns: 20px 32px 76px 32px 14px; align-items: center; gap: 6px; }
+.step-btn {
+  width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 18px; line-height: 1; cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.step-btn:hover { background: rgba(255, 255, 255, 0.24); }
+.preset-row { display: grid; grid-template-columns: 32px 1fr; align-items: center; gap: 6px; }
+.preset-row select {
+  height: 32px; padding: 0 8px; border: 0; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95); color: var(--ink);
+  font: 600 13px system-ui, sans-serif;
+}
+.size-row input {
+  width: 100%; height: 32px; box-sizing: border-box; border: 0; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95); color: var(--ink);
+  font: 600 13px system-ui, sans-serif; text-align: center;
+}
+
+#hint {
+  position: fixed; top: 12px; left: 50%;
+  padding: 6px 14px; border-radius: 999px;
+  background: var(--glass); color: #fff; font-size: 12px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transform: translate(-50%, -8px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+#hint.visible { opacity: 1; transform: translate(-50%, 0); }
+kbd { padding: 1px 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.18); font: 600 11px system-ui, sans-serif; }
+
+#readout {
+  position: fixed; left: 0; top: 0; padding: 4px 8px; border-radius: 6px;
+  background: var(--ink); color: #fff; font: 600 12px/1.3 system-ui, sans-serif;
+  white-space: nowrap; pointer-events: none; opacity: 0;
+}
+#readout.visible { opacity: 1; }
+#readout.bad { background: var(--bad); }
+#readout.warn { background: var(--warn-bg); color: var(--ink); }
+
+.icon-btn:focus-visible, .step-btn:focus-visible, .size-row input:focus-visible, .preset-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 第一人稱的操作提示：不擋滑鼠，開始移動或拖曳就收掉 */
+#fp-hint {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.25); color: #fff; pointer-events: none;
+}
+#fp-hint .card {
+  padding: 16px 20px; border-radius: 14px; background: var(--glass);
+  font-size: 14px; line-height: 1.7; text-align: center;
+}
+#fp-hint .card b { display: block; font-size: 16px; margin-bottom: 4px; }
+#fp-hint[hidden], #hud [hidden] { display: none; }
+@media (max-width: 767px) { #hint { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  #actionbar, #hint, .icon-btn, .icon-btn::after, .step-btn { transition: none; }
+}
