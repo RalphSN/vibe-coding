@@ -1,14 +1,14 @@
 // scene.config.json 的型別。單位：公尺、秒、角度（度）。
 // 座標：原點在房屋外框中心的地面；+X 東、-Z 北、+Y 上。
 
-export type FurnitureType = 'bed' | 'desk' | 'chair' | 'bookcase' | 'wardrobe' | 'counter' | 'island' | 'sofa' | 'bath' | 'table';
+export type FurnitureType = 'bed' | 'desk' | 'chair' | 'bookcase' | 'wardrobe' | 'counter' | 'island' | 'sofa' | 'bath' | 'table' | 'car';
 export type ClipRole = 'idle' | 'walk' | 'run' | 'jumpStart' | 'jumpLoop' | 'jumpLand';
 export type OpeningKind = 'door' | 'slider' | 'window';
-export type FloorKind = 'room' | 'deck';
+export type FloorKind = 'room' | 'deck' | 'garage';
 
-export const FURNITURE_TYPES: FurnitureType[] = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe', 'counter', 'island', 'sofa', 'bath', 'table'];
+export const FURNITURE_TYPES: FurnitureType[] = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe', 'counter', 'island', 'sofa', 'bath', 'table', 'car'];
 export const OPENING_KINDS: OpeningKind[] = ['door', 'slider', 'window'];
-export const FLOOR_KINDS: FloorKind[] = ['room', 'deck'];
+export const FLOOR_KINDS: FloorKind[] = ['room', 'deck', 'garage'];
 export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'jumpStart', 'jumpLoop', 'jumpLand'];
 
 export interface Sizes { width: number; depth: number; height: number }
@@ -18,7 +18,7 @@ export interface Spot { x: number; z: number }
  * 一件家具。x / z 是佔地中心；width 沿家具自身 X，depth 沿自身 Z（rotation 0 時背面朝北）。
  * rotation 是從上往下看的逆時針角度（整數度，0–359）。type 決定外型與顏色，同一種家具可以有好幾件。
  */
-export interface FurnitureItem extends Sizes, Spot { type: FurnitureType; label: string; rotation: number }
+export interface FurnitureItem extends Sizes, Spot { type: FurnitureType; label: string; rotation: number; level: number }
 
 /** 軸對齊的長方形範圍（世界座標）。 */
 export interface Rect { minX: number; maxX: number; minZ: number; maxZ: number }
@@ -26,25 +26,52 @@ export interface Rect { minX: number; maxX: number; minZ: number; maxZ: number }
 /** 牆上的開口。offset：從牆的起點（x1, z1）量到開口中心；sill 是窗台離地高度（門沒有）。slider 是拉門。 */
 export interface Opening { label: string; kind: OpeningKind; offset: number; width: number; height: number; sill?: number }
 
-/** 一段牆（中心線從 (x1, z1) 到 (x2, z2)，只支援東西向或南北向）。 */
+/** 一段牆（中心線從 (x1, z1) 到 (x2, z2)，任意角度；圓弧牆用幾段直牆近似）。 */
 export interface Wall { label: string; x1: number; z1: number; x2: number; z2: number; openings: Opening[] }
 
-/** 可以站、可以擺家具的地板：室內房間或木平台（和室內同高）。 */
-export interface FloorArea extends Rect { label: string; kind: FloorKind }
+/** 平面上的點 [x, z]。 */
+export type Point = [number, number];
+
+/**
+ * 可以站、可以擺家具的地板（多邊形，頂點依序繞一圈）：室內、露台／陽台、車庫。
+ * ceiling：要不要在牆頂加天花板；沒寫時室內與車庫有、露台沒有（有頂露台寫 true）。
+ */
+export interface FloorArea { label: string; kind: FloorKind; points: Point[]; ceiling?: boolean }
 
 /** 平台邊的欄杆（中心線）。 */
 export interface Railing { label: string; x1: number; z1: number; x2: number; z2: number; height: number }
 
-/** 台階：實心方塊，height 是頂面高度。 */
-export interface Step extends Rect { label: string; height: number }
+/** 台階：實心方塊，height 是頂面離這層地板的高度。isVisualOnly 的台階只有外觀，碰撞交給斜面（ramps）。 */
+export interface Step extends Rect { label: string; height: number; isVisualOnly?: boolean }
 
-export interface HouseConfig {
+export type RampDirection = 'north' | 'south' | 'east' | 'west';
+export const RAMP_DIRECTIONS: RampDirection[] = ['north', 'south', 'east', 'west'];
+
+/**
+ * 看不見的碰撞斜面：樓梯走起來才平順，不會一階一階彈。
+ * uphill 是往上走的方向；bottom／top 是低端與高端的高度（從這層地板算）。
+ */
+export interface Ramp extends Rect { label: string; uphill: RampDirection; bottom: number; top: number }
+
+/** 一層樓。elevation 是這層地板面的高度；二樓以上的地板是有厚度的實心樓板。 */
+export interface Level {
+  label: string;
+  elevation: number;
   wallHeight: number;
-  wallThickness: number;
   floors: FloorArea[];
   walls: Wall[];
   railings: Railing[];
   steps: Step[];
+  ramps: Ramp[];
+  /** 樓板挖空的地方（例如樓梯塔），結構樓板不會鋪過去。 */
+  voids: Point[][];
+}
+
+export interface HouseConfig {
+  wallThickness: number;
+  /** 二樓以上樓板的厚度（m），樓板頂面在該層 elevation。 */
+  slabThickness: number;
+  levels: Level[];
 }
 
 export interface SceneSection {
@@ -148,25 +175,40 @@ function collectListIssues(list: unknown, path: string, numbers: string[], extra
 }
 
 function collectOpeningIssues(wall: Record<string, unknown>, at: string): string[] {
-  const issues: string[] = [];
-  if (SEGMENT_KEYS.every((key) => typeof wall[key] === 'number') && wall.x1 !== wall.x2 && wall.z1 !== wall.z2) {
-    issues.push(`${at}（牆只能東西向或南北向）`);
-  }
-  issues.push(...collectListIssues(wall.openings, `${at}.openings`, ['offset', 'width', 'height'], (opening, path) =>
-    (OPENING_KINDS.some((kind) => kind === opening.kind) ? [] : [`${path}.kind（要是 ${OPENING_KINDS.join('／')}）`])));
+  return collectListIssues(wall.openings, `${at}.openings`, ['offset', 'width', 'height'], (opening, path) =>
+    (OPENING_KINDS.some((kind) => kind === opening.kind) ? [] : [`${path}.kind（要是 ${OPENING_KINDS.join('／')}）`]));
+}
+
+const isPoint = (value: unknown): boolean =>
+  Array.isArray(value) && value.length === 2 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+
+function collectFloorIssues(floor: Record<string, unknown>, at: string): string[] {
+  const issues = FLOOR_KINDS.some((kind) => kind === floor.kind) ? [] : [`${at}.kind（要是 ${FLOOR_KINDS.join('／')}）`];
+  const points = floor.points;
+  if (!Array.isArray(points) || points.length < 3 || !points.every(isPoint)) issues.push(`${at}.points（至少 3 個 [x, z]）`);
   return issues;
+}
+
+function collectLevelIssues(level: Record<string, unknown>, at: string): string[] {
+  return [
+    ...collectListIssues(level.floors, `${at}.floors`, [], collectFloorIssues),
+    ...collectListIssues(level.walls, `${at}.walls`, SEGMENT_KEYS, collectOpeningIssues),
+    ...collectListIssues(level.railings, `${at}.railings`, [...SEGMENT_KEYS, 'height'], () => []),
+    ...collectListIssues(level.steps, `${at}.steps`, [...RECT_KEYS, 'height'], () => []),
+    ...collectListIssues(level.ramps, `${at}.ramps`, [...RECT_KEYS, 'bottom', 'top'], (ramp, path) =>
+      (RAMP_DIRECTIONS.some((direction) => direction === ramp.uphill) ? [] : [`${path}.uphill（要是 ${RAMP_DIRECTIONS.join('／')}）`])),
+    ...(Array.isArray(level.voids) && level.voids.every((points: unknown) => Array.isArray(points) && points.length >= 3 && points.every(isPoint))
+      ? [] : [`${at}.voids（每個挖空區至少 3 個 [x, z]）`]),
+  ];
 }
 
 function collectSceneIssues(scene: unknown): string[] {
   if (!isObject(scene)) return ['scene'];
   const house = scene.house;
   if (!isObject(house)) return ['scene.house'];
-  const issues = missingNumbers(house, ['wallHeight', 'wallThickness']).map((key) => `scene.house.${key}`);
-  issues.push(...collectListIssues(house.floors, 'scene.house.floors', RECT_KEYS, (floor, at) =>
-    (FLOOR_KINDS.some((kind) => kind === floor.kind) ? [] : [`${at}.kind（要是 ${FLOOR_KINDS.join('／')}）`])));
-  issues.push(...collectListIssues(house.walls, 'scene.house.walls', SEGMENT_KEYS, collectOpeningIssues));
-  issues.push(...collectListIssues(house.railings, 'scene.house.railings', [...SEGMENT_KEYS, 'height'], () => []));
-  issues.push(...collectListIssues(house.steps, 'scene.house.steps', [...RECT_KEYS, 'height'], () => []));
+  const issues = missingNumbers(house, ['wallThickness', 'slabThickness']).map((key) => `scene.house.${key}`);
+  issues.push(...collectListIssues(house.levels, 'scene.house.levels', ['elevation', 'wallHeight'], collectLevelIssues));
+  if (Array.isArray(house.levels) && house.levels.length === 0) issues.push('scene.house.levels（至少一層）');
   issues.push(...missingNumbers(scene, ['groundMargin']).map((key) => `scene.${key}`));
   issues.push(...missingNumbers(scene.spawn, ['x', 'z', 'facing']).map((key) => `scene.spawn.${key}`));
   issues.push(...missingNumbers(scene.rules, ['gridSnap', 'edgeSnap', 'sizeSnap', 'windowClearance']).map((key) => `scene.rules.${key}`));
@@ -177,7 +219,7 @@ function collectFurnitureIssues(furniture: unknown): string[] {
   if (!isObject(furniture)) return ['furniture'];
   const issues: string[] = [];
   for (const [key, item] of Object.entries(furniture)) {
-    issues.push(...missingNumbers(item, ['x', 'z', 'rotation', 'width', 'depth', 'height']).map((prop) => `furniture.${key}.${prop}`));
+    issues.push(...missingNumbers(item, ['x', 'z', 'rotation', 'width', 'depth', 'height', 'level']).map((prop) => `furniture.${key}.${prop}`));
     const isTypeValid = isObject(item) && FURNITURE_TYPES.some((type) => type === item.type);
     if (!isTypeValid) issues.push(`furniture.${key}.type（要是 ${FURNITURE_TYPES.join('／')}）`);
     if (!isObject(item) || typeof item.label !== 'string') issues.push(`furniture.${key}.label`);

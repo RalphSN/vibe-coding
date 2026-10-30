@@ -2,10 +2,12 @@ import './style.css';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
 import GUI, { type Controller } from 'lil-gui';
 import {
   CLIP_ROLES, FURNITURE_TYPES, SAVE_ENDPOINT, loadSceneConfig,
-  type ClipRole, type FurnitureItem, type FurnitureType, type HouseConfig, type Opening, type SceneConfig, type Sizes, type Spot, type Wall,
+  type ClipRole, type FloorArea, type FurnitureItem, type FurnitureType, type HouseConfig, type Level, type Opening, type Point, type Ramp,
+  type SceneConfig, type Sizes, type Spot, type Wall,
 } from './config/scene.config';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
@@ -29,7 +31,9 @@ interface FurnitureSpec { limits: Record<SizeProp, [number, number]>; presets: P
 interface Hole { offset: number; width: number; height: number; bottom: number }
 interface Rect { minX: number; maxX: number; minZ: number; maxZ: number }
 interface Footprint extends Rect { corners: Spot[] }
-interface KeepClearZone { label: string; maxHeight: number; rect: Rect }
+// 門窗淨空區：fp 給碰撞判定；cx／cz、along（沿牆）／across（垂直牆）、angle 給畫面上的紅色區域。
+interface KeepClearZone { label: string; maxHeight: number; fp: Footprint; cx: number; cz: number; along: number; across: number; angle: number }
+interface Strip { x0: number; x1: number; z0: number; z1: number }
 interface Obstacle { issue: string; fp: Footprint; maxHeight: number }
 interface ZoneRect { cx: number; cz: number; w: number; d: number }
 interface ClearanceZone { side: ClearanceSide; rect: ZoneRect; blockers: string[] }
@@ -123,11 +127,21 @@ const BOOKCASE_PARTS = { board: 0.02, shelfSpacing: 0.35 };
 const CHAIR_PARTS = { seatHeight: 0.45, seatThickness: 0.04, legSize: 0.04, backThickness: 0.04 };
 const SOFA_PARTS = { seatRatio: 0.55, backThickness: 0.2 };   // 座面高 = 總高 × seatRatio
 const TABLE_PARTS = { topThickness: 0.04, pedestal: 0.12 };
+const CAR_PARTS = { bodyRatio: 0.5, cabinWidth: 0.9, cabinLength: 0.5, cabinShift: 0.05 };
 const RAILING_THICKNESS = 0.05;
-const GROUND_DROP = 0.01;          // 草地比室內地板低一點，地板邊緣才看得出來
+const GROUND_DROP = 0.04;          // 草地比室內地板低一點：要比一樓結構樓板（低 FILL_DROP）更低，兩個面才不會重疊閃爍
 const FENCE_HEIGHT = 3;            // 草地邊緣隱形圍欄的高度
 const DOOR_SWING_RATIO = 1;        // 門前淨空深度 = 門寬 × 這個值（開門半徑）
 const SLIDER_CLEARANCE = 0.6;      // 拉門不用開門半徑，只留一人通過的深度
+const COLLIDER_STEP = 0.25;        // 斜放的方塊沿長邊切成這麼長的小段算碰撞
+const SLAB_CELL = 0.25;            // 多邊形樓板切成這麼寬的條狀方塊算碰撞
+const SLAB_FILL = 0.25;            // 結構樓板把各房間地板往外擴這麼多，補起量測造成的縫
+const FINISH_THICKNESS = 0.02;     // 二樓以上每個房間的裝修地板厚度（鋪在結構樓板上）
+const THRESHOLD_SINK = 0.01;       // 門洞下緣比裝修地板底再低一點
+const FILL_DROP = 0.01;            // 結構樓板頂面比裝修地板低一點，兩個面才不會重疊閃爍
+const CEILING_THICKNESS = 0.05;
+const CEILING_GAP = 0.06;          // 天花板頂面離牆頂（上一層樓板底）的距離；太近的話從上面看牆頂會和天花板互相閃
+const OFFSET_MITER_LIMIT = 4;      // 多邊形往外推時，尖角最多突出幾倍推移距離
 const SIZE_NAMES: Record<SizeProp, string> = { width: '寬', depth: '深', height: '高' };
 const SIZE_PROPS: SizeProp[] = ['width', 'depth', 'height'];
 
@@ -145,7 +159,7 @@ const FURNITURE_SPECS: Record<FurnitureType, FurnitureSpec> = {
       { name: '雙人加大 6×6.2 尺', width: 1.82, depth: 1.88, height: 0.45 },
       { name: '特大 6×7 尺', width: 1.82, depth: 2.12, height: 0.45 },
     ],
-    clearance: [{ sides: ['left', 'right'], need: 'any', depth: 0.6, name: '上下床走道' }],
+    clearance: [{ sides: ['left', 'right'], need: 'any', depth: 0.6, name: '上下床走道', ignoreTypes: ['table'] }],
   },
   desk: {
     limits: { width: [0.8, 3.5], depth: [0.45, 0.8], height: [0.68, 0.8] },
@@ -206,10 +220,11 @@ const FURNITURE_SPECS: Record<FurnitureType, FurnitureSpec> = {
     clearance: [{ sides: ['front', 'back'], depth: 0.9, name: '走道', ignoreTypes: ['chair'] }],
   },
   sofa: {
-    limits: { width: [0.7, 3.2], depth: [0.7, 1.1], height: [0.65, 1.0] },
+    limits: { width: [0.7, 3.2], depth: [0.7, 2.0], height: [0.35, 1.0] },
     presets: [
       { name: '單人 85×85', width: 0.85, depth: 0.85, height: 0.8 },
       { name: '三人 200×85', width: 2.0, depth: 0.85, height: 0.8 },
+      { name: '躺椅 75×190', width: 0.75, depth: 1.9, height: 0.4 },
     ],
     clearance: [{ sides: ['front'], depth: 0.45, name: '腳前空間' }],
   },
@@ -223,11 +238,21 @@ const FURNITURE_SPECS: Record<FurnitureType, FurnitureSpec> = {
     ],
     clearance: [{ sides: ['front'], depth: 0.6, name: '使用空間' }],
   },
+  car: {
+    limits: { width: [1.6, 2.2], depth: [3.8, 5.6], height: [1.3, 2.0] },
+    presets: [
+      { name: '轎車 185×480', width: 1.85, depth: 4.8, height: 1.45 },
+      { name: '休旅車 195×500', width: 1.95, depth: 5.0, height: 1.8 },
+    ],
+    clearance: [{ sides: ['left', 'right'], need: 'any', depth: 0.6, name: '開車門空間' }],
+  },
   table: {
-    limits: { width: [0.4, 2.0], depth: [0.4, 1.2], height: [0.4, 0.8] },
+    limits: { width: [0.4, 4.0], depth: [0.4, 1.4], height: [0.4, 0.8] },
     presets: [
       { name: '邊几 60×60×50', width: 0.6, depth: 0.6, height: 0.5 },
       { name: '餐桌 120×80×75', width: 1.2, depth: 0.8, height: 0.75 },
+      { name: '十人餐桌 300×120×75', width: 3.0, depth: 1.2, height: 0.75 },
+      { name: '烤肉長桌 360×100×75', width: 3.6, depth: 1.0, height: 0.75 },
     ],
     clearance: [],
   },
@@ -235,9 +260,9 @@ const FURNITURE_SPECS: Record<FurnitureType, FurnitureSpec> = {
 
 // 椅子用書桌的深一階橘色，看得出是一組，又能和書桌分開。
 const COLORS = {
-  floor: 0xd8d8d8, wall: 0xc4c4c4, deck: 0xb98a5e, grass: 0x9cc48a, railing: 0x6b5a4a, step: 0xa98058,
+  floor: 0xd8d8d8, wall: 0xc4c4c4, ceiling: 0xe9e9e6, deck: 0xb98a5e, garage: 0xa9a9a4, grass: 0x9cc48a, railing: 0x6b5a4a, step: 0xa98058,
   bed: 0x4f86e8, desk: 0xe8a33c, chair: 0xb8741c, bookcase: 0x47a65a, wardrobe: 0x9b62d1,
-  counter: 0x8a96a3, island: 0x5f6b78, sofa: 0xd9607a, bath: 0xe6eef2, table: 0xc98b5a,
+  counter: 0x8a96a3, island: 0x5f6b78, sofa: 0xd9607a, bath: 0xe6eef2, table: 0xc98b5a, car: 0x3f6fb5,
   player: 0xff6f3c, playerFace: 0x3a2a20, playerSkin: 0xf0c39c, playerPants: 0x3d4f73, playerShoe: 0x2b2b2b,
 };
 const HIGHLIGHT_EMISSIVE = 0x2a2a2a;
@@ -260,7 +285,8 @@ materials.clearance = new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent
 materials.clearanceWarn = new THREE.MeshBasicMaterial({ color: 0xffb300, transparent: true, opacity: 0.55, depthWrite: false });
 
 // ================= 2. 場景基礎 =================
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// 對數深度緩衝：整棟房子約 51 m，鏡頭拉遠時一般深度緩衝分不出只差幾公分的面（地板、草地、樓板會互相閃爍）。
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
@@ -269,7 +295,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeef0f2);
 
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
-camera.position.set(9, 17, 15);
+camera.position.set(28, 42, 38);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
@@ -284,6 +310,7 @@ const world: {
   overlay: THREE.Group;
   editor: THREE.Group;
   colliders: THREE.Box3[];
+  ramps: Ramp[];
 } = {
   room: new THREE.Group(),
   furniture: new THREE.Group(),
@@ -291,6 +318,7 @@ const world: {
   overlay: new THREE.Group(),   // 拖曳中才有：門窗淨空區
   editor: new THREE.Group(),    // 尺寸模式的控制點
   colliders: [],
+  ramps: [],                    // 世界座標的碰撞斜面（高度已加上樓層高度）
 };
 scene.add(world.room, world.furniture, world.guides, world.overlay, world.editor);
 
@@ -335,33 +363,54 @@ function buildWall(length: number, height: number, thickness: number, openings: 
   return wall;
 }
 
-const wallLength = (wall: Wall): number => Math.hypot(wall.x2 - wall.x1, wall.z2 - wall.z1);
-const wallDirection = (wall: Wall): Spot => {
+interface Segment { x1: number; z1: number; x2: number; z2: number }
+const wallLength = (wall: Segment): number => Math.hypot(wall.x2 - wall.x1, wall.z2 - wall.z1);
+const wallDirection = (wall: Segment): Spot => {
   const length = wallLength(wall) || 1;
   return { x: (wall.x2 - wall.x1) / length, z: (wall.z2 - wall.z1) / length };
 };
+// 局部 +X 沿著 dir 時的 rotation.y：往 +Z 的方向要轉 -90°。
+const yawAlong = (dir: Spot): number => -Math.atan2(dir.z, dir.x);
 
-// 牆的佔地（含兩端各多出半個牆厚，轉角才會接滿）：擺放、貼齊、活動空間都把它當障礙。
-function wallRect(wall: Wall, thickness: number): Rect {
-  const half = thickness / 2;
-  return {
-    minX: Math.min(wall.x1, wall.x2) - half, maxX: Math.max(wall.x1, wall.x2) + half,
-    minZ: Math.min(wall.z1, wall.z2) - half, maxZ: Math.max(wall.z1, wall.z2) + half,
-  };
+// 中心 (cx, cz)、沿 dir 半長 halfAlong、垂直 dir 半寬 halfAcross 的斜長方形。
+function orientedBox(cx: number, cz: number, dir: Spot, halfAlong: number, halfAcross: number): Footprint {
+  const nx = -dir.z;
+  const nz = dir.x;
+  return withBounds(CORNER_SIGNS.map(([sa, sn]) => ({
+    x: cx + dir.x * sa * halfAlong + nx * sn * halfAcross,
+    z: cz + dir.z * sa * halfAlong + nz * sn * halfAcross,
+  })));
 }
 
-function segmentRect(segment: { x1: number; z1: number; x2: number; z2: number }, thickness: number): Rect {
-  return wallRect({ label: '', openings: [], ...segment }, thickness);
+// 線段（牆、欄杆）的佔地：兩端各多出半個厚度，轉角才會接滿；斜的線段就是斜的長方形。
+function segmentFootprint(segment: Segment, thickness: number): Footprint {
+  const cx = (segment.x1 + segment.x2) / 2;
+  const cz = (segment.z1 + segment.z2) / 2;
+  return orientedBox(cx, cz, wallDirection(segment), wallLength(segment) / 2 + thickness / 2, thickness / 2);
 }
 
-// 房屋範圍：所有地板與台階的外接長方形（格線、搜尋空位、草地都以它為準）。
-function houseBounds(house: HouseConfig): Rect {
-  const rects: Rect[] = [...house.floors, ...house.steps, ...house.walls.map((wall) => wallRect(wall, house.wallThickness))];
+const polygonBounds = (points: Point[]): Rect => ({
+  minX: Math.min(...points.map((p) => p[0])), maxX: Math.max(...points.map((p) => p[0])),
+  minZ: Math.min(...points.map((p) => p[1])), maxZ: Math.max(...points.map((p) => p[1])),
+});
+
+function unionBounds(rects: Rect[]): Rect {
   return {
     minX: Math.min(...rects.map((r) => r.minX)), maxX: Math.max(...rects.map((r) => r.maxX)),
     minZ: Math.min(...rects.map((r) => r.minZ)), maxZ: Math.max(...rects.map((r) => r.maxZ)),
   };
 }
+
+// 一層樓的範圍：地板、台階、牆的外接長方形（格線、搜尋空位用）。
+function levelBounds(level: Level, wallThickness: number): Rect {
+  return unionBounds([
+    ...level.floors.map((floor) => polygonBounds(floor.points)),
+    ...level.steps,
+    ...level.walls.map((wall) => segmentFootprint(wall, wallThickness)),
+  ]);
+}
+
+const houseBounds = (house: HouseConfig): Rect => unionBounds(house.levels.map((level) => levelBounds(level, house.wallThickness)));
 
 const expandRect = (r: Rect, margin: number): Rect =>
   ({ minX: r.minX - margin, maxX: r.maxX + margin, minZ: r.minZ - margin, maxZ: r.maxZ + margin });
@@ -370,32 +419,208 @@ function addRectBox(parent: THREE.Object3D, material: THREE.Material, r: Rect, y
   return addBox(parent, material, [r.maxX - r.minX, y1 - y0, r.maxZ - r.minZ], [(r.minX + r.maxX) / 2, (y0 + y1) / 2, (r.minZ + r.maxZ) / 2]);
 }
 
-// 整間房屋：草地 → 地板（室內灰、平台木色）→ 牆（開門窗洞）→ 欄杆、台階。
-// 牆、欄杆、台階的方塊標 isSolid，碰撞只收這些和家具。
-function buildHouse(cfg: SceneConfig): THREE.Group {
-  const { house, groundMargin } = cfg.scene;
-  const T = house.wallThickness;
-  const group = new THREE.Group();
-  addRectBox(group, materials.grass, expandRect(houseBounds(house), groundMargin), -GROUND_DROP - FLOOR_THICKNESS, -GROUND_DROP);
-  for (const floor of house.floors) {
-    addRectBox(group, floor.kind === 'deck' ? materials.deck : materials.floor, floor, -FLOOR_THICKNESS, 0);
+// 射線法：從點往 +X 發射，和多邊形的邊交奇數次就在裡面。
+function isPointInPolygon(x: number, z: number, points: Point[]): boolean {
+  let isInside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, zi] = points[i];
+    const [xj, zj] = points[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) isInside = !isInside;
   }
-  for (const spec of house.walls) {
+  return isInside;
+}
+
+// 多邊形樓板：Shape 畫在 XY（y = -z），往 +Z 擠出厚度後轉 -90° 躺平，擠出方向就變成往上。
+function addFloorSlab(parent: THREE.Object3D, material: THREE.Material, points: Point[], y0: number, y1: number): THREE.Mesh {
+  const shape = new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z)));
+  const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: y1 - y0, bevelEnabled: false }), material);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = y0;
+  parent.add(mesh);
+  return mesh;
+}
+
+const FLOOR_MATERIAL: Record<FloorArea['kind'], string> = { room: 'floor', deck: 'deck', garage: 'garage' };
+const hasCeiling = (floor: FloorArea): boolean => floor.ceiling ?? floor.kind !== 'deck';
+
+// 水平線 z 和多邊形的交點，成對組成落在多邊形內的區間。
+function scanPolygon(points: Point[], z: number): [number, number][] {
+  const xs: number[] = [];
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, zi] = points[i];
+    const [xj, zj] = points[j];
+    if ((zi > z) !== (zj > z)) xs.push(xi + ((z - zi) * (xj - xi)) / (zj - zi));
+  }
+  xs.sort((a, b) => a - b);
+  const spans: [number, number][] = [];
+  for (let k = 0; k + 1 < xs.length; k += 2) spans.push([xs[k], xs[k + 1]]);
+  return spans;
+}
+
+function mergeSpans(spans: [number, number][]): [number, number][] {
+  const sorted = [...spans].sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const [a, b] of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && a <= last[1] + EPSILON) last[1] = Math.max(last[1], b);
+    else merged.push([a, b]);
+  }
+  return merged;
+}
+
+function subtractSpans(spans: [number, number][], holes: [number, number][]): [number, number][] {
+  let result = spans;
+  for (const [ha, hb] of holes) {
+    result = result.flatMap(([a, b]): [number, number][] => {
+      if (hb <= a || ha >= b) return [[a, b]];
+      const parts: [number, number][] = [[a, ha], [hb, b]];
+      return parts.filter(([start, end]) => end - start > EPSILON);
+    });
+  }
+  return result;
+}
+
+// 多邊形切成東西向的條狀長方形（每條 SLAB_CELL 寬）。dilate > 0 時每塊往外擴，補起相鄰多邊形之間的小縫；
+// voids 是挖空的區域（不擴）。
+function polygonStrips(polygons: Point[][], voids: Point[][], dilate: number): Strip[] {
+  if (polygons.length === 0) return [];
+  const bounds = unionBounds(polygons.map(polygonBounds));
+  const strips: Strip[] = [];
+  for (let z0 = bounds.minZ - dilate; z0 < bounds.maxZ + dilate - EPSILON; z0 += SLAB_CELL) {
+    const z1 = Math.min(z0 + SLAB_CELL, bounds.maxZ + dilate);
+    const mid = (z0 + z1) / 2;
+    const samples = dilate > 0 ? [mid - dilate, mid, mid + dilate] : [mid];
+    const spans = mergeSpans(polygons.flatMap((points) =>
+      samples.flatMap((z) => scanPolygon(points, z)).map(([a, b]): [number, number] => [a - dilate, b + dilate])));
+    const holes = mergeSpans(voids.flatMap((points) => scanPolygon(points, mid)));
+    for (const [x0, x1] of subtractSpans(spans, holes)) strips.push({ x0, x1, z0, z1 });
+  }
+  return strips;
+}
+
+// 不畫出來的碰撞（樓板、天花板的條狀方塊）記在掛著它的物件上。
+const stripColliders = new WeakMap<THREE.Object3D, THREE.Box3[]>();
+
+// 多邊形每條邊沿外法線往外推 distance，相鄰兩條推出去的線取交點（尖角最多突出 OFFSET_MITER_LIMIT 倍）。
+// 推出去會蓋進挖空區（樓梯塔）的邊不推，樓梯口才不會被樓板蓋住。
+function offsetPolygon(points: Point[], distance: number, voids: Point[][]): Point[] {
+  const count = points.length;
+  let area = 0;
+  for (let i = 0; i < count; i++) {
+    const [x1, z1] = points[i];
+    const [x2, z2] = points[(i + 1) % count];
+    area += x1 * z2 - x2 * z1;
+  }
+  const sign = area > 0 ? 1 : -1;
+  const edges = points.map(([x1, z1], i) => {
+    const [x2, z2] = points[(i + 1) % count];
+    const length = Math.hypot(x2 - x1, z2 - z1) || 1;
+    const dx = (x2 - x1) / length;
+    const dz = (z2 - z1) / length;
+    const nx = sign * dz;
+    const nz = -sign * dx;
+    const probe: Point = [(x1 + x2) / 2 + nx * distance, (z1 + z2) / 2 + nz * distance];
+    const isIntoVoid = voids.some((hole) => isPointInPolygon(probe[0], probe[1], hole));
+    const shift = isIntoVoid ? 0 : distance;
+    return { x: x1 + nx * shift, z: z1 + nz * shift, dx, dz, nx, nz, shift };
+  });
+  return points.map(([px, pz], i) => {
+    const a = edges[(i - 1 + count) % count];
+    const b = edges[i];
+    const cross = a.dx * b.dz - a.dz * b.dx;
+    const fallback: Point = [px + b.nx * b.shift, pz + b.nz * b.shift];
+    if (Math.abs(cross) < EPSILON) return fallback;
+    const t = ((b.x - a.x) * b.dz - (b.z - a.z) * b.dx) / cross;
+    const corner: Point = [a.x + a.dx * t, a.z + a.dz * t];
+    const reach = Math.hypot(corner[0] - px, corner[1] - pz);
+    return reach > OFFSET_MITER_LIMIT * distance ? fallback : corner;
+  });
+}
+
+const stripBoxes = (strips: Strip[], y0: number, y1: number): THREE.Box3[] =>
+  strips.map(({ x0, x1, z0, z1 }) => new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1)));
+
+// 斜面在 (x, z) 的高度（世界座標）：沿 uphill 方向從 bottom 線性升到 top，超出範圍就用端點。
+function rampHeightAt(ramp: Ramp, x: number, z: number): number {
+  const along: Record<Ramp['uphill'], number> = {
+    north: (ramp.maxZ - z) / (ramp.maxZ - ramp.minZ),
+    south: (z - ramp.minZ) / (ramp.maxZ - ramp.minZ),
+    east: (x - ramp.minX) / (ramp.maxX - ramp.minX),
+    west: (ramp.maxX - x) / (ramp.maxX - ramp.minX),
+  };
+  return lerp(ramp.bottom, ramp.top, clamp(along[ramp.uphill], 0, 1));
+}
+
+function addOrientedBar(parent: THREE.Object3D, material: THREE.Material, segment: Segment, thickness: number, y0: number, y1: number): THREE.Mesh {
+  const dir = wallDirection(segment);
+  const mesh = addBox(parent, material, [wallLength(segment) + thickness, y1 - y0, thickness],
+    [(segment.x1 + segment.x2) / 2, (y0 + y1) / 2, (segment.z1 + segment.z2) / 2]);
+  mesh.rotation.y = yawAlong(dir);
+  return mesh;
+}
+
+// 一層樓：地板（一樓是貼地的薄板，二樓以上是實心樓板）→ 牆（開門窗洞）→ 欄杆、台階。
+// 牆、欄杆、台階標 isSolid，樓板記在 slabInfo；碰撞只收這些和家具。
+function buildLevel(house: HouseConfig, level: Level, index: number): THREE.Group {
+  const T = house.wallThickness;
+  const base = level.elevation;
+  const group = new THREE.Group();
+  group.userData.levelIndex = index;
+  // 結構樓板：所有地板往外擴、扣掉挖空區，鋪在裝修地板下面。二樓以上是實心的（碰撞、擋頭都靠它），
+  // 一樓只是一層薄板，屋內的縫看下去才不會是草地。
+  // 外觀用每塊地板往外推 SLAB_FILL 的平滑多邊形（斜邊還是直線），碰撞用看不見的條狀方塊。
+  const fillBottom = index === 0 ? base - FLOOR_THICKNESS : base - house.slabThickness;
+  for (const floor of level.floors) {
+    addFloorSlab(group, materials.floor, offsetPolygon(floor.points, SLAB_FILL, level.voids), fillBottom, base - FILL_DROP);
+  }
+  if (index > 0) {
+    const fill = polygonStrips(level.floors.map((floor) => floor.points), level.voids, SLAB_FILL);
+    const holder = new THREE.Object3D();
+    stripColliders.set(holder, stripBoxes(fill, fillBottom, base));
+    group.add(holder);
+  }
+  for (const floor of level.floors) {
+    const thickness = index === 0 ? FLOOR_THICKNESS : FINISH_THICKNESS;
+    addFloorSlab(group, materials[FLOOR_MATERIAL[floor.kind]], floor.points, base - thickness, base);
+    if (!hasCeiling(floor)) continue;
+    const top = base + level.wallHeight - CEILING_GAP;
+    const ceiling = addFloorSlab(group, materials.ceiling, floor.points, top - CEILING_THICKNESS, top);
+    ceiling.userData.ceilingLevel = index;
+    stripColliders.set(ceiling, stripBoxes(polygonStrips([floor.points], [], 0), top - CEILING_THICKNESS, top));
+  }
+  // 二樓以上的牆往下延伸一個樓板厚，接上下一層的牆頂；沒有樓板蓋住的地方（例如樓梯塔外圍）才不會露出一條縫。
+  const drop = index === 0 ? 0 : house.slabThickness;
+  for (const spec of level.walls) {
     const length = wallLength(spec);
-    const dir = wallDirection(spec);
-    const toHole = (o: Opening): Hole => ({ offset: o.offset - length / 2, width: o.width, height: o.height, bottom: o.sill ?? 0 });
-    const wall = buildWall(length + T, house.wallHeight, T, spec.openings.map(toHole));
-    wall.position.set((spec.x1 + spec.x2) / 2, 0, (spec.z1 + spec.z2) / 2);
-    // 局部 +X 沿牆的方向：往 +Z 的牆要轉 -90°。
-    wall.rotation.y = -Math.atan2(dir.z, dir.x);
+    // 門洞下緣壓到裝修地板頂面以下：門檻那截牆的頂面才不會和地板同高而閃爍（窗台照原高度）。
+    const toHole = (o: Opening): Hole => {
+      const offset = o.offset - length / 2;
+      if (o.sill !== undefined) return { offset, width: o.width, height: o.height, bottom: drop + o.sill };
+      const bottom = Math.max(0, drop - FINISH_THICKNESS - THRESHOLD_SINK);
+      return { offset, width: o.width, height: o.height + drop - bottom, bottom };
+    };
+    const wall = buildWall(length + T, level.wallHeight + drop, T, spec.openings.map(toHole));
+    wall.position.set((spec.x1 + spec.x2) / 2, base - drop, (spec.z1 + spec.z2) / 2);
+    wall.rotation.y = yawAlong(wallDirection(spec));
     wall.userData.isWall = true;
     wall.userData.isSolid = true;
     group.add(wall);
   }
-  for (const railing of house.railings) {
-    addRectBox(group, materials.railing, segmentRect(railing, RAILING_THICKNESS), 0, railing.height).userData.isSolid = true;
+  for (const railing of level.railings) {
+    addOrientedBar(group, materials.railing, railing, RAILING_THICKNESS, base, base + railing.height).userData.isSolid = true;
   }
-  for (const step of house.steps) addRectBox(group, materials.step, step, 0, step.height).userData.isSolid = true;
+  for (const step of level.steps) {
+    const mesh = addRectBox(group, materials.step, step, base, base + step.height);
+    mesh.userData.isSolid = !step.isVisualOnly;
+  }
+  return group;
+}
+
+function buildHouse(cfg: SceneConfig): THREE.Group {
+  const { house, groundMargin } = cfg.scene;
+  const group = new THREE.Group();
+  addRectBox(group, materials.grass, expandRect(houseBounds(house), groundMargin), -GROUND_DROP - FLOOR_THICKNESS, -GROUND_DROP);
+  house.levels.forEach((level, index) => group.add(buildLevel(house, level, index)));
   return group;
 }
 
@@ -446,6 +671,12 @@ const furnitureBuilders: Record<FurnitureType, (group: THREE.Group, size: Sizes,
   },
   bath(group, { width, depth, height }, mat) {
     addBox(group, mat, [width, height, depth], [0, height / 2, 0]);
+  },
+  // 汽車：下半部車身＋縮進的車廂。
+  car(group, { width, depth, height }, mat) {
+    const body = height * CAR_PARTS.bodyRatio;
+    addBox(group, mat, [width, body, depth], [0, body / 2, 0]);
+    addBox(group, mat, [width * CAR_PARTS.cabinWidth, height - body, depth * CAR_PARTS.cabinLength], [0, body + (height - body) / 2, -depth * CAR_PARTS.cabinShift]);
   },
   table(group, { width, depth, height }, mat) {
     const { topThickness, pedestal } = TABLE_PARTS;
@@ -510,18 +741,75 @@ function groundFenceBoxes(cfg: SceneConfig): THREE.Box3[] {
   ];
 }
 
-// 碰撞用軸對齊外框（Box3），每個方塊各算一個：桌子是桌面＋四支腳，可以鑽到底下、站上桌面。
-// 斜放的家具外框會比實際大一點，blockout 階段夠用。
+const colliderCorner = new THREE.Vector3();
+
+// 一個方塊的碰撞外框（軸對齊 Box3），每個方塊各算：桌子是桌面＋四支腳，可以鑽到底下、站上桌面。
+// 轉了 90° 倍數以外角度的方塊（斜牆、斜放的家具）沿長邊切成小段各算一個，
+// 不然整面斜牆的外框會擋住旁邊一大片空地。
+function meshColliders(mesh: THREE.Mesh): THREE.Box3[] {
+  const geometry = mesh.geometry;
+  const e = mesh.matrixWorld.elements;
+  const yaw = Math.atan2(e[2], e[0]);
+  const isAxisAligned = Math.abs(Math.sin(2 * yaw)) < 1e-4;
+  if (!(geometry instanceof THREE.BoxGeometry) || isAxisAligned) return [new THREE.Box3().setFromObject(mesh)];
+  const { width, height, depth } = geometry.parameters;
+  const isAlongX = width >= depth;
+  const length = isAlongX ? width : depth;
+  const count = Math.max(1, Math.ceil(length / COLLIDER_STEP));
+  const boxes: THREE.Box3[] = [];
+  for (let i = 0; i < count; i++) {
+    const box = new THREE.Box3();
+    for (const u of [-length / 2 + (length * i) / count, -length / 2 + (length * (i + 1)) / count]) {
+      for (const v of [-height / 2, height / 2]) {
+        for (const w of isAlongX ? [-depth / 2, depth / 2] : [-width / 2, width / 2]) {
+          colliderCorner.set(isAlongX ? u : w, v, isAlongX ? w : u).applyMatrix4(mesh.matrixWorld);
+          box.expandByPoint(colliderCorner);
+        }
+      }
+    }
+    boxes.push(box);
+  }
+  return boxes;
+}
+
 function collectColliders(): THREE.Box3[] {
   scene.updateMatrixWorld(true);
   const boxes = groundFenceBoxes(config);
   world.room.traverse((obj) => {
-    if (obj instanceof THREE.Mesh && (obj.userData.isSolid || obj.parent?.userData.isSolid)) boxes.push(new THREE.Box3().setFromObject(obj));
+    const strips = stripColliders.get(obj);
+    if (strips) boxes.push(...strips);
+    else if (obj instanceof THREE.Mesh && (obj.userData.isSolid || obj.parent?.userData.isSolid)) boxes.push(...meshColliders(obj));
   });
   world.furniture.traverse((obj) => {
-    if (obj instanceof THREE.Mesh && !obj.userData.isOutline) boxes.push(new THREE.Box3().setFromObject(obj));
+    if (obj instanceof THREE.Mesh && !obj.userData.isOutline) boxes.push(...meshColliders(obj));
   });
   return boxes;
+}
+
+// --- 樓層：編輯器一次只操作一層，環繞檢視時上面的樓層藏起來才看得到、點得到這層 ---
+let editLevel = 0;
+const levelAt = (cfg: SceneConfig, index: number): Level => {
+  const levels = cfg.scene.house.levels;
+  return levels[clamp(Math.round(index), 0, levels.length - 1)];
+};
+const editElevation = (): number => levelAt(config, editLevel).elevation;
+
+function applyLevelVisibility(): void {
+  const isEditing = currentMode().allowsEditing;
+  // 編輯某一層時，那層的天花板也藏起來，才看得到房間裡面。
+  world.room.traverse((obj) => {
+    const index: unknown = obj.userData.levelIndex;
+    if (typeof index === 'number') obj.visible = !isEditing || index <= editLevel;
+    const ceilingLevel: unknown = obj.userData.ceilingLevel;
+    if (typeof ceilingLevel === 'number') obj.visible = !isEditing || ceilingLevel !== editLevel;
+  });
+  for (const [key, group] of itemGroups) group.visible = !isEditing || config.furniture[key].level <= editLevel;
+  // 格線、佔地、活動空間這些編輯用的輔助只在環繞編輯時出現，畫在正在編輯那層的地板高度。
+  for (const group of [world.guides, world.overlay, world.editor]) {
+    group.position.y = editElevation();
+    group.visible = isEditing;
+  }
+  floorPlane.constant = -editElevation();
 }
 
 const itemGroups = new Map<string, THREE.Group>();
@@ -575,6 +863,9 @@ function rebuildScene(): void {
   world.room.add(buildHouse(config));
   for (const [key, item] of Object.entries(config.furniture)) renderItem(key, item);
   world.colliders = collectColliders();
+  world.ramps = config.scene.house.levels.flatMap((level) =>
+    level.ramps.map((ramp) => ({ ...ramp, bottom: level.elevation + ramp.bottom, top: level.elevation + ramp.top })));
+  applyLevelVisibility();
   updateRoomGrid();
   updateFootprint();
   refreshGizmo();
@@ -607,6 +898,13 @@ function orientedRect(item: Spot & { rotation: number }, cx: number, cz: number,
 
 const getFootprint = (item: Spot & { rotation: number; width: number; depth: number }): Footprint =>
   orientedRect(item, 0, 0, item.width / 2, item.depth / 2);
+
+// 四條邊都是東西向或南北向（沒有轉斜角）的佔地。
+const isAxisAlignedFootprint = (fp: Footprint): boolean =>
+  fp.corners.every((c, i) => {
+    const next = fp.corners[(i + 1) % fp.corners.length];
+    return Math.abs(next.x - c.x) < EPSILON || Math.abs(next.z - c.z) < EPSILON;
+  });
 
 const rectFootprint = (r: Rect): Footprint =>
   withBounds([{ x: r.minX, z: r.minZ }, { x: r.maxX, z: r.minZ }, { x: r.maxX, z: r.maxZ }, { x: r.minX, z: r.maxZ }]);
@@ -641,29 +939,23 @@ function footprintsOverlap(a: Footprint, b: Footprint): boolean {
   return true;
 }
 
-// 淨空區：牆的兩側都留。門留一個門寬的開門半徑、拉門留一人通過的深度（都擋所有家具）；
+// 淨空區：牆的兩側都留（斜牆也沿著牆的方向）。門留一個門寬的開門半徑、拉門留一人通過的深度（都擋所有家具）；
 // 窗前留 windowClearance，只擋比窗台高的家具。
-function getKeepClearZones(cfg: SceneConfig): KeepClearZone[] {
+function getKeepClearZones(level: Level, cfg: SceneConfig): KeepClearZone[] {
   const T = cfg.scene.house.wallThickness;
   const zones: KeepClearZone[] = [];
-  for (const wall of cfg.scene.house.walls) {
+  for (const wall of level.walls) {
     const dir = wallDirection(wall);
-    const isAlongX = Math.abs(dir.x) > Math.abs(dir.z);
     for (const opening of wall.openings) {
       const depth = opening.kind === 'window' ? cfg.scene.rules.windowClearance
         : opening.kind === 'slider' ? SLIDER_CLEARANCE : opening.width * DOOR_SWING_RATIO;
       const maxHeight = opening.kind === 'window' ? opening.sill ?? 0 : 0;
-      const cx = wall.x1 + dir.x * opening.offset;
-      const cz = wall.z1 + dir.z * opening.offset;
-      const half = opening.width / 2;
       for (const side of [-1, 1]) {
-        const near = side * T / 2;
-        const far = side * (T / 2 + depth);
-        const [a, b] = [Math.min(near, far), Math.max(near, far)];
-        const rect: Rect = isAlongX
-          ? { minX: cx - half, maxX: cx + half, minZ: cz + a, maxZ: cz + b }
-          : { minX: cx + a, maxX: cx + b, minZ: cz - half, maxZ: cz + half };
-        zones.push({ label: opening.label, maxHeight, rect });
+        const shift = side * (T / 2 + depth / 2);
+        const cx = wall.x1 + dir.x * opening.offset - dir.z * shift;
+        const cz = wall.z1 + dir.z * opening.offset + dir.x * shift;
+        const fp = orientedBox(cx, cz, dir, opening.width / 2, depth / 2);
+        zones.push({ label: opening.label, maxHeight, fp, cx, cz, along: opening.width, across: depth, angle: yawAlong(dir) });
       }
     }
   }
@@ -671,44 +963,51 @@ function getKeepClearZones(cfg: SceneConfig): KeepClearZone[] {
 }
 
 // 牆、欄杆、台階的佔地：家具不能和它們重疊。
-function structureRects(house: HouseConfig): Rect[] {
+function structureFootprints(level: Level, wallThickness: number): Footprint[] {
   return [
-    ...house.walls.map((wall) => wallRect(wall, house.wallThickness)),
-    ...house.railings.map((railing) => segmentRect(railing, RAILING_THICKNESS)),
-    ...house.steps,
+    ...level.walls.map((wall) => segmentFootprint(wall, wallThickness)),
+    ...level.railings.map((railing) => segmentFootprint(railing, RAILING_THICKNESS)),
+    ...level.steps.map(rectFootprint),
   ];
 }
 
-// 會擋住這件家具的東西：其他家具、牆（任何高度都擋）＋門窗淨空區（只擋比 maxHeight 高的家具）。
+// 會擋住這件家具的東西（同一層）：其他家具、牆（任何高度都擋）＋門窗淨空區（只擋比 maxHeight 高的家具）。
 function buildObstacles(key: string, cfg: SceneConfig): Obstacle[] {
+  const levelIndex = cfg.furniture[key]?.level ?? editLevel;
+  const level = levelAt(cfg, levelIndex);
   const items = Object.entries(cfg.furniture)
-    .filter(([otherKey]) => otherKey !== key)
+    .filter(([otherKey, other]) => otherKey !== key && other.level === levelIndex)
     .map(([, other]): Obstacle => ({ issue: `和${other.label}重疊`, fp: getFootprint(other), maxHeight: -Infinity }));
-  const structures = structureRects(cfg.scene.house)
-    .map((rect): Obstacle => ({ issue: '撞到牆', fp: rectFootprint(rect), maxHeight: -Infinity }));
-  const zones = getKeepClearZones(cfg)
-    .map((zone): Obstacle => ({ issue: `擋到${zone.label}`, fp: rectFootprint(zone.rect), maxHeight: zone.maxHeight }));
+  const structures = structureFootprints(level, cfg.scene.house.wallThickness)
+    .map((fp): Obstacle => ({ issue: '撞到牆', fp, maxHeight: -Infinity }));
+  const zones = getKeepClearZones(level, cfg)
+    .map((zone): Obstacle => ({ issue: `擋到${zone.label}`, fp: zone.fp, maxHeight: zone.maxHeight }));
   return [...items, ...structures, ...zones];
 }
 
-const isPointOnFloor = (x: number, z: number, house: HouseConfig): boolean =>
-  house.floors.some((f) => x >= f.minX - EPSILON && x <= f.maxX + EPSILON && z >= f.minZ - EPSILON && z <= f.maxZ + EPSILON);
+const isPointOnFloor = (x: number, z: number, level: Level): boolean =>
+  level.floors.some((floor) => isPointInPolygon(x, z, floor.points));
 
-// 佔地的四個角、四邊中點和中心都要踩在某塊地板上（地板是幾個相鄰的長方形，這樣取樣就夠）。
-function isOnFloor(fp: Footprint, house: HouseConfig): boolean {
+// 佔地的四個角、四邊中點和中心都要踩在某塊地板上（地板是相鄰的多邊形，這樣取樣就夠）。
+// 角剛好貼在多邊形邊上時射線法可能判在外面，所以取樣點往中心縮一點點。
+function isOnFloor(fp: Footprint, level: Level): boolean {
   const { corners } = fp;
   const samples = [
     ...corners,
     ...corners.map((c, i) => ({ x: (c.x + corners[(i + 1) % 4].x) / 2, z: (c.z + corners[(i + 1) % 4].z) / 2 })),
     { x: (fp.minX + fp.maxX) / 2, z: (fp.minZ + fp.maxZ) / 2 },
   ];
-  return samples.every((p) => isPointOnFloor(p.x, p.z, house));
+  const cx = (fp.minX + fp.maxX) / 2;
+  const cz = (fp.minZ + fp.maxZ) / 2;
+  const shrink = (v: number, c: number): number => v + Math.sign(c - v) * EPSILON;
+  return samples.every((p) => isPointOnFloor(shrink(p.x, cx), shrink(p.z, cz), level));
 }
 
 function findPlacementIssue(key: string, candidate: FurnitureItem, cfg: SceneConfig, obstacles = buildObstacles(key, cfg)): string | null {
   const fp = getFootprint(candidate);
-  if (!isOnFloor(fp, cfg.scene.house)) return '不在地板上';
-  if (candidate.height > cfg.scene.house.wallHeight + EPSILON) return '比牆高';
+  const level = levelAt(cfg, candidate.level);
+  if (!isOnFloor(fp, level)) return '不在地板上';
+  if (candidate.height > level.wallHeight + EPSILON) return '比牆高';
   for (const obstacle of obstacles) {
     if (candidate.height > obstacle.maxHeight && footprintsOverlap(fp, obstacle.fp)) return obstacle.issue;
   }
@@ -734,12 +1033,13 @@ const SEARCH_OFFSETS = (() => {
 // 先把佔地夾回房屋範圍內（拖到屋外也會落在邊上），再由近到遠試格點；
 // 找到後再貼齊一次，讓家具靠緊擋住它的東西，不會留下格點造成的小縫。
 function findNearestFreeSpot(key: string, candidate: FurnitureItem, cfg: SceneConfig): Spot | null {
-  if (candidate.height > cfg.scene.house.wallHeight + EPSILON) return null;
+  const level = levelAt(cfg, candidate.level);
+  if (candidate.height > level.wallHeight + EPSILON) return null;
   const obstacles = buildObstacles(key, cfg);
   const fp = getFootprint(candidate);
   const halfX = (fp.maxX - fp.minX) / 2;
   const halfZ = (fp.maxZ - fp.minZ) / 2;
-  const bounds = houseBounds(cfg.scene.house);
+  const bounds = levelBounds(level, cfg.scene.house.wallThickness);
   if (bounds.maxX - bounds.minX < 2 * halfX - EPSILON || bounds.maxZ - bounds.minZ < 2 * halfZ - EPSILON) return null;
   const start = {
     ...candidate,
@@ -788,10 +1088,13 @@ const SIDE_TEXT: Record<ClearanceSide, string> = { front: '前方', back: '後�
 const WALL_BLOCKER = '牆';
 
 function findZoneBlockers(key: string, fp: Footprint, rule: ClearanceRule, furniture: Record<string, FurnitureItem>, house: HouseConfig): string[] {
-  const isBlockedByStructure = !isOnFloor(fp, house) || structureRects(house).some((rect) => footprintsOverlap(fp, rectFootprint(rect)));
+  const levelIndex = furniture[key].level;
+  const level = house.levels[clamp(levelIndex, 0, house.levels.length - 1)];
+  const isBlockedByStructure = !isOnFloor(fp, level)
+    || structureFootprints(level, house.wallThickness).some((structure) => footprintsOverlap(fp, structure));
   const blockers = isBlockedByStructure ? [WALL_BLOCKER] : [];
   for (const [otherKey, other] of Object.entries(furniture)) {
-    if (otherKey === key || rule.ignoreTypes?.includes(other.type)) continue;
+    if (otherKey === key || other.level !== levelIndex || rule.ignoreTypes?.includes(other.type)) continue;
     if (footprintsOverlap(fp, getFootprint(other))) blockers.push(otherKey);
   }
   return blockers;
@@ -844,8 +1147,12 @@ function snapPosition(key: string, item: FurnitureItem, rawX: number, rawZ: numb
   const reach = config.scene.rules.edgeSnap;
   const edgesX: number[] = [];
   const edgesZ: number[] = [];
-  const others = Object.entries(config.furniture).filter(([otherKey]) => otherKey !== key).map(([, other]) => getFootprint(other));
-  for (const fp of [...others, ...structureRects(config.scene.house)]) {
+  const others = Object.entries(config.furniture)
+    .filter(([otherKey, other]) => otherKey !== key && other.level === item.level)
+    .map(([, other]) => getFootprint(other));
+  // 斜牆不當貼齊對象：貼齊只沿 X、Z 兩軸。
+  const structures = structureFootprints(levelAt(config, item.level), config.scene.house.wallThickness).filter(isAxisAlignedFootprint);
+  for (const fp of [...others, ...structures]) {
     const isAlongsideZ = fp.minZ < own.maxZ + reach && fp.maxZ > own.minZ - reach;
     const isAlongsideX = fp.minX < own.maxX + reach && fp.maxX > own.minX - reach;
     if (isAlongsideZ) edgesX.push(fp.minX, fp.maxX);
@@ -888,7 +1195,7 @@ function createOrbitMode(): ViewMode {
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;
-  controls.maxDistance = 30;
+  controls.maxDistance = 90;
   let savedPosition: THREE.Vector3 | null = null;   // 切回來時回到離開前的鏡頭位置
   return {
     allowsEditing: true,
@@ -1872,6 +2179,13 @@ function createFirstPersonMode(): ViewMode {
     for (const box of world.colliders) {
       if (box.max.y <= maxTop + SURFACE_EPSILON && box.max.y > height && overlapsAt(box, x, z)) height = box.max.y;
     }
+    // 樓梯的斜面：腳底範圍碰到就用中心點的高度，走起來是連續爬升，不會一階一階彈。
+    const r = config.character.radius;
+    for (const ramp of world.ramps) {
+      if (x + r <= ramp.minX || x - r >= ramp.maxX || z + r <= ramp.minZ || z - r >= ramp.maxZ) continue;
+      const rampTop = rampHeightAt(ramp, x, z);
+      if (rampTop <= maxTop + SURFACE_EPSILON && rampTop > height) height = rampTop;
+    }
     return height;
   }
 
@@ -2015,6 +2329,7 @@ function setViewMode(name: ViewModeName): void {
   activeMode = viewModes[name];
   activeModeName = name;
   activeMode.enter();
+  applyLevelVisibility();
   for (const list of document.querySelectorAll('[data-view]')) {
     if (list instanceof HTMLElement) list.hidden = list.dataset.view !== name;
   }
@@ -2219,7 +2534,7 @@ const clearanceZones = new THREE.Group();
 world.guides.add(roomGrid, footprint, clearanceZones);
 
 function updateRoomGrid(): void {
-  const bounds = houseBounds(config.scene.house);
+  const bounds = levelBounds(levelAt(config, editLevel), config.scene.house.wallThickness);
   const W = bounds.maxX - bounds.minX;
   const D = bounds.maxZ - bounds.minZ;
   roomGrid.position.set((bounds.minX + bounds.maxX) / 2, roomGrid.position.y, (bounds.minZ + bounds.maxZ) / 2);
@@ -2253,12 +2568,15 @@ function liveFurniture(): Record<string, FurnitureItem> {
   return { ...config.furniture, [action.key]: { ...action.draft, ...(action.landing ?? {}) } };
 }
 
-// 黃色活動空間：不夠的一律顯示（深黃）；選取中的家具連夠的也顯示（淺黃），讓人知道要留多少。
+// 黃色活動空間只在有選取（或拖曳）時顯示：選取中那件的區塊（不夠深黃、夠淺黃），
+// 加上被它擋住的其他家具的區塊。全部的提醒列在配置檢查的文字裡，不常駐畫在地上。
 function updateClearanceZones(): void {
   disposeChildren(clearanceZones);
   const activeKey = editor.action?.key ?? editor.selectedKey;
+  if (!activeKey) return;
   for (const entry of getClearanceReport(liveFurniture(), config.scene.house)) {
-    if (!entry.isFailed && entry.key !== activeKey) continue;
+    const isRelevant = entry.key === activeKey || (entry.isFailed && involvesKey(entry, activeKey));
+    if (!isRelevant) continue;
     const { item, zones, isFailed } = entry;
     const group = new THREE.Group();
     group.position.set(item.x, PREVIEW_LIFT * 0.75, item.z);
@@ -2282,7 +2600,7 @@ function targetPose(key: string): Pose {
     x: item.x,
     z: item.z,
     angle: THREE.MathUtils.degToRad(item.rotation),
-    lift: isLifted ? LIFT_HEIGHT : 0,
+    lift: levelAt(config, item.level).elevation + (isLifted ? LIFT_HEIGHT : 0),
   };
 }
 
@@ -2379,11 +2697,15 @@ function aimRay(event: PointerEvent): void {
   raycaster.setFromCamera(pointer, camera);
 }
 
+// 只點得到正在編輯那層的家具（上面樓層藏起來了，但射線還是會打到，所以要過濾）。
 function pickFurnitureKey(): string | null {
-  let obj: THREE.Object3D | null | undefined = raycaster.intersectObjects(world.furniture.children, true)[0]?.object;
-  while (obj && !obj.userData.furnitureKey) obj = obj.parent;
-  const key: unknown = obj?.userData.furnitureKey;
-  return typeof key === 'string' ? key : null;
+  for (const hit of raycaster.intersectObjects(world.furniture.children, true)) {
+    let obj: THREE.Object3D | null = hit.object;
+    while (obj && !obj.userData.furnitureKey) obj = obj.parent;
+    const key: unknown = obj?.userData.furnitureKey;
+    if (typeof key === 'string' && config.furniture[key]?.level === editLevel) return key;
+  }
+  return null;
 }
 
 function pickHandleId(): string | null {
@@ -2764,11 +3086,14 @@ function endAction(shouldCommit: boolean): void {
 }
 
 function showKeepClearZones(): void {
-  for (const { rect } of getKeepClearZones(config)) {
-    const zone = new THREE.Mesh(new THREE.PlaneGeometry(rect.maxX - rect.minX, rect.maxZ - rect.minZ), materials.keepClear);
+  for (const { cx, cz, along, across, angle } of getKeepClearZones(levelAt(config, editLevel), config)) {
+    const holder = new THREE.Group();
+    holder.position.set(cx, PREVIEW_LIFT / 2, cz);
+    holder.rotation.y = angle;
+    const zone = new THREE.Mesh(new THREE.PlaneGeometry(along, across), materials.keepClear);
     zone.rotation.x = -Math.PI / 2;
-    zone.position.set((rect.minX + rect.maxX) / 2, PREVIEW_LIFT / 2, (rect.minZ + rect.maxZ) / 2);
-    world.overlay.add(zone);
+    holder.add(zone);
+    world.overlay.add(holder);
   }
 }
 
@@ -2997,10 +3322,11 @@ function updateHandles({ group: gizmo, handles }: Gizmo): void {
 function placeActionBar(item: FurnitureItem): void {
   if (!ui.actionbar.classList.contains('visible')) return;
   const points: ScreenPoint[] = [];
+  const base = levelAt(config, item.level).elevation;
   for (const c of getFootprint(item).corners) {
-    for (const y of [0, item.height]) points.push(toScreen(new THREE.Vector3(c.x, y, c.z)));
+    for (const y of [base, base + item.height]) points.push(toScreen(new THREE.Vector3(c.x, y, c.z)));
   }
-  const center = toScreen(new THREE.Vector3(item.x, item.height / 2, item.z));
+  const center = toScreen(new THREE.Vector3(item.x, base + item.height / 2, item.z));
   const barWidth = ui.actionbar.offsetWidth;
   const barHeight = ui.actionbar.offsetHeight;
   const bottomY = Math.max(...points.map((p) => p.y));
@@ -3043,19 +3369,25 @@ function addOpeningFolder(parent: GUI, wall: Wall, opening: Opening): void {
   folder.close();
 }
 
-// 牆與地板的形狀只在 scene.config.json 改；這裡調牆高、牆厚與每個門窗。
+// 牆與地板的形狀只在 scene.config.json 改；這裡調每層的高度、牆厚與每個門窗。
 function addSceneGroup(panel: GUI): void {
   const { house, rules } = config.scene;
   const group = panel.addFolder('場景');
   const structure = group.addFolder('房屋');
-  structure.add(house, 'wallHeight', 2, 4, 0.05).name('牆高').onChange(rebuildScene);
   structure.add(house, 'wallThickness', 0.05, 0.4, 0.01).name('牆厚').onChange(rebuildScene);
+  structure.add(house, 'slabThickness', 0.1, 0.5, 0.01).name('樓板厚').onChange(rebuildScene);
   structure.add(config.scene, 'groundMargin', 1, 10, 0.5).name('草地外擴（m）').onChange(rebuildScene);
-  const openings = group.addFolder('門窗');
-  for (const wall of house.walls) {
-    for (const opening of wall.openings) addOpeningFolder(openings, wall, opening);
+  for (const level of house.levels) {
+    const folder = group.addFolder(level.label);
+    folder.add(level, 'elevation', 0, 10, 0.05).name('地板高度（m）').onChange(rebuildScene);
+    folder.add(level, 'wallHeight', 2, 6, 0.05).name('牆高').onChange(rebuildScene);
+    const openings = folder.addFolder('門窗');
+    for (const wall of level.walls) {
+      for (const opening of wall.openings) addOpeningFolder(openings, wall, opening);
+    }
+    openings.close();
+    folder.close();
   }
-  openings.close();
   const snap = group.addFolder('編輯吸附');
   snap.add(rules, 'gridSnap', 0.01, 0.5, 0.01).name('格線（m）');
   snap.add(rules, 'edgeSnap', 0, 0.5, 0.01).name('貼邊距離（m）');
@@ -3068,7 +3400,7 @@ function addFurnitureGroup(panel: GUI): void {
   furnitureGroup = panel.addFolder('家具');
   furnitureFolders.clear();
   for (const [key, item] of Object.entries(config.furniture)) {
-    const folder = furnitureGroup.addFolder(item.label);
+    const folder = furnitureGroup.addFolder(`${item.label}（${levelAt(config, item.level).label}）`);
     const { limits } = FURNITURE_SPECS[item.type];
     folder.add(item, 'x', -6, 6, 0.05).name('位置 X').onChange(rebuildScene);
     folder.add(item, 'z', -6, 6, 0.05).name('位置 Z').onChange(rebuildScene);
@@ -3193,9 +3525,24 @@ function addFileButtons(panel: GUI): void {
   panel.add({ restore: restoreDefaults }, 'restore').name('還原預設');
 }
 
+// 換編輯樓層：取消選取、上面的樓層藏起來，格線和拖曳平面移到這層的地板高度。
+function setEditLevel(index: number): void {
+  select(null);
+  editLevel = index;
+  rebuildScene();
+}
+
+function addLevelPicker(panel: GUI): void {
+  const options = Object.fromEntries(config.scene.house.levels.map((level, index) => [level.label, index]));
+  panel.add({ level: editLevel }, 'level', options).name('編輯樓層').onChange((value: unknown) => {
+    if (typeof value === 'number') setEditLevel(value);
+  });
+}
+
 function buildInspector(): GUI {
   const panel = new GUI({ title: 'Inspector' });
   addFileButtons(panel);
+  addLevelPicker(panel);
   addSceneGroup(panel);
   addFurnitureGroup(panel);
   addCharacterGroup(panel);
