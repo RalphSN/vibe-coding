@@ -30,6 +30,9 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 | `npm run build` | 先跑 `tsc` 型別檢查，再打包到 `dist/` |
 | `npm run preview` | 在本機開啟打包好的 `dist/`，確認正式版能跑 |
 | `npx tsc --noEmit` | 只跑型別檢查 |
+| `npm run house` | 用 `tools/gen-house.cjs` 重新產生房屋與家具（寫入前備份；加 `-- --dry-run` 只看數量） |
+| `npm run plans` | 依目前設定畫一、二樓平面圖（`floor-plan-1f.svg`、`floor-plan-2f.svg`） |
+| `npm run check-floors` | 檢查有沒有懸空、沒接好的牆 |
 
 ## 專案結構
 
@@ -38,6 +41,8 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 - `src/config/scene.config.json`：所有可調數值（房間、門窗、家具、角色、鏡頭）
 - `src/config/scene.config.ts`：設定檔的型別、欄位說明與格式檢查
 - `vite.config.ts`：含「儲存」用的 dev 外掛
+- `tools/`：房屋產生器、平面圖繪製、樓板檢查（Node 腳本，`--help` 看用法）
+- `floor-plan-1f.svg`、`floor-plan-2f.svg`：由 `npm run plans` 產生的平面圖
 - `src/style.css`：樣式
 - `assets/raw/`：原始素材（例如動畫包 zip），只放本機、不進 git
 - `assets/models/`：整理好、要給程式載入的模型
