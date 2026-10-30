@@ -41,7 +41,7 @@ sh ai-dev-rules/skills/course-web-neo-brutalism/scripts/build.sh course-web/ai-s
 
 ## 下次查證
 
-**2027-01-22**：2-2、2-5 的模型價格（Opus 5.5 $4／$20），和第一部一起查。
+**2027-01-29**：2-1、2-2、2-5 的模型名稱、價格、快取與 Batch 折扣、API 錯誤碼（2026-10-29 已重查一次）。
 
 ## 下一卷
 

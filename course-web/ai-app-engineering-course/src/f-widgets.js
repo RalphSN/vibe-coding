@@ -728,11 +728,11 @@ Widgets.chunker = {
 };
 
 /* ---------- ragtrace：一個問題走過 RAG 的每一站 ---------- */
-// props: { title, scenarios: [{ label, stages: [{ title, body: [blocks] }] }] }
+// props: { title, chip?, scenarios: [{ label, stages: [{ title, body: [blocks] }] }] }；chip 預設「RAG 追蹤」，其他課拿來當逐站對照時改標籤
 Widgets.ragtrace = {
   render(props) {
     return `<div class="jw rt">
-      <div class="jw-head"><span class="label" style="--chip:var(--m6)">RAG 追蹤</span><span class="grow">${esc(props.title || '一個問題，一站一站看')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m6)">${esc(props.chip || 'RAG 追蹤')}</span><span class="grow">${esc(props.title || '一個問題，一站一站看')}</span></div>
       ${props.scenarios.length > 1 ? chipGroup('情境', props.scenarios.map((s, i) => [String(i), s.label]), 'data-rt', '0') : ''}
       <div class="rt-inner"></div>
     </div>`;

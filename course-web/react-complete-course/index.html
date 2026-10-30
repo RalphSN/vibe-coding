@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>React 完整入門：從元件到 React 19.3</title>
-<meta name="description" content="互動式 React 完整課程：JSX 與元件、props 與 state、渲染與快照、副作用與 ref、Context 與 reducer、自訂 Hook、React Compiler、表單與 Actions、Suspense、Server Components、TypeScript 與測試。每課先預測、再看結果。內容查證至 2026 年 10 月（React 19.3）。">
+<meta name="description" content="互動式 React 完整課程：JSX 與元件、props 與 state、渲染與快照、副作用與 ref、Context 與 reducer、自訂 Hook、React Compiler、表單與 Actions、Suspense、Server Components、TypeScript 與測試。每課有可執行的範例與「深入」段落。內容查證至 2026 年 10 月（React 19.3）。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap">
@@ -1008,7 +1008,7 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 .jw .btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .mono { font-family: var(--font-mono); }
 
-/* ---------- runner：預測再執行 ---------- */
+/* ---------- runner：執行範例 ---------- */
 .run-code { width: 100%; min-height: 8rem; resize: vertical; padding: var(--sp-3) var(--sp-4); border: var(--bw-sm) solid var(--ink); background: var(--code-bg); color: var(--code-ink); font-family: var(--font-mono); font-size: var(--fs-code); line-height: 1.65; tab-size: 2; white-space: pre; overflow: auto; }
 .run-code:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .run-predict { display: grid; gap: var(--sp-2); }
@@ -1294,7 +1294,7 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 const SITE = {
   name: "React 完整入門：從元件到 React 19.3",
   updated: "2026 年 10 月",
-  verifiedOn: "2026-10-16",
+  verifiedOn: "2026-10-30",
   version: "v1",
 };
 
@@ -1428,6 +1428,13 @@ defineSources({
   'testing-library': { title: 'Testing Library｜React Testing Library', url: 'https://testing-library.com/docs/react-testing-library/intro/' },
   'react-activity': { title: 'react.dev｜<Activity>', url: 'https://react.dev/reference/react/Activity' },
   'react-view-transition': { title: 'react.dev｜<ViewTransition>', url: 'https://react.dev/reference/react/ViewTransition' },
+  'react-19': { title: 'react.dev｜React v19（2024-12-05）', url: 'https://react.dev/blog/2024/12/05/react-19' },
+  'react-compiler-install': { title: 'react.dev｜React Compiler Installation', url: 'https://react.dev/learn/react-compiler/installation' },
+  'react-rsc-cve': { title: 'react.dev｜Critical Security Vulnerability in React Server Components（2025-12-03）', url: 'https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components' },
+  'react-rsc-dos': { title: 'react.dev｜Denial of Service and Source Code Exposure in React Server Components（2025-12-11，含後續更新）', url: 'https://react.dev/blog/2025/12/11/denial-of-service-and-source-code-exposure-in-react-server-components' },
+  'vite8': { title: 'Vite 官方部落格｜Announcing Vite 8（2026-03-12）', url: 'https://vite.dev/blog/announcing-vite8' },
+  'vitest4': { title: 'Vitest 官方部落格｜Vitest 4', url: 'https://vitest.dev/blog/vitest-4' },
+  'react-router-rsc': { title: 'React Router｜React Server Components（實驗性）', url: 'https://reactrouter.com/how-to/react-server-components' },
   'react-frameworks': { title: 'react.dev｜Creating a React App（框架建議）', url: 'https://react.dev/learn/creating-a-react-app' },
 });
 
@@ -1558,6 +1565,7 @@ defineTerms({
   'JSX': { en: 'JSX', def: '在 JavaScript 裡寫類似 HTML 的語法，編譯後變成 React 元素（一般物件）。', example: '`<h1 className="title">{name}</h1>`' },
   'Vite': { en: 'Vite', def: '前端建置工具：開發時啟動很快、存檔立刻更新畫面，也負責打包正式版。', example: '`npm create vite@latest`' },
   'Fragment': { en: 'Fragment', def: '`<>…</>`：把多個元素包成一組，又不在 DOM 多加一層。', example: '`<><h1 /><p /></>`' },
+  '協調': { en: 'reconciliation', def: 'React 比對新舊兩棵元素樹、找出最少 DOM 變更的過程。', example: '型別不同就整棵換掉；清單靠 key 對應。' },
   '屬性': { en: 'JSX attribute', def: '寫在 JSX 標籤上的值；HTML 的 class 要寫 className、for 要寫 htmlFor。', example: '`<label htmlFor="email">`' },
 });
 
@@ -1582,11 +1590,12 @@ defineLessons({
       caption: '你只負責「state → JSX」這一步；更新 DOM 交給 React。',
       blocks: [
         '[[React]] 採用[[宣告式]]：[[元件]]是一個函式，輸入資料、回傳 [[JSX]]。資料改變時 React 重新[[渲染]]，比對前後差異，只更新需要改的 [[DOM]]。和[[命令式]]直接操作 DOM 相比，畫面永遠和資料一致。',
-        { type: 'table', caption: '2026-10-16 查證的版本', head: ['項目', '狀態'], rows: [
+        { type: 'table', caption: '2026-10-30 查證的版本', head: ['項目', '狀態'], rows: [
+          ['Vite', '8（2026-03-12），改用 Rolldown 打包'],
           ['React', '19.3（2026-09-09），ViewTransition 與 Fragment Refs 轉為穩定'],
           ['React 19.2', '2025-10-01：Activity、useEffectEvent'],
           ['React Compiler', '1.0（2025-10-07），自動記憶化'],
-          ['React Foundation', '2026-02 起由 Linux Foundation 託管'],
+          ['React Foundation', '2026-02-24 正式成立，由 Linux Foundation 託管'],
         ] },
       ],
     },
@@ -1609,45 +1618,28 @@ defineLessons({
         why: ['畫面越複雜，宣告式的好處越明顯'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'decl', label: '宣告式（描述結果）' }, { id: 'imp', label: '命令式（下指令）' }],
-          items: [
-            { text: '`{isLoggedIn ? <Avatar /> : <LoginButton />}`', answer: 'decl', why: '描述兩種狀態下的畫面。' },
-            { text: '`el.classList.add("active")`', answer: 'imp', why: '直接修改 DOM。' },
-            { text: '`<li className={done ? "done" : ""}>`', answer: 'decl', why: 'class 由狀態決定。' },
-            { text: '`list.appendChild(document.createElement("li"))`', answer: 'imp', why: '一步步建立 DOM。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`{isLoggedIn ? <Avatar /> : <LoginButton />}`', '宣告式（描述結果）', '描述兩種狀態下的畫面。'],
+          ['`el.classList.add("active")`', '命令式（下指令）', '直接修改 DOM。'],
+          ['`<li className={done ? "done" : ""}>`', '宣告式（描述結果）', 'class 由狀態決定。'],
+          ['`list.appendChild(document.createElement("li"))`', '命令式（下指令）', '一步步建立 DOM。']
+        ] },
         { type: 'svg', svg: Fig.vs('命令式與宣告式：命令式要記得每個要改的地方，容易不一致；宣告式只改資料，畫面由資料推導，永遠一致', { title: '命令式', lines: ['改資料', '再手動改每處畫面', '容易漏'], tone: 5 }, { title: '宣告式（React）', lines: ['只改資料', '畫面自動推導'], tone: 4 }), caption: '「單一事實來源」：資料是唯一的真相，畫面只是它的投影。' },
+        { type: 'widget', name: 'csrun', props: { title: 'JSX 編譯後是什麼', code: 'const el = <h1 className="title">你好</h1>;\nconsole.log(el.type);\nconsole.log(el.props);', output: 'h1\n{ className: "title", children: "你好" }\n（JSX 只是描述畫面的一般物件；React 拿這些物件和上一次比對，再決定要改哪些 DOM）' } },
+        { type: 'heading', id: 'deep-render-commit', text: '深入：渲染、提交與協調' },
+        '[[渲染]]分兩個階段：render 階段呼叫元件函式，算出新的元素樹；commit 階段才把差異寫進 [[DOM]]。render 階段可能被中斷、重做或丟棄（並行渲染），所以元件函式必須是純的：同樣的 props 與 state，回傳同樣的 JSX。',
+        '比對新舊兩棵樹的過程叫[[協調]]。一般的樹比對演算法是 O(n³)，React 用兩個假設把成本降到 O(n)：型別不同就整棵子樹換掉；同一層的清單用 key 對應（1-2）。',
+        { type: 'table', caption: '宣告式什麼時候不適用', head: ['情境', '為什麼宣告式不划算', '常見做法'], rows: [
+          ['Canvas 繪圖、每秒 60 格的遊戲', '每格都重建元件樹，成本太高', '用 ref 拿到 canvas，在 requestAnimationFrame 裡命令式繪製'],
+          ['整合會自己改 DOM 的函式庫（地圖、編輯器）', 'React 和函式庫會互相覆蓋', '交給 ref + Effect 管理一個空容器（3-3）'],
+          ['幾乎沒有互動的靜態頁', '多載入 React 執行環境卻沒有好處', '靜態 HTML，或框架的靜態輸出'],
+        ] },
       ],
-      tryit: {
-        q: ['用一句話說明「畫面 = f(狀態)」，並指出下面哪個是 f：'],
-        draft: 'function Greeting({ name }) {\n  return <h1>哈囉，{name}</h1>;\n}\n\nf 是：____\n狀態是：____',
-        answer: ['f 是 Greeting 這個元件函式；狀態（這裡是 props 的 name）是輸入。', '同樣的 name 一定得到同樣的畫面；name 改變時，React 再呼叫一次 Greeting 取得新畫面。'],
-      },
     },
     mistakes: [
       { wrong: '在 React 元件裡用 document.querySelector 改畫面。', why: 'React 下次渲染時會把你的修改覆蓋掉，畫面和資料不一致。', right: '改 state，讓 React 更新 DOM；真的要碰 DOM 用 ref（3-3）。' },
       { wrong: '以為 React 是完整框架，路由、資料抓取都內建。', why: 'React 是 UI 函式庫；路由、伺服器渲染由框架（Next.js、React Router）提供。', right: '依需求選工具（6-4）。' },
       { wrong: '照著 2020 年以前的教學寫 class 元件。', why: '現在的 React 以函式元件與 Hook 為主。', right: '一律寫函式元件。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'React 的主要工作是？', options: [
-        { text: '依資料計算畫面，並把差異更新到 DOM', correct: true, why: '你描述結果，它負責更新。' },
-        { text: '取代 HTML 與 CSS', why: '最後仍然是 HTML 與 CSS。' },
-        { text: '負責資料庫存取', why: '那是後端的工作。' },
-        { text: '讓 JavaScript 跑得更快', why: '不是它的目的。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下列哪一個寫法最符合 React 的思維？', options: [
-        { text: '`<p>{cart.length} 件商品</p>`', correct: true, why: '畫面直接由資料推導。' },
-        { text: '加入購物車時順便 `p.textContent = …`', why: '命令式地手動更新。' },
-        { text: '用 setInterval 每秒檢查並更新畫面', why: '不必要，React 依 state 變化更新。' },
-        { text: '在全域變數存 count 再手動重新整理頁面', why: '完全不是 React 的方式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼「畫面 = f(狀態)」能減少 bug？舉一個用 jQuery 時常見、在 React 裡不會發生的錯誤。'], answer: [
-        '畫面只由狀態決定，所以不會出現「資料改了、某處畫面沒改」。',
-        '例如購物車：jQuery 時代加入商品後要同時更新右上角數量、清單、總價三個地方，漏改一處就不一致；React 裡三處都從同一個 cart 狀態算出來，不可能不一致。',
-      ] },
     ],
     keypoints: [
       'React 是宣告式：你描述某狀態下的畫面，它負責更新 DOM。',
@@ -1662,14 +1654,6 @@ defineLessons({
       '用 Vite 建立 React 專案並啟動',
       '看懂專案的主要檔案',
       '寫出並使用第一個元件',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1）「宣告式」的意思是？', options: [
-        { text: '描述結果，不寫一步步怎麼改', correct: true, why: 'React 負責怎麼改。' },
-        { text: '先宣告所有變數', why: '和變數宣告無關。' },
-        { text: '一定要用 TypeScript', why: '無關。' },
-        { text: '直接操作 DOM', why: '那是命令式。' },
-      ] },
     ],
     analogy: {
       text: ['Vite 像廚房裡的備料台：你專心做菜（寫元件），它負責把食材洗好切好（轉換 JSX 與 TypeScript）、即時端給試吃的人（瀏覽器），出餐時再幫你裝盒（打包）。'],
@@ -1709,60 +1693,41 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Badge() {\n  console.log("渲染 Badge");\n  return <span>新</span>;\n}\n\nexport default function App() {\n  return (\n    <div>\n      <Badge />\n      <Badge />\n      <Badge />\n    </div>\n  );\n}',
-          predict: { q: '主控台會印出幾次「渲染 Badge」？（不考慮開發模式的 StrictMode）', options: ['3 次', '1 次', '0 次'], answer: 0 },
           output: '渲染 Badge\n渲染 Badge\n渲染 Badge\n（開發模式開了 StrictMode 時會各多呼叫一次，用來幫你發現不純的程式）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'dev', label: '開發時用' }, { id: 'prod', label: '上線前用' }],
-          items: [
-            { text: '`npm run dev`', answer: 'dev', why: '開發伺服器，存檔立即更新。' },
-            { text: '`npm run build`', answer: 'prod', why: '產生最佳化的正式版。' },
-            { text: '`npm run preview`', answer: 'prod', why: '本機預覽 build 的結果。' },
-            { text: '熱更新（HMR）', answer: 'dev', why: '開發時的功能。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`npm run dev`', '開發時用', '開發伺服器，存檔立即更新。'],
+          ['`npm run build`', '上線前用', '產生最佳化的正式版。'],
+          ['`npm run preview`', '上線前用', '本機預覽 build 的結果。'],
+          ['熱更新（HMR）', '開發時用', '開發時的功能。']
+        ] },
         { type: 'svg', svg: Fig.stack('從啟動到畫面出現：瀏覽器載入 index.html；執行 main.tsx；createRoot 在 #root 建立 React 根；渲染 App 與它裡面的所有元件', [
           { title: '1. 載入 index.html', tone: 1 },
           { title: '2. 執行 src/main.tsx', tone: 3 },
           { title: '3. createRoot(#root).render(<App />)', tone: 2 },
           { title: '4. App 與子元件被渲染成畫面', tone: 4 },
         ]), caption: '畫面一片空白時，先看主控台有沒有錯誤，再確認 #root 存在。' },
+        { type: 'heading', id: 'deep-vite-dev-build', text: '深入：開發與正式版為什麼不一樣' },
+        'Vite 開發時不打包：瀏覽器用原生 ES 模組逐檔請求，Vite 只即時轉換被請求的檔案，所以專案再大啟動都快。`npm run build` 才打包、壓縮、切分程式碼；Vite 8（2026-03-12）起改用 Rolldown 打包，取代原本 esbuild ＋ Rollup 的組合。',
+        'Vite 8 需要 Node.js 20.19+ 或 22.12+，建立專案失敗時先用 `node -v` 確認。開發與正式版行為不完全相同：StrictMode 的重複呼叫只在開發模式、環境變數在建置時才替換，所以上線前一定要 `npm run preview` 看一次正式版。',
+        { type: 'table', caption: '什麼時候不用 Vite 起手', head: ['你的情況', '建議'], rows: [
+          ['學習、單頁應用、內部工具', 'Vite 最合適'],
+          ['公開網站，需要 SEO 與伺服器渲染', '用框架（6-4），框架內部多半也用 Vite 或自己的打包器'],
+          ['既有網站只想加一個互動區塊', '在那一頁掛一個 React 根（createRoot），不必整站改寫'],
+        ] },
       ],
-      tryit: {
-        q: ['新增一個 Footer 元件，顯示「© 2026」，並放在 App 的最下面：'],
-        draft: 'function ____() {\n  return <footer>© 2026</footer>;\n}\n\nexport default function App() {\n  return (\n    <main>\n      <h1>哈囉</h1>\n      ____\n    </main>\n  );\n}',
-        answer: ['`function Footer()`、`<Footer />`。', '元件可以放在同一個檔案；變大之後再拆成 Footer.tsx 並 export。'],
-      },
     },
     mistakes: [
       { wrong: '元件名稱小寫開頭。', why: '被當成 HTML 標籤。', right: 'PascalCase：`ProductCard`。' },
       { wrong: '在元件函式裡面再定義另一個元件。', why: '每次渲染都產生新的元件型別，子元件的狀態會一直被重置，效能也差。', right: '元件都定義在最外層。' },
       { wrong: '照舊教學用 create-react-app。', why: 'CRA 已停止維護（2025 年官方宣布棄用）。', right: '用 Vite 或框架。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'Vite 專案中，把 App 掛到頁面上的是哪個檔案？', options: [
-        { text: '`src/main.tsx`', correct: true, why: '呼叫 createRoot().render(<App />)。' },
-        { text: '`src/App.tsx`', why: '它是元件本身。' },
-        { text: '`vite.config.ts`', why: '那是建置設定。' },
-        { text: '`package.json`', why: '那是套件設定。' },
-      ] },
-      { level: '應用', type: 'mc', q: '寫了 `<card />`（小寫）想使用 Card 元件，會怎樣？', options: [
-        { text: '被當成未知的 HTML 標籤，不會呼叫 Card', correct: true, why: '小寫開頭被視為 DOM 元素。' },
-        { text: 'React 自動把它對應到大寫的 Card 元件', why: '不會自動轉換，大小寫有意義。' },
-        { text: '編譯錯誤', why: '可以編譯，只是行為不對（TypeScript 會提示未知的內建元素）。' },
-        { text: '畫面顯示文字「card」', why: '不會顯示文字。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事問「為什麼不在 index.html 直接寫 HTML，而要用元件？」你怎麼回答？'], answer: [
-        '元件可以重複使用、接受資料（props），並把畫面、邏輯、狀態放在一起；同一張商品卡片寫一次，傳入不同商品就能顯示一百張。',
-        '純 HTML 適合不會變的內容；只要畫面會依資料或操作改變，元件能讓「資料 → 畫面」維持一致。',
-      ] },
-    ],
     keypoints: [
       '用 `npm create vite@latest` 建專案，`npm run dev` 開發。',
       'main.tsx 把 App 掛到 #root；之後都在元件裡工作。',
       '元件大寫開頭、定義在最外層。',
     ],
-    sources: ['vite', 'react-frameworks'],
+    sources: ['vite', 'vite8', 'react-frameworks'],
   },
 
   '0-3': {
@@ -1770,14 +1735,6 @@ defineLessons({
       '寫出合法的 JSX（單一根元素、標籤要關閉）',
       '用大括號放入 JavaScript 運算式',
       '分辨 JSX 屬性與 HTML 屬性的差異',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 0-2）為什麼元件不能定義在另一個元件裡？', options: [
-        { text: '每次渲染都產生新元件型別，子元件狀態被重置', correct: true, why: '定義在最外層。' },
-        { text: '語法錯誤', why: '語法合法，所以才危險。' },
-        { text: '只能有一個元件', why: '可以有很多。' },
-        { text: 'TypeScript 不允許巢狀函式，編譯會失敗', why: '允許，但不建議。' },
-      ] },
     ],
     analogy: {
       text: ['JSX 像填空的邀請卡範本：固定的文字照印，`{ }` 是填空格，可以放任何「算得出一個值」的東西——名字、日期、計算結果。'],
@@ -1791,7 +1748,8 @@ defineLessons({
       ]),
       caption: 'JSX 編譯後是函式呼叫，所以要遵守 JavaScript 的規則。',
       blocks: [
-        '[[JSX]] 看起來像 HTML，其實是 JavaScript。多個元素要用 [[Fragment]] 包成一個。[[屬性]]用 camelCase：className、htmlFor、onClick；style 接收物件。大括號裡放運算式。',
+        '[[JSX]] 看起來像 HTML，其實是 JavaScript。多個元素要用 [[Fragment]] 包成一個。',
+        '[[屬性]]用 camelCase：className、htmlFor、onClick；style 接收物件。大括號裡放運算式。',
         { type: 'code', lang: 'tsx', title: 'Profile.tsx', code: 'const user = { name: "阿明", avatar: "/a.png", followers: 1280 };\n\nexport default function Profile() {\n  return (\n    <>\n      <img src={user.avatar} alt={`${user.name} 的頭像`} className="avatar" />\n      <h2 style={{ fontSize: 24, marginBottom: 8 }}>{user.name}</h2>\n      <p>追蹤者：{user.followers.toLocaleString()}</p>\n      <label htmlFor="bio">自我介紹</label>\n      <textarea id="bio" />\n    </>\n  );\n}' },
       ],
     },
@@ -1816,26 +1774,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const items = 3;\nconst price = 120;\n\nexport default function Summary() {\n  return (\n    <p>\n      {items} 件，共 {items * price} 元\n      {items > 5 ? "（免運）" : "（運費 60）"}\n    </p>\n  );\n}',
-          predict: { q: '畫面顯示什麼？', options: ['3 件，共 360 元（運費 60）', '{items} 件，共 {items * price} 元', '3 件，共 360 元（免運）'], answer: 0 },
           output: '3 件，共 360 元（運費 60）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '可以放進 { }' }, { id: 'no', label: '不能直接放' }],
-          items: [
-            { text: '`{user.name}`', answer: 'ok', why: '運算式，得到一個值。' },
-            { text: '`{price * 0.9}`', answer: 'ok', why: '運算式。' },
-            { text: '`{if (ok) { "是" }}`', answer: 'no', why: 'if 是陳述式；改用 `{ok ? "是" : "否"}`。' },
-            { text: '`{items.map((x) => <li>{x}</li>)}`', answer: 'ok', why: 'map 回傳陣列，是運算式（還需要 key，1-2）。' },
-            { text: '`{for (const x of items) {}}`', answer: 'no', why: 'for 是陳述式。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`{user.name}`', '可以放進 { }', '運算式，得到一個值。'],
+          ['`{price * 0.9}`', '可以放進 { }', '運算式。'],
+          ['`{if (ok) { "是" }}`', '不能直接放', 'if 是陳述式；改用 `{ok ? "是" : "否"}`。'],
+          ['`{items.map((x) => <li>{x}</li>)}`', '可以放進 { }', 'map 回傳陣列，是運算式（還需要 key，1-2）。'],
+          ['`{for (const x of items) {}}`', '不能直接放', 'for 是陳述式。']
+        ] },
         { type: 'svg', svg: Fig.vs('JSX 不是字串也不是 HTML：JSX 編譯成函式呼叫，產生描述畫面的物件；React 再根據這些物件建立或更新真正的 DOM', { title: 'JSX', lines: ['`<h1>{name}</h1>`'], tone: 3 }, { title: '編譯後', lines: ['`jsx("h1", {…})`', '→ 一般物件'], tone: 4 }), caption: '大括號裡的字串會自動跳脫，可以防止 XSS（不要用 dangerouslySetInnerHTML 插入使用者內容）。' },
+        { type: 'heading', id: 'deep-jsx-transform', text: '深入：JSX 轉換與自動跳脫的邊界' },
+        'React 17 起使用「新的 JSX 轉換」：編譯器自動從 `react/jsx-runtime` 匯入 `jsx()`，所以檔案不用再寫 `import React from "react"`。舊教學檔案開頭都有這行，現在可以省略。',
+        '自動跳脫只保護「文字內容」。`href={userInput}` 若是 `javascript:` 開頭的網址仍可能執行程式；React 19 對這種網址會擋下並警告，但從使用者來的網址最好先檢查只允許 http、https。',
+        { type: 'table', caption: '大括號裡放不同的值會怎樣', head: ['寫法', '結果', '原因'], rows: [
+          ['`{true}`、`{false}`、`{null}`、`{undefined}`', '什麼都不顯示', '方便寫 `{cond && <X />}`'],
+          ['`{0}`、`{NaN}`', '顯示 0、NaN', '數字會被當成文字渲染（1-2 的陷阱）'],
+          ['`{[1, 2]}`', '顯示 12', '陣列的每一項依序渲染'],
+          ['`{{ a: 1 }}` 放在子元素位置', '執行時錯誤', '物件不能當成子元素'],
+        ] },
       ],
-      tryit: {
-        q: ['讓按鈕在 disabled 為 true 時加上 class「btn-off」，否則是「btn-on」：'],
-        draft: 'const disabled = true;\n<button className={____} disabled={____}>送出</button>',
-        answer: ['`className={disabled ? "btn-off" : "btn-on"}`、`disabled={disabled}`。', '屬性值要動態時一律用大括號；寫成 `"disabled"`（字串）就永遠是同一個值。'],
-      },
     },
     mistakes: [
       { wrong: '元件回傳兩個並列的元素。', why: 'JSX 一次只能回傳一個根。', right: '用 `<>…</>` 包起來。' },
@@ -1843,19 +1801,7 @@ defineLessons({
       { wrong: '`style="color: red"`。', why: 'style 要物件。', right: '`style={{ color: "red" }}`（外層大括號是運算式、內層是物件）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'JSX 中 HTML 的 class 屬性要寫成？', options: [
-        { text: '`className`', correct: true, why: 'class 是 JavaScript 保留字。' },
-        { text: '`class`', why: '會有警告且不建議。' },
-        { text: '`cssClass`', why: '沒有這個屬性。' },
-        { text: '`styleName`', why: '沒有這個屬性。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`<p>{"<b>粗體</b>"}</p>` 會顯示？', options: [
-        { text: '文字 `<b>粗體</b>`，不會變粗', correct: true, why: 'React 自動跳脫字串，防止 XSS。' },
-        { text: '粗體的「粗體」，因為 b 標籤會被解析', why: '字串不會被當成 HTML。' },
-        { text: '編譯錯誤', why: '合法。' },
-        { text: '什麼都不顯示', why: '會顯示原始文字。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['後端回傳一段 Markdown 轉好的 HTML，要顯示在頁面上。為什麼不能直接 `{html}`？要用什麼，風險是什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['後端回傳一段 Markdown 轉好的 HTML，要顯示在頁面上。為什麼不能直接 `{html}`？要用什麼，風險是什麼？'], answer: [
         '`{html}` 會把它當純文字顯示（跳脫）。要插入 HTML 得用 `dangerouslySetInnerHTML={{ __html: html }}`。',
         '名稱刻意寫「dangerous」：內容若含使用者輸入，可能被插入惡意 script（XSS）。必須先用 DOMPurify 之類的工具清洗，只允許安全的標籤。',
       ] },
@@ -1865,7 +1811,7 @@ defineLessons({
       '大括號放運算式；屬性用 camelCase（className、htmlFor）。',
       '字串會自動跳脫，插入 HTML 要先清洗。',
     ],
-    sources: ['react-jsx'],
+    sources: ['react-jsx', 'react-19'],
   },
 });
 </script>
@@ -1883,6 +1829,7 @@ defineTerms({
   '事件處理函式': { en: 'event handler', def: '傳給 onClick、onChange 等屬性的函式，使用者操作時被呼叫。', example: '`<button onClick={handleClick}>`' },
   '合成事件': { en: 'SyntheticEvent', def: 'React 包裝過的跨瀏覽器事件物件，API 和原生事件幾乎相同。', example: '`e.preventDefault()`' },
   '事件冒泡': { en: 'event propagation', def: '事件從被點的元素往外層一路傳遞；`e.stopPropagation()` 可以停止。', example: '點卡片裡的按鈕，卡片的 onClick 也會被觸發。' },
+  '事件委派': { en: 'event delegation', def: '不在每個元素上綁監聽器，而是在共同的祖先節點統一監聽，再依事件來源分派。React 17 起綁在根容器。', example: '一萬個按鈕也只有少數幾個原生監聽器。' },
   'children': { en: 'children', def: '寫在元件開關標籤之間的內容，會以 props.children 傳入。', example: '`<Card><p>內容</p></Card>`' },
   '組合': { en: 'composition', def: '用元件包住元件、透過 children 或 props 傳入 JSX 來建構畫面，取代繼承。', example: '`<Layout sidebar={<Menu />}>`' },
 });
@@ -1893,14 +1840,6 @@ defineLessons({
       '用 props 把資料傳給子元件',
       '用解構與預設值接收 props',
       '說出為什麼子元件不能修改 props',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-3）JSX 大括號裡可以放什麼？', options: [
-        { text: '運算式，例如 `{price * 2}`', correct: true, why: '要能算出一個值。' },
-        { text: 'if 陳述式，例如 `{if (ok) "是"}`', why: '不行，if 是陳述式；用三元運算子。' },
-        { text: 'for 迴圈', why: '不行，用 map。' },
-        { text: '只能放字串', why: '任何運算式都可以。' },
-      ] },
     ],
     analogy: {
       text: ['props 像點餐單：廚房（子元件）照單做菜，但不能改點餐單上的內容。想改點菜，要請客人（父元件）重新點一次。'],
@@ -1938,49 +1877,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Greeting({ name = "朋友", times = 1 }) {\n  return <p>{"嗨，" + name + "！".repeat(times)}</p>;\n}\n\nexport default function App() {\n  return (\n    <>\n      <Greeting />\n      <Greeting name="阿明" times={3} />\n      <Greeting name="小華" times="2" />\n    </>\n  );\n}',
-          predict: { q: '第三個 `times="2"`（字串）會顯示什麼？', options: ['嗨，小華！！', '嗨，小華！', '錯誤'], answer: 0 },
           output: '嗨，朋友！\n嗨，阿明！！！\n嗨，小華！！\n（"！".repeat("2") 會把 "2" 轉成 2；用 TypeScript 時這行會先報型別錯誤）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'string', label: '傳入字串' }, { id: 'expr', label: '傳入運算式的值' }],
-          items: [
-            { text: '`<Img src="a.png" />`', answer: 'string', why: '引號是字串字面值。' },
-            { text: '`<Img width={200} />`', answer: 'expr', why: '大括號：number 200。' },
-            { text: '`<Img width="200" />`', answer: 'string', why: '是字串 "200"，不是數字。' },
-            { text: '`<Btn disabled />`', answer: 'expr', why: '簡寫等於 `{true}`。' },
-            { text: '`<User data={user} />`', answer: 'expr', why: '傳入物件。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`<Img src="a.png" />`', '傳入字串', '引號是字串字面值。'],
+          ['`<Img width={200} />`', '傳入運算式的值', '大括號：number 200。'],
+          ['`<Img width="200" />`', '傳入字串', '是字串 "200"，不是數字。'],
+          ['`<Btn disabled />`', '傳入運算式的值', '簡寫等於 `{true}`。'],
+          ['`<User data={user} />`', '傳入運算式的值', '傳入物件。']
+        ] },
         { type: 'svg', svg: Fig.vs('props 與 state：props 由父元件給，子元件唯讀；state 由元件自己擁有，可以透過 set 函式更新', { title: 'props', lines: ['父元件給的', '唯讀'], tone: 3 }, { title: 'state', lines: ['自己擁有', '用 set 函式更新'], tone: 4 }), caption: '模組 2 會詳細講 state。' },
+        { type: 'heading', id: 'deep-props-identity', text: '深入：props 是凍結的快照，但只凍結一層' },
+        '開發模式下 React 會用 Object.freeze 凍結 JSX 元素的 props，而模組預設是嚴格模式，所以 `props.title = "x"` 會直接拋出 TypeError。',
+        '凍結是淺層的：`props.user.name = "x"` 不會報錯，卻改到父元件持有的資料，這就是比喻裡「物件 props 改得到」的原因。每次渲染傳下來的物件或箭頭函式都是新參考，平常沒差，只有子元件用了 memo（4-4）時才會讓記憶化失效。',
+        { type: 'table', head: ['傳法', '什麼時候用', '代價'], rows: [
+          ['個別列出 `name={…} price={…}`', '大多數情況', '多寫幾個字，但介面清楚'],
+          ['傳整個物件 `product={p}`', '子元件需要很多欄位', '子元件和資料形狀綁在一起'],
+          ['展開 `{...rest}`', '包裝原生元素（6-1）', '看不出傳了什麼，可能把不該給 DOM 的屬性傳下去'],
+        ] },
       ],
-      tryit: {
-        q: ['讓 Avatar 接收 size（預設 40）與 name，並用 size 設定圖片寬高：'],
-        draft: 'function Avatar({ name, size = ____ }: { name: string; size?: number }) {\n  return <img src={`/a/${name}.png`} width={____} height={size} alt={name} />;\n}',
-        answer: ['`size = 40`、`width={size}`。', '可選 props 加 `?`，再用解構的預設值處理沒傳的情況。'],
-      },
     },
     mistakes: [
       { wrong: '`<Img width="200" />` 以為傳的是數字。', why: '引號一律是字串。', right: '`width={200}`。' },
       { wrong: '在子元件裡修改 props 物件的屬性。', why: '父元件與其他使用同一物件的地方會被影響，React 也不會重新渲染。', right: '呼叫父元件傳下來的回呼函式。' },
       { wrong: '把 props 複製到 state：`useState(props.value)`。', why: 'props 之後改變時，state 不會跟著更新。', right: '直接使用 props；真的需要「初始值」才用 initialValue 這種命名。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '子元件要讓父元件的資料改變，正確做法是？', options: [
-        { text: '呼叫父元件透過 props 傳下來的函式', correct: true, why: '事件往上通知。' },
-        { text: '直接修改 props，React 會偵測到變化', why: 'props 唯讀，修改也不會觸發更新。' },
-        { text: '用全域變數', why: 'React 不會知道它改變了。' },
-        { text: '重新整理頁面', why: '不是 React 的方式。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`<Button primary />` 中 primary 的值是？', options: [
-        { text: '`true`', correct: true, why: '布林簡寫。' },
-        { text: '`"primary"`', why: '只寫名稱時是 true。' },
-        { text: '`undefined`', why: '有寫就是 true。' },
-        { text: '`""`', why: '不是空字串。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 堅持單向資料流？如果子元件可以直接改父元件的資料，大型應用會出現什麼問題？'], answer: [
-        '單向資料流讓「資料在哪裡被改」只有一個地方：擁有 state 的元件。出 bug 時只要找那個元件與它傳下去的函式。',
-        '如果任何子元件都能改，資料可能被畫面上十個地方修改，很難追蹤誰改的、什麼時候改的，畫面也可能不同步。',
-      ] },
     ],
     keypoints: [
       'props 是元件的參數，從父傳到子，而且唯讀。',
@@ -1995,14 +1915,6 @@ defineLessons({
       '用 &&、三元運算子、提早 return 做條件渲染',
       '用 map 渲染清單',
       '選對 key，並說出為什麼不能用索引',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-1）`<Img width="200" />` 中 width 的型別是？', options: [
-        { text: '字串', correct: true, why: '引號一律是字串。' },
-        { text: '數字', why: '要 `{200}` 才是數字。' },
-        { text: '布林', why: '不是。' },
-        { text: '自動判斷', why: 'JSX 不會自動轉型。' },
-      ] },
     ],
     analogy: {
       text: ['key 像學生的學號：老師重新排座位時，靠學號知道誰是誰，作業本（元件狀態）跟著對的人走。用「座號」（陣列索引）當 key，換座位後座號跟著位置走，作業本就發錯人。'],
@@ -2041,26 +1953,27 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const items = ["蘋果", "香蕉"];\n\nexport default function List() {\n  return (\n    <ul>\n      {items.map((name) => <li>{name}</li>)}\n    </ul>\n  );\n}',
-          predict: { q: '主控台會出現什麼？', options: ['key 的警告', '沒有任何訊息', '錯誤，畫面不顯示'], answer: 0 },
           output: '畫面：• 蘋果　• 香蕉\n!Warning: Each child in a list should have a unique "key" prop.',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'good', label: '好的 key' }, { id: 'bad', label: '不好的 key' }],
-          items: [
-            { text: '資料庫的 id', answer: 'good', why: '穩定且唯一。' },
-            { text: '陣列索引 i（清單會排序或刪除）', answer: 'bad', why: '位置改變時 key 跟著改，狀態錯位。' },
-            { text: '`Math.random()`', answer: 'bad', why: '每次渲染都不同，元件每次都被重建。' },
-            { text: '`crypto.randomUUID()` 在建立資料時產生並存起來', answer: 'good', why: '建立時產生一次並保存就是穩定的 id。' },
-            { text: '使用者名稱（可能重複）', answer: 'bad', why: '不保證唯一。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['資料庫的 id', '好的 key', '穩定且唯一。'],
+          ['陣列索引 i（清單會排序或刪除）', '不好的 key', '位置改變時 key 跟著改，狀態錯位。'],
+          ['`Math.random()`', '不好的 key', '每次渲染都不同，元件每次都被重建。'],
+          ['`crypto.randomUUID()` 在建立資料時產生並存起來', '好的 key', '建立時產生一次並保存就是穩定的 id。'],
+          ['使用者名稱（可能重複）', '不好的 key', '不保證唯一。']
+        ] },
         { type: 'svg', svg: Fig.vs('用索引當 key 時刪除第一項：原本 key 0 是蘋果、key 1 是香蕉，刪掉蘋果後香蕉變成 key 0，React 以為是蘋果被修改、香蕉被刪除，輸入框等狀態錯位；用 id 當 key 時 React 正確知道是蘋果被刪除', { title: 'key = 索引', lines: ['刪掉第一項後', '後面全部錯位'], tone: 5 }, { title: 'key = id', lines: ['正確知道', '哪一項被刪除'], tone: 4 }), caption: '清單只顯示、永遠不排序也不增刪時，索引才勉強可以。' },
+        { type: 'heading', id: 'deep-key-identity', text: '深入：key 是元件的身分證' },
+        'React 用「型別 ＋ 在父元件中的位置 ＋ key」判斷是不是同一個元件。三者相同就保留 state，任何一個不同就卸載舊的、建立新的。',
+        '所以 key 不只用在清單：`<ProfileForm key={userId} />` 換人時整個表單重置。反過來，`{isA ? <Counter /> : <Counter />}` 兩邊位置與型別相同，切換時 state 會被保留，常被誤以為是 bug。',
+        { type: 'table', head: ['情況', 'state 會保留嗎', '原因'], rows: [
+          ['同位置、同型別、同 key', '保留', '視為同一個元件'],
+          ['同位置，`<div>` 換成 `<section>`', '整棵子樹重置', '型別不同'],
+          ['同位置、同型別，key 改變', '重置', 'key 不同就是不同元件'],
+          ['索引當 key，刪除第一項', '保留但錯位', 'key 0 現在指向原本的第二項'],
+        ] },
+        '索引當 key 也有合理的場合：清單只在尾端新增、從不排序、項目沒有自己的 state（純顯示文字）。',
       ],
-      tryit: {
-        q: ['渲染使用者清單，並在沒有人時顯示「尚無使用者」：'],
-        draft: 'function Users({ users }: { users: { id: number; name: string }[] }) {\n  if (users.length === 0) return <p>尚無使用者</p>;\n  return (\n    <ul>\n      {users.____((u) => <li ____={u.id}>{u.name}</li>)}\n    </ul>\n  );\n}',
-        answer: ['`users.map(...)`、`key={u.id}`。', 'key 放在 map 回傳的最外層元素上；如果最外層是 Fragment，要用 `<Fragment key={…}>`。'],
-      },
     },
     mistakes: [
       { wrong: '`{count && <X />}`，count 可能是 0。', why: '畫面會顯示 0。', right: '`{count > 0 && <X />}`。' },
@@ -2068,19 +1981,7 @@ defineLessons({
       { wrong: '在 JSX 裡寫 if。', why: 'JSX 只接受運算式。', right: '三元運算子、&&，或在 return 前先算好。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'key 的主要作用是？', options: [
-        { text: '讓 React 在重新渲染時辨認每個項目', correct: true, why: '正確對應狀態與 DOM。' },
-        { text: '輸出成 DOM 屬性，給 CSS 選擇器使用', why: 'key 不會出現在 DOM。' },
-        { text: '傳給子元件當 props', why: 'key 不會傳進 props。' },
-        { text: '決定項目在畫面上的顯示順序', why: '順序由陣列決定。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`{items.length && <List />}`，items 是空陣列時畫面顯示？', options: [
-        { text: '`0`', correct: true, why: '&& 左邊是 0 時渲染 0。' },
-        { text: '什麼都不顯示', why: '0 會被渲染出來。' },
-        { text: '空的 List', why: '不會渲染 List。' },
-        { text: '錯誤', why: '不會報錯。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你想讓某個表單元件「切換使用者時完全重置」（清空所有欄位）。可以怎麼利用 key？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你想讓某個表單元件「切換使用者時完全重置」（清空所有欄位）。可以怎麼利用 key？'], answer: [
         '`<ProfileForm key={userId} user={user} />`：userId 改變時 key 不同，React 視為不同的元件，卸載舊的、建立新的，所有內部 state 都重置。',
         '這比在 effect 裡手動重置每個欄位簡單而且不會漏。',
       ] },
@@ -2098,14 +1999,6 @@ defineLessons({
       '為元素加上事件處理函式',
       '分辨「傳函式」與「呼叫函式」',
       '用 preventDefault 與 stopPropagation 控制事件',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）`{count && <X />}` 的陷阱是？', options: [
-        { text: 'count 為 0 時畫面出現 0', correct: true, why: '&& 左邊放布林。' },
-        { text: 'count 是 0 時 X 仍會渲染出來', why: '不會渲染 X，而是渲染出 0。' },
-        { text: '語法錯誤', why: '合法。' },
-        { text: 'count 會被改掉', why: '不會。' },
-      ] },
     ],
     analogy: {
       text: ['事件處理函式像門鈴的接線：你把「響鈴時要做什麼」接上去（傳函式），而不是現在就按一下（呼叫函式）。寫成 `onClick={handle()}` 等於裝門鈴時就自己按了一次。'],
@@ -2140,52 +2033,34 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'export default function Card() {\n  return (\n    <div onClick={() => console.log("開啟卡片")}>\n      <h3>商品</h3>\n      <button onClick={() => console.log("加入購物車")}>加入</button>\n    </div>\n  );\n}\n// 使用者點了「加入」按鈕',
-          predict: { q: '主控台會印出什麼？', options: ['加入購物車、開啟卡片', '只有加入購物車', '只有開啟卡片'], answer: 0 },
           output: '加入購物車\n開啟卡片\n（事件冒泡到外層 div；按鈕的處理函式加 e.stopPropagation() 可以阻止）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '正確傳入函式' }, { id: 'bad', label: '渲染時就呼叫了' }],
-          items: [
-            { text: '`onClick={handleClick}`', answer: 'ok', why: '傳函式本身。' },
-            { text: '`onClick={handleClick()}`', answer: 'bad', why: '渲染時呼叫，傳入的是回傳值。' },
-            { text: '`onClick={() => setOpen(true)}`', answer: 'ok', why: '箭頭函式，點擊時才執行。' },
-            { text: '`onClick={setOpen(true)}`', answer: 'bad', why: '渲染時就 setState，造成無限重新渲染。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`onClick={handleClick}`', '正確傳入函式', '傳函式本身。'],
+          ['`onClick={handleClick()}`', '渲染時就呼叫了', '渲染時呼叫，傳入的是回傳值。'],
+          ['`onClick={() => setOpen(true)}`', '正確傳入函式', '箭頭函式，點擊時才執行。'],
+          ['`onClick={setOpen(true)}`', '渲染時就呼叫了', '渲染時就 setState，造成無限重新渲染。']
+        ] },
         { type: 'svg', svg: Fig.stack('點擊卡片內按鈕時事件的路徑：先觸發按鈕的 onClick；接著冒泡到卡片 div 的 onClick；再往上到更外層；在按鈕處理函式呼叫 stopPropagation 可以在第一步就停住', [
           { title: '1. button 的 onClick', tone: 4 },
           { title: '2. 冒泡到 div 的 onClick', tone: 3 },
           { title: '3. 再往外層冒泡…', tone: 1 },
         ]), caption: '`e.stopPropagation()` 讓事件停在按鈕這一層。' },
+        { type: 'heading', id: 'deep-event-delegation', text: '深入：React 事件其實綁在根節點' },
+        'React 17 起，監聽器不綁在每個元素上，而是統一綁在 React 根容器（#root），事件冒泡到根時再分派給對應元件，這叫[[事件委派]]。畫面上有一萬個按鈕，也只有少數幾個原生監聽器。',
+        '邊界情況：在 React 裡呼叫 `e.stopPropagation()`，也會擋住綁在 document 上的原生監聽器。React 17 起 `onScroll` 不再冒泡（原生 scroll 本來就不冒泡）；需要在捕獲階段處理時，用 `onClickCapture` 這類 Capture 版本。',
+        { type: 'table', head: ['需求', '寫法'], rows: [
+          ['阻止表單重新載入、連結跳轉', '`e.preventDefault()`'],
+          ['內層按鈕不要觸發外層卡片', '`e.stopPropagation()`'],
+          ['外層要比內層先收到事件', '`onClickCapture`'],
+          ['點擊元件外部時關閉選單', 'Effect 裡對 document 加監聽並在清理時移除（3-2）'],
+        ] },
       ],
-      tryit: {
-        q: ['讓連結點擊時不跳轉，而是呼叫 openModal：'],
-        draft: '<a href="/detail" onClick={(e) => {\n  e.____();\n  ____();\n}}>看詳情</a>',
-        answer: ['`e.preventDefault(); openModal();`。', '保留 href 讓使用者可以用新分頁開啟或複製連結（無障礙與可用性），一般點擊才由 JS 處理。'],
-      },
     },
     mistakes: [
       { wrong: '`onClick={handleClick()}`。', why: '渲染時就執行；若裡面 setState 會無限重新渲染。', right: '`onClick={handleClick}` 或 `() => handleClick(x)`。' },
       { wrong: '表單送出沒有 preventDefault。', why: '瀏覽器重新載入頁面，state 全部消失。', right: 'onSubmit 裡 `e.preventDefault()`，或用 5-2 的 form action。' },
       { wrong: '用 `<div onClick>` 做按鈕。', why: '鍵盤無法操作、螢幕閱讀器不知道是按鈕。', right: '用 `<button type="button">`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '要讓點擊時才呼叫 `remove(id)`，正確寫法是？', options: [
-        { text: '`onClick={() => remove(id)}`', correct: true, why: '傳入之後才呼叫的函式。' },
-        { text: '`onClick={remove(id)}`', why: '渲染時就呼叫。' },
-        { text: '`onClick="remove(id)"`', why: 'React 不接受字串形式的處理函式。' },
-        { text: '`onClick={remove.bind(null)}`', why: '沒有帶入 id，點擊時 remove 收到的是事件物件。' },
-      ] },
-      { level: '應用', type: 'mc', q: '表單送出後整頁重新載入、輸入的資料不見了。最可能缺少？', options: [
-        { text: '`e.preventDefault()`', correct: true, why: '取消瀏覽器的預設送出行為。' },
-        { text: '`e.stopPropagation()`', why: '那是停止冒泡，不會阻止送出。' },
-        { text: 'key', why: '和表單送出無關。' },
-        { text: 'useEffect', why: '無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 建議子元件的事件 prop 命名成 onXxx，而父元件的處理函式命名成 handleXxx？'], answer: [
-        'onXxx 表示「事件發生時會呼叫你給的函式」，和原生 onClick 一致；handleXxx 表示「這是處理那個事件的實作」。',
-        '讀 `<SearchBox onSearch={handleSearch} />` 一眼就知道：SearchBox 會在搜尋時通知，父元件用 handleSearch 處理。命名一致讓資料流向更清楚。',
-      ] },
     ],
     keypoints: [
       '傳函式 `onClick={fn}`，不是呼叫 `onClick={fn()}`。',
@@ -2200,14 +2075,6 @@ defineLessons({
       '用 children 讓元件可以包住任意內容',
       '用 props 傳入 JSX 做出「插槽」',
       '用組合取代複雜的條件與繼承',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-3）點擊卡片內的按鈕，卡片的 onClick 也被觸發，原因是？', options: [
-        { text: '事件冒泡', correct: true, why: '用 stopPropagation 停止。' },
-        { text: 'key 重複', why: '無關。' },
-        { text: '元件渲染兩次', why: '無關。' },
-        { text: 'preventDefault 沒寫', why: 'preventDefault 不會停止冒泡。' },
-      ] },
     ],
     analogy: {
       text: ['children 像相框：相框（Card 元件）負責邊框、陰影、圓角，中間放什麼照片由使用的人決定。多個 props 插槽像有好幾格的展示框：標題一格、內容一格、按鈕一格。'],
@@ -2246,25 +2113,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Box({ children }: { children: React.ReactNode }) {\n  return <div className="box">[{children}]</div>;\n}\n\nexport default function App() {\n  return (\n    <Box>\n      <b>A</b>\n      <i>B</i>\n    </Box>\n  );\n}',
-          predict: { q: '畫面上方括號裡會有什麼？', options: ['粗體 A 和斜體 B', '空的', '只有 A'], answer: 0 },
           output: '[AB]（A 粗體、B 斜體；children 是包含兩個元素的陣列）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'children', label: '用 children' }, { id: 'slot', label: '用具名的 JSX props' }, { id: 'data', label: '用資料 props' }],
-          items: [
-            { text: 'Card 中間的任意內容', answer: 'children', why: '單一主要內容區。' },
-            { text: 'Layout 的側欄與主內容兩個區域', answer: 'slot', why: '兩個位置，各自命名。' },
-            { text: '商品卡片的價格數字', answer: 'data', why: '資料，元件自己決定怎麼顯示。' },
-            { text: 'Dialog 底部的按鈕區', answer: 'slot', why: '`footer={…}`。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['Card 中間的任意內容', '用 children', '單一主要內容區。'],
+          ['Layout 的側欄與主內容兩個區域', '用具名的 JSX props', '兩個位置，各自命名。'],
+          ['商品卡片的價格數字', '用資料 props', '資料，元件自己決定怎麼顯示。'],
+          ['Dialog 底部的按鈕區', '用具名的 JSX props', '`footer={…}`。']
+        ] },
         { type: 'svg', svg: Fig.vs('繼承與組合：其他框架常用子類別繼承基底元件；React 用組合，外框元件透過 children 或 props 接收內容', { title: '繼承（React 不用）', lines: ['FancyButton', 'extends Button'], tone: 5 }, { title: '組合（React 的方式）', lines: ['`<Button>`', '  `<Icon />`', '`</Button>`'], tone: 4 }), caption: 'React 官方：沒有發現需要元件繼承的情況。' },
+        { type: 'heading', id: 'deep-composition-patterns', text: '深入：組合不夠用時的三種延伸' },
+        'children 是不透明的：外層元件拿到的是一團 ReactNode，不該拆解或改寫它。外層需要知道每一項的資料時（例如 Tabs 要知道分頁標題），改傳資料陣列 `items={[{ id, label, content }]}`。',
+        'compound components（`<Tabs><Tabs.List /><Tabs.Panel /></Tabs>`）用 Context（4-1）在外層與內層之間共享狀態，是無樣式元件庫的常見做法。render prop 則是傳一個回傳 JSX 的函式，讓外層給資料、呼叫端決定每一項怎麼畫，例如 `renderItem={(item) => <Row {...item} />}`。',
+        { type: 'table', head: ['需求', '做法'], rows: [
+          ['一個主要內容區', 'children'],
+          ['幾個固定位置', '具名 JSX props（header、footer）'],
+          ['外層要知道每一項的資料', '傳資料陣列'],
+          ['外層給資料、呼叫端決定畫法', 'render prop'],
+          ['一組元件共享狀態', 'compound components ＋ Context'],
+        ] },
       ],
-      tryit: {
-        q: ['做一個 Alert 元件：type 決定顏色，內容用 children：'],
-        draft: 'function Alert({ type, ____ }: { type: "info" | "error"; children: React.____ }) {\n  return <div className={`alert alert-${type}`} role="alert">{children}</div>;\n}\n\n<Alert type="error">儲存失敗，請再試一次</Alert>',
-        answer: ['`children`、`React.ReactNode`。', 'role="alert" 讓螢幕閱讀器在內容出現時主動朗讀。'],
-      },
     },
     mistakes: [
       { wrong: '為了多一種樣式就加一個布林 prop（isLarge、isRed、hasIcon…）。', why: '組合數爆炸，元件內部充滿判斷。', right: '用 variant 字面型別，或讓使用者傳入 JSX。' },
@@ -2272,19 +2140,7 @@ defineLessons({
       { wrong: 'children 型別寫 `JSX.Element`。', why: '傳入文字或多個元素時型別不符。', right: '`React.ReactNode`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`<Card><p>內容</p></Card>` 中 `<p>內容</p>` 以什麼傳給 Card？', options: [
-        { text: '`props.children`', correct: true, why: '開關標籤之間的內容。' },
-        { text: '`props.content`', why: '要自己這樣命名才會有。' },
-        { text: '`props.body`', why: '同上。' },
-        { text: '不會傳入', why: '會以 children 傳入。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'Layout 需要「側欄」與「主內容」兩個區域，最清楚的寫法是？', options: [
-        { text: '`<Layout sidebar={<Nav />}>{main}</Layout>`', correct: true, why: '具名 props 加 children。' },
-        { text: '在 Layout 內部判斷 children 的第幾個是側欄', why: '依順序判斷很脆弱。' },
-        { text: '`<Layout>{[<Nav />, main]}</Layout>` 依位置判斷', why: '依順序判斷很脆弱，讀的人也看不出哪個是側欄。' },
-        { text: '用全域變數傳', why: '不是 React 的方式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['組合也能減少「props 一層層往下傳」（prop drilling）。怎麼做？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['組合也能減少「props 一層層往下傳」（prop drilling）。怎麼做？'], answer: [
         '如果中間的元件只是把 user 傳給更深的 Avatar，可以讓最外層直接建立 `<Avatar user={user} />`，以 children 或 slot 傳進中間的版面元件。',
         '中間層不需要知道 user，props 不用一層層傳。這是 Context（4-1）之前應該先考慮的做法。',
       ] },
@@ -2312,6 +2168,7 @@ defineTerms({
   '批次更新': { en: 'batching', def: '同一個事件裡的多次 set 會合併成一次重新渲染。', example: '同時 setName、setAge 只渲染一次。' },
   '不可變更新': { en: 'immutable update', def: '更新物件或陣列 state 時建立新的物件或陣列，而不是修改原本的。', example: '`setUser({ ...user, name: "小華" })`' },
   '展開運算子': { en: 'spread syntax', def: '`...` 複製物件或陣列的內容到新的物件或陣列。', example: '`[...items, newItem]`' },
+  '結構共享': { en: 'structural sharing', def: '不可變更新時只複製被改到的路徑，沒改的部分沿用原本的參考。', example: '`{ ...user, address: newAddress }` 裡的 orders 仍是同一個陣列。' },
   '狀態提升': { en: 'lifting state up', def: '兩個元件需要共用同一份 state 時，把 state 移到它們最近的共同父元件，再用 props 傳下去。', example: '兩個面板只能同時展開一個。' },
   '單一事實來源': { en: 'single source of truth', def: '每份資料只存在一個地方，其他地方都從它推導。', example: '總價從購物車清單計算，不另存 state。' },
   '受控元件': { en: 'controlled component', def: '值由父元件的 props 決定、變更透過回呼通知的元件。', example: '`<Tabs active={tab} onChange={setTab} />`' },
@@ -2323,14 +2180,6 @@ defineLessons({
       '用 useState 讓元件記住資料',
       '說出為什麼一般變數無法讓畫面更新',
       '遵守 Hook 只能在最上層呼叫的規則',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）子元件能修改 props 嗎？', options: [
-        { text: '不能，props 唯讀', correct: true, why: '這課的 state 才是元件可以改的資料。' },
-        { text: '可以，直接指定', why: '不會觸發更新，也違反規則。' },
-        { text: '只有物件型別的 props 可以', why: '都不應該修改。' },
-        { text: '只能改一次', why: '不能改。' },
-      ] },
     ],
     analogy: {
       text: ['一般變數像寫在便利貼上的數字：每次重新渲染，元件函式從頭執行，便利貼就重新寫一張，之前的數字不見了。state 像存在 React 保險箱裡的數字：函式每次執行時都去保險箱拿最新的，而且只有用指定的鑰匙（set 函式）改，React 才知道要重新渲染。'],
@@ -2370,29 +2219,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Profile({ showEmail }: { showEmail: boolean }) {\n  const [name, setName] = useState("阿明");\n  if (showEmail) {\n    const [email, setEmail] = useState("a@x.tw");\n  }\n  const [age, setAge] = useState(30);\n  return <p>{name} {age}</p>;\n}',
-          predict: { q: '這段程式有什麼問題？', options: ['在 if 裡呼叫 Hook，違反規則', '沒有問題', 'useState 不能用字串'], answer: 0 },
           output: '!React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.（eslint）\n（showEmail 改變時 Hook 數量不同，React 會拋錯或拿錯 state）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'state', label: '放 state' }, { id: 'not', label: '不用 state' }],
-          items: [
-            { text: '輸入框目前的文字', answer: 'state', why: '會變，而且要顯示。' },
-            { text: '從 props 的價格與數量算出的總價', answer: 'not', why: '每次渲染算出來就好（2-4、3-1）。' },
-            { text: '選單是否展開', answer: 'state', why: '使用者操作會改變，畫面要跟著變。' },
-            { text: '固定的常數，例如稅率 0.05', answer: 'not', why: '不會變，放在元件外面的常數。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['輸入框目前的文字', '放 state', '會變，而且要顯示。'],
+          ['從 props 的價格與數量算出的總價', '不用 state', '每次渲染算出來就好（2-4、3-1）。'],
+          ['選單是否展開', '放 state', '使用者操作會改變，畫面要跟著變。'],
+          ['固定的常數，例如稅率 0.05', '不用 state', '不會變，放在元件外面的常數。']
+        ] },
         { type: 'svg', svg: Fig.stack('React 依呼叫順序對應 state：第一個 useState 對應第一格 name；第二個對應第二格 age；如果中間的 Hook 被 if 跳過，之後全部錯位', [
           { title: '第 1 格：useState("阿明") → name', tone: 1 },
           { title: '第 2 格：useState(30) → age', tone: 3 },
           { title: '中間用 if 跳過一個 → 之後全部拿錯', tone: 5 },
         ], { arrows: false }), caption: '這就是 Hook 不能放在條件裡的原因。' },
+        { type: 'heading', id: 'deep-state-storage', text: '深入：state 存在哪裡、什麼時候被丟掉' },
+        'state 不存在元件函式裡，而是存在 React 為畫面上每個元件建立的內部節點上，依 Hook 呼叫順序排成一串。元件從畫面移除（卸載）時，這串 state 一起丟掉；再出現時從初始值重新開始。',
+        '`useState(expensive())` 每次渲染都會執行 expensive，只是結果被忽略；改成 `useState(() => expensive())`（惰性初始化）只在第一次執行。set 函式的參考是穩定的，不必列進 Effect 的相依陣列；傳入和目前相同的值（Object.is）時，React 通常會略過這次重新渲染。',
+        { type: 'table', caption: 'state 不是唯一的存放位置', head: ['你想存的東西', '放哪裡'], rows: [
+          ['畫面要顯示、會變', 'useState'],
+          ['不顯示、要跨渲染保留（計時器 id）', 'useRef（3-3）'],
+          ['重新整理頁面後還要在', 'localStorage 或伺服器；state 只在記憶體'],
+          ['應該出現在網址上（篩選條件、分頁）', 'URL 查詢參數，由路由管理'],
+        ] },
       ],
-      tryit: {
-        q: ['做一個開關：點按鈕在「開」與「關」之間切換：'],
-        draft: 'function Toggle() {\n  const [on, setOn] = useState(____);\n  return <button onClick={() => setOn(____)}>{on ? "開" : "關"}</button>;\n}',
-        answer: ['`useState(false)`、`setOn(!on)`（或 `setOn((v) => !v)`）。', '下一課會說明為什麼更新函式 `(v) => !v` 在某些情況更安全。'],
-      },
     },
     mistakes: [
       { wrong: '直接改 state 變數：`count = 5`。', why: 'React 不知道它變了，不會重新渲染。', right: '`setCount(5)`。' },
@@ -2400,19 +2249,7 @@ defineLessons({
       { wrong: '可以算出來的值也放 state。', why: '要手動保持同步，容易不一致。', right: '渲染時直接計算。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`useState(0)` 回傳的是？', options: [
-        { text: '`[目前值, 設定函式]`', correct: true, why: '用陣列解構接住。' },
-        { text: '目前值', why: '還有設定函式。' },
-        { text: '一個物件 `{ value, set }`', why: '是陣列。' },
-        { text: 'Promise', why: '不是非同步。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`const [items] = useState(loadFromStorage())`，有什麼問題？', options: [
-        { text: 'loadFromStorage 每次渲染都會被呼叫', correct: true, why: '初始值雖只用一次，但運算式每次都會執行；改成 `useState(() => loadFromStorage())`。' },
-        { text: '語法錯誤', why: '合法。' },
-        { text: 'items 不能是陣列，useState 只接受原始值', why: 'useState 可以存任何值。' },
-        { text: '沒有問題，初始值本來就只計算一次', why: '初始值只「使用」一次，但運算式每次渲染都會執行。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 選擇「呼叫 set 函式」而不是「直接改變數就自動偵測」（像 Vue 的響應式）？各有什麼取捨？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 React 選擇「呼叫 set 函式」而不是「直接改變數就自動偵測」（像 Vue 的響應式）？各有什麼取捨？'], answer: [
         'React 的做法讓「何時更新」很明確：只有呼叫 set 才會渲染，資料流好追蹤，也方便做批次更新與並行渲染。',
         '代價是要記得不可變更新（2-3），而且寫法比直接指定冗長。Vue 的響應式寫起來直覺，但更新時機與依賴追蹤比較隱含。',
       ] },
@@ -2430,14 +2267,6 @@ defineLessons({
       '說出「state 是這次渲染的快照」',
       '用更新函式依序累加 state',
       '理解批次更新與重新渲染的時機',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-1）`count = 5` 為什麼不會更新畫面？', options: [
-        { text: 'React 只在呼叫 set 函式時重新渲染', correct: true, why: '要 setCount(5)。' },
-        { text: 'count 是 const，改成 let 就會更新', why: '就算用 let 也不會更新畫面。' },
-        { text: '5 不是合法值', why: '值本身沒問題。' },
-        { text: '要等 1 秒', why: '和時間無關。' },
-      ] },
     ],
     analogy: {
       text: ['每次渲染像拍一張照片：照片裡的 count 是 0，你在照片上寫「把它改成 count + 1」三次，三次看到的都是照片裡的 0，結果都是 1。更新函式像寫「在最新的值上加 1」，React 會一張張依序套用。'],
@@ -2472,30 +2301,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Demo() {\n  const [n, setN] = useState(0);\n  function handle() {\n    setN(n + 1);\n    setN((x) => x + 10);\n    console.log("handle 裡的 n：", n);\n  }\n  return <button onClick={handle}>{n}</button>;\n}\n// 點一下按鈕',
-          predict: { q: '點一下後按鈕顯示多少？', options: ['11', '10', '1'], answer: 0 },
           output: 'handle 裡的 n： 0\n按鈕顯示：11\n（先替換成 0 + 1 = 1，再由更新函式 1 + 10 = 11）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'updater', label: '建議用更新函式' }, { id: 'direct', label: '直接給值就好' }],
-          items: [
-            { text: '計數器加 1', answer: 'updater', why: '新值依賴舊值。' },
-            { text: '把輸入框的值設成使用者輸入的文字', answer: 'direct', why: '新值不依賴舊值。' },
-            { text: '在清單尾端加一筆', answer: 'updater', why: '依賴舊清單。' },
-            { text: '關閉對話框（設成 false）', answer: 'direct', why: '固定的新值。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['計數器加 1', '建議用更新函式', '新值依賴舊值。'],
+          ['把輸入框的值設成使用者輸入的文字', '直接給值就好', '新值不依賴舊值。'],
+          ['在清單尾端加一筆', '建議用更新函式', '依賴舊清單。'],
+          ['關閉對話框（設成 false）', '直接給值就好', '固定的新值。']
+        ] },
         { type: 'svg', svg: Fig.stack('一次事件裡多個更新的處理：React 把 setN(n + 1) 與 setN(x => x + 10) 依序放入佇列；事件結束後依序計算 0 → 1 → 11；只重新渲染一次', [
           { title: '佇列 1：替換成 0 + 1', tone: 1 },
           { title: '佇列 2：x => x + 10', tone: 3 },
           { title: '依序計算：0 → 1 → 11', tone: 2 },
           { title: '只重新渲染一次，顯示 11', tone: 4 },
         ]), caption: '批次更新讓多次 set 只觸發一次渲染。' },
+        { type: 'heading', id: 'deep-batching-flushsync', text: '深入：批次更新的歷史與 flushSync' },
+        'React 18 以前，只有 React 事件處理函式裡的更新會批次；setTimeout、Promise 裡的每次 set 都各自渲染一次。React 18 的 createRoot 之後，所有地方都自動批次。',
+        '少數情況必須「set 完立刻更新 DOM」，例如新增訊息後馬上捲到最底：用 react-dom 的 `flushSync(() => setMessages(next))`，下一行就能讀到新的 DOM。它會打斷批次、拖慢效能，只在必要時用。',
+        { type: 'table', head: ['寫法', '適合', '注意'], rows: [
+          ['`setX(5)`', '新值和舊值無關', '—'],
+          ['`setX((x) => x + 1)`', '新值依賴舊值', '更新函式要純：StrictMode 會呼叫兩次檢查'],
+          ['`flushSync(() => setX(…))`', '下一行必須讀到新 DOM', '打斷批次，少用'],
+        ] },
       ],
-      tryit: {
-        q: ['讓按一下按鈕就把分數加 3（呼叫三次也要正確）：'],
-        draft: 'function addPoint() {\n  setScore(____ => ____ + 1);\n}\n<button onClick={() => { addPoint(); addPoint(); addPoint(); }}>+3</button>',
-        answer: ['`setScore((s) => s + 1)`。', '直接寫 `setScore(score + 1)` 時三次都會是同一個快照值加 1，結果只加 1。'],
-      },
     },
     mistakes: [
       { wrong: 'set 之後立刻讀 state，以為已經是新值。', why: '目前這次渲染的 state 不會改變。', right: '要用新值就自己先算好：`const next = count + 1; setCount(next); use(next);`。' },
@@ -2503,19 +2331,7 @@ defineLessons({
       { wrong: '在 setTimeout 或非同步回呼裡讀 state 想拿到最新值。', why: '閉包抓到的是建立時的快照。', right: '用更新函式，或用 ref 存最新值（3-3）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`setCount(count + 1); console.log(count);` 印出的是？', options: [
-        { text: '更新前的值', correct: true, why: '這次渲染的快照不會變。' },
-        { text: '更新後的值', why: '要等下一次渲染。' },
-        { text: 'undefined', why: '仍是原本的值。' },
-        { text: '一個 Promise', why: 'set 不回傳任何東西。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`setN(5); setN((x) => x * 2);`，n 原本是 1，結果是？', options: [
-        { text: '`10`', correct: true, why: '先替換成 5，再 5 × 2。' },
-        { text: '`2`', why: '更新函式拿到的是佇列中的最新值 5，不是 1。' },
-        { text: '`5`', why: '還有第二個更新。' },
-        { text: '`6`', why: '是乘以 2。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['聊天室：使用者送出訊息後 3 秒，要顯示「已送出給 {收件人}」。如果使用者在這 3 秒內切換了收件人，應該顯示哪一位？React 預設會顯示哪一位？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['聊天室：使用者送出訊息後 3 秒，要顯示「已送出給 {收件人}」。如果使用者在這 3 秒內切換了收件人，應該顯示哪一位？React 預設會顯示哪一位？'], answer: [
         '多半應該顯示「送出時」的收件人，React 預設也正是如此：setTimeout 的回呼抓住的是送出那次渲染的快照。',
         '這正是快照模型的好處：非同步行為依「事件發生時」的資料進行，不會被之後的狀態改變影響。真的需要最新值時才用 ref。',
       ] },
@@ -2533,14 +2349,6 @@ defineLessons({
       '用展開運算子更新物件 state',
       '用 map、filter、展開更新陣列 state',
       '說出為什麼不能直接修改 state 物件',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-2）在清單尾端加一筆，建議寫法是？', options: [
-        { text: '`setItems((list) => [...list, item])`', correct: true, why: '依賴舊值時用更新函式。' },
-        { text: '`items.push(item)`', why: '直接修改，React 不會更新（這課的重點）。' },
-        { text: '`setItems(items.concat(item).sort())`', why: 'concat 回傳新陣列沒問題，但多了不需要的 sort，順序也被改變。' },
-        { text: '`items = [...items, item]`', why: '沒有呼叫 set。' },
-      ] },
     ],
     analogy: {
       text: ['React 比較 state 像比對兩份文件的「檔案編號」：編號一樣就認定沒改。你在原文件上塗改（直接修改物件），編號沒變，React 就不會重新渲染。要改就影印一份新的（建立新物件），新編號才會被注意到。'],
@@ -2580,29 +2388,28 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Tags() {\n  const [tags, setTags] = useState(["react"]);\n  function add() {\n    tags.push("hooks");\n    setTags(tags);\n  }\n  return (\n    <>\n      <p>{tags.join(", ")}</p>\n      <button onClick={add}>新增</button>\n    </>\n  );\n}\n// 點一下按鈕',
-          predict: { q: '點一下後畫面會更新嗎？', options: ['不會，參考沒變', '會，顯示 react, hooks', '會報錯'], answer: 0 },
           output: '畫面仍是：react\n（tags 陣列被改了，但 setTags 收到同一個參考，React 略過渲染）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '正確（新陣列或新物件）' }, { id: 'bad', label: '錯誤（修改原本的）' }],
-          items: [
-            { text: '`setList([...list, item])`', answer: 'ok', why: '新陣列。' },
-            { text: '`list.splice(i, 1); setList(list)`', answer: 'bad', why: 'splice 修改原陣列。' },
-            { text: '`setList(list.filter((x) => x.id !== id))`', answer: 'ok', why: 'filter 回傳新陣列。' },
-            { text: '`setUser({ ...user, age: 31 })`', answer: 'ok', why: '新物件。' },
-            { text: '`user.age = 31; setUser({ ...user })`', answer: 'bad', why: '雖然最後是新物件，但已經修改了原本的 state（可能被其他地方共用）。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`setList([...list, item])`', '正確（新陣列或新物件）', '新陣列。'],
+          ['`list.splice(i, 1); setList(list)`', '錯誤（修改原本的）', 'splice 修改原陣列。'],
+          ['`setList(list.filter((x) => x.id !== id))`', '正確（新陣列或新物件）', 'filter 回傳新陣列。'],
+          ['`setUser({ ...user, age: 31 })`', '正確（新陣列或新物件）', '新物件。'],
+          ['`user.age = 31; setUser({ ...user })`', '錯誤（修改原本的）', '雖然最後是新物件，但已經修改了原本的 state（可能被其他地方共用）。']
+        ] },
         { type: 'svg', svg: Fig.tree('巢狀物件的更新：只複製被修改的路徑；user 是新物件，address 是新物件，但沒改到的 orders 陣列繼續共用原本的', { title: '新的 user', lines: ['`{ ...user, address: … }`'], tone: 4 }, [
           { title: '新的 address', lines: ['city 改成台中'], tone: 3 },
           { title: '原本的 orders', lines: ['沒改，共用'], tone: 1 },
         ]), caption: '巢狀很深時，可以用 Immer（useImmer）以「看似直接修改」的寫法產生不可變更新。' },
+        { type: 'heading', id: 'deep-structural-sharing', text: '深入：淺複製為什麼不慢' },
+        '不可變更新只複製「被改到的路徑」，其他部分沿用舊參考，這叫[[結構共享]]。一千筆的陣列改一項，map 會建立一個新陣列，但沒改的 999 個物件都不複製，成本通常遠小於一次 DOM 更新。',
+        '結構共享也是 memo（4-4）能運作的前提：沒改的物件參考相同，用它的子元件就能略過渲染。反過來，`structuredClone` 深複製會讓每個參考都變新，等於放棄結構共享，不適合拿來更新 state。',
+        { type: 'table', head: ['做法', '適合', '代價'], rows: [
+          ['展開運算子與 map、filter', '一到兩層的資料', '巢狀深時很冗長'],
+          ['Immer（useImmer）', '巢狀很深的資料', '多一個套件；只有草稿可以「直接改」'],
+          ['把資料攤平（以 id 為鍵的物件）', '關聯多、常依 id 更新', '要另外維護排序'],
+        ] },
       ],
-      tryit: {
-        q: ['刪除指定 id 的商品：'],
-        draft: 'function remove(id: number) {\n  setCart((items) => items.____((it) => it.id ____ id));\n}',
-        answer: ['`items.filter((it) => it.id !== id)`。', 'filter 保留「不是要刪的」項目，回傳新陣列。'],
-      },
     },
     mistakes: [
       { wrong: '`state.push(x); setState(state)`。', why: '參考相同，React 不重新渲染。', right: '`setState([...state, x])`。' },
@@ -2610,19 +2417,7 @@ defineLessons({
       { wrong: '`list.sort()` 後 setList(list)。', why: 'sort 原地排序。', right: '`list.toSorted(…)` 或 `[...list].sort(…)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'React 怎麼判斷物件 state 有沒有改變？', options: [
-        { text: '比較新舊參考（Object.is）', correct: true, why: '所以要建立新物件。' },
-        { text: '深度比較新舊物件的每一個屬性', why: '不會深度比較，只比參考。' },
-        { text: '比較 JSON 字串', why: '不會。' },
-        { text: '每次都重新渲染', why: '參考相同時會略過。' },
-      ] },
-      { level: '應用', type: 'mc', q: '把第 2 項（索引 1）的數量改成 5，哪個寫法正確？', options: [
-        { text: '`setItems(items.map((it, i) => i === 1 ? { ...it, qty: 5 } : it))`', correct: true, why: '新陣列、新物件。' },
-        { text: '`items[1].qty = 5; setItems([...items])`', why: '修改了原本的物件。' },
-        { text: '`setItems(items.map((it, i) => { if (i === 1) it.qty = 5; return it; }))`', why: 'map 回傳新陣列，但裡面直接修改了原本的物件。' },
-        { text: '`items.splice(1, 1, {...items[1], qty: 5})`', why: 'splice 修改原陣列，也沒呼叫 set。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼不可變更新能讓「上一步／復原」功能變得簡單？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼不可變更新能讓「上一步／復原」功能變得簡單？'], answer: [
         '每次更新都產生新的 state 物件，舊的 state 完整保留、不會被修改。只要把每一版存進陣列，復原就是回到上一個索引。',
         '如果直接修改，所有「歷史版本」其實指向同一個物件，早就被改掉了，無法復原。',
       ] },
@@ -2640,14 +2435,6 @@ defineLessons({
       '判斷 state 該放在哪個元件',
       '把兩個元件共用的 state 提升到共同父元件',
       '避免重複與可以計算出來的 state',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）刪除陣列 state 的一項，建議用？', options: [
-        { text: '`filter`', correct: true, why: '回傳新陣列。' },
-        { text: '`splice`', why: '修改原陣列。' },
-        { text: '`pop`', why: '修改原陣列，而且只能刪最後一個。' },
-        { text: '`delete arr[i]`', why: '留下空洞而且修改原陣列。' },
-      ] },
     ],
     analogy: {
       text: ['兩個房間要共用一台電視遙控器，與其各買一支（兩份 state 不同步），不如把遙控器放在客廳（共同父元件），誰要用就從客廳拿（props），按了也是通知客廳（回呼）。'],
@@ -2685,30 +2472,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Filter() {\n  const [query, setQuery] = useState("");\n  return <input value={query} onChange={(e) => setQuery(e.target.value)} />;\n}\nfunction List() {\n  const [query] = useState("");\n  return <ul>{products.filter((p) => p.name.includes(query)).map(/* … */)}</ul>;\n}\nexport default function Page() {\n  return <><Filter /><List /></>;\n}\n// 在輸入框輸入「耳機」',
-          predict: { q: '清單會依輸入篩選嗎？', options: ['不會，兩個 query 是不同的 state', '會', '輸入框打不了字'], answer: 0 },
           output: '清單沒有變化。\n（Filter 與 List 各有一份 query；要把 query 提升到 Page，傳給兩者）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'state', label: '存 state' }, { id: 'derived', label: '渲染時計算' }],
-          items: [
-            { text: '購物車的商品清單', answer: 'state', why: '原始資料。' },
-            { text: '購物車的商品總數', answer: 'derived', why: '從清單算。' },
-            { text: '搜尋框的文字', answer: 'state', why: '使用者輸入。' },
-            { text: '符合搜尋文字的商品', answer: 'derived', why: '從清單與搜尋文字算。' },
-            { text: '目前選中的商品（只存 id）', answer: 'state', why: '存 id，不要存整個物件。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['購物車的商品清單', '存 state', '原始資料。'],
+          ['購物車的商品總數', '渲染時計算', '從清單算。'],
+          ['搜尋框的文字', '存 state', '使用者輸入。'],
+          ['符合搜尋文字的商品', '渲染時計算', '從清單與搜尋文字算。'],
+          ['目前選中的商品（只存 id）', '存 state', '存 id，不要存整個物件。']
+        ] },
         { type: 'svg', svg: Fig.stack('state 該放哪裡的判斷：找出所有用到這份 state 的元件；找出它們最近的共同父元件；把 state 放在那裡，用 props 往下傳', [
           { title: '1. 誰需要這份資料？', tone: 1 },
           { title: '2. 它們最近的共同父元件是誰？', tone: 3 },
           { title: '3. state 放那裡，props 往下傳', tone: 4 },
         ]), caption: '共同父元件離太遠、傳太多層時，考慮組合（1-4）或 Context（4-1）。' },
+        { type: 'heading', id: 'deep-state-placement', text: '深入：state 放太高或太低的代價' },
+        '放太低：兄弟元件拿不到，只好各存一份，兩份不同步。放太高：每次更新都讓整棵子樹重新渲染，還要把大量 props 往下傳。',
+        '把 state 往下移到真正用到它的元件，是最常被忽略的效能手段：只有搜尋框用到的 query 留在搜尋框裡，打字時就不會讓整頁重新渲染。元件也可以同時支援受控與非受控：提供 `value`／`onChange`，也接受 `defaultValue`，原生 `<input>` 就是這樣設計的。',
+        { type: 'table', head: ['症狀', '可能原因', '調整'], rows: [
+          ['兩個地方顯示的值不一致', '同一份資料存了兩份', '提升到共同父元件'],
+          ['打一個字整頁都變慢', 'state 放太高', '移到真正用到的元件'],
+          ['中間元件只為了轉傳而接 props', '層數太多', '組合（1-4）或 Context（4-1）'],
+          ['伺服器資料散在很多元件的 state', '把快取當成 state 管', '交給 TanStack Query 或框架（5-3）'],
+        ] },
       ],
-      tryit: {
-        q: ['讓 Filter 與 List 共用 query：把 state 放到 Page：'],
-        draft: 'export default function Page() {\n  const [query, setQuery] = useState("");\n  return (\n    <>\n      <Filter value={____} onChange={____} />\n      <List query={query} />\n    </>\n  );\n}',
-        answer: ['`value={query}`、`onChange={setQuery}`。', 'Filter 變成受控元件：顯示父元件給的值，變更時通知父元件。'],
-      },
     },
     mistakes: [
       { wrong: '兩個兄弟元件各自 useState 同一份資料。', why: '兩份會不同步。', right: '提升到共同父元件。' },
@@ -2716,19 +2503,7 @@ defineLessons({
       { wrong: 'selectedItem 存整個物件。', why: '清單裡的物件更新後，selectedItem 還是舊的那份。', right: '存 selectedId，渲染時 `items.find(i => i.id === selectedId)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '兩個元件需要同步同一份資料，應該？', options: [
-        { text: '把 state 提升到最近的共同父元件', correct: true, why: '單一事實來源。' },
-        { text: '兩邊各存一份再用 effect 同步', why: '容易不一致又多一次渲染。' },
-        { text: '用全域變數', why: 'React 不會知道它改變。' },
-        { text: '一律放在 App', why: '不一定需要那麼高。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下列哪一個「不應該」存成 state？', options: [
-        { text: '`fullName`（姓加名）', correct: true, why: '可以算出來。' },
-        { text: '`firstName`（使用者在輸入框打的名字）', why: '使用者輸入，要存。' },
-        { text: '`isMenuOpen`', why: '使用者操作狀態。' },
-        { text: '`selectedId`', why: '使用者選擇。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['表單有「國家」與「城市」兩個下拉選單，換國家時城市要清空。有人用 useEffect 監聽國家變化再 setCity("")。有沒有更好的寫法？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['表單有「國家」與「城市」兩個下拉選單，換國家時城市要清空。有人用 useEffect 監聽國家變化再 setCity("")。有沒有更好的寫法？'], answer: [
         '在國家的 onChange 處理函式裡同時 `setCountry(v); setCity("")`：兩個更新在同一事件裡批次處理，只渲染一次，而且意圖清楚。',
         '用 effect 會先渲染一次「新國家 + 舊城市」的錯誤組合，再渲染一次修正，還多一層間接。3-1 會專門談「你可能不需要 Effect」。',
       ] },
@@ -2765,14 +2540,6 @@ defineLessons({
       '分辨「渲染時計算」、「事件處理」與「Effect」',
       '把不需要的 Effect 改成計算或事件處理',
       '說出 Effect 真正的用途：和外部系統同步',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-4）能從其他 state 算出來的值應該？', options: [
-        { text: '渲染時直接計算', correct: true, why: '這課會看到它也能取代很多 Effect。' },
-        { text: '存成另一個 state', why: '要手動同步。' },
-        { text: '用 Effect 同步到另一個 state', why: '多一次渲染又容易出錯。' },
-        { text: '存在全域變數', why: '不是 React 的方式。' },
-      ] },
     ],
     analogy: {
       text: ['Effect 像餐廳打烊後才做的「跟外面對帳」：對帳本來就是廚房以外的事。但很多人把「算今天賣了多少」（廚房裡就能算的）也拖到打烊後才做，還要再開一次店（重新渲染）把結果貼出來。'],
@@ -2817,50 +2584,32 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Form() {\n  const [first, setFirst] = useState("阿");\n  const [last, setLast] = useState("明");\n  const [full, setFull] = useState("");\n  useEffect(() => {\n    setFull(first + last);\n  }, [first, last]);\n  console.log("渲染，full =", full);\n  return <p>{full}</p>;\n}\n// 元件第一次出現',
-          predict: { q: '第一次出現時主控台會印幾次「渲染」？', options: ['2 次', '1 次', '無限多次'], answer: 0 },
           output: '渲染，full = \n渲染，full = 阿明\n（第一次渲染時 full 還是空的；改成 const full = first + last 只需要 1 次）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'render', label: '渲染時計算' }, { id: 'event', label: '事件處理函式' }, { id: 'effect', label: 'Effect' }],
-          items: [
-            { text: '依搜尋文字篩選商品', answer: 'render', why: '從 state 算得出來。' },
-            { text: '使用者按「送出」後呼叫 API', answer: 'event', why: '因為使用者的動作。' },
-            { text: '元件出現時連線到聊天室', answer: 'effect', why: '和外部系統同步。' },
-            { text: '計算購物車總價', answer: 'render', why: '衍生資料。' },
-            { text: '把 document.title 設成目前頁面標題', answer: 'effect', why: '同步到 React 以外的 DOM。' },
-            { text: '加入購物車後顯示通知', answer: 'event', why: '使用者的動作造成的。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['依搜尋文字篩選商品', '渲染時計算', '從 state 算得出來。'],
+          ['使用者按「送出」後呼叫 API', '事件處理函式', '因為使用者的動作。'],
+          ['元件出現時連線到聊天室', 'Effect', '和外部系統同步。'],
+          ['計算購物車總價', '渲染時計算', '衍生資料。'],
+          ['把 document.title 設成目前頁面標題', 'Effect', '同步到 React 以外的 DOM。'],
+          ['加入購物車後顯示通知', '事件處理函式', '使用者的動作造成的。']
+        ] },
         { type: 'svg', svg: Fig.vs('多餘 Effect 的代價：用 Effect 同步衍生 state 時，會先渲染錯的值，再渲染一次正確的值；直接計算只渲染一次，而且沒有中間的錯誤狀態', { title: 'Effect 同步', lines: ['渲染 1：舊值', '渲染 2：正確值'], tone: 5 }, { title: '直接計算', lines: ['渲染 1：正確值'], tone: 4 }), caption: '中間那次錯誤的渲染可能造成畫面閃爍。' },
+        { type: 'heading', id: 'deep-effect-chains', text: '深入：Effect 連鎖與只做一次的初始化' },
+        'Effect 連鎖是指 A 的 Effect 改 state、觸發 B 的 Effect 再改另一個 state。每一環多一次渲染，中間狀態還可能被使用者看到；把整串邏輯移進同一個事件處理函式，通常一次就算完。',
+        '整個 App 只該做一次的初始化（讀設定、檢查登入 token），不要放在 `useEffect(…, [])`：StrictMode 會執行兩次。放在模組頂層，或用一個模組變數記錄「已初始化」。依 props 抓資料仍是 Effect 的合理用途，但要處理競態（3-2），正式專案多半交給框架或 TanStack Query。',
+        { type: 'table', head: ['程式碼為什麼要執行', '放哪裡'], rows: [
+          ['使用者點了、輸入了', '事件處理函式'],
+          ['props 或 state 變了，要算出新值', '渲染時計算'],
+          ['元件在畫面上，要和外部系統保持一致', 'Effect'],
+          ['整個 App 只做一次', '模組頂層'],
+        ] },
       ],
-      tryit: {
-        q: ['把這段 Effect 改成事件處理：'],
-        draft: '// 原本\nuseEffect(() => {\n  if (submitted) api.send(form);\n}, [submitted]);\n\n// 改成：\nfunction handleSubmit() {\n  ____\n}',
-        answer: ['`function handleSubmit() { api.send(form); }`，並移除 submitted state 與 Effect。', '「因為使用者按了送出」就放在送出的事件處理函式裡；用 state 旗標加 Effect 間接觸發，既繞路又容易重複送出。'],
-      },
     },
     mistakes: [
       { wrong: '用 Effect 把 props 或 state 轉換成另一個 state。', why: '多一次渲染，也容易不同步。', right: '渲染時計算。' },
       { wrong: '用「旗標 state + Effect」處理使用者動作。', why: '繞路、難以追蹤，可能重複觸發。', right: '直接在事件處理函式裡做。' },
       { wrong: '在渲染時呼叫 API 或改 localStorage。', why: '渲染可能執行多次，也可能被丟棄。', right: '事件處理函式或 Effect。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'Effect 主要用來做什麼？', options: [
-        { text: '讓元件和 React 以外的系統同步', correct: true, why: '例如連線、訂閱、DOM API。' },
-        { text: '計算衍生資料', why: '渲染時計算即可。' },
-        { text: '處理按鈕點擊', why: '用事件處理函式。' },
-        { text: '把 state 轉換成另一個 state，讓元件渲染得更快', why: 'Effect 反而常讓渲染變多；衍生資料在渲染時計算。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'userId prop 改變時要清空留言輸入框，最好的做法是？', options: [
-        { text: '`<CommentBox key={userId} />`', correct: true, why: 'key 改變時元件重建，state 自動重置。' },
-        { text: '在 Effect 裡 `setText("")`', why: '能用但會先渲染一次舊內容。' },
-        { text: '把 text 存到全域變數，切換時清空', why: '不需要，也不會觸發渲染。' },
-        { text: '重新整理頁面', why: '不需要。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 官方要花一整頁說「你可能不需要 Effect」？這反映了大家常有的什麼誤解？'], answer: [
-        '很多人把 useEffect 當成「state 改變時要做某事」的監聽器（類似 Vue 的 watch），結果用 Effect 串起一連串 state 更新，程式難懂又慢。',
-        'Effect 的正確心智模型是「同步」：只要元件在畫面上，就讓某個外部系統和目前的 props、state 保持一致。不是外部系統的事，就不需要 Effect。',
-      ] },
     ],
     keypoints: [
       '先問「為什麼要執行」：算得出來→渲染時；使用者動作→事件處理；和外部同步→Effect。',
@@ -2876,14 +2625,6 @@ defineLessons({
       '說出 Effect 何時執行、何時清理',
       '理解開發模式下 Effect 執行兩次的原因',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-1）使用者按「送出」後呼叫 API，該放哪裡？', options: [
-        { text: '事件處理函式', correct: true, why: '因為使用者的動作。' },
-        { text: 'Effect', why: '不需要。' },
-        { text: '渲染時', why: '渲染要是純的。' },
-        { text: 'useRef', why: '無關。' },
-      ] },
-    ],
     analogy: {
       text: ['Effect 像用 Bluetooth 連接耳機：元件出現時連線（Effect），換了一副耳機（相依值改變）要先斷開舊的（清理）再連新的，元件離開畫面時一定要斷線（卸載時清理）。'],
       limit: ['真的耳機很少頻繁切換；Effect 在相依值改變時就會「斷開再連」，相依陣列寫錯會讓它太常或太少執行。'],
@@ -2897,7 +2638,8 @@ defineLessons({
       ]),
       caption: '每一次「連線」都配對一次「斷線」。',
       blocks: [
-        '[[Effect]] 在畫面更新後執行。[[相依陣列]]列出 Effect 用到的所有[[響應式值]]：空陣列表示只在出現時執行；省略則每次渲染後都執行。回傳[[清理函式]]，在下次執行前與卸載時呼叫。開發模式的 [[StrictMode]] 會刻意執行「連線→斷線→連線」，讓沒寫清理的 bug 立刻現形。',
+        '[[Effect]] 在畫面更新後執行。[[相依陣列]]列出 Effect 用到的所有[[響應式值]]：空陣列表示只在出現時執行；省略則每次渲染後都執行。',
+        '回傳[[清理函式]]，在下次執行前與卸載時呼叫。開發模式的 [[StrictMode]] 會刻意執行「連線→斷線→連線」，讓沒寫清理的 bug 立刻現形。',
         { type: 'code', lang: 'tsx', title: 'ChatRoom.tsx', code: 'import { useEffect, useState } from "react";\n\nexport function ChatRoom({ roomId }: { roomId: string }) {\n  const [messages, setMessages] = useState<string[]>([]);\n\n  useEffect(() => {\n    const conn = createConnection(roomId);\n    conn.on("message", (m: string) => setMessages((list) => [...list, m]));\n    conn.connect();\n    return () => {\n      conn.disconnect();\n      setMessages([]);\n    };\n  }, [roomId]);\n\n  return <ul>{messages.map((m, i) => <li key={i}>{m}</li>)}</ul>;\n}' },
       ],
     },
@@ -2922,25 +2664,24 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Logger({ id }: { id: number }) {\n  useEffect(() => {\n    console.log("開始", id);\n    return () => console.log("清理", id);\n  }, [id]);\n  return null;\n}\n// 正式版：id 從 1 變成 2，然後元件被移除',
-          predict: { q: '主控台的順序是？', options: ['開始 1、清理 1、開始 2、清理 2', '開始 1、開始 2、清理 1、清理 2', '開始 1、開始 2'], answer: 0 },
           output: '開始 1\n清理 1\n開始 2\n清理 2\n（開發模式的 StrictMode 會在最前面多一組「開始 1、清理 1」）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'empty', label: '`[]`：只在出現時' }, { id: 'deps', label: '`[a, b]`：a 或 b 改變時' }, { id: 'none', label: '省略：每次渲染後' }],
-          items: [
-            { text: '頁面出現時向分析服務記錄一次「瀏覽」', answer: 'empty', why: '只需要一次（StrictMode 開發時會兩次）。' },
-            { text: '依 roomId 連線聊天室', answer: 'deps', why: 'roomId 改變要重連。' },
-            { text: '每次渲染後把捲動位置記錄下來（很少需要）', answer: 'none', why: '省略相依陣列，但通常是錯誤設計。' },
-            { text: '依 query 抓取搜尋結果', answer: 'deps', why: 'query 改變要重新抓。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['頁面出現時向分析服務記錄一次「瀏覽」', '`[]`：只在出現時', '只需要一次（StrictMode 開發時會兩次）。'],
+          ['依 roomId 連線聊天室', '`[a, b]`：a 或 b 改變時', 'roomId 改變要重連。'],
+          ['每次渲染後把捲動位置記錄下來（很少需要）', '省略：每次渲染後', '省略相依陣列，但通常是錯誤設計。'],
+          ['依 query 抓取搜尋結果', '`[a, b]`：a 或 b 改變時', 'query 改變要重新抓。']
+        ] },
         { type: 'svg', svg: Fig.vs('相依陣列不要說謊：Effect 用到 roomId 卻寫空陣列，roomId 改變時不會重連，連到舊房間；列出 roomId，改變時正確地斷開再連線', { title: '`[]`（漏列 roomId）', lines: ['換房間不重連', '連到舊房間'], tone: 5 }, { title: '`[roomId]`', lines: ['換房間時', '斷開再連'], tone: 4 }), caption: '想讓 Effect 少執行，要改程式結構（例如 3-4 的 useEffectEvent），不是刪掉相依項。' },
+        { type: 'heading', id: 'deep-effect-timing', text: '深入：Effect 的執行時機與 useLayoutEffect' },
+        'useEffect 通常在瀏覽器畫出畫面之後才執行，所以 Effect 裡改 state 造成的變化，使用者可能先看到舊畫面一瞬間。要在畫面出現前量測版面（例如提示框該放在按鈕上方還是下方），用 useLayoutEffect：它在 DOM 更新後、瀏覽器繪製前同步執行。',
+        'useLayoutEffect 會擋住繪製，用多了畫面會卡，而且伺服器渲染時不執行。相依陣列用 Object.is 比較：物件或函式每次渲染都是新的，放進相依陣列會讓 Effect 每次都跑，解法是在 Effect 裡面建立物件，或只依賴原始值（`roomId`，而不是 `options`）。',
+        { type: 'table', head: ['Hook', '執行時機', '用途'], rows: [
+          ['useEffect', '繪製之後（通常）', '連線、訂閱、記錄'],
+          ['useLayoutEffect', 'DOM 更新後、繪製之前', '量測版面、避免閃爍'],
+          ['useInsertionEffect', '版面效果之前', '只給 CSS-in-JS 函式庫插入樣式'],
+        ] },
       ],
-      tryit: {
-        q: ['監聽視窗大小並在卸載時移除監聽：'],
-        draft: 'useEffect(() => {\n  function onResize() { setWidth(window.innerWidth); }\n  window.addEventListener("resize", onResize);\n  return () => window.____("resize", onResize);\n}, ____);',
-        answer: ['`removeEventListener`、`[]`。', '加入與移除要用同一個函式參考；onResize 定義在 Effect 裡，不需要列進相依陣列。'],
-      },
     },
     mistakes: [
       { wrong: '開了計時器、監聽、連線，卻沒有清理函式。', why: '卸載後仍在執行，開發模式會重複。', right: '回傳清理函式。' },
@@ -2948,19 +2689,7 @@ defineLessons({
       { wrong: '看到開發模式 Effect 跑兩次，就加旗標阻止。', why: '那是 StrictMode 刻意幫你找缺少的清理。', right: '寫好清理函式，讓「連線→斷線→連線」的結果正確。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '清理函式什麼時候執行？', options: [
-        { text: '下次 Effect 執行前，以及元件卸載時', correct: true, why: '兩個時機都會。' },
-        { text: '只在元件從畫面上移除（卸載）時', why: '相依改變時也會先清理。' },
-        { text: 'Effect 本體執行完之後立刻執行', why: '不是，要等下次執行前或卸載時。' },
-        { text: '每次渲染前', why: '只有 Effect 要重跑時。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'Effect 裡用到 query 與 page，相依陣列應該是？', options: [
-        { text: '`[query, page]`', correct: true, why: '列出所有用到的響應式值。' },
-        { text: '`[]`', why: 'query、page 改變時不會更新。' },
-        { text: '`[query, setPage]`', why: '漏了 page；set 函式是穩定的，不需要列。' },
-        { text: '省略', why: '每次渲染都執行，太頻繁。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 Effect 裡 fetch 資料，使用者快速切換三個分類時，畫面可能顯示第一個分類的結果（競態條件）。怎麼用清理函式避免？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 Effect 裡 fetch 資料，使用者快速切換三個分類時，畫面可能顯示第一個分類的結果（競態條件）。怎麼用清理函式避免？'], answer: [
         '在 Effect 裡用 `let ignore = false;` 或 AbortController；清理函式設 `ignore = true` 或 `controller.abort()`；回應回來時若已被忽略就不 setState。',
         '這樣只有最後一個分類的回應會寫入 state。實務上更建議用資料抓取函式庫或框架（5-3），它們已處理好快取與競態。',
       ] },
@@ -2978,14 +2707,6 @@ defineLessons({
       '用 useRef 保存不影響畫面的值',
       '用 ref 存取 DOM 元素（聚焦、捲動、量測）',
       '分辨 ref 與 state 的使用時機',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）開了 setInterval 的 Effect 必須？', options: [
-        { text: '在清理函式 clearInterval', correct: true, why: '否則卸載後仍在執行。' },
-        { text: '把相依陣列刪掉', why: '和清理無關。' },
-        { text: '用 StrictMode 關掉', why: '不應該關。' },
-        { text: '什麼都不用做', why: '會洩漏。' },
-      ] },
     ],
     analogy: {
       text: ['ref 像抽屜裡的筆記本：你可以隨時寫、隨時看，但寫了不會有人來重新佈置房間（不會重新渲染）。state 像牆上的公告：改了大家都會注意到，畫面也會跟著更新。'],
@@ -3020,30 +2741,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Counter() {\n  const ref = useRef(0);\n  return (\n    <button onClick={() => { ref.current += 1; console.log(ref.current); }}>\n      按了 {ref.current} 次\n    </button>\n  );\n}\n// 點三下',
-          predict: { q: '點三下後按鈕上顯示？', options: ['按了 0 次', '按了 3 次', '按了 1 次'], answer: 0 },
           output: '主控台：1、2、3\n按鈕仍顯示：按了 0 次\n（ref 改變不會重新渲染；要顯示就用 state）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'state', label: 'state' }, { id: 'ref', label: 'ref' }],
-          items: [
-            { text: '畫面上顯示的計數', answer: 'state', why: '要顯示就要渲染。' },
-            { text: 'setInterval 回傳的 id', answer: 'ref', why: '只在清除時用，不需要顯示。' },
-            { text: '輸入框的 DOM 節點', answer: 'ref', why: '用來呼叫 focus。' },
-            { text: '對話框是否開啟', answer: 'state', why: '影響畫面。' },
-            { text: '上一次的捲動位置（只用來比較）', answer: 'ref', why: '不顯示。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['畫面上顯示的計數', 'state', '要顯示就要渲染。'],
+          ['setInterval 回傳的 id', 'ref', '只在清除時用，不需要顯示。'],
+          ['輸入框的 DOM 節點', 'ref', '用來呼叫 focus。'],
+          ['對話框是否開啟', 'state', '影響畫面。'],
+          ['上一次的捲動位置（只用來比較）', 'ref', '不顯示。']
+        ] },
         { type: 'svg', svg: Fig.stack('DOM ref 何時有值：渲染時 ref.current 還是 null；React 更新 DOM 後把節點放進 ref.current；之後在事件處理函式或 Effect 裡才能使用', [
           { title: '渲染中：current 是 null', tone: 5 },
           { title: 'React 更新 DOM，接上 ref', tone: 3 },
           { title: '事件處理、Effect：可以使用', tone: 4 },
         ]), caption: '不要在渲染時讀 DOM ref。' },
+        { type: 'heading', id: 'deep-ref-callback', text: '深入：ref callback 與 React 19 的清理函式' },
+        'ref 屬性也可以傳函式（ref callback）：節點掛上時被呼叫，收到 DOM 節點。React 19 起它可以回傳清理函式，節點移除時呼叫，適合清單裡每一項各自要觀察的情況。',
+        { type: 'code', lang: 'tsx', title: 'ref callback（React 19）', code: '<li\n  ref={(node) => {\n    const observer = new ResizeObserver(() => measure(node));\n    observer.observe(node);\n    return () => observer.disconnect();   // 節點移除時呼叫\n  }}\n>' },
+        '有了清理函式，TypeScript 不再允許 ref callback 隱含回傳其他值：`ref={(n) => (inputEl = n)}` 要改成 `ref={(n) => { inputEl = n; }}`。只想對外公開幾個方法（focus、reset）而不是整個節點時，用 useImperativeHandle，元件庫常用，日常應用很少需要。',
       ],
-      tryit: {
-        q: ['頁面出現時自動聚焦到輸入框：'],
-        draft: 'const inputRef = useRef<HTMLInputElement>(null);\nuseEffect(() => {\n  inputRef.current____focus();\n}, ____);\nreturn <input ref={inputRef} />;',
-        answer: ['`inputRef.current?.focus()`、`[]`。', '簡單情況也可以直接寫 `<input autoFocus />`；但對話框打開等情境需要用 ref 控制。'],
-      },
     },
     mistakes: [
       { wrong: '用 ref 存要顯示在畫面上的值。', why: '改了不會重新渲染，畫面不更新。', right: '用 state。' },
@@ -3051,19 +2767,7 @@ defineLessons({
       { wrong: '用 ref 取得 DOM 後直接改 innerHTML 或刪除 React 管理的節點。', why: '和 React 的更新衝突。', right: '只做 React 沒提供的操作：focus、scroll、量測、整合第三方函式庫。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '改變 `ref.current` 會怎樣？', options: [
-        { text: '值保留，但不會重新渲染', correct: true, why: 'ref 的特性。' },
-        { text: '立刻重新渲染', why: '那是 state。' },
-        { text: '值在下次渲染被重置', why: 'ref 會跨渲染保留。' },
-        { text: '報錯', why: '可以修改。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'React 19 讓自訂的 Input 元件接收 ref，最簡單的方式是？', options: [
-        { text: '直接在 props 解構出 ref 並傳給 <input>', correct: true, why: 'ref 是一般 prop。' },
-        { text: '一定要用 forwardRef 包住元件', why: 'React 19 起不再必要。' },
-        { text: '用 document.querySelector', why: '不是 React 的方式。' },
-        { text: '元件不能接收 ref', why: '可以。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['要整合一個第三方地圖函式庫（它自己操作 DOM），怎麼用 ref 與 Effect 搭配？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['要整合一個第三方地圖函式庫（它自己操作 DOM），怎麼用 ref 與 Effect 搭配？'], answer: [
         '用 ref 取得一個容器 div；在 Effect 裡 `const map = new MapLib(containerRef.current)`，清理函式呼叫 `map.destroy()`。',
         'React 只負責那個空容器，裡面交給地圖函式庫；props 改變（例如中心座標）時，用另一個 Effect 呼叫 `map.setCenter()` 同步。',
       ] },
@@ -3073,7 +2777,7 @@ defineLessons({
       'DOM ref 用來 focus、捲動、量測、整合第三方函式庫。',
       'React 19 起 ref 是一般 prop；不要在渲染時讀寫 ref。',
     ],
-    sources: ['react-refs'],
+    sources: ['react-refs', 'react-19'],
   },
 
   '3-4': {
@@ -3081,14 +2785,6 @@ defineLessons({
       '辨認「Effect 裡需要最新值、但不該重新同步」的情況',
       '用 useEffectEvent 把這部分抽出來',
       '知道 useEffectEvent 的使用限制',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-2）想讓 Effect 少執行，可以刪掉相依項嗎？', options: [
-        { text: '不行，會讀到舊值；要改程式結構', correct: true, why: '這課的 useEffectEvent 就是方法之一。' },
-        { text: '可以，lint 警告可以忽略', why: '會產生讀到舊值的 bug。' },
-        { text: '可以，React 會自動補', why: '不會。' },
-        { text: '只有 props 可以刪', why: '都不該刪。' },
-      ] },
     ],
     analogy: {
       text: ['連線聊天室時，「要連哪個房間」決定要不要重連；「連上後通知要用什麼主題色」只是當下讀一下設定。換主題色時不應該斷線重連。useEffectEvent 就是把「讀一下最新設定」從「決定要不要重連」裡分出來。'],
@@ -3123,30 +2819,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Page({ url, cartCount }: { url: string; cartCount: number }) {\n  const onVisit = useEffectEvent((visitedUrl: string) => {\n    logVisit(visitedUrl, cartCount);\n  });\n  useEffect(() => {\n    onVisit(url);\n  }, [url]);\n  return null;\n}\n// url 不變，cartCount 從 1 變成 2',
-          predict: { q: 'cartCount 改變時會再記錄一次瀏覽嗎？', options: ['不會', '會', '會記錄兩次'], answer: 0 },
-          output: '不會。\n（只有 url 改變才代表新的瀏覽；下次 url 改變時，logVisit 會讀到當時最新的 cartCount）',
+          title: 'cartCount 改變時會不會再記錄一次', output: '（沒有輸出：url 沒變，Effect 不會重新執行）\n只有 url 改變才代表新的瀏覽；下次 url 改變時，logVisit 會讀到當時最新的 cartCount',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'dep', label: '留在相依陣列' }, { id: 'event', label: '放進 useEffectEvent' }],
-          items: [
-            { text: '聊天室 roomId', answer: 'dep', why: '改變時必須重新連線。' },
-            { text: '連線成功通知要用的主題色', answer: 'event', why: '只是讀一下，不該重連。' },
-            { text: '要訂閱的股票代號', answer: 'dep', why: '改變時要重新訂閱。' },
-            { text: '記錄日誌時附帶的使用者暱稱', answer: 'event', why: '暱稱改變不代表要重新訂閱。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['聊天室 roomId', '留在相依陣列', '改變時必須重新連線。'],
+          ['連線成功通知要用的主題色', '放進 useEffectEvent', '只是讀一下，不該重連。'],
+          ['要訂閱的股票代號', '留在相依陣列', '改變時要重新訂閱。'],
+          ['記錄日誌時附帶的使用者暱稱', '放進 useEffectEvent', '暱稱改變不代表要重新訂閱。']
+        ] },
         { type: 'svg', svg: Fig.stack('判斷流程：Effect 用到某個值；問這個值改變時是否應該重新同步；是就列入相依陣列；否就把讀取它的邏輯移到 useEffectEvent', [
           { title: 'Effect 用到某個值', tone: 1 },
           { title: '它改變時，應該重新同步嗎？', tone: 2 },
           { title: '是 → 列入相依陣列', tone: 3 },
           { title: '否 → 移到 useEffectEvent', tone: 4 },
         ]), caption: '不要用「刪掉相依項」或 eslint-disable 解決。' },
+        { type: 'heading', id: 'deep-effect-event-history', text: '深入：useEffectEvent 為什麼花了三年' },
+        '這個想法 2022 年以 useEvent 的 RFC 提出，後來改名、縮小範圍成「只能在 Effect 裡呼叫」，2025-10 隨 React 19.2 穩定。範圍縮小的原因：若能傳給子元件，「永遠讀最新值」會讓畫面不再只由 props 與 state 決定。',
+        '它讀到的最新值是最近一次提交到畫面的值，不是渲染中的值，所以不能在渲染時呼叫。新版 eslint-plugin-react-hooks 認得它：不會要求列進相依陣列，傳出去時會報錯。',
+        { type: 'table', head: ['舊做法', '問題', '現在'], rows: [
+          ['eslint-disable 漏列相依', '藏住讀到舊值的 bug', 'useEffectEvent'],
+          ['useRef 存最新值，渲染時寫 ref.current', '違反「渲染時不寫 ref」；並行渲染可能存到被丟棄的值', 'useEffectEvent'],
+          ['把值也列進相依，容忍重連', '多餘的斷線重連', '分清楚哪些值決定「同步什麼」'],
+        ] },
       ],
-      tryit: {
-        q: ['把「用最新 muted 設定決定要不要播放音效」抽成 Effect Event：'],
-        draft: 'const onMessage = ____((text: string) => {\n  if (!muted) playSound();\n  console.log(text);\n});\nuseEffect(() => {\n  const conn = connect(roomId);\n  conn.on("message", onMessage);\n  return () => conn.disconnect();\n}, [____]);',
-        answer: ['`useEffectEvent(...)`、`[roomId]`。', 'muted 改變時不會斷線重連，但下一則訊息會依最新的 muted 決定是否播放。'],
-      },
     },
     mistakes: [
       { wrong: '用 `// eslint-disable-next-line` 關掉相依陣列警告。', why: '把讀到舊值的 bug 藏起來。', right: '依情況移到 useEffectEvent。' },
@@ -3154,19 +2849,7 @@ defineLessons({
       { wrong: '把真正的依賴（roomId）也包進 useEffectEvent。', why: '房間改變時不會重連。', right: '決定「同步什麼」的值留在相依陣列。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'useEffectEvent 解決的問題是？', options: [
-        { text: 'Effect 需要讀最新值，但那個值改變時不該重新執行 Effect', correct: true, why: '把讀取邏輯與同步依賴分開。' },
-        { text: '讓 Effect 不需要清理函式，也不需要相依陣列', why: '仍需要清理，決定同步的值仍要列在相依陣列。' },
-        { text: '讓元件在 props 改變時不要重新渲染，提升效能', why: '無關，那是記憶化（4-4）。' },
-        { text: '取代 useState', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪裡可以呼叫 Effect Event？', options: [
-        { text: 'Effect 裡（包括 Effect 中設定的回呼）', correct: true, why: '規則。' },
-        { text: 'JSX 的 onClick 等任何事件處理函式', why: '不允許，一般事件處理用普通函式。' },
-        { text: '渲染時', why: '不允許。' },
-        { text: '傳給子元件', why: '不允許。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 useEffectEvent 出現之前，大家常用 ref 存最新值來解決同樣的問題。兩種做法比較起來如何？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 useEffectEvent 出現之前，大家常用 ref 存最新值來解決同樣的問題。兩種做法比較起來如何？'], answer: [
         '舊做法：`const themeRef = useRef(theme); themeRef.current = theme;`，Effect 裡讀 themeRef.current。能用，但要手動同步、在渲染時寫 ref 也違反規則。',
         'useEffectEvent 是官方提供的同一個模式：自動拿到最新值、意圖清楚、有 lint 規則保護，2025-10 起在 React 19.2 是穩定 API。',
       ] },
@@ -3205,14 +2888,6 @@ defineLessons({
       '用 useContext（或 use）讀取 Context',
       '判斷什麼資料適合放 Context',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-4）除了 Context，減少 prop drilling 還可以先考慮？', options: [
-        { text: '組合：用 children 把元件傳下去', correct: true, why: '中間層不必知道資料。' },
-        { text: '全域變數', why: 'React 不會知道它改變。' },
-        { text: '把所有元件寫在同一個檔案，就不用傳 props', why: '檔案位置和 props 傳遞無關。' },
-        { text: 'useRef', why: '無關。' },
-      ] },
-    ],
     analogy: {
       text: ['Context 像大樓的廣播系統：管理室（Provider）廣播「今天停水」，任何樓層的住戶（子元件）只要打開收音機（useContext）就聽得到，不用一戶戶傳話（prop drilling）。'],
       limit: ['廣播一響全大樓都會聽到；Context 的值改變時，所有讀取它的元件都會重新渲染。頻繁變動的資料放 Context，可能讓大片畫面一直重繪。'],
@@ -3250,26 +2925,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const LangContext = createContext("zh-TW");\n\nfunction Label() {\n  const lang = useContext(LangContext);\n  return <span>{lang}</span>;\n}\n\nexport default function App() {\n  return (\n    <>\n      <Label />\n      <LangContext value="en">\n        <Label />\n        <LangContext value="ja">\n          <Label />\n        </LangContext>\n      </LangContext>\n    </>\n  );\n}',
-          predict: { q: '三個 Label 分別顯示？', options: ['zh-TW、en、ja', 'en、en、ja', 'ja、ja、ja'], answer: 0 },
           output: 'zh-TW en ja\n（第一個沒有 Provider，用預設值；其他讀最近的上層 Provider）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ctx', label: '適合 Context' }, { id: 'not', label: '不適合' }],
-          items: [
-            { text: '深色或淺色主題', answer: 'ctx', why: '到處都要用、很少變。' },
-            { text: '登入的使用者資訊', answer: 'ctx', why: '很多元件需要。' },
-            { text: '輸入框每打一個字的內容', answer: 'not', why: '變動頻繁，會讓所有讀取者一直重新渲染。' },
-            { text: '只有父子兩層用到的資料', answer: 'not', why: '直接用 props。' },
-            { text: '介面語言', answer: 'ctx', why: '全域、不常變。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['深色或淺色主題', '適合 Context', '到處都要用、很少變。'],
+          ['登入的使用者資訊', '適合 Context', '很多元件需要。'],
+          ['輸入框每打一個字的內容', '不適合', '變動頻繁，會讓所有讀取者一直重新渲染。'],
+          ['只有父子兩層用到的資料', '不適合', '直接用 props。'],
+          ['介面語言', '適合 Context', '全域、不常變。']
+        ] },
         { type: 'svg', svg: Fig.vs('Context 值改變的影響：值是新物件時，所有讀取者都重新渲染；把變動頻繁與不常變的資料拆成不同 Context，可以縮小影響範圍', { title: '一個大 Context', lines: ['任何欄位改變', '所有讀取者重繪'], tone: 5 }, { title: '拆成多個 Context', lines: ['只影響', '讀取那一個的元件'], tone: 4 }), caption: '每次渲染都建立新的 value 物件，也會讓讀取者重繪（React Compiler 可自動記憶化）。' },
+        { type: 'heading', id: 'deep-context-rerender', text: '深入：Context 的重新渲染與拆分' },
+        'Context 沒有「只訂閱某個欄位」的功能：value 的參考一變，所有讀它的元件都重新渲染，就算只用到沒變的欄位；memo 也擋不住。Zustand、Redux 這類 store 用 useSyncExternalStore 加 selector，只有選到的值變了才渲染，這是它們在高頻更新時勝過 Context 的原因。',
+        'React 19.3（2026-09）起，Server Component 可以直接渲染 `<UserContext value={user}>`（Context 定義在 `"use client"` 檔案），不用另外包一個 Provider 元件（5-4）。',
+        { type: 'table', head: ['拆分方式', '效果'], rows: [
+          ['state 與 dispatch 拆成兩個 Context', '只發送動作的元件，不會因 state 改變而渲染'],
+          ['依領域拆（Theme、Auth、Locale）', '彼此獨立變動，互不影響'],
+          ['改用外部 store ＋ selector', '高頻、欄位多時只渲染用到的元件'],
+        ] },
       ],
-      tryit: {
-        q: ['建立一個 Context，並在沒有 Provider 時拋出清楚的錯誤：'],
-        draft: 'const CartContext = createContext<Cart | null>(____);\n\nexport function useCart() {\n  const cart = useContext(CartContext);\n  if (!cart) throw new Error("useCart 必須在 ____ 裡使用");\n  return cart;\n}',
-        answer: ['`createContext<Cart | null>(null)`、`CartProvider`（或你的 Provider 名稱）。', '包一個自訂 Hook（4-3）：呼叫端不用每次檢查 null，忘記包 Provider 時錯誤訊息也很清楚。'],
-      },
     },
     mistakes: [
       { wrong: '所有 state 都丟進一個全域 Context。', why: '任何一個欄位改變都讓整棵樹重新渲染。', right: '只放全域、不常變的資料；依用途拆成多個 Context。' },
@@ -3277,19 +2951,7 @@ defineLessons({
       { wrong: '忘了包 Provider，元件默默拿到預設值。', why: '不容易察覺。', right: '預設值設 null，用自訂 Hook 檢查並拋錯。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '沒有任何上層 Provider 時，useContext 會回傳？', options: [
-        { text: 'createContext 時給的預設值', correct: true, why: '找不到 Provider 就用預設值。' },
-        { text: 'undefined，因為找不到任何 Provider', why: '是預設值（除非預設值就是 undefined）。' },
-        { text: '拋出例外', why: 'React 不會自動拋例外。' },
-        { text: 'null', why: '同上。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'Context 的值是每次渲染都新建的物件 `{ user, logout }`，會造成？', options: [
-        { text: '每次 Provider 重新渲染，所有讀取者都重新渲染', correct: true, why: '參考每次都不同。' },
-        { text: '什麼都不會發生', why: '參考改變會觸發更新。' },
-        { text: '報錯', why: '不會報錯。' },
-        { text: '只有用到 user 的讀取者重新渲染，用 logout 的不會', why: 'Context 不會細分欄位，所有讀取者都會。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['Context 加上 useReducer（下一課）常被當成「輕量版 Redux」。什麼時候這樣就夠，什麼時候該用專門的狀態管理函式庫？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['Context 加上 useReducer（下一課）常被當成「輕量版 Redux」。什麼時候這樣就夠，什麼時候該用專門的狀態管理函式庫？'], answer: [
         '中小型應用、全域狀態不多且更新不頻繁時，Context + useReducer 就夠。',
         '狀態很多、更新很頻繁、需要細緻地只讓用到某欄位的元件重新渲染、或需要開發工具（時間旅行除錯）時，可以考慮 Zustand、Redux Toolkit 等。伺服器資料（快取、重新驗證）則交給 TanStack Query 或框架。',
       ] },
@@ -3307,14 +2969,6 @@ defineLessons({
       '把分散的 setState 集中到 reducer',
       '用 dispatch 送出描述事件的 action',
       '判斷什麼時候用 useReducer 比 useState 好',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-3）reducer 裡更新陣列 state 應該？', options: [
-        { text: '回傳新陣列', correct: true, why: 'reducer 也必須是不可變更新。' },
-        { text: 'push 後回傳原陣列', why: '參考沒變，不會更新。' },
-        { text: '直接修改，不用回傳', why: 'reducer 要回傳新 state。' },
-        { text: '呼叫 setState', why: 'reducer 裡不呼叫 setState。' },
-      ] },
     ],
     analogy: {
       text: ['useState 像每個員工自己改帳本；useReducer 像所有人都只填「異動單」（action），交給會計（reducer）統一入帳。帳要怎麼改，全部寫在會計的規則裡，查帳時只看一個地方。'],
@@ -3353,25 +3007,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function counter(state: number, action: { type: "inc" | "dec" | "reset" }) {\n  switch (action.type) {\n    case "inc": return state + 1;\n    case "dec": return state - 1;\n    case "reset": return 0;\n  }\n}\n\nlet s = 5;\nfor (const a of ["inc", "inc", "dec", "reset", "inc"] as const) {\n  s = counter(s, { type: a });\n}\nconsole.log(s);',
-          predict: { q: '最後印出？', options: ['1', '6', '7'], answer: 0 },
           output: '1\n（5 → 6 → 7 → 6 → 0 → 1；reducer 是純函式，可以這樣單獨測試）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'state', label: 'useState 就好' }, { id: 'reducer', label: '考慮 useReducer' }],
-          items: [
-            { text: '一個開關（是否展開）', answer: 'state', why: '單一簡單值。' },
-            { text: '待辦清單：新增、刪除、勾選、編輯、清除已完成', answer: 'reducer', why: '多種操作改同一份資料。' },
-            { text: '表單有 10 個欄位且彼此有連動規則', answer: 'reducer', why: '邏輯集中比較好管理。' },
-            { text: '輸入框文字', answer: 'state', why: '單一值。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['一個開關（是否展開）', 'useState 就好', '單一簡單值。'],
+          ['待辦清單：新增、刪除、勾選、編輯、清除已完成', '考慮 useReducer', '多種操作改同一份資料。'],
+          ['表單有 10 個欄位且彼此有連動規則', '考慮 useReducer', '邏輯集中比較好管理。'],
+          ['輸入框文字', 'useState 就好', '單一值。']
+        ] },
         { type: 'svg', svg: Fig.vs('useState 與 useReducer：useState 簡單、更新邏輯寫在事件處理函式裡；useReducer 把邏輯集中在 reducer，元件只送出 action，適合多種操作改同一份資料', { title: 'useState', lines: ['簡單直接', '邏輯在事件處理'], tone: 3 }, { title: 'useReducer', lines: ['邏輯集中', '元件只 dispatch'], tone: 4 }), caption: '兩者可以混用；從 useState 開始，變複雜再改。' },
+        { type: 'heading', id: 'deep-reducer-design', text: '深入：reducer 的設計取捨' },
+        '每次狀態變化都是一筆 action，所以容易加日誌、重播、寫測試；代價是同樣功能要多寫 action 型別與 switch。reducer 在下一次渲染時才執行，StrictMode 會呼叫兩次，所以一定要純。',
+        '第三個參數是初始化函式：`useReducer(reducer, userId, createInitialState)`，和 useState 的惰性初始化一樣只在第一次執行。dispatch 之後，目前這次渲染讀到的 state 不會變（快照，2-2）。',
+        { type: 'table', head: ['訊號', '建議'], rows: [
+          ['只有一兩個彼此獨立的值', 'useState'],
+          ['多個事件改同一份資料，常漏改', 'useReducer'],
+          ['下一個值要同時看好幾個欄位', 'useReducer（reducer 一次看到全部）'],
+          ['跨很多元件共享、高頻更新', '外部 store（4-1 深入）'],
+        ] },
       ],
-      tryit: {
-        q: ['為 reducer 加上「清除已完成」的 action：'],
-        draft: 'type Action = … | { type: "____" };\n\ncase "clearedDone":\n  return todos.____((t) => !t.done);',
-        answer: ['`{ type: "clearedDone" }`、`todos.filter((t) => !t.done)`。', 'Action 是可辨識聯合（TypeScript 2-2），switch 漏處理新的 type 時 TypeScript 會提醒。'],
-      },
     },
     mistakes: [
       { wrong: 'reducer 裡修改 state 再回傳。', why: '參考沒變，React 不會更新；也破壞純函式。', right: '回傳新物件或新陣列。' },
@@ -3379,19 +3033,7 @@ defineLessons({
       { wrong: 'action 命名成 `setItems`、`setTotal`。', why: '又回到「元件決定怎麼改」，失去集中的好處。', right: '用事件命名：`added`、`removed`、`checkedOut`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'reducer 的簽章是？', options: [
-        { text: '`(state, action) => newState`', correct: true, why: '純函式。' },
-        { text: '`(action) => void`', why: '要接收 state 並回傳新 state。' },
-        { text: '`() => state`', why: '需要 action。' },
-        { text: '`(state) => { setState(next); }`', why: 'reducer 不呼叫 setState，而是回傳新 state。' },
-      ] },
-      { level: '應用', type: 'mc', q: '為什麼 reducer 很好測試？', options: [
-        { text: '它是純函式，給定輸入就能斷言輸出', correct: true, why: '不需要渲染元件。' },
-        { text: 'React 會自動測試', why: '不會。' },
-        { text: '它不需要測試', why: '仍需要。' },
-        { text: '它沒有分支，所以一個測試就夠了', why: '通常有很多分支。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['C# 與 TypeScript 課程都提到「可辨識聯合」。在 useReducer 裡它扮演什麼角色？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['C# 與 TypeScript 課程都提到「可辨識聯合」。在 useReducer 裡它扮演什麼角色？'], answer: [
         'Action 型別寫成可辨識聯合（以 type 欄位區分）：在 switch 的每個 case 裡，TypeScript 知道 action 有哪些欄位（例如 "deleted" 一定有 id）。',
         '新增一種 action 時，加上窮舉檢查（never），所有沒處理的 reducer 都會在編譯時報錯。',
       ] },
@@ -3410,14 +3052,6 @@ defineLessons({
       '遵守自訂 Hook 的命名與規則',
       '分辨「共用邏輯」與「共用狀態」',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-1）Hook 只能在哪裡呼叫？', options: [
-        { text: '元件或自訂 Hook 的最上層', correct: true, why: '這課會寫自訂 Hook。' },
-        { text: '任何函式', why: '一般函式不能呼叫 Hook。' },
-        { text: '條件判斷裡', why: '違反規則。' },
-        { text: '事件處理函式或 useEffect 的回呼裡', why: '不行，只能在最上層。' },
-      ] },
-    ],
     analogy: {
       text: ['自訂 Hook 像一份食譜卡：「如何追蹤網路是否連線」寫一次，任何元件照食譜做都會有自己的一份。兩個元件用同一張食譜，做出的是兩盤菜，不是共用同一盤。'],
       limit: ['食譜不會讓兩盤菜同步；需要多個元件共用「同一份」資料時，要提升 state 或用 Context，自訂 Hook 本身不會共享狀態。'],
@@ -3429,7 +3063,8 @@ defineLessons({
       ]),
       caption: '共用的是邏輯，不是狀態。',
       blocks: [
-        '[[自訂 Hook]] 是名稱以 use 開頭、內部呼叫其他 Hook 的函式。它讓「有狀態的邏輯」（訂閱、表單、資料抓取）可以重用。每次呼叫都有獨立的 state。好的自訂 Hook 描述「做什麼」（useOnlineStatus），而不是「怎麼做」（useMountEffect）。',
+        '[[自訂 Hook]] 是名稱以 use 開頭、內部呼叫其他 Hook 的函式。它讓「有狀態的邏輯」（訂閱、表單、資料抓取）可以重用。',
+        '每次呼叫都有獨立的 state。好的自訂 Hook 描述「做什麼」（useOnlineStatus），而不是「怎麼做」（useMountEffect）。',
         { type: 'code', lang: 'tsx', title: 'useOnlineStatus.ts', code: 'import { useSyncExternalStore } from "react";\n\nfunction subscribe(callback: () => void) {\n  window.addEventListener("online", callback);\n  window.addEventListener("offline", callback);\n  return () => {\n    window.removeEventListener("online", callback);\n    window.removeEventListener("offline", callback);\n  };\n}\n\nexport function useOnlineStatus(): boolean {\n  return useSyncExternalStore(subscribe, () => navigator.onLine, () => true);\n}\n\n// 使用\nfunction SaveButton() {\n  const isOnline = useOnlineStatus();\n  return <button disabled={!isOnline}>{isOnline ? "儲存" : "離線中…"}</button>;\n}' },
       ],
     },
@@ -3454,25 +3089,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function useCounter() {\n  const [n, setN] = useState(0);\n  return { n, inc: () => setN((x) => x + 1) };\n}\n\nfunction A() { const c = useCounter(); return <button onClick={c.inc}>A：{c.n}</button>; }\nfunction B() { const c = useCounter(); return <span>B：{c.n}</span>; }\n// 點 A 三下',
-          predict: { q: 'B 顯示多少？', options: ['B：0', 'B：3', 'B：1'], answer: 0 },
           output: 'A：3\nB：0\n（每次呼叫自訂 Hook 都有自己的 state）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'hook', label: '適合自訂 Hook' }, { id: 'fn', label: '一般函式就好' }],
-          items: [
-            { text: '追蹤 localStorage 某個鍵的值並同步', answer: 'hook', why: '需要 state 與 effect。' },
-            { text: '把金額格式化成千分位字串', answer: 'fn', why: '純計算，不用 Hook。' },
-            { text: '輸入防抖：停止輸入 300ms 後才更新值', answer: 'hook', why: '需要 state 與計時器 effect。' },
-            { text: '計算兩個日期相差幾天', answer: 'fn', why: '純計算。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['追蹤 localStorage 某個鍵的值並同步', '適合自訂 Hook', '需要 state 與 effect。'],
+          ['把金額格式化成千分位字串', '一般函式就好', '純計算，不用 Hook。'],
+          ['輸入防抖：停止輸入 300ms 後才更新值', '適合自訂 Hook', '需要 state 與計時器 effect。'],
+          ['計算兩個日期相差幾天', '一般函式就好', '純計算。']
+        ] },
         { type: 'svg', svg: Fig.vs('命名：好的自訂 Hook 描述目的，例如 useOnlineStatus、useChatRoom；不好的描述生命週期，例如 useMount、useUpdateEffect', { title: '描述目的 ✓', lines: ['useOnlineStatus', 'useChatRoom'], tone: 4 }, { title: '描述生命週期 ✗', lines: ['useMount', 'useUpdateEffect'], tone: 5 }), caption: '函式不用到任何 Hook 時，不要用 use 開頭。' },
+        { type: 'heading', id: 'deep-hook-design', text: '深入：好的自訂 Hook 長什麼樣' },
+        '自訂 Hook 每次渲染都重新執行，回傳值和元件一樣是這次渲染的快照；它不是獨立的狀態容器，而是把元件函式的一段搬出去。',
+        'useSyncExternalStore 的第三個參數是伺服器渲染用的快照（上例回傳 true），少了它伺服器渲染會出錯。getSnapshot 必須每次回傳同一個值或同一個參考，回傳新物件會造成無限重新渲染。',
+        { type: 'table', head: ['Hook', '評價'], rows: [
+          ['`useDebounce(value, 300)`', '好：目的清楚、相依明確'],
+          ['`useMount(fn)`', '不好：藏住相依陣列'],
+          ['`useFetch(url)`', '可以，但快取與競態要自己處理；正式專案改包 TanStack Query'],
+          ['`useLocalStorage(key)`', '好：可以用 useSyncExternalStore 監聽其他分頁的 storage 事件'],
+        ] },
+        '回傳值兩個以內用陣列（像 useState，呼叫端好改名），三個以上用物件。',
       ],
-      tryit: {
-        q: ['寫一個 useToggle：回傳目前的布林值與切換函式：'],
-        draft: 'function useToggle(initial = false) {\n  const [on, setOn] = ____(initial);\n  const toggle = () => setOn((v) => ____);\n  return [on, toggle] as const;\n}',
-        answer: ['`useState(initial)`、`!v`。', '`as const` 讓回傳型別是 `readonly [boolean, () => void]`，呼叫端解構時每個位置的型別都正確。'],
-      },
     },
     mistakes: [
       { wrong: '純計算的函式也取名 useXxx。', why: '誤導讀者，也受到 Hook 規則限制（不能在條件裡呼叫）。', right: '沒用到 Hook 就用一般函式名稱。' },
@@ -3480,19 +3116,7 @@ defineLessons({
       { wrong: '寫一個 useMount(fn) 包住 `useEffect(fn, [])`。', why: '隱藏了相依陣列，容易讀到舊值。', right: '寫描述目的的 Hook，內部的 Effect 正確列出相依。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '自訂 Hook 的名稱必須？', options: [
-        { text: '以 use 開頭', correct: true, why: 'lint 與 React 依此辨識 Hook。' },
-        { text: '以 Hook 結尾', why: '不是規則。' },
-        { text: '大寫開頭', why: '那是元件。' },
-        { text: '沒有規定', why: '有規定。' },
-      ] },
-      { level: '應用', type: 'mc', q: '兩個元件都呼叫 `useCart()`（內部用 useState），其中一個加入商品後，另一個？', options: [
-        { text: '看不到變化，因為各自有獨立 state', correct: true, why: '要共享就把 state 放進 Context 再由 Hook 讀取。' },
-        { text: '自動同步，因為用的是同一個 useCart', why: '自訂 Hook 不共享狀態。' },
-        { text: '報錯', why: '不會報錯。' },
-        { text: '要重新整理頁面才同步', why: '根本不會同步。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你常在元件裡寫「fetch 資料 + loading + error + 取消」的 Effect。抽成 useFetch 自訂 Hook 之後，還缺少什麼？為什麼很多團隊最後改用 TanStack Query 或框架？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你常在元件裡寫「fetch 資料 + loading + error + 取消」的 Effect。抽成 useFetch 自訂 Hook 之後，還缺少什麼？為什麼很多團隊最後改用 TanStack Query 或框架？'], answer: [
         'useFetch 解決了重複程式碼，但仍缺：跨元件快取、重複請求合併、背景重新驗證、分頁、重試、伺服器渲染整合。',
         '這些自己做很容易出錯，所以資料抓取通常交給專門函式庫或框架的資料層（5-3）。自訂 Hook 適合包裝這些函式庫，例如 `useProducts()` 內部呼叫 useQuery。',
       ] },
@@ -3511,14 +3135,6 @@ defineLessons({
       '知道 memo、useMemo、useCallback 的用途',
       '了解 React Compiler 自動記憶化，先量測再優化',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-1）Context 的 value 每次都是新物件，會？', options: [
-        { text: '讓所有讀取者每次都重新渲染', correct: true, why: '參考每次都不同。' },
-        { text: '沒有影響', why: '有影響。' },
-        { text: '只影響 Provider 本身', why: '影響讀取者。' },
-        { text: '報錯', why: '不會報錯。' },
-      ] },
-    ],
     analogy: {
       text: ['記憶化像便利商店的熱食櫃：同樣的便當有人點，直接從櫃子拿（重用結果），不用重做。但熱食櫃也要花電與空間；不熱門的東西放進去反而浪費。React Compiler 像一位會自動判斷「哪些值得放熱食櫃」的店長。'],
       limit: ['店長再厲害也只能幫你省「重做」的時間；如果問題是食材本身就難做（演算法太慢、清單有上萬筆），要換做法（虛擬化清單、分頁），不是靠熱食櫃。'],
@@ -3532,12 +3148,12 @@ defineLessons({
       caption: 'props 改變並不是單獨的原因：子元件跟著渲染，是因為父元件渲染了。',
       blocks: [
         '大部分重新渲染都很便宜，不需要優化。真的慢時：先用 [[React DevTools Profiler]] 量測，再考慮[[記憶化]]：`memo` 讓 props 沒變的元件略過渲染、`useMemo` 記住計算結果、`useCallback` 記住函式。[[React Compiler]] 1.0（2025-10）在建置時自動加上這些記憶化，新專案建議開啟，大多數情況不必再手寫。',
-        { type: 'code', lang: 'ts', title: 'vite.config.ts（啟用 React Compiler）', code: 'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({\n  plugins: [\n    react({\n      babel: { plugins: ["babel-plugin-react-compiler"] },\n    }),\n  ],\n});' },
+        { type: 'code', lang: 'ts', title: 'vite.config.ts（Vite 8 ＋ plugin-react 6 啟用 React Compiler）', code: '// npm install -D babel-plugin-react-compiler@latest @rolldown/plugin-babel\nimport { defineConfig } from "vite";\nimport react, { reactCompilerPreset } from "@vitejs/plugin-react";\nimport babel from "@rolldown/plugin-babel";\n\nexport default defineConfig({\n  plugins: [\n    react(),\n    babel({ presets: [reactCompilerPreset()] }),\n  ],\n});' },
       ],
     },
     define: [
       { term: '記憶化', en: 'memo / useMemo / useCallback', def: 'memo(Component)：props 淺比較沒變就略過；useMemo(() => 計算, deps)；useCallback(fn, deps)。', example: '`const sorted = useMemo(() => sort(list), [list]);`' },
-      { term: 'React Compiler', en: 'React Compiler', def: '建置時分析元件與 Hook，自動記憶化；要求程式遵守 React 規則（純渲染、不可變更新）。', example: '`npm i -D babel-plugin-react-compiler`' },
+      { term: 'React Compiler', en: 'React Compiler', def: '建置時分析元件與 Hook，自動記憶化；要求程式遵守 React 規則（純渲染、不可變更新）。', example: '`npm install -D babel-plugin-react-compiler@latest`' },
       { term: 'Profiler', en: 'React DevTools Profiler', def: '錄製一段操作，顯示每個元件渲染的次數與時間，以及渲染的原因。', example: '找出真正慢的元件再優化。' },
     ],
     examples: {
@@ -3556,30 +3172,32 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Child({ label }: { label: string }) {\n  console.log("Child 渲染");\n  return <p>{label}</p>;\n}\n\nexport default function Parent() {\n  const [n, setN] = useState(0);\n  return (\n    <>\n      <button onClick={() => setN(n + 1)}>{n}</button>\n      <Child label="固定文字" />\n    </>\n  );\n}\n// 沒有開 React Compiler，點按鈕一下',
-          predict: { q: 'Child 會重新渲染嗎？', options: ['會', '不會，因為 label 沒變', '只有第一次'], answer: 0 },
           output: 'Child 渲染\n（父元件渲染時子元件預設也會渲染；用 memo(Child) 或開啟 React Compiler 可略過）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'need', label: '值得優化' }, { id: 'skip', label: '不需要' }],
-          items: [
-            { text: 'Profiler 顯示某個清單元件每次輸入都花 80ms', answer: 'need', why: '量測證實有問題。' },
-            { text: '一個只顯示標題的小元件多渲染了一次', answer: 'skip', why: '成本極低。' },
-            { text: '渲染一萬筆資料的表格', answer: 'need', why: '考慮虛擬化（只渲染看得到的列）。' },
-            { text: '「感覺」useCallback 比較快，全部包起來', answer: 'skip', why: '沒有量測依據，徒增複雜度。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['Profiler 顯示某個清單元件每次輸入都花 80ms', '值得優化', '量測證實有問題。'],
+          ['一個只顯示標題的小元件多渲染了一次', '不需要', '成本極低。'],
+          ['渲染一萬筆資料的表格', '值得優化', '考慮虛擬化（只渲染看得到的列）。'],
+          ['「感覺」useCallback 比較快，全部包起來', '不需要', '沒有量測依據，徒增複雜度。']
+        ] },
         { type: 'svg', svg: Fig.stack('效能優化的順序：先用 Profiler 量測找出慢的元件；確認是渲染次數多還是單次太慢；次數多就開啟 React Compiler 或 memo；單次太慢就改演算法、分頁或虛擬化', [
           { title: '1. Profiler 量測，找出慢的元件', tone: 1 },
           { title: '2. 是「次數多」還是「單次慢」？', tone: 2 },
           { title: '3. 次數多 → React Compiler／memo', tone: 3 },
           { title: '4. 單次慢 → 改演算法、分頁、虛擬化', tone: 4 },
         ]), caption: '沒量測就優化，常常白忙一場。' },
+        { type: 'heading', id: 'deep-compiler-setup', text: '深入：Compiler 設定方式的變化與限制' },
+        { type: 'table', caption: '舊做法 → 現在的做法', head: ['時期', '設定方式'], rows: [
+          ['`@vitejs/plugin-react` 5 以前', '`react({ babel: { plugins: ["babel-plugin-react-compiler"] } })`'],
+          ['Vite 8 ＋ `@vitejs/plugin-react` 6 起（2026-03）', 'plugin-react 移除內建 Babel；改用 `@rolldown/plugin-babel` ＋ `reactCompilerPreset()`（見上方設定）'],
+        ] },
+        'Compiler 遇到看不懂或違反規則的元件會直接跳過，不會報錯；開了之後某個元件沒變快，先跑 eslint-plugin-react-hooks 看有沒有違規。既有大專案可以設 `compilationMode: "annotation"`，只編譯標了 `"use memo"` 的元件，逐步導入。',
+        { type: 'table', head: ['情況', '還要手寫 useMemo／useCallback 嗎'], rows: [
+          ['開了 Compiler 的一般元件', '不需要'],
+          ['沒開 Compiler 的舊專案', 'Profiler 量測後，只在熱點加'],
+          ['第三方函式庫要求傳入穩定參考', '依函式庫文件；Compiler 多半已處理，確認行為後再決定'],
+        ] },
       ],
-      tryit: {
-        q: ['沒有 React Compiler 的專案，要讓 Child 在 label 沒變時略過渲染：'],
-        draft: 'import { ____ } from "react";\n\nconst Child = ____(function Child({ label }: { label: string }) {\n  return <p>{label}</p>;\n});',
-        answer: ['`import { memo } from "react";`、`const Child = memo(function Child(…) {…})`。', '注意：如果父元件每次傳入新的物件或函式 prop，淺比較仍會判定改變；這時還要 useMemo／useCallback，這也是 Compiler 方便的原因。'],
-      },
     },
     mistakes: [
       { wrong: '沒有量測就到處加 useMemo、useCallback。', why: '增加複雜度與記憶體，效能不一定變好。', right: '先 Profiler；新專案直接開 React Compiler。' },
@@ -3587,19 +3205,7 @@ defineLessons({
       { wrong: '一萬筆清單想靠 memo 解決卡頓。', why: '單次渲染本身太重。', right: '虛擬化（只渲染可見的列）或分頁。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '父元件重新渲染時，子元件預設會？', options: [
-        { text: '也重新渲染', correct: true, why: '除非被記憶化且 props 沒變。' },
-        { text: '只有 props 改變才渲染', why: '那是 memo 之後的行為。' },
-        { text: '永遠不渲染', why: '會渲染。' },
-        { text: '看子元件有沒有 state', why: '和這無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'React Compiler 主要做什麼？', options: [
-        { text: '建置時自動為元件與 Hook 加上記憶化', correct: true, why: '減少手寫 useMemo／useCallback。' },
-        { text: '把 React 編譯成原生 App', why: '那是 React Native。' },
-        { text: '取代 TypeScript 型別檢查', why: '無關。' },
-        { text: '讓 Effect 不需要相依陣列', why: '不會。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React Compiler「要求程式遵守 React 規則」？舉一個違反規則、會讓 Compiler 出問題的寫法。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 React Compiler「要求程式遵守 React 規則」？舉一個違反規則、會讓 Compiler 出問題的寫法。'], answer: [
         'Compiler 假設渲染是純函式、state 與 props 不會被直接修改，才能安全地重用上次的結果。',
         '例如直接修改 state 物件（`items.push(x); setItems(items)`）或在渲染時修改外部變數：Compiler 可能重用舊結果，畫面就不會更新。eslint-plugin-react-hooks 的 recommended 規則會先幫你抓出這些問題。',
       ] },
@@ -3609,7 +3215,7 @@ defineLessons({
       '先用 Profiler 量測；次數多用記憶化，單次慢改演算法或虛擬化。',
       'React Compiler 1.0 自動記憶化，前提是遵守 React 規則。',
     ],
-    sources: ['react-compiler', 'react-learn'],
+    sources: ['react-compiler', 'react-compiler-install', 'vite8'],
   },
 });
 </script>
@@ -3638,14 +3244,6 @@ defineLessons({
       '寫出受控輸入框',
       '用 FormData 讀取非受控表單',
       '判斷什麼時候用受控、什麼時候用非受控',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-3）表單送出時要避免整頁重新載入，傳統做法是？', options: [
-        { text: 'onSubmit 裡呼叫 e.preventDefault()', correct: true, why: '下一課的 form action 會幫你處理。' },
-        { text: '在按鈕的 onClick 裡呼叫 stopPropagation()', why: '那是停止冒泡，不會阻止送出。' },
-        { text: '把 form 改成 div', why: '失去表單語意與鍵盤送出。' },
-        { text: '用 useEffect', why: '無關。' },
-      ] },
     ],
     analogy: {
       text: ['受控輸入像同步翻譯：使用者每說一個字，翻譯員（state）就記一個字，畫面顯示的是翻譯員的版本。非受控像收問卷：使用者自己填，交卷（送出）時才一次收回來看。'],
@@ -3680,29 +3278,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Upper() {\n  const [text, setText] = useState("");\n  return (\n    <input\n      value={text}\n      onChange={(e) => setText(e.target.value.toUpperCase())}\n    />\n  );\n}\n// 使用者輸入 abc',
-          predict: { q: '輸入框顯示什麼？', options: ['ABC', 'abc', '空白'], answer: 0 },
           output: 'ABC\n（受控輸入可以在輸入當下轉換、格式化）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'controlled', label: '受控' }, { id: 'uncontrolled', label: '非受控就好' }],
-          items: [
-            { text: '輸入時即時顯示「還剩幾個字」', answer: 'controlled', why: '需要每次輸入都知道值。' },
-            { text: '單純的聯絡表單，送出時才讀取', answer: 'uncontrolled', why: '不需要即時反應。' },
-            { text: '選了國家後，城市選項跟著變', answer: 'controlled', why: '欄位彼此連動。' },
-            { text: '信用卡號輸入時自動每 4 碼加空格', answer: 'controlled', why: '輸入當下格式化。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['輸入時即時顯示「還剩幾個字」', '受控', '需要每次輸入都知道值。'],
+          ['單純的聯絡表單，送出時才讀取', '非受控就好', '不需要即時反應。'],
+          ['選了國家後，城市選項跟著變', '受控', '欄位彼此連動。'],
+          ['信用卡號輸入時自動每 4 碼加空格', '受控', '輸入當下格式化。']
+        ] },
         { type: 'svg', svg: Fig.row('受控輸入的資料流：使用者輸入觸發 onChange；setState 更新 state；重新渲染時 input 的 value 等於新的 state', [
           { title: '使用者輸入', lines: ['觸發 onChange'], tone: 1 },
           { title: 'setState', lines: ['更新 state'], tone: 3 },
           { title: '重新渲染', lines: ['value = state'], tone: 4 },
         ]), caption: '畫面上的值永遠等於 state，這就是「受控」。' },
+        { type: 'heading', id: 'deep-form-edge', text: '深入：表單的自動重置與邊界情況' },
+        'React 19 用 `<form action>` 送出成功後，會自動重置表單裡的非受控欄位；受控欄位的值來自 state，不會被重置。需要手動重置時，可以呼叫 react-dom 的 `requestFormReset(form)`。',
+        '受控輸入的更新一定要同步：在 onChange 裡 `await` 之後才 setState，React 來不及把值寫回，游標會跳到最後。`<input type="file">` 一律是非受控（瀏覽器不允許程式設定它的值）；數字欄位的 `e.target.value` 是字串，要轉型並處理空字串。',
+        { type: 'table', head: ['欄位', '建議'], rows: [
+          ['文字、需要即時驗證或格式化', '受控'],
+          ['檔案', '非受控（只能讀）'],
+          ['欄位很多的大表單', '非受控 ＋ 送出時驗證，或 React Hook Form'],
+          ['依其他欄位連動', '受控'],
+        ] },
       ],
-      tryit: {
-        q: ['用 FormData 讀取「訂閱電子報」核取方塊：'],
-        draft: '<input type="checkbox" name="newsletter" />\n…\nconst subscribed = formData.____("newsletter") === "on";',
-        answer: ['`formData.get("newsletter") === "on"`。', '沒勾選時 get 回傳 null；有勾選時預設值是 "on"（可以用 value 屬性改）。'],
-      },
     },
     mistakes: [
       { wrong: '`<input value={x} />` 沒有 onChange。', why: '變成唯讀，打不了字。', right: '加 onChange，或改用 defaultValue。' },
@@ -3710,19 +3308,7 @@ defineLessons({
       { wrong: '只在前端驗證就相信資料。', why: '前端驗證可以被繞過。', right: '伺服器端一定再驗證（TypeScript 課程 6-2 的 schema 可以共用）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '受控輸入一定要有哪兩個屬性？', options: [
-        { text: 'value 與 onChange', correct: true, why: '成對出現。' },
-        { text: 'name 與 id', why: '那是表單與無障礙用的。' },
-        { text: 'defaultValue 與 onChange', why: 'defaultValue 是非受控。' },
-        { text: 'ref 與 key', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要在送出時一次讀取 10 個欄位、平常不需要即時反應，最簡單的方式是？', options: [
-        { text: '非受控欄位加 name，送出時用 FormData', correct: true, why: '不用 10 個 state。' },
-        { text: '寫 10 個 useState，每個欄位都受控', why: '可以但冗長，也會每打一字就重新渲染。' },
-        { text: '10 個 ref', why: '比 FormData 麻煩。' },
-        { text: '用 Context', why: '不需要。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['大型表單（30 個欄位、即時驗證、動態新增欄位）用受控寫法時，每打一個字整個表單都重新渲染。有什麼對策？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['大型表單（30 個欄位、即時驗證、動態新增欄位）用受控寫法時，每打一個字整個表單都重新渲染。有什麼對策？'], answer: [
         '把表單拆成小元件，讓 state 留在各自欄位；或用 React Hook Form 這類以非受控為主、只在需要時讀值的函式庫。',
         '驗證規則用 Zod schema 描述，前端顯示錯誤、後端再驗一次。開啟 React Compiler 也能減少不必要的重新渲染。',
       ] },
@@ -3741,14 +3327,6 @@ defineLessons({
       '用 useActionState 取得結果與處理中狀態',
       '用 useOptimistic 做樂觀更新',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-1）用 FormData 讀取欄位，欄位需要有什麼屬性？', options: [
-        { text: 'name', correct: true, why: 'FormData 依 name 收集。' },
-        { text: 'key', why: 'key 是清單用的。' },
-        { text: 'ref', why: '不需要。' },
-        { text: 'value', why: '非受控不需要 value。' },
-      ] },
-    ],
     analogy: {
       text: ['form action 像餐廳的取號機：你按下送出（取號），系統自動顯示「處理中」（isPending），處理完叫號給結果（state）。以前要自己寫「顯示處理中、防止重複點、清空表單、顯示錯誤」，現在取號機幫你做了大半。'],
       limit: ['取號機不知道你的業務規則；驗證、錯誤訊息內容、成功後要去哪一頁，仍然由你的 Action 函式決定。'],
@@ -3762,7 +3340,8 @@ defineLessons({
       ]),
       caption: 'Action 可以是 async 函式；不需要自己 preventDefault。',
       blocks: [
-        'React 19 起，`<form action={函式}>` 接受 [[Action]]。[[useActionState]] 包裝 Action，提供上次結果與處理中狀態。表單內的子元件可以用 [[useFormStatus]] 讀取送出狀態。[[useOptimistic]] 讓畫面在請求完成前先顯示預期結果。',
+        'React 19 起，`<form action={函式}>` 接受 [[Action]]。[[useActionState]] 包裝 Action，提供上次結果與處理中狀態。',
+        '表單內的子元件可以用 [[useFormStatus]] 讀取送出狀態。[[useOptimistic]] 讓畫面在請求完成前先顯示預期結果。',
         { type: 'code', lang: 'tsx', title: 'NewsletterForm.tsx', code: 'import { useActionState } from "react";\n\ntype Result = { ok: boolean; message: string } | null;\n\nasync function subscribe(_prev: Result, formData: FormData): Promise<Result> {\n  const email = formData.get("email");\n  if (typeof email !== "string" || !email.includes("@")) {\n    return { ok: false, message: "Email 格式不正確" };\n  }\n  const res = await fetch("/api/v1/subscriptions", { method: "POST", body: formData });\n  return res.ok ? { ok: true, message: "訂閱成功" } : { ok: false, message: "伺服器忙碌，請稍後再試" };\n}\n\nexport function NewsletterForm() {\n  const [result, formAction, isPending] = useActionState(subscribe, null);\n  return (\n    <form action={formAction}>\n      <input name="email" type="email" required />\n      <button disabled={isPending}>{isPending ? "送出中…" : "訂閱"}</button>\n      {result && <p role="status">{result.message}</p>}\n    </form>\n  );\n}' },
       ],
     },
@@ -3786,30 +3365,28 @@ defineLessons({
       }],
       blocks: [
         { type: 'widget', name: 'csrun', props: {
-          code: 'function LikeButton({ likes, onLike }: { likes: number; onLike: () => Promise<void> }) {\n  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (n, delta: number) => n + delta);\n  return (\n    <form action={async () => {\n      addOptimistic(1);\n      await onLike();      // 伺服器要 1 秒\n    }}>\n      <button>❤ {optimisticLikes}</button>\n    </form>\n  );\n}\n// likes = 10，使用者點一下，伺服器回傳失敗',
-          predict: { q: '畫面上的數字會怎麼變？', options: ['立刻 11，失敗後回到 10', '等 1 秒才變 11', '一直是 10'], answer: 0 },
-          output: '點擊當下：❤ 11\n請求失敗、Action 結束後：❤ 10\n（樂觀值只在 Action 進行中有效，結束後顯示真實的 likes）',
+          code: 'function LikeButton({ likes, onLike }: { likes: number; onLike: () => Promise<void> }) {\n  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (n, delta: number) => n + delta);\n  return (\n    <form action={async () => {\n      addOptimistic(1);\n      await onLike();      // 伺服器要 1 秒\n    }}>\n      <button>❤ {optimisticLikes}</button>\n    </form>\n  );\n}\n// likes = 10，使用者點一下；伺服器回應「沒成功」（onLike 正常結束，父元件的 likes 沒變）',
+          output: '點擊當下：❤ 11\nAction 結束後：❤ 10\n（樂觀值只在 Action 進行中有效，結束後顯示真實的 likes；若 onLike 拋出錯誤，會交給 Error Boundary）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'actionstate', label: 'useActionState' }, { id: 'formstatus', label: 'useFormStatus' }, { id: 'optimistic', label: 'useOptimistic' }],
-          items: [
-            { text: '顯示伺服器回傳的驗證錯誤訊息', answer: 'actionstate', why: 'Action 的回傳結果。' },
-            { text: '共用的 SubmitButton 元件要知道所屬表單是否送出中', answer: 'formstatus', why: '在表單子元件讀取狀態。' },
-            { text: '聊天訊息送出後立刻出現在清單', answer: 'optimistic', why: '先顯示預期結果。' },
-            { text: '送出成功後顯示「已儲存」', answer: 'actionstate', why: '結果 state。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['顯示伺服器回傳的驗證錯誤訊息', 'useActionState', 'Action 的回傳結果。'],
+          ['共用的 SubmitButton 元件要知道所屬表單是否送出中', 'useFormStatus', '在表單子元件讀取狀態。'],
+          ['聊天訊息送出後立刻出現在清單', 'useOptimistic', '先顯示預期結果。'],
+          ['送出成功後顯示「已儲存」', 'useActionState', '結果 state。']
+        ] },
         { type: 'svg', svg: Fig.row('樂觀更新的時間線：點擊時立刻顯示預期結果；請求進行中維持樂觀值；請求結束後改為真實結果，成功則一致，失敗則退回', [
           { title: '點擊', lines: ['立刻顯示', '預期結果'], tone: 4 },
           { title: '請求中', lines: ['維持樂觀值'], tone: 3 },
           { title: '完成', lines: ['換成真實結果', '失敗就退回'], tone: 2 },
         ]), caption: '適合成功率高、可以退回的操作；付款這類不適合。' },
+        { type: 'heading', id: 'deep-actions-transitions', text: '深入：Action 其實是 Transition' },
+        'Action 是在 Transition 裡執行的函式：`<form action>`、useActionState、手動的 `startTransition(async () => …)` 都是。等待期間 isPending 為 true，期間的更新被視為非緊急，不會讓正在輸入的欄位卡住。',
+        'useActionState 會把多次送出排成佇列依序執行，每次都收到上一次的結果。Action 裡拋出的錯誤會交給最近的 Error Boundary，所以預期內的失敗要用回傳值表達；useOptimistic 的樂觀值在 Action 結束時消失，成功時要記得更新真實 state，否則畫面會跳回舊值。',
+        { type: 'table', head: ['失敗類型', '例子', '怎麼處理'], rows: [
+          ['預期內', 'Email 格式錯、名額已滿', '回傳 `{ ok: false, message }`，畫面顯示'],
+          ['例外', '網路斷線、程式 bug', 'throw，交給 Error Boundary 顯示替代畫面'],
+        ] },
       ],
-      tryit: {
-        q: ['做一個共用的送出按鈕，自己讀取表單是否送出中：'],
-        draft: 'import { ____ } from "react-dom";\n\nfunction SubmitButton({ label }: { label: string }) {\n  const { ____ } = useFormStatus();\n  return <button disabled={pending}>{pending ? "處理中…" : label}</button>;\n}',
-        answer: ['`import { useFormStatus } from "react-dom";`、`const { pending } = useFormStatus();`。', 'useFormStatus 只能在 `<form>` 的子元件裡使用，讀的是最近的上層表單。'],
-      },
     },
     mistakes: [
       { wrong: '用了 `<form action>` 還在 onSubmit 裡 preventDefault 並手動 fetch。', why: '兩套機制混用，處理中狀態不同步。', right: '統一用 Action。' },
@@ -3817,19 +3394,7 @@ defineLessons({
       { wrong: '付款、刪除帳號這類操作也用樂觀更新。', why: '失敗時退回會讓使用者誤以為已完成。', right: '只用在可以安全退回、成功率高的操作。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`useActionState` 回傳的第三個值是？', options: [
-        { text: 'isPending：是否處理中', correct: true, why: '可以用來停用按鈕。' },
-        { text: '最後一次的錯誤訊息（字串）', why: '錯誤是你放在 state 裡的。' },
-        { text: 'FormData', why: 'FormData 是傳給你的函式的。' },
-        { text: '重新整理函式', why: '沒有。' },
-      ] },
-      { level: '應用', type: 'mc', q: '使用 `<form action={fn}>` 時，需要自己呼叫 preventDefault 嗎？', options: [
-        { text: '不需要，React 會處理', correct: true, why: '不會整頁重新載入。' },
-        { text: '需要，否則頁面重新載入', why: 'Action 已處理。' },
-        { text: '只有 async 函式需要', why: '都不需要。' },
-        { text: '要在 Effect 裡呼叫', why: '無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 Next.js 等支援 Server Functions 的框架裡，表單 Action 可以直接是一個 `"use server"` 函式。這帶來什麼好處？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 Next.js 等支援 Server Functions 的框架裡，表單 Action 可以直接是一個 `"use server"` 函式。這帶來什麼好處？'], answer: [
         '不用另外寫 API 路由與 fetch：表單送出時直接在伺服器執行函式（寫資料庫），React 處理序列化與處理中狀態。',
         '在 JavaScript 還沒載入時表單也能送出（漸進增強）。但伺服器函式是公開端點，仍要驗證輸入與檢查權限（5-4）。',
       ] },
@@ -3847,14 +3412,6 @@ defineLessons({
       '用 Suspense 宣告等待時的畫面',
       '用 use 讀取 Promise',
       '說出為什麼不要在元件裡自己建立 Promise',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）在 Effect 裡 fetch，快速切換時可能出現什麼問題？', options: [
-        { text: '競態條件：舊的回應覆蓋新的', correct: true, why: '這課的 Suspense 與資料函式庫能處理。' },
-        { text: '無限迴圈', why: '不是這個問題。' },
-        { text: '不會有問題', why: '有。' },
-        { text: 'CORS 錯誤', why: '無關。' },
-      ] },
     ],
     analogy: {
       text: ['Suspense 像餐廳的「餐點準備中」立牌：桌上某道菜還沒好時，服務生放一個立牌（fallback），好了就換成菜。你不用在每道菜的程式裡寫「如果還沒好就顯示立牌」。'],
@@ -3892,25 +3449,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: '<Suspense fallback={<p>整頁載入中…</p>}>\n  <Header />          {/* 0.2 秒 */}\n  <Suspense fallback={<p>文章載入中…</p>}>\n    <Posts />         {/* 2 秒 */}\n  </Suspense>\n</Suspense>',
-          predict: { q: '0.5 秒時畫面顯示？', options: ['Header 與「文章載入中…」', '「整頁載入中…」', '什麼都沒有'], answer: 0 },
           output: '0 秒：整頁載入中…\n0.2 秒：Header ＋ 文章載入中…\n2 秒：Header ＋ Posts\n（巢狀 Suspense 讓快的部分先出現）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'suspense', label: 'Suspense 處理' }, { id: 'error', label: 'Error Boundary 處理' }],
-          items: [
-            { text: '資料還在載入', answer: 'suspense', why: '等待中。' },
-            { text: 'API 回傳 500，Promise 被 reject', answer: 'error', why: '錯誤由錯誤邊界處理。' },
-            { text: 'lazy 載入的元件程式碼還在下載', answer: 'suspense', why: '等待中。' },
-            { text: '元件渲染時拋出例外', answer: 'error', why: '錯誤。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['資料還在載入', 'Suspense 處理', '等待中。'],
+          ['API 回傳 500，Promise 被 reject', 'Error Boundary 處理', '錯誤由錯誤邊界處理。'],
+          ['lazy 載入的元件程式碼還在下載', 'Suspense 處理', '等待中。'],
+          ['元件渲染時拋出例外', 'Error Boundary 處理', '錯誤。']
+        ] },
         { type: 'svg', svg: Fig.vs('兩種載入畫面的寫法：自己在每個元件寫 if loading return spinner，載入狀態散落各處；用 Suspense 在外層宣告一次，元件裡只寫資料準備好之後的樣子', { title: '各自 if (loading)', lines: ['每個元件都寫', '散落各處'], tone: 5 }, { title: 'Suspense 邊界', lines: ['外層宣告一次', '元件只寫成功畫面'], tone: 4 }), caption: 'Suspense 讓「等待」變成版面設計的一部分。' },
+        { type: 'heading', id: 'deep-suspense-transition', text: '深入：Suspense 與 Transition 怎麼搭配' },
+        '已經顯示內容的區塊再次暫停時（例如換頁抓新資料），React 會改回顯示 fallback，畫面閃回「載入中」。把造成暫停的更新包在 startTransition 裡，React 會保留舊畫面，直到新內容準備好。',
+        'React 本身沒有內建資料快取：`use(promise)` 需要框架的 loader、Server Component 傳下來的 Promise，或有快取的函式庫提供穩定的 Promise。`cache()` 只在 Server Components 裡用來讓同一次請求不重複抓取。',
+        { type: 'table', head: ['你想要', '用'], rows: [
+          ['第一次載入時顯示骨架畫面', 'Suspense 的 fallback'],
+          ['切換時保留舊畫面，不閃回載入中', 'startTransition'],
+          ['輸入不卡，結果稍後更新', 'useDeferredValue'],
+          ['只在瀏覽器渲染某個元件（伺服器顯示 fallback）', '`use(browser())`（React 19.3，react-dom）'],
+        ] },
       ],
-      tryit: {
-        q: ['讓圖表元件按需載入，下載期間顯示「圖表載入中」：'],
-        draft: 'const Chart = ____(() => import("./Chart"));\n\n<____ fallback={<p>圖表載入中…</p>}>\n  <Chart />\n</Suspense>',
-        answer: ['`lazy(() => import("./Chart"))`、`<Suspense fallback={…}>`。', '圖表的程式碼會拆成另一個檔案，只有用到時才下載，首頁載入更快。'],
-      },
     },
     mistakes: [
       { wrong: '在元件渲染時 `use(fetch(…))`。', why: '每次渲染新的 Promise，無限暫停。', right: 'Promise 從外部傳入或使用有快取的函式庫。' },
@@ -3918,19 +3475,7 @@ defineLessons({
       { wrong: '整個 App 只包一個 Suspense。', why: '任何一小塊在等，整頁都變成載入畫面。', right: '依「希望一起出現」的區塊放置多個邊界。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`use(promise)` 在 Promise 未完成時會？', options: [
-        { text: '暫停元件，讓最近的 Suspense 顯示 fallback', correct: true, why: '完成後再繼續渲染。' },
-        { text: '回傳 undefined，完成後再自動重新渲染', why: '不會回傳半成品，而是暫停。' },
-        { text: '拋出錯誤', why: '未完成不是錯誤。' },
-        { text: '同步等待，直到 Promise 完成前阻塞整個頁面', why: '不會阻塞，而是暫停這個元件。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪個 Hook／API「可以」寫在 if 裡？', options: [
-        { text: '`use`', correct: true, why: 'use 是例外。' },
-        { text: '`useState`', why: '不行。' },
-        { text: '`useEffect`', why: '不行。' },
-        { text: '`useContext`', why: '不行（但 use(Context) 可以）。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['「在 Effect 裡 fetch」與「框架提供資料再用 Suspense 顯示」相比，使用者體驗有什麼差別？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['「在 Effect 裡 fetch」與「框架提供資料再用 Suspense 顯示」相比，使用者體驗有什麼差別？'], answer: [
         'Effect 方式要等元件渲染、JavaScript 執行後才開始請求，資料一層層「瀑布式」載入；每個元件都要自己處理 loading 與競態。',
         '框架在路由切換或伺服器端就開始抓資料，Suspense 決定等待時的版面；資料更早到、載入狀態一致，也能搭配串流讓快的部分先出現。',
       ] },
@@ -3949,14 +3494,6 @@ defineLessons({
       '判斷哪些元件該加 "use client"',
       '知道 Server Functions 的安全注意事項',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-3）use(promise) 的 Promise 最好從哪裡來？', options: [
-        { text: '外部傳入（框架、快取、Server Component）', correct: true, why: '這課的 Server Component 正是常見來源。' },
-        { text: '在元件渲染時直接 fetch 一個新的 Promise', why: '每次渲染都是新的 Promise，會無限重新請求。' },
-        { text: 'useState 的初始值', why: '不是建議做法。' },
-        { text: 'Effect 裡建立', why: '不需要。' },
-      ] },
-    ],
     analogy: {
       text: ['Server Components 像餐廳的中央廚房：在後場（伺服器）把菜做好，只把成品送到桌上，食譜和廚具（程式碼、資料庫連線）不會送到客人手上。Client Components 像桌邊料理：需要和客人互動（點擊、輸入）的部分，才在桌邊（瀏覽器）處理。'],
       limit: ['中央廚房不能即時回應客人的手勢；Server Component 不能用 state、Effect、事件處理。需要互動的地方一定要是 Client Component。'],
@@ -3965,7 +3502,8 @@ defineLessons({
       svg: Fig.vs('Server Component 與 Client Component：Server Component 在伺服器執行，可以直接讀資料庫，不送程式碼到瀏覽器，不能用 state 與事件；Client Component 在瀏覽器執行，可以用 state、Effect、事件，程式碼會送到瀏覽器', { title: 'Server Component', lines: ['伺服器執行', '可直接讀資料庫', '不能用 state、事件'], tone: 3 }, { title: 'Client Component', lines: ['"use client"', '瀏覽器執行', 'state、Effect、事件'], tone: 4 }),
       caption: '預設是 Server Component；只有需要互動的葉子加 "use client"。',
       blocks: [
-        '[[Server Components]] 需要框架支援（例如 Next.js App Router、React Router 的 RSC 支援（2026-10 仍是實驗性））。它們可以是 async 函式，直接查資料庫，產生的結果傳到瀏覽器。需要互動的部分寫成 [[Client Components]]，在檔案最上面加 `"use client"`。[[Server Functions]] 用 `"use server"` 標記，能從客戶端呼叫；它們是公開的網路端點，一定要驗證輸入與檢查權限。',
+        '[[Server Components]] 需要框架支援（例如 Next.js App Router、React Router 的 RSC 支援（2026-10 仍是實驗性））。它們可以是 async 函式，直接查資料庫，產生的結果傳到瀏覽器。',
+        '需要互動的部分寫成 [[Client Components]]，在檔案最上面加 `"use client"`。[[Server Functions]] 用 `"use server"` 標記，能從客戶端呼叫；它們是公開的網路端點，一定要驗證輸入與檢查權限。',
         { type: 'code', lang: 'tsx', title: 'app/products/page.tsx（Server Component）', code: 'import { db } from "@/lib/db";\nimport { AddToCart } from "./AddToCart";\n\nexport default async function ProductsPage() {\n  const products = await db.product.findMany({ take: 20 });   // 直接查資料庫\n  return (\n    <ul>\n      {products.map((p) => (\n        <li key={p.id}>\n          {p.name}：{p.price} 元\n          <AddToCart productId={p.id} />   {/* Client Component */}\n        </li>\n      ))}\n    </ul>\n  );\n}' },
         { type: 'code', lang: 'tsx', title: 'app/products/AddToCart.tsx（Client Component）', code: '"use client";\nimport { useState } from "react";\n\nexport function AddToCart({ productId }: { productId: number }) {\n  const [added, setAdded] = useState(false);\n  return <button onClick={() => setAdded(true)}>{added ? "已加入" : "加入購物車"}</button>;\n}' },
       ],
@@ -3989,33 +3527,34 @@ defineLessons({
         why: ['"use client" 放在越下層（越接近葉子）越好'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'server', label: 'Server Component 就好' }, { id: 'client', label: '要 "use client"' }],
-          items: [
-            { text: '從資料庫讀出文章並顯示', answer: 'server', why: '不需要互動，直接讀資料。' },
-            { text: '有 onClick 的按讚按鈕', answer: 'client', why: '事件處理。' },
-            { text: '使用 useState 的分頁切換', answer: 'client', why: 'state。' },
-            { text: '把 Markdown 轉成 HTML 的靜態內容', answer: 'server', why: '轉換用的套件不必送到瀏覽器。' },
-            { text: '讀取 window.innerWidth', answer: 'client', why: '瀏覽器 API。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['從資料庫讀出文章並顯示', 'Server Component 就好', '不需要互動，直接讀資料。'],
+          ['有 onClick 的按讚按鈕', '要 "use client"', '事件處理。'],
+          ['使用 useState 的分頁切換', '要 "use client"', 'state。'],
+          ['把 Markdown 轉成 HTML 的靜態內容', 'Server Component 就好', '轉換用的套件不必送到瀏覽器。'],
+          ['讀取 window.innerWidth', '要 "use client"', '瀏覽器 API。']
+        ] },
         { type: 'widget', name: 'csrun', props: {
           file: 'app/actions.ts',
+          title: '只有作者看得到按鈕，別人能刪嗎',
           code: '"use server";\n\nexport async function deletePost(id: number) {\n  await db.post.delete({ where: { id } });\n}\n// 頁面上只有文章作者看得到刪除按鈕',
-          predict: { q: '其他使用者能刪除別人的文章嗎？', options: ['能，Server Function 是公開端點，要檢查權限', '不能，按鈕被隱藏了', '不能，"use server" 會自動檢查'], answer: 0 },
-          output: '能。\n（任何人都能直接呼叫這個端點；函式內必須確認目前登入者有權刪除這篇文章，並驗證 id）',
+          output: '!能：任何人都能對這個端點送出請求，帶入任意 id\n（按鈕藏起來不等於有權限；函式內必須確認目前登入者有權刪除這篇文章，並驗證 id）',
         } },
         { type: 'svg', svg: Fig.stack('一次請求的流程：伺服器執行 Server Components，查資料並產生結果；把結果與 Client Components 的參照串流到瀏覽器；瀏覽器顯示畫面並為 Client Components 加上互動（hydration）', [
           { title: '1. 伺服器執行 Server Components（查資料）', tone: 3 },
           { title: '2. 串流結果到瀏覽器', tone: 2 },
           { title: '3. 瀏覽器顯示並啟用 Client Components', tone: 4 },
         ]), caption: 'Server Component 的 props 傳給 Client Component 時必須可以序列化（不能傳函式，Server Function 除外）。' },
+        { type: 'heading', id: 'deep-rsc-security', text: '深入：Server Components 的安全事件與序列化邊界' },
+        '2025-12-03 React 公布 Server Components 的嚴重漏洞 CVE-2025-55182：未登入就能遠端執行程式碼。之後又公布了阻斷服務與原始碼外洩漏洞（CVE-2025-55184、CVE-2025-67779、CVE-2026-23864、CVE-2025-55183），前幾次修補不完整。',
+        { type: 'table', caption: 'react-server-dom-* 的修補版本（2026-10-30 查證；19.0.3、19.1.4、19.2.3 修補不完整）', head: ['版本線', '至少升到'], rows: [
+          ['19.0.x', '19.0.4'],
+          ['19.1.x', '19.1.5'],
+          ['19.2.x', '19.2.4'],
+        ] },
+        '受影響的是 `react-server-dom-*` 套件與用它們的框架（next、React Router 的 RSC 模式等）；沒有伺服器的 Vite SPA 不受影響。用了 RSC，就要像維護後端一樣追蹤安全公告。',
+        'Server Component 傳給 Client Component 的 props 會被序列化：可以傳字串、數字、純物件、陣列、Date、Map、Set、Promise、JSX 與 Server Function；不能傳一般函式或 class 實例。',
       ],
-      tryit: {
-        q: ['補上權限檢查，讓 deletePost 只允許作者刪除：'],
-        draft: '"use server";\nexport async function deletePost(id: number) {\n  const user = await getCurrentUser();\n  const post = await db.post.findUnique({ where: { id } });\n  if (!post || post.authorId !== ____?.id) {\n    throw new Error("____");\n  }\n  await db.post.delete({ where: { id } });\n}',
-        answer: ['`user?.id`、例如「沒有權限刪除這篇文章」。', '隱藏按鈕只是介面；授權一定在伺服器端檢查。也要驗證 id 的型別（用 Zod 等）。'],
-      },
     },
     mistakes: [
       { wrong: '在 Server Component 裡用 useState 或 onClick。', why: 'Server Component 不在瀏覽器執行。', right: '把互動部分拆成 Client Component。' },
@@ -4023,19 +3562,7 @@ defineLessons({
       { wrong: '以為 Server Function 只有自己的頁面會呼叫。', why: '它是公開的 HTTP 端點。', right: '驗證輸入、檢查身分與權限。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Server Component「不能」做哪一件事？', options: [
-        { text: '使用 useState', correct: true, why: '沒有瀏覽器端的狀態。' },
-        { text: '直接查資料庫', why: '這正是它的能力。' },
-        { text: '寫成 async 函式', why: '可以。' },
-        { text: '渲染 Client Component', why: '可以。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一頁大部分是靜態文章，只有一個留言表單要互動。"use client" 放哪裡？', options: [
-        { text: '只放在留言表單元件的檔案', correct: true, why: '越接近葉子越好。' },
-        { text: '頁面最上層的 page.tsx', why: '整頁都進瀏覽器 bundle。' },
-        { text: '每個檔案都放', why: '失去 Server Component 的好處。' },
-        { text: '不需要放', why: '有互動就需要。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用 Vite 建立的單頁應用（SPA）可以用 Server Components 嗎？什麼情況下 SPA 仍然是好選擇？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['用 Vite 建立的單頁應用（SPA）可以用 Server Components 嗎？什麼情況下 SPA 仍然是好選擇？'], answer: [
         'Server Components 需要伺服器（或建置時）執行環境與框架整合，單純的 Vite SPA 不支援；要用就選擇支援 RSC 的框架（6-4）。',
         '登入後才使用的內部系統、儀表板、不需要 SEO 與首屏極速的工具類應用，SPA 部署簡單（靜態檔案即可），仍是好選擇。',
       ] },
@@ -4045,7 +3572,7 @@ defineLessons({
       '"use client" 放在需要互動的葉子元件，越下層越好。',
       'Server Function 是公開端點，一定要驗證輸入與檢查權限。',
     ],
-    sources: ['react-rsc'],
+    sources: ['react-rsc', 'react-rsc-cve', 'react-rsc-dos', 'react-router-rsc'],
   },
 });
 </script>
@@ -4074,14 +3601,6 @@ defineLessons({
       '用 ComponentProps 擴充原生元素',
       '用可辨識聯合讓 props 組合不會出錯',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-4）children 的型別通常寫？', options: [
-        { text: '`React.ReactNode`', correct: true, why: '可以是文字、元素、陣列、null。' },
-        { text: '`JSX.Element`', why: '太窄，不接受文字或陣列。' },
-        { text: '`string`', why: '太窄。' },
-        { text: '`any`', why: '失去檢查。' },
-      ] },
-    ],
     analogy: {
       text: ['為 props 寫型別，像在插座旁貼上「只接受 110V、兩孔」：任何人插錯插頭，在動工前（編譯時）就會被擋下，而不是插上去才冒煙（執行時錯誤）。'],
       limit: ['規格貼紙只對「從程式碼插進來」的東西有效；從 API 來的資料仍要在邊界驗證（TypeScript 課程 6-2）。'],
@@ -4094,7 +3613,8 @@ defineLessons({
       ], { arrows: false }),
       caption: '其他大多交給推斷。',
       blocks: [
-        '[[Props 型別]]用 type 描述；可選 props 加 `?`。useState 的初始值推不出完整型別時寫泛型（例如 `useState<User | null>(null)`）。[[事件型別]]用 React 提供的型別。要包裝原生元素時，用 [[ComponentProps]] 繼承所有原生屬性。',
+        '[[Props 型別]]用 type 描述；可選 props 加 `?`。useState 的初始值推不出完整型別時寫泛型（例如 `useState<User | null>(null)`）。',
+        '[[事件型別]]用 React 提供的型別。要包裝原生元素時，用 [[ComponentProps]] 繼承所有原生屬性。',
         { type: 'code', lang: 'tsx', title: 'Button.tsx', code: 'import type { ComponentProps } from "react";\n\ntype ButtonProps = ComponentProps<"button"> & {\n  variant?: "primary" | "ghost" | "danger";\n};\n\nexport function Button({ variant = "primary", className = "", ...rest }: ButtonProps) {\n  return <button className={`btn btn-${variant} ${className}`} {...rest} />;\n}\n\n// 使用：所有原生 button 屬性都有型別檢查與自動完成\n<Button variant="danger" type="submit" disabled={saving} onClick={handleDelete}>\n  刪除\n</Button>' },
       ],
     },
@@ -4119,26 +3639,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Search() {\n  const [q, setQ] = useState("");\n  function handleChange(e) {\n    setQ(e.target.value);\n  }\n  return <input value={q} onChange={handleChange} />;\n}\n// tsc --noEmit（strict）',
-          predict: { q: 'tsc 會怎樣？', options: ['參數 e 隱含 any 的錯誤', '通過', 'useState 型別錯誤'], answer: 0 },
           output: "!Search.tsx:3:24 - error TS7006: Parameter 'e' implicitly has an 'any' type.\n（改成 e: React.ChangeEvent<HTMLInputElement>，或直接寫成行內箭頭函式讓 TypeScript 推斷）",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'write', label: '要寫型別' }, { id: 'infer', label: '交給推斷' }],
-          items: [
-            { text: '元件的 props', answer: 'write', why: '參數無法推斷。' },
-            { text: '`useState(0)`', answer: 'infer', why: '推斷為 number。' },
-            { text: '`useState(null)` 之後要放 User', answer: 'write', why: '`useState<User | null>(null)`。' },
-            { text: '行內的 `onChange={(e) => …}`', answer: 'infer', why: '從 onChange 的型別推斷 e。' },
-            { text: '抽出去的 handleChange 函式參數', answer: 'write', why: '脫離了上下文，要寫事件型別。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['元件的 props', '要寫型別', '參數無法推斷。'],
+          ['`useState(0)`', '交給推斷', '推斷為 number。'],
+          ['`useState(null)` 之後要放 User', '要寫型別', '`useState<User | null>(null)`。'],
+          ['行內的 `onChange={(e) => …}`', '交給推斷', '從 onChange 的型別推斷 e。'],
+          ['抽出去的 handleChange 函式參數', '要寫型別', '脫離了上下文，要寫事件型別。']
+        ] },
         { type: 'svg', svg: Fig.vs('React.FC 與直接寫參數型別：舊寫法 const Card: React.FC<Props>；現在建議 function Card(props: Props)，比較簡單，泛型元件也比較好寫', { title: 'React.FC<Props>（舊）', lines: ['多一層包裝', '泛型元件難寫'], tone: 2 }, { title: '(props: Props)（建議）', lines: ['就是一般函式', '回傳型別自動推斷'], tone: 4 }), caption: '兩種都能用；新程式直接為參數寫型別。' },
+        { type: 'heading', id: 'deep-react19-types', text: '深入：React 19 的型別變化' },
+        '`@types/react` 19 移除了全域的 `JSX` 命名空間，要寫 `React.JSX.Element`。`useRef` 一定要給參數，所有 ref 的 current 都可以寫入；ref 變成一般 prop 後，`ComponentProps<"input">` 已包含 ref，要排除時用 `ComponentPropsWithoutRef`。',
+        { type: 'table', caption: '舊做法 → 現在的做法', head: ['舊寫法', 'React 19 的寫法'], rows: [
+          ['`JSX.Element`', '`React.JSX.Element`'],
+          ['`useRef<number>()`', '`useRef<number | null>(null)` 或給初始值'],
+          ['`forwardRef<HTMLInputElement, Props>(…)`', '`function Input({ ref, ...p }: Props & { ref?: React.Ref<HTMLInputElement> })`'],
+          ['`const C: React.FC<Props>`', '`function C(props: Props)`（泛型元件也好寫）'],
+        ] },
+        '型別只在編譯時存在：API 回應、localStorage、URL 參數進來的資料，執行時仍要用 Zod 這類 schema 驗證後才相信。',
       ],
-      tryit: {
-        q: ['為輸入框的 onKeyDown 寫型別，按 Enter 時送出：'],
-        draft: 'function handleKeyDown(e: React.____<HTMLInputElement>) {\n  if (e.key === "____") submit();\n}',
-        answer: ['`React.KeyboardEvent<HTMLInputElement>`、`"Enter"`。', '注意中文輸入法選字時也會觸發 Enter，可以檢查 `e.nativeEvent.isComposing` 避免誤送。'],
-      },
     },
     mistakes: [
       { wrong: 'props 寫成 any 或不寫型別。', why: '失去所有檢查與自動完成。', right: '一律為 props 寫 type。' },
@@ -4146,19 +3666,7 @@ defineLessons({
       { wrong: '包裝原生元素時手動列出 onClick、disabled 等屬性。', why: '永遠列不完，型別也不精確。', right: '`ComponentProps<"button">` 加上展開。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '輸入框 onChange 的事件型別是？', options: [
-        { text: '`React.ChangeEvent<HTMLInputElement>`', correct: true, why: 'React 的事件型別。' },
-        { text: '`Event`（瀏覽器原生的事件型別）', why: '原生型別，缺少 React 與目標元素的型別資訊。' },
-        { text: '`InputEvent<HTMLInputElement>`（原生輸入事件）', why: '不是 React 的型別，原生 InputEvent 也不是泛型。' },
-        { text: '`string`', why: '是事件物件。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`useState<User | null>(null)` 之後讀 `user.name` 會？', options: [
-        { text: '報錯：user 可能是 null', correct: true, why: '要先檢查或用 `user?.name`。' },
-        { text: '通過', why: 'strict 下會報錯。' },
-        { text: '自動轉成 User', why: '不會。' },
-        { text: '通過編譯，執行時才拋 TypeError', why: '型別錯誤在編譯時就被抓到。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要做一個泛型的 Select 元件：options 是任意型別的陣列，onChange 回傳選中的那一個（型別要正確）。型別大概怎麼寫？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要做一個泛型的 Select 元件：options 是任意型別的陣列，onChange 回傳選中的那一個（型別要正確）。型別大概怎麼寫？'], answer: [
         '`function Select<T>({ options, getLabel, onChange }: { options: T[]; getLabel: (o: T) => string; onChange: (o: T) => void })`。',
         '傳入 `User[]` 時 onChange 的參數自動是 User。這是 TypeScript 課程 3-1 的泛型，用在元件上；用 `function` 宣告比 React.FC 好寫。',
       ] },
@@ -4168,7 +3676,7 @@ defineLessons({
       '事件用 React.ChangeEvent 等型別；包裝原生元素用 ComponentProps。',
       '互斥的 props 組合用可辨識聯合。',
     ],
-    sources: ['react-ts'],
+    sources: ['react-ts', 'react-19'],
   },
 
   '6-2': {
@@ -4176,14 +3684,6 @@ defineLessons({
       '用 Vitest 與 Testing Library 測試元件',
       '依角色與文字找元素，模擬使用者操作',
       '說出「測行為不測實作」的意思',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-2）為什麼 reducer 特別好測試？', options: [
-        { text: '它是純函式，不用渲染就能測', correct: true, why: '元件測試則要渲染（這課）。' },
-        { text: 'React 會自動測試', why: '不會。' },
-        { text: '它沒有邏輯', why: '有很多邏輯。' },
-        { text: '它一定會用到 DOM', why: '不會。' },
-      ] },
     ],
     analogy: {
       text: ['Testing Library 的哲學像請一位真實顧客試用：顧客不會去看你的 state 叫什麼名字，只會找到「送出」按鈕、點下去、看畫面上出現什麼。測試寫得像顧客，重構內部時測試就不會壞。'],
@@ -4223,31 +3723,31 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           file: 'npx vitest 的輸出',
-          title: '先預測，再看測試結果',
+          title: '執行測試，看結果',
           code: '// 元件：送出後呼叫 API，1 秒後才顯示「已儲存」\ntest("shows saved message", async () => {\n  const user = userEvent.setup();\n  render(<SaveForm />);\n  await user.click(screen.getByRole("button", { name: "儲存" }));\n  expect(screen.getByText("已儲存")).toBeInTheDocument();\n});',
-          predict: { q: '這個測試會通過嗎？', options: ['不會：要用 findByText 等待', '會', '會，但很慢'], answer: 0 },
           output: '!FAIL SaveForm.test.tsx > shows saved message\n!TestingLibraryElementError: Unable to find an element with the text: 已儲存\n（改成 expect(await screen.findByText("已儲存")).toBeInTheDocument()，並 mock API）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'get', label: 'getBy' }, { id: 'query', label: 'queryBy' }, { id: 'find', label: 'findBy' }],
-          items: [
-            { text: '確認按鈕存在（應該立刻在畫面上）', answer: 'get', why: '找不到就失敗。' },
-            { text: '確認錯誤訊息「不存在」', answer: 'query', why: '回傳 null 不會拋錯。' },
-            { text: '等待 API 回來後出現的清單', answer: 'find', why: '非同步等待。' },
-            { text: '確認標題文字正確', answer: 'get', why: '同步出現。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['確認按鈕存在（應該立刻在畫面上）', 'getBy', '找不到就失敗。'],
+          ['確認錯誤訊息「不存在」', 'queryBy', '回傳 null 不會拋錯。'],
+          ['等待 API 回來後出現的清單', 'findBy', '非同步等待。'],
+          ['確認標題文字正確', 'getBy', '同步出現。']
+        ] },
         { type: 'svg', svg: Fig.stack('React 測試的分層：reducer、工具函式用單元測試，最快最多；元件用 Testing Library 測互動行為；少量端對端測試用 Playwright 驗證主要流程', [
           { title: '單元測試：reducer、工具函式（最多）', tone: 4 },
           { title: '元件測試：Testing Library（互動行為）', tone: 3 },
           { title: '端對端：Playwright（主要流程，少量）', tone: 2 },
         ], { arrows: false }), caption: '越往下越慢、越接近真實；比例上越少。' },
+        { type: 'heading', id: 'deep-test-env', text: '深入：測試環境與 act 警告' },
+        'Vitest 預設在 Node 執行，沒有 DOM；元件測試要在設定裡指定 `environment: "jsdom"`（或 happy-dom），並在 setup 檔匯入 `@testing-library/jest-dom/vitest`，才有 toBeInTheDocument。',
+        'jsdom 不是真的瀏覽器：沒有版面計算（寬高都是 0），也沒有 View Transition。依賴版面或真實瀏覽器 API 的元件，改用 Vitest 4（2025-10）起穩定的 Browser Mode 或 Playwright。看到 `not wrapped in act(...)` 警告，通常代表測試結束後還有非同步更新，用 `await findBy…` 或 `waitFor` 等畫面穩定，不要包一層 act 壓掉警告。',
+        { type: 'table', head: ['要測的', '工具'], rows: [
+          ['reducer、格式化函式', 'Vitest 單元測試'],
+          ['元件互動', 'Testing Library ＋ jsdom'],
+          ['版面、捲動、真實瀏覽器 API', 'Vitest Browser Mode 或 Playwright'],
+          ['跨頁的主要流程', 'Playwright 端對端'],
+        ] },
       ],
-      tryit: {
-        q: ['測試「輸入少於 8 個字的密碼時顯示錯誤」：'],
-        draft: 'const user = userEvent.setup();\nrender(<SignupForm />);\nawait user.____(screen.getByLabelText("密碼"), "123");\nexpect(screen.getByRole("____")).toHaveTextContent("至少 8 個字元");',
-        answer: ['`await user.type(...)`、`getByRole("alert")`。', '元件裡錯誤訊息用 `role="alert"`（5-1），測試就能依角色找到；label 與 input 正確關聯時 getByLabelText 才找得到。'],
-      },
     },
     mistakes: [
       { wrong: '用 class 或 test id 找元素。', why: '和實作綁太緊，也測不到無障礙。', right: '優先 getByRole、getByLabelText。' },
@@ -4255,19 +3755,7 @@ defineLessons({
       { wrong: '測試裡真的打外部 API。', why: '慢、不穩定、可能有副作用。', right: '用 MSW 之類的工具攔截請求並回傳假資料。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Testing Library 最推薦的查詢方式是？', options: [
-        { text: '`getByRole`', correct: true, why: '接近使用者與輔助科技的認知。' },
-        { text: '`getByTestId`', why: '最後手段。' },
-        { text: '`container.querySelector`', why: '依實作細節。' },
-        { text: '直接讀元件的 state', why: '測不到。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要斷言「載入完成後，『載入中』文字消失」，用哪個查詢？', options: [
-        { text: '`queryByText` 搭配 `toBeNull`', correct: true, why: '不存在時不會拋錯。' },
-        { text: '`getByText`', why: '找不到會直接失敗。' },
-        { text: '`findByText`', why: '用來等待出現，不是消失。' },
-        { text: '`getByText("載入中")` 再檢查 `toBeInTheDocument()`', why: '那是驗證存在；找不到時 getBy 會直接失敗。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事把元件從 useState 重構成 useReducer，結果 20 個測試全壞了。這說明那些測試有什麼問題？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同事把元件從 useState 重構成 useReducer，結果 20 個測試全壞了。這說明那些測試有什麼問題？'], answer: [
         '測試在檢查實作細節（state 的名稱、內部函式、某個 setState 是否被呼叫），而不是使用者看得到的行為。',
         '好的測試只透過畫面與操作驗證結果；重構不改變行為時，測試應該全部通過——這正是測試在重構時要提供的保護。',
       ] },
@@ -4277,7 +3765,7 @@ defineLessons({
       '非同步用 findBy；斷言不存在用 queryBy。',
       '測行為不測實作，重構時測試才不會壞。',
     ],
-    sources: ['vitest', 'testing-library'],
+    sources: ['vitest', 'vitest4', 'testing-library'],
   },
 
   '6-3': {
@@ -4285,14 +3773,6 @@ defineLessons({
       '用 Activity 隱藏畫面但保留狀態',
       '用 ViewTransition 為 Transition 更新加上動畫',
       '知道 Fragment refs 能做什麼',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）用 key 改變元件會怎樣？', options: [
-        { text: '元件重建，內部 state 全部重置', correct: true, why: '這課的 Activity 則是「隱藏但保留」。' },
-        { text: '只重新渲染，state 保留不變', why: 'key 改變是重建，state 會重置。' },
-        { text: '沒有影響', why: '有影響。' },
-        { text: '報錯', why: '不會。' },
-      ] },
     ],
     analogy: {
       text: ['條件渲染 `{show && <Panel />}` 像把房間拆掉，下次要用再重蓋（狀態歸零）。Activity 像把房間的燈關掉、門關上：裡面的東西都還在，下次打開門就是原樣。ViewTransition 則像換房間時的轉場：門滑開、新房間淡入。'],
@@ -4304,7 +3784,7 @@ defineLessons({
         { title: '<ViewTransition>', lines: ['19.3 穩定', 'Transition 時動畫'], tone: 3 },
         { title: 'Fragment ref', lines: ['19.3 穩定', '操作多個子節點'], tone: 4 },
       ], { arrows: false }),
-      caption: '2026-10-16 查證；以 react.dev 文件為準。',
+      caption: '2026-10-30 查證；以 react.dev 文件為準。',
       blocks: [
         '[[Activity]]（19.2）：`mode="hidden"` 時隱藏子樹、保留 state，並暫停它的 Effect，切回 visible 時恢復，適合分頁、側欄、預先渲染下一頁。[[ViewTransition]]（19.3 穩定）：包住要動畫的區塊，只有標記為 Transition 的更新（startTransition、Suspense 揭示、useDeferredValue）會觸發動畫，預設交叉淡入淡出。[[Fragment ref]]（19.3 穩定）：不用多包一層 div 就能對多個子節點加事件監聽、聚焦、觀察可見度。',
         { type: 'code', lang: 'tsx', title: 'Tabs.tsx（React 19.3）', code: 'import { Activity, ViewTransition, startTransition, useState } from "react";\n\nexport function Tabs() {\n  const [tab, setTab] = useState<"posts" | "settings">("posts");\n\n  function select(next: typeof tab) {\n    startTransition(() => setTab(next));   // Transition 才會觸發 ViewTransition 動畫\n  }\n\n  return (\n    <>\n      <button onClick={() => select("posts")}>文章</button>\n      <button onClick={() => select("settings")}>設定</button>\n      <ViewTransition>\n        <Activity mode={tab === "posts" ? "visible" : "hidden"}>\n          <Posts />          {/* 切走再切回，捲動位置與輸入內容都還在 */}\n        </Activity>\n        <Activity mode={tab === "settings" ? "visible" : "hidden"}>\n          <Settings />\n        </Activity>\n      </ViewTransition>\n    </>\n  );\n}' },
@@ -4331,25 +3811,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Panel() {\n  const [open, setOpen] = useState(false);\n  return (\n    <>\n      <button onClick={() => setOpen(!open)}>切換</button>\n      {open && (\n        <ViewTransition>\n          <Details />\n        </ViewTransition>\n      )}\n    </>\n  );\n}\n// 點按鈕',
-          predict: { q: 'Details 出現時會有動畫嗎？', options: ['不會：這不是 Transition 更新', '會，預設淡入', '會，但只有離場'], answer: 0 },
           output: '沒有動畫。\n（一般的 setState 是緊急更新；改成 startTransition(() => setOpen(!open)) 才會觸發 enter／exit 動畫）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'activity', label: 'Activity' }, { id: 'vt', label: 'ViewTransition' }, { id: 'frag', label: 'Fragment ref' }],
-          items: [
-            { text: '分頁切換時保留各分頁的捲動位置與輸入', answer: 'activity', why: '隱藏但保留狀態。' },
-            { text: '清單項目新增或刪除時淡入淡出', answer: 'vt', why: 'enter／exit 動畫。' },
-            { text: '對一組相鄰元素統一加上點擊監聽，又不想多包一層 div', answer: 'frag', why: 'Fragment ref。' },
-            { text: '預先在背景渲染使用者「可能」會點的下一頁', answer: 'activity', why: 'hidden 模式可以預先渲染。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['分頁切換時保留各分頁的捲動位置與輸入', 'Activity', '隱藏但保留狀態。'],
+          ['清單項目新增或刪除時淡入淡出', 'ViewTransition', 'enter／exit 動畫。'],
+          ['對一組相鄰元素統一加上點擊監聽，又不想多包一層 div', 'Fragment ref', 'Fragment ref。'],
+          ['預先在背景渲染使用者「可能」會點的下一頁', 'Activity', 'hidden 模式可以預先渲染。']
+        ] },
         { type: 'svg', svg: Fig.vs('條件渲染與 Activity：條件渲染隱藏時卸載元件，state 消失，Effect 清理；Activity 隱藏時保留 state，Effect 清理，顯示時重新執行 Effect', { title: '{show && <X />}', lines: ['隱藏 = 卸載', 'state 消失'], tone: 5 }, { title: '<Activity hidden>', lines: ['隱藏 = 保留 state', 'Effect 暫停'], tone: 4 }), caption: 'Activity 隱藏時會執行 Effect 的清理，顯示時再執行 Effect；所以 Effect 一定要寫好清理（3-2）。' },
+        { type: 'heading', id: 'deep-activity-boundaries', text: '深入：Activity、ViewTransition 與 19.3 的其他新功能' },
+        'Activity 隱藏時用 `display: none` 藏起子樹、清理 Effect，但保留 state 與 DOM，並繼續以低優先度渲染，所以隱藏的分頁能預先準備好。寫在 Effect 裡的訂閱、計時器會停；DOM 本身的行為（例如正在播放的 `<video>`）不會自動停，要在 Effect 的清理函式裡暫停。',
+        'ViewTransition 依賴瀏覽器的 View Transition API，不支援時直接更新、沒有動畫。`addTransitionType("next")` 可以讓同一個狀態變化依原因套用不同動畫，CSS 用 `:active-view-transition-type()` 選取。',
+        { type: 'table', head: ['需求', '選擇'], rows: [
+          ['隱藏但保留輸入與捲動位置', 'Activity'],
+          ['不需要保留，切走就丟', '條件渲染（省記憶體）'],
+          ['只在瀏覽器渲染（要讀 localStorage）', '`use(browser())`（19.3，react-dom）'],
+          ['網站強制使用 Trusted Types', '19.3 起 React 不再把 TrustedHTML 轉成字串'],
+        ] },
       ],
-      tryit: {
-        q: ['讓側欄關閉時保留它的狀態：'],
-        draft: '<____ mode={isOpen ? "____" : "hidden"}>\n  <Sidebar />\n</Activity>',
-        answer: ['`<Activity mode={isOpen ? "visible" : "hidden"}>`。', '隱藏時 Sidebar 的 Effect 會被清理（例如停止輪詢），再打開時重新執行。'],
-      },
     },
     mistakes: [
       { wrong: '包了 ViewTransition 卻沒有動畫。', why: '只有 Transition 更新會觸發。', right: '用 startTransition 包住更新，或在 Suspense、useDeferredValue 情境下使用。' },
@@ -4357,19 +3837,7 @@ defineLessons({
       { wrong: 'Effect 沒寫清理，用了 Activity 之後行為異常。', why: 'hidden 時會清理、visible 時重新執行。', right: '每個 Effect 都要能正確地「清理再重來」。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`<Activity mode="hidden">` 的子元件會？', options: [
-        { text: '被隱藏但保留 state', correct: true, why: '顯示時恢復原樣。' },
-        { text: '被卸載，state 消失', why: '那是條件渲染。' },
-        { text: '照常顯示', why: 'hidden 會隱藏。' },
-        { text: '拋出錯誤', why: '不會。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'ViewTransition 在 React 19.3 的狀態是？', options: [
-        { text: '穩定 API', correct: true, why: '19.3 將 ViewTransition 與 Fragment Refs 轉為穩定。' },
-        { text: '仍是實驗性', why: '19.3 已轉為穩定。' },
-        { text: '已被移除', why: '沒有。' },
-        { text: '只能在 React Native 使用', why: '目前只支援 DOM。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['動畫原則說「只在真的有東西移動或變化時使用動畫」。ViewTransition 很方便，什麼情況下你會選擇「不加」動畫？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['動畫原則說「只在真的有東西移動或變化時使用動畫」。ViewTransition 很方便，什麼情況下你會選擇「不加」動畫？'], answer: [
         '純粹的資料更新（例如每秒更新的數字）、使用者需要快速連續操作的地方、以及使用者設定了「減少動態效果」時。',
         'ViewTransition 建立在瀏覽器的 View Transition API 上，CSS 可以用 `@media (prefers-reduced-motion: reduce)` 關閉動畫；動畫應該幫助理解「什麼從哪裡變成什麼」，不是裝飾。',
       ] },
@@ -4387,14 +3855,6 @@ defineLessons({
       '分辨 Vite SPA 與全端框架的差別',
       '依需求選擇 Vite、React Router、Next.js',
       '列出一個 React 專案上線前的檢查清單',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-4）Server Components 需要什麼？', options: [
-        { text: '支援 RSC 的框架', correct: true, why: '純 Vite SPA 不支援。' },
-        { text: '只要 React 19', why: '還需要框架整合。' },
-        { text: 'TypeScript', why: '不需要。' },
-        { text: 'Redux', why: '無關。' },
-      ] },
     ],
     analogy: {
       text: ['Vite + React 像買一套好用的工具與木材，自己蓋小木屋：彈性大，但水電（路由、資料、伺服器渲染）要自己接。框架像買預售屋：格局、水電、管線都配好，照它的規矩住進去就好。'],
@@ -4434,22 +3894,18 @@ defineLessons({
         why: ['公開網站、內容型網站、需要 SEO 時，才是框架的主場'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'spa', label: 'Vite SPA' }, { id: 'framework', label: '全端框架' }],
-          items: [
-            { text: '公司內部的請假系統', answer: 'spa', why: '登入後使用、不需要 SEO。' },
-            { text: '電商網站的商品頁', answer: 'framework', why: 'SEO 與首屏速度很重要。' },
-            { text: '部落格與文件網站', answer: 'framework', why: '內容需要被搜尋引擎讀取（也可以用靜態網站產生器）。' },
-            { text: '一個在瀏覽器裡跑的圖片編輯工具', answer: 'spa', why: '全部在客戶端運作。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['公司內部的請假系統', 'Vite SPA', '登入後使用、不需要 SEO。'],
+          ['電商網站的商品頁', '全端框架', 'SEO 與首屏速度很重要。'],
+          ['部落格與文件網站', '全端框架', '內容需要被搜尋引擎讀取（也可以用靜態網站產生器）。'],
+          ['一個在瀏覽器裡跑的圖片編輯工具', 'Vite SPA', '全部在客戶端運作。']
+        ] },
         { type: 'widget', name: 'csrun', props: {
           file: '終端機（Vite SPA）',
-          title: '先預測，再看結果',
+          title: '執行 build，看輸出',
           lang: 'BASH',
           hl: 'bash',
           code: 'npm run build\nls dist',
-          predict: { q: 'dist 資料夾裡主要是什麼？', options: ['index.html 與 assets（JS、CSS）靜態檔案', '需要 Node 執行的伺服器程式', '原始的 .tsx 檔'], answer: 0 },
           output: 'index.html\nassets/\n  index-Bx3k.js\n  index-D9aQ.css\n（檔名中的雜湊為示意；可以直接放到任何靜態主機）',
         } },
         { type: 'svg', svg: Fig.stack('上線前的檢查清單：TypeScript 與 ESLint 零錯誤、測試通過；Lighthouse 或 Core Web Vitals 檢查效能；鍵盤與螢幕閱讀器能操作；錯誤邊界與錯誤回報；環境變數與金鑰不進前端程式碼', [
@@ -4459,12 +3915,25 @@ defineLessons({
           { title: '4. 錯誤邊界與錯誤回報', tone: 2 },
           { title: '5. 金鑰不進前端（VITE_ 開頭會公開）', tone: 5 },
         ], { arrows: false }), caption: 'Vite 只會把 VITE_ 開頭的環境變數放進前端程式碼，所以祕密金鑰絕對不能用 VITE_ 開頭。' },
+        { type: 'heading', id: 'deep-one-page-map', text: '深入：全書一頁地圖' },
+        { type: 'table', caption: '每個模組最重要的一件事', head: ['模組', '核心觀念', '最重要的一個行動'], rows: [
+          ['0 認識 React', '畫面 = f(狀態)', '用 Vite 建專案，只寫函式元件'],
+          ['1 元件與 props', '資料往下、事件往上', '清單一律用資料 id 當 key'],
+          ['2 state 與渲染', 'state 是快照，要不可變更新', '能算出來的不要存成 state'],
+          ['3 副作用與 ref', 'Effect 只用來和外部系統同步', '寫 Effect 前先問「為什麼要執行」'],
+          ['4 架構與效能', '先量測再優化', '新專案開啟 React Compiler'],
+          ['5 資料與表單', '等待交給 Suspense，送出交給 Action', 'Server Function 一律驗證輸入與權限'],
+          ['6 實戰工具', '測行為不測實作', '依需不需要 SEO 與伺服器渲染，選 SPA 或框架'],
+        ] },
+        { type: 'table', caption: '會過時的內容與更新方式', head: ['項目', '本書寫法（2026-10）', '怎麼確認最新'], rows: [
+          ['React 版本', '19.3（2026-09-09）', 'react.dev/blog'],
+          ['React Compiler 的 Vite 設定', 'Vite 8 ＋ `@rolldown/plugin-babel`', 'react.dev 的 Compiler Installation 頁'],
+          ['RSC 安全修補版本', '19.0.4／19.1.5／19.2.4 起', 'react.dev/blog 的安全公告'],
+          ['React Router 的 RSC 支援', '仍是實驗性（unstable_ 前綴）', 'reactrouter.com 的 RSC 文件'],
+          ['Vite 主版本', 'Vite 8（Rolldown）', 'vite.dev/blog'],
+        ] },
+        '框架與建置工具變動最快，建議每 3 個月對照一次上表；快照、不可變更新、Effect 只做同步這些核心觀念，幾年內不太會變。',
       ],
-      tryit: {
-        q: ['把 Vite SPA 部署到 GitHub Pages 的子路徑 `/my-app/`，vite.config.ts 要設定什麼？'],
-        draft: 'export default defineConfig({\n  ____: "/my-app/",\n  plugins: [react()],\n});',
-        answer: ['`base: "/my-app/"`。', 'SPA 使用瀏覽器路由時，GitHub Pages 重新整理子頁面會 404；常見解法是用 hash 路由或提供 404.html 轉址。'],
-      },
     },
     mistakes: [
       { wrong: '內部工具也選全端框架，結果大部分時間在處理伺服器與部署。', why: '用不到的能力也有成本。', right: '依需求選擇，不需要 SEO 與 SSR 就用 SPA。' },
@@ -4472,19 +3941,7 @@ defineLessons({
       { wrong: '照舊教學用 create-react-app。', why: '已停止維護。', right: 'Vite 或框架的官方建立指令。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Vite SPA 的 `npm run build` 產生的是？', options: [
-        { text: '可以放到靜態主機的 HTML、JS、CSS', correct: true, why: '不需要 Node 伺服器。' },
-        { text: '一定要 Node 才能執行的伺服器', why: '那是全端框架。' },
-        { text: '手機 App', why: '那是 React Native／Expo。' },
-        { text: '資料庫', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '需要 SEO 的電商網站，比較適合？', options: [
-        { text: '支援伺服器渲染的框架', correct: true, why: '首屏 HTML 就有內容。' },
-        { text: '純 SPA，SEO 交給搜尋引擎爬蟲自己執行 JavaScript', why: '不可靠，首屏也慢。' },
-        { text: 'create-react-app', why: '已停止維護。' },
-        { text: '不用 React', why: '不一定需要放棄 React。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['回顧整門課：一個「待辦清單」從 SPA 演變成多人協作的全端網站，會依序用到哪些模組的知識？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['回顧整門課：一個「待辦清單」從 SPA 演變成多人協作的全端網站，會依序用到哪些模組的知識？'], answer: [
         '起步：元件、props、state、清單 key、事件（模組 0–2）；不可變更新與 useReducer 管理清單（2-3、4-2）；自訂 Hook 包裝 localStorage 同步（4-3）。',
         '變成全端：表單 Actions 與樂觀更新（5-2）、Suspense 載入資料（5-3）、Server Components 與 Server Functions（5-4，注意權限）；全程用 TypeScript 型別與 Testing Library 測試（6-1、6-2），最後依需求選擇框架部署（6-4）。',
       ] },
@@ -4494,7 +3951,7 @@ defineLessons({
       '公開網站、需要 SSR 或 Server Components：Next.js、React Router 框架模式。',
       '上線前：型別與測試、效能、無障礙、錯誤處理、金鑰不進前端。',
     ],
-    sources: ['react-frameworks', 'vite'],
+    sources: ['react-frameworks', 'vite', 'react-193', 'react-rsc-dos'],
   },
 });
 </script>
@@ -4612,7 +4069,7 @@ function renderPhrases(text) {
   return phrases.map((phrase, i) => `${i > 0 && needsSpaceBetween(phrases[i - 1], phrase) ? ' ' : ''}<span class="phrase">${wrapWordsHtml(phrase)}</span>`).join('');
 }
 
-/* ---------- 閱讀時間：中文每分鐘 300 字，練習每題另計 ---------- */
+/* ---------- 閱讀時間：中文每分鐘 300 字，深入思考題每題另計 ---------- */
 function collectText(value) {
   if (value == null) return '';
   if (typeof value === 'string') return value;
@@ -4955,7 +4412,7 @@ Views.home = () => {
         <span class="label tilt" style="--chip:var(--info)">React 19.3・Vite</span>
       </div>
       <h1><span class="phrase">畫面</span><br><span class="phrase">是</span><span class="phrase hl">狀態的函式</span></h1>
-      <p class="lead">會一點 JavaScript 就能開始：從 JSX、元件、props 與 state，一路學到副作用、Context、自訂 Hook、表單 Actions、Suspense 與測試。每課都先讓你預測畫面會怎麼變，再對答案，用結果修正直覺。</p>
+      <p class="lead">會一點 JavaScript 就能開始：從 JSX、元件、props 與 state，一路學到副作用、Context、自訂 Hook、表單 Actions、Suspense 與測試。每課都附上執行結果，並在「深入」段落講原理、邊界與取捨。</p>
       <div class="actions">
         ${resumeBtn}
         <a class="btn big nb-press" href="#/l/2-2">直接看「state 是快照」</a>
@@ -4982,10 +4439,10 @@ Views.home = () => {
     <h2 class="section-title"><span class="label" style="--chip:var(--m2)">怎麼用</span><span class="phrase">本站的使用方式</span></h2>
     <div class="content" style="margin:0">
       <ul>
-        <li>每個單元的結構都一樣：3 件事 → 暖身回顧 → 比喻 → 心智模型 → 定義 → 範例 → 常見錯誤 → 練習 → 三個重點。</li>
+        <li>每個單元的結構都一樣：3 件事 → 比喻 → 心智模型 → 定義 → 範例與深入 → 常見錯誤 → 深入思考（選用）→ 三個重點。</li>
         <li>這門課的主軸：看到一段 React 程式先問三個問題。<ol class="three-q"><li>這個值是 <strong>props</strong>、<strong>state</strong>，還是可以<strong>算出來</strong>的？</li><li>這行在<strong>渲染時</strong>執行，還是在<strong>事件或 effect</strong> 裡執行？</li><li>這次更新會讓<strong>哪些元件重新渲染</strong>？</li></ol></li>
-        <li>頁面不執行 React，所以「試試看」是先預測、再看事先寫好的畫面結果或主控台輸出。想自己跑，用 <code>npm create vite@latest my-app -- --template react-ts</code> 建立專案，再 <code>npm run dev</code>。</li>
-        <li>練習的答案預設隱藏；選擇題送出後，每個選項都有解析。</li>
+        <li>頁面不執行 React，所以「試試看」按下「執行」後，顯示事先寫好的畫面結果或主控台輸出。想自己跑，用 <code>npm create vite@latest my-app -- --template react-ts</code> 建立專案，再 <code>npm run dev</code>。</li>
+        <li>深入思考題的解析預設收起，想過再展開。</li>
         <li>鍵盤：<kbd>←</kbd> <kbd>→</kbd> 切換上一課與下一課，<kbd>/</kbd> 搜尋。頂部列可以調整字級，寬螢幕可以拖曳目錄的右緣調整寬度。</li>
         <li>進度存在這台電腦的瀏覽器裡${Store.persistent() ? '' : '（目前瀏覽器不允許儲存，關閉分頁後進度會消失）'}。</li>
       </ul>
@@ -5033,7 +4490,7 @@ const SECTION_DEFS = [
   ['define', '正式定義'],
   ['examples', '範例'],
   ['mistakes', '常見錯誤'],
-  ['practice', '練習'],
+  ['practice', '深入思考'],
   ['keypoints', '三個重點'],
 ];
 
@@ -5108,7 +4565,7 @@ Views.lesson = ({ id }) => {
     ${c ? `<div class="done-row" id="done-row">
       ${isDone
         ? `<span class="stamp">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`}
+        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`}
     </div>` : ''}
     <nav class="lesson-nav" aria-label="上一課與下一課">
       ${prev ? `<a class="prev nb-press" href="#/l/${prev.id}" rel="prev"><span class="dir">← 上一課</span><span class="ttl">${renderPhrases(`${prev.id} ${prev.title}`)}</span></a>` : ''}
@@ -5177,7 +4634,7 @@ function onClick(e) {
   const { action: name, id } = action.dataset;
   if (name === 'done') markDone(id, true);
   if (name === 'undone') markDone(id, false);
-  if (name === 'reset' && window.confirm('確定要清除所有學習進度與測驗紀錄嗎？字級與目錄寬度不會被清除。')) {
+  if (name === 'reset' && window.confirm('確定要清除所有學習進度嗎？字級與目錄寬度不會被清除。')) {
     Store.reset();
     render();
     announce('學習進度已清除');
@@ -5190,7 +4647,7 @@ function markDone(id, isDone) {
   if (row) {
     row.innerHTML = isDone
       ? `<span class="stamp animate">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`;
+      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`;
     const focusTarget = $('button', row);
     if (focusTarget) focusTarget.focus();
   }
@@ -5922,22 +5379,22 @@ function makeStepper(el, count, draw, { interval = STEP_MS, start = 0 } = {}) {
   return { go, stop };
 }
 
-/* ---------- csrun：先預測，再看輸出 ---------- */
+/* ---------- csrun：執行，再看輸出 ---------- */
 // props: { code, title?, file?, predict?: { q?, options: [文字], answer: index }, output: 字串（\n 分行，! 開頭的行顯示成錯誤） }
 // 頁面不執行 TSX，輸出是事先寫好的；推導依據記在 research-notes.md。
 Widgets.csrun = {
   render(props, id) {
     const p = props.predict;
     return `<div class="jw runner">
-      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '先預測，再看輸出')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '執行，看輸出')}</span></div>
       <div class="code"><div class="code-head"><span class="lang">${esc(props.lang || 'TSX')}</span><span class="ttl">${esc(props.file || 'App.tsx')}</span></div>
         <pre tabindex="0" aria-label="程式碼"><code class="language-${esc(props.hl || 'typescript')}">${esc(props.code)}</code></pre></div>
       ${p ? `<div class="run-predict" role="group" aria-label="預測">
         <span class="jw-note"><strong>先預測：</strong>${md(p.q || '執行後會印出什麼？')}</span>
         <div class="opts">${p.options.map((o, i) => `<button type="button" class="btn small nb-press" data-pick="${i}" aria-pressed="false">${esc(o)}</button>`).join('')}</div>
       </div>` : ''}
-      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 看輸出</button></div>
-      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（先預測，再按「看輸出」）</span></pre>
+      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 執行</button></div>
+      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（按「執行」看結果）</span></pre>
       <div class="run-verdict" aria-live="polite"></div>
     </div>`;
   },
@@ -6018,23 +5475,14 @@ Widgets.classify = {
 };
 
 
-/* ---------- herodemo：首頁的第一個預測 ---------- */
+/* ---------- herodemo：首頁的第一個範例 ---------- */
 const HERO_RUNNER = {
-  "title": "這門課的第一個問題",
+  "title": "連呼叫兩次 setCount 的結果",
   "lang": "TSX",
   "hl": "typescript",
   "file": "Counter.tsx",
   "code": "function Counter() {\n  const [count, setCount] = useState(0);\n  function handleClick() {\n    setCount(count + 1);\n    setCount(count + 1);\n  }\n  return <button onClick={handleClick}>{count}</button>;\n}",
-  "predict": {
-    "q": "按一下按鈕後顯示多少？",
-    "options": [
-      "2",
-      "1",
-      "0"
-    ],
-    "answer": 1
-  },
-  "output": "1\n（兩次都是 setCount(0 + 1)：state 是這次渲染的快照）"
+  "output": "按一下後顯示：1\n（兩次都是 setCount(0 + 1)：state 是這次渲染的快照）"
 };
 Widgets.herodemo = {
   render(props, id) { return Widgets.csrun.render(HERO_RUNNER, id); },
@@ -6185,10 +5633,10 @@ Views.styleguide = () => {
       ${tabsBlock({ label: '作業系統', tabs: [{ label: 'Windows', blocks: ['`winget install OpenJS.NodeJS.LTS`'] }, { label: 'macOS', blocks: ['`brew install node`'] }] })}
     </section>
 
-    <section class="sg-block"><h2>摺疊與測驗</h2>
+    <section class="sg-block"><h2>摺疊（深入思考）</h2>
       <div class="quiz-list">
         ${quizItem(sampleQuiz, 'styleguide:q:0')}
-        ${quizItem({ type: 'reveal', level: '遷移', q: '先想一想：為什麼答案要先藏起來？', answer: ['先嘗試提取記憶，再看答案，記得比較牢（提取練習）。'] }, 'styleguide:r:0')}
+        ${quizItem({ type: 'reveal', level: '深入思考', q: '先想一想：為什麼解析要先收起來？', answer: ['先自己推理一次，再看解析，比較容易發現自己的盲點。'] }, 'styleguide:r:0')}
       </div>
     </section>
 
@@ -6200,8 +5648,8 @@ Views.styleguide = () => {
       ${renderWidget({ name: 'checklist', props: { key: 'sg', items: ['第一項', '第二項', '第三項'] } })}
     </section>
 
-    <section class="sg-block"><h2>csrun：預測再看結果</h2>
-      ${renderWidget({ name: 'csrun', props: { code: '<p>{1 + 1}</p>', predict: { options: ['1 + 1', '2'], answer: 1 }, output: '2' } })}
+    <section class="sg-block"><h2>csrun：執行再看結果</h2>
+      ${renderWidget({ name: 'csrun', props: { code: '<p>{1 + 1}</p>', output: '2' } })}
     </section>
     <section class="sg-block"><h2>classify</h2>
       ${renderWidget({ name: 'classify', props: { buckets: [{ id: 'p', label: 'props' }, { id: 's', label: 'state' }], items: [{ text: '父元件傳進來的標題', answer: 'p', why: '由外部決定。' }, { text: '輸入框目前的文字', answer: 's', why: '元件自己記住、會變。' }] } })}

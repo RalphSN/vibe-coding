@@ -22,14 +22,6 @@ defineLessons({
       '把不需要的 Effect 改成計算或事件處理',
       '說出 Effect 真正的用途：和外部系統同步',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-4）能從其他 state 算出來的值應該？', options: [
-        { text: '渲染時直接計算', correct: true, why: '這課會看到它也能取代很多 Effect。' },
-        { text: '存成另一個 state', why: '要手動同步。' },
-        { text: '用 Effect 同步到另一個 state', why: '多一次渲染又容易出錯。' },
-        { text: '存在全域變數', why: '不是 React 的方式。' },
-      ] },
-    ],
     analogy: {
       text: ['Effect 像餐廳打烊後才做的「跟外面對帳」：對帳本來就是廚房以外的事。但很多人把「算今天賣了多少」（廚房裡就能算的）也拖到打烊後才做，還要再開一次店（重新渲染）把結果貼出來。'],
       limit: ['對帳一天一次；Effect 卻可能每次渲染後都執行。用錯地方時，不只多一次渲染，還可能造成一連串的更新與閃爍。'],
@@ -73,50 +65,32 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Form() {\n  const [first, setFirst] = useState("阿");\n  const [last, setLast] = useState("明");\n  const [full, setFull] = useState("");\n  useEffect(() => {\n    setFull(first + last);\n  }, [first, last]);\n  console.log("渲染，full =", full);\n  return <p>{full}</p>;\n}\n// 元件第一次出現',
-          predict: { q: '第一次出現時主控台會印幾次「渲染」？', options: ['2 次', '1 次', '無限多次'], answer: 0 },
           output: '渲染，full = \n渲染，full = 阿明\n（第一次渲染時 full 還是空的；改成 const full = first + last 只需要 1 次）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'render', label: '渲染時計算' }, { id: 'event', label: '事件處理函式' }, { id: 'effect', label: 'Effect' }],
-          items: [
-            { text: '依搜尋文字篩選商品', answer: 'render', why: '從 state 算得出來。' },
-            { text: '使用者按「送出」後呼叫 API', answer: 'event', why: '因為使用者的動作。' },
-            { text: '元件出現時連線到聊天室', answer: 'effect', why: '和外部系統同步。' },
-            { text: '計算購物車總價', answer: 'render', why: '衍生資料。' },
-            { text: '把 document.title 設成目前頁面標題', answer: 'effect', why: '同步到 React 以外的 DOM。' },
-            { text: '加入購物車後顯示通知', answer: 'event', why: '使用者的動作造成的。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['依搜尋文字篩選商品', '渲染時計算', '從 state 算得出來。'],
+          ['使用者按「送出」後呼叫 API', '事件處理函式', '因為使用者的動作。'],
+          ['元件出現時連線到聊天室', 'Effect', '和外部系統同步。'],
+          ['計算購物車總價', '渲染時計算', '衍生資料。'],
+          ['把 document.title 設成目前頁面標題', 'Effect', '同步到 React 以外的 DOM。'],
+          ['加入購物車後顯示通知', '事件處理函式', '使用者的動作造成的。']
+        ] },
         { type: 'svg', svg: Fig.vs('多餘 Effect 的代價：用 Effect 同步衍生 state 時，會先渲染錯的值，再渲染一次正確的值；直接計算只渲染一次，而且沒有中間的錯誤狀態', { title: 'Effect 同步', lines: ['渲染 1：舊值', '渲染 2：正確值'], tone: 5 }, { title: '直接計算', lines: ['渲染 1：正確值'], tone: 4 }), caption: '中間那次錯誤的渲染可能造成畫面閃爍。' },
+        { type: 'heading', id: 'deep-effect-chains', text: '深入：Effect 連鎖與只做一次的初始化' },
+        'Effect 連鎖是指 A 的 Effect 改 state、觸發 B 的 Effect 再改另一個 state。每一環多一次渲染，中間狀態還可能被使用者看到；把整串邏輯移進同一個事件處理函式，通常一次就算完。',
+        '整個 App 只該做一次的初始化（讀設定、檢查登入 token），不要放在 `useEffect(…, [])`：StrictMode 會執行兩次。放在模組頂層，或用一個模組變數記錄「已初始化」。依 props 抓資料仍是 Effect 的合理用途，但要處理競態（3-2），正式專案多半交給框架或 TanStack Query。',
+        { type: 'table', head: ['程式碼為什麼要執行', '放哪裡'], rows: [
+          ['使用者點了、輸入了', '事件處理函式'],
+          ['props 或 state 變了，要算出新值', '渲染時計算'],
+          ['元件在畫面上，要和外部系統保持一致', 'Effect'],
+          ['整個 App 只做一次', '模組頂層'],
+        ] },
       ],
-      tryit: {
-        q: ['把這段 Effect 改成事件處理：'],
-        draft: '// 原本\nuseEffect(() => {\n  if (submitted) api.send(form);\n}, [submitted]);\n\n// 改成：\nfunction handleSubmit() {\n  ____\n}',
-        answer: ['`function handleSubmit() { api.send(form); }`，並移除 submitted state 與 Effect。', '「因為使用者按了送出」就放在送出的事件處理函式裡；用 state 旗標加 Effect 間接觸發，既繞路又容易重複送出。'],
-      },
     },
     mistakes: [
       { wrong: '用 Effect 把 props 或 state 轉換成另一個 state。', why: '多一次渲染，也容易不同步。', right: '渲染時計算。' },
       { wrong: '用「旗標 state + Effect」處理使用者動作。', why: '繞路、難以追蹤，可能重複觸發。', right: '直接在事件處理函式裡做。' },
       { wrong: '在渲染時呼叫 API 或改 localStorage。', why: '渲染可能執行多次，也可能被丟棄。', right: '事件處理函式或 Effect。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'Effect 主要用來做什麼？', options: [
-        { text: '讓元件和 React 以外的系統同步', correct: true, why: '例如連線、訂閱、DOM API。' },
-        { text: '計算衍生資料', why: '渲染時計算即可。' },
-        { text: '處理按鈕點擊', why: '用事件處理函式。' },
-        { text: '把 state 轉換成另一個 state，讓元件渲染得更快', why: 'Effect 反而常讓渲染變多；衍生資料在渲染時計算。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'userId prop 改變時要清空留言輸入框，最好的做法是？', options: [
-        { text: '`<CommentBox key={userId} />`', correct: true, why: 'key 改變時元件重建，state 自動重置。' },
-        { text: '在 Effect 裡 `setText("")`', why: '能用但會先渲染一次舊內容。' },
-        { text: '把 text 存到全域變數，切換時清空', why: '不需要，也不會觸發渲染。' },
-        { text: '重新整理頁面', why: '不需要。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 官方要花一整頁說「你可能不需要 Effect」？這反映了大家常有的什麼誤解？'], answer: [
-        '很多人把 useEffect 當成「state 改變時要做某事」的監聽器（類似 Vue 的 watch），結果用 Effect 串起一連串 state 更新，程式難懂又慢。',
-        'Effect 的正確心智模型是「同步」：只要元件在畫面上，就讓某個外部系統和目前的 props、state 保持一致。不是外部系統的事，就不需要 Effect。',
-      ] },
     ],
     keypoints: [
       '先問「為什麼要執行」：算得出來→渲染時；使用者動作→事件處理；和外部同步→Effect。',
@@ -132,14 +106,6 @@ defineLessons({
       '說出 Effect 何時執行、何時清理',
       '理解開發模式下 Effect 執行兩次的原因',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-1）使用者按「送出」後呼叫 API，該放哪裡？', options: [
-        { text: '事件處理函式', correct: true, why: '因為使用者的動作。' },
-        { text: 'Effect', why: '不需要。' },
-        { text: '渲染時', why: '渲染要是純的。' },
-        { text: 'useRef', why: '無關。' },
-      ] },
-    ],
     analogy: {
       text: ['Effect 像用 Bluetooth 連接耳機：元件出現時連線（Effect），換了一副耳機（相依值改變）要先斷開舊的（清理）再連新的，元件離開畫面時一定要斷線（卸載時清理）。'],
       limit: ['真的耳機很少頻繁切換；Effect 在相依值改變時就會「斷開再連」，相依陣列寫錯會讓它太常或太少執行。'],
@@ -153,7 +119,8 @@ defineLessons({
       ]),
       caption: '每一次「連線」都配對一次「斷線」。',
       blocks: [
-        '[[Effect]] 在畫面更新後執行。[[相依陣列]]列出 Effect 用到的所有[[響應式值]]：空陣列表示只在出現時執行；省略則每次渲染後都執行。回傳[[清理函式]]，在下次執行前與卸載時呼叫。開發模式的 [[StrictMode]] 會刻意執行「連線→斷線→連線」，讓沒寫清理的 bug 立刻現形。',
+        '[[Effect]] 在畫面更新後執行。[[相依陣列]]列出 Effect 用到的所有[[響應式值]]：空陣列表示只在出現時執行；省略則每次渲染後都執行。',
+        '回傳[[清理函式]]，在下次執行前與卸載時呼叫。開發模式的 [[StrictMode]] 會刻意執行「連線→斷線→連線」，讓沒寫清理的 bug 立刻現形。',
         { type: 'code', lang: 'tsx', title: 'ChatRoom.tsx', code: 'import { useEffect, useState } from "react";\n\nexport function ChatRoom({ roomId }: { roomId: string }) {\n  const [messages, setMessages] = useState<string[]>([]);\n\n  useEffect(() => {\n    const conn = createConnection(roomId);\n    conn.on("message", (m: string) => setMessages((list) => [...list, m]));\n    conn.connect();\n    return () => {\n      conn.disconnect();\n      setMessages([]);\n    };\n  }, [roomId]);\n\n  return <ul>{messages.map((m, i) => <li key={i}>{m}</li>)}</ul>;\n}' },
       ],
     },
@@ -178,25 +145,24 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Logger({ id }: { id: number }) {\n  useEffect(() => {\n    console.log("開始", id);\n    return () => console.log("清理", id);\n  }, [id]);\n  return null;\n}\n// 正式版：id 從 1 變成 2，然後元件被移除',
-          predict: { q: '主控台的順序是？', options: ['開始 1、清理 1、開始 2、清理 2', '開始 1、開始 2、清理 1、清理 2', '開始 1、開始 2'], answer: 0 },
           output: '開始 1\n清理 1\n開始 2\n清理 2\n（開發模式的 StrictMode 會在最前面多一組「開始 1、清理 1」）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'empty', label: '`[]`：只在出現時' }, { id: 'deps', label: '`[a, b]`：a 或 b 改變時' }, { id: 'none', label: '省略：每次渲染後' }],
-          items: [
-            { text: '頁面出現時向分析服務記錄一次「瀏覽」', answer: 'empty', why: '只需要一次（StrictMode 開發時會兩次）。' },
-            { text: '依 roomId 連線聊天室', answer: 'deps', why: 'roomId 改變要重連。' },
-            { text: '每次渲染後把捲動位置記錄下來（很少需要）', answer: 'none', why: '省略相依陣列，但通常是錯誤設計。' },
-            { text: '依 query 抓取搜尋結果', answer: 'deps', why: 'query 改變要重新抓。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['頁面出現時向分析服務記錄一次「瀏覽」', '`[]`：只在出現時', '只需要一次（StrictMode 開發時會兩次）。'],
+          ['依 roomId 連線聊天室', '`[a, b]`：a 或 b 改變時', 'roomId 改變要重連。'],
+          ['每次渲染後把捲動位置記錄下來（很少需要）', '省略：每次渲染後', '省略相依陣列，但通常是錯誤設計。'],
+          ['依 query 抓取搜尋結果', '`[a, b]`：a 或 b 改變時', 'query 改變要重新抓。']
+        ] },
         { type: 'svg', svg: Fig.vs('相依陣列不要說謊：Effect 用到 roomId 卻寫空陣列，roomId 改變時不會重連，連到舊房間；列出 roomId，改變時正確地斷開再連線', { title: '`[]`（漏列 roomId）', lines: ['換房間不重連', '連到舊房間'], tone: 5 }, { title: '`[roomId]`', lines: ['換房間時', '斷開再連'], tone: 4 }), caption: '想讓 Effect 少執行，要改程式結構（例如 3-4 的 useEffectEvent），不是刪掉相依項。' },
+        { type: 'heading', id: 'deep-effect-timing', text: '深入：Effect 的執行時機與 useLayoutEffect' },
+        'useEffect 通常在瀏覽器畫出畫面之後才執行，所以 Effect 裡改 state 造成的變化，使用者可能先看到舊畫面一瞬間。要在畫面出現前量測版面（例如提示框該放在按鈕上方還是下方），用 useLayoutEffect：它在 DOM 更新後、瀏覽器繪製前同步執行。',
+        'useLayoutEffect 會擋住繪製，用多了畫面會卡，而且伺服器渲染時不執行。相依陣列用 Object.is 比較：物件或函式每次渲染都是新的，放進相依陣列會讓 Effect 每次都跑，解法是在 Effect 裡面建立物件，或只依賴原始值（`roomId`，而不是 `options`）。',
+        { type: 'table', head: ['Hook', '執行時機', '用途'], rows: [
+          ['useEffect', '繪製之後（通常）', '連線、訂閱、記錄'],
+          ['useLayoutEffect', 'DOM 更新後、繪製之前', '量測版面、避免閃爍'],
+          ['useInsertionEffect', '版面效果之前', '只給 CSS-in-JS 函式庫插入樣式'],
+        ] },
       ],
-      tryit: {
-        q: ['監聽視窗大小並在卸載時移除監聽：'],
-        draft: 'useEffect(() => {\n  function onResize() { setWidth(window.innerWidth); }\n  window.addEventListener("resize", onResize);\n  return () => window.____("resize", onResize);\n}, ____);',
-        answer: ['`removeEventListener`、`[]`。', '加入與移除要用同一個函式參考；onResize 定義在 Effect 裡，不需要列進相依陣列。'],
-      },
     },
     mistakes: [
       { wrong: '開了計時器、監聽、連線，卻沒有清理函式。', why: '卸載後仍在執行，開發模式會重複。', right: '回傳清理函式。' },
@@ -204,19 +170,7 @@ defineLessons({
       { wrong: '看到開發模式 Effect 跑兩次，就加旗標阻止。', why: '那是 StrictMode 刻意幫你找缺少的清理。', right: '寫好清理函式，讓「連線→斷線→連線」的結果正確。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '清理函式什麼時候執行？', options: [
-        { text: '下次 Effect 執行前，以及元件卸載時', correct: true, why: '兩個時機都會。' },
-        { text: '只在元件從畫面上移除（卸載）時', why: '相依改變時也會先清理。' },
-        { text: 'Effect 本體執行完之後立刻執行', why: '不是，要等下次執行前或卸載時。' },
-        { text: '每次渲染前', why: '只有 Effect 要重跑時。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'Effect 裡用到 query 與 page，相依陣列應該是？', options: [
-        { text: '`[query, page]`', correct: true, why: '列出所有用到的響應式值。' },
-        { text: '`[]`', why: 'query、page 改變時不會更新。' },
-        { text: '`[query, setPage]`', why: '漏了 page；set 函式是穩定的，不需要列。' },
-        { text: '省略', why: '每次渲染都執行，太頻繁。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 Effect 裡 fetch 資料，使用者快速切換三個分類時，畫面可能顯示第一個分類的結果（競態條件）。怎麼用清理函式避免？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 Effect 裡 fetch 資料，使用者快速切換三個分類時，畫面可能顯示第一個分類的結果（競態條件）。怎麼用清理函式避免？'], answer: [
         '在 Effect 裡用 `let ignore = false;` 或 AbortController；清理函式設 `ignore = true` 或 `controller.abort()`；回應回來時若已被忽略就不 setState。',
         '這樣只有最後一個分類的回應會寫入 state。實務上更建議用資料抓取函式庫或框架（5-3），它們已處理好快取與競態。',
       ] },
@@ -234,14 +188,6 @@ defineLessons({
       '用 useRef 保存不影響畫面的值',
       '用 ref 存取 DOM 元素（聚焦、捲動、量測）',
       '分辨 ref 與 state 的使用時機',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）開了 setInterval 的 Effect 必須？', options: [
-        { text: '在清理函式 clearInterval', correct: true, why: '否則卸載後仍在執行。' },
-        { text: '把相依陣列刪掉', why: '和清理無關。' },
-        { text: '用 StrictMode 關掉', why: '不應該關。' },
-        { text: '什麼都不用做', why: '會洩漏。' },
-      ] },
     ],
     analogy: {
       text: ['ref 像抽屜裡的筆記本：你可以隨時寫、隨時看，但寫了不會有人來重新佈置房間（不會重新渲染）。state 像牆上的公告：改了大家都會注意到，畫面也會跟著更新。'],
@@ -276,30 +222,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Counter() {\n  const ref = useRef(0);\n  return (\n    <button onClick={() => { ref.current += 1; console.log(ref.current); }}>\n      按了 {ref.current} 次\n    </button>\n  );\n}\n// 點三下',
-          predict: { q: '點三下後按鈕上顯示？', options: ['按了 0 次', '按了 3 次', '按了 1 次'], answer: 0 },
           output: '主控台：1、2、3\n按鈕仍顯示：按了 0 次\n（ref 改變不會重新渲染；要顯示就用 state）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'state', label: 'state' }, { id: 'ref', label: 'ref' }],
-          items: [
-            { text: '畫面上顯示的計數', answer: 'state', why: '要顯示就要渲染。' },
-            { text: 'setInterval 回傳的 id', answer: 'ref', why: '只在清除時用，不需要顯示。' },
-            { text: '輸入框的 DOM 節點', answer: 'ref', why: '用來呼叫 focus。' },
-            { text: '對話框是否開啟', answer: 'state', why: '影響畫面。' },
-            { text: '上一次的捲動位置（只用來比較）', answer: 'ref', why: '不顯示。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['畫面上顯示的計數', 'state', '要顯示就要渲染。'],
+          ['setInterval 回傳的 id', 'ref', '只在清除時用，不需要顯示。'],
+          ['輸入框的 DOM 節點', 'ref', '用來呼叫 focus。'],
+          ['對話框是否開啟', 'state', '影響畫面。'],
+          ['上一次的捲動位置（只用來比較）', 'ref', '不顯示。']
+        ] },
         { type: 'svg', svg: Fig.stack('DOM ref 何時有值：渲染時 ref.current 還是 null；React 更新 DOM 後把節點放進 ref.current；之後在事件處理函式或 Effect 裡才能使用', [
           { title: '渲染中：current 是 null', tone: 5 },
           { title: 'React 更新 DOM，接上 ref', tone: 3 },
           { title: '事件處理、Effect：可以使用', tone: 4 },
         ]), caption: '不要在渲染時讀 DOM ref。' },
+        { type: 'heading', id: 'deep-ref-callback', text: '深入：ref callback 與 React 19 的清理函式' },
+        'ref 屬性也可以傳函式（ref callback）：節點掛上時被呼叫，收到 DOM 節點。React 19 起它可以回傳清理函式，節點移除時呼叫，適合清單裡每一項各自要觀察的情況。',
+        { type: 'code', lang: 'tsx', title: 'ref callback（React 19）', code: '<li\n  ref={(node) => {\n    const observer = new ResizeObserver(() => measure(node));\n    observer.observe(node);\n    return () => observer.disconnect();   // 節點移除時呼叫\n  }}\n>' },
+        '有了清理函式，TypeScript 不再允許 ref callback 隱含回傳其他值：`ref={(n) => (inputEl = n)}` 要改成 `ref={(n) => { inputEl = n; }}`。只想對外公開幾個方法（focus、reset）而不是整個節點時，用 useImperativeHandle，元件庫常用，日常應用很少需要。',
       ],
-      tryit: {
-        q: ['頁面出現時自動聚焦到輸入框：'],
-        draft: 'const inputRef = useRef<HTMLInputElement>(null);\nuseEffect(() => {\n  inputRef.current____focus();\n}, ____);\nreturn <input ref={inputRef} />;',
-        answer: ['`inputRef.current?.focus()`、`[]`。', '簡單情況也可以直接寫 `<input autoFocus />`；但對話框打開等情境需要用 ref 控制。'],
-      },
     },
     mistakes: [
       { wrong: '用 ref 存要顯示在畫面上的值。', why: '改了不會重新渲染，畫面不更新。', right: '用 state。' },
@@ -307,19 +248,7 @@ defineLessons({
       { wrong: '用 ref 取得 DOM 後直接改 innerHTML 或刪除 React 管理的節點。', why: '和 React 的更新衝突。', right: '只做 React 沒提供的操作：focus、scroll、量測、整合第三方函式庫。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '改變 `ref.current` 會怎樣？', options: [
-        { text: '值保留，但不會重新渲染', correct: true, why: 'ref 的特性。' },
-        { text: '立刻重新渲染', why: '那是 state。' },
-        { text: '值在下次渲染被重置', why: 'ref 會跨渲染保留。' },
-        { text: '報錯', why: '可以修改。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'React 19 讓自訂的 Input 元件接收 ref，最簡單的方式是？', options: [
-        { text: '直接在 props 解構出 ref 並傳給 <input>', correct: true, why: 'ref 是一般 prop。' },
-        { text: '一定要用 forwardRef 包住元件', why: 'React 19 起不再必要。' },
-        { text: '用 document.querySelector', why: '不是 React 的方式。' },
-        { text: '元件不能接收 ref', why: '可以。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['要整合一個第三方地圖函式庫（它自己操作 DOM），怎麼用 ref 與 Effect 搭配？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['要整合一個第三方地圖函式庫（它自己操作 DOM），怎麼用 ref 與 Effect 搭配？'], answer: [
         '用 ref 取得一個容器 div；在 Effect 裡 `const map = new MapLib(containerRef.current)`，清理函式呼叫 `map.destroy()`。',
         'React 只負責那個空容器，裡面交給地圖函式庫；props 改變（例如中心座標）時，用另一個 Effect 呼叫 `map.setCenter()` 同步。',
       ] },
@@ -329,7 +258,7 @@ defineLessons({
       'DOM ref 用來 focus、捲動、量測、整合第三方函式庫。',
       'React 19 起 ref 是一般 prop；不要在渲染時讀寫 ref。',
     ],
-    sources: ['react-refs'],
+    sources: ['react-refs', 'react-19'],
   },
 
   '3-4': {
@@ -337,14 +266,6 @@ defineLessons({
       '辨認「Effect 裡需要最新值、但不該重新同步」的情況',
       '用 useEffectEvent 把這部分抽出來',
       '知道 useEffectEvent 的使用限制',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-2）想讓 Effect 少執行，可以刪掉相依項嗎？', options: [
-        { text: '不行，會讀到舊值；要改程式結構', correct: true, why: '這課的 useEffectEvent 就是方法之一。' },
-        { text: '可以，lint 警告可以忽略', why: '會產生讀到舊值的 bug。' },
-        { text: '可以，React 會自動補', why: '不會。' },
-        { text: '只有 props 可以刪', why: '都不該刪。' },
-      ] },
     ],
     analogy: {
       text: ['連線聊天室時，「要連哪個房間」決定要不要重連；「連上後通知要用什麼主題色」只是當下讀一下設定。換主題色時不應該斷線重連。useEffectEvent 就是把「讀一下最新設定」從「決定要不要重連」裡分出來。'],
@@ -379,30 +300,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Page({ url, cartCount }: { url: string; cartCount: number }) {\n  const onVisit = useEffectEvent((visitedUrl: string) => {\n    logVisit(visitedUrl, cartCount);\n  });\n  useEffect(() => {\n    onVisit(url);\n  }, [url]);\n  return null;\n}\n// url 不變，cartCount 從 1 變成 2',
-          predict: { q: 'cartCount 改變時會再記錄一次瀏覽嗎？', options: ['不會', '會', '會記錄兩次'], answer: 0 },
-          output: '不會。\n（只有 url 改變才代表新的瀏覽；下次 url 改變時，logVisit 會讀到當時最新的 cartCount）',
+          title: 'cartCount 改變時會不會再記錄一次', output: '（沒有輸出：url 沒變，Effect 不會重新執行）\n只有 url 改變才代表新的瀏覽；下次 url 改變時，logVisit 會讀到當時最新的 cartCount',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'dep', label: '留在相依陣列' }, { id: 'event', label: '放進 useEffectEvent' }],
-          items: [
-            { text: '聊天室 roomId', answer: 'dep', why: '改變時必須重新連線。' },
-            { text: '連線成功通知要用的主題色', answer: 'event', why: '只是讀一下，不該重連。' },
-            { text: '要訂閱的股票代號', answer: 'dep', why: '改變時要重新訂閱。' },
-            { text: '記錄日誌時附帶的使用者暱稱', answer: 'event', why: '暱稱改變不代表要重新訂閱。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['聊天室 roomId', '留在相依陣列', '改變時必須重新連線。'],
+          ['連線成功通知要用的主題色', '放進 useEffectEvent', '只是讀一下，不該重連。'],
+          ['要訂閱的股票代號', '留在相依陣列', '改變時要重新訂閱。'],
+          ['記錄日誌時附帶的使用者暱稱', '放進 useEffectEvent', '暱稱改變不代表要重新訂閱。']
+        ] },
         { type: 'svg', svg: Fig.stack('判斷流程：Effect 用到某個值；問這個值改變時是否應該重新同步；是就列入相依陣列；否就把讀取它的邏輯移到 useEffectEvent', [
           { title: 'Effect 用到某個值', tone: 1 },
           { title: '它改變時，應該重新同步嗎？', tone: 2 },
           { title: '是 → 列入相依陣列', tone: 3 },
           { title: '否 → 移到 useEffectEvent', tone: 4 },
         ]), caption: '不要用「刪掉相依項」或 eslint-disable 解決。' },
+        { type: 'heading', id: 'deep-effect-event-history', text: '深入：useEffectEvent 為什麼花了三年' },
+        '這個想法 2022 年以 useEvent 的 RFC 提出，後來改名、縮小範圍成「只能在 Effect 裡呼叫」，2025-10 隨 React 19.2 穩定。範圍縮小的原因：若能傳給子元件，「永遠讀最新值」會讓畫面不再只由 props 與 state 決定。',
+        '它讀到的最新值是最近一次提交到畫面的值，不是渲染中的值，所以不能在渲染時呼叫。新版 eslint-plugin-react-hooks 認得它：不會要求列進相依陣列，傳出去時會報錯。',
+        { type: 'table', head: ['舊做法', '問題', '現在'], rows: [
+          ['eslint-disable 漏列相依', '藏住讀到舊值的 bug', 'useEffectEvent'],
+          ['useRef 存最新值，渲染時寫 ref.current', '違反「渲染時不寫 ref」；並行渲染可能存到被丟棄的值', 'useEffectEvent'],
+          ['把值也列進相依，容忍重連', '多餘的斷線重連', '分清楚哪些值決定「同步什麼」'],
+        ] },
       ],
-      tryit: {
-        q: ['把「用最新 muted 設定決定要不要播放音效」抽成 Effect Event：'],
-        draft: 'const onMessage = ____((text: string) => {\n  if (!muted) playSound();\n  console.log(text);\n});\nuseEffect(() => {\n  const conn = connect(roomId);\n  conn.on("message", onMessage);\n  return () => conn.disconnect();\n}, [____]);',
-        answer: ['`useEffectEvent(...)`、`[roomId]`。', 'muted 改變時不會斷線重連，但下一則訊息會依最新的 muted 決定是否播放。'],
-      },
     },
     mistakes: [
       { wrong: '用 `// eslint-disable-next-line` 關掉相依陣列警告。', why: '把讀到舊值的 bug 藏起來。', right: '依情況移到 useEffectEvent。' },
@@ -410,19 +330,7 @@ defineLessons({
       { wrong: '把真正的依賴（roomId）也包進 useEffectEvent。', why: '房間改變時不會重連。', right: '決定「同步什麼」的值留在相依陣列。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'useEffectEvent 解決的問題是？', options: [
-        { text: 'Effect 需要讀最新值，但那個值改變時不該重新執行 Effect', correct: true, why: '把讀取邏輯與同步依賴分開。' },
-        { text: '讓 Effect 不需要清理函式，也不需要相依陣列', why: '仍需要清理，決定同步的值仍要列在相依陣列。' },
-        { text: '讓元件在 props 改變時不要重新渲染，提升效能', why: '無關，那是記憶化（4-4）。' },
-        { text: '取代 useState', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪裡可以呼叫 Effect Event？', options: [
-        { text: 'Effect 裡（包括 Effect 中設定的回呼）', correct: true, why: '規則。' },
-        { text: 'JSX 的 onClick 等任何事件處理函式', why: '不允許，一般事件處理用普通函式。' },
-        { text: '渲染時', why: '不允許。' },
-        { text: '傳給子元件', why: '不允許。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 useEffectEvent 出現之前，大家常用 ref 存最新值來解決同樣的問題。兩種做法比較起來如何？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 useEffectEvent 出現之前，大家常用 ref 存最新值來解決同樣的問題。兩種做法比較起來如何？'], answer: [
         '舊做法：`const themeRef = useRef(theme); themeRef.current = theme;`，Effect 裡讀 themeRef.current。能用，但要手動同步、在渲染時寫 ref 也違反規則。',
         'useEffectEvent 是官方提供的同一個模式：自動拿到最新值、意圖清楚、有 lint 規則保護，2025-10 起在 React 19.2 是穩定 API。',
       ] },

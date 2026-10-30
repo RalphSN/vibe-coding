@@ -11,14 +11,6 @@ defineTerms({
   'XOR': { en: 'exclusive or', def: '兩個輸入「剛好一個是 1」時輸出 1，否則 0。一條直線分不開，是說明非線性必要性的經典例子。', example: '(0,1)→1、(1,1)→0。', lesson: '1-3' },
 });
 
-const REVIEW_M0 = [
-  { level: '回想', type: 'mc', q: '（回顧 0-1）隱藏層的值是哪裡來的？', options: [
-    { text: '網路自己算出來的中間特徵', correct: true, why: '不是資料直接給的。' },
-    { text: '資料表裡另外一欄的標籤', why: '標籤是答案。' },
-    { text: '使用者在推論時手動輸入', why: '不是手動。' },
-    { text: '隨機產生，每次都不一樣', why: '固定參數下是確定的。' },
-  ] },
-];
 
 const SIGMA = (z) => 1 / (1 + Math.exp(-z));
 const GELU = (z) => 0.5 * z * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (z + 0.044715 * z ** 3)));
@@ -44,7 +36,6 @@ defineLessons({
       '手算一個神經元的輸出',
       '說出權重與偏差各自的作用',
     ],
-    review: REVIEW_M0,
     analogy: {
       text: ['要不要出門跑步：天氣好加分、昨晚睡得少扣分、今天有約會扣很多分。每個因素有不同的重要性，加起來超過某個門檻，你就出門。', '一個[[神經元]]就是這樣：每個輸入乘上[[權重]]（重要性），加總後加上[[偏差]]（門檻往哪移），再交給[[激活函數]]決定要輸出多少。'],
       limit: ['你的決定是是或否，神經元的輸出通常是連續的數字；而且它的權重不是你想好的，是訓練時從資料調出來的。'],
@@ -77,12 +68,11 @@ defineLessons({
           ${[[-1, 'm7', 'b＝−1'], [0, 'm2', 'b＝0'], [1, 'm3', 'b＝1']].map(([b, c, t], i) => { const x0 = 280 - b * 60; return `<path d="M40 ${140 - i * 2} L${x0} ${140 - i * 2} L${x0 + 120} 40" fill="none" style="stroke:var(--${c})" stroke-width="4"/><text x="${x0 + 124}" y="${46 + i * 16}" font-size="13" font-weight="900">${t}</text>`; }).join('')}
           <text x="280" y="168" text-anchor="middle" font-size="13">ReLU(x ＋ b)：b 越大，轉折點越往左（越早開始輸出）</text>
         </svg>`, caption: '權重決定斜率，偏差決定從哪裡開始。' },
+        { type: 'heading', id: 'perceptron', text: '深入：從感知器到現代神經元' },
+        'Rosenblatt 1958 年的感知器（perceptron）也是加權加總，但輸出是 0 或 1 的階梯函式。階梯在平的地方斜率是 0、在跳的那一點沒有導數，梯度傳不回去，所以不能用反向傳播訓練。',
+        '現代神經元把階梯換成平滑或分段線性的激活函數（1-2），才有梯度可用。這是「激活函數要幾乎處處可微分」的原因；ReLU 只在 0 那一點不可微，框架直接把那點的斜率當成 0。',
+        '偏差也可以看成「一個永遠是 1 的輸入」乘上權重 b，很多教科書這樣把 b 併進 w。PyTorch 的 nn.Linear 則把權重與偏差存成兩個 tensor（2-1 的深入段落）。',
       ],
-      tryit: {
-        q: ['x＝[2, 1]、w＝[1, −3]、b＝0.5。算 z 和 ReLU(z)。'],
-        draft: 'z ＝ ＿\nReLU(z) ＝ ＿',
-        answer: ['z ＝ 1×2 ＋ (−3)×1 ＋ 0.5 ＝ −0.5。', 'ReLU(−0.5) ＝ 0：這個神經元「沒被激活」。'],
-      },
     },
     mistakes: [
       { wrong: '忘了加偏差。', why: '沒有偏差，所有轉折點都卡在原點。', right: 'z＝Σwx＋b。' },
@@ -90,19 +80,7 @@ defineLessons({
       { wrong: '把 z 當成神經元的輸出。', why: '輸出是激活之後的 a。', right: 'a＝激活(z)。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '神經元的計算順序？', options: [
-        { text: '加權加總 → 加偏差 → 激活', correct: true, why: 'z＝Σwx＋b，a＝激活(z)。' },
-        { text: '激活 → 加權加總 → 加偏差', why: '激活在最後。' },
-        { text: '加偏差 → 激活 → 加權加總', why: '順序錯了。' },
-        { text: '只做加權加總，不需要其他步驟', why: '少了偏差與激活。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'x＝[1, 1]、w＝[2, −1]、b＝−2，ReLU 輸出？', options: [
-        { text: '0', correct: true, why: 'z＝2−1−2＝−1，ReLU→0。' },
-        { text: '−1，就是 z', why: 'ReLU 把負數變 0。' },
-        { text: '1，因為 2 減 1', why: '少算了偏差。' },
-        { text: '3，因為全部取絕對值相加', why: '不是這樣算。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一個神經元的權重全部是 0、偏差也是 0。不管輸入是什麼，輸出都一樣嗎？這對訓練有什麼啟示？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一個神經元的權重全部是 0、偏差也是 0。不管輸入是什麼，輸出都一樣嗎？這對訓練有什麼啟示？'], answer: [
         '一樣：z 永遠是 0，輸出永遠是激活(0)。',
         '如果一整層所有神經元都從同樣的值開始，它們會算出一樣的輸出、拿到一樣的梯度，永遠學一樣的東西。所以權重要用隨機的小數字初始化（4-4）。',
       ] },
@@ -112,7 +90,7 @@ defineLessons({
       '權重決定每個輸入的重要性（可正可負），偏差移動門檻。',
       '輸出是激活之後的值，不是 z。',
     ],
-    sources: ['rumelhart-1986'],
+    sources: ['rumelhart-1986', 'perceptron'],
   },
 
   '1-2': {
@@ -120,14 +98,6 @@ defineLessons({
       '說出 ReLU、sigmoid、tanh、GELU 的形狀',
       '算出它們在幾個點的值',
       '知道各自常用在哪裡',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）z＝−2 時 ReLU 輸出？', options: [
-        { text: '0', correct: true, why: '負數變 0。' },
-        { text: '−2，ReLU 不改變數字', why: '負數會被截掉。' },
-        { text: '2，取絕對值', why: '不是絕對值。' },
-        { text: '0.5，就是 sigmoid 的中點', why: '那是 σ(0)。' },
-      ] },
     ],
     analogy: {
       text: ['電燈開關有很多種：一般開關（關或開）、調光器（慢慢變亮、到頂就停）、有夜燈功能的開關（關的時候還亮一點點）。', '[[激活函數]]就是神經元的「開關樣式」：[[ReLU]] 負數直接關掉、正數照抄；sigmoid 與 [[tanh]] 是兩端會飽和的調光器；[[GELU]] 像 ReLU 但在 0 附近比較平滑，負數不會一刀切掉。'],
@@ -169,12 +139,15 @@ defineLessons({
           <path d="M310 120 L420 120 L530 40" fill="none" class="stroke-ink" stroke-width="4"/>
           <text x="420" y="170" text-anchor="middle" font-size="14">ReLU：正數斜率固定 1</text>
         </svg>`, caption: '斜率就是反向傳播要乘上的數；斜率接近 0，梯度就傳不回去（4-4）。' },
+        { type: 'heading', id: 'act-now', text: '深入：現在的大型語言模型用什麼激活' },
+        { type: 'table', head: ['激活', '代表模型', '特色'], rows: [
+          ['ReLU', 'AlexNet、ResNet', '最便宜；負數區梯度是 0'],
+          ['GELU', 'BERT、GPT-2', '平滑；負數附近還有一點梯度'],
+          ['SwiGLU', 'PaLM、Llama 系列', '兩組線性投影相乘的閘門形式，多一組參數，同樣總參數量下效果較好'],
+        ] },
+        'SwiGLU 出自 Shazeer 2020 的比較實驗：把前饋網路的「線性 → 激活 → 線性」改成「兩個線性投影，一個過 Swish 之後和另一個相乘」。為了讓參數量和原本相同，中間維度通常從 4d 縮成約 8d/3（Llama 論文的做法）。',
+        '什麼時候不必管這些：小型網路或表格資料，ReLU 通常就夠，換激活的差異往往比調學習率的差異小。sigmoid 與 tanh 現在主要留在輸出層和閘門（6-2）這種需要固定範圍的地方。',
       ],
-      tryit: {
-        q: ['z＝0 時，四種激活各輸出多少？'],
-        draft: 'ReLU：＿　sigmoid：＿　tanh：＿　GELU：＿',
-        answer: ['ReLU 0、sigmoid 0.5、tanh 0、GELU 0。', 'sigmoid 在 0 輸出 0.5，其他三個都是 0：這是 sigmoid 用在「機率」的原因。'],
-      },
     },
     mistakes: [
       { wrong: '隱藏層也全部用 sigmoid。', why: '兩端飽和，深網路梯度會消失。', right: '隱藏層常用 ReLU 或 GELU。' },
@@ -182,19 +155,7 @@ defineLessons({
       { wrong: '以為激活函數只是讓數字變小。', why: '它的作用是加入非線性（1-3）。', right: '沒有非線性，疊再多層也等於一層。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Transformer 的前饋網路常用哪個激活？', options: [
-        { text: 'GELU', correct: true, why: 'GPT、BERT 等常用。' },
-        { text: 'sigmoid，因為輸出在 0 到 1', why: '隱藏層少用。' },
-        { text: '不用任何激活，直接線性', why: '一定要非線性。' },
-        { text: 'softmax，因為要算機率', why: 'softmax 用在輸出或 attention。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'tanh(0) 等於？', options: [
-        { text: '0', correct: true, why: '對稱於原點。' },
-        { text: '0.5，和 sigmoid 一樣', why: 'tanh 的中點是 0。' },
-        { text: '1，因為 e⁰＝1', why: '要代入公式。' },
-        { text: '−1，最小值', why: '−1 是極限。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['ReLU 在負數時輸出 0、斜率也是 0。如果某個神經元的 z 永遠是負的，會發生什麼事？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['ReLU 在負數時輸出 0、斜率也是 0。如果某個神經元的 z 永遠是負的，會發生什麼事？'], answer: [
         '它永遠輸出 0，反向傳播時梯度也是 0，權重永遠不會被更新，等於「死掉了」（常叫 dying ReLU）。',
         '常見的緩解：好的初始化、不要太大的學習率，或改用負數仍有一點斜率的變體（例如 GELU、Leaky ReLU）。',
       ] },
@@ -204,7 +165,7 @@ defineLessons({
       '隱藏層常用 ReLU／GELU；機率輸出用 sigmoid／softmax。',
       '飽和的地方斜率接近 0，梯度傳不回去。',
     ],
-    sources: ['gelu'],
+    sources: ['gelu', 'swiglu', 'llama'],
   },
 
   '1-3': {
@@ -212,20 +173,6 @@ defineLessons({
       '說明為什麼一條直線分不開 XOR',
       '驗證一個有隱藏層的小網路能解 XOR',
       '解釋「沒有非線性，疊再多層也等於一層」',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）ReLU(3) 等於？', options: [
-        { text: '3', correct: true, why: '正數照抄。' },
-        { text: '0，ReLU 會把數字歸零', why: '只有負數歸零。' },
-        { text: '1，正數一律輸出 1', why: '那是階梯函數。' },
-        { text: '0.95，接近 1', why: '那是 sigmoid。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-1）x＝[1, 0]、w＝[1, 1]、b＝−0.5 的 z？', options: [
-        { text: '0.5', correct: true, why: '1＋0−0.5。' },
-        { text: '1.5，忘了偏差是負的', why: 'b 要減。' },
-        { text: '−0.5，忘了 x₁', why: 'x₁ 是 1。' },
-        { text: '2，兩個權重相加', why: 'x₂ 是 0。' },
-      ] },
     ],
     analogy: {
       text: ['桌上擺四個杯子，左上和右下是咖啡，右上和左下是茶（對角線同一種）。你要用一根筷子（直線）把咖啡和茶分開：怎麼擺都做不到。', '這就是 [[XOR]]。一個神經元的決策邊界是一條直線，所以它學不會 XOR。加一個隱藏層，先把四個點「搬」到新的位置，再用直線就分得開了。'],
@@ -273,12 +220,11 @@ defineLessons({
           <text x="280" y="160" text-anchor="middle" font-size="14">沒有激活函數：兩層等於一層，還是一條直線</text>
           <text x="280" y="186" text-anchor="middle" font-size="13">中間夾一個 ReLU，就不能合併了</text>
         </svg>`, caption: '這是第二部 4-1 說「前饋網路中間要有非線性」的原因。' },
+        { type: 'heading', id: 'xor-train', text: '深入：理論上 2 個神經元就夠，訓練卻常常失敗' },
+        '上表用 2 個隱藏神經元就解了 XOR，這是理論上最小的解之一。實際從亂數開始訓練時，只有 2 個隱藏神經元常常卡住：某個 ReLU 一開始就落在永遠輸出 0 的區域（1-2 的深入思考題），或停在只判對 3 個點的解。',
+        '所以實務上會給比理論最小值多的神經元，例如 7-2 的程式用 16 個。多出來的容量讓梯度下降比較容易找到好的解，這也是大模型「參數比必要的多」反而好訓練的一個直覺。',
+        'XOR 也說明了特徵工程為什麼有用：手動加上 x₁·x₂ 這個特徵，y＝x₁＋x₂−2x₁x₂ 就變成線性的，一個神經元就分得開。隱藏層就是在自動做這種組合。',
       ],
-      tryit: {
-        q: ['用上表的網路，驗算 (1, 1) 的輸出。如果把 ReLU 拿掉（h 直接等於括號裡的數），(1, 1) 會輸出多少？'],
-        draft: '有 ReLU：＿\n沒有 ReLU：＿',
-        answer: ['有 ReLU：h₁＝2、h₂＝1，y＝2 − 2 ＝ 0 ✓。', '沒有 ReLU：(0, 0) 時 h₂＝−1，y＝0 − 2×(−1) ＝ 2，已經錯了；整個網路變成 y＝−(x₁＋x₂)＋2，是一條直線，不可能做出 XOR。'],
-      },
     },
     mistakes: [
       { wrong: '以為多疊幾層線性層就能解 XOR。', why: '線性疊線性還是線性。', right: '層與層之間要有非線性激活。' },
@@ -286,19 +232,7 @@ defineLessons({
       { wrong: '以為隱藏層的權重必須手選。', why: '上表是為了示範；實際上由訓練學出來。', right: '模組 3、4 講怎麼學。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '為什麼一個神經元學不會 XOR？', options: [
-        { text: '它的邊界是一條直線', correct: true, why: 'XOR 不是線性可分。' },
-        { text: '因為 XOR 的資料只有四筆', why: '資料量不是問題。' },
-        { text: '因為學習率設得太小', why: '再怎麼訓練都分不開。' },
-        { text: '因為輸入只有 0 和 1', why: '和數值範圍無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '兩層線性層之間沒有激活函數，整體等於？', options: [
-        { text: '一層線性層', correct: true, why: 'W₂W₁ 可以合併。' },
-        { text: '兩層非線性網路', why: '沒有非線性。' },
-        { text: '一個 sigmoid 神經元', why: '沒有 sigmoid。' },
-        { text: '無法計算', why: '可以算。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['「客戶會流失，如果他最近很少登入，或者他最近客訴很多，但兩者同時發生時反而是因為他在積極處理問題、不會流失」。這種規則一個神經元學得會嗎？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['「客戶會流失，如果他最近很少登入，或者他最近客訴很多，但兩者同時發生時反而是因為他在積極處理問題、不會流失」。這種規則一個神經元學得會嗎？'], answer: [
         '學不會：這是類似 XOR 的關係（兩個因素各自出現時是一種結果，同時出現時相反），不是線性可分。',
         '需要隱藏層讓模型先組合出「只有一個因素」「兩個都有」這種中間特徵，再判斷。',
       ] },

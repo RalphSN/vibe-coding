@@ -107,7 +107,7 @@ Widgets.runner = {
     const p = props.predict;
     const lines = String(props.code).split('\n').length;
     return `<div class="jw runner">
-      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '先預測，再執行')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '執行看看')}</span></div>
       <label class="visually-hidden" for="${id}-code">程式碼（可以修改）</label>
       <textarea class="run-code" id="${id}-code" spellcheck="false" rows="${Math.min(Math.max(lines, 3), 16)}"${props.editable === false ? ' readonly' : ''}>${esc(props.code)}</textarea>
       ${p ? `<div class="run-predict" role="group" aria-label="預測">

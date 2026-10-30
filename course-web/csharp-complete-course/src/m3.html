@@ -37,14 +37,6 @@ defineLessons({
       '用 `new` 建立物件並呼叫它的方法',
       '用 private 封裝資料，不讓外界改成不合理的狀態',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）`int[] b = a;` 之後 `b[0] = 9`，a[0] 會變嗎？', options: [
-        { text: '會，陣列是參考型別，a 和 b 指向同一個陣列', correct: true, why: '只複製了參考。' },
-        { text: '不會，C# 預設傳值會複製一份陣列', why: '傳值複製的是參考本身，不是陣列內容。' },
-        { text: '編譯錯誤，陣列不能直接指定給另一個變數', why: '這是合法的指定。' },
-        { text: '執行時拋出例外', why: '指定與修改都是合法操作。' },
-      ] },
-    ],
     analogy: {
       text: ['類別像手搖飲店的「標準作業手冊」：規定每杯飲料有甜度、冰塊、品項（資料），以及能做的動作（加料、封膜）。物件是照手冊做出來的「某一杯」：你的珍奶半糖，我的紅茶無糖，各自獨立。'],
       limit: ['手冊改了，已經做好的飲料不會變；但類別定義改了，重新編譯後所有物件都照新規則。另外，物件可以一直被修改，飲料做好就不會再變。'],
@@ -91,19 +83,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var a = new Counter();\nvar b = new Counter();\na.Add();\na.Add();\nb.Add();\nConsole.WriteLine($"{a.Count} {b.Count}");\n\nclass Counter\n{\n    public int Count { get; private set; }\n    public void Add() => Count++;\n}',
-          predict: { q: '會印出什麼？', options: ['3 3', '2 1', '1 1'], answer: 1 },
           output: '2 1',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'data', label: '資料（欄位／屬性）' }, { id: 'act', label: '行為（方法）' }],
-          items: [
-            { text: '購物車的「商品清單」', answer: 'data', why: '描述狀態，是資料。' },
-            { text: '購物車的「加入商品」', answer: 'act', why: '改變狀態的動作，是方法。' },
-            { text: '訂單的「建立時間」', answer: 'data', why: '一個值。' },
-            { text: '訂單的「計算總價」', answer: 'act', why: '根據資料算出結果，是方法（也可以是唯讀屬性）。' },
-            { text: '使用者的「Email」', answer: 'data', why: '一個值。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['購物車的「商品清單」', '資料（欄位／屬性）', '描述狀態，是資料。'],
+          ['購物車的「加入商品」', '行為（方法）', '改變狀態的動作，是方法。'],
+          ['訂單的「建立時間」', '資料（欄位／屬性）', '一個值。'],
+          ['訂單的「計算總價」', '行為（方法）', '根據資料算出結果，是方法（也可以是唯讀屬性）。'],
+          ['使用者的「Email」', '資料（欄位／屬性）', '一個值。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="主要建構子的寫法比較：傳統寫法需要欄位宣告、建構子、指定三段；主要建構子把參數寫在類別名稱後面，一行完成">
           <rect x="10" y="20" width="260" height="130" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
           <text x="140" y="52" text-anchor="middle" font-size="18" font-weight="900" class="on-color">傳統：三段</text>
@@ -116,32 +104,25 @@ defineLessons({
           <text x="310" y="124" font-size="15" class="on-color mono">{ … 直接用 n … }</text>
           <path d="M270 85 H290" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: '主要建構子（C# 12）適合只是把參數存起來的情況；需要驗證時仍可在成員初始化裡檢查。' },
+        { type: 'heading', id: 'deep-ctor', text: '深入：建構順序與主要建構子的陷阱' },
+        'new 一個子類別物件的順序：先執行子類別的欄位初始設定式，再執行基底類別（初始設定式加建構子本體），最後才是子類別的建構子本體。所以在基底建構子裡呼叫 virtual 方法很危險：子類別的覆寫版本會在子類別建構子本體之前被呼叫，看到的欄位可能還沒設好。',
+        '主要建構子的參數不是唯讀欄位，類別裡任何方法都能重新指定它。如果同時把參數存進屬性、又在方法裡直接用參數，就有兩份可能不一致的狀態，編譯器會給 CS9124 警告；需要不可變時，明確寫 `private readonly string _name = name;`。',
+        { type: 'table', head: ['修飾詞', '誰看得到', '預設用在'], rows: [
+          ['`public`', '所有人', '—'],
+          ['`internal`', '同一個組件（同一個專案）', '頂層類別沒寫修飾詞時'],
+          ['`protected`', '自己與子類別', '—'],
+          ['`private`', '只有自己', '成員沒寫修飾詞時'],
+          ['`private protected`', '同組件內的子類別', '少用'],
+        ] },
       ],
-      tryit: {
-        q: ['補完建構子，讓 `new Book("C# 入門", 320)` 能建立物件：'],
-        draft: 'class Book\n{\n    public string Title { get; }\n    public int Pages { get; }\n    public ____(string title, int pages)\n    {\n        ____ = title;\n        Pages = pages;\n    }\n}',
-        answer: ['`public Book(string title, int pages)`、`Title = title;`', '建構子名稱必須和類別相同、沒有回傳型別；只有 get 的屬性可以在建構子裡設定。也可以改寫成 `class Book(string title, int pages) { public string Title => title; … }`。'],
-      },
     },
     mistakes: [
-      { wrong: '建構子寫成 `public void Book(...)`。', why: '加了 void 就變成一個普通方法，new 時不會執行。', right: '建構子沒有回傳型別：`public Book(...)`。' },
+      { wrong: '建構子寫成 `public void Book(...)`。', why: '加了 void 就是一般方法，而一般方法不能和類別同名，編譯器回報 CS0542。', right: '建構子沒有回傳型別：`public Book(...)`。' },
       { wrong: '所有欄位都 public，方便存取。', why: '任何地方都能把物件改成不合理的狀態，出錯時很難追。', right: '欄位 private，對外用屬性或方法，並在裡面檢查規則。' },
       { wrong: '宣告了 `Book b;` 就直接 `b.Title`。', why: '只宣告變數沒有建立物件，區域變數會是編譯錯誤 CS0165（未指定）；欄位則是 null，執行時拋 NullReferenceException。', right: '`var b = new Book(...);`' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下面哪個是建構子的正確宣告？（類別名稱是 Order）', options: [
-        { text: '`public Order(int id) { }`', correct: true, why: '同名、沒有回傳型別。' },
-        { text: '`public void Order(int id) { }`', why: '有回傳型別就是普通方法，而且和類別同名會編譯錯誤 CS0542。' },
-        { text: '`public new Order(int id) { }`', why: 'new 不是用在宣告建構子。' },
-        { text: '`public Order Create(int id) { }`', why: '這是回傳 Order 的工廠方法，不是建構子。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`Count { get; private set; }` 的效果是？', options: [
-        { text: '外界可以讀，只有類別自己能改', correct: true, why: 'set 加了 private，只在類別內部可用。' },
-        { text: '外界可以讀也可以改', why: 'private set 擋住了外界的寫入。' },
-        { text: '只能在建構子裡設定一次', why: '那是 `init` 或唯讀屬性的行為。' },
-        { text: '完全不能讀', why: 'get 是 public 的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要設計一個「購物車」類別。哪些資料該是 private？對外該開放哪些方法？為什麼不直接開放 `List<Item> Items`？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要設計一個「購物車」類別。哪些資料該是 private？對外該開放哪些方法？為什麼不直接開放 `List<Item> Items`？'], answer: [
         '商品清單用 private 的 List，對外提供 `Add(item)`、`Remove(id)`、唯讀的 `Total`，以及 `IReadOnlyList<Item> Items` 給畫面顯示。',
         '直接開放 List，外界可以 Add 數量為負的商品、繞過庫存檢查。把規則放進 Add 方法，才能保證購物車永遠是合理的狀態。',
       ] },
@@ -159,14 +140,6 @@ defineLessons({
       '分辨欄位與屬性，寫自動屬性',
       '用 C# 14 的 `field` 關鍵字在屬性裡加檢查',
       '用 init 與 required 讓物件建立後不可變',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-1）為什麼要把餘額欄位設成 private？', options: [
-        { text: '讓修改只能透過會檢查規則的方法', correct: true, why: '封裝：避免外界把物件改成不合理的狀態。' },
-        { text: 'private 欄位執行比較快', why: '存取修飾詞不影響效能。' },
-        { text: '這樣序列化成 JSON 時才會包含它', why: '剛好相反，預設序列化器只處理 public 屬性。' },
-        { text: '編譯器規定欄位一定要 private', why: '欄位可以是 public，只是不建議。' },
-      ] },
     ],
     analogy: {
       text: ['屬性像銀行櫃檯：你說「我要存錢」（set），櫃員先檢查鈔票真偽才放進金庫（背後欄位）；你問「餘額多少」（get），櫃員去金庫看了再告訴你。你從頭到尾碰不到金庫。'],
@@ -214,7 +187,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var t = new Temperature();\nt.Celsius = 25;\nConsole.WriteLine(t.Fahrenheit);\nt.Celsius = -300;\n\nclass Temperature\n{\n    public double Celsius\n    {\n        get;\n        set => field = value < -273.15\n            ? throw new ArgumentOutOfRangeException(nameof(value))\n            : value;\n    }\n    public double Fahrenheit => Celsius * 9 / 5 + 32;\n}',
-          predict: { q: '`t.Celsius = -300;` 會怎樣？', options: ['存成 -300', '存成 -273.15', '拋出 ArgumentOutOfRangeException'], answer: 2 },
           output: '77\n!Unhandled exception. System.ArgumentOutOfRangeException: Specified argument was out of the range of valid values. (Parameter \'value\')',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="三種設定時機：set 隨時可以改；init 只能在建立物件時設定；required 加上 init 表示建立時一定要設定，而且之後不能改">
@@ -231,12 +203,17 @@ defineLessons({
           <text x="465" y="138" text-anchor="middle" font-size="16" class="on-color">一定要給</text>
           <g class="stroke-ink" stroke-width="4"><path d="M180 100 H195"/><path d="M365 100 H380"/></g>
         </svg>`, caption: '越往右越嚴格：資料建立後就不該變的（ID、建立時間），用 init 或 required init。' },
+        { type: 'heading', id: 'deep-props', text: '深入：屬性編譯後長什麼樣' },
+        '屬性編譯後就是 `get_Name()` 與 `set_Name(value)` 兩個方法；自動屬性的背後欄位叫 `<Name>k__BackingField`，程式碼裡叫不到，只有 `field` 能碰到它。這也是把欄位改成屬性會破壞已編譯的呼叫端的原因：呼叫端原本讀的是欄位，現在要呼叫方法。',
+        { type: 'table', head: ['寫法', '誰能設定', '何時能設定'], rows: [
+          ['`{ get; set; }`', '任何人', '隨時'],
+          ['`{ get; private set; }`', '類別內部', '隨時'],
+          ['`{ get; }`', '只有建構子與初始設定式', '建立時'],
+          ['`{ get; init; }`', '任何人', '只在建立時'],
+          ['`required … { get; init; }`', '呼叫端必須設定', '只在建立時'],
+        ] },
+        'init 只保證「屬性本身不能被換掉」，不保證深層不可變：`public List<string> Tags { get; init; }` 的清單內容照樣可以 Add。要真的不可變，型別改用 `IReadOnlyList<T>` 或 `ImmutableArray<T>`。另外，建構子已經負責設定 required 屬性時，在建構子加 `[SetsRequiredMembers]`，呼叫端才不會被要求重複設定。',
       ],
-      tryit: {
-        q: ['讓 Email 屬性在存入時自動轉成小寫並去掉空白，用 field 關鍵字：'],
-        draft: 'public string Email\n{\n    get;\n    set => ____ = value.Trim().ToLowerInvariant();\n} = "";',
-        answer: ['`set => field = value.Trim().ToLowerInvariant();`', '`value` 是呼叫端給的新值，`field` 是背後欄位。最後的 `= "";` 是屬性初始值，確保不是 null。'],
-      },
     },
     mistakes: [
       { wrong: '`public string Name { get => Name; set => Name = value; }`', why: '屬性在自己的 get 裡讀自己，無限遞迴，執行時 StackOverflow 讓程式直接結束。', right: '用 `field`，或另外宣告背後欄位。' },
@@ -244,19 +221,7 @@ defineLessons({
       { wrong: '類別已經有一個叫 `field` 的欄位，升級到 C# 14 後屬性裡的 `field` 意思變了。', why: 'C# 14 起，屬性存取子內的 `field` 指背後欄位。', right: '改用 `@field` 或 `this.field`，或乾脆把舊欄位改名。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`public string Id { get; init; }` 的 Id 什麼時候可以設定？', options: [
-        { text: '只有建立物件時（建構子或物件初始設定式）', correct: true, why: 'init 存取子只在初始化階段可用。' },
-        { text: '任何時候都可以', why: '那是 set。' },
-        { text: '永遠不能設定，只能讀', why: '只有 get 的屬性才是這樣；init 可以在建立時設定。' },
-        { text: '只能在同一個類別內部設定', why: '那是 private set。' },
-      ] },
-      { level: '應用', type: 'mc', q: '有 `required string Name { get; init; }`，`var p = new Person();` 會怎樣？', options: [
-        { text: '編譯錯誤 CS9035：必須設定 Name', correct: true, why: 'required 成員一定要在物件初始設定式中設定。' },
-        { text: 'Name 會是 null', why: '編譯器不允許建立出缺少 required 成員的物件。' },
-        { text: 'Name 會是空字串', why: '不會給預設值，直接編譯錯誤。' },
-        { text: '執行時拋 InvalidOperationException', why: '這在編譯時就被擋下。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事問：「既然屬性只是包一層 get／set，為什麼不直接用 public 欄位？效能還比較好。」你怎麼回答？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同事問：「既然屬性只是包一層 get／set，為什麼不直接用 public 欄位？效能還比較好。」你怎麼回答？'], answer: [
         '效能幾乎沒差，JIT 會把簡單屬性內聯（inline）。真正的差別是彈性：今天是自動屬性，明天要加檢查或通知，只改屬性內部，呼叫端完全不用動；欄位改成屬性則會破壞已編譯的呼叫端（二進位相容性）。',
         '而且序列化、資料繫結、EF Core 這些框架預設都以屬性為對象。',
       ] },
@@ -274,14 +239,6 @@ defineLessons({
       '用繼承讓子類別重用父類別',
       '用 virtual／override 做出多型',
       '知道什麼時候該用 abstract、什麼時候該 sealed',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）C# 14 的 `field` 關鍵字代表什麼？', options: [
-        { text: '屬性存取子裡，編譯器產生的背後欄位', correct: true, why: '不用自己宣告 private 欄位。' },
-        { text: '類別裡所有欄位的集合', why: 'field 只在屬性的 get／set 內有特殊意義。' },
-        { text: '宣告欄位用的關鍵字，取代 private', why: '它不是宣告用的修飾詞。' },
-        { text: '反射（reflection）用的 API', why: '這是語言關鍵字，和反射無關。' },
-      ] },
     ],
     analogy: {
       text: ['繼承像連鎖店的分店：總店（父類別）規定了營業時間、收銀流程，分店（子類別）直接沿用，再加上自己的在地菜色。客人說「給我招牌菜」（呼叫 virtual 方法），每家分店端出的是自己版本（override），這就是多型。'],
@@ -327,7 +284,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'Animal[] zoo = [new Dog(), new Cat(), new Animal()];\nforeach (var a in zoo)\n    Console.WriteLine(a.Speak());\n\nclass Animal\n{\n    public virtual string Speak() => "……";\n}\nclass Dog : Animal\n{\n    public override string Speak() => "汪";\n}\nclass Cat : Animal\n{\n    public new string Speak() => "喵";\n}',
-          predict: { q: 'Cat 用的是 `new` 不是 `override`，第二行會印出什麼？', options: ['喵', '……', '編譯錯誤'], answer: 1 },
           output: '汪\n……\n……',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="override 與 new 的差別：override 取代父類別的版本，透過父型別變數呼叫也會執行子類別的；new 只是隱藏，透過父型別變數呼叫仍執行父類別的版本">
@@ -341,35 +297,21 @@ defineLessons({
           <text x="420" y="140" text-anchor="middle" font-size="16" class="on-color mono">Animal a → "……"</text>
           <path d="M270 95 H290" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: '要多型就用 override；`new` 幾乎只在相容舊程式時才用。' },
+        { type: 'heading', id: 'deep-inherit', text: '深入：什麼時候繼承會出問題' },
+        '經典反例是「正方形繼承長方形」：長方形允許分別設定寬和高，正方形為了維持正方形，改寬時要連高一起改，拿到「長方形」的呼叫端就會算出意外的面積。子類別必須能完全取代父類別（Liskov 替換原則）；常見的警訊是子類別覆寫後拋 `NotSupportedException`。',
+        { type: 'table', head: ['', '繼承', '組合（把物件當欄位）'], rows: [
+          ['關係', '是一種（is-a）', '有一個（has-a）'],
+          ['改父類別的影響', '所有子孫都受影響', '只影響持有它的類別'],
+          ['執行時換行為', '不行，型別固定', '可以，換掉欄位裡的物件'],
+          ['可以有幾個', '一個父類別', '任意多個'],
+        ] },
+        '`base.Speak()` 讓子類別覆寫時先執行父類別的版本再加料。另一個常見設計是範本方法（template method）：父類別的公開方法固定流程，流程中呼叫 `protected abstract` 的步驟交給子類別實作。sealed 除了防止誤用，也讓 JIT 能把 virtual 呼叫改成直接呼叫；分析器 CA1852 會提醒你把沒有被繼承的 internal 類別加上 sealed。',
       ],
-      tryit: {
-        q: ['補完，讓 `Employee` 的 `Salary()` 可以被 `Manager` 覆寫成多加 10000：'],
-        draft: 'class Employee\n{\n    public ____ decimal Salary() => 40000m;\n}\nclass Manager : Employee\n{\n    public ____ decimal Salary() => base.Salary() + 10000m;\n}',
-        answer: ['`virtual`、`override`。', '`base.Salary()` 呼叫父類別的版本再加上去，避免把 40000 寫兩次。'],
-      },
     },
     mistakes: [
       { wrong: '子類別寫了同名方法但沒加 override。', why: '變成隱藏（編譯器警告 CS0114），透過父型別呼叫時不會執行子類別的版本。', right: '父類別加 virtual，子類別加 override。' },
       { wrong: '為了重用幾個方法就建立很深的繼承鏈（A : B : C : D）。', why: '改父類別會影響所有子孫，很難預測。', right: '「是一種」（Dog 是一種 Animal）才用繼承；只是想重用功能時，用組合（把另一個物件當欄位）或介面。' },
       { wrong: '`new Shape()`，而 Shape 是 abstract。', why: '抽象類別不能實例化（CS0144）。', right: '`new Circle(…)`，用 Shape 當變數型別。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'C# 的類別可以同時繼承幾個父類別？', options: [
-        { text: '只能一個', correct: true, why: 'C# 是單一繼承；要多種能力用多個介面。' },
-        { text: '最多兩個', why: '沒有這個規則，就是一個。' },
-        { text: '不限，用逗號分隔', why: '逗號後面接的只能是介面。' },
-        { text: '零個，C# 不支援繼承', why: 'C# 支援類別繼承。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`Shape s = new Circle(2); s.Area();` 執行的是哪個 Area？（Area 在 Shape 是 abstract，Circle override 了它）', options: [
-        { text: 'Circle 的 Area', correct: true, why: 'virtual／abstract 呼叫依物件實際型別決定。' },
-        { text: 'Shape 的 Area', why: 'Shape 的 Area 是抽象的，沒有實作可以執行。' },
-        { text: '編譯錯誤：s 是 Shape 型別', why: '透過父型別呼叫正是多型的用法。' },
-        { text: '執行時拋出 NotImplementedException', why: 'Circle 已經提供了實作。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['遊戲裡有「會飛的」、「會游泳的」、「會跑的」動物，鴨子三種都會。用繼承設計會遇到什麼問題？'], answer: [
-        '單一繼承只能選一個父類別：Duck : FlyingAnimal 就不能同時是 SwimmingAnimal。硬做會變成 FlyingSwimmingRunningAnimal 這種組合爆炸。',
-        '比較好的做法是把能力拆成介面：`IFly`、`ISwim`、`IRun`，Duck 同時實作三個。下一課就是介面。',
-      ] },
     ],
     keypoints: [
       '「是一種」的關係才用繼承；C# 只能單一繼承。',
@@ -384,14 +326,6 @@ defineLessons({
       '定義介面並讓類別實作它',
       '寫一個只依賴介面、不依賴具體類別的方法',
       '分辨介面和抽象類別的使用時機',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-3）子類別同名方法沒加 override，透過父型別變數呼叫時會執行？', options: [
-        { text: '父類別的版本（子類別只是隱藏）', correct: true, why: '沒有 override 就沒有多型。' },
-        { text: '子類別的版本', why: '只有 override 才會。' },
-        { text: '編譯錯誤', why: '只會有 CS0114 警告，仍可編譯。' },
-        { text: '兩個版本都執行', why: 'C# 不會同時執行兩個版本。' },
-      ] },
     ],
     analogy: {
       text: ['介面像插座規格：只規定「兩孔、110V」，不管插上去的是吹風機、手機充電器還是檯燈。電器只要符合規格就能插；牆上的插座也不用知道插的是什麼。'],
@@ -417,7 +351,7 @@ defineLessons({
         '[[介面]]只描述能力。類別用 `class X : I1, I2` 實作多個介面。方法參數寫介面型別，呼叫端就能傳任何符合約定的物件。.NET 本身大量使用介面：`IEnumerable<T>`、`IDisposable`、`IComparable<T>`。',
         { type: 'table', caption: '介面 vs 抽象類別', head: ['', '介面', '抽象類別'], rows: [
           ['一個類別可以有幾個', '多個', '一個'],
-          ['可以有欄位（狀態）', '不行', '可以'],
+          ['可以有實例欄位（狀態）', '不行（只能有靜態欄位）', '可以'],
           ['建構子', '沒有', '有'],
           ['適合', '描述「能做什麼」', '共用實作與狀態的「是一種」'],
         ] },
@@ -444,18 +378,14 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'Notify(new Email(), "出貨了");\nNotify(new Sms(), "出貨了");\n\nvoid Notify(INotifier n, string msg) => n.Send(msg);\n\ninterface INotifier { void Send(string msg); }\nclass Email : INotifier\n{\n    public void Send(string msg) => Console.WriteLine($"[Email] {msg}");\n}\nclass Sms : INotifier\n{\n    public void Send(string msg) => Console.WriteLine($"[SMS] {msg}");\n}',
-          predict: { q: 'Notify 方法不知道實際型別，會印出什麼？', options: ['兩行都是 [Email]', '[Email] 與 [SMS] 各一行', '編譯錯誤'], answer: 1 },
           output: '[Email] 出貨了\n[SMS] 出貨了',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'iface', label: '介面' }, { id: 'abs', label: '抽象類別' }],
-          items: [
-            { text: '「可以被儲存」：使用者、訂單、設定檔都要能存', answer: 'iface', why: '彼此不是同一種東西，只是有共同能力。' },
-            { text: '各種「報表」共用頁首頁尾與分頁邏輯，只有內容不同', answer: 'abs', why: '要共用實作與狀態，且都是「一種報表」。' },
-            { text: '測試時要換成假的「付款服務」', answer: 'iface', why: '介面最容易用假物件替換。' },
-            { text: '一個類別同時要「可比較」又「可複製」', answer: 'iface', why: '需要多個能力，只能用介面。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['「可以被儲存」：使用者、訂單、設定檔都要能存', '介面', '彼此不是同一種東西，只是有共同能力。'],
+          ['各種「報表」共用頁首頁尾與分頁邏輯，只有內容不同', '抽象類別', '要共用實作與狀態，且都是「一種報表」。'],
+          ['測試時要換成假的「付款服務」', '介面', '介面最容易用假物件替換。'],
+          ['一個類別同時要「可比較」又「可複製」', '介面', '需要多個能力，只能用介面。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="一個類別實作多個介面：Duck 同時實作 IFly、ISwim、IRun 三個介面">
           <rect x="20" y="20" width="150" height="56" style="fill:var(--m1)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/><text x="95" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">IFly</text>
           <rect x="205" y="20" width="150" height="56" style="fill:var(--m3)" class="stroke-ink" stroke-width="4" stroke-dasharray="8 6"/><text x="280" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">ISwim</text>
@@ -463,12 +393,15 @@ defineLessons({
           <rect x="180" y="110" width="200" height="50" class="fill-surface stroke-ink" stroke-width="4"/><text x="280" y="142" text-anchor="middle" font-size="18" font-weight="900" class="mono">Duck</text>
           <path d="M95 76 V93 H465 V76 M280 76 V110" class="stroke-ink" stroke-width="4" fill="none"/>
         </svg>`, caption: '`class Duck : IFly, ISwim, IRun`：解決上一課單一繼承的限制。' },
+        { type: 'heading', id: 'deep-interface', text: '深入：介面這幾年多了什麼' },
+        { type: 'table', head: ['功能', '版本', '用途'], rows: [
+          ['預設介面方法', 'C# 8', '替介面新增成員而不破壞既有的實作者'],
+          ['static abstract 成員', 'C# 11', '泛型數學：讓 `T` 可以有 `+`、`T.Zero`（`INumber<T>`）'],
+          ['明確介面實作', '一直都有', '兩個介面有同名方法時分開實作；只能透過介面型別呼叫'],
+        ] },
+        '預設實作只能透過介面型別呼叫：類別沒有覆寫時，`new Email().Retry()` 編譯失敗，要寫 `((INotifier)email).Retry()`。這是故意的設計，避免介面偷偷替類別加上公開成員。',
+        '介面也有成本：透過介面呼叫是間接呼叫，struct 轉成介面還會 boxing。效能熱點上可以改用泛型約束 `void Draw<T>(T shape) where T : IShape`，JIT 會替每個 struct 產生專用版本、不 boxing。',
       ],
-      tryit: {
-        q: ['讓 Score 可以用 `list.Sort()` 由小到大排序：'],
-        draft: 'class Score(int value) : ____<Score>\n{\n    public int Value => value;\n    public int CompareTo(Score? other) => Value.____(other?.Value ?? 0);\n}',
-        answer: ['`IComparable<Score>`、`Value.CompareTo(...)`。', 'CompareTo 回傳負數表示自己比較小、0 相等、正數比較大；int 已經實作了，直接借用。`Score?` 是可為 null 的參考型別，4-2 會講。'],
-      },
     },
     mistakes: [
       { wrong: '每個類別都配一個介面（IUser、IOrder…），即使永遠只有一個實作。', why: '多一層間接，程式更難讀，卻沒換來替換的彈性。', right: '需要替換（外部服務、測試替身）或多個實作時才抽介面。' },
@@ -476,19 +409,7 @@ defineLessons({
       { wrong: '介面加了一個新方法，結果所有實作都編譯失敗。', why: '介面是約定，改約定就要所有人一起改。', right: '公開函式庫的介面要謹慎擴充，必要時提供預設實作或新增另一個介面。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下列哪個是介面「做不到」的？', options: [
-        { text: '宣告實例欄位來保存狀態', correct: true, why: '介面不能有實例欄位；要狀態用抽象類別。' },
-        { text: '讓一個類別同時實作好幾個', why: '這正是介面的優勢。' },
-        { text: '當作方法參數的型別', why: '很常見的用法。' },
-        { text: '宣告屬性', why: '介面可以宣告屬性，例如 `string Name { get; }`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`void Print(IEnumerable<int> items)` 可以傳入哪些？', options: [
-        { text: '陣列、List、HashSet 都可以', correct: true, why: '它們都實作了 IEnumerable<int>。' },
-        { text: '只能傳 IEnumerable 這個類別', why: 'IEnumerable 是介面，不能 new；可以傳任何實作它的物件。' },
-        { text: '只能傳 List<int>', why: '參數型別是介面，任何實作都行。' },
-        { text: '只能傳陣列', why: '陣列只是其中一種實作。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你寫的「匯率換算」類別直接呼叫外部 API，單元測試每次都要連網而且結果會變。怎麼用介面解決？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你寫的「匯率換算」類別直接呼叫外部 API，單元測試每次都要連網而且結果會變。怎麼用介面解決？'], answer: [
         '定義 `interface IRateProvider { decimal GetRate(string from, string to); }`，換算類別在建構子收 IRateProvider。',
         '正式環境傳呼叫 API 的實作；測試時傳一個固定回傳 31.5m 的假實作。測試就變得快、穩定、可離線。',
       ] },
@@ -506,14 +427,6 @@ defineLessons({
       '分辨實值型別與參考型別在指定時的差別',
       '知道 struct 適合什麼資料',
       '用 record 寫資料類別，並用 with 複製',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-4）測試時想把寄信服務換成假的，關鍵是？', options: [
-        { text: '讓使用端依賴介面，從外部傳入實作', correct: true, why: '依賴介面才能替換。' },
-        { text: '把寄信類別設成 sealed', why: 'sealed 讓它更難替換。' },
-        { text: '在寄信方法裡判斷是不是測試環境', why: '把測試邏輯混進正式程式，越來越難維護。' },
-        { text: '把寄信方法改成 static', why: 'static 方法無法透過介面替換。' },
-      ] },
     ],
     analogy: {
       text: ['實值型別像影印：你把成績單影印一份給家人，他在影本上畫線，你的正本不變。參考型別像分享雲端文件的連結：你把連結傳給同事，他改了內容，你打開也看到改過的。'],
@@ -562,20 +475,16 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var p1 = new PointS { X = 1 };\nvar p2 = p1;\np2.X = 9;\n\nvar c1 = new PointC { X = 1 };\nvar c2 = c1;\nc2.X = 9;\n\nConsole.WriteLine($"{p1.X} {c1.X}");\n\nstruct PointS { public int X; }\nclass PointC { public int X; }',
-          predict: { q: '會印出什麼？', options: ['1 1', '1 9', '9 9'], answer: 1 },
           output: '1 9',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'v', label: '實值型別' }, { id: 'r', label: '參考型別' }],
-          items: [
-            { text: '`int`、`double`、`bool`', answer: 'v', why: '內建數字與布林都是 struct。' },
-            { text: '`string`', answer: 'r', why: 'string 是 class，但不可變，所以用起來像值。' },
-            { text: '`int[]`', answer: 'r', why: '陣列一律是參考型別，即使元素是 int。' },
-            { text: '`DateTime`', answer: 'v', why: 'DateTime 是 struct。' },
-            { text: '`record Person(...)`', answer: 'r', why: '`record` 預設是 record class；要實值型別寫 `record struct`。' },
-            { text: '`List<int>`', answer: 'r', why: 'List 是 class。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`int`、`double`、`bool`', '實值型別', '內建數字與布林都是 struct。'],
+          ['`string`', '參考型別', 'string 是 class，但不可變，所以用起來像值。'],
+          ['`int[]`', '參考型別', '陣列一律是參考型別，即使元素是 int。'],
+          ['`DateTime`', '實值型別', 'DateTime 是 struct。'],
+          ['`record Person(...)`', '參考型別', '`record` 預設是 record class；要實值型別寫 `record struct`。'],
+          ['`List<int>`', '參考型別', 'List 是 class。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="with 運算式：原本的 record a 年齡 30，a with Age 31 產生新的 record，a 不變">
           <rect x="20" y="40" width="200" height="90" class="fill-surface stroke-ink" stroke-width="4"/>
           <text x="120" y="78" text-anchor="middle" font-size="18" font-weight="900" class="mono">a</text>
@@ -586,35 +495,21 @@ defineLessons({
           <path d="M220 85 H340" class="stroke-ink" stroke-width="4"/>
           <text x="280" y="160" text-anchor="middle" font-size="16" class="mono">a with { Age = 31 }</text>
         </svg>`, caption: 'with 複製出新的 record，只換指定的屬性；適合「不可變資料」的更新方式。' },
+        { type: 'heading', id: 'deep-record', text: '深入：record 的淺層相等與 struct 的預設值' },
+        'record 的值相等是淺層的：屬性是 `List<string>` 時，比的是兩個 List 是不是同一個物件，不是內容。所以兩筆看起來一樣、各自 new 出清單的 record 會不相等；`with` 也是淺層複製，新舊兩筆共用同一個 List。',
+        'struct 一定有預設值 `default`（所有欄位為 0 或 null）。C# 10 起可以寫無參數建構子，但 `default(T)` 和 `new T[5]` 的元素仍然會略過它，所以 struct 要設計成「全部是 0 也合理」。',
+        { type: 'table', head: ['宣告', '種類', '== 比什麼', '適合'], rows: [
+          ['`class`', '參考型別', '是不是同一個物件', '有身分、會變化的實體（訂單、帳戶）'],
+          ['`record`（record class）', '參考型別', '每個屬性的值', 'DTO、查詢結果、事件'],
+          ['`struct`', '實值型別', '預設沒有 ==，要自己定義', '小而簡單的值'],
+          ['`readonly record struct`', '實值型別、不可變', '每個屬性的值', '座標、金額加幣別這類小的值'],
+        ] },
       ],
-      tryit: {
-        q: ['把這個 class 改成一行 record，並用 with 做出價格打九折的新商品：'],
-        draft: 'class Product { public string Name { get; init; } = ""; public decimal Price { get; init; } }\n\n// 改成：\n____ Product(string Name, decimal Price);\nvar p = new Product("耳機", 1000m);\nvar sale = p ____ { Price = p.Price * 0.9m };',
-        answer: ['`record Product(string Name, decimal Price);`、`p with { Price = p.Price * 0.9m }`。', 'record 的位置參數會自動變成 init 屬性；with 產生新物件，p 保持 1000。'],
-      },
     },
     mistakes: [
       { wrong: '以為把物件傳進方法、方法裡改屬性，外面不會變。', why: '參考型別傳的是參考的複本，指向同一個物件。', right: '需要保護時傳 record 並用 with 產生新的，或傳複本。' },
       { wrong: '把很大、會一直修改的資料做成 struct。', why: '每次指定與傳參數都整份複製，而且改到的常常是複本（例如從 List 取出來的 struct）。', right: 'struct 只用於小而不可變的值；其他用 class 或 record。' },
       { wrong: '用 `==` 比較兩個 class 物件的內容。', why: 'class 預設比較參考。', right: '用 record、覆寫 Equals，或比較特定屬性。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '哪一個是實值型別？', options: [
-        { text: '`DateTime`', correct: true, why: 'DateTime 是 struct。' },
-        { text: '`string`', why: 'string 是 class（參考型別），只是不可變。' },
-        { text: '`int[]`', why: '陣列都是參考型別。' },
-        { text: '`record Person(string Name)`', why: '`record` 預設是 record class。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`record R(int X); var a = new R(1); var b = a with { X = 2 };` 之後 a.X 是？', options: [
-        { text: '`1`', correct: true, why: 'with 產生新物件，a 不變。' },
-        { text: '`2`', why: 'with 不會修改原本的 record。' },
-        { text: '編譯錯誤：record 屬性不能改', why: 'with 不是修改，而是建立新物件，合法。' },
-        { text: '`0`', why: 'a 建立時 X 就是 1，之後沒被改。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['API 回傳的「訂單查詢結果」該用 class、struct 還是 record？為什麼？'], answer: [
-        'record（record class）。它是純資料、通常建立後不改、需要能比較與好讀的 ToString（記日誌時很方便），序列化框架也完整支援。',
-        '不用 struct：訂單有很多欄位，複製成本高。不用一般 class：要自己寫 Equals 與 ToString。',
-      ] },
     ],
     keypoints: [
       '實值型別指定時整份複製；參考型別只複製參考，會共用同一個物件。',

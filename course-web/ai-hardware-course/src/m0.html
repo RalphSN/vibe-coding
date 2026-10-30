@@ -8,6 +8,7 @@ defineTerms({
   'HBM': { en: 'High Bandwidth Memory', def: '堆疊在 GPU 旁邊、頻寬極高的記憶體；資料中心 GPU 都用它。', example: 'H100 用 80 GB HBM3。', lesson: '0-1' },
   'VRAM': { en: 'video memory', def: 'GPU 自己的記憶體；模型的權重、KV cache 都要放在這裡才算得快。', example: '消費級顯示卡常見 8～32 GB。', lesson: '2-1' },
   '頻寬': { en: 'memory bandwidth', def: '每秒能從記憶體搬多少資料到運算單元。', example: 'H100：3.35 TB/s。', lesson: '2-2' },
+  'MoE': { en: 'Mixture of Experts', def: '把前饋層拆成很多「專家」，每個 token 只走其中幾個的模型架構；記憶體要放全部參數，運算只算啟用的那部分。', example: '總參數 1,000 億、每個 token 只啟用 50 億。', lesson: '0-1' },
 });
 
 const REQ_HW_SVG = `<svg viewBox="0 0 560 240" role="img" aria-label="一個請求在硬體上的路：資料中心裡的伺服器，伺服器裡有好幾張 GPU，每張 GPU 旁邊有 HBM 記憶體；權重從記憶體搬到運算核心做矩陣乘法">
@@ -59,12 +60,15 @@ defineLessons({
           ${[['放得下嗎？', '記憶體容量', 'm2'], ['跑多快？', '頻寬與算力', 'm1'], ['多少錢？', 'GPU 數 × 時間', 'm4']].map(([a, b, c], i) => `<rect x="${10 + i * 185}" y="30" width="170" height="120" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="80" text-anchor="middle" font-size="17" font-weight="900" class="on-color">${a}</text><text x="${95 + i * 185}" y="112" text-anchor="middle" font-size="14" class="on-color">${b}</text>`).join('')}
           <text x="280" y="178" text-anchor="middle" font-size="13">這一卷的拉桿，都在幫你回答這三題</text>
         </svg>`, caption: '學完這一卷，看到「某某模型 700 億參數」時，你應該能估出大概要什麼硬體。' },
+        { type: 'heading', id: 'beyond-2n', text: '深入：2N 什麼時候不準' },
+        '2N 只算了「每個參數一乘一加」。Kaplan 等 2020 的完整式子是 2N ＋ 2 × 層數 × context 長度 × attention 維度：多出來的那項是 attention 拿目前的 token 去和前面所有 token 比對。context 短時它很小，context 拉到幾十萬 token 時就不能忽略（2-4）。',
+        '另一個例外是 [[MoE]]：每個 token 只走一部分專家，所以運算量要用「啟用參數」算，記憶體卻要用「總參數」算。看到 MoE 模型時，兩個數字要分開問。',
+        { type: 'table', head: ['模型類型', '每 token 運算量', '要放進記憶體的權重'], rows: [
+          ['一般（dense）70B', '約 2 × 700 億', '700 億個參數'],
+          ['MoE：總 1,000 億、啟用 50 億', '約 2 × 50 億', '1,000 億個參數（全部）'],
+          ['長 context（例如 20 萬 token）', '2N ＋ attention 項，後者明顯變大', '再加上 KV cache（2-4）'],
+        ], caption: 'MoE 的數字是示意；個別模型的總參數與啟用參數以官方模型卡為準。' },
       ],
-      tryit: {
-        q: ['8B（80 億參數）的模型，產生一個 token 大約要多少 FLOPs？寫出算式。'],
-        draft: '算式：＿\n結果：＿',
-        answer: ['2 × 8 × 10⁹ ＝ 1.6 × 10¹⁰，約 160 億次浮點運算（16 GFLOPs）。', '一張每秒能做數百 TFLOPS 的 GPU，理論上一秒可以做好幾萬個 token 的運算量；實際上做不到，原因在模組 2。'],
-      },
     },
     mistakes: [
       { wrong: '以為 AI 慢就是「算力不夠」。', why: '產生文字時，瓶頸常常是記憶體頻寬。', right: '先分清是算不夠還是搬不夠（模組 2）。' },
@@ -72,19 +76,7 @@ defineLessons({
       { wrong: '把 FLOPs 和 FLOPS 混用。', why: '一個是次數，一個是每秒次數。', right: '算量用 FLOPs，算速度用 FLOPS。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '推論一個 token 的運算量大約是？', options: [
-        { text: '2 × 參數量', correct: true, why: '每個參數一乘一加。' },
-        { text: '6 × 參數量，和訓練一樣', why: '6N 是訓練（含反向）。' },
-        { text: '參數量的平方', why: '不是平方。' },
-        { text: '和參數量無關，只看長度', why: '和參數量成正比。' },
-      ] },
-      { level: '應用', type: 'mc', q: '從外到內，哪個順序正確？', options: [
-        { text: '資料中心 → 伺服器 → GPU → HBM', correct: true, why: '一層包一層。' },
-        { text: 'GPU → 資料中心 → HBM → 伺服器', why: '順序亂了。' },
-        { text: 'HBM → GPU → 資料中心 → 伺服器', why: '倒過來了。' },
-        { text: '伺服器 → 資料中心 → GPU → HBM', why: '伺服器在資料中心裡。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['第一部 1-5 說 API 依 token 計費。用這一課的觀念，說說為什麼輸出 token 通常比輸入 token 貴。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['第一部 1-5 說 API 依 token 計費。用這一課的觀念，說說為什麼輸出 token 通常比輸入 token 貴。'], answer: [
         '輸入 token 可以一次平行處理（prefill），GPU 利用率高；輸出 token 一個一個產生，每一步都要把整份權重搬一次，GPU 很多時間在等記憶體（2-3）。',
         '同樣一個 token，輸出佔用硬體的時間比較長，所以比較貴。這是推論，實際定價還有商業考量。',
       ] },

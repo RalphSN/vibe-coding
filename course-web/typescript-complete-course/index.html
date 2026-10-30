@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TypeScript 完整入門：從型別到 TS 7</title>
-<meta name="description" content="互動式 TypeScript 完整課程：型別註記與推斷、聯合與收斂、泛型、工具型別、映射與條件型別、類別與模組、tsconfig、執行期驗證與 TypeScript 7 原生編譯器。每課先預測、再看結果。內容查證至 2026 年 10 月。">
+<meta name="description" content="互動式 TypeScript 完整課程：型別註記與推斷、聯合與收斂、泛型、工具型別、映射與條件型別、類別與模組、tsconfig、執行期驗證與 TypeScript 7 原生編譯器。每課附編譯器訊息與執行結果，最後一段寫原理與邊界。內容查證至 2026 年 10 月。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap">
@@ -788,7 +788,7 @@ details.reveal[open] > .reveal-body { opacity: 1; transform: none; }
 details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 @keyframes reveal-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
-/* 測驗 */
+/* 摺疊題目（深入思考） */
 .quiz-list { display: grid; gap: var(--sp-5); }
 .quiz { padding: var(--sp-4); background: var(--surface); border: var(--bw-lg) solid var(--ink); }
 .quiz-head { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
@@ -1294,8 +1294,8 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 const SITE = {
   name: "TypeScript 完整入門：從型別到 TS 7",
   updated: "2026 年 10 月",
-  verifiedOn: "2026-10-16",
-  version: "v1",
+  verifiedOn: "2026-10-30",
+  version: "v2",
 };
 
 const COURSES = [
@@ -1396,7 +1396,28 @@ function defineSources(map) { Object.assign(SOURCES, map); }
 defineSources({
   'ts-handbook': { title: 'TypeScript Handbook', url: 'https://www.typescriptlang.org/docs/handbook/intro.html' },
   'ts-60': { title: 'Microsoft｜Announcing TypeScript 6.0（2026-03-23）', url: 'https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/' },
-  'ts-70': { title: 'Microsoft｜Announcing TypeScript 7.0（2026-07-08）', url: 'https://devblogs.microsoft.com/typescript/' },
+  'ts-70': { title: 'Microsoft｜Announcing TypeScript 7.0（2026-07-08）', url: 'https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/' },
+  'ts-71-beta': { title: 'Microsoft｜Announcing TypeScript 7.1 Beta（2026-10-20，查證 2026-10-30）', url: 'https://devblogs.microsoft.com/typescript/announcing-typescript-7-1-beta/' },
+  'npm-typescript': { title: 'npm｜typescript 套件（latest 7.0.2，查證 2026-10-30）', url: 'https://www.npmjs.com/package/typescript' },
+  'infoq-ts7': { title: 'InfoQ｜TypeScript 7 Released（2026-08）', url: 'https://www.infoq.com/news/2026/08/typescript-7-released/' },
+  'ts-design-goals': { title: 'TypeScript Wiki｜Design Goals', url: 'https://github.com/microsoft/TypeScript/wiki/TypeScript-Design-Goals' },
+  'ts-perf': { title: 'TypeScript Wiki｜Performance（偏好 interface 而非交集）', url: 'https://github.com/microsoft/TypeScript/wiki/Performance' },
+  'ts-24': { title: 'TypeScript 2.4 Release Notes｜Weak type detection', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-4.html' },
+  'ts-44': { title: 'TypeScript 4.4 Release Notes｜Control flow analysis of aliased conditions', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-4.html' },
+  'ts-46': { title: 'TypeScript 4.6 Release Notes｜Destructured discriminated unions', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-6.html' },
+  'ts-47': { title: 'TypeScript 4.7 Release Notes｜extends constraints on infer', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-7.html' },
+  'ts-48': { title: 'TypeScript 4.8 Release Notes｜NonNullable 改為 T & {}', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-8.html' },
+  'ts-50': { title: 'TypeScript 5.0 Release Notes｜const type parameters', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-0.html' },
+  'ts-54': { title: 'TypeScript 5.4 Release Notes｜NoInfer、closure 內保留收斂', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-4.html' },
+  'ts-55': { title: 'TypeScript 5.5 Release Notes｜Inferred type predicates、isolatedDeclarations', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-5.html' },
+  'ts-57': { title: 'TypeScript 5.7 Release Notes｜rewriteRelativeImportExtensions', url: 'https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-7.html' },
+  'ts-modules-ref': { title: 'TypeScript｜Modules Reference（package.json exports 與 types 條件）', url: 'https://www.typescriptlang.org/docs/handbook/modules/reference.html' },
+  'node-subpath': { title: 'Node.js docs｜Subpath imports', url: 'https://nodejs.org/api/packages.html#subpath-imports' },
+  'mdn-safe-int': { title: 'MDN｜Number.MAX_SAFE_INTEGER', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER' },
+  'mdn-private': { title: 'MDN｜Private elements（#）', url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/Private_properties' },
+  'mdn-abort': { title: 'MDN｜AbortSignal.timeout() 與 AbortSignal.any()', url: 'https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static' },
+  'zod-v4': { title: 'Zod｜Release notes：Zod 4（npm latest 4.6.7，查證 2026-10-30）', url: 'https://zod.dev/v4' },
+  'standard-schema': { title: 'Standard Schema', url: 'https://standardschema.dev/' },
   'node-ts': { title: 'Node.js docs｜Modules: TypeScript（型別擦除）', url: 'https://nodejs.org/api/typescript.html' },
   'ts-everyday': { title: 'TypeScript Handbook｜Everyday Types', url: 'https://www.typescriptlang.org/docs/handbook/2/everyday-types.html' },
   'ts-narrowing': { title: 'TypeScript Handbook｜Narrowing', url: 'https://www.typescriptlang.org/docs/handbook/2/narrowing.html' },
@@ -1547,6 +1568,7 @@ defineTerms({
   '靜態型別': { en: 'static typing', def: '在程式執行前（編譯時）就檢查型別。', example: '把字串傳給要數字的函式，存檔時編輯器就會畫紅線。' },
   'Node.js': { en: 'Node.js', def: '在瀏覽器以外執行 JavaScript 的環境。22.18 起可以直接執行 .ts 檔（自動擦除型別）。', example: '`node app.ts`' },
   '錯誤代碼': { en: 'error code', def: 'tsc 錯誤訊息裡 TS 開頭的編號，可以直接搜尋，例如 TS2322 是「型別不能指定」。', example: '`error TS2322`' },
+  '子路徑匯入': { en: 'subpath imports', def: 'package.json 的 imports 欄位定義以 # 開頭的匯入別名，由 Node 本身解析，可以取代 tsconfig 的 paths。', example: '`import { db } from "#lib/db.ts";`' },
 });
 
 defineLessons({
@@ -1570,7 +1592,8 @@ defineLessons({
       caption: '型別只活在檢查階段；執行的永遠是 JavaScript。',
       blocks: [
         '[[TypeScript]] 是 [[JavaScript]] 的超集：合法的 JS 幾乎都是合法的 TS。它提供[[靜態型別]]，由[[型別檢查器]]在執行前找錯；產生 JavaScript 時進行[[型別擦除]]。',
-        { type: 'table', caption: '2026-10-16 查證的版本狀態', head: ['版本', '發布', '說明', '這門課'], rows: [
+        { type: 'table', caption: '2026-10-30 查證的版本狀態（npm latest 為 7.0.2）', head: ['版本', '發布', '說明', '這門課'], rows: [
+          ['TypeScript 7.1 Beta', '2026-10-20', '第一個加入新程式化 API 的原生版；正式版預計約一個月後', '觀望，不用在正式專案'],
           ['TypeScript 7.0', '2026-07-08', '用 Go 重寫的原生編譯器，約快 10 倍', '**主線**'],
           ['TypeScript 6.0', '2026-03-23', '最後一個 JavaScript 版編譯器；預設改為 strict', '部分工具（typescript-eslint 等）暫時仍需要'],
           ['5.x 以前', '—', '預設不是 strict', '舊專案'],
@@ -1596,53 +1619,41 @@ defineLessons({
         why: ['錯誤從「使用者踩到」提前到「寫程式時」'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'compile', label: '只在檢查時存在' }, { id: 'runtime', label: '執行時也存在' }],
-          items: [
-            { text: '`let age: number`  的 `: number`', answer: 'compile', why: '型別註記會被擦掉。' },
-            { text: '`typeof x === "string"`', answer: 'runtime', why: '這是 JavaScript 的運算子，會留在程式裡。' },
-            { text: '`interface User { … }`', answer: 'compile', why: 'interface 只是型別，輸出的 JS 裡完全不存在。' },
-            { text: '`class User { … }`', answer: 'runtime', why: 'class 是 JavaScript 的語法，執行時真的存在。' },
-            { text: '`x as string`', answer: 'compile', why: '型別斷言只告訴檢查器，執行時不做任何轉換。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`let age: number`  的 `: number`', '只在檢查時存在', '型別註記會被擦掉。'],
+          ['`typeof x === "string"`', '執行時也存在', '這是 JavaScript 的運算子，會留在程式裡。'],
+          ['`interface User { … }`', '只在檢查時存在', 'interface 只是型別，輸出的 JS 裡完全不存在。'],
+          ['`class User { … }`', '執行時也存在', 'class 是 JavaScript 的語法，執行時真的存在。'],
+          ['`x as string`', '只在檢查時存在', '型別斷言只告訴檢查器，執行時不做任何轉換。']
+        ] },
         { type: 'svg', svg: Fig.vs('JavaScript 的錯誤在執行時才出現；TypeScript 把一部分錯誤提前到寫程式時，但外部資料的錯誤仍要在執行時檢查', { title: 'JavaScript', lines: ['執行時才發現', '使用者先踩到'], tone: 5 }, { title: 'TypeScript', lines: ['寫程式時發現', '外部資料仍要驗證'], tone: 4 }), caption: 'TypeScript 不是萬靈丹，它只檢查程式碼本身。' },
+        { type: 'widget', name: 'csrun', props: {
+          title: '執行 tsc，看輸出的 JavaScript',
+          code: 'interface User { name: string }\n\nfunction greet(user: User, times: number = 1): string {\n  return \`嗨，\${user.name}\`.repeat(times);\n}\n\nconst me = { name: "阿明" } as User;\nconsole.log(greet(me, 2));\n\n// $ npx tsc app.ts --target es2022 && cat app.js',
+          output: 'function greet(user, times = 1) {\n    return `嗨，${user.name}`.repeat(times);\n}\nconst me = { name: "阿明" };\nconsole.log(greet(me, 2));\n（interface、型別註記、as User 全部消失；預設值 = 1 是 JavaScript 語法，所以留下）',
+        } },
+        { type: 'heading', id: 'deep-unsound', text: '深入：型別系統刻意不完全可靠' },
+        'TypeScript 的設計目標明寫「不追求可證明正確（sound）的型別系統」，它選擇在實用與安全之間取捨。所以「tsc 通過」代表常見錯誤被擋下，不代表執行時一定沒有型別錯誤。',
+        { type: 'table', head: ['刻意留下的漏洞', '例子', '本書哪裡處理'], rows: [
+          ['型別斷言', '`data as User` 不做任何檢查', '2-3、6-2'],
+          ['陣列索引', '`arr[99]` 型別仍是元素型別', '1-2、6-1 noUncheckedIndexedAccess'],
+          ['any 的擴散', '一個 any 讓整條資料流失去檢查', '2-3'],
+          ['方法參數雙變', '方法語法的參數檢查比較寬鬆', '1-4 深入'],
+        ] },
+        '型別擦除也有例外：enum、帶執行期程式碼的 namespace、建構子參數屬性、decorator 會產生新的 JavaScript。這些是 TypeScript 早期的設計，新程式通常避開，這也是 0-2 的 erasableSyntaxOnly 存在的原因。',
       ],
-      tryit: {
-        q: ['填空：下面三樣在輸出的 JavaScript 裡會留下嗎？'],
-        draft: 'A. type Id = string;　→ ____\nB. enum Color { Red }　→ ____\nC. const id: Id = "a1";　→ ____',
-        answer: ['A 不留（純型別）；B 會留下（enum 會產生 JavaScript 物件）；C 留下 `const id = "a1";`，只擦掉 `: Id`。', '所以 Node.js 直接執行 .ts 時不支援 enum：它只會擦除型別，不會產生新程式碼（0-2 會講）。'],
-      },
     },
     mistakes: [
       { wrong: '以為加了型別，執行時就會檢查參數。', why: '型別在執行時已經被擦掉。', right: '外部資料用執行期驗證（6-2）。' },
       { wrong: '把 TypeScript 當成另一個完全不同的語言重新學。', why: 'TypeScript 就是 JavaScript 加型別，執行規則完全一樣。', right: '先熟悉 JavaScript 的值、物件、函式，再學型別。' },
       { wrong: '新專案裝 TypeScript 5.x。', why: '2026-10 最新是 7.0；6.0 起預設 strict。', right: '`npm install -D typescript` 會裝到 7.x。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`function f(x: number) {}` 編譯成 JavaScript 後是？', options: [
-        { text: '`function f(x) {}`', correct: true, why: '型別註記被擦除。' },
-        { text: '`function f(x) { if (typeof x !== "number") throw … }`', why: 'TypeScript 不會自動加執行期檢查。' },
-        { text: '`function f(x: number) {}`', why: 'JavaScript 不認得 `: number`。' },
-        { text: '不能編譯', why: '這是合法的 TypeScript。' },
-      ] },
-      { level: '應用', type: 'mc', q: '2026-10 開新專案，哪個說法正確？', options: [
-        { text: '用 TypeScript 7；有工具還不支援時可暫時用 6.0', correct: true, why: '7.0 尚無穩定的程式化 API，部分工具（如 typescript-eslint）需要 6.x。' },
-        { text: '用 TypeScript 4.x，比較穩定', why: '已經過時，很多新語法不支援。' },
-        { text: 'TypeScript 7 要另外裝 tsgo 套件', why: '正式版已併入一般的 typescript 套件，指令仍是 tsc。' },
-        { text: 'TypeScript 7 預設關閉 strict', why: '6.0 起預設就是 strict。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事說：「我們用 TypeScript，所以 API 回傳的資料一定符合我們定義的 User 型別。」你怎麼回應？'], answer: [
-        '型別只在檢查程式碼時存在。API 回傳什麼是執行時才知道的事，TypeScript 看不到；`as User` 只是告訴檢查器「相信我」。',
-        '在資料進入程式的地方（fetch 之後）用 zod 這類工具驗證一次，驗證過的資料才能放心當 User 使用（6-2）。',
-      ] },
-    ],
     keypoints: [
       'TypeScript = JavaScript + 型別；執行的永遠是 JavaScript。',
       '型別在輸出時被擦除，執行時不存在。',
       '2026-10 主線是 TypeScript 7（Go 原生編譯器），預設 strict。',
     ],
-    sources: ['ts-handbook', 'ts-60', 'ts-70'],
+    sources: ['ts-handbook', 'ts-design-goals', 'ts-60', 'ts-70', 'ts-71-beta', 'npm-typescript'],
   },
 
   '0-2': {
@@ -1650,14 +1661,6 @@ defineLessons({
       '安裝 Node.js 與 TypeScript',
       '用 `node app.ts` 直接執行',
       '分清「執行」與「型別檢查」是兩件事',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1）型別擦除是指？', options: [
-        { text: '輸出 JavaScript 時刪掉所有型別', correct: true, why: '執行時沒有型別資訊。' },
-        { text: '執行時把不符合型別的值自動清掉', why: '執行時根本沒有型別。' },
-        { text: '刪掉沒用到的變數', why: '那是 tree shaking。' },
-        { text: '把 any 改成 unknown', why: '和擦除無關。' },
-      ] },
     ],
     analogy: {
       text: ['直接執行 .ts 像影印時用修正液塗掉鉛筆註記再印：內容照印，但註記對不對，影印機完全不管。型別檢查是另一位校對，要另外請他看。'],
@@ -1696,7 +1699,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const price: number = "100";\nconsole.log(price + 1);\n\n// 終端機：\n// $ node app.ts\n// $ npx tsc --noEmit',
-          predict: { q: '`node app.ts` 會印出什麼？', options: ['1001', '101', '型別錯誤，不執行'], answer: 0 },
           output: '1001\n!app.ts:1:7 - error TS2322: Type \'string\' is not assignable to type \'number\'.',
         } },
         { type: 'svg', svg: Fig.stack('日常開發流程：在編輯器寫程式時即時看到型別錯誤；用 node app.ts 快速執行；提交前或在 CI 用 tsc --noEmit 做完整檢查', [
@@ -1704,12 +1706,18 @@ defineLessons({
           { title: '2. node app.ts 快速執行', tone: 3 },
           { title: '3. 提交前 tsc --noEmit 完整檢查', tone: 4 },
         ]), caption: '執行和檢查分開，各自都很快。' },
+        { type: 'heading', id: 'deep-node-strip', text: '深入：Node 直接執行的邊界' },
+        'Node 的型別擦除只把型別換成空白，完全不讀 tsconfig。凡是需要「改寫程式碼」或「解析設定」的功能，它都不處理。',
+        { type: 'table', caption: 'Node 型別擦除不支援的寫法（nodejs.org，2026-10-30 查證）', head: ['寫法', '結果', '替代做法'], rows: [
+          ['enum、帶程式碼的 namespace、參數屬性', 'ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX', '物件常數 + 字面型別；明確宣告屬性'],
+          ['`import x = require("y")` 這類 import alias', '不支援', '一般的 ES import'],
+          ['decorator', '語法錯誤（還是 TC39 提案）', '交給打包工具或 tsx 這類轉譯工具'],
+          ['tsconfig 的 paths 別名', '找不到模組', 'package.json 的[[子路徑匯入]]（`#` 開頭）'],
+          ['型別匯入沒寫 type', '執行時找不到匯出', '`import type`（5-3）'],
+          ['.tsx 檔', '不支援', 'Vite 等打包工具'],
+        ] },
+        '2026-10 時 Node 文件的版本是 26.x（LTS）；舊的 `--experimental-transform-types` 已在 26.0 移除，所以「Node 幫你轉 enum」這條路已經沒有了。需要 enum 或 decorator 的專案，用打包工具或轉譯器執行，tsc 仍只負責檢查。',
       ],
-      tryit: {
-        q: ['只檢查型別、不產生任何 .js 檔，指令是？'],
-        draft: 'npx tsc ____',
-        answer: ['`npx tsc --noEmit`。', '現在多數專案由 Node、Vite 或打包工具負責執行與輸出，tsc 只負責檢查。'],
-      },
     },
     mistakes: [
       { wrong: '`node app.ts` 跑得起來，就以為型別都對。', why: 'Node 只擦除型別、不檢查。', right: '另外跑 `tsc --noEmit`，並放進 CI。' },
@@ -1717,19 +1725,7 @@ defineLessons({
       { wrong: '全域安裝 `npm i -g typescript`。', why: '不同專案需要不同版本時會衝突。', right: '每個專案 `npm install -D typescript`，用 npx 執行。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`node app.ts` 會做哪件事？', options: [
-        { text: '擦除型別後執行', correct: true, why: '不做型別檢查。' },
-        { text: '檢查型別，有錯就不執行', why: '那是 tsc 的工作。' },
-        { text: '產生 app.js 檔', why: '只在記憶體中處理，不產生檔案。' },
-        { text: '把 enum 轉成物件', why: '不支援需要轉換的語法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '程式裡有型別錯誤，`node app.ts` 會怎樣？', options: [
-        { text: '照樣執行', correct: true, why: '型別錯誤不影響擦除。' },
-        { text: '拒絕執行', why: 'Node 不檢查型別。' },
-        { text: '只執行到錯誤那行', why: '型別錯誤不是執行時錯誤。' },
-        { text: '自動修正型別', why: '不會修改程式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['團隊想讓 CI 在型別錯誤時擋下合併。要加什麼步驟？為什麼光靠「測試會執行程式」不夠？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['團隊想讓 CI 在型別錯誤時擋下合併。要加什麼步驟？為什麼光靠「測試會執行程式」不夠？'], answer: [
         'CI 加一步 `npx tsc --noEmit`，失敗就讓 pipeline 失敗。',
         '測試執行時型別已被擦除，型別錯誤只有在剛好走到、而且造成執行錯誤時才會被發現；tsc 會檢查所有程式碼，包括測試沒覆蓋的分支。',
       ] },
@@ -1739,7 +1735,7 @@ defineLessons({
       '型別檢查另外跑 `tsc --noEmit`。',
       '直接執行時避開 enum、參數屬性；開 erasableSyntaxOnly。',
     ],
-    sources: ['node-ts', 'ts-erasable', 'ts-tsconfig'],
+    sources: ['node-ts', 'node-subpath', 'ts-erasable', 'ts-tsconfig'],
   },
 
   '0-3': {
@@ -1747,14 +1743,6 @@ defineLessons({
       '從錯誤訊息找出檔案、行號、錯誤代碼',
       '讀懂「Type A is not assignable to type B」',
       '從多行錯誤的最後一行找到真正的原因',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 0-2）型別有錯的程式，CI 要怎麼擋下來？', options: [
-        { text: '執行 `tsc --noEmit`，失敗就中止', correct: true, why: 'tsc 失敗會回傳非 0 的結束代碼。' },
-        { text: '執行 `node app.ts`，型別錯誤時它會拒絕執行', why: 'node 不檢查型別。' },
-        { text: '執行 `npm install`', why: '只是安裝套件。' },
-        { text: '不需要，編輯器會擋', why: '編輯器只提示，不會阻止提交。' },
-      ] },
     ],
     analogy: {
       text: ['型別錯誤訊息像退貨單：「您寄的是 A，但收件規格要求 B」。多行的錯誤像層層的退貨原因：「整箱不合格 → 因為其中一盒不合格 → 因為那盒裡有一顆是壞的」，最後一行才是真正的原因。'],
@@ -1800,25 +1788,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type User = { name: string };\nconst user: User = { name: "阿明" };\nconsole.log(user.nmae);',
-          predict: { q: 'tsc 會回報哪個代碼？', options: ['屬性不存在（TS2551／TS2339）', 'TS2322 型別不能指定', '沒有錯誤'], answer: 0 },
           output: "!app.ts:3:18 - error TS2551: Property 'nmae' does not exist on type 'User'. Did you mean 'name'?",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: '2322', label: 'TS2322 不能指定' }, { id: '2345', label: 'TS2345 引數不符' }, { id: '2339', label: 'TS2339 屬性不存在' }],
-          items: [
-            { text: '`let n: number = "1";`', answer: '2322', why: '指定時型別不符。' },
-            { text: '`Math.round("1.5")`', answer: '2345', why: '呼叫時傳錯型別。' },
-            { text: '`"abc".size`', answer: '2339', why: 'string 沒有 size（有 length）。' },
-            { text: '`const ok: boolean = 1;`', answer: '2322', why: 'number 不能指定給 boolean。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`let n: number = "1";`', 'TS2322 不能指定', '指定時型別不符。'],
+          ['`Math.round("1.5")`', 'TS2345 引數不符', '呼叫時傳錯型別。'],
+          ['`"abc".size`', 'TS2339 屬性不存在', 'string 沒有 size（有 length）。'],
+          ['`const ok: boolean = 1;`', 'TS2322 不能指定', 'number 不能指定給 boolean。']
+        ] },
         { type: 'svg', svg: Fig.vs('解讀錯誤的順序：先找位置與代碼定位，再讀縮排最深的最後一行找原因', { title: '先定位', lines: ['檔案:行:欄', 'TS 代碼'], tone: 3 }, { title: '再找原因', lines: ['縮排最深的', '最後一行'], tone: 4 }), caption: 'TS2551 是 TS2339 的「你是不是要打 …」版本，會附上建議。' },
+        { type: 'heading', id: 'deep-diagnostics', text: '深入：錯誤代碼的分區與錯誤訊息被截斷時' },
+        { type: 'table', caption: '錯誤代碼的大致分區（看第一位數就知道是哪一類問題）', head: ['代碼範圍', '類型', '例子'], rows: [
+          ['1xxx', '語法錯誤', 'TS1005：缺少分號或括號'],
+          ['2xxx', '型別與語意', 'TS2322、TS2345、TS2339'],
+          ['5xxx', 'tsconfig 選項錯誤', 'TS5023：未知的選項'],
+          ['7xxx', '隱含 any 相關', 'TS7006、TS7053'],
+          ['18xxx', '較新加入的檢查', 'TS18047、TS18048'],
+        ] },
+        '型別很長時 tsc 會用 `...` 截斷，看不出差在哪；暫時在 tsconfig 開 `noErrorTruncation` 就會印出完整型別。CI 或腳本要解析錯誤時，加 `--pretty false` 得到一行一則的穩定格式。',
+        '真的要暫時壓掉錯誤時用 `// @ts-expect-error 原因`：哪天錯誤被修好了，它自己會變成錯誤（TS2578：沒用到的指令），提醒你刪掉。`@ts-ignore` 不會提醒，所以容易永久殘留。',
       ],
-      tryit: {
-        q: ['下面的錯誤，要改哪個檔案、第幾行、什麼問題？'],
-        draft: "src/order.ts:14:9 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.\n\n14   addItem(\"3\");\n             ~~~\n\n檔案：____　行：____　問題：____",
-        answer: ['`src/order.ts` 第 14 行：addItem 需要 number，卻傳了字串 "3"。', '改成 `addItem(3)`；如果 "3" 來自使用者輸入，先 `Number(text)` 並檢查不是 NaN。'],
-      },
     },
     mistakes: [
       { wrong: '看到一大段錯誤就加 `as any` 讓它消失。', why: '錯誤沒有被解決，只是被藏起來，執行時照樣出事。', right: '讀最後一行找出真正不符的屬性，修正資料或型別。' },
@@ -1826,19 +1815,7 @@ defineLessons({
       { wrong: '一次出現 50 個錯誤，從最後一個開始修。', why: '前面的一個錯（例如型別定義錯）常常連帶造成後面一大串。', right: '從第一個開始修，修完重跑。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`app.ts:8:3` 中的 8 和 3 分別是？', options: [
-        { text: '第 8 行、第 3 欄', correct: true, why: '行在前、欄在後。' },
-        { text: '第 3 行、第 8 欄', why: '順序反了。' },
-        { text: '錯誤數與警告數', why: '那是位置。' },
-        { text: '錯誤代碼', why: '代碼是 TS 開頭的數字。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function add(a, b) { return a + b; }` 在 strict 下會出現什麼錯誤？', options: [
-        { text: 'TS7006：參數隱含 any', correct: true, why: 'strict 包含 noImplicitAny。' },
-        { text: 'TS2322：a + b 的結果不能指定給回傳值', why: '沒有指定動作。' },
-        { text: '沒有錯誤', why: 'strict 會要求參數有型別。' },
-        { text: 'TS2339', why: '沒有存取不存在的屬性。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 TypeScript 比較型別時看「結構」而不是「名字」？這對讀錯誤訊息有什麼幫助？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 TypeScript 比較型別時看「結構」而不是「名字」？這對讀錯誤訊息有什麼幫助？'], answer: [
         'JavaScript 的物件本來就是「有什麼屬性就能怎麼用」，TypeScript 依結構比較（結構型別），所以兩個名字不同但屬性相同的型別可以互相指定。',
         '因此錯誤訊息會指出「哪個屬性缺少或型別不符」，而不是只說名字不同；讀錯誤時要找的是那個屬性。',
       ] },
@@ -1848,7 +1825,7 @@ defineLessons({
       '多行錯誤看縮排最深的最後一行。',
       '不要用 `as any` 讓錯誤消失，要修正型別或資料。',
     ],
-    sources: ['ts-handbook', 'ts-compat'],
+    sources: ['ts-handbook', 'ts-compat', 'ts-tsconfig'],
   },
 });
 </script>
@@ -1872,6 +1849,8 @@ defineTerms({
   '函式型別': { en: 'function type', def: '描述函式的參數與回傳值的型別。', example: '`(a: number, b: number) => number`' },
   'void': { en: 'void', def: '函式沒有有意義的回傳值。', example: '`function log(msg: string): void`' },
   '多載': { en: 'overload', def: '同一個函式宣告多組參數與回傳型別的組合。', example: '`function parse(x: string): number; function parse(x: number): string;`' },
+  '型別寬化': { en: 'widening', def: '可變的位置（let 變數、物件屬性）把字面型別放寬成一般型別，例如 "red" 變成 string。', example: '`const o = { c: "red" }` 的 c 是 string。' },
+  '弱型別': { en: 'weak type', def: '所有屬性都是可選的物件型別。指定給它的值如果和它沒有任何共同屬性，就算經過變數也會報錯（TS2559）。', example: '`type Options = { timeout?: number }`' },
 });
 
 defineLessons({
@@ -1880,14 +1859,6 @@ defineLessons({
       '寫出變數、參數、回傳值的型別註記',
       '知道什麼時候可以交給型別推斷',
       '分辨 let 與 const 推斷出的型別差異',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-3）TS7006「參數隱含 any」的意思是？', options: [
-        { text: '參數沒寫型別，也推斷不出來', correct: true, why: 'strict 下這是錯誤。' },
-        { text: '參數型別寫錯，和宣告的型別不一致', why: '那是 TS2345 等。' },
-        { text: '參數太多', why: '那是 TS2554。' },
-        { text: '參數名稱打錯', why: '那是 TS2304 或 TS2552。' },
-      ] },
     ],
     analogy: {
       text: ['型別註記像在收納盒上貼標籤；型別推斷像看一眼你放進去的東西就自動貼好標籤。第一次放進的是襪子，盒子就被標成「襪子」，之後放毛衣會被擋下來。'],
@@ -1926,26 +1897,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'let a = "red";\nconst b = "red";\nlet c = [1, "two"];\n\n// 把滑鼠移到 a、b、c 上，編輯器顯示的型別是？',
-          predict: { q: 'b 的型別是？', options: ['string', '"red"', 'any'], answer: 1 },
           output: 'let a: string\nconst b: "red"\nlet c: (string | number)[]',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'need', label: '要寫註記' }, { id: 'infer', label: '交給推斷' }],
-          items: [
-            { text: '`function greet(name) {}` 的 name', answer: 'need', why: '參數無法推斷。' },
-            { text: '`const total = price * qty;`', answer: 'infer', why: '從運算式就知道是 number。' },
-            { text: '`let selected;` 之後才指定', answer: 'need', why: '沒有初始值。' },
-            { text: '`const names = ["a", "b"];`', answer: 'infer', why: '推斷為 string[]。' },
-            { text: '`const empty = [];` 之後要放 User', answer: 'need', why: '空陣列推不出元素型別，寫 `const empty: User[] = [];`。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`function greet(name) {}` 的 name', '要寫註記', '參數無法推斷。'],
+          ['`const total = price * qty;`', '交給推斷', '從運算式就知道是 number。'],
+          ['`let selected;` 之後才指定', '要寫註記', '沒有初始值。'],
+          ['`const names = ["a", "b"];`', '交給推斷', '推斷為 string[]。'],
+          ['`const empty = [];` 之後要放 User', '要寫註記', '空陣列推不出元素型別，寫 `const empty: User[] = [];`。']
+        ] },
         { type: 'svg', svg: Fig.vs('let 與 const 的推斷：let color = "red" 推斷為 string，因為之後可能改成別的字串；const color = "red" 推斷為字面型別 "red"，因為不會再變', { title: 'let', lines: ['`let c = "red"`', '→ string'], tone: 3 }, { title: 'const', lines: ['`const c = "red"`', '→ "red"'], tone: 4 }), caption: '字面型別在 2-2 會變得很重要。' },
+        { type: 'heading', id: 'deep-widening', text: '深入：寬化、上下文推斷與什麼時候推斷不夠' },
+        '[[型別寬化]]不只發生在 let：`const o = { color: "red" }` 的 color 是 string，因為物件屬性之後可以改。想保留字面型別要用 as const 或 satisfies（3-4）。',
+        '推斷也會「從外往內」：把箭頭函式直接寫在 `map`、`addEventListener` 的參數位置，參數型別由那個位置決定（上下文推斷）。同一個函式先存成變數再傳進去，就失去這個資訊，參數要自己寫型別。',
+        { type: 'table', head: ['推斷不夠用的情況', '為什麼', '做法'], rows: [
+          ['遞迴函式的回傳值', '回傳型別取決於自己，推不出來（TS7023）', '寫出回傳型別'],
+          ['開 isolatedDeclarations（TS 5.5 起）的函式庫', '工具要能不經型別檢查就產生 .d.ts', '匯出的函式與變數都寫註記'],
+          ['空陣列、沒有初始值的 let', '沒有資訊可推', '`const list: Item[] = []`'],
+        ] },
       ],
-      tryit: {
-        q: ['補上型別註記，讓函式的參數與回傳值都明確：'],
-        draft: 'function bmi(weight____, height____)____ {\n  return weight / (height * height);\n}',
-        answer: ['`function bmi(weight: number, height: number): number`。', '回傳型別可以推斷，但匯出或公開的函式寫出來，能避免實作改錯時默默改變介面。'],
-      },
     },
     mistakes: [
       { wrong: '每個變數都寫註記：`const n: number = 5;`。', why: '重複資訊，程式變冗長。', right: '有初始值就交給推斷。' },
@@ -1953,19 +1923,7 @@ defineLessons({
       { wrong: '以為推斷出來的型別比較「鬆」。', why: '推斷出的型別和寫註記一樣嚴格。', right: '放心交給推斷，只在需要時寫。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`const size = 10;` 的型別是？', options: [
-        { text: '`10`', correct: true, why: 'const 保留字面型別。' },
-        { text: '`number`', why: 'let 才會放寬成 number。' },
-        { text: '`any`', why: '有初始值就推得出來。' },
-        { text: '`const`', why: 'const 不是型別。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`let x = 5; x = "5";` 會？', options: [
-        { text: 'TS2322：string 不能指定給 number', correct: true, why: 'x 被推斷為 number。' },
-        { text: '可以，因為沒寫註記時型別不會固定', why: '推斷出的型別一樣會被檢查。' },
-        { text: 'x 變成 string | number', why: '型別在宣告時就固定了。' },
-        { text: '執行時錯誤', why: '是編譯時錯誤，而且執行時其實能跑。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼「匯出的函式」建議寫出回傳型別，即使能推斷？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼「匯出的函式」建議寫出回傳型別，即使能推斷？'], answer: [
         '回傳型別是函式對外的承諾。只靠推斷時，改實作（例如某個分支忘了 return）可能讓回傳型別默默變成 `number | undefined`，錯誤出現在很遠的呼叫端。',
         '寫出回傳型別後，錯誤會出現在函式本身，離原因最近；大型專案也能加快型別檢查。',
       ] },
@@ -1975,7 +1933,7 @@ defineLessons({
       'let 推斷成一般型別，const 推斷成字面型別。',
       '沒有初始值、空陣列時要自己寫註記。',
     ],
-    sources: ['ts-everyday'],
+    sources: ['ts-everyday', 'ts-55'],
   },
 
   '1-2': {
@@ -1983,14 +1941,6 @@ defineLessons({
       '使用 string、number、boolean 與陣列型別',
       '用 tuple 表示固定長度的一組值',
       '用 readonly 防止陣列被修改',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-1）`const empty = [];` 之後要放 User，最好怎麼寫？', options: [
-        { text: '`const empty: User[] = [];`', correct: true, why: '空陣列推不出元素型別。' },
-        { text: '不用處理，push 時自動推斷', why: '結果型別會很寬鬆或報錯。' },
-        { text: '`const empty = [] as any;`', why: '關掉檢查。' },
-        { text: '`const empty = new User[]();`', why: '不是合法語法。' },
-      ] },
     ],
     analogy: {
       text: ['陣列 `string[]` 像一排一樣大的置物格，每格都放字串，格數不限。tuple `[string, number]` 像飯店的鑰匙卡套：第一格一定是房號、第二格一定是張數，位置有固定意義。'],
@@ -2029,25 +1979,24 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const pair: [string, number] = ["a", 1];\nconst nums = [1, 2, 3];\nconst first = nums[5];\n\nconsole.log(first);\n// 編輯器顯示 first 的型別是？',
-          predict: { q: '預設設定下，first 的型別是？', options: ['number', 'number | undefined', 'undefined'], answer: 0 },
           output: 'const first: number\n執行結果：undefined\n（開啟 noUncheckedIndexedAccess 後型別才會是 number | undefined）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'arr', label: '陣列 T[]' }, { id: 'tuple', label: 'tuple' }],
-          items: [
-            { text: '購物車裡的商品清單', answer: 'arr', why: '數量不固定、型別相同。' },
-            { text: '座標 [緯度, 經度]', answer: 'tuple', why: '固定兩個、位置有意義。' },
-            { text: 'React 的 `[count, setCount]`', answer: 'tuple', why: '第一個是值、第二個是函式。' },
-            { text: '所有學生的分數', answer: 'arr', why: '數量不固定。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['購物車裡的商品清單', '陣列 T[]', '數量不固定、型別相同。'],
+          ['座標 [緯度, 經度]', 'tuple', '固定兩個、位置有意義。'],
+          ['React 的 `[count, setCount]`', 'tuple', '第一個是值、第二個是函式。'],
+          ['所有學生的分數', '陣列 T[]', '數量不固定。']
+        ] },
         { type: 'svg', svg: Fig.vs('索引存取的陷阱：預設 nums[5] 的型別是 number，但執行時是 undefined；開啟 noUncheckedIndexedAccess 後型別變成 number | undefined，逼你檢查', { title: '預設', lines: ['`nums[5]`: number', '實際 undefined'], tone: 5 }, { title: 'noUncheckedIndexedAccess', lines: ['`number | undefined`', '要先檢查'], tone: 4 }), caption: '這個選項不在 strict 裡，要另外開（6-1）。' },
+        { type: 'heading', id: 'deep-number', text: '深入：number 的精度與 readonly 的方向' },
+        'number 是 64 位元浮點數，能精確表示的最大整數是 `Number.MAX_SAFE_INTEGER`（2⁵³ − 1）。資料庫的 64 位元 id 傳成 JSON 數字時，超過這個值會被默默四捨五入；常見做法是 API 用字串傳 id。',
+        'bigint 不能和 number 直接相加（TS2365），`JSON.stringify` 遇到 bigint 會拋 TypeError，所以它適合內部計算，不適合直接當 API 欄位。',
+        { type: 'table', head: ['指定方向', '結果', '原因'], rows: [
+          ['`string[]` → `readonly string[]`', '可以', '可修改的陣列也能當唯讀的用'],
+          ['`readonly string[]` → `string[]`', 'TS4104', '對方可能 push，會破壞唯讀承諾'],
+          ['`[number, number]` 上呼叫 push', '可以（不報錯）', '一般 tuple 仍有陣列方法；要擋就用 `readonly [number, number]`'],
+        ] },
       ],
-      tryit: {
-        q: ['把參數改成唯讀，讓函式不能修改呼叫端的陣列：'],
-        draft: 'function sortedCopy(items: ____ string[]): string[] {\n  return [...items].sort();\n}',
-        answer: ['`readonly string[]`。', '注意 `items.sort()` 會原地修改，所以先複製 `[...items]`（或用 ES2023 的 `items.toSorted()`）。'],
-      },
     },
     mistakes: [
       { wrong: '用 `Number`、`String`（大寫）當型別。', why: '那是包裝物件型別，不是原始型別。', right: '一律小寫 `number`、`string`、`boolean`。' },
@@ -2055,19 +2004,7 @@ defineLessons({
       { wrong: '用 tuple 回傳 5 個值。', why: '呼叫端要記住每個位置的意義。', right: '超過 2–3 個值就回傳物件。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`[string, number]` 表示？', options: [
-        { text: '長度 2，第一個 string、第二個 number', correct: true, why: 'tuple。' },
-        { text: '可以放 string 或 number 的陣列', why: '那是 `(string | number)[]`。' },
-        { text: '兩個陣列', why: '是一個陣列。' },
-        { text: 'string 或 number', why: '那是 `string | number`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '參數是 `readonly number[]` 時，哪個操作會報錯？', options: [
-        { text: '`nums.push(1)`', correct: true, why: 'readonly 陣列沒有 push。' },
-        { text: '`nums.map(n => n * 2)`', why: 'map 回傳新陣列，不修改原陣列。' },
-        { text: '`nums.length`', why: '讀取長度可以。' },
-        { text: '`nums[0]`', why: '讀取元素可以。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['readonly 只在檢查時有效。如果你真的需要執行時也不能被修改的陣列，要怎麼做？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['readonly 只在檢查時有效。如果你真的需要執行時也不能被修改的陣列，要怎麼做？'], answer: [
         '用 `Object.freeze(arr)`：執行時修改會失敗（嚴格模式下拋 TypeError），而且它的回傳型別就是 readonly 陣列。',
         '兩者互補：readonly 讓錯誤在寫程式時被抓到；freeze 保護來自不受控程式碼的修改。',
       ] },
@@ -2077,7 +2014,7 @@ defineLessons({
       '陣列 `T[]` 長度不限；tuple `[A, B]` 長度與位置固定。',
       '參數加 readonly，承諾不修改呼叫端的陣列。',
     ],
-    sources: ['ts-everyday', 'ts-objects'],
+    sources: ['ts-everyday', 'ts-objects', 'mdn-safe-int'],
   },
 
   '1-3': {
@@ -2085,14 +2022,6 @@ defineLessons({
       '用 interface 或 type 描述物件',
       '使用可選屬性與 readonly 屬性',
       '理解多餘屬性檢查在抓什麼錯',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-2）函式回傳 5 個值，最好用？', options: [
-        { text: '回傳物件', correct: true, why: '屬性有名字，呼叫端不用記位置。' },
-        { text: '回傳 5 個元素的 tuple', why: '呼叫端要記住每個位置的意義。' },
-        { text: '回傳 any', why: '失去型別保護。' },
-        { text: '分成 5 個函式', why: '不一定需要。' },
-      ] },
     ],
     analogy: {
       text: ['物件型別像報名表的欄位規定：姓名必填、Email 選填、會員編號填了就不能改。interface 和 type 都是在寫這份規定，差別在於 interface 之後可以「補欄位」，type 寫好就固定。'],
@@ -2118,8 +2047,8 @@ defineLessons({
         code: true,
         badLabel: '先存變數再傳',
         goodLabel: '直接寫字面值',
-        bad: 'type Options = { timeout?: number };\nconst raw = { timout: 5000 };\nconst opts: Options = raw;   // 通過！',
-        good: 'type Options = { timeout?: number };\nconst opts: Options = { {{1:timout}}: 5000 };\n// TS2561：…did you mean to write \'timeout\'?',
+        bad: 'type Options = { url: string; timeout?: number };\nconst raw = { url: "/api", timout: 5000 };\nconst opts: Options = raw;   // 通過！',
+        good: 'type Options = { url: string; timeout?: number };\nconst opts: Options = { url: "/api", {{1:timout}}: 5000 };\n// TS2561：…did you mean to write \'timeout\'?',
         badResult: '經過變數時不做多餘屬性檢查，timeout 默默變成 undefined。',
         goodResult: '直接寫字面值時，打錯的屬性被抓出來。',
         why: ['設定物件盡量直接寫在需要型別的位置，或用 satisfies（3-4）'],
@@ -2127,29 +2056,28 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'interface Box { width: number }\ninterface Box { height: number }\n\nconst b: Box = { width: 10 };\n// tsc 會說什麼？',
-          predict: { q: '兩個同名 interface 會怎樣？', options: ['合併，b 少了 height 會報錯', '後面的蓋掉前面，b 少了 width', '重複宣告的錯誤'], answer: 0 },
           output: "!app.ts:4:7 - error TS2741: Property 'height' is missing in type '{ width: number; }' but required in type 'Box'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'both', label: '兩者都可以' }, { id: 'type', label: '只能用 type' }, { id: 'iface', label: '只能用 interface' }],
-          items: [
-            { text: '描述 User 物件的欄位', answer: 'both', why: '物件形狀兩者都行。' },
-            { text: '`"asc" | "desc"`', answer: 'type', why: '聯合型別只能用 type。' },
-            { text: '`(a: number) => number` 函式型別別名', answer: 'type', why: '雖然 interface 也能寫呼叫簽章，但慣例用 type。' },
-            { text: '擴充第三方函式庫的型別（宣告合併）', answer: 'iface', why: '只有 interface 會宣告合併。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['描述 User 物件的欄位', '兩者都可以', '物件形狀兩者都行。'],
+          ['`"asc" | "desc"`', '只能用 type', '聯合型別只能用 type。'],
+          ['`(a: number) => number` 函式型別別名', '只能用 type', '雖然 interface 也能寫呼叫簽章，但慣例用 type。'],
+          ['擴充第三方函式庫的型別（宣告合併）', '只能用 interface', '只有 interface 會宣告合併。']
+        ] },
         { type: 'svg', svg: Fig.row('結構型別：函式需要有 name 的物件；傳入有 name 與 age 的變數可以通過，因為結構符合；直接寫字面值時多出的 age 會被多餘屬性檢查擋下', [
           { title: '需要', lines: ['`{ name: string }`'], tone: 1 },
           { title: '傳變數', lines: ['有 name、age', '✓ 通過'], tone: 4 },
           { title: '傳字面值', lines: ['多了 age', '✗ 多餘屬性'], tone: 5 },
         ]), caption: 'TypeScript 比的是「形狀夠不夠」，字面值多寫屬性時額外提醒。' },
+        { type: 'heading', id: 'deep-weak-intersect', text: '深入：弱型別偵測、交集衝突與效能' },
+        '多餘屬性檢查有個例外：型別的屬性全部可選時（[[弱型別]]），指定的值如果和它沒有任何共同屬性，經過變數也會報 TS2559。所以上面的範例要有一個必填的 url，打錯字才會「通過」。',
+        '`interface A extends B` 遇到屬性型別衝突會在宣告處報錯；`type A = B & C` 不會，衝突的屬性默默變成 never，要等到使用時才發現。TypeScript 官方的效能建議也偏好 interface extends，因為交集型別每次都要重新計算。',
+        { type: 'table', head: ['需求', '選擇', '理由'], rows: [
+          ['一般物件、類別要實作的形狀', 'interface', '錯誤出現得早，檢查較快'],
+          ['聯合、函式、映射、條件型別', 'type', 'interface 寫不出來'],
+          ['任意鍵的字典', '`Record<string, V>` 或索引簽章', '讀取時搭配 noUncheckedIndexedAccess（6-1）'],
+        ] },
       ],
-      tryit: {
-        q: ['定義 Product：id 唯讀、name 必填、discount 選填：'],
-        draft: 'interface Product {\n  ____ id: number;\n  name: string;\n  discount____: number;\n}',
-        answer: ['`readonly id: number;`、`discount?: number;`。', '讀 discount 時型別是 `number | undefined`，計算前要給預設值：`p.discount ?? 0`。'],
-      },
     },
     mistakes: [
       { wrong: '以為屬性多了一定會被擋。', why: '只有直接寫物件字面值時才做多餘屬性檢查。', right: '在需要型別的位置直接寫字面值，或用 satisfies。' },
@@ -2157,19 +2085,7 @@ defineLessons({
       { wrong: '以為 readonly 讓物件在執行時不能改。', why: '只在檢查時有效。', right: '需要執行時保護用 Object.freeze。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一個「只能」用 type 寫？', options: [
-        { text: '`type Dir = "up" | "down"`', correct: true, why: '聯合型別。' },
-        { text: '有 name、age 兩個屬性的一般物件型別', why: 'interface 也可以。' },
-        { text: '繼承另一個物件型別', why: 'interface 用 extends，type 用 &，兩者都行。' },
-        { text: '有可選屬性的物件', why: '兩者都可以。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`interface A { x?: number }`，`const a: A = {}; a.x.toFixed()` 會？', options: [
-        { text: 'TS18048：a.x 可能是 undefined', correct: true, why: '可選屬性讀出來包含 undefined。' },
-        { text: '可以編譯', why: 'strict 下會報錯。' },
-        { text: 'TS2741：缺少 x', why: 'x 是可選的，可以不給。' },
-        { text: 'TS2339：沒有 toFixed', why: 'number 有 toFixed，問題是可能 undefined。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你想幫 Express 的 Request 加上自訂的 `user` 屬性，讓所有 middleware 都看得到型別。用這課學到的哪個特性？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你想幫 Express 的 Request 加上自訂的 `user` 屬性，讓所有 middleware 都看得到型別。用這課學到的哪個特性？'], answer: [
         'interface 的宣告合併：在宣告檔裡寫 `declare global { namespace Express { interface Request { user?: User } } }`（依套件的型別結構而定）。',
         'type 不能合併，所以擴充第三方型別是少數必須用 interface 的情況（5-4 會講宣告檔）。',
       ] },
@@ -2179,7 +2095,7 @@ defineLessons({
       '`?` 可選、readonly 唯讀，都只在檢查時有效。',
       '多餘屬性檢查只在直接寫字面值時發生。',
     ],
-    sources: ['ts-objects', 'ts-compat'],
+    sources: ['ts-objects', 'ts-compat', 'ts-24', 'ts-perf'],
   },
 
   '1-4': {
@@ -2187,14 +2103,6 @@ defineLessons({
       '為函式參數、回傳值與 callback 寫型別',
       '使用可選參數、預設參數與剩餘參數',
       '用函式型別描述「傳進來的函式」',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-3）可選屬性 `discount?: number` 拿來計算前要？', options: [
-        { text: '處理 undefined，例如 `discount ?? 0`', correct: true, why: '型別是 number | undefined。' },
-        { text: '什麼都不用做', why: 'strict 下會報 TS18048。' },
-        { text: '改成 any', why: '關掉檢查。' },
-        { text: '直接用 `!` 斷言，告訴檢查器 discount 一定有值', why: '可以讓錯誤消失，但不安全。' },
-      ] },
     ],
     analogy: {
       text: ['函式型別像插座規格：「兩孔、輸入 110V、輸出 5V」。任何符合規格的充電器（函式）都能插。callback 就是你交給別人、讓他在適當時機插上的那個充電器。'],
@@ -2233,29 +2141,24 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function apply(n: number, fn: (x: number) => number) {\n  return fn(n);\n}\n\nconsole.log(apply(5, (x) => x * 2));\nconsole.log(apply(5, (x) => String(x)));',
-          predict: { q: '第二個呼叫（回傳字串的 callback）tsc 會怎樣？', options: ['型別錯誤', '通過，印出 "5"', '通過，印出 5'], answer: 0 },
-          output: "!app.ts:6:27 - error TS2322: Type 'string' is not assignable to type 'number'.",
+          output: "!app.ts:6:29 - error TS2322: Type 'string' is not assignable to type 'number'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'void', label: '回傳 void' }, { id: 'val', label: '回傳有意義的值' }],
-          items: [
-            { text: '按鈕的 onClick 處理函式', answer: 'void', why: '呼叫者不使用回傳值。' },
-            { text: 'Array.map 的 callback', answer: 'val', why: '回傳值組成新陣列。' },
-            { text: '寫日誌的 log 函式', answer: 'void', why: '只有副作用。' },
-            { text: 'Array.filter 的 callback', answer: 'val', why: '回傳 boolean 決定是否保留。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['按鈕的 onClick 處理函式', '回傳 void', '呼叫者不使用回傳值。'],
+          ['Array.map 的 callback', '回傳有意義的值', '回傳值組成新陣列。'],
+          ['寫日誌的 log 函式', '回傳 void', '只有副作用。'],
+          ['Array.filter 的 callback', '回傳有意義的值', '回傳 boolean 決定是否保留。']
+        ] },
         { type: 'svg', svg: Fig.tree('參數的三種寫法：可選參數 name? 型別包含 undefined；預設參數 name = "朋友" 型別就是 string；剩餘參數 ...tags 收集成陣列', { title: '參數寫法' }, [
           { title: 'name?: string', lines: ['可能 undefined'], tone: 5 },
           { title: 'name = "朋友"', lines: ['型別是 string'], tone: 4 },
           { title: '...tags: string[]', lines: ['收集成陣列'], tone: 3 },
         ]), caption: '可選與預設參數都要放在必要參數後面。' },
+        { type: 'heading', id: 'deep-variance', text: '深入：參數的雙變與 void 的寬鬆' },
+        'strict 內的 strictFunctionTypes 會嚴格檢查函式型別的參數，但只套用在「屬性寫法」`handle: (e: Event) => void`。寫成「方法寫法」`handle(e: Event): void` 時參數是雙變的，比較寬鬆，這是為了讓 DOM 等舊型別能用而保留的取捨。',
+        { type: 'code', lang: 'typescript', title: 'variance.ts', code: 'type ByProp = { handle: (e: Event) => void };\ntype ByMethod = { handle(e: Event): void };\n\nconst onlyMouse = (e: MouseEvent) => console.log(e.clientX);\n\nconst a: ByProp = { handle: onlyMouse };    // TS2322：Event 不一定是 MouseEvent\nconst b: ByMethod = { handle: onlyMouse };  // 通過，但收到 KeyboardEvent 時會出錯' },
+        '回傳 void 的「函式型別」可以接受有回傳值的函式（所以 forEach 能傳 push）；但你自己宣告 `function f(): void` 時 return 一個值會報錯。多載的實作簽章對外不可見，把最具體的多載寫在最前面，因為 TypeScript 從上往下挑第一個符合的。',
       ],
-      tryit: {
-        q: ['為這個「重試」函式寫出型別：task 是不收參數、回傳 Promise<T> 的函式。'],
-        draft: 'async function retry<T>(task: ____, times = 3): Promise<T> {\n  for (let i = 1; ; i++) {\n    try { return await task(); }\n    catch (e) { if (i >= times) throw e; }\n  }\n}',
-        answer: ['`task: () => Promise<T>`。', '`<T>` 是泛型（3-1）：retry 回傳的型別跟著 task 回傳的型別走。'],
-      },
     },
     mistakes: [
       { wrong: '參數型別寫 `Function`。', why: '等於什麼都能傳、呼叫時參數與回傳都是 any。', right: '寫出具體的 `(x: number) => string`。' },
@@ -2263,19 +2166,7 @@ defineLessons({
       { wrong: '回傳型別寫 `any` 讓 callback 好傳。', why: '呼叫端拿到 any，錯誤一路擴散。', right: '用 void（不用回傳值）或具體型別。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`(a: string) => void` 描述的是？', options: [
-        { text: '收一個 string、不回傳有意義值的函式', correct: true, why: '函式型別。' },
-        { text: '回傳 string 的函式', why: 'string 是參數。' },
-        { text: '一個 string 變數', why: '這是函式型別。' },
-        { text: '可以回傳任何東西的函式，而且一定要用回傳值', why: 'void 表示不使用回傳值。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function f(a: number, b?: number) {}`，哪個呼叫「不」合法？', options: [
-        { text: '`f()`', correct: true, why: 'a 是必要參數。' },
-        { text: '`f(1)`', why: 'b 可以省略。' },
-        { text: '`f(1, 2)`', why: '合法。' },
-        { text: '`f(1, undefined)`', why: '可選參數可以明確傳 undefined。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['`["1", "2", "3"].map(parseInt)` 在 JavaScript 會得到 [1, NaN, NaN]。TypeScript 為什麼沒有攔下來？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['`["1", "2", "3"].map(parseInt)` 在 JavaScript 會得到 [1, NaN, NaN]。TypeScript 為什麼沒有攔下來？'], answer: [
         'map 會把 (元素, 索引, 陣列) 傳給 callback；parseInt 的型別是 (string, radix?: number) => number，第二個參數剛好接住索引，型別完全相容，所以不報錯。',
         '這是型別系統抓不到的「語意」錯誤：要寫成 `.map((s) => parseInt(s, 10))` 或 `.map(Number)`。型別正確不等於行為正確，還需要測試。',
       ] },
@@ -2285,7 +2176,7 @@ defineLessons({
       '可選參數型別含 undefined；有預設值時更好處理。',
       '不用 `Function` 與 `any`，寫出具體的函式型別。',
     ],
-    sources: ['ts-functions'],
+    sources: ['ts-functions', 'ts-tsconfig'],
   },
 });
 </script>
@@ -2316,17 +2207,9 @@ defineLessons({
       '用 typeof、in、instanceof 收斂型別',
       '寫一個自訂型別守衛',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-4）callback 型別寫成 `Function` 的問題是？', options: [
-        { text: '參數與回傳都變成 any，失去檢查', correct: true, why: '要寫具體的函式型別。' },
-        { text: '執行比較慢，因為要在執行時檢查函式型別', why: '型別不影響執行速度。' },
-        { text: '不能傳箭頭函式', why: '可以傳，只是沒檢查。' },
-        { text: '語法錯誤', why: '合法但不安全。' },
-      ] },
-    ],
     analogy: {
       text: ['聯合型別像寄來的包裹「可能是書或衣服」：你不能直接翻頁（書的操作），也不能直接穿（衣服的操作）。先打開看是哪一種（收斂），確定是書才翻頁。'],
-      limit: ['你打開一次就記住了；TypeScript 的收斂只在那個 if 區塊裡有效，而且如果中間呼叫了可能改變它的函式，收斂結果可能被重置。'],
+      limit: ['你打開一次就記住了；TypeScript 的收斂只在那段控制流程裡有效。變數被重新指定、或在之後才執行的 callback 裡讀取 let 變數時，收斂可能失效（見本課「深入」）。'],
     },
     model: {
       svg: Fig.tree('收斂流程：x 的型別是 string 或 number；在 typeof x === "string" 的分支裡 x 是 string，可以用 toUpperCase；在 else 分支裡 x 是 number，可以用 toFixed', { title: 'x: string | number', lines: ['只能用兩者共有的操作'] }, [
@@ -2360,55 +2243,36 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function len(x: string | null) {\n  if (typeof x === "object") {\n    return 0;          // 這裡 x 是什麼型別？\n  }\n  return x.length;\n}\n\nconsole.log(len(null), len("hi"));',
-          predict: { q: '`typeof x === "object"` 分支裡 x 的型別是？', options: ['null', 'string | null', 'object'], answer: 0 },
           output: '0 2\n（typeof null 是 "object"，所以這個分支收斂成 null）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'typeof', label: 'typeof' }, { id: 'in', label: 'in' }, { id: 'inst', label: 'instanceof' }, { id: 'arr', label: 'Array.isArray' }],
-          items: [
-            { text: '區分 string 與 number', answer: 'typeof', why: '原始型別用 typeof。' },
-            { text: '區分 Date 與 string', answer: 'inst', why: 'Date 是類別，用 instanceof（或先 typeof 判斷 string）。' },
-            { text: '區分「有 meow 方法的物件」與「有 bark 方法的物件」', answer: 'in', why: '依屬性存在與否。' },
-            { text: '區分 string 與 string[]', answer: 'arr', why: '`typeof` 對陣列是 "object"。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['區分 string 與 number', 'typeof', '原始型別用 typeof。'],
+          ['區分 Date 與 string', 'instanceof', 'Date 是類別，用 instanceof（或先 typeof 判斷 string）。'],
+          ['區分「有 meow 方法的物件」與「有 bark 方法的物件」', 'in', '依屬性存在與否。'],
+          ['區分 string 與 string[]', 'Array.isArray', '`typeof` 對陣列是 "object"。']
+        ] },
         { type: 'svg', svg: Fig.vs('filter 搭配型別守衛：一般 filter(x => x !== null) 結果仍是 (User | null)[]；寫成 filter((x): x is User => x !== null) 結果收斂成 User[]（TS 5.5 起簡單情況可自動推斷）', { title: '一般 callback', lines: ['`(User | null)[]`', '舊版不會收斂'], tone: 5 }, { title: '型別守衛 callback', lines: ['`User[]`', '明確收斂'], tone: 4 }), caption: 'TypeScript 5.5 起會自動推斷簡單的型別守衛；複雜條件仍要自己寫 `x is T`。' },
+        { type: 'heading', id: 'deep-narrow-limits', text: '深入：收斂在哪裡會失效' },
+        { type: 'table', head: ['情況', '收斂還在嗎', '說明'], rows: [
+          ['if 之後呼叫一個可能修改物件的函式', '還在', '刻意的取捨：每次呼叫都重置會讓收斂幾乎沒用，代價是少數情況不安全'],
+          ['let 變數在 callback 裡讀取', '最後一次指定之後才保留', 'TS 5.4 起，callback 建立在最後一次指定之後時會保留收斂；之前的版本一律失效'],
+          ['把條件存成 const：`const isStr = typeof x === "string"`', '還在', 'TS 4.4 起支援「別名條件」，x 也要是 const 或沒被重新指定的參數'],
+          ['`arr.filter(x => !!x)` 用在 `(number | undefined)[]`', '不會自動收斂', '5.5 的自動型別守衛要求 false 時「一定不是」該型別；0 也會被濾掉，所以不成立'],
+        ] },
+        '第一列是最容易被誤解的地方：TypeScript 不追蹤函式的副作用。收斂完立刻使用，不要中間夾著會改狀態的呼叫，是最實際的防法。',
       ],
-      tryit: {
-        q: ['寫一個型別守衛，判斷 unknown 值是不是有 id（number）的物件：'],
-        draft: 'function hasId(x: unknown): x ____ { id: number } {\n  return typeof x === "object" && x !== null && "id" in x && typeof x.id === ____;\n}',
-        answer: ['`x is { id: number }`、`"number"`。', '要先排除 null（typeof null 是 "object"），再用 in 確認屬性存在，最後檢查屬性型別。'],
-      },
     },
     mistakes: [
       { wrong: '用 `typeof x === "object"` 判斷是物件，忘了 null。', why: '`typeof null` 也是 "object"。', right: '`x !== null && typeof x === "object"`。' },
       { wrong: '用 `as string` 直接斷言聯合型別。', why: '沒有真的檢查，執行時可能是 number。', right: '用 typeof 收斂。' },
       { wrong: '自訂型別守衛寫錯邏輯（回傳 true 但其實不是）。', why: 'TypeScript 完全相信 `x is T`，不檢查守衛本身。', right: '型別守衛要有測試。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`x: string | number`，收斂前能直接呼叫哪個？', options: [
-        { text: '`x.toString()`', correct: true, why: '兩種型別都有 toString。' },
-        { text: '`x.toUpperCase()`', why: '只有 string 有。' },
-        { text: '`x.toFixed()`', why: '只有 number 有。' },
-        { text: '`x.length`', why: '只有 string 有。' },
-      ] },
-      { level: '應用', type: 'mc', q: '區分 `Date | string`，最直接的寫法是？', options: [
-        { text: '`if (x instanceof Date)`', correct: true, why: 'Date 是類別。' },
-        { text: '`if (typeof x === "date")`', why: 'typeof 沒有 "date" 這個結果。' },
-        { text: '`if (x as Date)`', why: '斷言不是檢查。' },
-        { text: '`if ("getTime" === x)`', why: '這是字串比較。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼說「收斂」是 TypeScript 最核心的能力？舉一個 JavaScript 本來就會寫、加了 TypeScript 後變更安全的例子。'], answer: [
-        'TypeScript 不需要新語法來判斷型別，它直接理解你本來就會寫的 JavaScript 檢查（typeof、in、if (!x) return）。',
-        '例如 `if (!user) return; user.name` ——JavaScript 裡你本來就會這樣寫；TypeScript 讀懂這個 return，在後面把 user 收斂成非 null，忘了寫這個檢查時就報錯。',
-      ] },
-    ],
     keypoints: [
       '聯合型別 `A | B`，收斂前只能用共有的成員。',
       '用 typeof、in、instanceof、Array.isArray 收斂。',
       '自訂型別守衛 `x is T` 要寫對，TypeScript 會完全相信它。',
     ],
-    sources: ['ts-narrowing'],
+    sources: ['ts-narrowing', 'ts-44', 'ts-54', 'ts-55'],
   },
 
   '2-2': {
@@ -2416,14 +2280,6 @@ defineLessons({
       '用字面型別限制值的範圍',
       '用可辨識聯合描述「幾種狀態，每種帶不同資料」',
       '用 never 做窮舉檢查',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-1）`typeof null` 的結果是？', options: [
-        { text: '`"object"`', correct: true, why: '歷史遺留，收斂時要另外排除 null。' },
-        { text: '`"null"`', why: '沒有這個結果。' },
-        { text: '`"undefined"`', why: '那是 undefined 的結果。' },
-        { text: '拋出例外', why: 'typeof 不會拋例外。' },
-      ] },
     ],
     analogy: {
       text: ['可辨識聯合像外送訂單的狀態欄：「準備中」只有預計時間、「外送中」有外送員與位置、「已送達」有簽收時間。看狀態欄（kind）就知道其他欄位有哪些。'],
@@ -2462,29 +2318,28 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Shape =\n  | { kind: "circle"; r: number }\n  | { kind: "square"; size: number }\n  | { kind: "triangle"; base: number; h: number };\n\nfunction area(s: Shape): number {\n  switch (s.kind) {\n    case "circle": return Math.PI * s.r ** 2;\n    case "square": return s.size ** 2;\n    default: {\n      const _x: never = s;\n      return _x;\n    }\n  }\n}',
-          predict: { q: 'tsc 會在哪裡報錯？', options: ['`const _x: never = s` 那行', '沒有錯誤', 'case "circle" 那行'], answer: 0 },
           output: "!app.ts:11:13 - error TS2322: Type '{ kind: \"triangle\"; base: number; h: number; }' is not assignable to type 'never'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'lit', label: '字面型別聯合就夠' }, { id: 'du', label: '用可辨識聯合' }],
-          items: [
-            { text: '排序方向：升冪或降冪', answer: 'lit', why: '`"asc" | "desc"`，不帶額外資料。' },
-            { text: '付款方式：信用卡要末四碼、轉帳要帳號、現金不用', answer: 'du', why: '每種帶不同資料。' },
-            { text: '按鈕尺寸 S、M、L', answer: 'lit', why: '單純的選項。' },
-            { text: 'WebSocket 訊息：聊天、加入、離開，各有不同欄位', answer: 'du', why: '用 type 欄位區分。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['排序方向：升冪或降冪', '字面型別聯合就夠', '`"asc" | "desc"`，不帶額外資料。'],
+          ['付款方式：信用卡要末四碼、轉帳要帳號、現金不用', '用可辨識聯合', '每種帶不同資料。'],
+          ['按鈕尺寸 S、M、L', '字面型別聯合就夠', '單純的選項。'],
+          ['WebSocket 訊息：聊天、加入、離開，各有不同欄位', '用可辨識聯合', '用 type 欄位區分。']
+        ] },
         { type: 'svg', svg: Fig.row('窮舉檢查的效果：新增 triangle 到聯合型別；所有沒處理 triangle 的 switch 的 never 那行都報錯；逐一補上後全部通過', [
           { title: '新增 triangle', lines: ['改型別定義'], tone: 2 },
           { title: '漏處理的地方', lines: ['never 那行報錯'], tone: 5 },
           { title: '補上 case', lines: ['全部通過'], tone: 4 },
         ]), caption: '編譯器幫你找出所有要改的地方。' },
+        { type: 'heading', id: 'deep-discriminant', text: '深入：判別屬性的細節與窮舉的其他寫法' },
+        '判別屬性不一定要是字串：`{ ok: true; data: T } | { ok: false; error: string }` 用 boolean 字面型別也能收斂。TS 4.6 起，先用 const 解構 `const { kind, ... } = shape` 再判斷 kind，也能收斂其他解構出來的變數。',
+        { type: 'table', head: ['窮舉寫法', '優點', '缺點'], rows: [
+          ['`const _x: never = s`', '不用額外工具', '每個 switch 都要寫'],
+          ['`default: throw new Error(String(s satisfies never))`', '一行，執行時也會拋錯', '要 TS 4.9 以上'],
+          ['typescript-eslint 的 switch-exhaustiveness-check', '不改程式碼', '需要型別感知的 lint 設定'],
+        ] },
+        '不適用的情況：資料來自 API 時，判別屬性的值可能是新版後端才有的狀態，型別上「窮舉」不代表執行時窮舉。用 `z.discriminatedUnion` 驗證（6-2），未知狀態走明確的錯誤處理。',
       ],
-      tryit: {
-        q: ['補完型別：Toast 有 success（只有 text）與 error（有 text 與 retry 函式）兩種：'],
-        draft: 'type Toast =\n  | { type: ____; text: string }\n  | { type: "error"; text: string; retry: ____ };',
-        answer: ['`type: "success"`、`retry: () => void`。', '確認 `t.type === "error"` 之後才能呼叫 `t.retry()`。'],
-      },
     },
     mistakes: [
       { wrong: '判別屬性用 string 而不是字面型別：`{ kind: string; r: number }`。', why: 'string 無法收斂到特定成員。', right: '`kind: "circle"`。' },
@@ -2492,21 +2347,9 @@ defineLessons({
       { wrong: '用一堆 boolean 旗標描述狀態。', why: '組合爆炸，容易出現不可能的狀態。', right: '可辨識聯合。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '可辨識聯合的「判別屬性」要是什麼型別？', options: [
-        { text: '字面型別，例如 `"circle"`', correct: true, why: '才能透過比較收斂。' },
-        { text: '`string`', why: 'string 無法區分成員。' },
-        { text: '`boolean` 一定不行', why: 'true／false 也是字面型別，兩種狀態時其實可以。' },
-        { text: '`any`', why: '無法收斂。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`type Dir = "up" | "down"; let d: Dir = "left";` 會？', options: [
-        { text: 'TS2322：\'"left"\' 不能指定給 Dir', correct: true, why: '只能是列出的值。' },
-        { text: '可以編譯，因為 "left" 和 Dir 的成員都是字串', why: '字面型別比 string 嚴格。' },
-        { text: 'd 變成 string', why: '型別是 Dir。' },
-        { text: '執行時錯誤', why: '是編譯時錯誤。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['C# 15（.NET 11）新增了 union 型別與 closed 類別，目的是讓 switch 可以窮舉。TypeScript 的可辨識聯合在解決同一個問題嗎？差在哪？'], answer: [
-        '是同一個問題：讓編譯器知道「所有可能」，漏處理時報錯。',
-        'TypeScript 用結構型別加判別屬性，在 JavaScript 物件上就做得到，不需要新語法；代價是要自己寫 never 檢查，而且判別屬性需要真的存在於執行時的物件裡。',
+      { level: '深入思考', type: 'reveal', q: ['Kotlin 的 sealed class 與 Rust 的 enum 都能讓 when／match 窮舉所有情況。TypeScript 的可辨識聯合在解決同一個問題嗎？少了什麼、多了什麼？'], answer: [
+        '同一個問題：讓編譯器知道「所有可能」，漏處理時報錯。Kotlin、Rust 的窮舉檢查是語言內建；TypeScript 要靠 never 指定、satisfies never 或 lint 規則（switch-exhaustiveness-check）自己補。',
+        'TypeScript 多的是彈性：判別屬性就是一般的 JavaScript 屬性，API 回傳的 JSON 不用轉成類別就能收斂。代價是判別屬性必須真的存在於執行時的物件，外部資料要先驗證（6-2）。',
       ] },
     ],
     keypoints: [
@@ -2514,7 +2357,7 @@ defineLessons({
       '每種狀態帶不同資料時用可辨識聯合。',
       'switch 的 default 指定給 never，漏處理時會報錯。',
     ],
-    sources: ['ts-narrowing'],
+    sources: ['ts-narrowing', 'ts-46'],
   },
 
   '2-3': {
@@ -2522,14 +2365,6 @@ defineLessons({
       '說出 any 為什麼危險',
       '用 unknown 安全地接收不明資料',
       '認識 never 的兩種用途',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）窮舉檢查用哪個型別？', options: [
-        { text: '`never`', correct: true, why: '處理完所有情況後剩下的就是 never。' },
-        { text: '`unknown`', why: '任何值都能指定給 unknown，抓不到漏處理。' },
-        { text: '`any`', why: '關掉檢查。' },
-        { text: '`void`', why: 'void 用於函式回傳。' },
-      ] },
     ],
     analogy: {
       text: ['any 像機場的「免檢通道」：什麼都放行，危險品也一起進來，而且它經手的行李也都變成免檢。unknown 像「待檢查區」：什麼都收，但要開箱檢查後才能帶走。'],
@@ -2568,30 +2403,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'let a: any = "hello";\nlet n: number = a;     // ?\nlet u: unknown = "hello";\nlet m: number = u;     // ?',
-          predict: { q: '哪一行會報錯？', options: ['只有 `let m: number = u`', '只有 `let n: number = a`', '兩行都會'], answer: 0 },
           output: "!app.ts:4:5 - error TS2322: Type 'unknown' is not assignable to type 'number'.\n（any 可以默默放進 number，這正是它危險的地方）",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'unknown', label: '用 unknown' }, { id: 'never', label: '用 never' }, { id: 'specific', label: '寫具體型別' }],
-          items: [
-            { text: 'JSON.parse 的結果', answer: 'unknown', why: '執行前不知道內容。' },
-            { text: '一定會拋例外、不會正常回傳的函式', answer: 'never', why: '回傳型別 never。' },
-            { text: '函式參數：使用者名稱', answer: 'specific', why: '你知道它是 string。' },
-            { text: 'catch (e) 裡的 e', answer: 'unknown', why: '任何東西都可能被 throw。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['JSON.parse 的結果', '用 unknown', '執行前不知道內容。'],
+          ['一定會拋例外、不會正常回傳的函式', '用 never', '回傳型別 never。'],
+          ['函式參數：使用者名稱', '寫具體型別', '你知道它是 string。'],
+          ['catch (e) 裡的 e', '用 unknown', '任何東西都可能被 throw。']
+        ] },
         { type: 'svg', svg: Fig.stack('any 的擴散：data 是 any，data.user 也是 any，data.user.name 也是 any，傳給要 number 的函式也不報錯，錯誤在很遠的地方才在執行時出現', [
           { title: 'data: any', tone: 5 },
           { title: 'data.user: any', tone: 5 },
           { title: 'data.user.name: any', tone: 5 },
           { title: 'add(data.user.name, 1) ← 不報錯', tone: 1 },
         ]), caption: '一個 any 可以讓整條資料流都失去檢查。' },
+        { type: 'heading', id: 'deep-top-types', text: '深入：unknown、{}、object 的差別與雙重斷言' },
+        { type: 'table', head: ['型別', '接受', '不接受'], rows: [
+          ['`unknown`', '所有值', '—（使用前要收斂）'],
+          ['`{}`', '所有非 null／undefined 的值，包括 42、"a"', 'null、undefined'],
+          ['`object`', '物件、陣列、函式', '原始值'],
+        ] },
+        '`{}` 常被誤以為是「空物件」，其實它接受字串和數字；要表示「任何物件」用 object，要表示「什麼都可能」用 unknown。',
+        'as 只允許「可能相容」的型別，`"a" as number` 會報 TS2352。`x as unknown as T` 的雙重斷言可以繞過，它是最強的關閉檢查手段，只該出現在測試替身或已經驗證過的資料上，並附註解說明原因。',
       ],
-      tryit: {
-        q: ['在 catch 裡安全地印出錯誤訊息：'],
-        draft: 'try {\n  risky();\n} catch (e) {\n  const msg = e ____ Error ? e.message : String(e);\n  console.error(msg);\n}',
-        answer: ['`e instanceof Error`。', 'JavaScript 可以 throw 任何東西（字串、數字），所以 e 是 unknown；先確認是 Error 才讀 message。'],
-      },
     },
     mistakes: [
       { wrong: '遇到型別錯誤就加 `: any`。', why: '錯誤被藏起來並擴散。', right: '找出正確型別；真的不知道就 unknown 加收斂。' },
@@ -2599,19 +2433,7 @@ defineLessons({
       { wrong: '`catch (e) { console.log(e.message) }`。', why: 'e 是 unknown，TS18046；而且被 throw 的可能不是 Error。', right: '`e instanceof Error`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪個型別「什麼都能接受，但使用前必須收斂」？', options: [
-        { text: '`unknown`', correct: true, why: '安全版的 any。' },
-        { text: '`any`', why: 'any 不需要收斂就能用。' },
-        { text: '`never`', why: 'never 什麼都不能接受。' },
-        { text: '`object`', why: 'object 不接受原始值。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function fail(msg: string): never { throw new Error(msg); }` 為什麼回傳 never？', options: [
-        { text: '它永遠不會正常回傳', correct: true, why: '一定拋例外。' },
-        { text: '它回傳 undefined', why: '那是 void。' },
-        { text: '它可以回傳任何型別', why: '那是 any。' },
-        { text: '語法要求', why: '回傳 void 也能編譯，never 更精確。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['接手一個充滿 any 的舊專案，要怎麼漸進地清除？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['接手一個充滿 any 的舊專案，要怎麼漸進地清除？'], answer: [
         '先開 noImplicitAny（strict），擋住新的隱含 any；用 ESLint 的 no-explicit-any 規則列出明確的 any。',
         '從資料進入點（API、JSON、localStorage）開始改成 unknown 加驗證，型別會一路往內傳遞；內部的 any 很多會自然消失。',
       ] },
@@ -2629,14 +2451,6 @@ defineLessons({
       '說出 strictNullChecks 帶來的保護',
       '用 ?. 與 ?? 處理可能是 null 的值',
       '分辨 `??` 與 `||`，避免把 0 和空字串換掉',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-3）catch 的參數 e 在 strict 下是什麼型別？', options: [
-        { text: '`unknown`', correct: true, why: '任何東西都可能被 throw。' },
-        { text: '`Error`', why: '不一定是 Error。' },
-        { text: '`any`', why: 'strict 起改為 unknown。' },
-        { text: '`never`', why: '不是。' },
-      ] },
     ],
     analogy: {
       text: ['strictNullChecks 像要求每個可能空著的座位都插上「可能空位」的牌子。沒有牌子的座位保證有人；有牌子的座位，你要先看一眼才能跟對方說話。'],
@@ -2681,48 +2495,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const el = document.querySelector("#price");\nel.textContent = "100";\n\n// tsc 會說什麼？',
-          predict: { q: 'el 的型別與 tsc 的結果？', options: ['Element | null，報錯 TS18047', 'Element，通過', 'any，通過'], answer: 0 },
           output: "!app.ts:2:1 - error TS18047: 'el' is possibly 'null'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'q', label: '用 ??' }, { id: 'or', label: '用 || 也沒問題' }],
-          items: [
-            { text: '分頁大小：使用者可能傳 0（代表不分頁）', answer: 'q', why: '0 是有效值。' },
-            { text: '顯示名稱：空字串也想換成「匿名」', answer: 'or', why: '這時正是要把空字串也換掉。' },
-            { text: '是否開啟通知：false 是有效值', answer: 'q', why: '|| 會把 false 換掉。' },
-            { text: '價格：0 元是免費商品', answer: 'q', why: '0 是有效值。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['分頁大小：使用者可能傳 0（代表不分頁）', '用 ??', '0 是有效值。'],
+          ['顯示名稱：空字串也想換成「匿名」', '用 || 也沒問題', '這時正是要把空字串也換掉。'],
+          ['是否開啟通知：false 是有效值', '用 ??', '|| 會把 false 換掉。'],
+          ['價格：0 元是免費商品', '用 ??', '0 是有效值。']
+        ] },
         { type: 'svg', svg: Fig.vs('處理 querySelector 回傳 null：用 ! 斷言時找不到元素執行期才出錯；用 if 檢查時找不到元素可以給出清楚的錯誤訊息', { title: 'el!.textContent', lines: ['找不到時', '執行期 TypeError'], tone: 5 }, { title: 'if (!el) throw …', lines: ['清楚的錯誤訊息', '之後 el 非空'], tone: 4 }), caption: '`!` 只在你百分之百確定時使用，例如頁面一定有的根元素。' },
+        { type: 'heading', id: 'deep-null-undefined', text: '深入：缺少、undefined 與 null 是三件事' },
+        { type: 'table', head: ['寫法', '`{}`（沒有這個鍵）', '`{ email: undefined }`', '`{ email: null }`'], rows: [
+          ['`email?: string`', '可以', '可以（預設）', '不行'],
+          ['`email?: string` + exactOptionalPropertyTypes', '可以', '不行', '不行'],
+          ['`email: string | undefined`', '不行', '可以', '不行'],
+          ['`email: string | null`', '不行', '不行', '可以'],
+        ] },
+        '差別在 JSON：`JSON.stringify` 會丟掉值是 undefined 的鍵，但保留 null。很多 PATCH API 因此約定「缺欄位 = 不改、null = 清空」，型別就該分開寫。',
+        '`x == null` 同時檢查 null 與 undefined，TypeScript 也能據此收斂，是少數建議用 == 的地方。類別屬性或變數確定會在別處指定時，可以寫 `let ready!: boolean`（明確指定斷言），但它和非空斷言一樣不做檢查。',
       ],
-      tryit: {
-        q: ['安全地取得使用者所在城市，沒有就顯示「未填寫」：'],
-        draft: 'type User = { address?: { city?: string } };\nfunction city(u: User | null) {\n  return u____address____city ____ "未填寫";\n}',
-        answer: ['`u?.address?.city ?? "未填寫"`。', '任何一層是 null 或 undefined，`?.` 都會停下得到 undefined，再由 ?? 換成預設值。'],
-      },
     },
     mistakes: [
       { wrong: '關掉 strictNullChecks 讓錯誤消失。', why: '最常見的執行時錯誤（Cannot read properties of null）就沒有保護了。', right: '保持 strict，用 ?. ?? 與收斂處理。' },
       { wrong: '到處寫 `!`。', why: '等於關掉 null 檢查。', right: '用 if 檢查並給出清楚錯誤，或 ?. 與 ??。' },
       { wrong: '`count || 0` 處理可能為 0 的數字。', why: '0 也會被換掉（剛好結果相同時看不出 bug，換成其他預設值就錯）。', right: '`count ?? 0`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`0 ?? 5` 的結果是？', options: [
-        { text: '`0`', correct: true, why: '0 不是 null 或 undefined。' },
-        { text: '`5`', why: '那是 `0 || 5`。' },
-        { text: '`null`', why: '不是。' },
-        { text: '型別錯誤', why: '合法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`user?.profile.name`，當 user 存在但 profile 是 undefined 時會？', options: [
-        { text: '執行時 TypeError（TypeScript 也會先報錯）', correct: true, why: '`?.` 只保護 user，profile 之後要再加 `?.`。' },
-        { text: '得到 undefined，因為 `?.` 會一路保護到最後', why: '要寫 `user?.profile?.name`。' },
-        { text: '得到空字串', why: '不會自動給空字串。' },
-        { text: '得到 null', why: '不會。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['API 的型別寫著 `name: string`，但實際上某些舊資料是 null。為什麼 TypeScript 沒提醒你？要怎麼防？'], answer: [
-        '型別是你自己宣告的，TypeScript 相信它；執行時 API 回傳什麼它看不到。',
-        '在資料進來的地方驗證（6-2），驗證失敗時記錄並處理；或把型別誠實地改成 `name: string | null`，讓所有使用的地方都被要求處理 null。',
-      ] },
     ],
     keypoints: [
       'strict 下 null 與 undefined 必須寫進型別，使用前要處理。',
@@ -2758,14 +2554,6 @@ defineLessons({
       '寫一個泛型函式並說出它比 any 好在哪',
       '讓 TypeScript 從引數推斷型別參數',
       '寫一個泛型型別（例如 ApiResponse<T>）',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）any 最大的問題是？', options: [
-        { text: '關掉檢查而且會擴散', correct: true, why: '這課的泛型是 any 的正確替代方案之一。' },
-        { text: '執行比較慢', why: '型別不影響執行。' },
-        { text: '不能放物件', why: 'any 什麼都能放。' },
-        { text: '只能用在參數', why: '哪裡都能用。' },
-      ] },
     ],
     analogy: {
       text: ['泛型像有標籤欄的保鮮盒：盒子設計只有一種，裝進去時貼上「咖哩」，拿出來時就知道是咖哩。any 像沒有標籤的盒子：拿出來時誰也不知道裡面是什麼。'],
@@ -2804,60 +2592,41 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function pair<A, B>(a: A, b: B): [A, B] {\n  return [a, b];\n}\n\nconst p = pair("年齡", 30);\n// 編輯器顯示 p 的型別是？',
-          predict: { q: 'p 的型別是？', options: ['[string, number]', '[any, any]', '(string | number)[]'], answer: 0 },
           output: 'const p: [string, number]',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'gen', label: '適合泛型' }, { id: 'plain', label: '一般型別就好' }],
-          items: [
-            { text: '回傳陣列最後一個元素的函式', answer: 'gen', why: '輸出型別跟著輸入陣列的元素型別。' },
-            { text: '計算兩個數字平均的函式', answer: 'plain', why: '永遠是 number。' },
-            { text: 'API 回應的外層包裝 `{ ok, data }`', answer: 'gen', why: 'data 的型別依 API 而不同。' },
-            { text: '把字串轉成大寫的函式', answer: 'plain', why: '永遠是 string。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['回傳陣列最後一個元素的函式', '適合泛型', '輸出型別跟著輸入陣列的元素型別。'],
+          ['計算兩個數字平均的函式', '一般型別就好', '永遠是 number。'],
+          ['API 回應的外層包裝 `{ ok, data }`', '適合泛型', 'data 的型別依 API 而不同。'],
+          ['把字串轉成大寫的函式', '一般型別就好', '永遠是 string。']
+        ] },
         { type: 'svg', svg: Fig.stack('泛型推斷的過程：呼叫 first(["a", "b"])；TypeScript 比對參數型別 T[] 與引數 string[]；推出 T 是 string；回傳型別 T | undefined 變成 string | undefined', [
           { title: '呼叫 first(["a", "b"])' },
           { title: '比對 T[] 與 string[]', tone: 3 },
           { title: '推出 T = string', tone: 2 },
           { title: '回傳 string | undefined', tone: 4 },
         ]), caption: '推斷不出來或推錯時，才自己寫 `first<string>(…)`。' },
+        { type: 'heading', id: 'deep-inference-tools', text: '深入：推斷的候選與控制推斷的工具' },
+        '同一個 T 出現在多個參數時，TypeScript 會收集候選再挑一個：`function same<T>(a: T, b: T)` 呼叫 `same(1, "x")` 時 T 推成 number，第二個引數報 TS2345，而不是自動變成 `number | string`。',
+        { type: 'table', head: ['工具', '版本', '用途'], rows: [
+          ['`<const T>`', 'TS 5.0', '像 as const 一樣推出最精確的字面型別，呼叫端不用自己加 as const'],
+          ['`NoInfer<T>`', 'TS 5.4', '指定某個參數「不參與推斷」，例如預設值不該把 T 擴大'],
+          ['`<T = unknown>`', '—', '型別參數的預設值，推不出來時使用'],
+        ] },
+        '什麼時候不用泛型：型別參數只出現一次、或函式對所有輸入做完全相同的事又不回傳它，用 unknown 或具體型別更好讀。',
       ],
-      tryit: {
-        q: ['寫一個泛型函式 `last`，回傳陣列最後一個元素：'],
-        draft: 'function last____(items: readonly ____[]): T | undefined {\n  return items[items.length - 1];\n}',
-        answer: ['`function last<T>(items: readonly T[]): T | undefined`。', '也可以寫 `items.at(-1)`，它的回傳型別本來就是 `T | undefined`。'],
-      },
     },
     mistakes: [
       { wrong: '泛型參數只出現一次：`function log<T>(x: T): void`。', why: 'T 沒有連結任何其他型別，等於 unknown，泛型沒有意義。', right: '改成 `(x: unknown): void`。' },
       { wrong: '每次呼叫都手寫型別參數 `first<string>(names)`。', why: '推斷做得到，手寫只是重複。', right: '交給推斷，推不出來時才寫。' },
       { wrong: '泛型函式裡 `return {} as T`。', why: '騙過檢查器，呼叫端拿到的不是真正的 T。', right: '讓呼叫端傳入需要的值或工廠函式。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '泛型相較於 any 最大的好處是？', options: [
-        { text: '保留輸入與輸出之間的型別關係', correct: true, why: '輸出型別跟著輸入走。' },
-        { text: '執行比較快，因為泛型會在編譯時展開', why: '型別不影響執行。' },
-        { text: '可以放任何型別', why: 'any 也可以，差別是型別資訊有沒有保留。' },
-        { text: '不需要寫型別', why: '兩者都可能不寫。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function wrap<T>(x: T) { return { value: x }; }`，`wrap(5)` 的型別是？', options: [
-        { text: '`{ value: number }`', correct: true, why: 'T 推斷為 number。' },
-        { text: '`{ value: 5 }`', why: '一般參數位置會放寬成 number（除非用 const 型別參數）。' },
-        { text: '`{ value: any }`', why: '泛型保留了型別。' },
-        { text: '`{ value: T }`', why: 'T 在呼叫時已經被決定。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['`Promise<T>` 也是泛型型別。`async function getUser(): Promise<User>` 中的 T 代表什麼？為什麼 await 之後就是 User？'], answer: [
-        'T 是「Promise 完成時會給你的值」的型別；Promise<User> 表示將來會得到 User。',
-        'await 的型別規則就是「取出 Promise<T> 的 T」，所以 `const u = await getUser()` 的 u 是 User。6-3 會再談 fetch 的 Promise 型別。',
-      ] },
-    ],
     keypoints: [
       '泛型讓輸出型別跟著輸入型別走，是 any 的正確替代。',
       '型別參數大多由引數推斷，不用手寫。',
       '泛型參數至少要出現兩次（連結輸入與輸出）才有意義。',
     ],
-    sources: ['ts-generics'],
+    sources: ['ts-generics', 'ts-50', 'ts-54'],
   },
 
   '3-2': {
@@ -2865,14 +2634,6 @@ defineLessons({
       '用 extends 約束型別參數',
       '用 keyof 與 T[K] 寫出安全的屬性存取',
       '寫一個只接受物件實際屬性名的函式',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-1）`function f<T>(x: T): void` 的問題是？', options: [
-        { text: 'T 只出現一次，沒有連結任何東西', correct: true, why: '直接寫 unknown 就好。' },
-        { text: '語法錯誤', why: '合法。' },
-        { text: 'void 不能和泛型一起用', why: '可以。' },
-        { text: 'T 一定要寫約束', why: '約束不是必須。' },
-      ] },
     ],
     analogy: {
       text: ['約束像餐廳的「需穿著正式服裝」：什麼人都可以來（泛型），但一定要穿西裝（有某個屬性），服務生才能幫你掛外套。keyof 像衣帽間的號碼牌清單：只能領清單上有的號碼。'],
@@ -2911,26 +2672,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Product = { id: number; title: string; price: number };\ntype Keys = keyof Product;\ntype PriceType = Product["price"];\ntype IdOrTitle = Product["id" | "title"];\n\n// 這三個型別分別是？',
-          predict: { q: 'IdOrTitle 是？', options: ['number | string', '"id" | "title"', 'Product'], answer: 0 },
           output: 'type Keys = "id" | "title" | "price"\ntype PriceType = number\ntype IdOrTitle = number | string',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '符合 T extends { length: number }' }, { id: 'no', label: '不符合' }],
-          items: [
-            { text: '`"hello"`', answer: 'ok', why: 'string 有 length。' },
-            { text: '`[1, 2, 3]`', answer: 'ok', why: '陣列有 length。' },
-            { text: '`42`', answer: 'no', why: 'number 沒有 length。' },
-            { text: '`{ length: 5, name: "x" }`', answer: 'ok', why: '結構符合：有 number 型別的 length。' },
-            { text: '`{ size: 5 }`', answer: 'no', why: '沒有 length。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`"hello"`', '符合 T extends { length: number }', 'string 有 length。'],
+          ['`[1, 2, 3]`', '符合 T extends { length: number }', '陣列有 length。'],
+          ['`42`', '不符合', 'number 沒有 length。'],
+          ['`{ length: 5, name: "x" }`', '符合 T extends { length: number }', '結構符合：有 number 型別的 length。'],
+          ['`{ size: 5 }`', '不符合', '沒有 length。']
+        ] },
         { type: 'svg', svg: Fig.vs('約束的雙向作用：對呼叫端，限制只能傳符合條件的型別；對函式內部，保證可以使用約束中的屬性', { title: '對呼叫端', lines: ['只能傳有 length 的', '`longest(1, 2)` 報錯'], tone: 3 }, { title: '對函式內部', lines: ['可以安心用', '`a.length`'], tone: 4 }), caption: '約束既是限制，也是保證。' },
+        { type: 'heading', id: 'deep-keyof-edges', text: '深入：Object.keys 為什麼不是 keyof T' },
+        '`Object.keys(user)` 的型別是 `string[]`，不是 `(keyof User)[]`。原因是結構型別：型別說是 User 的物件，執行時可能多帶其他屬性（1-3），回傳 keyof User 會是謊言。',
+        { type: 'table', head: ['情況', 'keyof 的結果', '注意'], rows: [
+          ['`keyof (A | B)`', '只有 A、B 共有的鍵', '聯合只能確定共同的部分'],
+          ['`keyof { [k: string]: X }`', '`string | number`', '因為 obj[1] 會被轉成 obj["1"]'],
+          ['寫入 `obj[k] = v`，k 是 `keyof T` 聯合', 'v 要符合所有屬性型別的交集', '用 `<K extends keyof T>(k: K, v: T[K])` 才安全'],
+        ] },
+        '確定物件沒有額外屬性時，可以寫 `(Object.keys(o) as (keyof typeof o)[])`，但這是斷言，要自己負責。',
       ],
-      tryit: {
-        q: ['寫一個 pluck：從物件陣列取出某個欄位的所有值，回傳型別要正確：'],
-        draft: 'function pluck<T, K extends ____ T>(items: T[], key: K): ____[] {\n  return items.map((it) => it[key]);\n}\n\nconst names = pluck(users, "name");   // string[]',
-        answer: ['`K extends keyof T`、回傳 `T[K][]`。', '傳 "id" 會得到 number[]，傳 "name" 得到 string[]，完全由 key 決定。'],
-      },
     },
     mistakes: [
       { wrong: '泛型函式裡直接存取 `x.length`，沒有約束。', why: 'TS2339：T 不一定有 length。', right: '`<T extends { length: number }>`。' },
@@ -2938,19 +2698,7 @@ defineLessons({
       { wrong: '以為 `keyof` 只會給字串。', why: '陣列、有索引簽章的型別會包含 number。', right: '只要字串鍵時寫 `Extract<keyof T, string>` 或 `keyof T & string`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`keyof { a: number; b: string }` 是？', options: [
-        { text: '`"a" | "b"`', correct: true, why: '所有鍵的字面型別聯合。' },
-        { text: '`number | string`', why: '那是值的型別，用 `T[keyof T]`。' },
-        { text: '`string`', why: '更精確，是字面型別聯合。' },
-        { text: '`["a", "b"]`', why: 'keyof 產生聯合，不是 tuple。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function f<T extends string>(x: T)`，哪個呼叫會報錯？', options: [
-        { text: '`f(1)`', correct: true, why: 'number 不符合 string 約束。' },
-        { text: '`f("a")`', why: '符合。' },
-        { text: '`f("a" as const)`', why: '字面型別是 string 的子型別，符合。' },
-        { text: '`f(String(1))`', why: '回傳 string，符合。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['表單函式庫常有 `register("email")` 這種 API，打錯欄位名會在編譯時報錯。它大概是怎麼用這課的工具做到的？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['表單函式庫常有 `register("email")` 這種 API，打錯欄位名會在編譯時報錯。它大概是怎麼用這課的工具做到的？'], answer: [
         '表單元件帶一個泛型 `TForm`（表單資料型別），`register` 的參數型別是 `keyof TForm`（巢狀欄位時用樣板字面型別產生 "address.city" 這種路徑，4-4）。',
         '所以只能傳存在的欄位名，回傳的值型別也能用 `TForm[K]` 精確推出。',
       ] },
@@ -2968,14 +2716,6 @@ defineLessons({
       '使用 Partial、Required、Readonly',
       '用 Pick、Omit 從既有型別衍生新型別',
       '用 Record 與 ReturnType 減少重複定義',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）`User["name"]` 取出的是？', options: [
-        { text: 'name 屬性的型別', correct: true, why: '索引存取型別。' },
-        { text: '字串 "name"', why: '那是字面型別 "name"。' },
-        { text: 'User 的所有鍵', why: '那是 keyof User。' },
-        { text: '執行時的 name 值', why: '這是型別層面的運算。' },
-      ] },
     ],
     analogy: {
       text: ['工具型別像影印機的功能鍵：「全部改成選填」（Partial）、「只印這幾欄」（Pick）、「遮掉密碼欄」（Omit）。原本的表格只有一份，需要不同版本時按一下就產生，不用重畫。'],
@@ -3014,48 +2754,31 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Status = "draft" | "published" | "archived";\nconst labels: Record<Status, string> = {\n  draft: "草稿",\n  published: "已發布",\n};',
-          predict: { q: 'tsc 會怎樣？', options: ['報錯：缺少 archived', '通過', '報錯：Record 不能用字面型別'], answer: 0 },
           output: "!app.ts:2:7 - error TS2741: Property 'archived' is missing in type '{ draft: string; published: string; }' but required in type 'Record<Status, string>'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'partial', label: 'Partial' }, { id: 'omit', label: 'Omit' }, { id: 'pick', label: 'Pick' }, { id: 'record', label: 'Record' }],
-          items: [
-            { text: 'PATCH API：只傳要修改的欄位', answer: 'partial', why: '全部變可選。' },
-            { text: '回傳給前端時去掉 passwordHash', answer: 'omit', why: '去掉特定欄位。' },
-            { text: '下拉選單只需要 id 和 label', answer: 'pick', why: '只保留需要的欄位。' },
-            { text: '每種語言對應一段翻譯文字', answer: 'record', why: '鍵是語言代碼聯合。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['PATCH API：只傳要修改的欄位', 'Partial', '全部變可選。'],
+          ['回傳給前端時去掉 passwordHash', 'Omit', '去掉特定欄位。'],
+          ['下拉選單只需要 id 和 label', 'Pick', '只保留需要的欄位。'],
+          ['每種語言對應一段翻譯文字', 'Record', '鍵是語言代碼聯合。']
+        ] },
         { type: 'svg', svg: Fig.vs('Pick 與 Omit 的差別：Pick 列出要保留的鍵，鍵打錯會報錯；Omit 列出要移除的鍵，鍵打錯不會報錯，要小心', { title: 'Pick<T, K>', lines: ['列出要留的', '打錯會報錯'], tone: 4 }, { title: 'Omit<T, K>', lines: ['列出要去掉的', '打錯不報錯'], tone: 2 }), caption: 'Omit 的 K 只要求是 string，所以 `Omit<User, "pasword">` 不會提醒你拼錯。' },
+        { type: 'heading', id: 'deep-utility-edges', text: '深入：工具型別的兩個陷阱' },
+        '第一，工具型別都是「淺」的：`Partial<User>` 只讓第一層可選，`address.city` 仍是必填；`Readonly` 也一樣。需要深層版本時要自己寫遞迴型別，或確認是不是真的需要。',
+        '第二，`Omit` 對聯合不會分配：`Omit<Cat | Dog, "id">` 只留下兩者共有的屬性，可辨識聯合的差異欄位全部消失。要保留時用分配版本：',
+        { type: 'code', lang: 'typescript', title: 'distributive-omit.ts', code: 'type DistributiveOmit<T, K extends PropertyKey> =\n  T extends unknown ? Omit<T, K> : never;\n\ntype Shape = { kind: "circle"; r: number; id: string } | { kind: "square"; size: number; id: string };\ntype NewShape = DistributiveOmit<Shape, "id">;   // 兩個成員都保留 r／size' },
+        { type: 'table', head: ['其他常用工具型別', '用途'], rows: [
+          ['`Parameters<F>`', '取出函式參數的 tuple，包裝函式時沿用原參數'],
+          ['`InstanceType<typeof C>`', '從類別建構子取出實例型別'],
+          ['`Awaited<T>`', '拆開（巢狀的）Promise'],
+          ['`NoInfer<T>`', '阻止推斷（TS 5.4）'],
+        ] },
       ],
-      tryit: {
-        q: ['為「更新商品」定義輸入型別：id 不能改、其他欄位都選填：'],
-        draft: 'interface Product { id: number; title: string; price: number }\ntype ProductPatch = ____<____<Product, "id">>;',
-        answer: ['`Partial<Omit<Product, "id">>`。', '由內往外讀：先去掉 id，再把剩下的變成可選。'],
-      },
     },
     mistakes: [
       { wrong: '為每個 API 手寫一份幾乎一樣的型別。', why: '欄位一多就不同步。', right: '從核心型別用 Pick、Omit、Partial 衍生。' },
       { wrong: '`Omit<User, "pasword">` 拼錯沒發現。', why: 'Omit 不檢查鍵是否存在。', right: '仔細檢查，或自訂 `StrictOmit<T, K extends keyof T>`。' },
       { wrong: '用 `Record<string, V>` 表示「固定幾個鍵」。', why: '任何字串鍵都可以，讀取時也不提醒鍵可能不存在。', right: '鍵是固定集合時用字面聯合：`Record<"a" | "b", V>`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`Partial<{ a: number; b: string }>` 是？', options: [
-        { text: '`{ a?: number; b?: string }`', correct: true, why: '所有屬性變可選。' },
-        { text: '`{ a: number }`', why: '那像是 Pick。' },
-        { text: '`{ a: number | undefined; b: string | undefined }` 而且必填', why: 'Partial 是加上 `?`。' },
-        { text: '`{}`', why: '屬性仍在，只是可選。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要確保每個 Status 都有對應的顏色，最適合的型別是？', options: [
-        { text: '`Record<Status, string>`', correct: true, why: '缺少任何一個狀態都會報錯。' },
-        { text: '`Record<string, string>`', why: '不會檢查缺少哪個狀態。' },
-        { text: '`Partial<Record<Status, string>>`', why: '全部變可選，就不會檢查缺漏了。' },
-        { text: '`string[]`', why: '無法對應狀態。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你用一個函式 `buildConfig()` 產生設定物件，想讓其他地方使用它的型別，但不想手寫一份 interface。怎麼做？'], answer: [
-        '`type Config = ReturnType<typeof buildConfig>;`：從函式回傳值推出型別。如果函式是 async，用 `Awaited<ReturnType<typeof buildConfig>>`。',
-        '好處是單一來源；缺點是型別由實作決定，實作改壞時型別跟著變。公開 API 仍建議明確定義介面。',
-      ] },
     ],
     keypoints: [
       '從核心型別用 Partial、Pick、Omit、Record 衍生，避免重複定義。',
@@ -3071,17 +2794,9 @@ defineLessons({
       '用 satisfies 檢查物件又不失去推斷',
       '分辨型別註記、as、satisfies 三者',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-3）`Record<Status, string>` 少寫一個狀態時會？', options: [
-        { text: '編譯錯誤：缺少屬性', correct: true, why: '每個鍵都必須有值。' },
-        { text: '自動補上空字串', why: '不會自動補值。' },
-        { text: '沒有錯誤', why: 'Record 會檢查。' },
-        { text: '執行時錯誤', why: '是編譯時。' },
-      ] },
-    ],
     analogy: {
       text: ['型別註記像穿上制服：所有人看起來都一樣（型別變成註記的那個），個人特色不見了。satisfies 像門口的服裝檢查：確認你符合規定就放行，但你還是穿著自己的衣服（保留精確型別）。as 像對保全說「我是員工」，他就不檢查了。'],
-      limit: ['服裝檢查只看規定的部分；satisfies 不會限制「多出來」的屬性（直接寫字面值時仍會做多餘屬性檢查）。'],
+      limit: ['服裝檢查員看不到你包包裡的東西；satisfies 也只在編譯時檢查程式碼裡寫死的值，從檔案或 API 讀進來的設定一樣要在執行時驗證（6-2）。'],
     },
     model: {
       svg: Fig.row('三種寫法的比較：型別註記 const c: Config 會檢查，但變數型別變成 Config、失去精確性；as Config 不檢查、直接相信；satisfies Config 會檢查，而且保留推斷出的精確型別', [
@@ -3116,29 +2831,28 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const a = ["red", "green"];\nconst b = ["red", "green"] as const;\n\ntype A = (typeof a)[number];\ntype B = (typeof b)[number];\n// A 和 B 分別是？',
-          predict: { q: 'B 是？', options: ['"red" | "green"', 'string', 'readonly string[]'], answer: 0 },
           output: 'type A = string\ntype B = "red" | "green"',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'sat', label: 'satisfies' }, { id: 'const', label: 'as const' }, { id: 'ann', label: '型別註記' }],
-          items: [
-            { text: '設定檔物件：要檢查格式，又要保留每個鍵的精確型別', answer: 'sat', why: '檢查 + 保留推斷。' },
-            { text: '從陣列 ["S", "M", "L"] 產生聯合型別', answer: 'const', why: '保留字面型別。' },
-            { text: '函式參數 `user: User`', answer: 'ann', why: '參數只能用註記。' },
-            { text: '變數之後會被重新指定成其他 User', answer: 'ann', why: '需要的就是寬一點的 User 型別。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['設定檔物件：要檢查格式，又要保留每個鍵的精確型別', 'satisfies', '檢查 + 保留推斷。'],
+          ['從陣列 ["S", "M", "L"] 產生聯合型別', 'as const', '保留字面型別。'],
+          ['函式參數 `user: User`', '型別註記', '參數只能用註記。'],
+          ['變數之後會被重新指定成其他 User', '型別註記', '需要的就是寬一點的 User 型別。']
+        ] },
         { type: 'svg', svg: Fig.stack('從常數陣列產生型別的步驟：寫常數陣列並加上 as const；用 typeof 取得陣列的型別；用 [number] 取出元素型別，得到字面聯合；執行時也能用這個陣列做下拉選單', [
           { title: '1. const SIZES = ["S", "M", "L"] as const', tone: 1 },
           { title: '2. typeof SIZES → readonly ["S", "M", "L"]', tone: 3 },
           { title: '3. (typeof SIZES)[number] → "S" | "M" | "L"', tone: 4 },
         ]), caption: '值與型別只寫一次：執行時用陣列，編譯時用聯合型別。' },
+        { type: 'heading', id: 'deep-satisfies-edges', text: '深入：satisfies 的細節與不該用的時候' },
+        'satisfies 也會做多餘屬性檢查，所以設定物件打錯鍵名一樣會被抓到。它會把目標型別當成「上下文」，所以 `theme.primary` 能保留 `"#0071e3"` 這種字面型別；加上 `as const satisfies Theme` 則連屬性都變唯讀。',
+        { type: 'table', head: ['需求', '用', '原因'], rows: [
+          ['變數之後會重新指定成其他值', '型別註記', 'satisfies 推出的型別太窄，重新指定時會報錯'],
+          ['函式庫匯出的公開常數', '型別註記', '.d.ts 裡的型別穩定，不會隨實作細節改變'],
+          ['設定檔、對照表、路由表', 'satisfies', '檢查 + 保留精確鍵名'],
+          ['已經驗證過、但 TS 推不出來的值', 'as（附註解）', '唯一不做檢查的選項'],
+        ] },
       ],
-      tryit: {
-        q: ['讓 config 被檢查符合 Config，同時 `config.port` 的型別保持 8080（字面型別）：'],
-        draft: 'type Config = { port: number; host: string };\nconst config = { port: 8080, host: "localhost" } ____ ____ Config;',
-        answer: ['`as const satisfies Config`。', 'as const 讓 port 保留 8080 字面型別並唯讀；satisfies 檢查結構符合 Config。順序是先 as const 再 satisfies。'],
-      },
     },
     mistakes: [
       { wrong: '用 `as Config` 代替 satisfies。', why: 'as 不檢查，少了屬性也不報錯。', right: '`satisfies Config`。' },
@@ -3146,19 +2860,7 @@ defineLessons({
       { wrong: '`as const` 之後想 push。', why: '已經是 readonly tuple。', right: '需要修改就複製一份 `[...SIZES]`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一個「不會」檢查值是否符合型別？', options: [
-        { text: '`value as Config`', correct: true, why: 'as 是斷言，不檢查。' },
-        { text: '`const c: Config = value`', why: '註記會檢查。' },
-        { text: '`value satisfies Config`', why: 'satisfies 會檢查。' },
-        { text: '把 value 傳給參數型別是 Config 的函式', why: '傳參數時會檢查。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`const c = { mode: "dark" } satisfies { mode: string }`，c.mode 的型別是？', options: [
-        { text: '`string`', correct: true, why: '物件屬性預設會放寬；要保留 "dark" 需加 as const。' },
-        { text: '`"dark"`', why: '沒有 as const 時屬性會被放寬成 string。' },
-        { text: '`{ mode: string }`', why: '那是整個物件的型別。' },
-        { text: '`any`', why: '有推斷。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['Vite、ESLint 等工具的設定檔常寫成 `export default { … } satisfies UserConfig`。和 `defineConfig({ … })` 相比，satisfies 的好處是什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['Vite、ESLint 等工具的設定檔常寫成 `export default { … } satisfies UserConfig`。和 `defineConfig({ … })` 相比，satisfies 的好處是什麼？'], answer: [
         '兩者都能檢查設定格式並提供自動完成。defineConfig 是工具提供的函式（執行時也會被呼叫）；satisfies 純粹是型別層面的檢查，不需要額外函式。',
         'satisfies 還保留設定物件的精確型別，其他檔案 import 這份設定時能拿到實際的值型別，而不是寬鬆的 UserConfig。',
       ] },
@@ -3196,14 +2898,6 @@ defineLessons({
       '用 typeof 從值取得型別',
       '用索引存取取出巢狀與陣列元素的型別',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-4）`(typeof SIZES)[number]` 的作用是？', options: [
-        { text: '取出陣列元素的型別', correct: true, why: '搭配 as const 得到字面聯合。' },
-        { text: '取出陣列長度', why: '那是 `["length"]`。' },
-        { text: '取得第一個元素的值', why: '這是型別運算，不是取值。' },
-        { text: '把陣列轉成 number', why: '不是轉換。' },
-      ] },
-    ],
     analogy: {
       text: ['值空間與型別空間像建築物與藍圖：建築物（值）是真的蓋起來、住得進去的；藍圖（型別）只在設計階段存在。typeof 像對著蓋好的房子反推出一份藍圖。'],
       limit: ['反推的藍圖只記得「蓋好時的樣子」；如果值是 let 而且之後會變，typeof 取到的是宣告時推斷出的型別，不是某個時刻的實際內容。'],
@@ -3237,30 +2931,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const api = {\n  users: { list: "/users", detail: "/users/:id" },\n  posts: { list: "/posts" },\n} as const;\n\ntype Api = typeof api;\ntype UserPaths = Api["users"][keyof Api["users"]];',
-          predict: { q: 'UserPaths 是？', options: ['"/users" | "/users/:id"', 'string', '"list" | "detail"'], answer: 0 },
           output: 'type UserPaths = "/users" | "/users/:id"',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'value', label: '只在值空間' }, { id: 'type', label: '只在型別空間' }, { id: 'both', label: '兩邊都有' }],
-          items: [
-            { text: '`interface User {}`', answer: 'type', why: '執行時不存在。' },
-            { text: '`const config = {}`', answer: 'value', why: '要用 typeof 才能當型別。' },
-            { text: '`class Account {}`', answer: 'both', why: '值是建構子，型別是實例的形狀。' },
-            { text: '`type Id = string`', answer: 'type', why: '純型別。' },
-            { text: '`function load() {}`', answer: 'value', why: '要 typeof 才能當型別。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`interface User {}`', '只在型別空間', '執行時不存在。'],
+          ['`const config = {}`', '只在值空間', '要用 typeof 才能當型別。'],
+          ['`class Account {}`', '兩邊都有', '值是建構子，型別是實例的形狀。'],
+          ['`type Id = string`', '只在型別空間', '純型別。'],
+          ['`function load() {}`', '只在值空間', '要 typeof 才能當型別。']
+        ] },
         { type: 'svg', svg: Fig.stack('深層型別的取法：typeof api 取得整體型別；["users"] 取屬性；[keyof …] 取所有值的聯合；陣列用 [number] 取元素', [
           { title: 'typeof api', tone: 1 },
           { title: '…["users"]', tone: 3 },
           { title: '…[keyof Api["users"]] → 所有值的聯合', tone: 4 },
         ]), caption: '`T[keyof T]` 是「T 所有屬性值型別的聯合」。' },
+        { type: 'heading', id: 'deep-companion', text: '深入：同名的值與型別' },
+        '值與型別在不同空間，所以同一個名字可以同時是 const 與 type。0-2 的 `const Color = {...} as const; type Color = ...` 就是這個模式：用 Color.Red 時是值，寫 `c: Color` 時是型別，效果接近 enum，但只靠擦除就能執行。',
+        { type: 'table', head: ['寫法', '得到什麼'], rows: [
+          ['`typeof SomeClass`', '建構子本身的型別（含靜態成員）'],
+          ['`SomeClass`（當型別用）', '實例的型別'],
+          ['`InstanceType<typeof SomeClass>`', '從建構子型別反推實例型別'],
+          ['`keyof typeof obj`', '常數物件的鍵名聯合'],
+        ] },
+        '限制：typeof 取到的是宣告時推斷出的型別。let 變數之後被指定成更窄的值，typeof 不會跟著變。',
       ],
-      tryit: {
-        q: ['從這個常數陣列取出單一商品的型別：'],
-        draft: 'const products = [\n  { id: 1, title: "書", price: 300 },\n  { id: 2, title: "筆", price: 30 },\n];\ntype Product = (____ products)[____];',
-        answer: ['`(typeof products)[number]` → `{ id: number; title: string; price: number }`。', '常用在測試資料、mock 資料：先寫資料，再推出型別。'],
-      },
     },
     mistakes: [
       { wrong: '把 interface 當值用：`console.log(User)`。', why: 'TS2693：只是型別，執行時不存在。', right: '要執行時存在的東西用 class 或 const。' },
@@ -3268,19 +2962,7 @@ defineLessons({
       { wrong: '對函式呼叫結果用 typeof：`typeof load()`。', why: 'typeof 只能接識別字或屬性存取。', right: '`ReturnType<typeof load>`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`type T = typeof x` 中的 typeof 是？', options: [
-        { text: '型別運算子，取 x 的型別', correct: true, why: '在型別位置。' },
-        { text: 'JavaScript 執行時的 typeof，回傳字串', why: '那是在運算式位置。' },
-        { text: '語法錯誤', why: '合法。' },
-        { text: '取 x 的值', why: '型別位置不會取值。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`type E = string[][number]` 是？', options: [
-        { text: '`string`', correct: true, why: '陣列元素型別。' },
-        { text: '`number`', why: 'number 是索引的型別。' },
-        { text: '`string[]`', why: '已經取出元素。' },
-        { text: '錯誤', why: '合法。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 class 可以同時當型別和值，interface 只能當型別？這對「依賴注入要在執行時知道型別」有什麼影響？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 class 可以同時當型別和值，interface 只能當型別？這對「依賴注入要在執行時知道型別」有什麼影響？'], answer: [
         'class 會編譯成 JavaScript 的建構子（值），同時宣告實例的形狀（型別）；interface 編譯後完全消失。',
         '所以需要在執行時辨識型別的機制（例如 Angular、NestJS 的 DI 依建構子參數型別注入）只能依賴 class 或額外的 token，不能只靠 interface。',
       ] },
@@ -3298,14 +2980,6 @@ defineLessons({
       '讀懂並寫出簡單的映射型別',
       '用 +／- 修飾詞加上或移除 readonly 與 ?',
       '用 as 重新命名或篩選鍵',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-1）`T[keyof T]` 代表？', options: [
-        { text: 'T 所有屬性值型別的聯合', correct: true, why: '用所有鍵去索引。' },
-        { text: 'T 的所有鍵', why: '那是 keyof T。' },
-        { text: 'T 本身', why: '不是。' },
-        { text: 'T 的第一個屬性', why: '物件沒有順序概念。' },
-      ] },
     ],
     analogy: {
       text: ['映射型別像郵件合併：有一份收件人名單（鍵的聯合），一份信件範本（每個屬性要變成什麼），一鍵就產生每個人的信。Partial、Readonly 都是用這個機制寫的。'],
@@ -3344,28 +3018,27 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Flags<T> = { [K in keyof T]: boolean };\ntype Settings = { darkMode: string; fontSize: number };\ntype SettingFlags = Flags<Settings>;',
-          predict: { q: 'SettingFlags 是？', options: ['{ darkMode: boolean; fontSize: boolean }', '{ darkMode: string; fontSize: number }', 'boolean'], answer: 0 },
           output: 'type SettingFlags = {\n    darkMode: boolean;\n    fontSize: boolean;\n}',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'partial', label: 'Partial 的寫法' }, { id: 'required', label: 'Required 的寫法' }, { id: 'readonly', label: 'Readonly 的寫法' }],
-          items: [
-            { text: '`{ [K in keyof T]?: T[K] }`', answer: 'partial', why: '加上 ?。' },
-            { text: '`{ [K in keyof T]-?: T[K] }`', answer: 'required', why: '移除 ?。' },
-            { text: '`{ readonly [K in keyof T]: T[K] }`', answer: 'readonly', why: '加上 readonly。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`{ [K in keyof T]?: T[K] }`', 'Partial 的寫法', '加上 ?。'],
+          ['`{ [K in keyof T]-?: T[K] }`', 'Required 的寫法', '移除 ?。'],
+          ['`{ readonly [K in keyof T]: T[K] }`', 'Readonly 的寫法', '加上 readonly。']
+        ] },
         { type: 'svg', svg: Fig.row('Getters 映射的過程：User 的鍵 name 與 age；用 as 把鍵改成 getName 與 getAge；值型別改成回傳原屬性型別的函式', [
           { title: '原本的鍵', lines: ['name、age'], tone: 1 },
           { title: 'as 重新命名', lines: ['getName', 'getAge'], tone: 3 },
           { title: '新的值型別', lines: ['`() => string`', '`() => number`'], tone: 4 },
         ]), caption: '鍵重新對應常搭配樣板字面型別（4-4）。' },
+        { type: 'heading', id: 'deep-homomorphic', text: '深入：同態映射會保留修飾詞' },
+        '寫成 `[K in keyof T]` 的映射叫同態映射，它會保留原本的 ? 與 readonly，所以 `Nullable<{ a?: string }>` 的 a 仍是可選。改成 `[K in "a" | "b"]` 這種直接列鍵的寫法時，修飾詞不會被帶過來。',
+        '同態映射作用在陣列或 tuple 上時，結果仍是陣列或 tuple：`Nullable<[number, string]>` 是 `[number | null, string | null]`，而不是一個有 length、push 等鍵的物件。',
+        { type: 'table', head: ['寫法', '保留 ?／readonly', '陣列輸入'], rows: [
+          ['`{ [K in keyof T]: ... }`', '保留', '輸出陣列或 tuple'],
+          ['`{ [K in Keys]: ... }`', '不保留', '不特別處理'],
+          ['`{ [K in keyof T as ...]: ... }`', '保留', '加了 as 後會當成一般物件處理'],
+        ] },
       ],
-      tryit: {
-        q: ['寫一個 `Optional<T, K>`：只把指定的鍵變成可選，其他不變（提示：組合 Omit、Pick、Partial）：'],
-        draft: 'type Optional<T, K extends keyof T> = ____<T, K> & Partial<____<T, K>>;',
-        answer: ['`Omit<T, K> & Partial<Pick<T, K>>`。', '常用在「建立時 id 可以不給」：`Optional<User, "id">`。'],
-      },
     },
     mistakes: [
       { wrong: '為了炫技寫三層巢狀的映射加條件型別。', why: '錯誤訊息難讀，維護困難。', right: '先用內建工具型別組合；真的需要才寫，並加上註解與範例。' },
@@ -3373,19 +3046,7 @@ defineLessons({
       { wrong: '以為映射型別會影響執行時的物件。', why: '純型別運算。', right: '執行時的轉換要自己寫函式（例如 Object.fromEntries）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`{ [K in "a" | "b"]: number }` 是？', options: [
-        { text: '`{ a: number; b: number }`', correct: true, why: '走過聯合中每個鍵。' },
-        { text: '`number[]`', why: '產生的是物件型別。' },
-        { text: '`{ K: number }`，K 是固定的屬性名稱', why: 'K 會被每個鍵取代。' },
-        { text: '`"a" | "b"`', why: '那是鍵本身。' },
-      ] },
-      { level: '應用', type: 'mc', q: '映射型別中 `as never` 的效果是？', options: [
-        { text: '移除該屬性', correct: true, why: '鍵是 never 時不會出現在結果中。' },
-        { text: '屬性型別變成 never', why: '那是改值型別，不是 as 子句。' },
-        { text: '變成可選', why: '可選要用 ?。' },
-        { text: '語法錯誤', why: '合法用法。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['ORM 或 API 用戶端常有「從資料表定義自動產生查詢條件型別」的功能（每個欄位都可以傳 equals、in、gt 等）。這背後大概用了什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['ORM 或 API 用戶端常有「從資料表定義自動產生查詢條件型別」的功能（每個欄位都可以傳 equals、in、gt 等）。這背後大概用了什麼？'], answer: [
         '映射型別走過每個欄位：`{ [K in keyof Row]?: Filter<Row[K]> }`，再用條件型別依欄位型別決定可用的運算子（數字有 gt、字串有 contains）。',
         '這讓你寫查詢時打錯欄位名或用錯運算子都會在編譯時報錯。',
       ] },
@@ -3403,14 +3064,6 @@ defineLessons({
       '讀懂條件型別 `T extends U ? X : Y`',
       '用 infer 抓出部分型別',
       '理解聯合型別的分配行為',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-2）`{ [K in keyof T]-?: T[K] }` 是哪個工具型別的寫法？', options: [
-        { text: 'Required', correct: true, why: '移除所有 ?。' },
-        { text: 'Partial', why: 'Partial 是加上 ?。' },
-        { text: 'Readonly', why: '和 readonly 無關。' },
-        { text: 'Pick', why: 'Pick 會篩選鍵。' },
-      ] },
     ],
     analogy: {
       text: ['條件型別像郵局的分揀規則：「如果包裹是易碎品，走 A 線；否則走 B 線」。infer 像拆開外箱看裡面是什麼：「如果是一個裝著某樣東西的盒子，把那樣東西拿出來」。'],
@@ -3448,60 +3101,42 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type IsString<T> = T extends string ? "是" : "否";\n\ntype A = IsString<"hi">;\ntype B = IsString<number>;\ntype C = IsString<string | number>;',
-          predict: { q: 'C 是？', options: ['"是" | "否"', '"否"', '"是"'], answer: 0 },
           output: 'type A = "是"\ntype B = "否"\ntype C = "是" | "否"\n（聯合被分配：string → "是"、number → "否"）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'cond', label: '條件型別' }, { id: 'mapped', label: '映射型別' }],
-          items: [
-            { text: 'ReturnType<F>', answer: 'cond', why: '用 infer 抓出回傳型別。' },
-            { text: 'Partial<T>', answer: 'mapped', why: '走過每個鍵加上 ?。' },
-            { text: 'Exclude<T, U>', answer: 'cond', why: '分配到每個成員，符合 U 就變成 never。' },
-            { text: 'Record<K, V>', answer: 'mapped', why: '走過 K 產生屬性。' },
-            { text: 'Awaited<T>', answer: 'cond', why: '判斷是不是 Promise 並拆開。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['ReturnType<F>', '條件型別', '用 infer 抓出回傳型別。'],
+          ['Partial<T>', '映射型別', '走過每個鍵加上 ?。'],
+          ['Exclude<T, U>', '條件型別', '分配到每個成員，符合 U 就變成 never。'],
+          ['Record<K, V>', '映射型別', '走過 K 產生屬性。'],
+          ['Awaited<T>', '條件型別', '判斷是不是 Promise 並拆開。']
+        ] },
         { type: 'svg', svg: Fig.row('Exclude<"a" | "b" | "c", "a"> 的分配計算：對 "a" 計算得到 never；對 "b" 得到 "b"；對 "c" 得到 "c"；合併後 never 消失，結果是 "b" | "c"', [
           { title: '"a"', lines: ['extends "a"', '→ never'], tone: 5 },
           { title: '"b"', lines: ['不符合', '→ "b"'], tone: 4 },
           { title: '"c"', lines: ['不符合', '→ "c"'], tone: 4 },
         ], { arrows: false, note: '合併：never | "b" | "c" = "b" | "c"' }), caption: 'never 在聯合中會消失，所以可以用來「刪掉」成員。' },
+        { type: 'heading', id: 'deep-conditional-edges', text: '深入：never 的分配、infer 約束與遞迴上限' },
+        '`NonNullable<T>` 從 TS 4.8 起實作為 `T & {}`：`{}` 不含 null 與 undefined，交集後自然刪掉它們。對 `string | null | undefined` 分配計算，結果只剩 string。',
+        '裸型別參數遇到 never 會「分配到零個成員」，結果直接是 never。所以判斷是不是 never 要寫 `[T] extends [never] ? true : false`。',
+        { type: 'table', head: ['技巧', '版本', '用途'], rows: [
+          ['`infer E extends string`', 'TS 4.7', '抓出來的同時加約束，例如只接受字串'],
+          ['尾端遞迴的條件型別', 'TS 4.5', '可以遞迴到約 1000 層'],
+          ['TS2589 instantiation excessively deep', '—', '型別遞迴太深，改寫或降低泛用程度'],
+        ] },
+        '時效提醒：7.1 Beta 的說明提到「分配式條件型別的檢查變得更嚴格」，升級到 7.1 時共用型別庫要重跑一次 tsc。',
       ],
-      tryit: {
-        q: ['用 infer 寫一個取出 tuple 第一個元素型別的 First<T>：'],
-        draft: 'type First<T> = T extends [____ F, ...unknown[]] ? ____ : never;\ntype X = First<[string, number]>;   // string',
-        answer: ['`T extends [infer F, ...unknown[]] ? F : never`。', '空 tuple `[]` 不符合模式，結果是 never。'],
-      },
     },
     mistakes: [
       { wrong: '在業務程式裡大量寫條件型別。', why: '大多數應用程式只需要使用內建工具型別。', right: '條件型別留給函式庫、共用型別；一般程式用 ReturnType、Awaited 等現成的。' },
       { wrong: '沒預期到分配，結果多出 boolean。', why: '裸型別參數遇到聯合會分配。', right: '要整體判斷時寫 `[T] extends [U]`。' },
       { wrong: '在 extends 左邊用 infer。', why: 'infer 只能出現在 extends 右邊的模式中。', right: '`T extends Array<infer E> ? E : never`。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`Exclude<"x" | "y", "x">` 是？', options: [
-        { text: '`"y"`', correct: true, why: '去掉可指定給 "x" 的成員。' },
-        { text: '`"x"`', why: '那是 Extract。' },
-        { text: '`"x" | "y"`', why: '有去掉 "x"。' },
-        { text: '`never`', why: '還剩 "y"。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`type T = ReturnType<() => Promise<number>>` 是？', options: [
-        { text: '`Promise<number>`', correct: true, why: 'ReturnType 不拆 Promise，要再包 Awaited。' },
-        { text: '`number`', why: '那是 Awaited<ReturnType<…>>。' },
-        { text: '`() => Promise<number>`', why: '已經取出回傳型別。' },
-        { text: '`void`', why: '有回傳 Promise。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 `NonNullable<string | null | undefined>` 能得到 string？用分配解釋。'], answer: [
-        'NonNullable<T> 等同 `T extends null | undefined ? never : T`（現在實作為 `T & {}`，效果相同）。對 string 計算得 string；對 null、undefined 計算得 never。',
-        '合併後 never 消失，只剩 string。這就是「用分配 + never 刪除聯合成員」的模式。',
-      ] },
-    ],
     keypoints: [
       '條件型別是型別層面的 if；infer 抓出模式中的一部分。',
       '作用在聯合上時會分配到每個成員，never 會被刪掉。',
       '日常多用內建的 ReturnType、Awaited、Exclude，不必自己寫。',
     ],
-    sources: ['ts-conditional', 'ts-utility'],
+    sources: ['ts-conditional', 'ts-utility', 'ts-47', 'ts-48', 'ts-71-beta'],
   },
 
   '4-4': {
@@ -3509,14 +3144,6 @@ defineLessons({
       '用樣板字面型別組合字串型別',
       '用 Uppercase、Capitalize 轉換字串型別',
       '用樣板字面型別約束事件名、CSS 值等格式',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-3）條件型別裡的 never 在聯合結果中會？', options: [
-        { text: '消失', correct: true, why: '`X | never` 就是 X。' },
-        { text: '讓整個結果變成 never', why: '只有交集時才會。' },
-        { text: '變成 undefined', why: '不會。' },
-        { text: '報錯', why: '合法。' },
-      ] },
     ],
     analogy: {
       text: ['樣板字面型別像印章組合：一顆印章刻「on」，另一組刻「Click、Hover、Focus」，蓋在一起就自動得到「onClick、onHover、onFocus」三種，不用一個個刻。'],
@@ -3555,30 +3182,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Method = "get" | "post";\ntype Entity = "user" | "order";\ntype Action = `${Uppercase<Method>} /${Entity}s`;\n// Action 有幾個成員？',
-          predict: { q: 'Action 有幾種字串？', options: ['4 種', '2 種', '1 種'], answer: 0 },
           output: 'type Action = "GET /users" | "GET /orders" | "POST /users" | "POST /orders"',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '符合 `${number}px`' }, { id: 'no', label: '不符合' }],
-          items: [
-            { text: '`"16px"`', answer: 'ok', why: '數字加 px。' },
-            { text: '`"1.5px"`', answer: 'ok', why: '小數也是 number。' },
-            { text: '`"16 px"`', answer: 'no', why: '多了空白。' },
-            { text: '`"px"`', answer: 'no', why: '沒有數字。' },
-            { text: '`"-4px"`', answer: 'ok', why: '負數也是 number。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`"16px"`', '符合 `${number}px`', '數字加 px。'],
+          ['`"1.5px"`', '符合 `${number}px`', '小數也是 number。'],
+          ['`"16PX"`', '不符合', '樣板比對分大小寫，PX 不是 px。'],
+          ['`"px"`', '不符合', '沒有數字。'],
+          ['`"-4px"`', '符合 `${number}px`', '負數也是 number。']
+        ] },
         { type: 'svg', svg: Fig.row('組合展開：Size 有 sm、md、lg 三種，Color 有 red、blue 兩種，btn-${Size}-${Color} 展開成 3 × 2 = 6 種 class 名稱', [
           { title: 'Size', lines: ['sm、md、lg', '3 種'], tone: 1 },
           { title: 'Color', lines: ['red、blue', '2 種'], tone: 3 },
           { title: 'ButtonClass', lines: ['3 × 2 = 6 種'], tone: 4 },
         ]), caption: '組合數相乘；超大的組合會拖慢型別檢查。' },
+        { type: 'heading', id: 'deep-template-infer', text: '深入：用 infer 解析字串與大小寫轉換的限制' },
+        '樣板字面型別也能搭配 infer「拆字串」：模式是「Head、一個點、Rest」時，遇到 "a.b.c" 會得到 Head = "a"、Rest = "b.c"。前面的 infer 取到第一個符合的分隔點為止，最後一個 infer 吃掉剩下全部，所以用遞迴就能拆完整條路徑。',
+        { type: 'code', lang: 'typescript', title: 'split.ts', code: 'type Split<S extends string> =\n  S extends `${infer Head}.${infer Rest}` ? [Head, ...Split<Rest>] : [S];\n\ntype P = Split<"user.address.city">;   // ["user", "address", "city"]' },
+        '`Capitalize` 等內建字串型別只對字面型別有效；傳入一般的 string 時結果仍是 `Capitalize<string>`，等於沒有約束。另外聯合成員上限約 10 萬個，大型組合會報「表示式產生的聯合型別過於複雜」。',
       ],
-      tryit: {
-        q: ['為 i18n 的翻譯鍵寫型別：格式是「頁面.欄位」，頁面有 home、cart，欄位有 title、desc：'],
-        draft: 'type Page = "home" | "cart";\ntype Field = "title" | "desc";\ntype I18nKey = `${____}.${____}`;\nconst k: I18nKey = "cart.title";',
-        answer: ['`` `${Page}.${Field}` `` → 4 種鍵。', '翻譯函式 `t(key: I18nKey)` 就能檢查鍵是否存在、並提供自動完成。'],
-      },
     },
     mistakes: [
       { wrong: '映射型別裡 `` `on${K}` `` 沒有 `& string`。', why: 'keyof 可能包含 symbol，不能放進樣板。', right: '`` `on${K & string}` ``。' },
@@ -3586,19 +3208,7 @@ defineLessons({
       { wrong: '以為 `${number}px` 會在執行時驗證輸入。', why: '純型別，只檢查程式碼中的字面值。', right: '使用者輸入仍要執行期驗證。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`` type T = `id-${1 | 2}` `` 是？', options: [
-        { text: '`"id-1" | "id-2"`', correct: true, why: '聯合展開。' },
-        { text: '`` `id-${number}` ``', why: '插入的是字面聯合，會展開成具體值。' },
-        { text: '`string`', why: '更精確。' },
-        { text: '錯誤：不能放數字', why: '數字字面型別可以。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`Capitalize<"hello world">` 是？', options: [
-        { text: '`"Hello world"`', correct: true, why: '只把第一個字母大寫。' },
-        { text: '`"Hello World"`', why: '不會把每個單字都大寫。' },
-        { text: '`"HELLO WORLD"`', why: '那是 Uppercase。' },
-        { text: '`string`', why: '作用在字面型別上會得到字面型別。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['路由函式庫能讓 `navigate("/users/:id", { id: 5 })` 的參數型別自動從路徑字串推出 `{ id: … }`。這是怎麼做到的？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['路由函式庫能讓 `navigate("/users/:id", { id: 5 })` 的參數型別自動從路徑字串推出 `{ id: … }`。這是怎麼做到的？'], answer: [
         '用條件型別加 infer 解析樣板字面型別：`` T extends `${string}:${infer P}/${infer Rest}` ? P | Params<`/${Rest}`> : … ``，遞迴抓出所有冒號開頭的片段。',
         '再用映射型別把這些片段變成 `{ [K in P]: string | number }`。這是 4-2、4-3、4-4 三種工具的組合。',
       ] },
@@ -3630,6 +3240,7 @@ defineTerms({
   '宣告檔': { en: 'declaration file (.d.ts)', def: '只有型別、沒有實作的檔案，描述 JavaScript 程式庫的型別。', example: '`index.d.ts`' },
   '@types': { en: 'DefinitelyTyped', def: '社群維護的型別套件，給本身沒附型別的 JavaScript 套件使用。', example: '`npm i -D @types/node`' },
   'declare': { en: 'declare', def: '告訴 TypeScript「這個東西在執行時存在，這是它的型別」，不產生任何程式碼。', example: '`declare const __APP_VERSION__: string;`' },
+  '品牌型別': { en: 'branded type', def: '在原始型別上交集一個只存在於型別層面的標記屬性，讓結構相同的兩種值不能混用。', example: '`type UserId = string & { readonly __brand: "UserId" }`' },
 });
 
 defineLessons({
@@ -3638,14 +3249,6 @@ defineLessons({
       '為 class 的屬性與方法加上型別',
       '分辨 TypeScript 的 private 與 JavaScript 的 #私有',
       '用 readonly 屬性保護不該改的資料',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-1）class 和 interface 在型別空間與值空間的差別？', options: [
-        { text: 'class 兩邊都有，interface 只在型別空間', correct: true, why: 'class 會編譯成建構子。' },
-        { text: '兩者都只在型別空間，編譯後都會被擦除', why: 'class 執行時存在。' },
-        { text: '兩者都在值空間', why: 'interface 執行時不存在。' },
-        { text: 'interface 兩邊都有', why: '剛好相反。' },
-      ] },
     ],
     analogy: {
       text: ['TypeScript 的 private 像門上貼「員工專用」：守規矩的人（檢查器）不會進去，但門其實沒鎖。JavaScript 的 #私有 是真的上鎖，執行時誰都打不開。'],
@@ -3680,61 +3283,43 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'class Box {\n  private secret = "TS 私有";\n  #real = "JS 私有";\n}\nconst b = new Box();\nconsole.log((b as any).secret);\nconsole.log(Object.keys(b));',
-          predict: { q: '`(b as any).secret` 執行時印出什麼？', options: ['TS 私有', 'undefined', '執行時錯誤'], answer: 0 },
           output: "TS 私有\n[ 'secret' ]\n（#real 不會出現在 Object.keys 裡）",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ts', label: '只在檢查時有效' }, { id: 'js', label: '執行時也有效' }],
-          items: [
-            { text: '`private`', answer: 'ts', why: 'TypeScript 的修飾詞。' },
-            { text: '`#field`', answer: 'js', why: 'JavaScript 原生私有欄位。' },
-            { text: '`readonly`', answer: 'ts', why: '執行時仍可修改。' },
-            { text: '`Object.freeze(this)`', answer: 'js', why: '執行時凍結物件。' },
-            { text: '`protected`', answer: 'ts', why: 'TypeScript 的修飾詞。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`private`', '只在檢查時有效', 'TypeScript 的修飾詞。'],
+          ['`#field`', '執行時也有效', 'JavaScript 原生私有欄位。'],
+          ['`readonly`', '只在檢查時有效', '執行時仍可修改。'],
+          ['`Object.freeze(this)`', '執行時也有效', '執行時凍結物件。'],
+          ['`protected`', '只在檢查時有效', 'TypeScript 的修飾詞。']
+        ] },
         { type: 'svg', svg: Fig.row('類別成員的型別寫法：屬性用名稱加型別或初始值；建構子設定初始狀態；方法寫參數與回傳型別；getter 提供唯讀存取', [
           { title: '屬性', lines: ['`id: string`', '`#balance = 0`'], tone: 1 },
           { title: '建構子', lines: ['設定初始值'], tone: 3 },
           { title: '方法', lines: ['參數與回傳型別'], tone: 4 },
           { title: 'getter', lines: ['唯讀存取'], tone: 2 },
         ], { arrows: false }), caption: 'strict 下屬性必須在建構子裡指定，否則 TS2564。' },
+        { type: 'heading', id: 'deep-class-fields', text: '深入：類別欄位的語意與 # 的代價' },
+        'target 是 ES2022 以上時，useDefineForClassFields 預設開啟，類別欄位用標準的「定義」語意。子類別宣告同名欄位會蓋掉父類別的 getter／setter；只想加型別、不想產生欄位時寫 `declare name: string`。',
+        { type: 'table', head: ['', 'private', '#私有欄位'], rows: [
+          ['執行時保護', '沒有', '有'],
+          ['子類別可用', 'protected 才行', '不行'],
+          ['經過 Proxy 存取', '正常', '方法裡讀 this.#x 會拋 TypeError'],
+          ['檢查物件有沒有', '—', '`#x in obj`（TS 4.5 起）'],
+        ] },
+        'Proxy 那一列是 # 的實際代價：Vue 的 reactive、部分 mock 工具會用 Proxy 包物件，類別裡用了 # 就可能出錯。這種情況改用 private 或不要把類別實例交給 Proxy。',
       ],
-      tryit: {
-        q: ['補完：計數器的 count 對外唯讀、只能透過 increment 增加：'],
-        draft: 'class Counter {\n  ____count = 0;\n  increment() { this.#count++; }\n  ____ count() { return this.#count; }\n}',
-        answer: ['`#count = 0`、`get count()`。', '外部只能讀 `c.count`，不能指定；`c.count = 5` 會報錯（沒有 setter）。'],
-      },
     },
     mistakes: [
       { wrong: '以為 private 在執行時也保護資料。', why: '編譯後消失，`(obj as any).x` 照樣讀得到。', right: '真正需要私有時用 #。' },
       { wrong: '屬性宣告了型別卻沒在建構子指定。', why: 'strict 下 TS2564：屬性沒有初始值。', right: '給初始值、在建構子指定，或確實知道時用 `!:`（少用）。' },
       { wrong: '直接執行 .ts 時用參數屬性。', why: 'Node 不支援需要轉換的語法。', right: '明確宣告屬性並在建構子指定。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '哪一個在執行時真的無法從類別外部存取？', options: [
-        { text: '`#secret`', correct: true, why: 'JavaScript 原生私有。' },
-        { text: '`private secret`', why: '只在檢查時。' },
-        { text: '`protected secret`', why: '只在檢查時。' },
-        { text: '`readonly secret`', why: '可以讀，只是檢查時不能寫。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'strict 下 `class A { name: string; }` 沒有建構子，會？', options: [
-        { text: 'TS2564：屬性沒有初始值', correct: true, why: 'strictPropertyInitialization。' },
-        { text: '通過，name 是 undefined', why: 'strict 會檢查。' },
-        { text: 'name 自動是空字串', why: '不會自動給值。' },
-        { text: '執行時錯誤', why: '是編譯時錯誤。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你在寫一個開源函式庫，裡面的快取資料絕對不能被使用者改。用 private 還是 #？為什麼？'], answer: [
-        '用 #。函式庫的使用者可能用 JavaScript，或用 `as any` 繞過型別檢查；private 擋不住這些情況。',
-        '# 欄位在執行時就無法從外部存取，也不會出現在 Object.keys、JSON.stringify 的結果中，是真正的封裝。',
-      ] },
-    ],
     keypoints: [
       'class 屬性要有型別或初始值，strict 下要在建構子指定。',
       'private 只在檢查時有效，# 在執行時也私有。',
       '直接執行 .ts 時避開參數屬性。',
     ],
-    sources: ['ts-classes', 'node-ts'],
+    sources: ['ts-classes', 'node-ts', 'mdn-private'],
   },
 
   '5-2': {
@@ -3742,14 +3327,6 @@ defineLessons({
       '用 implements 讓類別符合介面',
       '用抽象類別共用實作',
       '理解結構型別：不寫 implements 也能相容',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-1）`private` 與 `#` 哪個適合函式庫的內部資料？', options: [
-        { text: '`#`，執行時也無法從外部存取', correct: true, why: '真正的封裝。' },
-        { text: '`private`，比較快', why: '速度不是重點。' },
-        { text: '兩者完全一樣', why: '執行時行為不同。' },
-        { text: '都不用，寫在註解就好', why: '沒有任何保護。' },
-      ] },
     ],
     analogy: {
       text: ['結構型別像應徵工作只看技能：會開堆高機、有證照，就能做這份工作，不管你畢業於哪間學校。implements 像履歷上主動寫「我符合這個職缺的要求」，讓面試官（檢查器）先對照一次。'],
@@ -3787,25 +3364,20 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Point2D = { x: number; y: number };\ntype Vector = { x: number; y: number };\n\nfunction len(p: Point2D) { return Math.hypot(p.x, p.y); }\n\nconst v: Vector = { x: 3, y: 4 };\nconsole.log(len(v));',
-          predict: { q: '把 Vector 傳給要 Point2D 的函式會？', options: ['通過，印出 5', '型別錯誤：名稱不同', '印出 NaN'], answer: 0 },
           output: '5',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'iface', label: 'interface + implements' }, { id: 'abs', label: '抽象類別' }],
-          items: [
-            { text: '各種報表共用頁首頁尾，只有內容不同', answer: 'abs', why: '需要共用實作。' },
-            { text: '寄信、簡訊、推播都要有 send', answer: 'iface', why: '只約定能力，實作完全不同。' },
-            { text: '一個類別同時要「可比較」又「可序列化」', answer: 'iface', why: '可以 implements 多個介面，只能 extends 一個類別。' },
-            { text: '所有資料表存取類別共用連線與重試邏輯', answer: 'abs', why: '共用狀態與實作。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['各種報表共用頁首頁尾，只有內容不同', '抽象類別', '需要共用實作。'],
+          ['寄信、簡訊、推播都要有 send', 'interface + implements', '只約定能力，實作完全不同。'],
+          ['一個類別同時要「可比較」又「可序列化」', 'interface + implements', '可以 implements 多個介面，只能 extends 一個類別。'],
+          ['所有資料表存取類別共用連線與重試邏輯', '抽象類別', '共用狀態與實作。']
+        ] },
         { type: 'svg', svg: Fig.vs('結構型別與名義型別：TypeScript 依形狀判斷，名稱不同但結構相同就相容；C# 與 Java 依宣告的名稱判斷，必須明確實作介面才相容', { title: 'TypeScript（結構）', lines: ['形狀相同就相容', '不必宣告'], tone: 4 }, { title: 'C#、Java（名義）', lines: ['名稱必須相符', '要明確實作'], tone: 3 }), caption: '需要「同形狀但不能混用」（例如 UserId 和 OrderId）時，要用品牌型別等技巧。' },
+        { type: 'heading', id: 'deep-nominal', text: '深入：在結構型別裡做出名義型別' },
+        '[[品牌型別]]是最常見的做法：建立時經過一個驗證函式，回傳 `id as UserId`，之後 UserId 和 OrderId 就不能混用。品牌只存在型別層面，執行時仍是一般字串，沒有額外成本。',
+        { type: 'code', lang: 'typescript', title: 'brand.ts', code: 'type UserId = string & { readonly __brand: "UserId" };\ntype OrderId = string & { readonly __brand: "OrderId" };\n\nfunction toUserId(raw: string): UserId {\n  if (!/^u_\\w+$/.test(raw)) throw new Error(`不是使用者 id：${raw}`);\n  return raw as UserId;\n}\n\nfunction loadOrder(id: OrderId) { /* … */ }\n// loadOrder(toUserId("u_1"));   // TS2345' },
+        '類別有 private 或 protected 成員時，相容性會變成名義的：兩個類別即使形狀相同，只要私有成員不是來自同一個宣告，就不能互相指定。想讓類別「只能是它自己」時，這是不用品牌的另一個辦法。',
       ],
-      tryit: {
-        q: ['讓 Circle 符合 Shape 介面，並在定義時就被檢查：'],
-        draft: 'interface Shape { area(): number }\nclass Circle ____ Shape {\n  constructor(r: number) { this.r = r; }\n  r: number;\n  ____(): number { return Math.PI * this.r ** 2; }\n}',
-        answer: ['`implements Shape`、`area()`。', '如果方法名稱打錯（例如 aera），有 implements 時錯誤出現在 Circle 定義處；沒有時要等到傳給 Shape 參數那一刻才報錯。'],
-      },
     },
     mistakes: [
       { wrong: '以為 implements 會繼承介面的實作。', why: '介面沒有實作；implements 只檢查。', right: '要共用實作用 extends 抽象類別或組合。' },
@@ -3813,19 +3385,7 @@ defineLessons({
       { wrong: '兩種 id 都是 string，傳錯了也沒報錯。', why: '結構相同就相容。', right: '用品牌型別：`type UserId = string & { readonly __brand: "UserId" }`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'TypeScript 判斷兩個型別是否相容，主要看？', options: [
-        { text: '結構（屬性與型別）', correct: true, why: '結構型別。' },
-        { text: '型別名稱', why: '那是名義型別。' },
-        { text: '有沒有寫 implements', why: '不是必要條件。' },
-        { text: '宣告在哪個檔案', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`abstract class A { abstract f(): void }`，`new A()` 會？', options: [
-        { text: 'TS2511：不能建立抽象類別的實例', correct: true, why: '抽象類別不能 new。' },
-        { text: '建立成功，只是呼叫 f 時才會出錯', why: '會報錯。' },
-        { text: '執行時錯誤', why: '是編譯時錯誤（執行時其實能 new）。' },
-        { text: 'f 自動變成空函式', why: '不會。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['C# 課程 3-4 說「依賴介面才能在測試時替換」。在 TypeScript 裡這件事變得更簡單還是更難？為什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['C# 課程 3-4 說「依賴介面才能在測試時替換」。在 TypeScript 裡這件事變得更簡單還是更難？為什麼？'], answer: [
         '更簡單。結構型別讓你不需要宣告新類別，直接傳一個形狀相同的物件字面值當替身；甚至不需要事先定義 interface，用 `Pick<RealService, "send">` 描述需要的部分即可。',
         '代價是保護較弱：形狀剛好相同但語意不同的物件也會被接受，所以關鍵的 id 類型可以用品牌型別區分。',
       ] },
@@ -3843,14 +3403,6 @@ defineLessons({
       '用 ES 模組的 import／export 組織程式',
       '用 import type 匯入只在型別用到的東西',
       '知道 verbatimModuleSyntax 解決的問題',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-2）interface 能用 instanceof 檢查嗎？', options: [
-        { text: '不能，介面在執行時不存在', correct: true, why: '型別會被擦除。' },
-        { text: '可以', why: 'instanceof 需要執行時的建構子。' },
-        { text: '要加 implements 才能', why: '仍然不行。' },
-        { text: '只有 abstract 介面可以', why: '沒有 abstract 介面這種東西。' },
-      ] },
     ],
     analogy: {
       text: ['模組像公司的部門：每個部門（檔案）決定對外公開哪些服務（export），其他部門要用就提出申請（import）。import type 像只索取「部門的組織圖」：你只需要知道結構，不需要真的派人過來。'],
@@ -3886,30 +3438,29 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'app.ts（tsconfig 開了 verbatimModuleSyntax）',
           code: 'import { User, createUser } from "./user.ts";\n// User 是 interface，createUser 是函式\n\nconst u: User = createUser("阿明");',
-          predict: { q: 'tsc 會怎樣？', options: ['報錯：User 要用 type 匯入', '通過', '報錯：createUser 要用 type 匯入'], answer: 0 },
           output: "!app.ts:1:10 - error TS1484: 'User' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'type', label: '用 import type' }, { id: 'value', label: '一般 import' }],
-          items: [
-            { text: '`interface Product`（只拿來寫參數型別）', answer: 'type', why: '純型別。' },
-            { text: '`function formatPrice`', answer: 'value', why: '執行時要呼叫。' },
-            { text: '`class Account`，要 new 它', answer: 'value', why: '用到值（建構子）。' },
-            { text: '`class Account`，只拿來寫參數型別', answer: 'type', why: '只用到型別那一面。' },
-            { text: '`type Status = "a" | "b"`', answer: 'type', why: '純型別。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`interface Product`（只拿來寫參數型別）', '用 import type', '純型別。'],
+          ['`function formatPrice`', '一般 import', '執行時要呼叫。'],
+          ['`class Account`，要 new 它', '一般 import', '用到值（建構子）。'],
+          ['`class Account`，只拿來寫參數型別', '用 import type', '只用到型別那一面。'],
+          ['`type Status = "a" | "b"`', '用 import type', '純型別。']
+        ] },
         { type: 'svg', svg: Fig.stack('Node 直接執行 .ts 的模組規則：相對路徑要寫 .ts 副檔名；型別匯入用 import type；tsconfig 開 allowImportingTsExtensions 與 verbatimModuleSyntax，讓 tsc 檢查結果一致', [
           { title: '相對路徑寫副檔名："./format.ts"', tone: 1 },
           { title: '型別用 import type', tone: 3 },
           { title: 'tsconfig：verbatimModuleSyntax、allowImportingTsExtensions', tone: 4 },
         ], { arrows: false }), caption: '打包工具（Vite 等）通常可以省略副檔名；Node 直接執行時不行。' },
+        { type: 'heading', id: 'deep-resolution', text: '深入：moduleResolution 怎麼選與 CJS 互通' },
+        { type: 'table', head: ['執行方式', 'module／moduleResolution', '相對匯入寫法'], rows: [
+          ['Vite、esbuild 等打包工具', '`esnext` + `bundler`', '可以省略副檔名'],
+          ['Node 直接執行 .ts', '`nodenext`', '`./x.ts` + allowImportingTsExtensions'],
+          ['tsc 輸出 .js 給 Node 跑', '`nodenext`', '寫 `./x.ts` 並開 rewriteRelativeImportExtensions（TS 5.7），輸出時改成 .js'],
+        ] },
+        '舊的 CommonJS 套件和 ESM 混用時，Node 22.12 起預設允許 `require()` 載入 ESM（沒有 top-level await 的模組），互通比以前容易。TypeScript 6.0 起 noUncheckedSideEffectImports 預設開啟，`import "./polyfill"` 這類只為副作用的匯入路徑打錯也會報錯。',
+        '在 isolatedModules 下重新匯出型別要寫 `export type { User } from "./types.ts"`，理由和 import type 一樣：單檔轉換的工具不知道 User 是不是值。',
       ],
-      tryit: {
-        q: ['同一行匯入函式 readFile 與型別 Stats：'],
-        draft: 'import { readFile, ____ Stats } from "node:fs/promises";',
-        answer: ['`import { readFile, type Stats } from "node:fs/promises";`', '行內的 type 修飾只刪掉 Stats，readFile 照常保留。'],
-      },
     },
     mistakes: [
       { wrong: '型別與值混在一般 import 裡。', why: '執行時行為取決於編譯設定，不可預測。', right: '開 verbatimModuleSyntax，型別一律標 type。' },
@@ -3917,19 +3468,7 @@ defineLessons({
       { wrong: '到處 `export default`。', why: '匯入端可以任意取名，重新命名與搜尋都不方便。', right: '多數情況用具名匯出。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`import type { User } from "./u.ts"` 編譯後會？', options: [
-        { text: '整行被刪除', correct: true, why: '只匯入型別。' },
-        { text: '保留，執行時載入 u.ts', why: 'type-only 匯入會被刪除。' },
-        { text: '變成 require', why: '不會。' },
-        { text: '變成註解', why: '直接刪除。' },
-      ] },
-      { level: '應用', type: 'mc', q: '開了 verbatimModuleSyntax，一般 import 一個只用作型別的 interface 會？', options: [
-        { text: 'TS1484，要求改成 type-only import', correct: true, why: '這正是這個選項的目的。' },
-        { text: '自動刪除那行 import，執行時不會載入該模組', why: '開了這個選項後不會自動刪除。' },
-        { text: '沒有任何影響', why: '會報錯。' },
-        { text: '執行時錯誤', why: '在編譯時就報錯。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼「每個檔案能單獨被轉換」（isolatedModules 的概念）對 Vite、esbuild、Node 很重要？這和 import type 有什麼關係？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼「每個檔案能單獨被轉換」（isolatedModules 的概念）對 Vite、esbuild、Node 很重要？這和 import type 有什麼關係？'], answer: [
         '這些工具為了快，一次只看一個檔案、只擦除型別，不知道別的檔案匯出的東西是型別還是值。',
         '所以檔案本身必須說清楚：用 import type 標出型別匯入，工具才知道可以刪掉；verbatimModuleSyntax 讓 tsc 用同樣的規則檢查，避免「tsc 通過但打包後壞掉」。',
       ] },
@@ -3939,7 +3478,7 @@ defineLessons({
       '開 verbatimModuleSyntax，讓輸出與你寫的一致。',
       'Node 直接執行時，相對匯入要寫 `.ts` 副檔名。',
     ],
-    sources: ['ts-modules', 'ts-tsconfig', 'node-ts'],
+    sources: ['ts-modules', 'ts-tsconfig', 'node-ts', 'ts-57', 'ts-60'],
   },
 
   '5-4': {
@@ -3947,14 +3486,6 @@ defineLessons({
       '說出 .d.ts 宣告檔的用途',
       '為沒有型別的套件安裝 @types 或自己補宣告',
       '用 declare 描述全域變數與模組',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-3）`import { readFile, type Stats }` 編譯後？', options: [
-        { text: '只保留 readFile', correct: true, why: '行內 type 只刪掉 Stats。' },
-        { text: '整行刪除，因為裡面有一個是型別', why: 'readFile 是值，要保留。' },
-        { text: '兩個都保留', why: 'Stats 被刪除。' },
-        { text: '語法錯誤', why: '合法寫法。' },
-      ] },
     ],
     analogy: {
       text: ['宣告檔像電器的使用說明書：機器（JavaScript 程式庫）已經做好了，說明書（.d.ts）告訴你每個按鈕是什麼、接受什麼。@types 是熱心網友幫沒有附說明書的機器寫的說明書。'],
@@ -3975,7 +3506,7 @@ defineLessons({
     define: [
       { term: '宣告檔', en: '.d.ts', def: '只能包含型別宣告與 declare；tsc 開 declaration 時會為你的程式自動產生。', example: '`"declaration": true`' },
       { term: '@types', en: 'DefinitelyTyped', def: '`@types/套件名`；版本號主次版本通常對應原套件。', example: '`npm i -D @types/express`' },
-      { term: 'declare', en: 'ambient declaration', def: '描述「執行時已經存在」的東西；`declare module "x"` 描述一個模組，`declare global` 擴充全域。', example: '`declare global { interface Window { gtag: Function } }`' },
+      { term: 'declare', en: 'ambient declaration', def: '描述「執行時已經存在」的東西；`declare module "x"` 描述一個模組，`declare global` 擴充全域。', example: '`declare global { interface Window { gtag: (...args: unknown[]) => void } }`' },
     ],
     examples: {
       compare: [{
@@ -3994,25 +3525,20 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'tsconfig 沒有設定 types（TypeScript 6 以後）',
           code: '// 已安裝 @types/node\nimport { readFileSync } from "node:fs";\nconsole.log(process.env.HOME);',
-          predict: { q: '`process` 會被認得嗎？', options: ['不一定：要在 types 列出 "node" 才保證', '一定認得', '一定報錯'], answer: 0 },
           output: '!app.ts:3:13 - error TS2591: Cannot find name \'process\'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add \'node\' to the types field in your tsconfig.\n（在 tsconfig 加 "types": ["node"] 後通過）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'self', label: '套件自帶型別' }, { id: 'types', label: '要裝 @types' }, { id: 'declare', label: '自己 declare' }],
-          items: [
-            { text: 'Node.js 內建模組（fs、process）', answer: 'types', why: '`@types/node`。' },
-            { text: '用 TypeScript 寫、發布時附 .d.ts 的套件（如 zod）', answer: 'self', why: '不用另外裝。' },
-            { text: 'Vite 注入的 `__APP_VERSION__`', answer: 'declare', why: '只有你的專案知道。' },
-            { text: '公司內部沒有型別的舊 JS 模組', answer: 'declare', why: '寫 declare module。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['Node.js 內建模組（fs、process）', '要裝 @types', '`@types/node`。'],
+          ['用 TypeScript 寫、發布時附 .d.ts 的套件（如 zod）', '套件自帶型別', '不用另外裝。'],
+          ['Vite 注入的 `__APP_VERSION__`', '自己 declare', '只有你的專案知道。'],
+          ['公司內部沒有型別的舊 JS 模組', '自己 declare', '寫 declare module。']
+        ] },
         { type: 'svg', svg: Fig.vs('TypeScript 6 的 types 預設改變：以前自動載入所有 @types 套件；6.0 起預設空陣列，要在 tsconfig 的 types 列出需要的，例如 node', { title: '5.x 以前', lines: ['自動載入', '所有 @types'], tone: 2 }, { title: '6.0 起', lines: ['預設 []', '要列出 "node" 等'], tone: 4 }), caption: '升級後出現「找不到 process」時，先檢查 types 設定。' },
+        { type: 'heading', id: 'deep-publish-types', text: '深入：發布套件時型別放哪裡' },
+        'package.json 用 exports 時，型別要寫在條件裡，而且 "types" 要放在每組條件的第一個，TypeScript 依順序比對。只寫頂層的 "types" 欄位，在 moduleResolution 是 nodenext 或 bundler 時可能找不到。',
+        { type: 'code', lang: 'json', title: 'package.json（片段）', code: '{\n  "type": "module",\n  "exports": {\n    ".": {\n      "types": "./dist/index.d.ts",\n      "default": "./dist/index.js"\n    }\n  }\n}' },
+        '`declare global { ... }` 只能寫在模組檔裡；env.d.ts 沒有任何 import／export 時，要加一行 `export {}` 讓它變成模組。@types/node 的主版本對應 Node 的主版本，Node 升級時一起換。',
       ],
-      tryit: {
-        q: ['讓 TypeScript 知道 `window.dataLayer` 存在（Google Analytics 會注入）：'],
-        draft: 'declare ____ {\n  interface ____ {\n    dataLayer: unknown[];\n  }\n}\nexport {};',
-        answer: ['`declare global { interface Window { dataLayer: unknown[] } }`。', '最後的 `export {}` 讓檔案成為模組，declare global 才能使用；這也是 1-3 提到的 interface 宣告合併。'],
-      },
     },
     mistakes: [
       { wrong: '用 `// @ts-ignore` 壓掉找不到型別的錯誤。', why: '整個匯入變 any，而且 ts-ignore 會壓掉那行所有錯誤。', right: '裝 @types 或寫最小宣告；真的要壓用 `@ts-expect-error` 並寫原因。' },
@@ -4020,19 +3546,7 @@ defineLessons({
       { wrong: '升級 TS 6 後到處找不到 Node 全域變數。', why: 'types 預設改為 []。', right: 'tsconfig 加 `"types": ["node"]`（或 `["*"]` 恢復舊行為）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '.d.ts 檔裡可以有什麼？', options: [
-        { text: '只有型別宣告與 declare', correct: true, why: '沒有實作。' },
-        { text: '函式實作與執行時會用到的程式碼', why: '宣告檔不能有實作。' },
-        { text: '執行時的變數值', why: '只能宣告型別。' },
-        { text: '測試程式', why: '不是用途。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 TypeScript 6 以後找不到 `process`，最可能的原因是？', options: [
-        { text: 'tsconfig 沒把 "node" 放進 types', correct: true, why: '6.0 起預設 types 為空。' },
-        { text: 'Node.js 版本太舊，新版才內建 process 型別', why: '型別問題和 Node 版本無關。' },
-        { text: 'process 已被移除', why: '仍然存在。' },
-        { text: '要改用 window', why: 'window 是瀏覽器的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要把公司內部的 JavaScript 工具函式庫發布給其他 TypeScript 專案用，但暫時不想改寫成 TypeScript。怎麼提供型別？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要把公司內部的 JavaScript 工具函式庫發布給其他 TypeScript 專案用，但暫時不想改寫成 TypeScript。怎麼提供型別？'], answer: [
         '方法一：手寫 index.d.ts 放在套件裡，package.json 加 `"types": "index.d.ts"`。',
         '方法二：在 JS 檔用 JSDoc 寫型別註解，開 `allowJs`、`checkJs`、`declaration`，讓 tsc 自動從 JSDoc 產生 .d.ts。後者讓型別和實作放在一起，比較不會不同步。',
       ] },
@@ -4042,7 +3556,7 @@ defineLessons({
       'declare 描述執行時已存在的全域變數與模組。',
       'TypeScript 6 起 types 預設為空，要列出 "node" 等。',
     ],
-    sources: ['ts-dts', 'ts-60', 'ts-tsconfig'],
+    sources: ['ts-dts', 'ts-60', 'ts-tsconfig', 'ts-modules-ref'],
   },
 });
 </script>
@@ -4061,6 +3575,7 @@ defineTerms({
   'Response.json': { en: 'Response.json()', def: 'fetch 回應的 json() 回傳 `Promise<any>`，型別資訊在這裡斷掉，要自己驗證。', example: '`const data: unknown = await res.json();`' },
   'TypeScript 7': { en: 'TypeScript 7', def: '2026-07 發布、以 Go 重寫的原生編譯器，速度約為 6.0 的 8–12 倍；7.0 沒有穩定的程式化 API。', example: '`npm i -D typescript`' },
   'typescript-eslint': { en: 'typescript-eslint', def: '讓 ESLint 理解 TypeScript 的工具，依賴 TypeScript 的程式化 API。', example: '`npm i -D typescript-eslint`' },
+  '程式化 API': { en: 'programmatic API', def: '讓其他工具在程式裡呼叫編譯器（建立 program、查詢型別）的介面；TypeScript 7.1 Beta 起以 typescript/sync、typescript/async 等入口提供。', example: 'typescript-eslint 的型別感知規則依賴它。' },
 });
 
 defineLessons({
@@ -4069,14 +3584,6 @@ defineLessons({
       '讀懂 tsconfig 的關鍵選項',
       '說出 strict 包含哪些檢查',
       '為新專案選一組建議設定',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-4）TypeScript 6 起 tsconfig 的 types 預設是？', options: [
-        { text: '空陣列，要自己列出', correct: true, why: '所以要寫 "types": ["node"]。' },
-        { text: '自動載入所有 @types', why: '那是 5.x 以前。' },
-        { text: '只載入 @types/node', why: '預設是空的。' },
-        { text: '沒有這個選項', why: '有。' },
-      ] },
     ],
     analogy: {
       text: ['tsconfig 像檢驗中心的檢驗標準：strict 是「全套健檢」，一次打開十幾項檢查。新專案直接用全套；舊專案從部分項目開始，逐步加嚴。'],
@@ -4116,31 +3623,32 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'tsconfig：strict 開啟',
           code: 'function greet(name) {\n  return "嗨，" + name;\n}\n\nlet title: string = null;',
-          predict: { q: '會出現幾個錯誤？', options: ['2 個', '0 個', '1 個'], answer: 0 },
           output: "!app.ts:1:16 - error TS7006: Parameter 'name' implicitly has an 'any' type.\n!app.ts:5:5 - error TS2322: Type 'null' is not assignable to type 'string'.\nFound 2 errors.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'in', label: '在 strict 裡' }, { id: 'out', label: '要另外開' }],
-          items: [
-            { text: 'noImplicitAny', answer: 'in', why: 'strict 的一部分。' },
-            { text: 'strictNullChecks', answer: 'in', why: 'strict 的一部分。' },
-            { text: 'noUncheckedIndexedAccess', answer: 'out', why: '影響範圍大，所以沒放進 strict。' },
-            { text: 'useUnknownInCatchVariables', answer: 'in', why: '4.4 起納入 strict。' },
-            { text: 'verbatimModuleSyntax', answer: 'out', why: '模組相關，不是 strict 的一部分。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['noImplicitAny', '在 strict 裡', 'strict 的一部分。'],
+          ['strictNullChecks', '在 strict 裡', 'strict 的一部分。'],
+          ['noUncheckedIndexedAccess', '要另外開', '影響範圍大，所以沒放進 strict。'],
+          ['useUnknownInCatchVariables', '在 strict 裡', '4.4 起納入 strict。'],
+          ['verbatimModuleSyntax', '要另外開', '模組相關，不是 strict 的一部分。']
+        ] },
         { type: 'svg', svg: Fig.stack('舊專案漸進開啟嚴格設定的順序：先開 noImplicitAny；再開 strictNullChecks；再開完整 strict；最後評估 noUncheckedIndexedAccess', [
           { title: '1. noImplicitAny', tone: 1 },
           { title: '2. strictNullChecks（錯誤最多、價值最高）', tone: 3 },
           { title: '3. 完整 strict', tone: 4 },
           { title: '4. noUncheckedIndexedAccess', tone: 2 },
         ]), caption: '每一步修完、合併後再開下一步。' },
+        { type: 'heading', id: 'deep-ts6-defaults', text: '深入：TypeScript 6.0 改了哪些預設值' },
+        { type: 'table', caption: 'TypeScript 6.0 官方公告（2026-10-30 查證）', head: ['選項', '6.0 起的預設或規則', '升級時的影響'], rows: [
+          ['strict', 'true', '舊專案沒寫就會突然多很多錯誤；要暫時維持舊行為就寫 false'],
+          ['module', 'esnext', 'CommonJS 專案要明確寫出'],
+          ['target', '最新（es2025）', 'es5 已棄用，最低 ES2015'],
+          ['types', '`[]`', '`["*"]` 可恢復自動載入所有 @types，但官方建議列清單'],
+          ['noUncheckedSideEffectImports', 'true', '副作用匯入的路徑打錯會報錯'],
+          ['esModuleInterop', '不能設成 false', '一律使用安全的互通行為'],
+        ] },
+        'strict 這個總開關會隨版本納入新的嚴格檢查，例如 TS 5.6 加入的 strictBuiltinIteratorReturn。升級後錯誤變多不一定是退步，先看新增的錯誤屬於哪個選項。另外 6.0 起，有 tsconfig 時直接 `tsc app.ts` 會報錯，要嘛用設定檔，要嘛加 `--ignoreConfig`。',
       ],
-      tryit: {
-        q: ['只想做型別檢查（由 Node 或打包工具負責執行），tsconfig 要開哪個選項？'],
-        draft: '{\n  "compilerOptions": {\n    "____": true\n  }\n}',
-        answer: ['`"noEmit": true`。', 'tsc 只檢查不產生 .js；搭配 `npx tsc` 或 `tsc --noEmit` 在 CI 執行。'],
-      },
     },
     mistakes: [
       { wrong: '為了減少錯誤把 strict 關掉。', why: '失去 null 與 any 的保護，問題延到執行時。', right: '保持 strict；舊專案逐步開啟。' },
@@ -4148,19 +3656,7 @@ defineLessons({
       { wrong: '關掉 skipLibCheck 去修第三方型別錯誤。', why: '浪費時間在不是你的程式碼上，檢查也變慢。', right: '一般開 skipLibCheck；確實需要時才關。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'TypeScript 6 起，沒有寫 strict 時預設是？', options: [
-        { text: 'true', correct: true, why: '6.0 把預設改成 strict。' },
-        { text: 'false', why: '那是 5.x 以前。' },
-        { text: '只開 noImplicitAny', why: '是整個 strict。' },
-        { text: '要看 target', why: '和 target 無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '開了 noUncheckedIndexedAccess，`const x = ["a"][0]` 的型別是？', options: [
-        { text: '`string | undefined`', correct: true, why: '索引讀取一律加上 undefined。' },
-        { text: '`string`，因為陣列字面值的元素一定存在', why: '那是沒開的情況。' },
-        { text: '`"a"`', why: '陣列元素型別是 string。' },
-        { text: '`undefined`', why: '仍包含 string。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['公司電腦（Windows）和家裡的 Mac 跑 tsc 結果不同，一台有錯一台沒有。可能的原因和處理方式？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['公司電腦（Windows）和家裡的 Mac 跑 tsc 結果不同，一台有錯一台沒有。可能的原因和處理方式？'], answer: [
         '常見原因：TypeScript 版本不同（全域安裝或不同的 lock 檔）、檔名大小寫在 macOS 不分、Windows 分（import 路徑大小寫寫錯）、types 依賴的 @types 版本不同。',
         '處理：TypeScript 裝在專案的 devDependencies 並 commit lock 檔、一律 `npx tsc`；開 forceConsistentCasingInFileNames（預設已開）抓出大小寫不一致；CI 用同一份設定檢查。',
       ] },
@@ -4178,14 +3674,6 @@ defineLessons({
       '說出為什麼外部資料一定要在執行時驗證',
       '用 Zod 定義 schema 並驗證資料',
       '用 z.infer 讓 schema 成為型別的單一來源',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-3）`JSON.parse` 的結果應該當成什麼型別？', options: [
-        { text: '`unknown`', correct: true, why: '這課用 Zod 把 unknown 驗證成具體型別。' },
-        { text: '直接 `as User`', why: '不做檢查。' },
-        { text: '`any`', why: '關掉檢查。' },
-        { text: '`never`', why: '不是。' },
-      ] },
     ],
     analogy: {
       text: ['型別是工廠裡的品管標準，Zod 是收貨口的驗貨員。工廠內部的零件都照標準做（型別保證），但外面送來的貨（API、表單、檔案）一定要在收貨口驗過才能進廠。'],
@@ -4224,26 +3712,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'import { z } from "zod";\n\nconst Order = z.object({ id: z.number(), qty: z.number().int().min(1) });\nconst r = Order.safeParse({ id: "7", qty: 0 });\nconsole.log(r.success);\nif (!r.success) console.log(r.error.issues.map((i) => i.path.join(".")));',
-          predict: { q: '有問題的欄位是哪些？', options: ['["id", "qty"]', '["qty"]', '沒有，success 為 true'], answer: 0 },
           output: "false\n[ 'id', 'qty' ]",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'validate', label: '要在執行時驗證' }, { id: 'trust', label: '信任型別即可' }],
-          items: [
-            { text: '外部 API 的回應', answer: 'validate', why: '你控制不了對方。' },
-            { text: '使用者送出的表單', answer: 'validate', why: '使用者可以送任何東西。' },
-            { text: '自己程式內部兩個函式之間傳遞的物件', answer: 'trust', why: '型別檢查已經保證。' },
-            { text: '從 localStorage 讀出的設定', answer: 'validate', why: '可能是舊版格式或被手動修改。' },
-            { text: '環境變數', answer: 'validate', why: '啟動時驗證一次，缺少就直接報錯。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['外部 API 的回應', '要在執行時驗證', '你控制不了對方。'],
+          ['使用者送出的表單', '要在執行時驗證', '使用者可以送任何東西。'],
+          ['自己程式內部兩個函式之間傳遞的物件', '信任型別即可', '型別檢查已經保證。'],
+          ['從 localStorage 讀出的設定', '要在執行時驗證', '可能是舊版格式或被手動修改。'],
+          ['環境變數', '要在執行時驗證', '啟動時驗證一次，缺少就直接報錯。']
+        ] },
         { type: 'svg', svg: Fig.vs('型別與 schema 的關係：手寫 interface 加另外寫驗證，兩份定義會不同步；用 schema 加 z.infer，只有一份定義，型別與驗證永遠一致', { title: 'interface + 手寫驗證', lines: ['兩份定義', '容易不同步'], tone: 5 }, { title: 'schema + z.infer', lines: ['一份定義', '永遠一致'], tone: 4 }), caption: '單一來源原則再次出現（3-3、4-1）。' },
+        { type: 'heading', id: 'deep-zod4', text: '深入：Zod 4 的細節與替代方案' },
+        '這課用 Zod 4 的寫法（2025-07 發布，2026-10-30 時 npm 最新為 4.6.7）：`z.email()` 改成頂層函式、錯誤用 `z.prettifyError` 格式化、可以用 `z.toJSONSchema()` 產生 JSON Schema 給文件或其他語言使用。',
+        { type: 'table', head: ['情況', '做法', '原因'], rows: [
+          ['有 transform 或 default 的 schema', '分清 `z.input` 與 `z.output`（z.infer 是 output）', '驗證前後的型別不同'],
+          ['表單欄位都是字串', '`z.coerce.number()`', '先轉型再驗證'],
+          ['套件想支援多種驗證庫', '接受 Standard Schema 介面', 'Zod、Valibot、ArkType 都實作了同一個介面'],
+          ['每秒處理大量訊息的熱路徑', '量測後再決定', '驗證有成本；可改成只驗關鍵欄位'],
+        ] },
+        '不適用的地方：程式內部已經有型別保證的資料不需要再驗；驗證只回答「格式對不對」，權限、商業規則（這個使用者能不能改這筆訂單）仍要另外檢查。',
       ],
-      tryit: {
-        q: ['為環境變數寫 schema：PORT 是數字（字串轉數字）、API_KEY 必填：'],
-        draft: 'const Env = z.object({\n  PORT: z.coerce.____().default(3000),\n  API_KEY: z.string().____(1),\n});\nexport const env = Env.____(process.env);',
-        answer: ['`z.coerce.number()`、`.min(1)`、`Env.parse(process.env)`。', '環境變數一律是字串，coerce 會先轉型再驗證；啟動時 parse 失敗就直接結束，比執行到一半才發現缺設定好。'],
-      },
     },
     mistakes: [
       { wrong: '`await res.json() as User`。', why: '只是騙過檢查器。', right: 'schema.parse 或 safeParse。' },
@@ -4251,19 +3739,7 @@ defineLessons({
       { wrong: 'interface 與 Zod schema 各寫一份。', why: '欄位一多就不同步。', right: '用 `z.infer` 從 schema 推出型別。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '為什麼 TypeScript 專案還需要 Zod 這類工具？', options: [
-        { text: '型別在執行時被擦除，外部資料需要執行時檢查', correct: true, why: '型別保護不到執行時才進來的資料。' },
-        { text: 'TypeScript 不能描述物件型別', why: '可以。' },
-        { text: '讓程式跑更快', why: '驗證會增加一點成本。' },
-        { text: '取代單元測試', why: '兩者用途不同。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`User.safeParse(data)` 失敗時會？', options: [
-        { text: '回傳 `{ success: false, error }`，不拋例外', correct: true, why: '適合要顯示錯誤的情況。' },
-        { text: '拋出 ZodError，訊息列出每個不合格的欄位', why: '那是 parse。' },
-        { text: '回傳 null', why: '回傳結果物件。' },
-        { text: '自動修正資料', why: '不會修正（除非有 coerce、default 等轉換）。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['前端表單與後端 API 都要驗證同一份資料。怎麼避免兩邊規則不一致？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['前端表單與後端 API 都要驗證同一份資料。怎麼避免兩邊規則不一致？'], answer: [
         '把 Zod schema 放在共用的套件（monorepo 的 shared 資料夾），前端表單用它即時顯示錯誤，後端 API 用它驗證請求本文。',
         '型別也一起從 schema 推出；任何一邊改規則，另一邊在編譯時就會看到差異。注意前端驗證只是體驗，後端一定要再驗一次（前端可以被繞過）。',
       ] },
@@ -4273,7 +3749,7 @@ defineLessons({
       '在邊界用 schema 驗證一次，內部信任型別。',
       '用 z.infer 讓 schema 成為型別的單一來源。',
     ],
-    sources: ['zod', 'ts-narrowing'],
+    sources: ['zod', 'zod-v4', 'standard-schema', 'ts-narrowing'],
   },
 
   '6-3': {
@@ -4281,14 +3757,6 @@ defineLessons({
       '為 async 函式寫出 Promise<T> 回傳型別',
       '知道 fetch 的 json() 在哪裡失去型別',
       '寫一個型別安全的 API 呼叫函式',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-2）parse 與 safeParse 的差別？', options: [
-        { text: 'parse 失敗拋例外，safeParse 回傳結果物件', correct: true, why: '依情境選用。' },
-        { text: 'safeParse 只檢查型別不檢查值，比較寬鬆', why: '兩者都會檢查。' },
-        { text: 'parse 比較快', why: '不是差別所在。' },
-        { text: '完全相同', why: '失敗時的行為不同。' },
-      ] },
     ],
     analogy: {
       text: ['Promise<T> 像外送的取餐單號：上面寫著「一份牛肉麵」（T），餐還沒好但你知道會拿到什麼。fetch 的 json() 卻像單號上寫「一份餐點」——到底是什麼，要打開才知道。'],
@@ -4329,31 +3797,30 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'app.ts（伺服器回應 404 與一段 JSON 錯誤訊息）',
           code: 'try {\n  const res = await fetch("/api/users/999");\n  console.log("狀態", res.status, res.ok);\n  const data = await res.json();\n  console.log("拿到資料", data);\n} catch (e) {\n  console.log("進入 catch");\n}',
-          predict: { q: '會進入 catch 嗎？', options: ['不會，fetch 不因 404 拋例外', '會，404 會拋例外', '會，json() 一定失敗'], answer: 0 },
           output: '狀態 404 false\n拿到資料 { error: \'user not found\' }',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'reject', label: 'fetch 會 reject（拋例外）' }, { id: 'resolve', label: 'fetch 正常回傳 Response' }],
-          items: [
-            { text: '伺服器回應 500', answer: 'resolve', why: 'HTTP 錯誤不會 reject，要看 res.ok。' },
-            { text: '網路斷線', answer: 'reject', why: '網路層失敗。' },
-            { text: '伺服器回應 404', answer: 'resolve', why: '要看 res.ok。' },
-            { text: 'AbortSignal 逾時', answer: 'reject', why: '中止會 reject（TimeoutError）。' },
-            { text: 'CORS 被擋', answer: 'reject', why: '瀏覽器回報網路錯誤。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['伺服器回應 500', 'fetch 正常回傳 Response', 'HTTP 錯誤不會 reject，要看 res.ok。'],
+          ['網路斷線', 'fetch 會 reject（拋例外）', '網路層失敗。'],
+          ['伺服器回應 404', 'fetch 正常回傳 Response', '要看 res.ok。'],
+          ['AbortSignal 逾時', 'fetch 會 reject（拋例外）', '中止會 reject（TimeoutError）。'],
+          ['CORS 被擋', 'fetch 會 reject（拋例外）', '瀏覽器回報網路錯誤。']
+        ] },
         { type: 'svg', svg: Fig.row('型別安全的 API 呼叫函式要做的四件事：設定逾時；檢查 res.ok；把 json 當 unknown；用 schema 驗證並回傳有型別的資料', [
           { title: '逾時', lines: ['`AbortSignal`', '`.timeout`'], tone: 1 },
           { title: '檢查狀態', lines: ['`res.ok`'], tone: 2 },
           { title: 'unknown', lines: ['`await res.json()`'], tone: 3 },
           { title: '驗證', lines: ['`schema.parse`'], tone: 4 },
         ]), caption: '寫一次，整個專案共用。' },
+        { type: 'heading', id: 'deep-async-errors', text: '深入：錯誤沒有型別，Promise 也會被遺忘' },
+        'TypeScript 沒有「這個函式會拋出哪些錯誤」的型別。`Promise<T>` 只描述成功的值，reject 的原因在 catch 裡一律是 unknown，所以 ApiError 這類自訂錯誤要用 instanceof 收斂。想讓錯誤出現在型別裡，可以改回傳 `{ ok: true; data } | { ok: false; error }` 的可辨識聯合（2-2）。',
+        { type: 'table', head: ['情況', '會發生什麼', '處理'], rows: [
+          ['伺服器回 204、內容是空的', '`res.json()` 拋 SyntaxError', '先看狀態碼或 content-length'],
+          ['逾時', 'reject 的是名稱為 TimeoutError 的 DOMException', '和使用者取消（AbortError）分開處理'],
+          ['同時要逾時又要可取消', '一個 signal 不夠', '`AbortSignal.any([userSignal, AbortSignal.timeout(ms)])`'],
+          ['呼叫 async 函式卻忘了 await', 'tsc 不報錯，錯誤變成未處理的 rejection', 'typescript-eslint 的 no-floating-promises'],
+        ] },
       ],
-      tryit: {
-        q: ['同時取得使用者與訂單，兩者互不相依：'],
-        draft: 'const [user, orders] = await Promise.____([\n  getJson(`/api/v1/users/${id}`, User),\n  getJson(`/api/v1/orders?user=${id}`, z.array(Order)),\n]);',
-        answer: ['`Promise.all([...])`。', 'TypeScript 會推出 `[User, Order[]]`，每個位置的型別都正確。任一個失敗時整個 Promise.all 失敗；需要「各自成功或失敗」用 Promise.allSettled。'],
-      },
     },
     mistakes: [
       { wrong: '以為 fetch 遇到 404、500 會進 catch。', why: '只有網路層失敗才 reject。', right: '檢查 `res.ok`。' },
@@ -4361,19 +3828,7 @@ defineLessons({
       { wrong: '沒有設定逾時。', why: '伺服器不回應時請求一直掛著。', right: '`AbortSignal.timeout(毫秒)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`async function f() { return 1; }` 的回傳型別是？', options: [
-        { text: '`Promise<number>`', correct: true, why: 'async 函式一定回傳 Promise。' },
-        { text: '`number`', why: '要 await 才是 number。' },
-        { text: '`Promise<1>`', why: '回傳值型別會放寬成 number。' },
-        { text: '`void`', why: '有回傳值。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`res.json()` 的回傳型別是？', options: [
-        { text: '`Promise<any>`', correct: true, why: '型別資訊在這裡斷掉。' },
-        { text: '`Promise<unknown>`', why: '標準 lib 定義成 any。' },
-        { text: '依照呼叫端的回傳型別自動推斷', why: '不會。' },
-        { text: '`object`', why: '是 Promise<any>。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['如果後端也是 TypeScript，有沒有辦法讓前端「不寫 schema 也能知道 API 的型別」？各有什麼取捨？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['如果後端也是 TypeScript，有沒有辦法讓前端「不寫 schema 也能知道 API 的型別」？各有什麼取捨？'], answer: [
         '方法一：後端產生 OpenAPI 規格，前端用工具產生型別與用戶端；方法二：共用 Zod schema 的 monorepo；方法三：tRPC 這類讓前端直接推斷後端路由型別的框架。',
         '取捨：共用型別省去重寫，但只在「前後端一起部署」時才可靠；對外公開或版本不同步的 API，仍需要在前端驗證回應。',
       ] },
@@ -4383,7 +3838,7 @@ defineLessons({
       'fetch 不因 4xx、5xx 拋例外，要檢查 res.ok。',
       'res.json() 是 any，接成 unknown 再用 schema 驗證。',
     ],
-    sources: ['mdn-fetch', 'zod'],
+    sources: ['mdn-fetch', 'mdn-abort', 'zod'],
   },
 
   '6-4': {
@@ -4392,17 +3847,9 @@ defineLessons({
       '知道哪些工具暫時還需要 TypeScript 6',
       '規劃一個專案從 5.x 升到 7 的步驟',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 6-1）TypeScript 6 起 strict 預設？', options: [
-        { text: '開啟', correct: true, why: '升級時舊專案可能突然多出很多錯誤。' },
-        { text: '關閉', why: '那是 5.x。' },
-        { text: '只對新檔案開啟', why: '不是。' },
-        { text: '沒有預設', why: '有預設值。' },
-      ] },
-    ],
     analogy: {
       text: ['TypeScript 7 像餐廳把整個廚房從瓦斯爐換成高效率的商用爐：菜單（語言）完全一樣，出菜速度快了十倍。但有些外包廠商（工具）的設備還接在舊瓦斯管上，暫時要保留一個舊爐子給他們用。'],
-      limit: ['換廚房的過渡期總會結束；TypeScript 團隊預計 7.1 提供新的程式化 API，屆時 typescript-eslint 等工具就能直接使用 7。'],
+      limit: ['換廚房的過渡期總會結束；7.1 Beta（2026-10-20）已經帶來新的程式化 API，等 7.1 正式版與各工具跟進後，typescript-eslint 等就能直接使用 7。'],
     },
     model: {
       svg: Fig.row('TypeScript 版本演進：5.x 是 JavaScript 編譯器，預設非 strict；6.0（2026-03）仍是 JavaScript 編譯器，改了預設值並棄用舊選項；7.0（2026-07）是 Go 原生編譯器，移除已棄用的選項，速度約快 10 倍', [
@@ -4412,7 +3859,7 @@ defineLessons({
       ]),
       caption: '6.0 是橋樑：先在 6.0 處理掉棄用警告，再換 7.0。',
       blocks: [
-        '[[TypeScript 7]] 是同一個語言、同一個 `tsc` 指令，只是編譯器用 Go 重寫，完整建置快 8–12 倍。差別在：6.0 棄用的選項（target es5、moduleResolution node10、baseUrl 等）在 7.0 移除；7.0 還沒有穩定的程式化 API，依賴它的工具（[[typescript-eslint]]、部分框架的範本型別檢查）暫時需要 6.x。',
+        '[[TypeScript 7]] 是同一個語言、同一個 `tsc` 指令，只是編譯器用 Go 重寫，完整建置快 8–12 倍。差別在：6.0 棄用的選項（target es5、moduleResolution node10、baseUrl 等）在 7.0 移除；7.0 沒有[[程式化 API]]，依賴它的工具（[[typescript-eslint]]、部分框架的範本型別檢查）暫時需要 6.x；新 API 在 7.1 Beta 才出現。',
         { type: 'table', caption: '升級時常遇到的變化', head: ['項目', '5.x', '6.0／7.0'], rows: [
           ['strict', '預設 false', '預設 **true**'],
           ['types', '自動載入所有 @types', '預設 `[]`，要列出'],
@@ -4425,7 +3872,7 @@ defineLessons({
     define: [
       { term: 'TypeScript 7', en: 'TypeScript 7.0', def: '原生（Go）編譯器；`npm install -D typescript` 安裝，指令仍是 tsc；語言語意與 6.0 相同。', example: '大型專案建置從數分鐘降到數十秒。' },
       { term: 'ignoreDeprecations', en: 'ignoreDeprecations', def: '`"ignoreDeprecations": "6.0"` 可暫時隱藏 6.0 的棄用警告；7.0 已移除那些選項，這招失效。', example: '只當過渡用。' },
-      { term: '程式化 API', en: 'programmatic API', def: '讓其他工具在程式裡呼叫 TypeScript 編譯器的介面；7.0 尚未穩定，預計 7.1 提供。', example: 'typescript-eslint 的型別感知規則依賴它。' },
+      { term: '程式化 API', en: 'programmatic API', def: '讓其他工具在程式裡呼叫 TypeScript 編譯器的介面；7.0 沒有，7.1 Beta（2026-10-20）起提供。', example: 'typescript-eslint 的型別感知規則依賴它。' },
     ],
     examples: {
       compare: [{
@@ -4441,23 +3888,19 @@ defineLessons({
         why: ['先在 6.0 清掉所有棄用警告，再升 7.0'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'same', label: '7.0 沒有改變' }, { id: 'diff', label: '7.0 改變了' }],
-          items: [
-            { text: 'TypeScript 語法與型別規則', answer: 'same', why: '語言語意與 6.0 相同。' },
-            { text: '編譯速度', answer: 'diff', why: '約快 8–12 倍。' },
-            { text: '指令名稱 tsc', answer: 'same', why: '正式版仍是 tsc（預覽版曾用 tsgo）。' },
-            { text: '6.0 已棄用的 tsconfig 選項', answer: 'diff', why: '7.0 移除。' },
-            { text: '程式化 API 的穩定性', answer: 'diff', why: '7.0 尚無穩定 API。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['TypeScript 語法與型別規則', '7.0 沒有改變', '語言語意與 6.0 相同。'],
+          ['編譯速度', '7.0 改變了', '約快 8–12 倍。'],
+          ['指令名稱 tsc', '7.0 沒有改變', '正式版仍是 tsc（預覽版曾用 tsgo）。'],
+          ['6.0 已棄用的 tsconfig 選項', '7.0 改變了', '7.0 移除。'],
+          ['程式化 API', '7.0 改變了', '7.0 沒有；7.1 Beta 起提供新 API。']
+        ] },
         { type: 'widget', name: 'csrun', props: {
           file: '終端機（大型專案，示意數字）',
-          title: '先預測，再看結果',
+          title: '比較 6.0 與 7.0 的建置時間',
           lang: 'BASH',
           hl: 'bash',
           code: '# 同一個專案，同一份 tsconfig\n$ npx -p typescript@6 tsc --noEmit --extendedDiagnostics\n$ npx -p typescript@7 tsc --noEmit --extendedDiagnostics',
-          predict: { q: '兩次型別檢查的錯誤數會？', options: ['相同，只有時間不同', '7 會多很多錯誤', '7 會少很多錯誤'], answer: 0 },
           output: 'TS 6.0：Errors 0　Total time 48.2s\nTS 7.0：Errors 0　Total time 4.6s\n（官方以 VS Code 原始碼測得 125.7s → 10.6s；此處數字為示意）',
         } },
         { type: 'svg', svg: Fig.stack('從 5.x 升級到 7 的步驟：先升到 6.0 並修正 strict 與 types 的新預設；清掉所有棄用警告；確認工具支援後換成 7.0；仍需要 6.x API 的工具暫時並存', [
@@ -4466,12 +3909,16 @@ defineLessons({
           { title: '3. 換 7.0，CI 比對錯誤數', tone: 4 },
           { title: '4. typescript-eslint 等暫時並存 6.x', tone: 2 },
         ]), caption: '每一步都在 CI 跑一次 tsc，確認錯誤數沒有意外變化。' },
+        { type: 'heading', id: 'deep-ts7-status', text: '深入：2026-10 的 TypeScript 7 現況' },
+        { type: 'table', caption: '2026-10-30 查證', head: ['項目', '狀態', '來源'], rows: [
+          ['npm latest', '7.0.2（7.0 正式版，2026-07-08 發布）', 'npm registry'],
+          ['7.1 Beta', '2026-10-20；新增 typescript/sync、typescript/async 等程式化 API；RC 預計約一個月後', '官方部落格'],
+          ['官方測得的速度', 'VS Code 原始碼完整建置 125.7 秒 → 10.6 秒', 'InfoQ 引述官方公告'],
+          ['typescript-eslint、Volar 等改用新 API', '尚未正式支援', '僅第三方預估 2027 Q1'],
+        ] },
+        '7.0 能平行處理解析、檢查與輸出，所以 CPU 核心越多差距越大；CI 機器核心少時，加速幅度會比公告的 8–12 倍小。7.1 Beta 還加入讓 Vue、Svelte、Astro 檔案也能被檢查的 content mappers，不過要另外開 `--runExternalCode`，正式專案先等正式版。',
+        '升級的判斷原則：tsc 只是檢查工具，換成 7 不會改變你輸出的 JavaScript 行為；真正的風險在於依賴舊 API 的周邊工具。先在 CI 並跑 6 與 7、比對錯誤數，再決定切換。',
       ],
-      tryit: {
-        q: ['舊專案升到 6.0 後出現大量 strictNullChecks 錯誤，又不能一次修完。暫時的做法是？'],
-        draft: '{\n  "compilerOptions": {\n    "strict": ____,\n    "noImplicitAny": true\n  }\n}',
-        answer: ['明確寫 `"strict": false`，再逐項開啟（6-1 的漸進順序）。', '這只是過渡：6.0 改預設是為了讓新專案預設安全；舊專案應該排時程逐步開回 strict。'],
-      },
     },
     mistakes: [
       { wrong: '從 5.x 直接跳到 7.0。', why: '棄用選項在 7.0 直接移除，錯誤訊息不如 6.0 的棄用提示清楚。', right: '先升 6.0 清掉警告，再換 7.0。' },
@@ -4479,19 +3926,7 @@ defineLessons({
       { wrong: '以為 7.0 會抓到更多或更少錯誤。', why: '型別規則相同，結果應該一致。', right: '結果不同時通常是設定差異或已知問題，對照官方的相容性清單。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'TypeScript 7.0 最大的改變是？', options: [
-        { text: '編譯器用 Go 重寫，速度大幅提升', correct: true, why: '語言本身不變。' },
-        { text: '新增大量語法與新的型別規則', why: '語言語意與 6.0 相同。' },
-        { text: '改用新的指令名稱', why: '仍是 tsc。' },
-        { text: '不再支援 strict', why: 'strict 預設開啟。' },
-      ] },
-      { level: '應用', type: 'mc', q: '2026-10 專案用 typescript-eslint 的型別感知規則，該怎麼安排？', options: [
-        { text: 'tsc 用 7.0，lint 工具暫時依賴 6.x', correct: true, why: '7.0 尚無穩定的程式化 API。' },
-        { text: '全部停在 5.x', why: '沒必要放棄 7.0 的速度。' },
-        { text: '移除 typescript-eslint', why: '不需要。' },
-        { text: '等 7.0 自動相容', why: '要等 7.1 的新 API 與工具更新。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要向主管說明「為什麼值得花兩天升級到 TypeScript 7」。你會怎麼說？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要向主管說明「為什麼值得花兩天升級到 TypeScript 7」。你會怎麼說？'], answer: [
         '效益：型別檢查快約 10 倍，CI 時間與編輯器回應速度都改善；6.0 的新預設（strict、types）讓專案更安全；越晚升級，累積的棄用項目越多。',
         '風險與成本：依賴編譯器 API 的工具暫時要並存 6.x；舊的 tsconfig 選項要改寫。提出分步計畫（先 6.0、再 7.0），每步都有 CI 驗證，可以隨時回退。',
       ] },
@@ -4499,9 +3934,9 @@ defineLessons({
     keypoints: [
       'TypeScript 7 = 同一個語言 + Go 原生編譯器，約快 10 倍。',
       '先升 6.0 處理新預設與棄用警告，再換 7.0。',
-      '依賴編譯器 API 的工具（typescript-eslint 等）暫時需要 6.x。',
+      '依賴編譯器 API 的工具（typescript-eslint 等）在 7.1 正式版普及前暫時需要 6.x。',
     ],
-    sources: ['ts-70', 'ts-60'],
+    sources: ['ts-70', 'ts-71-beta', 'npm-typescript', 'infoq-ts7', 'ts-60'],
   },
 });
 </script>
@@ -4580,6 +4015,8 @@ function esc(str) {
 function md(str) {
   let out = esc(str);
   const codes = [];
+  // 雙反引號包住的程式碼可以含單反引號（樣板字面型別），要先處理
+  out = out.replace(/`` ?([\s\S]+?) ?``/g, (m, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
   out = out.replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   out = out.replace(/==([^=]+)==/g, '<mark>$1</mark>');
@@ -4619,7 +4056,7 @@ function renderPhrases(text) {
   return phrases.map((phrase, i) => `${i > 0 && needsSpaceBetween(phrases[i - 1], phrase) ? ' ' : ''}<span class="phrase">${wrapWordsHtml(phrase)}</span>`).join('');
 }
 
-/* ---------- 閱讀時間：中文每分鐘 300 字，練習每題另計 ---------- */
+/* ---------- 閱讀時間：中文每分鐘 300 字，深入思考題每題另計 ---------- */
 function collectText(value) {
   if (value == null) return '';
   if (typeof value === 'string') return value;
@@ -4962,7 +4399,7 @@ Views.home = () => {
         <span class="label tilt" style="--chip:var(--info)">TypeScript 7・Node.js 24+</span>
       </div>
       <h1><span class="phrase">讓錯誤</span><br><span class="phrase">在</span><span class="phrase hl">執行之前</span><span class="phrase">就現身</span></h1>
-      <p class="lead">會寫一點 JavaScript 就能開始：從型別註記一路學到聯合型別、泛型、工具型別、條件型別與 tsconfig。每課都先讓你預測編譯器會說什麼，再對答案，用結果修正直覺。</p>
+      <p class="lead">會寫一點 JavaScript 就能開始：從型別註記一路學到聯合型別、泛型、工具型別、條件型別與 tsconfig。每課都附上編譯器真正會說的話，再用「深入」段落講清楚為什麼、什麼時候不適用。</p>
       <div class="actions">
         ${resumeBtn}
         <a class="btn big nb-press" href="#/l/2-1">直接看型別收斂</a>
@@ -4989,10 +4426,10 @@ Views.home = () => {
     <h2 class="section-title"><span class="label" style="--chip:var(--m2)">怎麼用</span><span class="phrase">本站的使用方式</span></h2>
     <div class="content" style="margin:0">
       <ul>
-        <li>每個單元的結構都一樣：3 件事 → 暖身回顧 → 比喻 → 心智模型 → 定義 → 範例 → 常見錯誤 → 練習 → 三個重點。</li>
+        <li>每個單元的結構都一樣：3 件事 → 比喻 → 心智模型 → 定義 → 範例與深入 → 常見錯誤 → 深入思考（部分單元）→ 三個重點。這門課沒有考題。</li>
         <li>這門課的主軸：看到一段 TypeScript 先問三個問題。<ol class="three-q"><li>編譯器認為這個值<strong>是什麼型別</strong>？</li><li>這個檢查發生在<strong>編譯時</strong>還是<strong>執行時</strong>？</li><li>資料是從<strong>外部</strong>來的嗎？要不要在執行時驗證？</li></ol></li>
-        <li>頁面不執行 TypeScript，所以「試試看」是先預測、再看事先寫好的輸出或編譯器訊息。想自己跑，把程式存成 <code>app.ts</code>，在終端機輸入 <code>node app.ts</code>（Node.js 22.18 起可直接執行），型別檢查用 <code>npx tsc --noEmit</code>。</li>
-        <li>練習的答案預設隱藏；選擇題送出後，每個選項都有解析。</li>
+        <li>頁面不執行 TypeScript，所以「試試看」按「執行」後顯示的是事先寫好的輸出或編譯器訊息。想自己跑，把程式存成 <code>app.ts</code>，在終端機輸入 <code>node app.ts</code>（Node.js 22.18 起可直接執行），型別檢查用 <code>npx tsc --noEmit</code>。</li>
+        <li>深入思考題的解析預設隱藏，想過再展開。</li>
         <li>鍵盤：<kbd>←</kbd> <kbd>→</kbd> 切換上一課與下一課，<kbd>/</kbd> 搜尋。頂部列可以調整字級，寬螢幕可以拖曳目錄的右緣調整寬度。</li>
         <li>進度存在這台電腦的瀏覽器裡${Store.persistent() ? '' : '（目前瀏覽器不允許儲存，關閉分頁後進度會消失）'}。</li>
       </ul>
@@ -5040,7 +4477,7 @@ const SECTION_DEFS = [
   ['define', '正式定義'],
   ['examples', '範例'],
   ['mistakes', '常見錯誤'],
-  ['practice', '練習'],
+  ['practice', '深入思考'],
   ['keypoints', '三個重點'],
 ];
 
@@ -5115,7 +4552,7 @@ Views.lesson = ({ id }) => {
     ${c ? `<div class="done-row" id="done-row">
       ${isDone
         ? `<span class="stamp">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`}
+        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`}
     </div>` : ''}
     <nav class="lesson-nav" aria-label="上一課與下一課">
       ${prev ? `<a class="prev nb-press" href="#/l/${prev.id}" rel="prev"><span class="dir">← 上一課</span><span class="ttl">${renderPhrases(`${prev.id} ${prev.title}`)}</span></a>` : ''}
@@ -5184,7 +4621,7 @@ function onClick(e) {
   const { action: name, id } = action.dataset;
   if (name === 'done') markDone(id, true);
   if (name === 'undone') markDone(id, false);
-  if (name === 'reset' && window.confirm('確定要清除所有學習進度與測驗紀錄嗎？字級與目錄寬度不會被清除。')) {
+  if (name === 'reset' && window.confirm('確定要清除所有學習進度嗎？字級與目錄寬度不會被清除。')) {
     Store.reset();
     render();
     announce('學習進度已清除');
@@ -5197,7 +4634,7 @@ function markDone(id, isDone) {
   if (row) {
     row.innerHTML = isDone
       ? `<span class="stamp animate">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`;
+      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`;
     const focusTarget = $('button', row);
     if (focusTarget) focusTarget.focus();
   }
@@ -5929,22 +5366,22 @@ function makeStepper(el, count, draw, { interval = STEP_MS, start = 0 } = {}) {
   return { go, stop };
 }
 
-/* ---------- csrun：先預測，再看輸出 ---------- */
+/* ---------- csrun：按「執行」看輸出 ---------- */
 // props: { code, title?, file?, predict?: { q?, options: [文字], answer: index }, output: 字串（\n 分行，! 開頭的行顯示成錯誤） }
 // 頁面不執行 TypeScript，輸出是事先寫好的；推導依據記在 research-notes.md。
 Widgets.csrun = {
   render(props, id) {
     const p = props.predict;
     return `<div class="jw runner">
-      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '先預測，再看輸出')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '執行看看')}</span></div>
       <div class="code"><div class="code-head"><span class="lang">${esc(props.lang || 'TypeScript')}</span><span class="ttl">${esc(props.file || 'app.ts')}</span></div>
         <pre tabindex="0" aria-label="程式碼"><code class="language-${esc(props.hl || 'typescript')}">${esc(props.code)}</code></pre></div>
       ${p ? `<div class="run-predict" role="group" aria-label="預測">
         <span class="jw-note"><strong>先預測：</strong>${md(p.q || '執行後會印出什麼？')}</span>
         <div class="opts">${p.options.map((o, i) => `<button type="button" class="btn small nb-press" data-pick="${i}" aria-pressed="false">${esc(o)}</button>`).join('')}</div>
       </div>` : ''}
-      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 看輸出</button></div>
-      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（先預測，再按「看輸出」）</span></pre>
+      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 執行</button></div>
+      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（按「執行」看結果）</span></pre>
       <div class="run-verdict" aria-live="polite"></div>
     </div>`;
   },
@@ -6025,23 +5462,14 @@ Widgets.classify = {
 };
 
 
-/* ---------- herodemo：首頁的第一個預測 ---------- */
+/* ---------- herodemo：首頁的第一個範例 ---------- */
 const HERO_RUNNER = {
-  "title": "這門課的第一個問題",
+  "title": "型別錯誤在執行前就現身",
   "lang": "TypeScript",
   "hl": "typescript",
   "file": "app.ts",
   "code": "function total(prices: number[]) {\n  return prices.reduce((sum, p) => sum + p, 0);\n}\n\ntotal([\"100\", \"50\"]);",
-  "predict": {
-    "q": "tsc 檢查時會怎樣？",
-    "options": [
-      "通過，回傳 \"010050\"",
-      "型別錯誤",
-      "通過，回傳 150"
-    ],
-    "answer": 1
-  },
-  "output": "!app.ts:5:8 - error TS2322: Type 'string' is not assignable to type 'number'."
+  "output": "!app.ts:5:8 - error TS2322: Type 'string' is not assignable to type 'number'.\n（JavaScript 會默默回傳 \"010050\"；tsc 在執行前就擋下）"
 };
 Widgets.herodemo = {
   render(props, id) { return Widgets.csrun.render(HERO_RUNNER, id); },
@@ -6124,10 +5552,6 @@ Sections.reference = (c, lesson) => `<div class="blocks" style="--chip:var(--m${
 
 /* ---------- 元件樣式表 ---------- */
 Views.styleguide = () => {
-  const sampleQuiz = { type: 'mc', level: '應用', q: '`let x = 5; x = "5";` 會怎樣？', options: [
-    { text: '可以編譯', why: 'x 被推斷為 number。' },
-    { text: '型別錯誤 TS2322', correct: true, why: 'string 不能指定給 number。' },
-  ] };
   return `<div class="content">
     <header class="lesson-head" style="--chip:var(--neutral)"><span class="lid-big">SG</span><h1>元件樣式表</h1></header>
     <p>這頁列出全站共用元件與它們的狀態。改樣式後先看這頁，深淺色各看一次。</p>
@@ -6192,10 +5616,9 @@ Views.styleguide = () => {
       ${tabsBlock({ label: '作業系統', tabs: [{ label: 'Windows', blocks: ['`winget install OpenJS.NodeJS.LTS`'] }, { label: 'macOS', blocks: ['`brew install node`'] }] })}
     </section>
 
-    <section class="sg-block"><h2>摺疊與測驗</h2>
+    <section class="sg-block"><h2>摺疊（深入思考）</h2>
       <div class="quiz-list">
-        ${quizItem(sampleQuiz, 'styleguide:q:0')}
-        ${quizItem({ type: 'reveal', level: '遷移', q: '先想一想：為什麼答案要先藏起來？', answer: ['先嘗試提取記憶，再看答案，記得比較牢（提取練習）。'] }, 'styleguide:r:0')}
+        ${quizItem({ type: 'reveal', level: '深入思考', q: '先想一想：為什麼解析要先藏起來？', answer: ['先自己推一次，再看推理過程，比較容易發現自己卡在哪一步。'] }, 'styleguide:r:0')}
       </div>
     </section>
 
@@ -6207,11 +5630,8 @@ Views.styleguide = () => {
       ${renderWidget({ name: 'checklist', props: { key: 'sg', items: ['第一項', '第二項', '第三項'] } })}
     </section>
 
-    <section class="sg-block"><h2>csrun：預測再看結果</h2>
-      ${renderWidget({ name: 'csrun', props: { code: 'let n: number = "1";', predict: { options: ['可以編譯', '型別錯誤'], answer: 1 }, output: '!error TS2322' } })}
-    </section>
-    <section class="sg-block"><h2>classify</h2>
-      ${renderWidget({ name: 'classify', props: { buckets: [{ id: 'c', label: '編譯時' }, { id: 'r', label: '執行時' }], items: [{ text: '型別註記', answer: 'c', why: '編譯後被擦掉。' }, { text: '`typeof x === "string"`', answer: 'r', why: 'JavaScript 本身的檢查。' }] } })}
+    <section class="sg-block"><h2>csrun：執行看結果</h2>
+      ${renderWidget({ name: 'csrun', props: { code: 'let n: number = "1";', output: '!error TS2322' } })}
     </section>
 
     <section class="sg-block"><h2>鍵盤提示</h2>

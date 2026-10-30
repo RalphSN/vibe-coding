@@ -50,11 +50,11 @@ defineLessons({
       caption: '兩次翻譯：寫完程式時由 SDK 的編譯器翻成 IL；執行時由 runtime 的 JIT 翻成機器碼。',
       blocks: [
         '[[C#]] 是語言，[[.NET]] 是讓它跑起來的平台。寫程式要裝 [[SDK]]（內含 [[編譯器]]），只執行別人的程式裝 [[runtime]] 就夠。',
-        { type: 'table', caption: '2026-10-16 查證的 .NET 版本狀態', head: ['版本', '類型', '支援到', '這門課'], rows: [
+        { type: 'table', caption: '2026-10-29 查證的 .NET 版本狀態', head: ['版本', '類型', '支援到', '這門課'], rows: [
           ['.NET 10（C# 14）', '[[LTS]]', '2028-11-14', '**主線**'],
           ['.NET 9', '[[STS]]', '2026-11-10', '快結束，不建議新專案'],
           ['.NET 8', 'LTS', '2026-11-10', '快結束，舊專案要規劃升級'],
-          ['.NET 11（C# 15）', 'STS', '預計 2026-11 正式發布', '目前是 RC，只在「預告」提到'],
+          ['.NET 11（C# 15）', 'STS', '正式版預計 2026-11-10 起的 .NET Conf 發布', '2026-10-13 發布 RC2，只在「預告」提到'],
         ] },
       ],
     },
@@ -76,17 +76,14 @@ defineLessons({
         why: ['SDK = 編譯器 + 工具 + runtime；runtime 只能執行已經編譯好的程式'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'lang', label: 'C# 語言' }, { id: 'lib', label: '.NET 函式庫' }, { id: 'tool', label: 'SDK 工具' }],
-          items: [
-            { text: '`if`、`for`、`class` 這些關鍵字', answer: 'lang', why: '關鍵字是語言規格的一部分，換任何函式庫都一樣。' },
-            { text: '`Console.WriteLine`', answer: 'lib', why: 'Console 是 System 命名空間裡的類別，由 .NET 的基礎類別庫提供，不是語法。' },
-            { text: '`dotnet new console`', answer: 'tool', why: '這是 SDK 附的命令列工具，用來建立專案。' },
-            { text: '`File.ReadAllText`', answer: 'lib', why: '讀檔是 .NET 提供的類別，語言本身不會讀檔。' },
-            { text: '字串插值 `$"{x}"`', answer: 'lang', why: '`$` 開頭的字串是語法，由編譯器處理。' },
-            { text: '`dotnet build`', answer: 'tool', why: '呼叫編譯器建置專案的 SDK 指令。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`if`、`for`、`class` 這些關鍵字', 'C# 語言', '關鍵字是語言規格的一部分，換任何函式庫都一樣。'],
+          ['`Console.WriteLine`', '.NET 函式庫', 'Console 是 System 命名空間裡的類別，由 .NET 的基礎類別庫提供，不是語法。'],
+          ['`dotnet new console`', 'SDK 工具', '這是 SDK 附的命令列工具，用來建立專案。'],
+          ['`File.ReadAllText`', '.NET 函式庫', '讀檔是 .NET 提供的類別，語言本身不會讀檔。'],
+          ['字串插值 `$"{x}"`', 'C# 語言', '`$` 開頭的字串是語法，由編譯器處理。'],
+          ['`dotnet build`', 'SDK 工具', '呼叫編譯器建置專案的 SDK 指令。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label=".NET 版本時間軸：2023-11 .NET 8 LTS，2024-11 .NET 9 STS，2025-11 .NET 10 LTS，2026-11 .NET 11 STS 預計發布；偶數版號是 LTS">
           <path d="M30 110 H530" class="stroke-ink" stroke-width="4"/>
           <rect x="30" y="40" width="110" height="50" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
@@ -103,12 +100,22 @@ defineLessons({
           <text x="340" y="28" text-anchor="middle" font-size="15">2025-11 LTS</text>
           <text x="472" y="205" text-anchor="middle" font-size="15">2026-11 預計</text>
         </svg>`, caption: '每年 11 月一版；偶數版號是 LTS（3 年支援），奇數是 STS（2 年）。虛線框是還沒正式發布的版本。' },
+        { type: 'widget', name: 'csrun', props: {
+          file: 'whoami.cs',
+          title: '執行結果（以 macOS Apple Silicon、.NET 10 為例）',
+          code: 'using System.Runtime.InteropServices;\n\nConsole.WriteLine(RuntimeInformation.FrameworkDescription);\nConsole.WriteLine(RuntimeInformation.ProcessArchitecture);\nConsole.WriteLine(RuntimeInformation.IsOSPlatform(OSPlatform.OSX));\nConsole.WriteLine(Environment.Version.Major);',
+          output: '.NET 10.0.13\nArm64\nTrue\n10',
+        } },
+        '同一份程式在 Windows x64 執行，第二行會是 `X64`、第三行是 `False`。這就是「IL 跨平台、機器碼由當地的 runtime 產生」的直接證據；第一行的修補版號依你安裝的 runtime 而定。',
+        { type: 'heading', id: 'deep-jit', text: '深入：JIT 不只翻一次，版本也有取捨' },
+        '.NET 的 JIT 採分層編譯（tiered compilation）：方法第一次被呼叫時先快速產生未最佳化的機器碼，呼叫次數多了再在背景重新編譯成最佳化版本。.NET 8 起預設啟用動態 PGO，依執行時實際走過的路徑最佳化，所以長時間執行的服務常常「跑一陣子後變快」。',
+        { type: 'table', head: ['執行方式', '什麼時候翻成機器碼', '取捨', '適合'], rows: [
+          ['JIT（預設）', '執行時', '啟動稍慢，但能依實際使用最佳化', '一般應用、長時間執行的伺服器'],
+          ['ReadyToRun', '發布時先翻一部分，執行時再補', '檔案變大，啟動變快，功能完整', '想縮短啟動又要完整功能'],
+          ['Native AOT（9-4）', '發布時全部翻完', '不需要安裝 runtime、啟動最快；不能在執行時產生程式碼', 'CLI 工具、Serverless、容器'],
+        ] },
+        '版本的取捨：LTS 適合要穩定運作 3 年的系統，STS 早一年拿到新功能，但 2 年內一定要升級。修補版（10.0.x 的 x）只修錯誤與安全性、不改 API，應該每月跟上；2026-10-13 微軟發布了 .NET 11 RC2（附可上線授權），正式版預計在 2026-11-10 開始的 .NET Conf 發布。',
       ],
-      tryit: {
-        q: ['填空：下面三樣各屬於哪一層？'],
-        draft: 'A. Roslyn：____\nB. List<int>：____\nC. switch 運算式：____',
-        answer: ['A 是 SDK 裡的編譯器；B 是 .NET 函式庫提供的型別；C 是 C# 語言的語法。', '判斷方法：會「翻譯程式」的是工具；可以用 `using` 引入、有命名空間的是函式庫；寫在語言規格裡、不用引入就能寫的是語法。'],
-      },
     },
     mistakes: [
       { wrong: '以為 C# 只能在 Windows 跑。', why: '那是 2016 年以前的 .NET Framework。現在的 .NET（Core 系列）從一開始就跨平台。', right: 'macOS、Linux 都直接裝 .NET 10 SDK；舊的 .NET Framework 4.x 只在維護舊系統時才碰。' },
@@ -116,19 +123,7 @@ defineLessons({
       { wrong: '把 .NET 11 的 RC 當正式版教新手。', why: 'RC 雖然可以上線，但 C# 15 的部分功能（例如 unsafe 新模型）仍是預覽，語法可能還會改。', right: '學習與正式專案以 .NET 10 為主；等 2026-11 正式版發布後再評估。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下面哪一個說法「錯誤」？', options: [
-        { text: 'SDK 裡面已經包含 runtime', why: '這是對的：裝 SDK 就能編譯也能執行。' },
-        { text: 'C# 編譯後直接產生這台 CPU 的機器碼', correct: true, why: '錯在這裡：一般情況先產生 IL，執行時才由 JIT 翻成機器碼（Native AOT 例外，模組 9 會提）。' },
-        { text: 'Console.WriteLine 是 .NET 函式庫提供的', why: '這是對的：Console 是 System 命名空間裡的類別。' },
-        { text: '.NET 可以在 macOS 與 Linux 上執行', why: '這是對的：.NET Core 以後就是跨平台。' },
-      ] },
-      { level: '應用', type: 'mc', q: '2026-10，公司要開一個預計維護 3 年的新後端，該選哪個版本？', options: [
-        { text: '.NET 8，因為它是 LTS 而且用的人多', why: '.NET 8 在 2026-11-10 就停止支援，等於上線就要升級。' },
-        { text: '.NET 10，LTS 支援到 2028-11', correct: true, why: '目前支援最久的正式版本，C# 14 也是它的預設版本。' },
-        { text: '.NET 11 RC，因為版本號最新', why: 'RC 還不是正式版，而且 .NET 11 是 STS，只支援 2 年。' },
-        { text: '.NET 9，因為它比 8 新又比 11 穩', why: '.NET 9 是 STS，也是 2026-11-10 結束支援。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事說：「Java 也是先編成中間碼再由虛擬機執行，那 C# 跟 Java 的執行方式有什麼像的地方？」你會怎麼用這課的模型回答？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同事說：「Java 也是先編成中間碼再由虛擬機執行，那 C# 跟 Java 的執行方式有什麼像的地方？」你會怎麼用這課的模型回答？'], answer: [
         '兩者都是「兩次翻譯」：原始碼先編成平台中立的中間碼（Java 是 bytecode，.NET 是 IL），執行時再由虛擬機的 JIT 翻成機器碼。',
         '所以同一份編譯結果能在不同作業系統跑，前提是那台機器有對應的 runtime（JVM 或 .NET runtime）。',
       ] },
@@ -138,7 +133,7 @@ defineLessons({
       'C# 先編成 IL，執行時由 JIT 翻成機器碼。',
       '2026-10 的主線是 .NET 10 LTS 與 C# 14；.NET 8、9 在 2026-11-10 停止支援。',
     ],
-    sources: ['dotnet-intro', 'dotnet-support', 'cs-whatsnew-14'],
+    sources: ['dotnet-intro', 'dotnet-support', 'cs-whatsnew-14', 'dotnet11-rc2'],
   },
 
   '0-2': {
@@ -146,14 +141,6 @@ defineLessons({
       '安裝 .NET 10 SDK 並確認版本',
       '用 `dotnet run app.cs` 執行一個沒有專案檔的程式',
       '知道什麼時候要改用 `dotnet new console` 建專案',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1）只安裝了「.NET Runtime 10.0」，能做到哪一件事？', options: [
-        { text: '執行別人已經編譯好的 .dll', correct: true, why: 'runtime 負責執行已經編譯好的程式。' },
-        { text: '用 dotnet run 編譯並執行 app.cs', why: '編譯需要 SDK 裡的編譯器，只有 runtime 會出現找不到 SDK 的錯誤。' },
-        { text: '用 dotnet new console 建立新專案', why: '範本與 new 指令都在 SDK 裡。' },
-        { text: '用 dotnet build 建置專案', why: 'build 會呼叫編譯器，也需要 SDK。' },
-      ] },
     ],
     analogy: {
       text: ['寫一張便條給自己，不需要先開一個資料夾、放封面、寫目錄；但要寫一本書，就需要資料夾和目錄。`app.cs` 就是便條，`dotnet new console` 建出來的專案就是一本書的資料夾。'],
@@ -209,7 +196,6 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'app.cs',
           code: 'Console.WriteLine("哈囉，C#");\nConsole.WriteLine(1 + 2);\nConsole.WriteLine("1" + 2);',
-          predict: { q: '第三行 `"1" + 2` 會印出什麼？', options: ['3', '12', '編譯錯誤'], answer: 1 },
           output: '哈囉，C#\n3\n12',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="執行 dotnet run app.cs 時的三個步驟：產生暫時的專案設定、編譯成 IL 並快取、執行；第二次執行如果檔案沒改，會直接用快取">
@@ -225,35 +211,22 @@ defineLessons({
           <g class="stroke-ink" stroke-width="4"><path d="M170 80 H200"/><path d="M360 80 H390"/></g>
           <text x="280" y="170" text-anchor="middle" font-size="16">檔案沒改：第二次跳過 1、2，啟動變快</text>
         </svg>`, caption: '第一次執行比較慢是在編譯；檔案沒改時會直接用快取。' },
+        { type: 'heading', id: 'deep-directives', text: '深入：檔案型程式的指令與邊界' },
+        '檔案型程式用檔案開頭的 `#:` 指令補上原本寫在專案檔裡的設定。這些指令要放在檔案最前面，寫在程式碼之前。',
+        { type: 'table', head: ['指令', '作用', '例子'], rows: [
+          ['`#:package`', '引用 NuGet 套件，要寫版本（或 `@*` 取最新）；只有啟用中央套件管理時才能省略', '`#:package Humanizer@2.14.1`'],
+          ['`#:sdk`', '換成別的 SDK，例如寫一支小型 Web API', '`#:sdk Microsoft.NET.Sdk.Web`'],
+          ['`#:property`', '設定 MSBuild 屬性', '`#:property LangVersion=preview`'],
+          ['`#:project`', '參考另一個專案', '`#:project ../Shop.Core`'],
+        ] },
+        'macOS、Linux 可以在第一行加 `#!/usr/bin/env dotnet`，`chmod +x app.cs` 之後直接 `./app.cs` 執行，像 Python 腳本一樣。檔案型程式預設開啟 Nullable 與隱含 using，`dotnet publish app.cs` 預設產生 Native AOT。',
+        '什麼時候不適用：需要多個 .cs 檔（`#:include` 要 SDK 10.0.300 或 .NET 11 才有）、要寫單元測試、要給團隊維護時，用 `dotnet project convert app.cs` 轉成專案。轉換會把 `#:` 指令搬進 .csproj，原檔不會被刪掉。',
       ],
-      tryit: {
-        q: ['你寫好了 `hello.cs`，想在終端機執行它，____ 該填什麼？'],
-        draft: 'dotnet ____',
-        answer: ['`dotnet run hello.cs`，或簡寫 `dotnet hello.cs`。', '注意：如果目前資料夾裡已經有 .csproj，`dotnet run hello.cs` 會跑那個專案，要改用 `dotnet run --file hello.cs`。'],
-      },
     },
     mistakes: [
       { wrong: '在已經有 .csproj 的資料夾裡執行 `dotnet run app.cs`，結果跑的是另一個程式。', why: '為了相容舊行為，有專案檔時 `app.cs` 會被當成傳給專案的參數。', right: '用 `dotnet run --file app.cs`，或把檔案型程式放在沒有專案檔的資料夾。' },
       { wrong: '兩個 .cs 檔都寫頂層陳述式，想放在同一個專案。', why: '一個程式只能有一個進入點，編譯器會回報 `CS8802`。', right: '只有一個檔寫頂層陳述式，其他檔放類別與方法。' },
       { wrong: '舊教學說要先 `dotnet new console` 才能跑任何東西，就一直被專案結構卡住。', why: '那是 .NET 10 以前的流程。', right: '學語法時用 `dotnet run app.cs`；要多檔案、測試、部署時再 `dotnet project convert`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`dotnet run app.cs` 最低需要哪個版本的 SDK？', options: [
-        { text: '.NET 8 SDK 就可以', why: '.NET 8 只能跑專案，不支援檔案型應用程式。' },
-        { text: '.NET 10 SDK', correct: true, why: '檔案型應用程式是 .NET 10 SDK 新增的功能。' },
-        { text: '一定要 .NET 11 SDK', why: '.NET 10 就支援，.NET 11 只是加了 `#:include` 等新指令。' },
-        { text: '任何版本，只要有 runtime', why: '只有 runtime 不能編譯，一定要 SDK。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`Console.WriteLine("1" + 2);` 會印出什麼？', options: [
-        { text: '`3`', why: '有一邊是字串時，`+` 做的是字串串接，不是數字相加。' },
-        { text: '`12`', correct: true, why: '2 被轉成字串 "2" 再接在 "1" 後面。' },
-        { text: '編譯錯誤 CS0019', why: 'string 和 int 用 + 是合法的：C# 定義了 string + object 的串接。' },
-        { text: '執行時拋出 FormatException', why: '這裡沒有做任何解析，只是串接字串。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你想寫一個每天整理下載資料夾的小工具，需要一個 NuGet 套件。用檔案型程式可以嗎？要怎麼寫？'], answer: [
-        '可以。在檔案最上面加 `#:package 套件名@版本`，例如 `#:package Spectre.Console@0.49.1`，`dotnet run tidy.cs` 會自動還原套件。',
-        '版本要寫清楚（或寫 `@*` 取最新）；只有用中央套件管理（Directory.Packages.props）時才能省略版本。工具長大、需要多個檔案時再 `dotnet project convert`。',
-      ] },
     ],
     keypoints: [
       '.NET 10 起，`dotnet run app.cs` 不用專案檔就能執行一個 .cs 檔。',
@@ -268,14 +241,6 @@ defineLessons({
       '分辨編譯錯誤與執行時的例外',
       '從錯誤訊息找出檔案、行號、錯誤代碼',
       '讀懂例外的堆疊追蹤，找到出錯的那一行',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 0-2）兩個檔案都寫了頂層陳述式，會發生什麼事？', options: [
-        { text: '編譯錯誤：只能有一個檔案有頂層陳述式', correct: true, why: '程式只能有一個進入點，編譯器回報 CS8802。' },
-        { text: '兩個檔案會依照檔名的字母順序各自執行', why: '編譯器不會幫你決定順序，直接拒絕編譯。' },
-        { text: '只執行先被編譯的那個檔案', why: '沒有「先編譯」的概念，整個專案一起編譯。' },
-        { text: '執行時才拋出例外', why: '這在編譯階段就會被擋下來。' },
-      ] },
     ],
     analogy: {
       text: ['編譯錯誤像郵局櫃檯退件：地址格式不對，信根本寄不出去。例外像信寄到了，卻發現那棟樓拆了：格式都對，但執行時才遇到問題。'],
@@ -323,16 +288,13 @@ defineLessons({
         why: ['編譯器只能檢查「寫死在程式裡」的值；從外部來的資料要到執行時才知道'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'compile', label: '編譯錯誤' }, { id: 'run', label: '執行時例外' }, { id: 'ok', label: '沒有錯' }],
-          items: [
-            { text: '`int n = "5";`', answer: 'compile', why: 'string 不能直接指定給 int，CS0029。' },
-            { text: '`int n = int.Parse("abc");`', answer: 'run', why: '型別沒問題，但 "abc" 不是數字，執行時拋 FormatException。' },
-            { text: '`Console.Writeline("hi");`', answer: 'compile', why: '大小寫錯了，Console 沒有 Writeline 這個成員，CS0117。' },
-            { text: '`int[] a = [1, 2]; Console.WriteLine(a[2]);`', answer: 'run', why: '索引 2 超出範圍，IndexOutOfRangeException。' },
-            { text: '`Console.WriteLine(10 / 4);`', answer: 'ok', why: '合法，印出 2（整數除法，1-4 會講）。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`int n = "5";`', '編譯錯誤', 'string 不能直接指定給 int，CS0029。'],
+          ['`int n = int.Parse("abc");`', '執行時例外', '型別沒問題，但 "abc" 不是數字，執行時拋 FormatException。'],
+          ['`Console.Writeline("hi");`', '編譯錯誤', '大小寫錯了，Console 沒有 Writeline 這個成員，CS0117。'],
+          ['`int[] a = [1, 2]; Console.WriteLine(a[2]);`', '執行時例外', '索引 2 超出範圍，IndexOutOfRangeException。'],
+          ['`Console.WriteLine(10 / 4);`', '沒有錯', '合法，印出 2（整數除法，1-4 會講）。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="閱讀編譯錯誤的拆解：app.cs 是檔案，括號裡的 2,22 是第 2 行第 22 欄，error CS1002 是錯誤代碼，最後是說明">
           <rect x="10" y="30" width="540" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
           <text x="25" y="62" font-size="18" class="mono">app.cs(2,22): error CS1002: ; expected</text>
@@ -346,12 +308,23 @@ defineLessons({
           <rect x="330" y="120" width="100" height="44" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
           <text x="380" y="148" text-anchor="middle" font-size="15" class="on-color">說明</text>
         </svg>`, caption: '錯誤代碼可以直接搜尋，例如「CS1002」，Microsoft Learn 有每個代碼的說明頁。' },
+        { type: 'widget', name: 'csrun', props: {
+          file: 'app.cs',
+          title: '執行結果：讀一份真的堆疊追蹤',
+          code: 'Console.WriteLine("開始");\nPrintAverage([]);\n\nvoid PrintAverage(int[] scores) => Console.WriteLine(Sum(scores) / scores.Length);\nint Sum(int[] a) { int s = 0; foreach (var x in a) s += x; return s; }',
+          output: '開始\n!Unhandled exception. System.DivideByZeroException: Attempted to divide by zero.\n!   at Program.<<Main>$>g__PrintAverage|0_0(Int32[] scores) in /Users/me/app.cs:line 4\n!   at Program.<Main>$(String[] args) in /Users/me/app.cs:line 2',
+        } },
+        '由上往下讀：第一個 `at` 是出事的地方（第 4 行的 PrintAverage，空陣列的 Length 是 0），下一個 `at` 是誰呼叫它（第 2 行）。「開始」已經印出來，證明這是執行到一半才發生的例外，不是編譯錯誤。',
+        { type: 'heading', id: 'deep-warnings', text: '深入：警告、偵錯符號與奇怪的方法名稱' },
+        '編譯器除了 error 還會給 warning，例如 CS8602（可能對 null 存取成員）。warning 不擋建置，但多半是未來的執行時錯誤；專案設 `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`，警告就會讓建置失敗，團隊常在 CI 上開啟。',
+        '堆疊追蹤的檔名與行號來自建置時產生的偵錯符號檔（.pdb）。Release 組態會最佳化，被內聯（inline）的小方法可能不出現在追蹤裡，所以正式環境看到的呼叫鏈有時比原始碼少一層。',
+        { type: 'table', head: ['在追蹤裡看到', '代表什麼'], rows: [
+          ['`<Main>$`', '頂層陳述式被編譯器包成的進入點'],
+          ['`<<Main>$>g__PrintAverage|0_0`', '頂層陳述式裡的區域函式 PrintAverage，找中間那段名字就好'],
+          ['`MoveNext()`、`<>c__DisplayClass`', 'async 方法、迭代器、lambda 被改寫成的類別（模組 6、8）'],
+          ['`--- End of stack trace from previous location ---`', '例外跨過 await 被重新拋出的位置'],
+        ] },
       ],
-      tryit: {
-        q: ['下面的例外訊息，錯在哪個檔案、第幾行、什麼種類？'],
-        draft: 'Unhandled exception. System.FormatException: The input string \'abc\' was not in a correct format.\n   at System.Int32.Parse(String s)\n   at Program.<Main>$(String[] args) in /Users/me/age.cs:line 4\n\n檔案：____　行：____　種類：____',
-        answer: ['檔案 `age.cs`、第 4 行、`FormatException`。', '第一個 `at` 是 .NET 內部的 Int32.Parse，往下找第一個「你自己的檔案」才是要改的地方：第 4 行把 "abc" 交給 int.Parse。'],
-      },
     },
     mistakes: [
       { wrong: '只看最後一行錯誤訊息，然後從程式最上面開始找。', why: '錯誤訊息已經寫了檔案與行號。', right: '先看 `檔案(行,欄)`，或堆疊追蹤裡第一個屬於自己檔案的 `at … line N`。' },
@@ -359,19 +332,7 @@ defineLessons({
       { wrong: '以為「能編譯就代表沒問題」。', why: '編譯器只保證型別與語法正確；資料造成的錯誤要到執行時才出現。', right: '外部輸入（使用者、檔案、網路）一律假設可能出錯，用 TryParse 等方法處理（1-4 會講）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一個一定是「編譯錯誤」？', options: [
-        { text: '把 `"hello"` 指定給 `int` 變數', correct: true, why: '型別不符，編譯器在產生程式前就會擋下（CS0029）。' },
-        { text: '`int.Parse` 收到 `"hello"`', why: '型別正確（string），要執行時才知道內容不是數字。' },
-        { text: '讀取一個不存在的檔案', why: '檔案存不存在只有執行時才知道，會拋 FileNotFoundException。' },
-        { text: '用變數當除數而它剛好是 0', why: '變數的值執行時才知道，會拋 DivideByZeroException。' },
-      ] },
-      { level: '應用', type: 'mc', q: '堆疊追蹤有三行 `at`：第 1 行是 `System.Number.ThrowFormatException`，第 2 行是 `System.Int32.Parse`，第 3 行是 `Program.<Main>$ in app.cs:line 7`。該去改哪裡？', options: [
-        { text: '.NET 的 Int32.Parse 有 bug，要回報', why: '.NET 內部只是忠實地拒絕了錯誤的輸入。' },
-        { text: 'app.cs 第 7 行：傳進 Parse 的字串', correct: true, why: '第一個屬於你自己程式的位置就是要檢查的地方。' },
-        { text: '程式的第 1 行', why: '堆疊追蹤已經指出是第 7 行。' },
-        { text: '重新安裝 .NET SDK', why: '這是資料問題，和安裝無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼說「靜態型別語言把一部分錯誤從執行時提前到編譯時」？舉一個 C# 能提前抓到、但 JavaScript 要到執行時才發現的例子。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼說「靜態型別語言把一部分錯誤從執行時提前到編譯時」？舉一個 C# 能提前抓到、但 JavaScript 要到執行時才發現的例子。'], answer: [
         'C# 在編譯時就知道每個變數的型別，所以型別不合的操作在產生程式前就被擋下。',
         '例子：`int n = "5";` 在 C# 是 CS0029 編譯錯誤；在 JavaScript，`let n = "5"; n.toFixed(2)` 要執行到那行才拋 TypeError。',
       ] },

@@ -88,49 +88,20 @@ defineLessons({
             <text x="305" y="200" class="on-color">新開的視窗都有</text>
           </g>
         </svg>`, caption: '改了永久設定之後，**已經開著的視窗不會自動更新**，要重開終端機或重新載入設定檔。' },
+        { type: 'heading', id: 'deep-env', text: '深入：變數的範圍與「環境變數不是保險箱」' },
+        { type: 'table', caption: '三種設定方式的範圍', head: ['寫法（zsh／bash）', '誰看得到', 'PowerShell 對應'], rows: [
+          ['`X=1`', '只有目前這個 shell，子程式看不到', '`$X = 1`（一般變數）'],
+          ['`export X=1`', '目前 shell 和之後啟動的所有子程式', '`$env:X = 1`'],
+          ['`X=1 node app.js`', '只有這一次執行的 node', '沒有這種寫法，要先設再清掉'],
+        ] },
+        '子程式改不回父程式，也解釋了一個常見困惑：執行 `./setup.sh` 時，腳本裡的 `cd` 和 `export` 都不會留到你的終端機。要讓設定留下來，得用 `source setup.sh`（4-4）。',
+        '環境變數方便，但不是加密的保險箱：同一個帳號下的其他程式、你啟動的每個子程式（包括 AI CLI 執行的指令）都讀得到。Windows 的 `setx` 可以永久設定，但值超過 1024 個字元會被截斷，用它改 PATH 可能把 PATH 截掉一半。',
       ],
-      tryit: {
-        q: ['在 zsh 設定一個環境變數 `PORT` 為 `8080`，再印出來確認。兩行。'],
-        code: true,
-        draft: '____\n____',
-        answer: ['`export PORT=8080`、`echo $PORT`。', '注意 `PORT=8080` 中間不能有空白：`PORT = 8080` 會被當成「執行叫 PORT 的程式，參數是 = 和 8080」。'],
-      },
     },
     mistakes: [
       { wrong: '在 zsh 打 `export NAME = amy`。', why: '空白是分隔符號（1-2），shell 看到的是三塊，會報錯。', right: '等號兩邊不留空白：`export NAME=amy`；有空白的值加引號：`export NAME="amy chen"`。' },
       { wrong: '在 PowerShell 打 `echo $HOME`、`export X=1`。', why: '這是 zsh／bash 的寫法；PowerShell 讀環境變數要加 `env:` 前綴，也沒有 export。', right: '`$env:USERPROFILE`、`$env:X = 1`。（PowerShell 有一個 `$HOME` 自動變數，但它不是環境變數。）' },
       { wrong: '設好環境變數後開新的終端機分頁，發現讀不到。', why: '用指令設定的只活在那個視窗。', right: '需要每次都有，就寫進設定檔（4-4）或 Windows 的環境變數設定。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '在 PowerShell 讀取 `USERNAME` 環境變數，正確寫法是？', options: [
-        { text: '`$USERNAME`', why: '沒有 `env:` 前綴，PowerShell 會找同名的一般變數，通常是空的。' },
-        { text: '`$env:USERNAME`', correct: true, why: 'PowerShell 用 `env:` 前綴讀取環境變數。' },
-        { text: '`%USERNAME%`', why: '這是 cmd 的寫法。' },
-        { text: '`printenv USERNAME`', why: '`printenv` 是 macOS／Linux 的程式，PowerShell 預設沒有。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你在終端機 A 執行 `export DEBUG=1`，然後在**另一個已經開著的**終端機 B 執行程式。程式讀得到 DEBUG 嗎？', options: [
-        { text: '讀得到，環境變數是全系統共用的', why: '每個 shell 有自己的一份；export 只影響這個 shell 和它之後啟動的程式。' },
-        { text: '讀不到，因為 B 是另一個 shell', correct: true, why: 'A 的設定不會傳到 B；要在 B 也設定，或寫進設定檔再重開。' },
-        { text: '讀得到，但要等幾秒鐘同步', why: '沒有同步機制。' },
-        { text: '讀不到，因為 export 只能用在腳本裡', why: '在互動式 shell 也能用，只是範圍限於這個 shell。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['AI 工具的安裝說明常寫「把 API 金鑰設成環境變數 `XXX_API_KEY`」。為什麼不直接讓你在設定檔寫明碼，或每次打在指令後面？'], answer: [
-        '參考：環境變數讓**程式碼和密碼分開**：程式碼可以公開或 commit，密碼留在你的電腦上。打在指令後面會留在歷史紀錄裡；寫死在程式碼裡容易不小心上傳到 GitHub。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-3）`echo $PATH > path.txt` 做了什麼？', options: [
-        { text: '把 PATH 的內容寫進 path.txt（覆寫）', correct: true, why: 'echo 印出 PATH 的值，`>` 把它存進檔案。' },
-        { text: '把 path.txt 這個檔案加進 PATH 變數', why: '這需要修改 PATH，不是用 `>`。' },
-        { text: '附加到 path.txt 最後', why: '附加是 `>>`。' },
-        { text: '把 PATH 傳給叫 path.txt 的程式', why: '傳給程式用的是 `|`。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-1）`export NODE_ENV=production` 裡，`export` 是？', options: [
-        { text: '程式（shell 的內建指令）', correct: true, why: '第一個字永遠是要執行的指令。' },
-        { text: '選項', why: '選項通常是減號開頭。' },
-        { text: '參數', why: '參數是 `NODE_ENV=production`。' },
-        { text: '變數名稱', why: '變數名稱是 NODE_ENV。' },
-      ] },
     ],
     keypoints: [
       '環境變數是 shell 傳給每個程式的「名稱＝值」，用來放設定和金鑰。',
@@ -202,13 +173,16 @@ defineLessons({
             <text x="30" y="200" font-weight="900" class="on-color">③ 裝了但找不到</text><text x="30" y="226" font-size="17" class="on-color">重開終端機 → 還不行就把安裝資料夾加進 PATH</text>
           </g>
         </svg>`, caption: '九成的「找不到指令」是第 ①、③ 種。第 ③ 種最常見的解法就是**重開終端機**。' },
+        { type: 'heading', id: 'deep-lookup', text: '深入：shell 在找 PATH 之前，還會先看別的地方' },
+        { type: 'table', caption: '輸入一個名字時的查找順序', head: ['順序', 'zsh／bash', 'PowerShell'], rows: [
+          ['1', '別名（alias）', '別名'],
+          ['2', '函式', '函式'],
+          ['3', '內建指令（cd、echo）', 'cmdlet'],
+          ['4', 'PATH 裡的程式（第一次找到後會記住位置）', 'PATH 裡的程式，副檔名依 `PATHEXT`（.exe、.cmd…）'],
+        ] },
+        'bash 會記住找過的位置。裝了新版本到另一個資料夾後，同一個視窗可能還在執行舊的那個；打 `hash -r`（zsh 是 `rehash`）清掉記憶。想看所有同名的程式，用 `which -a python3`、`Get-Command python -All` 或 `where.exe python`。',
+        'Windows 的 PATH 其實是兩段接起來的：系統 PATH 在前、使用者 PATH 在後。所以你在使用者 PATH 加的資料夾，碰到系統 PATH 裡的同名程式時會輸。PowerShell 也**不會**從目前資料夾執行程式，一定要寫 `.\\script.ps1`，這是刻意的安全設計。',
       ],
-      tryit: {
-        q: ['你在 macOS 裝了兩個版本的 Python。寫一個指令查出現在打 `python3` 會用到哪一個。'],
-        code: true,
-        draft: '____',
-        answer: ['`which python3`（zsh 也可以用 `where python3` 列出所有符合的位置）。', 'PowerShell：`Get-Command python`；cmd：`where python`。'],
-      },
     },
     mistakes: [
       { wrong: '照網路教學把 PATH 設成 `export PATH=/my/tool/bin`。', why: '這會**把整個 PATH 換掉**，原本的 `/usr/bin` 等都不見了，連 `ls` 都找不到。', right: '在原本的 PATH 前面加：`export PATH="/my/tool/bin:$PATH"`。' },
@@ -216,34 +190,8 @@ defineLessons({
       { wrong: '為了方便，把 `.`（目前資料夾）加到 PATH 最前面。', why: '任何資料夾裡放一個叫 `ls` 的惡意腳本，你一 `cd` 進去打 `ls` 就會執行它。', right: '不要把 `.` 放進 PATH；要執行目前資料夾的腳本，明確寫 `./script.sh`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'PATH 裡有兩個資料夾都放了 `node`，打 `node` 會執行哪一個？', options: [
-        { text: '版本比較新的那個', why: 'shell 不比較版本，只看順序。' },
-        { text: 'PATH 裡排在前面的那個', correct: true, why: '找到第一個就停止。' },
-        { text: '兩個都執行', why: '只會執行一個。' },
-        { text: 'shell 會跳出選單讓你選', why: 'shell 不會問你，直接用第一個。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你想把 `~/tools/bin` 加進 PATH（zsh，暫時），哪一行正確？', options: [
-        { text: '`export PATH=~/tools/bin`', why: '會把整個 PATH 換掉，其他指令都找不到了。' },
-        { text: '`export PATH="$HOME/tools/bin:$PATH"`', correct: true, why: '新資料夾放前面，接著原本的 PATH。' },
-        { text: '`export PATH = "$PATH:$HOME/tools/bin"`', why: '等號兩邊有空白，zsh 會報錯。' },
-        { text: '`PATH += ~/tools/bin`', why: '這不是 zsh 的語法。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事說「我裝了 Claude Code，可是打 `claude` 說 command not found」。列出你會依序請他做的三件事。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同事說「我裝了 Claude Code，可是打 `claude` 說 command not found」。列出你會依序請他做的三件事。'], answer: [
         '參考：① 確認拼字。② 關掉終端機重開。③ 還是不行，查安裝位置在不在 PATH：`which claude`／`Get-Command claude`、`echo $PATH`；不在就照安裝說明把那個資料夾加進 PATH（寫進設定檔，4-4）。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-4）`command not found` 屬於哪一類錯誤？', options: [
-        { text: '找不到指令', correct: true, why: 'shell 在 PATH 裡找不到這個名稱的程式。' },
-        { text: '找不到檔案', why: '那是 `No such file or directory`，指的是參數裡的檔案。' },
-        { text: '權限不足', why: '那是 `Permission denied`。' },
-        { text: '語法錯誤', why: '語法錯誤是 shell 看不懂整行的結構。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-1）PATH 裡的資料夾通常用哪種路徑寫？', options: [
-        { text: '絕對路徑', correct: true, why: '不管你在哪個資料夾，PATH 都要指向同樣的地方。' },
-        { text: '相對路徑', why: '相對路徑會隨著目前位置改變，放在 PATH 裡會很混亂也危險。' },
-        { text: '只能寫資料夾名稱', why: '要寫完整位置。' },
-        { text: '網址', why: 'PATH 是本機資料夾。' },
       ] },
     ],
     keypoints: [
@@ -290,7 +238,7 @@ defineLessons({
             '只在需要時開（例如安裝系統層級的軟體），做完就關掉，平常用一般身分的終端機。',
           ] },
           { label: 'Windows 的 sudo', blocks: [
-            'Windows 11 24H2 起內建 `sudo`，要先到「設定 → 系統 → 進階」開啟。開啟後可以在一般終端機打 `sudo 指令`，跳出 UAC 確認後以管理員身分執行那一個指令。',
+            'Windows 11 24H2 起內建 `sudo`，要先到「設定 → 系統 → 進階」開啟。開啟後可以在一般終端機打 `sudo 指令`，跳出 UAC 確認後以管理員身分執行那一個指令；預設會開一個新視窗來執行（見下方深入段）。',
           ] },
           { label: 'PowerShell 執行原則', blocks: [
             { type: 'code', lang: 'powershell', title: 'PowerShell', code: '# 錯誤：因為這個系統上已停用指令碼執行，所以無法載入 setup.ps1\nGet-ExecutionPolicy                 # 通常是 Restricted\nSet-ExecutionPolicy -Scope CurrentUser RemoteSigned' },
@@ -332,13 +280,15 @@ defineLessons({
             <text x="305" y="198" class="on-color">git、chmod 自己的檔</text>
           </g>
         </svg>`, caption: '在自己的專案裡遇到權限錯誤，答案幾乎從來不是 sudo，而是檔案擁有者或位置不對。' },
+        { type: 'heading', id: 'deep-perm', text: '深入：數字權限、資料夾的 x、和 sudo 也擋不住的情況' },
+        '權限也常寫成三位數字：r=4、w=2、x=1，加起來就是一組。`755` 是 `rwxr-xr-x`（腳本、資料夾常用），`644` 是 `rw-r--r--`（一般檔案）。`777` 讓所有人都能改，幾乎不該出現（8-1）。',
+        { type: 'table', caption: '容易誤會的情況', head: ['情況', '原因', '做法'], rows: [
+          ['資料夾有 r 卻進不去', '資料夾的 `x` 代表「可以進入」，`r` 只代表「可以列出」', '`chmod +x 資料夾`'],
+          ['macOS 出現 `Operation not permitted`', '這不是 rwx，而是系統的隱私保護：終端機沒被允許讀「文件」「桌面」等資料夾', '系統設定 → 隱私權與安全性 → 給終端機權限；加 sudo 沒用'],
+          ['Windows `sudo` 開了新視窗', '預設模式是 `forceNewWindow`，在新視窗以管理員執行', '另外兩種模式（disableInput、inline）比較方便，但官方提醒有安全風險'],
+        ] },
+        '[[執行原則]]也不是安全邊界：微軟的文件寫明它只是防止「不小心執行」的設定，使用者可以用 `-ExecutionPolicy Bypass` 繞過。真正要防的是你自己判斷要不要執行一個腳本（8-1）。',
       ],
-      tryit: {
-        q: ['你在 Windows 執行 `.\\setup.ps1`，出現「已停用指令碼執行」。寫出查看與修正的兩行指令（只改自己的帳號）。'],
-        code: true,
-        draft: '____\n____',
-        answer: ['`Get-ExecutionPolicy`、`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。', '執行前先打開 setup.ps1 看一下內容，確定它來自你信任的地方。'],
-      },
     },
     mistakes: [
       { wrong: '每次遇到 Permission denied 就加 `sudo`。', why: 'sudo 讓整個指令擁有改動系統的權力；而且在家目錄用 sudo 建的檔案會變成 root 的，之後你自己反而改不動。', right: '先判斷是不是真的要改系統；自己的檔案用 `chmod`／`chown` 修正擁有者或權限。' },
@@ -346,35 +296,9 @@ defineLessons({
       { wrong: '執行原則擋住腳本，就設成 `Set-ExecutionPolicy Unrestricted`。', why: 'Unrestricted 讓所有腳本都能執行，包含網路下載、沒簽章的；而且不加 Scope 會改整台電腦，需要管理員。', right: '用 `-Scope CurrentUser RemoteSigned`，範圍最小、夠用。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`-rwxr-xr--` 中，「其他人」有哪些權限？', options: [
-        { text: '讀、寫、執行', why: '那是第一組（擁有者）的 rwx。' },
-        { text: '讀、執行', why: '那是第二組（群組）的 r-x。' },
-        { text: '只能讀', correct: true, why: '最後一組 `r--`：只有 r。' },
-        { text: '沒有任何權限', why: '最後一組是 `r--`，有讀取權限。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`./build.sh` 回報 `permission denied`，檔案是你自己建的。最合適的做法是？', options: [
-        { text: '`sudo ./build.sh`', why: '問題是檔案沒有執行權限，不是你的身分不夠；而且用 root 跑建置腳本風險很高。' },
-        { text: '`chmod +x build.sh` 再執行', correct: true, why: '加上執行權限即可，不需要管理員。' },
-        { text: '`rm build.sh` 重新下載', why: '重新下載的檔案一樣沒有執行權限。' },
-        { text: '把 build.sh 移到 /usr/bin', why: '這需要 sudo，而且沒有解決執行權限的問題。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['網路教學寫 `curl https://某網站/install.sh | sudo bash`。用這課的觀念說明，這一行為什麼特別需要小心？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['網路教學寫 `curl https://某網站/install.sh | sudo bash`。用這課的觀念說明，這一行為什麼特別需要小心？'], answer: [
         '參考：它把網路上下載的內容（你沒看過）直接交給 bash 執行，而且是用 sudo，也就是**以系統管理員身分執行一段你沒讀過的程式**。網站被入侵或網址打錯，後果就是整台電腦。',
         '至少要：確認是官方網址、先下載下來看內容、能不用 sudo 就不用（8-1）。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-4）`chmod +x run.sh && ./run.sh` 的 `&&` 代表？', options: [
-        { text: 'chmod 成功才執行 run.sh', correct: true, why: '`&&` 依結束代碼決定是否繼續。' },
-        { text: '兩個同時執行', why: '同時執行並傳資料是管線。' },
-        { text: 'chmod 失敗才執行', why: '那是 `||`。' },
-        { text: '把 chmod 的輸出存進 run.sh', why: '寫進檔案用 `>`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-4）`Permission denied` 是哪一類錯誤？', options: [
-        { text: '權限不足', correct: true, why: '你目前的身分或檔案的權限不允許這個動作。' },
-        { text: '找不到指令', why: '那是 command not found。' },
-        { text: '找不到檔案', why: '那是 No such file。' },
-        { text: '語法錯誤', why: 'shell 看懂了指令，只是被擋下。' },
       ] },
     ],
     keypoints: [
@@ -454,56 +378,27 @@ defineLessons({
           <text x="10" y="160" font-size="18">shell 壞到打不開時：用 VS Code 或記事本</text>
           <text x="10" y="190" font-size="18">直接打開設定檔修改，或改開另一種 shell。</text>
         </svg>`, caption: '設定檔再怎麼壞，也只是一個文字檔，用編輯器打開就能修。' },
+        { type: 'heading', id: 'deep-startup', text: '深入：登入 shell 和一般 shell 讀不同的檔案' },
+        '0-2 提到 `echo $0` 開頭有 `-` 代表登入 shell。macOS 的終端機 App 每個新視窗都開登入 shell，大部分 Linux 桌面的終端機則不是，所以同一份設定放錯檔，在兩邊的表現會不同。',
+        { type: 'table', caption: '各 shell 啟動時讀哪些檔', head: ['shell', '登入 shell', '一般互動 shell', '執行腳本時'], rows: [
+          ['zsh', '`~/.zprofile`，接著 `~/.zshrc`', '`~/.zshrc`', '只讀 `~/.zshenv`'],
+          ['bash', '`~/.bash_profile`（**不讀** `.bashrc`）', '`~/.bashrc`', '都不讀'],
+          ['PowerShell', '四個設定檔，用 `$PROFILE | Select-Object *` 列出', '同左', '`-NoProfile` 時不讀'],
+        ] },
+        '實務影響：Homebrew 的安裝程式把 PATH 設定寫進 `~/.zprofile`，而不是 `.zshrc`；在 bash 裡常見的做法是讓 `.bash_profile` 去 `source ~/.bashrc`。腳本不會讀 `.zshrc`，所以你設定的別名在腳本裡不能用。Windows PowerShell 5.1 和 PowerShell 7 的設定檔放在不同資料夾，在其中一邊加的設定，另一邊看不到。',
       ],
-      tryit: {
-        q: ['寫出 PowerShell 版：在設定檔加一個別名 `ll` 代表 `Get-ChildItem -Force`。提示：Set-Alias 只能對應指令名稱，不能帶參數，要用函式。'],
-        code: true,
-        draft: '# 寫進 $PROFILE 的內容：\n____',
-        answer: ['`function ll { Get-ChildItem -Force @args }`', '存檔後 `. $PROFILE` 重新載入。zsh 版本則是 `alias ll="ls -la"`。'],
-      },
     },
     mistakes: [
       { wrong: '改了 `~/.zshrc`，在同一個視窗發現沒效果，以為寫錯了。', why: '設定檔只在 shell 啟動時執行；已經開著的視窗不會自動重讀。', right: '`source ~/.zshrc`（PowerShell：`. $PROFILE`），或開新視窗。' },
       { wrong: '在 macOS 把設定寫進 `~/.bashrc`，結果沒有作用。', why: 'macOS 預設是 zsh，zsh 讀的是 `~/.zshrc`。', right: '先確認自己用的 shell（0-2），寫進對應的設定檔。' },
       { wrong: '在設定檔裡寫 API 金鑰，然後把整個 dotfiles 上傳到 GitHub 分享。', why: '設定檔裡的金鑰跟著被公開了。', right: '金鑰放在不會上傳的獨立檔案或系統的金鑰管理工具裡；分享設定檔前先搜尋 `KEY`、`TOKEN`。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'macOS 預設 shell 的設定檔是？', options: [
-        { text: '`~/.bashrc`', why: '那是 bash 的；macOS 預設是 zsh。' },
-        { text: '`~/.zshrc`', correct: true, why: 'zsh 互動式啟動時會讀 `~/.zshrc`。' },
-        { text: '`$PROFILE`', why: '那是 PowerShell 的。' },
-        { text: '`/etc/hosts`', why: '那是系統的主機名稱對照表，跟 shell 設定無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你在 `$PROFILE` 加了新的別名，想在目前的 PowerShell 視窗立刻生效。該打？', options: [
-        { text: '`source $PROFILE`', why: '`source` 是 zsh／bash 的指令，PowerShell 用點。' },
-        { text: '`. $PROFILE`', correct: true, why: '點＋空白＋路徑：在目前的 shell 裡執行設定檔。' },
-        { text: '`$PROFILE`', why: '這只會印出設定檔的路徑。' },
-        { text: '`Restart-Computer`', why: '不需要重開機，開新視窗或重新載入就好。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['很多工具的安裝程式會「自動修改你的 .zshrc」。為什麼了解設定檔對你很重要？'], answer: [
-        '參考：安裝程式加的 PATH、初始化指令都寫在這裡。你知道它在哪、怎麼看，就能：解決「重開終端機才有效」的困惑、移除不用的工具留下的設定、在出錯時找到是哪一行造成的。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-3）要把一行設定**加到** `~/.zshrc` 最後，應該用？', options: [
-        { text: '`>>`', correct: true, why: '附加，不動原本的內容。' },
-        { text: '`>`', why: '會覆寫整個檔案。' },
-        { text: '`|`', why: '管線是接到程式，不是檔案。' },
-        { text: '`2>`', why: '那是改接錯誤訊息。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-2）`ls -a` 的 `-a` 讓你看到什麼？', options: [
-        { text: '點開頭的隱藏檔', correct: true, why: '所以要 `ls -a` 才看得到 `.zshrc`。' },
-        { text: '檔案的權限', why: '那是 `-l`。' },
-        { text: '依字母排序', why: 'ls 預設就依名稱排序。' },
-        { text: '子資料夾的內容', why: '那是 `-R`（遞迴）。' },
-      ] },
-    ],
     keypoints: [
       '設定檔：zsh `~/.zshrc`、bash `~/.bashrc`、PowerShell `$PROFILE`，開新視窗時自動執行。',
       '改完用 `source ~/.zshrc` 或 `. $PROFILE` 重新載入。',
       '寫入設定檔用 `>>`，改之前先備份。',
     ],
-    sources: ['ps-profiles', 'zsh-manual', 'bash-manual'],
+    sources: ['ps-profiles', 'zsh-manual', 'bash-manual', 'zsh-startup', 'bash-startup'],
   },
 });
 </script>

@@ -19,20 +19,6 @@ defineLessons({
       '解釋「活的綁定」與「模組只執行一次」',
       '分辨 ES 模組與 CommonJS',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 6-4）伺服器回 404，`await fetch(url)` 會？', options: [
-        { text: '成功，但 `res.ok` 是 false', correct: true, why: '有回應就算成功。' },
-        { text: '拋出 TypeError', why: '只有網路錯誤才會。' },
-        { text: '拋出 AbortError', why: '那是取消。' },
-        { text: '永遠等下去，直到伺服器改回 200 才會繼續往下執行', why: '有回應就會結束。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 5-2）想讓一個變數「外面改不到、只能透過函式改」，可以用？', options: [
-        { text: '閉包（或模組裡不匯出的變數）', correct: true, why: '外面根本碰不到那個變數。' },
-        { text: '宣告在最外層的全域變數', why: '全域誰都能改。' },
-        { text: 'const', why: 'const 只禁止重新指定，物件內容照樣能改。' },
-        { text: '物件屬性，再用 Object.freeze 凍結起來', why: '屬性誰都能改。' },
-      ] },
-    ],
     analogy: {
       text: ['模組像公司的部門。每個部門內部有很多文件（變數、函式），但只把「對外窗口」（export）公布出來；其他部門只能透過窗口拿東西（import）。部門內部怎麼整理，別人看不到也不能動。'],
       limit: ['真的部門給你的是影本；模組給的是[[活的綁定]]：對方內部改了，你讀到的也跟著變。'],
@@ -96,14 +82,17 @@ defineLessons({
         { type: 'widget', name: 'runner', props: {
           title: '用 data: 網址模擬另一個檔案',
           code: "const counterUrl = 'data:text/javascript,' + encodeURIComponent(\n  'export let count = 0; export function increment() { count++; }'\n);\nconst a = await import(counterUrl);\nconst b = await import(counterUrl);\na.increment();\nconsole.log(a.count, b.count, a === b);",
-          predict: { q: '`b.count` 是？', options: ['0（b 是另一份）', '1（同一個模組）', 'undefined'], answer: 1 },
         } },
+        { type: 'heading', id: 'deep-modules', text: '深入：循環匯入、匯入 JSON 與模組的載入順序' },
+        '匯入宣告會被提升：整個模組圖先全部載入、連結好，才從最底層的模組開始執行。所以 import 寫在檔案中間也一樣在最前面生效。兩個模組互相匯入（循環匯入）時，先執行的那一邊讀對方的 const 會碰到死區（2-2）；這是「把共用的部分抽到第三個模組」的訊號。',
+        { type: 'table', head: ['語法', '用途', '狀態'], rows: [
+          ['`import data from "./x.json" with { type: "json" }`', '直接匯入 JSON', 'ES2025（Import Attributes 與 JSON Modules）'],
+          ['`await import("./big.mjs")`', '需要時才載入；打包工具會把它切成另一個檔案', 'ES2020'],
+          ['`import.meta.url`', '目前模組自己的網址', '瀏覽器與 Node.js 都有'],
+          ['`import.meta.dirname`', '目前模組所在的資料夾', 'Node.js 20.11 起'],
+        ] },
+        '`with { type: "json" }` 不是裝飾：瀏覽器靠它確認「這個網址回來的必須是 JSON，不能被當成程式執行」。少了它，伺服器如果回傳 JavaScript，就等於執行了別人的程式碼。',
       ],
-      tryit: {
-        q: ['`utils.mjs` 有 `export function slugify() {}` 與 `export default function format() {}`。寫出一行把兩個都匯入，format 改叫 fmt：'],
-        draft: "import ____ from './utils.mjs';",
-        answer: ['`import fmt, { slugify } from \'./utils.mjs\';`', '預設匯出放前面、自己取名；具名匯出放大括號裡、名字要一樣。具名的也要改名時寫 `{ slugify as toSlug }`。'],
-      },
     },
     mistakes: [
       { wrong: '瀏覽器裡 `import \'./utils\'` 省略副檔名。', why: '瀏覽器不會猜副檔名，網址要完整。', right: "寫 `'./utils.js'`；省略副檔名是打包工具（Vite 等）提供的方便。" },
@@ -111,19 +100,7 @@ defineLessons({
       { wrong: '直接用 file:// 打開含 `type="module"` 的 HTML。', why: '瀏覽器對 file:// 的模組載入有限制，會被 CORS 擋下。', right: '用本機伺服器（例如 `npx serve` 或 Vite）開。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`export default` 一個模組可以有幾個？', options: [
-        { text: '最多一個', correct: true, why: '「預設」只能有一個；其他用具名匯出。' },
-        { text: '不限', why: '多個 default 會是語法錯誤。' },
-        { text: '剛好一個，不能沒有', why: '可以完全沒有預設匯出。' },
-        { text: '和具名匯出一樣多', why: '兩者數量無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '兩個檔案都 `import` 同一個 config 模組，其中一個改了 `config.theme`，另一個讀到的是？', options: [
-        { text: '改過的值', correct: true, why: '模組只執行一次，兩邊拿到的是同一個物件。' },
-        { text: '原本的值', why: '不會為每個匯入者各執行一份。' },
-        { text: 'undefined', why: '屬性一直存在。' },
-        { text: '拋出 TypeError', why: '改物件的屬性是允許的，只是不能重新指定匯入的名字。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你接手一個 Node.js 舊專案，`package.json` 沒有 `"type"`，檔案都是 `.js` 並用 require。你想新增一個用 import 的檔案，有哪些做法？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你接手一個 Node.js 舊專案，`package.json` 沒有 `"type"`，檔案都是 `.js` 並用 require。你想新增一個用 import 的檔案，有哪些做法？'], answer: [
         '最小改動：新檔案用 `.mjs` 副檔名，它一定被當成 ES 模組；舊檔案不受影響。',
         '整個專案轉換：`package.json` 加 `"type": "module"`，再把所有 require 改成 import（或把仍要用 CommonJS 的改名成 `.cjs`）。Node.js 22 也能在 CommonJS 裡 `require()` 同步的 ES 模組，但混用越少越好。',
       ] },
@@ -141,20 +118,6 @@ defineLessons({
       '判斷錯誤該在哪一層接住',
       '用 cause 包裝錯誤又不丟掉原因',
       '寫出帶有欄位資訊的自訂錯誤類別',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 6-3）async 函式裡 await 的 Promise 失敗了，會？', options: [
-        { text: '在 await 那一行拋出錯誤', correct: true, why: '可以用一般的 try／catch 接住。' },
-        { text: '回傳 undefined', why: '失敗不會被當成 undefined。' },
-        { text: '靜靜略過', why: '錯誤會拋出。' },
-        { text: '整個 async 函式靜靜結束，錯誤被忽略', why: '只會拋錯。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 5-4）`class ValidationError extends Error` 的實例，`instanceof Error` 是？', options: [
-        { text: 'true', correct: true, why: '原型鏈上有 Error.prototype。' },
-        { text: 'false', why: 'extends 讓它接上 Error 的原型鏈。' },
-        { text: '要看 name', why: 'instanceof 看原型鏈，不看 name。' },
-        { text: '拋出 TypeError', why: 'instanceof 對任何物件都能用。' },
-      ] },
     ],
     analogy: {
       text: ['餐廳裡出了問題：洗碗工打破盤子，自己能處理就換一個（在這一層接住）；處理不了的（冰箱壞了）往上報給主廚，主廚再處理不了就報給老闆。每一層都只處理「自己有能力處理」的事。'],
@@ -199,7 +162,6 @@ defineLessons({
         { type: 'widget', name: 'runner', props: {
           wait: 200,
           code: "class ValidationError extends Error {\n  constructor(message, field) {\n    super(message);\n    this.name = 'ValidationError';\n    this.field = field;\n  }\n}\ntry {\n  try { JSON.parse('{x'); }\n  catch (e) { throw new Error('讀取設定失敗', { cause: e }); }\n} catch (e) {\n  console.log(e.message, '|', e.cause.name);\n}\nconst ve = new ValidationError('email 格式錯', 'email');\nconsole.log(ve instanceof Error, ve.field, String(ve));\nasync function bad() { throw new Error('async 錯'); }\ntry { bad(); console.log('沒接到'); } catch { console.log('接到'); }\nawait bad().catch((e) => console.log('catch:', e.message));",
-          predict: { q: '`try { bad(); }`（沒有 await）會印出？', options: ['接到', '沒接到', '什麼都不印'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="try 接不到非同步錯誤：try 區塊在 bad 拋錯之前就結束了；加上 await 之後，try 會等到結果，錯誤在 await 那行拋出被 catch 接到">
           <rect x="10" y="10" width="265" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
@@ -213,12 +175,16 @@ defineLessons({
           <text x="417" y="130" text-anchor="middle" font-size="15" class="on-color">在這一行拋出</text>
           <text x="417" y="170" text-anchor="middle" font-size="15" class="on-color">→ catch 接到</text>
         </svg>`, caption: 'Node.js 22 遇到沒人處理的 rejection 會印出錯誤並結束程式（實測）。' },
+        { type: 'heading', id: 'deep-errors', text: '深入：可預期的錯誤與 bug、跨環境判斷錯誤' },
+        '錯誤分兩種，處理方式相反。**可預期的錯誤**：使用者輸入不合法、網路斷線、檔案不存在。它們一定會發生，要在能做決定的那一層接住並給出路。**bug**：讀了 undefined 的屬性、不該發生的狀態。它們應該大聲失敗，讓你盡快發現；在最外層記錄下來，不要在中間吞掉後假裝沒事。',
+        { type: 'table', head: ['工具', '用途'], rows: [
+          ['`AggregateError`', '一次帶著好幾個錯誤：`Promise.any` 全部失敗時拋出，`e.errors` 是陣列'],
+          ['`Error.isError(x)`（ES2026）', '判斷 x 是不是真的錯誤物件；跨 iframe、Node.js `vm` 時 instanceof 會失敗，它不會（Chrome 134、Firefox 138、Node.js 24.3 起）'],
+          ['`window.addEventListener("error")`、`"unhandledrejection"`', '瀏覽器最外層的安全網：記錄沒人接的錯誤'],
+          ['`process.on("uncaughtException")`', 'Node.js 最外層：只記錄然後結束程式，不要讓程式在不明狀態下繼續跑'],
+        ] },
+        '什麼時候不用 class 自訂錯誤：只有一兩個地方要分辨錯誤種類時，用 `new Error(msg, { cause })` 加上一個 `code` 屬性（例如 `e.code = "EMAIL_TAKEN"`）就夠了；Node.js 的內建錯誤也是用 `code` 區分（例如 `ENOENT`）。',
       ],
-      tryit: {
-        q: ['補完：email 不合法時拋出 ValidationError，上層依錯誤種類決定怎麼顯示。'],
-        draft: "function checkEmail(email) {\n  if (!email.includes('@')) throw ____;\n}\ntry {\n  checkEmail(input);\n} catch (e) {\n  if (e instanceof ValidationError) markField(e.field);\n  else ____;\n}",
-        answer: ["第一格 `new ValidationError('email 格式錯', 'email')`，第二格 `throw e`。", '這一層只知道怎麼處理「欄位驗證錯誤」；其他錯誤（例如程式寫錯的 TypeError）它處理不了，就原封不動往上拋。'],
-      },
     },
     mistakes: [
       { wrong: '`catch (e) {}` 空的。', why: '錯誤消失，出問題時完全沒有線索。', right: '至少記錄（`console.error`）或重新拋出。' },
@@ -226,19 +192,7 @@ defineLessons({
       { wrong: '包錯誤時把原本的訊息拼進字串，丟掉原本的錯誤物件。', why: '原本錯誤的堆疊追蹤與類型都沒了。', right: '`new Error(\'讀取設定失敗\', { cause: e })`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`new Error(\'A\', { cause: e })` 之後，原本的錯誤在哪？', options: [
-        { text: '新錯誤的 cause 屬性', correct: true, why: 'cause 保留原本的錯誤物件。' },
-        { text: '被丟掉了', why: '這正是 cause 要避免的事。' },
-        { text: '合併進 message', why: 'message 只有「A」。' },
-        { text: '在 e.stack 的最後一行', why: '它是獨立的屬性。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪一層最適合 catch「網路請求失敗」？', options: [
-        { text: '能決定「重試或告訴使用者」的那一層', correct: true, why: '在能處理的地方接，其他層讓它往上拋。' },
-        { text: '每一層都接一次', why: '重複處理，訊息會被層層蓋掉。' },
-        { text: '最底層的 fetch 包裝函式，接了回傳 null', why: '上層分不清「沒資料」與「失敗」。' },
-        { text: '不要接，讓程式結束', why: '使用者需要知道發生了什麼。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['表單送出時，API 回 422 並附上 `{ field: "email", message: "已被註冊" }`。設計一個錯誤類別與處理流程，讓畫面能在 email 欄位旁顯示訊息。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['表單送出時，API 回 422 並附上 `{ field: "email", message: "已被註冊" }`。設計一個錯誤類別與處理流程，讓畫面能在 email 欄位旁顯示訊息。'], answer: [
         '在 fetch 包裝函式裡：`if (res.status === 422) { const body = await res.json(); throw new ValidationError(body.message, body.field); }`，其他不 ok 的狀態丟一般 Error。',
         '表單送出的地方：`catch (e) { if (e instanceof ValidationError) showFieldError(e.field, e.message); else showToast(\'送出失敗，請稍後再試\'); }`。',
       ] },
@@ -248,7 +202,7 @@ defineLessons({
       '包裝錯誤用 `{ cause: e }` 保留原因；catch 不能是空的，只拋 Error 物件。',
       '`try { bad() }` 接不到非同步錯誤，要 `await`；自訂錯誤用 extends Error 加欄位。',
     ],
-    sources: ['mdn-errors'],
+    sources: ['mdn-errors', 'mdn-bcd'],
   },
 
   '7-3': {
@@ -256,20 +210,6 @@ defineLessons({
       '用 node:test 與 assert 寫出第一個測試',
       '寫出「情境＋預期結果」的測試名稱',
       '先看到測試失敗，再修程式',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 7-2）函式收到不合法的參數，該怎麼做？', options: [
-        { text: '拋出帶有清楚訊息的錯誤（例如 RangeError）', correct: true, why: '呼叫者馬上知道哪裡錯，也能在測試裡檢查。' },
-        { text: '回傳 null', why: '呼叫者分不清是錯誤還是正常的空值。' },
-        { text: '自己改成合法的值繼續跑', why: '錯誤被掩蓋。' },
-        { text: '用 console.log 印出警告，再照原本的值繼續算', why: '程式還是用錯的值在跑。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 4-1）`{ a: [1] } === { a: [1] }` 是？', options: [
-        { text: 'false', correct: true, why: '兩個不同的物件。測試時要用 deepEqual 比內容。' },
-        { text: 'true', why: '=== 不比內容。' },
-        { text: '拋出 TypeError', why: '物件可以用 === 比較。' },
-        { text: 'undefined', why: '比較一定得到布林值。' },
-      ] },
     ],
     analogy: {
       text: ['測試像餐廳的試吃清單：「這道菜放 100 元的料、打八折，端出來應該是 80 元份量」。每次換食譜（改程式），廚師把清單上的每一道都試一次，馬上知道有沒有哪道走味。'],
@@ -316,7 +256,6 @@ defineLessons({
         { type: 'widget', name: 'runner', props: {
           title: '迷你測試執行器（模擬 node --test 的輸出）',
           code: "function applyDiscount(price, rate) {\n  if (rate < 0 || rate > 1) throw new RangeError(`rate 必須在 0 到 1 之間：${rate}`);\n  return Math.round(price * (1 - rate));\n}\nfunction test(name, fn) {\n  try { fn(); console.log('✔', name); }\n  catch (e) { console.log('✖', name, '→', e.message); }\n}\nconst equal = (a, b) => { if (a !== b) throw new Error(`${a} !== ${b}`); };\ntest('returns 80 when 100 has 20% off', () => equal(applyDiscount(100, 0.2), 80));\ntest('returns 90 when 99 has 10% off', () => equal(applyDiscount(99, 0.1), 90));",
-          predict: { q: '第二個測試會？', options: ['通過', '失敗，實際是 89', '失敗，拋出 RangeError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="一個測試的三段：準備輸入，呼叫要測的函式，用斷言比對結果">
           <rect x="10" y="10" width="170" height="190" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -335,12 +274,17 @@ defineLessons({
           ['四捨五入', '`(99, 0.1)`', '`89`（89.1 四捨五入）'],
           ['折扣超過 100%', '`(100, 2)`', '拋出 RangeError'],
         ] },
+        { type: 'heading', id: 'deep-node-test', text: '深入：node:test 的其他工具與該測什麼' },
+        { type: 'table', head: ['工具', '用途'], rows: [
+          ['`describe`、`it`', '把相關測試分組，輸出有層次'],
+          ['`beforeEach`、`afterEach`', '每個測試前後的準備與清理'],
+          ['`t.mock.fn()`', '假函式，記錄被呼叫幾次、用什麼引數'],
+          ['`t.mock.timers.enable()`', '假時鐘：不用真的等，直接快轉 setTimeout／setInterval（測 9-1 的計時器很好用）'],
+          ['`node --test --watch`', '存檔就重跑測試'],
+        ] },
+        '測什麼最划算：邊界值（0、空陣列、最大值、剛好超過一點）、曾經出過的 bug、商業規則（折扣、權限）。不要測「實作細節」，例如「內部呼叫了哪個私有函式」：重構時這種測試會大量變紅，但程式其實沒壞。',
+        '什麼時候測試幫不上忙：版面好不好看、動畫順不順，這些要人眼看；跨瀏覽器的差異要在真的瀏覽器裡跑（例如 Playwright 的端對端測試）。單元測試負責「邏輯對不對」，不是全部。',
       ],
-      tryit: {
-        q: ['為 4-5 的「去除重複」寫一個測試：`unique([1, 1, 2])` 應該得到 `[1, 2]`。'],
-        draft: "test('returns each value once when input has duplicates', () => {\n  assert.____(unique([1, 1, 2]), [1, 2]);\n});",
-        answer: ['`deepEqual`。', '用 `equal` 會失敗：兩個陣列內容一樣，但不是同一個物件（4-1）。比較物件與陣列的內容一律用 deepEqual。'],
-      },
     },
     mistakes: [
       { wrong: '用 `assert.equal` 比較兩個陣列。', why: '`===` 比的是不是同一個物件。', right: '用 `assert.deepEqual`。' },
@@ -348,20 +292,8 @@ defineLessons({
       { wrong: '`assert.throws(applyDiscount(100, 2), RangeError)`。', why: '還沒交給 throws，函式就已經在這一行拋錯了。', right: '傳函式進去：`assert.throws(() => applyDiscount(100, 2), RangeError)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'node:test 要不要另外安裝？', options: [
-        { text: '不用，Node.js 18 起內建', correct: true, why: '`import { test } from \'node:test\'` 直接可用。' },
-        { text: '要，npm install node-test', why: '它是 Node.js 內建模組。' },
-        { text: '要裝 Jest 才能用', why: 'Jest 是另一套測試工具。' },
-        { text: '只有瀏覽器有', why: '它是 Node.js 的模組。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下面哪個測試名稱最好？', options: [
-        { text: "`'throws RangeError when rate is negative'`", correct: true, why: '有情境（rate 是負數）、有預期（拋 RangeError）。' },
-        { text: "`'test 1'`", why: '完全看不出在測什麼。' },
-        { text: "`'applyDiscount'`", why: '只有函式名稱，沒有情境與預期。' },
-        { text: "`'should calculate the discount correctly for all inputs'`", why: '「正確」是什麼沒有說。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['使用者回報：購物車有 3 件 33.33 元的商品，總額顯示 99.99000000000001。照「修 bug 先寫失敗測試」的原則，寫出你的第一步與第二步。'], answer: [
-        "第一步：寫測試重現它，`test('returns 99.99 when 3 items cost 33.33', () => assert.equal(cartTotal([33.33, 33.33, 33.33]), 99.99))`，執行確認它是紅的。",
+      { level: '深入思考', type: 'reveal', q: ['使用者回報：購物車有 3 件 10.1 元的商品，總額顯示 30.299999999999997。照「修 bug 先寫失敗測試」的原則，寫出你的第一步與第二步。'], answer: [
+        "第一步：寫測試重現它，`test('returns 30.3 when 3 items cost 10.1', () => assert.equal(cartTotal([10.1, 10.1, 10.1]), 30.3))`，執行確認它是紅的。",
         '第二步：修程式（1-2：用整數的分計算，最後才除以 100），再執行測試變綠。這個測試留著，以後有人改壞會馬上被抓到。',
       ] },
     ],
@@ -378,20 +310,6 @@ defineLessons({
       '在開發者工具裡設中斷點並逐步執行',
       '分辨「逐步執行」的三個按鈕',
       '用固定流程找出 bug，而不是到處加 console.log',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 7-3）修 bug 的第一步是？', options: [
-        { text: '寫一個能重現它的失敗測試', correct: true, why: '先確定能穩定重現，修好後也能證明。' },
-        { text: '直接改程式碼', why: '不確定改對沒有。' },
-        { text: '刪掉相關的測試', why: '只會讓 bug 更難被發現。' },
-        { text: '重新安裝所有套件，再重開一次電腦', why: '多數 bug 和安裝無關。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 0-3）錯誤訊息的堆疊追蹤，最上面一行通常是？', options: [
-        { text: '錯誤實際發生的位置', correct: true, why: '往下是一層層呼叫它的地方。' },
-        { text: '程式的進入點', why: '進入點在最下面。' },
-        { text: '最後一次 console.log 的位置', why: '堆疊追蹤和 console.log 無關。' },
-        { text: '隨機一行', why: '順序是固定的。' },
-      ] },
     ],
     analogy: {
       text: ['看監視器找掉東西的時間點：與其從頭快轉、到處貼便利貼（console.log），不如直接跳到「應該還在」的那一刻按暫停，然後一格一格往前看，東西在哪一格消失就是答案。'],
@@ -464,12 +382,15 @@ defineLessons({
           <text x="465" y="100" text-anchor="middle" font-size="15" class="on-color">calc() 剩下的跑完</text>
           <text x="465" y="130" text-anchor="middle" font-size="15" class="on-color">回到呼叫它的地方</text>
         </svg>`, caption: '目前停在 `const total = calc(items);` 這一行時，三個按鈕的差別。' },
+        { type: 'heading', id: 'deep-debug-tools', text: '深入：不改程式碼的除錯工具與 Node.js 除錯' },
+        { type: 'table', head: ['工具', '怎麼開', '什麼時候用'], rows: [
+          ['Logpoint', '行號按右鍵 → Add logpoint', '想看值但不想改程式碼、也不想暫停'],
+          ['遇到例外就暫停', 'Sources 面板的暫停圖示，可勾選「連被 catch 的也停」', '錯誤被某處吞掉、找不到在哪裡拋出'],
+          ['DOM 中斷點', 'Elements 面板對元素按右鍵 → Break on', '不知道是哪段程式改了這個元素'],
+          ['Node.js 除錯', '`node --inspect-brk app.mjs`，再到 `chrome://inspect`', '在 Node.js 也用同一套中斷點；VS Code 的 JavaScript Debug Terminal 更省事'],
+        ] },
+        '除錯流程什麼時候不夠用：只在正式環境、特定使用者身上才發生的 bug，你沒辦法在他的電腦上設中斷點。這時靠的是事先留好的結構化紀錄與錯誤回報（7-2 最外層的安全網），以及 source map（0-3）把壓縮後的位置翻回原始碼。',
       ],
-      tryit: {
-        q: ['迴圈跑 5000 次，第 3721 次時結果開始出錯。你會怎麼設中斷點，才不用按 F8 三千多次？'],
-        draft: '// 在迴圈裡的那一行按右鍵 → 新增條件中斷點，條件寫：____',
-        answer: ['`i === 3721`（或更直接的條件，例如 `Number.isNaN(result)`）。', '條件中斷點只在條件為 true 時暫停。條件寫「錯誤狀態本身」通常更好，因為你不一定知道是第幾次。'],
-      },
     },
     mistakes: [
       { wrong: '到處加 console.log，修好後忘了刪。', why: '輸出污染 console，也可能把敏感資料印出來。', right: '用中斷點或 logpoint（不改程式碼的 log）；必要的 log 在 commit 前刪掉。' },
@@ -477,19 +398,7 @@ defineLessons({
       { wrong: '在 console 只印物件，之後展開時看到的是「現在的值」。', why: 'console 顯示的是物件的參考（4-1），展開時才讀內容。', right: '要當下的值用 `structuredClone(obj)` 或 `JSON.stringify(obj)` 印，或直接用中斷點。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '停在 `render(data)` 這一行，想看 render 裡面發生什麼，要按？', options: [
-        { text: '進入（F11）', correct: true, why: '走進被呼叫的函式。' },
-        { text: '跳過（F10）', why: '會把 render 整個跑完。' },
-        { text: '跳出（Shift＋F11）', why: '會把目前所在的函式跑完。' },
-        { text: '繼續（F8）', why: '跑到下一個中斷點。' },
-      ] },
-      { level: '應用', type: 'mc', q: '程式碼裡寫 `debugger;`，但使用者沒有開開發者工具，會怎樣？', options: [
-        { text: '什麼事都不會發生，直接跳過', correct: true, why: '只有開發者工具開著時才會暫停。' },
-        { text: '頁面暫停並跳出提示', why: '一般使用者不會看到任何東西。' },
-        { text: '拋出 SyntaxError', why: 'debugger 是合法的陳述式。' },
-        { text: '頁面重新整理', why: '它不影響頁面。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['按「儲存」後畫面沒反應，console 也沒有錯誤。照本課的除錯流程，你的前三步是什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['按「儲存」後畫面沒反應，console 也沒有錯誤。照本課的除錯流程，你的前三步是什麼？'], answer: [
         '一、重現：確認哪些步驟一定會發生（每次？特定資料？）。二、縮小範圍：在儲存按鈕的事件處理函式第一行設中斷點，確認點擊有沒有進來。',
         '三、逐步執行：有進來就 F10 往下走，看是哪個 if 提早 return、或哪個 Promise 沒被 await（6-3）；沒進來就檢查事件綁定（5-1：是不是寫成 `save()`）。',
       ] },
@@ -499,7 +408,7 @@ defineLessons({
       'F10 跳過、F11 進入、Shift＋F11 跳出、F8 繼續；條件中斷點只在需要時停。',
       '除錯流程：重現 → 縮小範圍 → 觀察 → 假設 → 驗證，一次只改一處。',
     ],
-    sources: ['mdn-js'],
+    sources: ['chrome-devtools', 'mdn-js'],
   },
 });
 </script>

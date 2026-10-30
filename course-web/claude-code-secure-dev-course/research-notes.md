@@ -185,3 +185,58 @@
 3. Slopsquatting 數據與 Shai-Hulud 標「第三方資安研究」，只用來說明風險類型，不拿來比較模型。
 4. 每課頁尾列對應來源 URL 與「查證於 2026-10-02」。
 5. 下次重新查證：**2027-01-02**（AI 工具變動快，3 個月）。
+
+---
+
+## 2026-10-29 改版審查
+
+> 改版內容：取消測驗（刪 2 題只靠課文就能回答的思考題、8-2 總複習改為「一頁地圖」）、26 課補「深入」段落、12 課補互動元件（新增 `knobs` 拉桿元件）。
+> 查證方式：2026-10-29 用 WebFetch 讀官方頁面、`npm view @anthropic-ai/claude-code version`。
+
+### 修正的錯誤
+
+| 課號 | 原本 | 修正後 | 出處 | 可信度 |
+|---|---|---|---|---|
+| 全站、0-1 | 最新版 v2.1.287 | v2.1.312（npm `time.modified` 2026-10-27） | `npm view @anthropic-ai/claude-code version` | ✅ |
+| 6-1 | ctxcost 試算的 Sonnet 5.5 快取讀取價 $0.20／MTok | $0.10（Opus 5.5 與 Sonnet 5.5 的快取讀取是基本價的 5%） | https://platform.claude.com/docs/en/about-claude/models/overview | ✅ |
+| 6-2 | Haiku 4.5（$5 輸出）為目前小模型，退役日「不早於 2026-10-15」 | 目前陣容：Fable 5.1（$10／$50）、Opus 5.5、Sonnet 5.5、Haiku 5.5（起價 $0.10／$0.50）；Haiku 4.5 列為舊模型；長條圖改為 Sonnet、Opus、Opus fast、Fable | 同上 | ✅ |
+| 6-2 | fast mode「研究預覽」 | Opus 5.5 的 fast mode 已正式提供（v2.1.304 移除研究預覽標示）；Opus 5、Opus 4.8 仍是研究預覽 | https://code.claude.com/docs/en/fast-mode、changelog | ✅ |
+| 5-4、7-2 | Code Review「研究預覽、平均每次 $15–25、平均約 20 分鐘」 | 沒有固定單價，依審查等級（Quick／Standard／Deep，v2.1.304）與 PR 大小從 usage credits 計費；文件不再寫研究預覽與平均金額 | https://code.claude.com/docs/en/code-review、https://code.claude.com/docs/en/code-review-costs | ✅ |
+| 7-2 | 不能用：只列 Zero Data Retention | 另有 HIPAA 設定、客戶自管金鑰（CMEK） | code-review | ✅ |
+| 3-2 | worktree 終端機示範的分支名 `feature-search` | `worktree-feature-search`（和同課 callout 一致） | https://code.claude.com/docs/en/worktrees | ✅ |
+| 1-3、3-3 | CLAUDE.md「長對話壓縮後可能被稀釋」 | 專案根目錄 CLAUDE.md 在 `/compact` 後會從磁碟重讀；被忽略的原因是太長、互相矛盾，或指示只在對話裡 | https://code.claude.com/docs/en/memory | ✅ |
+| 3-4 | 每個 MCP server 都把工具定義放進 context | MCP 工具定義預設延遲載入，只放名稱與 server 說明 | https://code.claude.com/docs/en/costs | ✅ |
+| 4-1 | 重點寫「六種模式由嚴到寬」 | 改為只列六種模式（plan 比 acceptEdits 嚴，順序不是嚴到寬） | permission-modes | ✅ |
+
+### 補充的子題（寫在各課「深入」段落）
+
+| 課號 | 子題 | 出處 | 可信度 |
+|---|---|---|---|
+| 0-2 | trust 前後差異、外部 `@` 匯入的核准對話框 | memory、permissions | ✅ |
+| 1-1 | checkpoint 隨 session 資料清除（`cleanupPeriodDays` 預設 30 天） | costs | ✅ |
+| 1-3 | HTML 註解不進 context、`/doctor prompt-audit`、AGENTS.md 讀取條件（v2.1.277） | memory | ✅ |
+| 2-1 | 雲端化前後對照、各方案預設模式（Pro／Max／Team 為 Auto，Enterprise 新版介面為 Manual） | https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork | 🟡 |
+| 3-1 | skill 名稱隱藏字元檢查（v2.1.299）、每來源 1,024 個 hook 上限（v2.1.304） | changelog | ✅ |
+| 3-2 | worktree 隔離檢查、永久核准寫入主 checkout 的 settings.local.json、`isolation: worktree` | worktrees | ✅ |
+| 3-3 | hook 失敗時放行的修正（v2.1.309、v2.1.310）、`updatedInput` 驗證（v2.1.300） | changelog | ✅ |
+| 3-4 | MCP 規則 `mcp__a` 不再放行 `a__b`（v2.1.299） | changelog | ✅ |
+| 4-1 | auto mode 其他預設擋下類別、`/auto-mode-setup`（v2.1.304）、`-p` 第三方供應商預設 default（v2.1.302）、`safety_event`（v2.1.307） | permission-modes、changelog | ✅ |
+| 4-3 | sandbox 起不來時預設不 sandbox 執行、`failIfUnavailable`、docker 不相容、非 TCP 流量、`allowNestedUserNamespaces`（v2.1.305） | sandboxing、changelog | ✅ |
+| 4-4 | bypass 下危險 rm 直接拒絕（v2.1.309，桌面 App 與 VS Code） | changelog | ✅ |
+| 5-2 | 2025 版與 2021 版差異：SSRF 併入 A01、A03 擴大自 A06:2021、A10 涵蓋 24 個 CWE | https://top10.owasp.org/2025/0x00_2025-Introduction/ | ✅ |
+| 5-3 | `npm ci` 仍執行安裝腳本、`--ignore-scripts` 的取捨 | npm 一般行為 | 🟡 未逐字查官方文件 |
+| 5-4 | security guidance 的上限（30 檔、連續 3 次、每小時 20 次）、Python 3.10、只加不減的指引、REVIEW.md 只讀 base 分支 | security-guidance、code-review | ✅ |
+| 6-2 | 新模型一定會思考、各模型 API 預設 effort、`fastModePerSessionOptIn` | models overview、costs、fast-mode | ✅ |
+| 7-2 | 審查不建置不執行、三種取得審查方式比較、試算步驟（試用期平均 × PR 數 × push 次數） | code-review、code-review-costs | ✅ |
+| 7-3 | `modelPricing`（v2.1.242，只能 managed）、OpenTelemetry 稽核事件 | costs、changelog | ✅ |
+
+### 未查證
+
+- 5-1「讀得到、會處理、送得出去」三條件是資安社群的說法（第三方），課文只當觀念使用。
+- 2-1 Desktop 的路徑過濾與管理員限制資料夾：沿用 2026-10-02 的 changelog 摘要（🟡），設定名稱未寫進課文。
+- 1-3、3-4、4-1、4-3、5-2 終端機示範的輸出文字為示意，已在畫面上標註。
+- 7-2 試算的預設平均 10 美元是示意值，課文已說明要用自己試用期的數字。
+
+### 下次重新查證
+
+2027-01-29。

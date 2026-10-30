@@ -66,12 +66,15 @@ defineLessons({
           ${[['1', '切字', 'm1'], ['2', '向量', 'm2'], ['3', 'attention', 'm3'], ['4', '結構', 'm3'], ['5', '預訓練', 'm4'], ['6', '後訓練', 'm4'], ['7', '推論', 'm5']].map(([n, t, c], i) => `<rect x="${10 + i * 78}" y="50" width="70" height="90" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${45 + i * 78}" y="86" text-anchor="middle" font-size="20" font-weight="900" class="on-color">${n}</text><text x="${45 + i * 78}" y="116" text-anchor="middle" font-size="13" class="on-color">${t}</text>`).join('')}
           <text x="20" y="176" font-size="13">1–4：模型長什麼樣・5–6：數字怎麼訓練出來・7：怎麼用它產生回答</text>
         </svg>`, caption: '顏色對應上面六站：同色的模組在講同一站。' },
+        { type: 'heading', id: 'deep-io-cost', text: '深入：為什麼輸出 token 比輸入貴' },
+        '處理輸入時，每個 token 都已知，②～⑤ 可以把整段一次平行算完（7-3 的 [[prefill]]）。產生輸出時只能一個接一個：下一個 token 要等前一個選好，才能跑下一次前向計算（decode）。',
+        { type: 'table', head: ['', '輸入 token', '輸出 token'], rows: [
+          ['怎麼算', '整段平行，GPU 利用率高', '一次一個，每步都要把參數從記憶體讀一遍'],
+          ['影響什麼', '第一個字出現前的等待', '整段回答的總時間'],
+          ['Claude Opus 5.5 價格', '$4／百萬 token', '$20／百萬 token'],
+        ], caption: '價格查證於 2026-10-29（Claude Docs｜Pricing）。各家 API 的輸出價普遍高於輸入價，原因就是這兩種計算的效率不同。' },
+        '六站是「純文字、只用解碼器」模型的骨架，不是全部。看得懂圖片的模型會把圖片切成小方塊，各自變成向量，接進同一條序列；[[混合專家]]（MoE）模型在 ④ 的前饋網路裡，每個 token 只走其中幾個「專家」（4-4）。這些變化都發生在某一站的內部，六站的順序不變。',
       ],
-      tryit: {
-        q: ['不看上面的圖，寫出六站的順序，並在你最不懂的那一站畫星號：'],
-        draft: '① ＿ → ② ＿ → ③ ＿ → ④ ＿ → ⑤ ＿ → ⑥ ＿\n最不懂的：＿',
-        answer: ['文字 → token 編號 → 向量 → Transformer 區塊 → 下一個 token 的機率 → 取樣與輸出。', '標星號的那一站，就是你讀這一卷時要放慢的模組。多數人會標 ④，那是模組 3、4。'],
-      },
     },
     mistakes: [
       { wrong: '以為模型一次產生整段回答。', why: '每一次前向計算只算出下一個 token 的機率。', right: '回答是 ②～⑥ 重複很多次接出來的。' },
@@ -79,19 +82,7 @@ defineLessons({
       { wrong: '以為「知道 Claude 內部長怎樣」才能懂這一卷。', why: 'Claude 的細節沒有公開，但公開論文的通用做法已經足以理解原理。', right: '這一卷講通用架構；遇到 Claude 特有的事，只用官方文件寫過的。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下面哪一個順序是對的？', options: [
-        { text: 'token 編號 → 向量 → Transformer → 機率', correct: true, why: '先換成數字，再查向量、加工、打分。' },
-        { text: '向量 → token 編號 → 機率 → Transformer 區塊', why: '要先有編號才能查向量。' },
-        { text: '機率 → Transformer 區塊 → 向量 → token 編號', why: '整個倒過來了。' },
-        { text: 'Transformer 區塊 → token 編號 → 向量 → 機率', why: 'Transformer 處理的是向量，不是文字。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一段 200 個 token 的回答，⑤「下一個 token 的機率」這一站大約被算了幾次？', options: [
-        { text: '約 200 次', correct: true, why: '每產生一個 token 一次前向計算。' },
-        { text: '只算 1 次，整段回答一起產生', why: '模型一次只算下一個 token。' },
-        { text: '看輸入有幾個 token 就算幾次', why: '次數跟著輸出長度。' },
-        { text: '訓練時算好存起來，推論時不用算', why: '每次推論都要現算。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事說：「模型裡有一個資料庫，存著所有它看過的句子，回答時去找最像的。」用這一課的六站指出哪裡錯了。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同事說：「模型裡有一個資料庫，存著所有它看過的句子，回答時去找最像的。」用這一課的六站指出哪裡錯了。'], answer: [
         '六站裡沒有任何一站是「查句子」：③ 查的是 token 的向量表，不是句子；④ 是固定的計算；⑤ 算出每個 token 的分數。',
         '它看過的資料，只以「參數的數值」的形式留下來（模組 5），不是一句一句存著。',
       ] },
@@ -101,7 +92,7 @@ defineLessons({
       '每產生一個 token，②～⑤ 就要完整算一次。',
       '訓練調參數，推論時參數固定。',
     ],
-    sources: ['transformer', 'gpt3'],
+    sources: ['transformer', 'gpt3', 'claude-pricing', 'moe'],
   },
 });
 </script>

@@ -112,7 +112,7 @@ function renderPhrases(text) {
   return phrases.map((phrase, i) => `${i > 0 && needsSpaceBetween(phrases[i - 1], phrase) ? ' ' : ''}<span class="phrase">${wrapWordsHtml(phrase)}</span>`).join('');
 }
 
-/* ---------- 閱讀時間：中文每分鐘 300 字，練習每題另計 ---------- */
+/* ---------- 閱讀時間：中文每分鐘 300 字，深入思考題每題另計 ---------- */
 function collectText(value) {
   if (value == null) return '';
   if (typeof value === 'string') return value;
@@ -455,7 +455,7 @@ Views.home = () => {
         <span class="label tilt" style="--chip:var(--info)">React 19.3・Vite</span>
       </div>
       <h1><span class="phrase">畫面</span><br><span class="phrase">是</span><span class="phrase hl">狀態的函式</span></h1>
-      <p class="lead">會一點 JavaScript 就能開始：從 JSX、元件、props 與 state，一路學到副作用、Context、自訂 Hook、表單 Actions、Suspense 與測試。每課都先讓你預測畫面會怎麼變，再對答案，用結果修正直覺。</p>
+      <p class="lead">會一點 JavaScript 就能開始：從 JSX、元件、props 與 state，一路學到副作用、Context、自訂 Hook、表單 Actions、Suspense 與測試。每課都附上執行結果，並在「深入」段落講原理、邊界與取捨。</p>
       <div class="actions">
         ${resumeBtn}
         <a class="btn big nb-press" href="#/l/2-2">直接看「state 是快照」</a>
@@ -482,10 +482,10 @@ Views.home = () => {
     <h2 class="section-title"><span class="label" style="--chip:var(--m2)">怎麼用</span><span class="phrase">本站的使用方式</span></h2>
     <div class="content" style="margin:0">
       <ul>
-        <li>每個單元的結構都一樣：3 件事 → 暖身回顧 → 比喻 → 心智模型 → 定義 → 範例 → 常見錯誤 → 練習 → 三個重點。</li>
+        <li>每個單元的結構都一樣：3 件事 → 比喻 → 心智模型 → 定義 → 範例與深入 → 常見錯誤 → 深入思考（選用）→ 三個重點。</li>
         <li>這門課的主軸：看到一段 React 程式先問三個問題。<ol class="three-q"><li>這個值是 <strong>props</strong>、<strong>state</strong>，還是可以<strong>算出來</strong>的？</li><li>這行在<strong>渲染時</strong>執行，還是在<strong>事件或 effect</strong> 裡執行？</li><li>這次更新會讓<strong>哪些元件重新渲染</strong>？</li></ol></li>
-        <li>頁面不執行 React，所以「試試看」是先預測、再看事先寫好的畫面結果或主控台輸出。想自己跑，用 <code>npm create vite@latest my-app -- --template react-ts</code> 建立專案，再 <code>npm run dev</code>。</li>
-        <li>練習的答案預設隱藏；選擇題送出後，每個選項都有解析。</li>
+        <li>頁面不執行 React，所以「試試看」按下「執行」後，顯示事先寫好的畫面結果或主控台輸出。想自己跑，用 <code>npm create vite@latest my-app -- --template react-ts</code> 建立專案，再 <code>npm run dev</code>。</li>
+        <li>深入思考題的解析預設收起，想過再展開。</li>
         <li>鍵盤：<kbd>←</kbd> <kbd>→</kbd> 切換上一課與下一課，<kbd>/</kbd> 搜尋。頂部列可以調整字級，寬螢幕可以拖曳目錄的右緣調整寬度。</li>
         <li>進度存在這台電腦的瀏覽器裡${Store.persistent() ? '' : '（目前瀏覽器不允許儲存，關閉分頁後進度會消失）'}。</li>
       </ul>
@@ -533,7 +533,7 @@ const SECTION_DEFS = [
   ['define', '正式定義'],
   ['examples', '範例'],
   ['mistakes', '常見錯誤'],
-  ['practice', '練習'],
+  ['practice', '深入思考'],
   ['keypoints', '三個重點'],
 ];
 
@@ -608,7 +608,7 @@ Views.lesson = ({ id }) => {
     ${c ? `<div class="done-row" id="done-row">
       ${isDone
         ? `<span class="stamp">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`}
+        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`}
     </div>` : ''}
     <nav class="lesson-nav" aria-label="上一課與下一課">
       ${prev ? `<a class="prev nb-press" href="#/l/${prev.id}" rel="prev"><span class="dir">← 上一課</span><span class="ttl">${renderPhrases(`${prev.id} ${prev.title}`)}</span></a>` : ''}
@@ -677,7 +677,7 @@ function onClick(e) {
   const { action: name, id } = action.dataset;
   if (name === 'done') markDone(id, true);
   if (name === 'undone') markDone(id, false);
-  if (name === 'reset' && window.confirm('確定要清除所有學習進度與測驗紀錄嗎？字級與目錄寬度不會被清除。')) {
+  if (name === 'reset' && window.confirm('確定要清除所有學習進度嗎？字級與目錄寬度不會被清除。')) {
     Store.reset();
     render();
     announce('學習進度已清除');
@@ -690,7 +690,7 @@ function markDone(id, isDone) {
   if (row) {
     row.innerHTML = isDone
       ? `<span class="stamp animate">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`;
+      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`;
     const focusTarget = $('button', row);
     if (focusTarget) focusTarget.focus();
   }

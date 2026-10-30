@@ -24,14 +24,6 @@ defineLessons({
       '寫一個 async 方法並 await 它',
       '避開 .Result 與 async void 這兩個常見陷阱',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-3）`await using` 用在什麼情況？', options: [
-        { text: '物件實作 IAsyncDisposable，釋放時需要非同步', correct: true, why: '例如資料庫連線、網路串流。' },
-        { text: '任何 using 都要加 await 才會真的呼叫 Dispose', why: '一般 IDisposable 用 using 就好。' },
-        { text: '讓 using 的物件在背景執行緒建立', why: 'await using 只影響釋放的方式。' },
-        { text: '讓 Dispose 被延後到程式結束', why: '仍然是離開範圍時釋放。' },
-      ] },
-    ],
     analogy: {
       text: ['同步像在早餐店櫃檯點完餐站著等，後面的人全部卡住。async／await 像拿號碼牌：點完餐（啟動 Task）先回座位滑手機（執行緒去做別的事），叫號時（Task 完成）再去拿，然後繼續吃（await 之後的程式）。'],
       limit: ['你拿號碼牌時清楚知道自己在等；程式裡 await 之後的程式碼可能在另一個執行緒上繼續。而且號碼牌不會讓餐點做得比較快：async 不讓單一工作變快，是讓等待時資源不被佔住。'],
@@ -84,19 +76,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'Console.WriteLine("1");\nvar task = WorkAsync();\nConsole.WriteLine("2");\nawait task;\nConsole.WriteLine("4");\n\nasync Task WorkAsync()\n{\n    await Task.Delay(100);\n    Console.WriteLine("3");\n}',
-          predict: { q: '印出的順序是？', options: ['1 2 3 4', '1 3 2 4', '1 2 4 3'], answer: 0 },
           output: '1\n2\n3\n4',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'async', label: '適合 async／await' }, { id: 'cpu', label: 'CPU 密集，async 不會變快' }],
-          items: [
-            { text: '呼叫天氣 API', answer: 'async', why: '大部分時間在等網路。' },
-            { text: '把一張 8K 照片轉成黑白', answer: 'cpu', why: '時間花在計算像素。' },
-            { text: '查詢資料庫', answer: 'async', why: '等資料庫回應。' },
-            { text: '讀取一個大檔案', answer: 'async', why: '等磁碟 I/O。' },
-            { text: '計算 SHA-256 雜湊一個大字串', answer: 'cpu', why: '純計算。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['呼叫天氣 API', '適合 async／await', '大部分時間在等網路。'],
+          ['把一張 8K 照片轉成黑白', 'CPU 密集，async 不會變快', '時間花在計算像素。'],
+          ['查詢資料庫', '適合 async／await', '等資料庫回應。'],
+          ['讀取一個大檔案', '適合 async／await', '等磁碟 I/O。'],
+          ['計算 SHA-256 雜湊一個大字串', 'CPU 密集，async 不會變快', '純計算。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="async void 的問題：async Task 方法的例外會被 await 的呼叫端接住；async void 方法的例外沒人能接，會讓程式直接中止">
           <rect x="10" y="20" width="260" height="140" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
           <text x="140" y="55" text-anchor="middle" font-size="18" font-weight="900" class="on-color mono">async Task</text>
@@ -108,12 +96,16 @@ defineLessons({
           <text x="420" y="125" text-anchor="middle" font-size="16" class="on-color">例外讓程式中止</text>
           <path d="M270 90 H290" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: 'async void 只用在 UI 事件處理（例如按鈕 Click）；其他一律回傳 Task。' },
+        { type: 'heading', id: 'deep-statemachine', text: '深入：async 方法其實是狀態機' },
+        '編譯器把 async 方法改寫成狀態機：每個 await 是一個暫停點，等待的 Task 還沒完成時方法先回傳，完成後從下一個狀態繼續。如果 await 的 Task 已經完成（例如快取命中），就直接同步往下走，不切換執行緒，也幾乎沒有額外成本。',
+        '`ConfigureAwait(false)` 表示 await 之後不需要回到原本的同步內容（例如 UI 執行緒）。函式庫程式碼常加上它，避免被呼叫端用 .Result 時死結；ASP.NET Core 沒有同步內容，應用程式碼不需要寫。`ValueTask<T>` 適合「大多數時候同步完成」的熱路徑，可以省下 Task 的配置，代價是只能 await 一次，一般程式用 Task 就好。',
+        { type: 'table', head: ['情境', '寫法'], rows: [
+          ['程式進入點要 await', '頂層陳述式直接 await，或 `static async Task Main()`'],
+          ['UI 的按鈕事件', '`async void` 處理器，裡面自己 try/catch'],
+          ['建構子需要非同步初始化', '建構子不能 async；改成 `static async Task<T> CreateAsync()` 工廠方法'],
+          ['CPU 密集的計算不想卡住 UI', '`await Task.Run(() => Compute())`'],
+        ] },
       ],
-      tryit: {
-        q: ['把這個同步方法改成非同步：'],
-        draft: 'string ReadNote(string path)\n{\n    return File.ReadAllText(path);\n}\n\n// 改成：\n____ ____ ReadNoteAsync(string path)\n{\n    return ____ File.ReadAllTextAsync(path);\n}',
-        answer: ['`async Task<string> ReadNoteAsync(string path) { return await File.ReadAllTextAsync(path); }`', '回傳值是 string，所以方法回傳 `Task<string>`；名稱加 Async。只有一行時也可以省略 async／await 直接 `return File.ReadAllTextAsync(path);`，但新手先統一寫 await 比較不會出錯。'],
-      },
     },
     mistakes: [
       { wrong: '`var data = LoadAsync().Result;`', why: '阻塞執行緒；在有同步內容（SynchronizationContext）的環境會死結。', right: '`var data = await LoadAsync();`，呼叫端也改成 async。' },
@@ -121,19 +113,7 @@ defineLessons({
       { wrong: '呼叫 async 方法卻忘了 await。', why: '工作在背景跑，例外沒人接，後面的程式以為已經完成了（CS4014 警告）。', right: '加上 await；真的要「發射後不管」時要另外處理例外。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'async／await 主要的好處是？', options: [
-        { text: '等待 I/O 時不佔住執行緒', correct: true, why: '同樣的執行緒可以服務更多工作。' },
-        { text: '讓 CPU 計算變快', why: '計算速度不變；CPU 密集要用平行化。' },
-        { text: '自動把程式分到多個核心', why: 'await 本身不做平行化。' },
-        { text: '讓程式不會拋例外', why: '例外照樣會拋，await 時重新拋出。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`async Task<int> GetAsync()` 裡 `return 5;`，呼叫端 `var x = GetAsync();` 中 x 的型別是？', options: [
-        { text: '`Task<int>`', correct: true, why: '沒有 await，拿到的是 Task；要 int 必須 `await GetAsync()`。' },
-        { text: '`int`', why: '要 await 才會取出 int。' },
-        { text: '`Task`', why: '有回傳值的是 Task<int>。' },
-        { text: '`void`', why: '方法回傳 Task<int>。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一個 Web API 在流量高時回應變很慢，CPU 使用率卻很低。查程式碼發現到處都是 `.Result`。為什麼會這樣？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一個 Web API 在流量高時回應變很慢，CPU 使用率卻很低。查程式碼發現到處都是 `.Result`。為什麼會這樣？'], answer: [
         '每個請求都用 .Result 把執行緒卡在等資料庫或外部 API，執行緒池的執行緒很快被佔滿，新請求只能排隊等執行緒，CPU 其實閒著。這叫執行緒池飢餓（thread pool starvation）。',
         '解法是 async 一路到底：Controller、Service、Repository 全部改成 async Task 並 await。',
       ] },
@@ -151,14 +131,6 @@ defineLessons({
       '用 Task.WhenAll 同時等多個工作',
       '分辨「依序 await」與「同時開始再一起等」的時間差',
       '處理 WhenAll 裡的例外',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 8-1）呼叫 async 方法卻沒有 await，會怎樣？', options: [
-        { text: '工作在背景執行，呼叫端不會等它，例外也沒人接', correct: true, why: '編譯器會給 CS4014 警告。' },
-        { text: '方法根本不會執行，要等 await 出現才開始', why: 'Task 一建立就開始執行了。' },
-        { text: '編譯錯誤', why: '只是警告。' },
-        { text: '會自動同步等待', why: 'C# 不會自動等。' },
-      ] },
     ],
     analogy: {
       text: ['煮早餐：煎蛋 3 分鐘、烤吐司 2 分鐘、煮咖啡 4 分鐘。一件做完再做下一件要 9 分鐘；三件同時開火，最慢的咖啡好了就全部好了，只要 4 分鐘。Task.WhenAll 就是「三件一起開火，全部好了叫我」。'],
@@ -204,18 +176,14 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var sw = System.Diagnostics.Stopwatch.StartNew();\nawait Task.Delay(300);\nawait Task.Delay(300);\nConsole.WriteLine($"依序：約 {sw.ElapsedMilliseconds / 100 * 100} ms");\n\nsw.Restart();\nawait Task.WhenAll(Task.Delay(300), Task.Delay(300));\nConsole.WriteLine($"同時：約 {sw.ElapsedMilliseconds / 100 * 100} ms");',
-          predict: { q: '「同時」那行大約印出多少？', options: ['約 300 ms', '約 600 ms', '約 0 ms'], answer: 0 },
           output: '依序：約 600 ms\n同時：約 300 ms',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'all', label: '可以 WhenAll' }, { id: 'seq', label: '必須依序' }],
-          items: [
-            { text: '同時查天氣、匯率、新聞', answer: 'all', why: '三者互不相依。' },
-            { text: '先登入取得 token，再用 token 查訂單', answer: 'seq', why: '第二步需要第一步的結果。' },
-            { text: '下載 5 張不同的圖片', answer: 'all', why: '彼此獨立（數量多時要限制並行數）。' },
-            { text: '建立訂單，然後用訂單編號建立付款', answer: 'seq', why: '付款需要訂單編號。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['同時查天氣、匯率、新聞', '可以 WhenAll', '三者互不相依。'],
+          ['先登入取得 token，再用 token 查訂單', '必須依序', '第二步需要第一步的結果。'],
+          ['下載 5 張不同的圖片', '可以 WhenAll', '彼此獨立（數量多時要限制並行數）。'],
+          ['建立訂單，然後用訂單編號建立付款', '必須依序', '付款需要訂單編號。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="大量工作時限制並行數：一次發出 1000 個請求可能被對方限流；用 Parallel.ForEachAsync 設定最多同時 4 個，排隊依序處理">
           <rect x="10" y="30" width="250" height="110" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
           <text x="135" y="68" text-anchor="middle" font-size="17" font-weight="900" class="on-color">一次 1000 個</text>
@@ -225,12 +193,17 @@ defineLessons({
           <text x="425" y="105" text-anchor="middle" font-size="15" class="on-color">Parallel.ForEachAsync</text>
           <path d="M260 85 H300" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: '幾個工作用 WhenAll；成百上千個時限制並行數。' },
+        { type: 'heading', id: 'deep-concurrency', text: '深入：依完成順序處理，以及「同時」不等於多執行緒' },
+        '.NET 9 新增 `Task.WhenEach`：`await foreach (var t in Task.WhenEach(tasks))` 依完成的順序一個個處理，取代以前「WhenAny 迴圈再從清單移除」的寫法，那種寫法在工作很多時是 O(n²)。',
+        'Task.WhenAll 不會在第一個失敗時停下其他工作，它會等全部結束。要「一個失敗就全部停止」，把同一個 CancellationToken 傳給所有工作，捕捉到第一個例外時呼叫 Cancel（8-3）。',
+        { type: 'table', head: ['需求', '工具'], rows: [
+          ['一批 I/O 工作，限制同時幾個', '`Parallel.ForEachAsync` 設 MaxDegreeOfParallelism'],
+          ['自訂流程中限制同時數量', '`SemaphoreSlim`'],
+          ['生產者與消費者分開、可背壓', '`Channel<T>`'],
+          ['CPU 密集，要用滿多核心', '`Parallel.For`／`Parallel.ForEach`（不是 async）'],
+        ] },
+        'async 的「同時」不等於多執行緒：三個在等網路的 Task 可能在同一條執行緒上啟動，等待期間不佔任何執行緒。要讓多個 CPU 核心同時計算，用 Parallel 或 Task.Run。',
       ],
-      tryit: {
-        q: ['同時下載多個網址，取得每個內容的長度：'],
-        draft: 'string[] urls = ["https://a.example", "https://b.example"];\nvar tasks = urls.Select(u => http.GetStringAsync(u));\nstring[] pages = await Task.____(tasks);\nConsole.WriteLine(pages.Sum(p => p.____));',
-        answer: ['`Task.WhenAll(tasks)`、`p.Length`。', 'WhenAll 收到 `IEnumerable<Task<string>>` 時回傳 `string[]`，順序和 urls 相同（不是完成的順序）。'],
-      },
     },
     mistakes: [
       { wrong: '在 foreach 裡 `await` 每一個獨立的請求。', why: '彼此不相依卻排隊等待，總時間是全部相加。', right: '先建立所有 Task，再 `await Task.WhenAll`。' },
@@ -238,19 +211,7 @@ defineLessons({
       { wrong: 'try/catch 包住 `await Task.WhenAll(…)`，以為能看到所有失敗。', why: 'await 只重新拋出第一個例外。', right: '把 WhenAll 的 Task 存起來，在 catch 裡讀 `whenAllTask.Exception?.InnerExceptions`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '三個互不相依的工作各需 1、2、3 秒，用 WhenAll 約需多久？', options: [
-        { text: '約 3 秒', correct: true, why: '同時進行，由最慢的決定。' },
-        { text: '約 6 秒', why: '那是依序 await 的時間。' },
-        { text: '約 1 秒', why: '要等全部完成，不是最快的那個。' },
-        { text: '約 2 秒', why: '平均值沒有意義，要等最慢的。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`var t = LoadAsync();` 這行執行後，LoadAsync 開始執行了嗎？', options: [
-        { text: '開始了，await 只是等它完成', correct: true, why: '呼叫 async 方法時就開始執行，直到第一個需要等待的 await。' },
-        { text: '還沒，要 await 才會開始', why: 'C# 的 Task 是「熱」的，建立就開始。' },
-        { text: '要呼叫 t.Start() 才會開始', why: 'async 方法回傳的 Task 已經啟動，再呼叫 Start 會拋例外。' },
-        { text: '要等 Task.WhenAll 才會開始', why: 'WhenAll 只是等待，不負責啟動。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要用 Task.WhenAny 幫一個 API 呼叫加上「3 秒逾時就放棄」。怎麼寫？有沒有更好的做法？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要用 Task.WhenAny 幫一個 API 呼叫加上「3 秒逾時就放棄」。怎麼寫？有沒有更好的做法？'], answer: [
         '`var call = GetAsync(); var done = await Task.WhenAny(call, Task.Delay(3000)); if (done != call) throw new TimeoutException();`',
         '缺點是原本的請求其實還在跑。更好的做法是下一課的 CancellationToken：`new CancellationTokenSource(TimeSpan.FromSeconds(3))` 把 token 傳進去，逾時時真正取消請求；.NET 6 起也可以用 `call.WaitAsync(TimeSpan.FromSeconds(3))`。',
       ] },
@@ -268,14 +229,6 @@ defineLessons({
       '把 CancellationToken 傳進非同步方法',
       '用 CancellationTokenSource 設定逾時',
       '在自己的迴圈裡檢查取消',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 8-2）用 WhenAny 加 Task.Delay 實作逾時，主要缺點是？', options: [
-        { text: '逾時後原本的工作其實還在背景執行', correct: true, why: '只是不等它了，資源仍被佔用。' },
-        { text: 'WhenAny 不能和 Task.Delay 一起用', why: '可以，這是常見寫法。' },
-        { text: '一定會拋出例外', why: '是否拋例外看你怎麼寫。' },
-        { text: '會讓工作執行兩次', why: '工作只會執行一次。' },
-      ] },
     ],
     analogy: {
       text: ['CancellationToken 像外送平台的「取消訂單」按鈕：你按下去（Cancel），平台通知店家和外送員（每個收到 token 的方法），他們在方便停下的地方停下來，不再繼續做。'],
@@ -323,18 +276,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'using var cts = new CancellationTokenSource(250);\nint done = 0;\ntry\n{\n    for (int i = 0; i < 10; i++)\n    {\n        await Task.Delay(100, cts.Token);\n        done++;\n    }\n}\ncatch (OperationCanceledException)\n{\n    Console.WriteLine($"已取消，完成 {done} 個");\n}',
-          predict: { q: '250 ms 後取消，每個工作 100 ms，大約完成幾個？', options: ['2 個', '10 個', '0 個'], answer: 0 },
-          output: '已取消，完成 2 個\n（計時有誤差，實際可能是 1 或 2）',
+          title: '執行結果（計時有誤差，完成數可能是 1 或 2）',
+          output: '已取消，完成 2 個',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'yes', label: '應該接收 token' }, { id: 'no', label: '不需要' }],
-          items: [
-            { text: '呼叫外部 API 的 async 方法', answer: 'yes', why: '網路可能很久，要能中斷。' },
-            { text: '把兩個數字相加的方法', answer: 'no', why: '瞬間完成，沒有取消的意義。' },
-            { text: 'ASP.NET Core 的 API 端點查詢資料庫', answer: 'yes', why: '使用者關掉網頁時，框架會取消 token，可以停止白做的查詢。' },
-            { text: '處理上萬筆資料的背景工作', answer: 'yes', why: '服務關閉時要能優雅地停下。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['呼叫外部 API 的 async 方法', '應該接收 token', '網路可能很久，要能中斷。'],
+          ['把兩個數字相加的方法', '不需要', '瞬間完成，沒有取消的意義。'],
+          ['ASP.NET Core 的 API 端點查詢資料庫', '應該接收 token', '使用者關掉網頁時，框架會取消 token，可以停止白做的查詢。'],
+          ['處理上萬筆資料的背景工作', '應該接收 token', '服務關閉時要能優雅地停下。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="合作式取消：方法要主動檢查 token 或傳給下層，取消信號才有作用；沒有檢查的迴圈會照樣跑完">
           <rect x="10" y="30" width="250" height="110" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
           <text x="135" y="68" text-anchor="middle" font-size="17" font-weight="900" class="on-color">有檢查 token</text>
@@ -344,35 +294,21 @@ defineLessons({
           <text x="425" y="105" text-anchor="middle" font-size="15" class="on-color">照樣跑完</text>
           <path d="M260 85 H300" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: '取消不是強制終止，而是「請你停下」的信號。' },
+        { type: 'heading', id: 'deep-cancel', text: '深入：合併取消來源與取消後的狀態' },
+        '`CancellationTokenSource.CreateLinkedTokenSource(ct1, ct2)` 把多個來源合併成一個：例如「使用者取消」或「整體逾時」任一個發生就取消。ASP.NET Core 端點的 `CancellationToken` 參數就是 `HttpContext.RequestAborted`，使用者關掉頁面時會被取消，常再和自己的逾時連結起來。',
+        '`token.Register(() => …)` 在取消時執行回呼，用來中斷不支援 token 的舊 API（例如關閉 socket）。回呼要短、不要拋例外，回傳的註冊物件用完要 Dispose。',
+        { type: 'table', head: ['被取消時', '結果'], rows: [
+          ['Task 的狀態', '`Canceled`，不是 `Faulted`'],
+          ['await 它', '拋 `TaskCanceledException`（OperationCanceledException 的子類別）'],
+          ['catch 要抓', '父類別 `OperationCanceledException`，才不會漏掉另一種'],
+          ['不想支援取消的呼叫', '傳 `CancellationToken.None`（等於 `default`）'],
+        ] },
       ],
-      tryit: {
-        q: ['讓這個方法支援取消，並把 token 傳給 Task.Delay：'],
-        draft: 'async Task CountdownAsync(int seconds, ____ ct = default)\n{\n    for (int s = seconds; s > 0; s--)\n    {\n        Console.WriteLine(s);\n        await Task.Delay(1000, ____);\n    }\n}',
-        answer: ['`CancellationToken ct = default`、`Task.Delay(1000, ct)`。', '`default` 是一個永遠不會被取消的 token，讓不需要取消的呼叫端可以省略這個參數。'],
-      },
     },
     mistakes: [
       { wrong: '方法收了 token，卻沒有傳給下層的非同步呼叫。', why: '真正耗時的 I/O 收不到取消信號。', right: '一路把 token 傳下去：`await db.SaveChangesAsync(ct)`。' },
       { wrong: '把 OperationCanceledException 當成錯誤記錄並警報。', why: '取消是使用者或系統主動要求的正常結束。', right: '單獨 catch OperationCanceledException，記錄為資訊或忽略。' },
       { wrong: '`new CancellationTokenSource(…)` 用完沒有 Dispose。', why: '設定了逾時的 CTS 內部有計時器，不釋放會殘留。', right: '`using var cts = …`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '誰負責「發出」取消？', options: [
-        { text: 'CancellationTokenSource', correct: true, why: '它有 Cancel 與 CancelAfter。' },
-        { text: 'CancellationToken', why: 'token 只能讀取狀態，不能發出取消。' },
-        { text: 'Task', why: 'Task 不能取消自己，要靠 token。' },
-        { text: 'OperationCanceledException', why: '它是取消後的結果。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一個 for 迴圈只做 CPU 計算、沒有 await，也沒有檢查 token，呼叫 Cancel 後會？', options: [
-        { text: '迴圈照樣跑完', correct: true, why: '取消是合作式的，沒有檢查就不會停。' },
-        { text: '立刻停止', why: '.NET 不會強制中斷執行中的程式碼。' },
-        { text: '拋出 OperationCanceledException', why: '沒有任何地方檢查 token，就沒人拋。' },
-        { text: '程式當掉', why: 'Cancel 只是設定一個旗標。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['ASP.NET Core 的端點方法可以直接加一個 `CancellationToken ct` 參數。使用者關掉瀏覽器時會發生什麼？為什麼這對資料庫查詢有幫助？'], answer: [
-        '框架會把「請求中止」連到這個 token；使用者關掉頁面或連線中斷時，token 被取消。',
-        '把 ct 傳給 EF Core 的 `ToListAsync(ct)`，資料庫查詢會被中斷，不會為一個沒人看的頁面繼續佔用資料庫資源。',
-      ] },
     ],
     keypoints: [
       'CancellationTokenSource 發出取消，CancellationToken 一路傳下去。',
@@ -387,14 +323,6 @@ defineLessons({
       '用 yield return 寫一個迭代器',
       '用 IAsyncEnumerable 與 await foreach 一筆一筆處理非同步資料',
       '分辨「全部載入再處理」與「邊來邊處理」',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 8-3）方法參數的 `CancellationToken ct = default` 中 default 代表？', options: [
-        { text: '一個永遠不會被取消的 token', correct: true, why: '讓不需要取消的呼叫端可以省略。' },
-        { text: 'null', why: 'CancellationToken 是 struct，不是 null。' },
-        { text: '預設 30 秒逾時', why: 'default token 沒有逾時。' },
-        { text: '立刻取消', why: '剛好相反。' },
-      ] },
     ],
     analogy: {
       text: ['IEnumerable 回傳 List 像一次把整箱信件倒在桌上；`yield return` 像郵差一封一封遞給你。IAsyncEnumerable 則是郵差每封信都要去郵局再拿一次（要等），你拿到一封就先處理一封，不用等整箱到齊。'],
@@ -441,7 +369,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'foreach (var n in Numbers())\n{\n    Console.WriteLine($"拿到 {n}");\n    if (n == 2) break;\n}\n\nIEnumerable<int> Numbers()\n{\n    for (int i = 1; i <= 3; i++)\n    {\n        Console.WriteLine($"產生 {i}");\n        yield return i;\n    }\n}',
-          predict: { q: '「產生 3」會印出來嗎？', options: ['會', '不會', '編譯錯誤'], answer: 1 },
           output: '產生 1\n拿到 1\n產生 2\n拿到 2',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="迭代器的交替執行：產生 1、拿到 1、產生 2、拿到 2，呼叫端 break 後迭代器不會再產生 3">
@@ -453,44 +380,27 @@ defineLessons({
           <text x="105" y="20" font-size="14">迭代器</text>
           <text x="205" y="185" text-anchor="middle" font-size="14">呼叫端</text>
         </svg>`, caption: '兩邊交替執行；呼叫端不再要，迭代器就停在原地，不會多做。' },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'list', label: '回傳 List 就好' }, { id: 'stream', label: '用串流' }],
-          items: [
-            { text: '首頁顯示最新 10 則公告', answer: 'list', why: '筆數少，一次拿完最簡單。' },
-            { text: '把 2 GB 的日誌檔逐行分析', answer: 'stream', why: '全部讀進記憶體會爆。' },
-            { text: 'AI 模型一個字一個字回傳答案', answer: 'stream', why: '讓使用者邊等邊看到內容。' },
-            { text: '下拉選單的縣市清單', answer: 'list', why: '固定、少量。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['首頁顯示最新 10 則公告', '回傳 List 就好', '筆數少，一次拿完最簡單。'],
+          ['把 2 GB 的日誌檔逐行分析', '用串流', '全部讀進記憶體會爆。'],
+          ['AI 模型一個字一個字回傳答案', '用串流', '讓使用者邊等邊看到內容。'],
+          ['下拉選單的縣市清單', '回傳 List 就好', '固定、少量。']
+        ] },
+        { type: 'heading', id: 'deep-iterators', text: '深入：迭代器的 finally 與非同步 LINQ' },
+        'yield return 和 async 一樣，編譯器把方法改寫成狀態機類別。迭代器裡的 `finally` 與 using 會在列舉結束、或呼叫端 break（列舉器被 Dispose）時執行，所以上面的 StreamReader 在 break 之後也會關閉。',
+        'IAsyncEnumerable 上的 LINQ（Where、Select、ToListAsync）以前要另外安裝 System.Linq.Async 套件，.NET 10 起內建在 `System.Linq.AsyncEnumerable`。ASP.NET Core 的端點直接回傳 `IAsyncEnumerable<T>` 時，System.Text.Json 會邊產生邊寫出 JSON 陣列，不用等全部算完。',
+        { type: 'table', head: ['回傳型別', '要等待嗎', '幾筆'], rows: [
+          ['`T`', '不用', '一筆'],
+          ['`Task<T>`', '要', '一筆'],
+          ['`IEnumerable<T>`', '不用', '多筆，逐筆產生'],
+          ['`IAsyncEnumerable<T>`', '每一筆都可能要', '多筆，逐筆產生'],
+        ] },
       ],
-      tryit: {
-        q: ['補完一個每秒產生一個數字的非同步串流：'],
-        draft: '____ IAsyncEnumerable<int> TickAsync(int count)\n{\n    for (int i = 1; i <= count; i++)\n    {\n        await Task.Delay(1000);\n        ____ i;\n    }\n}\n\n____ (var n in TickAsync(3)) Console.WriteLine(n);',
-        answer: ['`async IAsyncEnumerable<int>`、`yield return i;`、`await foreach`。', '方法要同時有 async 與 yield return，回傳型別必須是 IAsyncEnumerable<T>（或 IAsyncEnumerator<T>）。'],
-      },
     },
     mistakes: [
       { wrong: '用 `foreach`（沒有 await）列舉 IAsyncEnumerable。', why: '編譯錯誤：IAsyncEnumerable 沒有同步的 GetEnumerator。', right: '`await foreach`。' },
       { wrong: '迭代器方法裡做參數檢查，以為呼叫時就會拋例外。', why: '迭代器是延遲執行，要到第一次 MoveNext 才會跑到檢查。', right: '外層方法先檢查參數，再呼叫內部的迭代器（區域函式）。' },
       { wrong: '小量資料也改成 IAsyncEnumerable。', why: '程式變複雜，沒有換到好處。', right: '大量或需要邊來邊處理時才串流。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '消費 `IAsyncEnumerable<T>` 要用哪個語法？', options: [
-        { text: '`await foreach`', correct: true, why: '每一步都可能要等待。' },
-        { text: '`foreach`', why: '同步 foreach 不支援非同步序列。' },
-        { text: '`await Task.WhenAll`', why: 'WhenAll 收的是 Task，不是序列。' },
-        { text: '`for` 加索引', why: '非同步序列沒有索引。' },
-      ] },
-      { level: '應用', type: 'mc', q: '迭代器方法 `IEnumerable<int> F()` 裡有 `Console.WriteLine("開始")`，`var x = F();` 這行會印出「開始」嗎？', options: [
-        { text: '不會，要開始列舉時才執行', correct: true, why: '迭代器是延遲執行。' },
-        { text: '會，呼叫方法就會執行', why: '迭代器方法被呼叫時只建立列舉器。' },
-        { text: '會印兩次', why: '根本還沒執行。' },
-        { text: '編譯錯誤：迭代器不能有 WriteLine', why: '迭代器裡可以寫任何程式碼。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼聊天機器人的 API 常用串流回傳答案？如果改成一次回傳完整答案，使用者體驗會差在哪？'], answer: [
-        '模型產生一段長回答可能要好幾秒。串流讓第一個字在幾百毫秒內就出現，使用者看到東西在動，覺得比較快，也能提早決定要不要中斷。',
-        '一次回傳則畫面空白好幾秒。在 C# 這邊，用 `await foreach` 讀 IAsyncEnumerable，每收到一段就更新畫面。',
-      ] },
     ],
     keypoints: [
       'yield return 讓方法「要一個給一個」，而且是延遲執行。',

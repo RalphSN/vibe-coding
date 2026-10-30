@@ -99,10 +99,9 @@ Views.styleguide = () => {
       ${tabsBlock({ label: '作業系統', tabs: [{ label: 'Windows', blocks: ['`winget install astral-sh.uv`'] }, { label: 'macOS', blocks: ['`brew install uv`'] }] })}
     </section>
 
-    <section class="sg-block"><h2>摺疊與測驗</h2>
+    <section class="sg-block"><h2>深入思考（答案摺疊）</h2>
       <div class="quiz-list">
-        ${quizItem(sampleQuiz, 'styleguide:q:0')}
-        ${quizItem({ type: 'reveal', level: '遷移', q: '先想一想：為什麼答案要先藏起來？', answer: ['先嘗試提取記憶，再看答案，記得比較牢（提取練習）。'] }, 'styleguide:r:0')}
+        ${quizItem({ type: 'reveal', level: '深入思考', q: '`b = a` 之後改 b，為什麼 a 也變了？', answer: ['兩個名字指向同一個 list 物件，append 改的是物件本身（見 1-1）。'] }, 'styleguide:r:0')}
       </div>
     </section>
 
@@ -114,11 +113,11 @@ Views.styleguide = () => {
       ${renderWidget({ name: 'checklist', props: { key: 'sg', items: ['第一項', '第二項', '第三項'] } })}
     </section>
 
-    <section class="sg-block"><h2>csrun：預測再看結果</h2>
-      ${renderWidget({ name: 'csrun', props: { code: 'print(7 // 2)', predict: { options: ['3', '3.5'], answer: 0 }, output: '3' } })}
+    <section class="sg-block"><h2>csrun：可執行的範例</h2>
+      ${renderWidget({ name: 'csrun', props: { code: 'print(7 // 2)', output: '3' } })}
     </section>
-    <section class="sg-block"><h2>classify</h2>
-      ${renderWidget({ name: 'classify', props: { buckets: [{ id: 'm', label: '可變' }, { id: 'i', label: '不可變' }], items: [{ text: '`list`', answer: 'm', why: '可以 append。' }, { text: '`str`', answer: 'i', why: '字串方法都回傳新字串。' }] } })}
+    <section class="sg-block"><h2>knobs：試算拉桿</h2>
+      ${renderWidget({ name: 'knobs', props: { title: '拉拉看', sliders: [{ id: 'n', label: '數量', min: 1, max: 10, step: 1, value: 3 }], compute: (v) => ({ rows: [{ label: '平方', value: String(v.n * v.n), ratio: v.n * v.n / 100 }], note: '改數量，看平方怎麼變。' }) } })}
     </section>
 
     <section class="sg-block"><h2>鍵盤提示</h2>

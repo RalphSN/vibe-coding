@@ -95,13 +95,14 @@ defineLessons({
             <text x="30" y="220" class="on-color" font-size="17">或直接寫 cd ~/Downloads，最不會錯</text>
           </g>
         </svg>`, caption: '每個 `..` 往上一層。離家目錄近的地方，用 `~` 開頭通常比數 `..` 簡單。' },
+        { type: 'heading', id: 'deep-paths', text: '深入：路徑在跨系統時會出問題的地方' },
+        { type: 'table', caption: '三個常見的邊界情況', head: ['情況', '發生什麼', '怎麼避免'], rows: [
+          ['大小寫', 'Windows 和 macOS 預設**不分**大小寫，Linux 分。`import "./App.js"` 在你的電腦能跑，到 Linux 伺服器卻找不到 `app.js`', '檔名和引用一律寫成完全相同的大小寫'],
+          ['路徑長度', 'Windows 傳統上限 260 個字元（MAX_PATH），很深的 `node_modules` 可能撞到', '專案放在短一點的路徑，例如 `C:\\dev\\專案`'],
+          ['WSL 與 Git Bash', '同一個資料夾有不同寫法：`C:\\Users\\you`、WSL 的 `/mnt/c/Users/you`、Git Bash 的 `/c/Users/you`', '在 WSL 用 `wslpath` 轉換；專案放在 WSL 自己的檔案系統裡速度較快'],
+        ] },
+        '`~` 也有限制：它是 shell 展開的（1-2 深入段），寫在程式的設定檔或 JSON 裡通常不會被換成家目錄。需要家目錄時，程式碼裡用語言提供的函式（例如 Node 的 `os.homedir()`）。',
       ],
-      tryit: {
-        q: ['目前在 `/Users/amy/projects/web`。寫出到 `Documents/school` 的相對路徑和絕對路徑。'],
-        code: true,
-        draft: '相對路徑：____\n絕對路徑：____\n用 ~ 的寫法：____',
-        answer: ['相對：`../../Documents/school`（上兩層到 amy，再往下）。', '絕對：`/Users/amy/Documents/school`。用 ~：`~/Documents/school`。'],
-      },
     },
     mistakes: [
       { wrong: '在 zsh 裡照 Windows 習慣打 `cd projects\\web`。', why: 'zsh 的路徑分隔符號是 `/`；`\\` 在 zsh 是跳脫字元，`\\w` 會變成普通的 `w`，結果找 `projectsweb`。', right: 'macOS／Linux 一律用 `/`。PowerShell 兩種都可以，跨平台時用 `/` 最保險。' },
@@ -109,28 +110,8 @@ defineLessons({
       { wrong: '以為 `~` 在任何程式裡都代表家目錄。', why: '`~` 是 shell 幫你展開的；放在引號裡（`"~/Downloads"`）或寫進某些設定檔時，不一定會被展開。', right: '在引號裡改用 `$HOME`（zsh／bash）或 `$env:USERPROFILE`（PowerShell）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`..` 代表什麼？', options: [
-        { text: '目前所在的資料夾', why: '那是單一個點 `.`。兩個點是往上一層。' },
-        { text: '上一層資料夾', correct: true, why: '`..` 永遠指向目前資料夾的上一層。' },
-        { text: '家目錄', why: '家目錄是 `~`。' },
-        { text: '最上層的根目錄', why: '根目錄是 `/` 或 `C:\\`；`..` 只往上一層。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你在 `C:\\Users\\you\\projects\\web`，想用相對路徑到 `C:\\Users\\you\\Desktop`，該打？', options: [
-        { text: '`cd ..\\Desktop`', why: '上一層是 projects，projects 裡沒有 Desktop。' },
-        { text: '`cd ..\\..\\Desktop`', correct: true, why: '兩個 `..` 回到 you，再往下到 Desktop。' },
-        { text: '`cd \\Desktop`', why: '`\\` 開頭代表從目前磁碟的根目錄開始，會去找 `C:\\Desktop`。' },
-        { text: '`cd Desktop`', why: '相對路徑從目前位置往下找，web 裡沒有 Desktop。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼專案的設定檔（例如 `package.json` 裡的 scripts）大多用相對路徑，而不是 `C:\\Users\\you\\...` 這種絕對路徑？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼專案的設定檔（例如 `package.json` 裡的 scripts）大多用相對路徑，而不是 `C:\\Users\\you\\...` 這種絕對路徑？'], answer: [
         '參考：因為專案會被不同的人 clone 到不同的位置、不同的作業系統。相對路徑以專案自己為起點，換到誰的電腦都成立；絕對路徑只在你的電腦上有效。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）資料夾名稱 `My Projects` 有空白，在 PowerShell 要怎麼切換進去？', options: [
-        { text: '`cd "My Projects"`', correct: true, why: '引號把名稱包成一個參數。' },
-        { text: '`cd My Projects`', why: '空白會把它切成兩塊。' },
-        { text: '`cd My_Projects`', why: '底線和空白是不同的字元，這是另一個名字。' },
-        { text: '`cd [My Projects]`', why: '方括號是說明文件的記號，不是引號。' },
       ] },
     ],
     keypoints: [
@@ -207,44 +188,20 @@ defineLessons({
           <text x="10" y="200" font-size="18">加 -h 會把 412 顯示成 412B、2.1M 這種好讀的單位。</text>
           <text x="10" y="236" font-size="18">PowerShell 的 Mode 欄：d 資料夾、a 封存、h 隱藏。</text>
         </svg>`, caption: '看不懂的欄位先跳過，初學最常用的是：類型（d 開頭是資料夾）、大小、名稱。' },
+        { type: 'heading', id: 'deep-ls', text: '深入：ls 的輸出是給人看的' },
+        '`ls` 會偵測輸出是不是接到螢幕：接螢幕時排成好幾欄、加顏色；接到管線或檔案時改成一行一個（3-1 深入段）。所以不要在腳本裡「切 `ls` 的輸出」來取檔名，檔名有空白或換行時就會切錯。',
+        { type: 'table', caption: '比 cd 更方便的移動方式', head: ['寫法', '做什麼', '哪裡能用'], rows: [
+          ['`cd -`', '回到上一個所在的資料夾', 'zsh、bash、PowerShell 7'],
+          ['`pushd 資料夾` ／ `popd`', '先記住現在的位置再過去；`popd` 回來', 'zsh、bash、PowerShell、cmd'],
+          ['`ls -G`（macOS）／`ls --color`（Linux）', '用顏色分出資料夾與檔案', 'macOS 的 BSD ls 不認得 `--color`'],
+        ] },
+        '`pwd` 印出的路徑也可能和你以為的不同：如果你是透過捷徑或符號連結（symlink）進來的，`pwd` 預設顯示連結的路徑，`pwd -P` 才顯示實際位置。',
       ],
-      tryit: {
-        q: ['在上面的資料夾樹模擬器裡，從 `C:\\Users\\you` 出發，**只用三個指令**找到 `app.js` 在哪個資料夾，並確認它在那裡。寫下你的三個指令。'],
-        code: true,
-        draft: '1. ____\n2. ____\n3. ____',
-        answer: ['一種解法：`cd projects\\web`、`ls`（看到 src）、`ls src`（看到 app.js）。', '也可以 `cd projects\\web\\src` 再 `ls`。重點是：不確定時先 `ls` 看，不要猜。'],
-      },
     },
     mistakes: [
       { wrong: '在 PowerShell 打 `ls -la`，出現錯誤。', why: 'PowerShell 的 `ls` 是 `Get-ChildItem` 的別名，它不認得 Unix 的 `-la` 選項。', right: '在 PowerShell 用 `ls -Force`（含隱藏檔）；`-la` 只在 zsh／bash 用。' },
       { wrong: '`cd` 之後直接執行專案指令，結果在錯的資料夾跑了 `npm install`。', why: '`cd` 打錯一個字可能失敗，你卻沒注意，還留在原地。', right: '`cd` 之後看一眼提示字元或打 `pwd`，確認位置再執行。' },
       { wrong: '在 cmd 打 `pwd` 找目前位置。', why: 'cmd 沒有 `pwd` 指令。', right: 'cmd 用不加參數的 `cd`，或直接看提示字元。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '在 PowerShell 打 `ls`，實際執行的是哪個指令？', options: [
-        { text: 'Unix 系統的 ls 程式', why: 'Windows 預設沒有 Unix 的 ls；PowerShell 用別名讓你能打 ls。' },
-        { text: '`Get-ChildItem`', correct: true, why: '`ls`、`dir`、`gci` 都是 `Get-ChildItem` 的別名。' },
-        { text: 'cmd 的 `dir`', why: '`dir` 在 PowerShell 一樣是 `Get-ChildItem` 的別名，不會去叫 cmd。' },
-        { text: '`List-Item`', why: 'PowerShell 沒有叫 `List-Item` 的 cmdlet；列出內容的是 `Get-ChildItem`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 zsh 想看下載資料夾裡**所有**檔案（含隱藏檔）和它們的大小，最合適的是？', options: [
-        { text: '`ls ~/Downloads`', why: '不加 `-a` 看不到隱藏檔，不加 `-l` 看不到大小。' },
-        { text: '`ls -lah ~/Downloads`', correct: true, why: '`-l` 詳細、`-a` 全部、`-h` 大小好讀。' },
-        { text: '`ls -Force ~/Downloads`', why: '`-Force` 是 PowerShell 的寫法；zsh 的 ls 不認得。' },
-        { text: '`cd -a ~/Downloads`', why: '`cd` 是移動，不是列出；而且 `-a` 不是 cd 的選項。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你打開終端機，提示字元是 `PS C:\\Windows\\System32>`（用系統管理員開時常見）。你想到自己的專案資料夾工作，第一步打什麼？為什麼不要在這裡工作？'], answer: [
-        '參考：先 `cd ~` 或 `cd ~\\projects\\...` 離開。`System32` 是 Windows 的系統資料夾，在這裡建立或刪除檔案可能影響系統。',
-        '習慣：開始工作前看一眼提示字元，確認自己在專案資料夾裡。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-4）`cd docs` 回了錯誤，你懷疑是不在正確位置。先做什麼？', options: [
-        { text: '`pwd` 看自己在哪，再 `ls` 看有什麼', correct: true, why: '找不到檔案類的錯誤，第一步就是確認位置與內容。' },
-        { text: '用系統管理員重開終端機', why: '那是處理權限錯誤的方法。' },
-        { text: '把 docs 改成大寫 DOCS 再試一次', why: '猜大小寫不如 `ls` 直接看真正的名稱。' },
-        { text: '重新開機', why: '路徑問題跟開機無關。' },
-      ] },
     ],
     keypoints: [
       '三招循環：`pwd` 我在哪、`ls` 有什麼、`cd` 走過去。',
@@ -329,13 +286,15 @@ defineLessons({
             <text x="190" y="221">→ 全部四個（小心！）</text>
           </g>
         </svg>`, caption: '`*` 代表任意長度的任意字元。單獨一個 `*` 就是「全部」，和 `rm` 放在一起時特別危險。' },
+        { type: 'heading', id: 'deep-mv-cp', text: '深入：mv 為什麼有時很快、有時很慢' },
+        '在同一顆硬碟上 `mv` 只是改檔案系統裡的名稱，再大的檔案也是一瞬間。跨硬碟（例如搬到隨身碟）時，`mv` 其實是「複製再刪除」，中途中斷可能兩邊都不完整。',
+        { type: 'table', caption: '同一個寫法，不同系統的細節', head: ['寫法', 'Linux（GNU）', 'macOS（BSD）'], rows: [
+          ['`cp -r photos/ backup`', '複製整個 photos 資料夾', '結尾有 `/` 時，只複製 photos **裡面的內容**'],
+          ['`cp a.txt b.txt`', '新檔案的修改時間是現在', '同左；要保留原本時間用 `cp -p`'],
+          ['`rm -I *.log`', '超過 3 個檔案時只問一次', '沒有 `-I`，只能用 `-i` 逐個問'],
+        ] },
+        'PowerShell 的刪除和複製大多支援 `-WhatIf`（只顯示會做什麼）和 `-Confirm`（每一步先問），比 Unix 的 `-i` 更適合拿來預覽一大批檔案（8-1）。',
       ],
-      tryit: {
-        q: ['用 zsh 完成：建立 `archive` 資料夾，把所有 `.pdf` 移進去，最後確認。寫下三行指令。'],
-        code: true,
-        draft: '1. ____\n2. ____\n3. ____',
-        answer: ['`mkdir archive`、`mv *.pdf archive/`、`ls archive`。', '保險起見可以在第 2 步之前先 `ls *.pdf` 預覽。PowerShell 版：`mkdir archive`、`Move-Item *.pdf archive`、`ls archive`。'],
-      },
     },
     mistakes: [
       { wrong: '用 `rm` 刪錯檔案，打開資源回收筒想救回來。', why: '`rm`、`Remove-Item`、`del` 都直接刪除，不經過資源回收筒。', right: '刪除前先 `ls` 預覽；重要的專案放在 git 裡（6-2），刪錯還能從版本紀錄救回。' },
@@ -343,29 +302,9 @@ defineLessons({
       { wrong: '`mv a.txt b.txt` 沒注意 b.txt 已經存在。', why: 'mv 和 cp 預設直接覆蓋同名檔案，舊的 b.txt 就消失了。', right: '不確定時加 `-i`（zsh／bash），覆蓋前會先問。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下列哪個敘述正確？', options: [
-        { text: '`rm` 刪除的檔案會先放進資源回收筒', why: '這是滑鼠刪除的行為；終端機的 rm 直接刪除。' },
-        { text: '`mv` 可以用來把檔案改名', correct: true, why: '移動到同一個資料夾、換一個名稱，就是改名。' },
-        { text: '`cp` 不加選項就能複製整個資料夾', why: '資料夾要加 `-r`（PowerShell 是 `-Recurse`），不然會報錯或略過。' },
-        { text: '`mkdir` 遇到已存在的資料夾會自動合併', why: '預設會報錯「已存在」；zsh／bash 加 `-p` 才會靜靜略過。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你想刪除目前資料夾中所有 `.tmp` 檔，最安全的流程是？', options: [
-        { text: '直接 `rm -rf *`，最乾淨', why: '這會刪掉目前資料夾的**所有東西**，包含子資料夾，而且不問。' },
-        { text: '`ls *.tmp` 確認清單，再 `rm *.tmp`', correct: true, why: '先預覽同一個萬用字元會選到什麼，確認無誤再刪。' },
-        { text: '`rm .tmp`', why: '這只會刪除名稱剛好是 `.tmp` 的那個檔案，不會刪 `a.tmp`。' },
-        { text: '`rm * .tmp`', why: '多一個空白，`*` 會選中所有檔案。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 AI 工具在要執行 `rm -rf` 之類的指令前，會停下來問你？從這課學到的特性解釋。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 AI 工具在要執行 `rm -rf` 之類的指令前，會停下來問你？從這課學到的特性解釋。'], answer: [
         '參考：因為 `rm` 不經過資源回收筒、`-r` 會連子資料夾一起刪、`-f` 不詢問也不報錯。三者加在一起，一個路徑寫錯就可能無法復原。',
         '所以權限設定通常把它列為「要先詢問」或直接禁止（7-1、8-1）。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）`cp -r photos backup` 裡的 `-r` 是什麼零件？', options: [
-        { text: '選項', correct: true, why: '減號開頭的開關，這裡代表遞迴（連子資料夾一起）。' },
-        { text: '參數', why: '參數是 `photos` 和 `backup` 這兩個要處理的對象。' },
-        { text: '子指令', why: 'cp 沒有子指令；`-r` 是改變做法的選項。' },
-        { text: '程式', why: '程式是 `cp`。' },
       ] },
     ],
     keypoints: [
@@ -453,13 +392,16 @@ defineLessons({
           <text x="280" y="108" text-anchor="middle" font-size="16" font-weight="900" class="mono">grep</text>
           <text x="280" y="128" text-anchor="middle" font-size="16" font-weight="900" class="mono">ERROR</text>
         </svg>`, caption: 'grep 像篩子：整行進去，只有含關鍵字的行出來。下一個模組會把它和其他指令串成管線。' },
+        { type: 'heading', id: 'deep-grep', text: '深入：grep 的樣式與更快的替代工具' },
+        '`grep` 的搜尋字串是[[正規表示式]]，不是純文字：`grep "a.b"` 也會找到 `axb`，因為 `.` 代表任意一個字元。只想找字面上的文字就加 `-F`；想用 `+`、`|` 這類進階符號就加 `-E`。',
+        { type: 'table', caption: '常見選擇', head: ['工具', '優點', '取捨'], rows: [
+          ['`grep -rn`', '每台 macOS／Linux 都有', '大專案慢；會搜進 `node_modules`'],
+          ['`rg`（ripgrep）', '很快；預設跳過 `.gitignore` 列出的檔案', '要另外安裝；被忽略的檔案不會出現在結果裡'],
+          ['`Select-String`', 'PowerShell 內建，結果是物件', '預設不分大小寫，要分就加 `-CaseSensitive`'],
+          ['`findstr`', 'cmd 內建', '樣式語法和 grep 不同，只求看懂'],
+        ] },
+        '`find` 找到檔案後可以直接處理：`find . -name "*.tmp" -exec rm {} +`。這和 `-delete` 一樣危險，先拿掉後面的動作執行一次，確認清單再加回去。',
       ],
-      tryit: {
-        q: ['用 zsh 寫指令：在 `notes` 資料夾（含子資料夾）裡，找出所有提到「期末考」的行，並顯示行號。'],
-        code: true,
-        draft: '____',
-        answer: ['`grep -rn "期末考" notes`', 'PowerShell 版：`Get-ChildItem notes -Recurse -File | Select-String "期末考"`（用到下一個模組的管線 `|`）。'],
-      },
     },
     mistakes: [
       { wrong: '用 `cat` 打開圖片、壓縮檔或 .exe。', why: '這些是二進位檔，印出來是亂碼，還可能把終端機的顯示弄亂。', right: '`cat` 只用在文字檔；不小心弄亂了可以打 `reset`（zsh／bash）或重開分頁。' },
@@ -467,29 +409,9 @@ defineLessons({
       { wrong: '`grep error app.log` 找不到，就以為沒有錯誤。', why: 'grep 預設分大小寫，記錄檔裡可能寫的是 `ERROR` 或 `Error`。', right: '加 `-i` 不分大小寫：`grep -i error app.log`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '想知道「哪些檔案的內容提到 password」，該用哪一類工具？', options: [
-        { text: '`find`，依名稱找檔案', why: 'find 看的是檔名，不是內容。檔名裡沒有 password 的檔案會被漏掉。' },
-        { text: '`grep -r`（PowerShell 是 `Select-String`）', correct: true, why: '搜尋**內容**用 grep；`-r` 讓它檢查整個資料夾。' },
-        { text: '`cat` 每個檔案再用眼睛看', why: '可行但很慢，檔案一多就不可能做到。' },
-        { text: '`ls -la`，看檔案大小判斷', why: 'ls 只列出檔名和屬性，看不到內容。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'PowerShell 裡，只看 `app.log` 最後 20 行，哪一行正確？', options: [
-        { text: '`tail -n 20 app.log`', why: 'Windows 預設沒有 tail 程式；這是 zsh／bash 的寫法。' },
-        { text: '`Get-Content app.log -Tail 20`', correct: true, why: '`-Tail` 是 Get-Content 看最後幾行的參數。' },
-        { text: '`Get-Content app.log -Last 20`', why: '`-Last` 是 `Select-Object` 的參數，Get-Content 用的是 `-Tail`。' },
-        { text: '`type app.log /tail 20`', why: 'cmd 的 type 沒有這個選項。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的專案很大，你想找出「哪裡定義了 `function login`」。用這課學到的工具，寫出你的搜尋策略。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的專案很大，你想找出「哪裡定義了 `function login`」。用這課學到的工具，寫出你的搜尋策略。'], answer: [
         '參考：用內容搜尋：`grep -rn "function login" src`（PowerShell：`Get-ChildItem src -Recurse -File | Select-String "function login"`）。',
         '如果結果太多，縮小範圍：只搜某種副檔名（`grep -rn --include="*.js" ...`），或先用 find 找出可能的檔案。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-2）要搜尋含空白的句子「not found」，哪一行正確？', options: [
-        { text: '`grep not found app.log`', why: '沒有引號：grep 只搜尋 `not`，`found` 被當成另一個檔名。' },
-        { text: '`grep "not found" app.log`', correct: true, why: '引號讓 `not found` 成為一個參數。' },
-        { text: '`grep not_found app.log`', why: '底線不等於空白，會搜尋另一個字串。' },
-        { text: '`grep (not found) app.log`', why: '括號在 shell 有特殊意義，不是引號。' },
       ] },
     ],
     keypoints: [

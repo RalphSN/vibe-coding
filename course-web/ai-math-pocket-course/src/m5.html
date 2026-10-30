@@ -6,85 +6,14 @@ defineTerms({
   '對數': { en: 'logarithm', def: '「要幾次方才會等於這個數」。ln 是以 e 為底的對數；log₂ 以 2 為底。', example: 'ln(e³) ＝ 3；log₂ 8 ＝ 3。', lesson: '5-1' },
   '下溢': { en: 'underflow', def: '數字小到電腦表示不了，直接變成 0。', example: '0.5 的 1000 次方在 float32 會變 0。', lesson: '5-1' },
   'perplexity': { en: 'perplexity', def: 'e 的（平均 cross-entropy）次方；可以讀成「模型平均在幾個選項之間猶豫」。', example: 'cross-entropy 0.41 → perplexity 約 1.5。', lesson: '5-2' },
+  'log-sum-exp': { en: 'log-sum-exp', def: '計算 log(Σ eˣ) 時先減掉最大值再算，結果一樣但不會溢位或下溢。', example: 'log(e¹⁰⁰⁰ ＋ e¹⁰⁰⁰) ＝ 1000 ＋ ln 2。', lesson: '5-1' },
+  'entropy': { en: 'entropy', def: '一個分布本身有多不確定；所有選項一樣可能時最大，只有一個選項時是 0。', example: '公平硬幣是 1 位元。', lesson: '5-2' },
+  'KL 散度': { en: 'KL divergence', def: '用分布 q 去近似真實分布 p 時多付出的代價；兩者一樣時是 0，永遠不會是負的。', example: 'cross-entropy ＝ entropy ＋ KL。', lesson: '5-2' },
   'one-hot': { en: 'one-hot', def: '只有正確答案那一格是 1、其他都是 0 的向量。', example: '正確答案是第 1 個：(1, 0, 0)。', lesson: '5-2' },
 });
 
 const NEG_LOG_PATH = Array.from({ length: 50 }, (_, i) => { const p = 0.02 + i * 0.02; return `${i ? 'L' : 'M'}${(60 + p * 460).toFixed(1)} ${(200 - -Math.log(p) * 42).toFixed(1)}`; }).join(' ');
 
-const REVIEW_12_MATH = [
-  { level: '回想', type: 'mc', q: '(5, 12) 的長度？', options: [
-    { text: '13', correct: true, why: '√(25＋144)。' },
-    { text: '17，兩個數字加起來', why: '要平方再開根號。' },
-    { text: '60', why: '那是相乘。' },
-    { text: '169', why: '還沒開根號。' },
-  ] },
-  { level: '回想', type: 'mc', q: 'cosine 相似度是 0，代表兩個向量？', options: [
-    { text: '垂直', correct: true, why: '不相關。' },
-    { text: '方向剛好相反，意思完全對立', why: '相反是 −1。' },
-    { text: '一模一樣', why: '一樣是 1。' },
-    { text: '長度都是 0', why: 'cosine 不看長度。' },
-  ] },
-  { level: '應用', type: 'mc', q: '輸入 512 維、輸出 128 維的一層，參數量？', options: [
-    { text: '65,664', correct: true, why: '512×128 ＋ 128。' },
-    { text: '65,536，就是兩個維度相乘', why: '忘了 128 個偏差。' },
-    { text: '640', why: '要相乘。' },
-    { text: '66,048', why: '偏差是輸出數 128，不是 512。' },
-  ] },
-  { level: '應用', type: 'mc', q: '(64×10) × (10×3) × (3×1) 的形狀？', options: [
-    { text: '64×1', correct: true, why: '每次留下外面兩個。' },
-    { text: '10×3，中間的維度留下來', why: '中間的會消失。' },
-    { text: '64×3', why: '還要乘最後一個。' },
-    { text: '不能乘', why: '中間都對得上。' },
-  ] },
-  { level: '回想', type: 'mc', q: 'f(x) ＝ x² 在 x ＝ 5 的導數？', options: [
-    { text: '10', correct: true, why: '2x。' },
-    { text: '25，就是把 5 代進去', why: '那是函數值。' },
-    { text: '5', why: '要乘 2。' },
-    { text: '0', why: '只有谷底是 0。' },
-  ] },
-  { level: '應用', type: 'mc', q: '某權重的梯度是 −3、學習率 0.1，權重現在是 2。走一步後？', options: [
-    { text: '2.3', correct: true, why: '2 − 0.1 × (−3)。' },
-    { text: '1.7，梯度是負的所以要減', why: '減一個負數是加。' },
-    { text: '−1', why: '要乘學習率。' },
-    { text: '2', why: '梯度不是 0，會動。' },
-  ] },
-  { level: '應用', type: 'mc', q: 'L ＝ (w·x − t)²，w ＝ 2、x ＝ 1、t ＝ 5。∂L/∂w ＝？', options: [
-    { text: '−6', correct: true, why: '誤差 −3；2 × (−3) × 1。' },
-    { text: '9，就是誤差的平方', why: '那是損失。' },
-    { text: '−3', why: '還要乘 2。' },
-    { text: '6', why: '誤差是負的。' },
-  ] },
-  { level: '回想', type: 'mc', q: '一個遊戲 50% 得 4 分、50% 得 0 分，期望值？', options: [
-    { text: '2', correct: true, why: '0.5×4 ＋ 0.5×0。' },
-    { text: '4，因為那是能拿到的分數', why: '要用機率加權。' },
-    { text: '0', why: '一半機會得 4 分。' },
-    { text: '0.5', why: '那是機率。' },
-  ] },
-  { level: '應用', type: 'mc', q: 'logits (3, 3, 3) 的 softmax？', options: [
-    { text: '各 1/3', correct: true, why: '差距都是 0。' },
-    { text: '各 1，因為分數都一樣高', why: '加總要是 1。' },
-    { text: '(1, 0, 0)', why: '沒有誰比較大。' },
-    { text: '各 3/9，再取 e 的次方', why: '直接就是 1/3。' },
-  ] },
-  { level: '應用', type: 'mc', q: '想讓模型的回答更有變化，temperature 該？', options: [
-    { text: '調高', correct: true, why: '分布變平，冷門字也有機會。' },
-    { text: '調低，讓每個字的機率更集中', why: '那會更固定。' },
-    { text: '設成 0', why: '幾乎只會挑第一名。' },
-    { text: '和 temperature 無關', why: '它就是在控制這件事。' },
-  ] },
-  { level: '應用', type: 'mc', q: '正確答案的機率是 0.1，cross-entropy 約？', options: [
-    { text: '2.30', correct: true, why: '−ln 0.1。' },
-    { text: '0.10，跟機率一樣', why: '要取 −ln。' },
-    { text: '0.90', why: '不是 1 − p。' },
-    { text: '10', why: '不是 1/p。' },
-  ] },
-  { level: '遷移', type: 'mc', q: '一個模型在測試資料上的 perplexity 從 20 降到 10。代表？', options: [
-    { text: '平均更有把握', correct: true, why: '正確字的機率平均變高了。' },
-    { text: '模型變小了，所以猶豫的選項比較少', why: 'perplexity 和模型大小無關。' },
-    { text: '回答變長了', why: '和長度無關。' },
-    { text: '準確率剛好加倍', why: 'perplexity 不是準確率。' },
-  ] },
-];
 
 defineLessons({
   '5-1': {
@@ -92,14 +21,6 @@ defineLessons({
       '說出對數把乘法變成加法',
       '算出常見機率的 −ln',
       '解釋為什麼模型用 log 機率而不是機率本身',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-2）softmax(0, 0) ＝？', options: [
-        { text: '(0.5, 0.5)', correct: true, why: '1 ÷ 2。' },
-        { text: '(0, 0)，因為分數都是 0', why: 'e⁰ ＝ 1，不是 0。' },
-        { text: '(1, 1)', why: '加總要是 1。' },
-        { text: '(1, 0)', why: '沒有誰比較大。' },
-      ] },
     ],
     analogy: {
       text: ['地震規模每加 1，能量約變 32 倍；聲音每加 10 分貝，強度變 10 倍。人類習慣把「一直相乘」的量，改用「加了幾格」來描述，數字就不會大到或小到難以處理。', '[[對數]]就是這把尺：log(a × b) ＝ log a ＋ log b。一句話的機率是每個 token 機率相乘，越乘越小；取對數之後變成相加，一句話再長也不會[[下溢]]。'],
@@ -149,12 +70,15 @@ defineLessons({
           <text x="430" y="144" font-size="15" font-weight="900" class="mono">相加 ＝ −6</text>
           <text x="280" y="192" text-anchor="middle" font-size="13">上排是機率；下排是 log₂ 機率。2⁻⁶ ＝ 1/64，兩邊說的是同一件事</text>
         </svg>`, caption: '乘法變加法：電腦處理一長串加法，比處理一長串越來越小的乘法穩定得多。' },
+        { type: 'heading', id: 'deep-float', text: '深入：浮點數能裝多小的數' },
+        { type: 'table', head: ['格式', '最小的正常數', '最大', '有效精度（相對）', '常用在'], rows: [
+          ['float32', '約 1.2 × 10⁻³⁸', '約 3.4 × 10³⁸', '約 10⁻⁷', '訓練時的主權重、損失'],
+          ['float16', '約 6.1 × 10⁻⁵', '65,504', '約 10⁻³', '推論；訓練時要配合 loss scaling'],
+          ['bfloat16', '約 1.2 × 10⁻³⁸', '約 3.4 × 10³⁸', '約 8 × 10⁻³', '現在大模型訓練最常用'],
+        ], caption: '數字依 IEEE 754 與 PyTorch torch.finfo。比最小正常數更小的還有一段「次正常數」，float32 最小約 1.4 × 10⁻⁴⁵，再小就變 0，所以 0.5ⁿ 在 n 約 150 時下溢。' },
+        'float16 的範圍很窄：機率 10⁻⁵ 在 float16 已經掉進精度很差的次正常數區，梯度更小就直接變 0。bfloat16 用較少的精度換到和 float32 一樣的範圍，所以大模型改用它，幾乎不必再處理下溢。',
+        '取 log 之後還有一個常見的需求：從 log 機率算回「log（總和）」。直接 e 次方再相加會溢位或下溢，做法和 softmax 一樣先減最大值：log Σ eˣⁱ ＝ m ＋ log Σ e^(xᵢ − m)，m 是最大的 xᵢ。這叫 [[log-sum-exp]]，PyTorch 的 log_softmax 和 CrossEntropyLoss 裡面就是這樣算的。',
       ],
-      tryit: {
-        q: ['不用計算機：log₂(1/8) ＝？ −ln(1) ＝？如果每個 token 的 −ln p 都是 0.7，100 個 token 加起來是多少？'],
-        draft: 'log₂(1/8)：＿\n−ln(1)：＿\n100 個 token：＿',
-        answer: ['log₂(1/8) ＝ −3（2⁻³ ＝ 1/8）；−ln(1) ＝ 0。', '100 × 0.7 ＝ 70。平均每個 token 是 0.7，這個「平均」就是下一課的 cross-entropy。'],
-      },
     },
     mistakes: [
       { wrong: '以為 log 機率是正數。', why: '機率小於 1，log 是負的。', right: '加一個負號，變成越小越好的正數。' },
@@ -162,19 +86,7 @@ defineLessons({
       { wrong: '混用 ln 和 log₂ 的數字比較。', why: '兩者差 ln 2 ≈ 0.693 倍。', right: '比較前先確認底數；PyTorch 用 ln。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'ln(a × b) 等於？', options: [
-        { text: 'ln a ＋ ln b', correct: true, why: '乘法變加法。' },
-        { text: 'ln a × ln b，乘法一樣保留', why: '對數把乘法變成加法。' },
-        { text: 'ln(a ＋ b)', why: '這是不同的東西。' },
-        { text: 'a × ln b', why: '沒有這條規則。' },
-      ] },
-      { level: '應用', type: 'mc', q: '−ln(0.01) 約是？', options: [
-        { text: '4.6', correct: true, why: '2 × 2.303。' },
-        { text: '0.01，跟機率本身一樣', why: '要取對數。' },
-        { text: '100', why: '那是 1/p。' },
-        { text: '−4.6', why: '前面有負號，所以是正的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['語音辨識要比較兩個候選句子哪個比較可能。兩句長度不同（一句 5 個字、一句 20 個字）。直接比較「每個字機率相乘」公平嗎？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['語音辨識要比較兩個候選句子哪個比較可能。兩句長度不同（一句 5 個字、一句 20 個字）。直接比較「每個字機率相乘」公平嗎？'], answer: [
         '不公平：每多一個字就多乘一個小於 1 的數，長句的機率天生比較小。',
         '常見做法是比較「平均每個字的 log 機率」（總和 ÷ 字數），這和下一課的 cross-entropy、perplexity 是同一個想法。',
       ] },
@@ -184,7 +96,7 @@ defineLessons({
       '−ln p：機率 1 是 0，機率越小越大。',
       '用 log 相加，長句子也不會下溢。',
     ],
-    sources: ['dlbook', '3b1b-calc'],
+    sources: ['dlbook', '3b1b-calc', 'ieee754'],
   },
 
   '5-2': {
@@ -192,20 +104,6 @@ defineLessons({
       '手算一個 token 的 cross-entropy',
       '用 perplexity 解讀損失',
       '說出 softmax ＋ cross-entropy 的梯度是「機率 − 答案」',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-1）−ln(0.5) 約是？', options: [
-        { text: '0.69', correct: true, why: 'ln 2。' },
-        { text: '0.5，跟機率一樣', why: '要取對數。' },
-        { text: '2', why: '那是 1/p。' },
-        { text: '−0.69', why: '負號抵消了。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 4-2）logits (2, 1, 0) 的 softmax 第一名？', options: [
-        { text: '0.665', correct: true, why: '7.39 ÷ 11.11。' },
-        { text: '0.667，就是 2 ÷ 3', why: '要先取指數。' },
-        { text: '1', why: '不會全部給第一名。' },
-        { text: '0.5', why: '那是兩個分數相同時。' },
-      ] },
     ],
     analogy: {
       text: ['考選擇題，老師要求你寫出每個選項的「信心」，加起來 100%。正確答案你只給了 10%？扣很多分；給了 90%？只扣一點；給了 100%？不扣分。扣分方式是 −ln（你給正確答案的信心）。', '這就是 [[cross-entropy]]。它不只看你有沒有猜對，還看你多有把握：猜對但很猶豫也會被扣分，猜錯又很有把握扣最多。語言模型訓練時，每一個位置都在做這樣一題。'],
@@ -275,15 +173,29 @@ print(logits.grad)                  # tensor([[-0.3348, 0.2447, 0.0900]])` },
           ['p ＝ 0.090', '2.41', '11.1', '像在 11 個選項間猶豫'],
           ['5 萬個 token 隨便猜', '10.82', '50,000', '完全沒學到東西'],
         ], caption: '剛開始訓練的語言模型，損失大約是 ln（詞彙表大小）；訓練就是把它一路往下壓。' },
-        { type: 'heading', id: 'final-review', text: '總複習：12 題' },
-        '最後一課，把五個工具一起複習。每題都對應前面的一課；答錯的話，回去翻那一課的「三個重點」。',
-        { type: 'quiz', key: '5-2:final', items: REVIEW_12_MATH },
+        { type: 'heading', id: 'deep-ce', text: '深入：cross-entropy 的下限在哪裡' },
+        'cross-entropy 可以拆成兩項：資料本身的不確定性（[[entropy]]），加上模型的分布和真實分布差多遠（[[KL 散度]]）。訓練只能把 KL 壓到 0，壓不掉 entropy。語言本來就有很多合理的下一個字，所以語言模型的 loss 不會降到 0；降到 0 通常代表在背訓練資料。',
+        { type: 'table', head: ['想比較的東西', '能不能直接比 loss 或 perplexity', '改用什麼'], rows: [
+          ['同一個模型、訓練前後', '可以', '—'],
+          ['兩個模型，tokenizer 相同、資料相同', '可以', '—'],
+          ['兩個模型，tokenizer 不同', '不行：一個 token 代表的字數不同', '每個 byte 的位元數（bits per byte）：總 −log₂ 機率 ÷ 文字的 byte 數'],
+          ['訓練集 vs 驗證集', '可以，看差距', '差距越拉越大代表過度擬合'],
+        ], caption: 'bits per byte 把分母從「token 數」換成「原始文字長度」，切法不同的模型才能放在同一把尺上。' },
+        { type: 'heading', id: 'map', text: '全書一頁地圖' },
+        { type: 'table', head: ['模組', '工具', '最重要的一個觀念', '在模型的哪裡'], rows: [
+          ['1', '向量與點積', '點積大 ＝ 方向接近；要比方向就用 cosine', 'embedding、attention 的 Q·K'],
+          ['2', '矩陣乘法', '(m×k)(k×n) ＝ m×n；一列權重 ＝ 一個神經元', '每一層、參數量、運算量'],
+          ['3', '導數與梯度', '往梯度反方向走一小步；反向傳播用鏈鎖律一趟算完', '訓練的每一步'],
+          ['4', '機率與 softmax', '取 eˣ 再除以總和；只有差距有影響', '選下一個字、temperature、attention 權重'],
+          ['5', '對數與 cross-entropy', '損失 ＝ −ln（正確答案的機率）；梯度 ＝ 機率 − 答案', 'loss、perplexity'],
+        ], caption: '卡住時先找這張表的那一列，再翻對應模組的「三個重點」。' },
+        { type: 'table', head: ['會過時的內容', '這本寫的', '怎麼更新'], rows: [
+          ['PyTorch API 與預設值', '2.14 文件（nn.Linear、CrossEntropyLoss）', '看 docs.pytorch.org 對應版本的頁面，特別是 reduction 等預設參數'],
+          ['模型規模與結構', '70B、Llama 3 8B 的 SwiGLU 3.5 倍', '看模型卡或 config.json 的 hidden_size、intermediate_size'],
+          ['數值格式', 'float32、float16、bfloat16', '新的 8 位元、4 位元格式持續出現，看 GPU 與框架文件'],
+          ['數學本身', '向量、矩陣、導數、機率、對數', '不會過時'],
+        ], caption: '建議每 3 個月重新查證一次前三列（下次：2027-01）。' },
       ],
-      tryit: {
-        q: ['某一步，模型給正確答案的機率是 0.25。cross-entropy 是多少？perplexity 呢？（ln 4 ≈ 1.386）'],
-        draft: 'cross-entropy：＿\nperplexity：＿',
-        answer: ['cross-entropy ＝ −ln 0.25 ＝ ln 4 ≈ 1.39。', 'perplexity ＝ e^1.39 ＝ 4：剛好像在 4 個選項之間平均猶豫。'],
-      },
     },
     mistakes: [
       { wrong: '模型最後先做 softmax，再丟進 CrossEntropyLoss。', why: '它裡面已經有 softmax，會做兩次。', right: '直接把 logits 丟進去。' },
@@ -291,19 +203,7 @@ print(logits.grad)                  # tensor([[-0.3348, 0.2447, 0.0900]])` },
       { wrong: '直接比較不同詞彙表模型的 perplexity。', why: 'token 切法不同，每個 token 的難度也不同。', right: '只在同一個 tokenizer、同一份資料上比較。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'cross-entropy（one-hot 答案）等於？', options: [
-        { text: '−ln（正確答案的機率）', correct: true, why: '其他項乘 0 都消失了。' },
-        { text: '1 − 正確答案的機率，越接近 1 越好', why: '要取對數。' },
-        { text: '所有機率的總和', why: '總和永遠是 1。' },
-        { text: '最大的那個機率', why: '要看正確答案。' },
-      ] },
-      { level: '應用', type: 'mc', q: '機率是 (0.7, 0.2, 0.1)、正確答案是第 2 個。對三個 logits 的梯度？', options: [
-        { text: '(0.7, −0.8, 0.1)', correct: true, why: 'p − y：第 2 格減 1。' },
-        { text: '(−0.3, 0.2, 0.1)，第 1 個要減 1', why: '正確答案是第 2 個。' },
-        { text: '(0.7, 0.2, 0.1)', why: '還要減 one-hot。' },
-        { text: '(0, −1, 0)', why: '那只是 −y。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['訓練報告寫：「驗證集 loss 從 3.0 降到 2.3」。用 perplexity 換算，模型進步了多少？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['訓練報告寫：「驗證集 loss 從 3.0 降到 2.3」。用 perplexity 換算，模型進步了多少？'], answer: [
         'e^3.0 ≈ 20.1、e^2.3 ≈ 10.0：從「像在 20 個選項間猶豫」變成「像在 10 個之間」，猶豫的程度減半。',
         'loss 只差 0.7 看起來不多，換成 perplexity 比較有感；但它還是平均值，不代表每個問題都答得比較好，最後仍要用實際任務評估（第一部的評估章節）。',
       ] },
@@ -313,7 +213,7 @@ print(logits.grad)                  # tensor([[-0.3348, 0.2447, 0.0900]])` },
       'perplexity ＝ e^CE：平均在幾個選項間猶豫。',
       'softmax ＋ cross-entropy 的梯度 ＝ 機率 − 答案。',
     ],
-    sources: ['pt-ce', 'dlbook', '3b1b-nn'],
+    sources: ['pt-ce', 'dlbook', '3b1b-nn', 'pt-linear'],
   },
 });
 </script>

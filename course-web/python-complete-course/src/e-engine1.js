@@ -455,7 +455,7 @@ Views.home = () => {
         <span class="label tilt" style="--chip:var(--info)">Python 3.15・uv</span>
       </div>
       <h1><span class="phrase">從第一行</span><br><span class="phrase">寫到</span><span class="phrase hl">能用的 Python 工具</span></h1>
-      <p class="lead">零基礎也能開始：先在終端機跑起第一支程式，再一路學到資料結構、類別、產生器、型別提示、asyncio 與 pytest。每課都先讓你預測輸出，再對答案，用結果修正直覺。</p>
+      <p class="lead">零基礎也能開始：先在終端機跑起第一支程式，再一路學到資料結構、類別、產生器、型別提示、asyncio 與 pytest。每課都有能自己跑的範例與實際輸出，加上「深入」段落，講清楚為什麼這樣運作、什麼時候不適用。</p>
       <div class="actions">
         ${resumeBtn}
         <a class="btn big nb-press" href="#/l/2-3">直接看「可變」的陷阱</a>
@@ -482,10 +482,10 @@ Views.home = () => {
     <h2 class="section-title"><span class="label" style="--chip:var(--m2)">怎麼用</span><span class="phrase">本站的使用方式</span></h2>
     <div class="content" style="margin:0">
       <ul>
-        <li>每個單元的結構都一樣：3 件事 → 暖身回顧 → 比喻 → 心智模型 → 定義 → 範例 → 常見錯誤 → 練習 → 三個重點。</li>
+        <li>每個單元的結構都一樣：3 件事 → 比喻 → 心智模型 → 定義 → 範例與「深入」段落 → 常見錯誤 → 深入思考 → 三個重點。</li>
         <li>這門課的主軸：看到一段 Python 先問三個問題。<ol class="three-q"><li>這個名字現在<strong>指向哪個物件</strong>？</li><li>那個物件<strong>可變</strong>還是<strong>不可變</strong>？</li><li>這行是<strong>現在執行</strong>，還是<strong>被呼叫時才執行</strong>？</li></ol></li>
-        <li>頁面不執行 Python，所以「試試看」是先預測、再看事先寫好的輸出。想自己跑，把程式存成 <code>app.py</code>，在終端機輸入 <code>python app.py</code>（或 <code>uv run app.py</code>）。</li>
-        <li>練習的答案預設隱藏；選擇題送出後，每個選項都有解析。</li>
+        <li>頁面不執行 Python，按「執行」顯示的是事先在 CPython 跑過的輸出（Traceback 省略了箭頭標記）。想自己跑，把程式存成 <code>app.py</code>，在終端機輸入 <code>python app.py</code>（或 <code>uv run app.py</code>）。</li>
+        <li>深入思考題的答案預設隱藏，想過再展開。</li>
         <li>鍵盤：<kbd>←</kbd> <kbd>→</kbd> 切換上一課與下一課，<kbd>/</kbd> 搜尋。頂部列可以調整字級，寬螢幕可以拖曳目錄的右緣調整寬度。</li>
         <li>進度存在這台電腦的瀏覽器裡${Store.persistent() ? '' : '（目前瀏覽器不允許儲存，關閉分頁後進度會消失）'}。</li>
       </ul>
@@ -533,7 +533,7 @@ const SECTION_DEFS = [
   ['define', '正式定義'],
   ['examples', '範例'],
   ['mistakes', '常見錯誤'],
-  ['practice', '練習'],
+  ['practice', '深入思考'],
   ['keypoints', '三個重點'],
 ];
 
@@ -608,7 +608,7 @@ Views.lesson = ({ id }) => {
     ${c ? `<div class="done-row" id="done-row">
       ${isDone
         ? `<span class="stamp">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`}
+        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`}
     </div>` : ''}
     <nav class="lesson-nav" aria-label="上一課與下一課">
       ${prev ? `<a class="prev nb-press" href="#/l/${prev.id}" rel="prev"><span class="dir">← 上一課</span><span class="ttl">${renderPhrases(`${prev.id} ${prev.title}`)}</span></a>` : ''}
@@ -677,7 +677,7 @@ function onClick(e) {
   const { action: name, id } = action.dataset;
   if (name === 'done') markDone(id, true);
   if (name === 'undone') markDone(id, false);
-  if (name === 'reset' && window.confirm('確定要清除所有學習進度與測驗紀錄嗎？字級與目錄寬度不會被清除。')) {
+  if (name === 'reset' && window.confirm('確定要清除所有學習進度嗎？字級與目錄寬度不會被清除。')) {
     Store.reset();
     render();
     announce('學習進度已清除');
@@ -690,7 +690,7 @@ function markDone(id, isDone) {
   if (row) {
     row.innerHTML = isDone
       ? `<span class="stamp animate">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`;
+      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`;
     const focusTarget = $('button', row);
     if (focusTarget) focusTarget.focus();
   }

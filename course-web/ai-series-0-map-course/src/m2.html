@@ -11,6 +11,11 @@ defineTerms({
   'KV cache': { en: 'key-value cache', def: '把前面 token 算過的中間結果存起來，下一步不必重算；所以第一個字慢、之後快。', example: '第二部 7 與第五部細講。', lesson: '2-4' },
   '串流': { en: 'streaming', def: '回答一邊產生一邊送回來，不等全部完成。', example: '聊天畫面逐字出現。', lesson: '2-5' },
   'SSE': { en: 'Server-Sent Events', def: '伺服器一行一行推事件給瀏覽器的格式；Claude 的串流用它。', example: '`event: content_block_delta`。', lesson: '2-5' },
+  '無狀態': { en: 'stateless', def: 'API 不記得上一次請求；每次都要把需要的對話紀錄全部重送。', example: '聊到第 20 輪時，第 1 輪的內容也在這次的輸入 token 裡。', lesson: '2-1' },
+  'BPE': { en: 'Byte Pair Encoding', def: '一種建立 tokenizer 的方法：反覆把資料裡最常相鄰出現的兩段合併成一個新 token。', example: '「t」「h」常一起出現，就合併成「th」。', lesson: '2-2' },
+  '記憶體頻寬': { en: 'memory bandwidth', def: '每秒能從記憶體搬多少資料到運算核心；產生 token 時常常是它在限制速度。', example: 'H100 SXM 的 HBM3 約每秒 3.35 TB。', lesson: '2-3' },
+  'temperature': { en: 'temperature', def: '取樣前把每個候選的分數除以的數字：小於 1 讓高分更集中，大於 1 讓機率更平均。', example: 'temperature 趨近 0 幾乎等於永遠挑最高的。', lesson: '2-4' },
+  'prompt caching': { en: 'prompt caching', def: '把每次都一樣的 prompt 開頭快取起來，之後重複讀到時用很低的單價計費。', example: '固定的系統說明、產品手冊。', lesson: '2-5' },
   'TTFT': { en: 'Time To First Token', def: '從送出到第一個字出現的時間；使用者感受到的「等待」主要是它。', example: '總共 8 秒的回答，TTFT 可能不到 1 秒。', lesson: '2-5' },
 });
 
@@ -28,14 +33,6 @@ const SIX_STOPS_SVG = `<svg viewBox="0 0 560 260" role="img" aria-label="六站�
   <text x="280" y="248" text-anchor="middle" font-size="13">⑤ 會一直重複，直到回答結束（2-4）</text>
 </svg>`;
 
-const REVIEW_1 = [
-  { level: '回想', type: 'mc', q: '（回顧 1-4）LLM 每一步在做什麼？', options: [
-    { text: '算出下一個 token 的機率，再選一個', correct: true, why: '一直重複就是一段回答。' },
-    { text: '從資料庫裡找出一段現成的回答', why: 'LLM 不查答案資料庫。' },
-    { text: '一次同時產生整段回答的所有字', why: '是一個 token 一個 token 產生。' },
-    { text: '把問題轉成規則再一條一條比對', why: '那比較像規則式系統。' },
-  ] },
-];
 
 /* 2-3：CPU 與 GPU 做同一批乘加的示意時間（數字是示意，不是任何真實晶片的規格） */
 const CPU_CORES = 16;
@@ -63,7 +60,6 @@ defineLessons({
       '每一站各用一句話說出它負責什麼',
       '知道每一站的細節在系列的哪一卷',
     ],
-    review: REVIEW_1,
     analogy: {
       text: ['寄一個包裹：你打包（你的電腦）→ 超商收件、貼單（後端）→ 物流中心驗收分揀（API）→ 拆成標準箱（tokenizer）→ 工廠加工（GPU 上的模型）→ 一箱一箱送回你家（回到螢幕）。', '每一站都有人在做事、都可能變慢或出錯。知道有哪幾站，遇到「AI 回答很慢」「很貴」就知道要去哪一站找原因。'],
       limit: ['包裹是送過去再送回來的兩趟，請求比較像一通電話：線一直接著，回答在同一條線上一段一段傳回來。另外第 ⑤ 站不是加工一次，是一個字一個字重複很多次。'],
@@ -104,12 +100,16 @@ defineLessons({
         </svg>`, caption: '請求像打一通電話：線接通後，回答在同一條線上陸續傳回。' },
         { type: 'callout', variant: 'tip', title: '慢、貴、錯，各去哪一站找', body: ['**慢**：先分清是「等第一個字」慢還是「整段」慢。前者看 ③ 排隊與 ⑤ 讀輸入，後者看 ⑤ 產生的長度（2-4、2-5）。', '**貴**：看 ④ 切出多少 token、⑤ 產生多少 token（2-2）。**錯**：先看 ② 有沒有把需要的資料放進請求，再看 ⑤ 的模型有沒有用上。'] },
         { type: 'callout', variant: 'tip', title: '每一課標題上方的小標籤', body: ['從這一課開始，每一課標題上方都會亮起六站中的某幾站。看到「tokenizer」亮著，就知道這一課在講請求旅程的第 ④ 站。', '讀到後面的卷時，也可以回來這張圖對照：第二部大多在 ④⑤，第一部大多在 ②③⑥，第五部在 ⑤ 的硬體底下。'] },
+        { type: 'heading', id: 'stateless', text: '深入：API 不記得你，以及每一站會怎麼失敗' },
+        'Messages API 是[[無狀態]]的：它不記得你上一句說了什麼。聊天畫面看起來有記憶，是因為 ② 後端每次都把整段對話紀錄重新送一次，所以對話越長，每一輪的輸入 token 越多、越貴、第一個字也越慢。',
+        { type: 'table', head: ['在哪一站', '常見錯誤（Claude API）', '意思與處理'], rows: [
+          ['② 後端', '`401 authentication_error`', '金鑰錯、過期或被撤銷；檢查環境變數'],
+          ['③ API', '`400 invalid_request_error`', '請求格式或內容有誤；看錯誤訊息修請求，重試沒用'],
+          ['③ API', '`429 rate_limit_error`', '超過用量限制；依 `retry-after` 等一下再試'],
+          ['③ API', '`529 overloaded_error`', 'API 暫時過載（所有使用者都可能遇到）；指數退避重試'],
+          ['⑤⑥ 串流途中', '收到 200 之後才出現的錯誤事件', '串流開始後的錯誤不走 HTTP 狀態碼，要處理 `error` 事件'],
+        ], caption: '查證於 2026-10-29（Claude Docs：API errors）。官方 SDK 預設會對連線錯誤、429 與 5xx 自動重試 2 次。' },
       ],
-      tryit: {
-        q: ['用你自己的話，把六站濃縮成一句話（可以用箭頭）：'],
-        draft: '＿＿ → ＿＿ → ＿＿ → ＿＿ → ＿＿ → ＿＿',
-        answer: ['範例：瀏覽器 → 後端加金鑰 → API 驗證排隊 → 切成 token → GPU 一個一個算 → 串流回螢幕。只要六站都在、順序對就好。'],
-      },
     },
     mistakes: [
       { wrong: '以為瀏覽器直接和模型講話。', why: '正式產品中間有後端；金鑰放在瀏覽器會被偷（第一部 0-2）。', right: '瀏覽器 → 自己的後端 → 模型 API。' },
@@ -117,19 +117,7 @@ defineLessons({
       { wrong: '以為整個回答是一次算出來再傳回來。', why: '第 ⑤ 站會重複很多次，每次一個 token。', right: '一個 token 一個 token 產生，邊產生邊送回。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'API 金鑰應該在哪一站加上去？', options: [
-        { text: '② 後端', correct: true, why: '只有後端能安全地保管金鑰。' },
-        { text: '① 你的電腦（瀏覽器）', why: '放在瀏覽器等於公開給所有訪客。' },
-        { text: '④ tokenizer', why: 'tokenizer 只處理文字，和金鑰無關。' },
-        { text: '⑥ 回到螢幕', why: '那時候請求早就送出去了。' },
-      ] },
-      { level: '應用', type: 'mc', q: '使用者反映「格式錯誤，請求馬上被拒絕」，問題最可能出在哪一站被擋下？', options: [
-        { text: '③ API 驗證請求格式時', correct: true, why: '格式不對時 API 會直接退回，不會進到模型。' },
-        { text: '⑤ GPU 上的模型算到一半', why: '格式錯不會進到模型這一站。' },
-        { text: '④ tokenizer 切 token 時', why: '格式驗證在 tokenizer 之前。' },
-        { text: '⑥ 回到螢幕顯示文字時', why: '已經被退回，沒有東西可以顯示。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的 AI 功能「有時候回答完全沒提到公司資料」。用六站推測可能出問題的地方。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的 AI 功能「有時候回答完全沒提到公司資料」。用六站推測可能出問題的地方。'], answer: [
         '最可能在 ② 後端：查資料那一步沒查到、或查到了沒放進請求。模型只能看到請求裡有的東西。',
         '其次是 ⑤：資料有放進去，但模型沒用上（prompt 寫法問題，第一部模組 3、5）。',
       ] },
@@ -139,7 +127,7 @@ defineLessons({
       '金鑰在後端；模型只看得到 token 編號。',
       '第 ⑤ 站會重複很多次，回答邊產生邊送回。',
     ],
-    sources: ['claude-messages'],
+    sources: ['claude-messages', 'claude-errors'],
   },
 
   '2-2': {
@@ -147,20 +135,6 @@ defineLessons({
       '說出 tokenizer 做的兩件事：切段、換編號',
       '解釋為什麼 AI 服務用 token 計費',
       '知道要算真的 token 數該用什麼工具',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-1）六站的順序，哪一個是對的？', options: [
-        { text: '後端 → API → tokenizer → GPU 上的模型', correct: true, why: '先組請求、再驗證、再切 token、再運算。' },
-        { text: 'tokenizer → 後端 → API → GPU 上的模型', why: 'tokenizer 在模型公司那端，排在 API 之後。' },
-        { text: '後端 → GPU 上的模型 → tokenizer → API', why: '模型看不懂文字，要先過 tokenizer。' },
-        { text: 'API → 後端 → GPU 上的模型 → tokenizer', why: '後端先組請求，才送到 API。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-2）你用 Claude 聊天時，模型在做訓練還是推論？', options: [
-        { text: '推論：參數固定，用來產生回答', correct: true, why: '你的對話不會即時改變參數。' },
-        { text: '訓練：每一句話都會即時調整參數', why: '推論時參數不變。' },
-        { text: '兩個同時在做，所以回答比較慢', why: '使用時只有推論。' },
-        { text: '都不是，聊天時模型處於待機狀態', why: '產生回答就是推論。' },
-      ] },
     ],
     analogy: {
       text: ['樂高說明書不會寫「蓋一座城堡」，它把城堡拆成一個個標準積木，每種積木有編號。', '[[tokenizer]] 對文字做同樣的事：把一句話切成模型認得的標準小段（[[token]]），每段換成一個編號。模型只看編號，就像機器手臂只認積木編號。'],
@@ -212,14 +186,17 @@ defineLessons({
           <rect x="300" y="50" width="250" height="70" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
           <text x="425" y="80" text-anchor="middle" font-size="14" font-weight="900" class="on-color">輸出 token × 輸出單價</text>
           <text x="425" y="104" text-anchor="middle" font-size="13" class="on-color">模型寫出來的回答</text>
-          <text x="280" y="158" text-anchor="middle" font-size="14">Opus 5.5：輸入 $4、輸出 $20（每百萬 token，查證於 2026-10-22）</text>
+          <text x="280" y="158" text-anchor="middle" font-size="14">Opus 5.5：輸入 $4、輸出 $20（每百萬 token，查證於 2026-10-29）</text>
         </svg>`, caption: '2-5 會把這張帳單和時間放在一起看。' },
+        { type: 'heading', id: 'bpe', text: '深入：「積木組」是怎麼來的' },
+        '多數 LLM 的 tokenizer 用 [[BPE]] 這一類方法建立：從單一字元（或位元組）開始，反覆找出訓練資料裡最常相鄰出現的兩段，把它們合併成一個新 token，直到詞彙表達到預定大小。所以常見的詞會變成一整個 token，罕見的詞只能拆成好幾段。',
+        { type: 'table', head: ['由這個原理推出的現象', '為什麼'], rows: [
+          ['訓練資料裡少見的語言，同樣意思常要更多 token', '合併時看的是出現頻率，資料少的語言比較少被合成大塊'],
+          ['程式碼裡的縮排、罕見變數名很佔 token', '空白與罕見字串不容易被合併'],
+          ['換一代模型，同一段文字的 token 數可能變', '詞彙表重新訓練過；第一部記錄過 Claude 新一代 tokenizer 同樣文字約多 3 成 token 的例子'],
+        ] },
+        '邊界：tokenizer 也解釋了一些奇怪的失誤，例如問模型「strawberry 有幾個 r」，它看到的是幾個 token 編號，不是一個個字母，所以數字母這種事反而不擅長。',
       ],
-      tryit: {
-        q: ['在上面的 token 示意器切到「罕見字」，再切回「英文」。為什麼罕見的長單字會被切成很多段？'],
-        draft: '我的推測：＿＿',
-        answer: ['tokenizer 的「積木組」是從大量文字統計出來的：常見的詞值得給一整塊，罕見的詞沒有自己的積木，只能用好幾個小塊拼起來。所以罕見字、新名詞、某些語言會花比較多 token。真正的切法要用模型自己的 tokenizer 量。'],
-      },
     },
     mistakes: [
       { wrong: '把 token 當成「字數」或「單字數」。', why: '一個 token 可能是半個詞，也可能是一整個常見詞。', right: '要知道 token 數就量，不要用字數估。' },
@@ -227,21 +204,9 @@ defineLessons({
       { wrong: '以為換模型 token 數一定一樣。', why: '每個模型有自己的 tokenizer。', right: '換模型時重新量一次。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'tokenizer 做哪兩件事？', options: [
-        { text: '把文字切成小段，再把每段換成編號', correct: true, why: '模型只看得到編號。' },
-        { text: '把文字翻譯成英文，再修正錯字', why: 'tokenizer 不翻譯也不改錯字。' },
-        { text: '檢查 API 金鑰，再把請求排進隊伍', why: '那是 ③ API 這一站的事。' },
-        { text: '把模型的回答壓縮後再傳回瀏覽器', why: '那和串流有關，不是 tokenizer。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你要估一份 3 萬字中文文件丟給 Claude 摘要要花多少錢，最可靠的做法是？', options: [
-        { text: '用 `count_tokens` 量實際 token 數再乘單價', correct: true, why: '只有模型自己的 tokenizer 量出來的才準。' },
-        { text: '假設一個中文字固定等於一個 token', why: '沒有這種固定比例。' },
-        { text: '用英文單字數的平均比例來推算', why: '中英文的切法差很多。' },
-        { text: '先把文件翻譯成英文再估算費用', why: '翻譯本身也要花錢，而且估出來的是另一份文字。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同一份產品說明，英文版和中文版送去摘要，帳單差了一截。為什麼？'], answer: [
-        '兩個語言被 tokenizer 切出來的 token 數不同；token 數不同，費用就不同。',
-        '要比較，就用 `count_tokens` 各量一次。第二部會講 tokenizer 怎麼從資料統計出「積木組」。',
+      { level: '深入思考', type: 'reveal', q: ['同事提議：「把很長的中文系統說明翻成英文，token 比較少，可以省錢。」在哪些情況下這個做法省不了多少，甚至得不償失？你會怎麼驗證？'], answer: [
+        '先算比例：系統說明只是輸入的一部分，而輸出單價是輸入的 5 倍。如果帳單主要來自輸出、或系統說明已經用 prompt caching（快取讀取只收很低的單價），翻譯省下的金額可能很小。另外使用者用中文問，模型很可能還是用中文回答，輸出 token 不會變少；翻譯也可能讓規則的語氣與細節走樣。',
+        '驗證：兩個版本都用 `count_tokens` 量輸入、從 `usage` 看實際輸出，乘上單價與每月次數；再用同一組測試問題比回答品質。只看「token 變少」就決定，常常是錯的。',
       ] },
     ],
     keypoints: [
@@ -249,7 +214,7 @@ defineLessons({
       '費用＝輸入 token × 單價＋輸出 token × 單價。',
       '不用字數估 token，用 `count_tokens` 量。',
     ],
-    sources: ['claude-token-counting', 'claude-pricing'],
+    sources: ['claude-token-counting', 'claude-pricing', 'bpe'],
   },
 
   '2-3': {
@@ -257,20 +222,6 @@ defineLessons({
       '說出「模型」實際上是一大堆數字',
       '說明一次計算主要是大量矩陣乘法',
       '解釋為什麼這種計算適合 GPU',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）模型實際上看到的是什麼？', options: [
-        { text: '一串 token 編號', correct: true, why: 'tokenizer 已經把文字換成編號。' },
-        { text: '你打的原始文字和標點符號', why: '文字在 tokenizer 已經被換掉了。' },
-        { text: '你的螢幕截圖', why: '一般文字請求不會傳截圖。' },
-        { text: '你的 API 金鑰和帳號資料', why: '金鑰在 API 那站就用完了。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-3）為什麼 AlexNet 在 2012 年被當成轉捩點？', options: [
-        { text: '大幅領先第二名，而且用 GPU 讓深層網路訓練得動', correct: true, why: '15.3% 對 26.2%。' },
-        { text: '它是第一個被發明出來的神經網路', why: '神經網路早了幾十年。' },
-        { text: '它是第一個會用文字聊天的程式', why: '它做的是影像辨識。' },
-        { text: '它證明規則式系統已經完全沒用', why: '它比的是影像辨識方法。' },
-      ] },
     ],
     analogy: {
       text: ['改 1 萬份選擇題考卷：一位資深教授（CPU）很聰明但只有一個人；1 萬個工讀生（GPU）每人只會對答案，但同時開工。', '[[神經網路]]的計算就像改選擇題：大量簡單、互相不影響的「相乘再相加」。這種工作人多就贏，所以 [[GPU]] 快很多。'],
@@ -316,12 +267,15 @@ defineLessons({
           ${[...Array(12).keys()].map((c) => `<rect x="${130 + c * 32}" y="128" width="26" height="26" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/>`).join('')}
           <text x="130" y="178" font-size="13">1 輪做完</text>
         </svg>`, caption: '真實 GPU 有上萬個核心，模型一次計算的乘加數以十億計。' },
+        { type: 'heading', id: 'memory-bound', text: '深入：真正的瓶頸常常是搬資料，不是算' },
+        '產生每一個 token，都要把全部參數從 GPU 的記憶體讀一遍。用整數估算：700 億參數、每個參數 2 bytes，就是 140 GB；H100 SXM 的[[記憶體頻寬]]約每秒 3.35 TB，光是讀一遍就要約 42 毫秒。所以只服務一個人時，每秒最多約 24 個 token，GPU 的運算單元大部分時間在等資料。',
+        { type: 'table', head: ['服務商的對策', '為什麼有效', '代價'], rows: [
+          ['把很多人的請求併成一批（batching）', '讀一次參數，同時算很多人的下一個 token', '每個人可能要等一下才被排進批次'],
+          ['降低參數精度（量化）', '每個參數從 2 bytes 變 1 byte 或更少，要搬的資料變少', '品質可能小幅下降'],
+          ['把模型切到多張 GPU', '頻寬加總，也放得下更大的模型', 'GPU 之間要通訊，第五部細講'],
+        ] },
+        '這也是上面的拉桿只是示意的原因：真實情況除了核心數，還要看記憶體搬得多快。估算用的是整數與單一 GPU 的假設，140 GB 其實放不進一張 80 GB 的 H100，實務上會切成兩張以上。',
       ],
-      tryit: {
-        q: ['把 knobs 的「GPU 每個核心慢幾倍」拉到最大，GPU 還是比較快嗎？寫下你看到的結果和原因：'],
-        draft: '結果：＿＿\n原因：＿＿',
-        answer: ['在示意數字下仍然快很多：一萬個核心就算每個慢 20 倍，同時做的數量還是遠遠多過 16 個核心。這就是平行運算的威力。', '但真實世界還要算「把參數搬到核心」的時間，常常才是瓶頸，這在第五部講。'],
-      },
     },
     mistakes: [
       { wrong: '以為 GPU 每個核心都比 CPU 強。', why: '剛好相反，GPU 每個核心很簡單。', right: 'GPU 贏在數量，適合大量相同的簡單運算。' },
@@ -329,19 +283,7 @@ defineLessons({
       { wrong: '以為 AI 服務完全不用 CPU。', why: '後端、tokenizer、排程都在 CPU 上跑。', right: 'CPU 管流程，GPU 做大量運算。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '模型在 ⑤ 站的計算，主要是哪一種運算？', options: [
-        { text: '大量的矩陣乘法（相乘再相加）', correct: true, why: '每一層都是向量乘上參數矩陣。' },
-        { text: '大量的 if／else 判斷式', why: '那比較像規則式程式。' },
-        { text: '在資料庫裡搜尋文字', why: '模型不查資料庫。' },
-        { text: '把文字切成 token', why: '那是 ④ tokenizer。' },
-      ] },
-      { level: '應用', type: 'mc', q: '為什麼大模型需要很多張 GPU？最主要的原因是？', options: [
-        { text: '參數太多，要放進 GPU 記憶體並平行計算', correct: true, why: '幾十億以上的參數一張放不下（第五部）。' },
-        { text: '每一張 GPU 只能處理一種語言', why: '沒有這種限制。' },
-        { text: '每個使用者都需要分到一張專屬的 GPU', why: '多個請求可以共用 GPU。' },
-        { text: '因為 GPU 的單一核心速度比 CPU 快很多', why: 'GPU 單核心其實比較簡單、比較慢。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['有人說「我買一顆最頂級的 CPU，跑大模型就會跟 GPU 一樣快」。你怎麼回應？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['有人說「我買一顆最頂級的 CPU，跑大模型就會跟 GPU 一樣快」。你怎麼回應？'], answer: [
         'CPU 核心再強，數量也只有幾十個；模型的計算是幾十億個可以同時做的乘加，需要的是數量。',
         '另外參數要放在高頻寬的記憶體裡快速搬運，這也是 GPU 的設計重點（第五部）。',
       ] },
@@ -359,14 +301,6 @@ defineLessons({
       '說明自迴歸：每次產生一個 token，再接回去',
       '說出取樣與 temperature 的作用',
       '解釋為什麼第一個字最慢、之後比較快',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）為什麼模型的計算適合 GPU？', options: [
-        { text: '大量互相獨立的乘加，可以同時做', correct: true, why: 'GPU 贏在核心數量。' },
-        { text: 'GPU 的每個核心都比 CPU 聰明', why: 'GPU 單核心比較簡單。' },
-        { text: '模型要畫很多圖片', why: '和畫圖無關，是因為運算型態。' },
-        { text: 'GPU 可以直接讀懂中文', why: '晶片只處理數字。' },
-      ] },
     ],
     analogy: {
       text: ['玩文字接龍：每個人只看到目前為止的句子，接一個字，再傳給下一個人。整句話就是這樣一個字一個字長出來的。', 'LLM 也是：算出下一個 [[token]]，接到後面，帶著整句再算下一個。這叫[[自迴歸]]。每一步都要跑一次 2-3 的前向計算。'],
@@ -416,12 +350,15 @@ defineLessons({
           ['壞處', '容易重複、很死板', '偶爾抽到怪字'],
         ] },
         { type: 'callout', variant: 'tip', title: '迴圈什麼時候停？', body: ['兩種情況：模型選到一個代表「說完了」的特殊 token，或產生的數量碰到你在請求裡設的 `max_tokens` 上限。', '第二種情況回答會在半句話停住。API 的回應會告訴你是哪一種（`stop_reason`），程式要分開處理：前者正常顯示，後者提示使用者回答被截斷，或調高上限再試（第一部 1-3）。'] },
+        { type: 'heading', id: 'temperature', text: '深入：temperature 實際上改了什麼' },
+        '模型輸出的是每個候選的分數（logit），softmax 把分數換成加起來等於 1 的機率。[[temperature]] 是在換算前把分數全部除以 T：T 小於 1 會放大分數差距，讓第一名更集中；T 大於 1 會縮小差距，冷門字更容易被抽到。',
+        { type: 'table', head: ['兩個候選的分數 2 與 1', '第一名的機率', '第二名的機率'], rows: [
+          ['T ＝ 0.5', '88%', '12%'],
+          ['T ＝ 1', '73%', '27%'],
+          ['T ＝ 2', '62%', '38%'],
+        ], caption: '由 softmax(分數 ÷ T) 算出，四捨五入到整數。T 趨近 0 時第一名趨近 100%，等於貪婪挑最高的。' },
+        '把預填（prefill）與逐字產生（decode）分開看：讀輸入是一次把整段平行算完，所以輸入長主要拉長 TTFT；產生是一個接一個，每步都要讀一遍參數（2-3）。另外 [[KV cache]] 會隨上下文變長而佔用更多 GPU 記憶體，這是長對話昂貴的另一個原因。',
       ],
-      tryit: {
-        q: ['在上面的 sampler 把 top-p 拉到 0.5，再按幾次「抽一個」。哪些字被劃掉了？為什麼這樣可以減少怪字？'],
-        draft: '被劃掉的：＿＿\n為什麼：＿＿',
-        answer: ['top-p 0.5 只保留「累積機率先到 50% 的前幾名」，後面的冷門候選直接不參加抽籤。這樣保留了變化，又不會抽到太離譜的字。', 'Claude 最新的 API 版本把 temperature、top-p 都移除了，由模型端決定；但機制本身仍是這樣運作（第二部細講）。'],
-      },
     },
     mistakes: [
       { wrong: '以為模型先想好整句話，再一次輸出。', why: '它是一個 token 一個 token 決定的，前面的字會影響後面。', right: '自迴歸：每一步只決定下一個。' },
@@ -429,19 +366,7 @@ defineLessons({
       { wrong: '以為回答越長，第一個字出現得越慢。', why: '第一個字主要受「輸入長度」影響；輸出長度影響的是總時間。', right: '輸入長 → 等第一個字久；輸出長 → 總時間久。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '一段 300 個 token 的回答，⑤ 站大約要做幾次前向計算？', options: [
-        { text: '大約 300 次，每產生一個 token 一次', correct: true, why: '自迴歸：每個 token 一次。' },
-        { text: '只要 1 次，整段一起算出來', why: '不是一次算完整段。' },
-        { text: '3 次，每 100 個 token 算一次', why: '沒有這種分批方式。' },
-        { text: '看輸入有幾個字就算幾次', why: '次數跟著輸出長度，不是輸入長度。' },
-      ] },
-      { level: '應用', type: 'mc', q: '同一個問題，把附上的參考文件從 1 頁加到 50 頁。最可能發生什麼？', options: [
-        { text: '第一個字出現前要等比較久', correct: true, why: '模型要先讀完更長的輸入。' },
-        { text: '回答之後每個字都會出現得更快', why: '之後每個字的速度差不多，甚至稍慢。' },
-        { text: '費用不變，因為回答長度沒有改變', why: '輸入 token 也要計費。' },
-        { text: '模型會自動略過多出來的那些頁數', why: '放進去的都會被讀（在上限內）。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的 AI 摘要功能「按下去要等 4 秒才開始出字」，但出字後很快。用這一課的知識推測原因與一個改善方向。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的 AI 摘要功能「按下去要等 4 秒才開始出字」，但出字後很快。用這一課的知識推測原因與一個改善方向。'], answer: [
         '「開始出字前」慢，多半是輸入太長（第一個 token 要先讀完全部輸入），或在後端排隊。',
         '改善：減少不必要的輸入、把固定不變的開頭用 prompt caching（第一部 8-2），並確認有開串流。',
       ] },
@@ -459,20 +384,6 @@ defineLessons({
       '分清 TTFT 與總時間',
       '說明串流為什麼讓等待感覺比較短',
       '把六站的時間與錢串成一張帳單',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-4）把參考文件從 1 頁加到 50 頁，最明顯的變化是？', options: [
-        { text: '第一個字出現前要等比較久', correct: true, why: '要先讀完較長的輸入。' },
-        { text: '回答一定變得比較短', why: '輸入長短不決定輸出長短。' },
-        { text: '不會有任何影響', why: '輸入越長越慢也越貴。' },
-        { text: '模型會改用 CPU 來計算', why: '不會換硬體。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-2）一次請求的費用怎麼算？', options: [
-        { text: '輸入 token × 輸入單價＋輸出 token × 輸出單價', correct: true, why: '兩邊分開算。' },
-        { text: '依照你打字的時間長短來計算', why: '和打字時間無關。' },
-        { text: '每次請求固定收一樣的費用', why: '費用跟著 token 數。' },
-        { text: '只算模型寫出來的那些字', why: '輸入也要計費。' },
-      ] },
     ],
     analogy: {
       text: ['餐廳上菜有兩種：一種等全部菜都好了一次端上桌；一種好一道上一道。總時間一樣，但第二種你很快就有東西吃，不會覺得等很久。', '[[串流]]就是第二種：模型每產生一小段就送回來，使用者在 [[TTFT]] 之後就開始讀，不用等整段完成。'],
@@ -521,14 +432,17 @@ defineLessons({
           <rect x="110" y="112" width="178" height="32" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><rect x="288" y="112" width="222" height="32" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
           <text x="199" y="134" text-anchor="middle" font-size="13" class="on-color">$0.008</text><text x="399" y="134" text-anchor="middle" font-size="13" class="on-color">$0.010</text>
           <text x="20" y="182" font-size="14">輸出 token 只有輸入的 1/4，花費卻比較多：輸出單價是輸入的 5 倍。</text>
-          <text x="20" y="202" font-size="13">價格查證於 2026-10-22，以官方價目表為準。</text>
+          <text x="20" y="202" font-size="13">價格查證於 2026-10-29，以官方價目表為準。</text>
         </svg>`, caption: '每次只要約 1.8 美分，一天 1,000 次、一個月就是約 540 美元。用上面的計算器自己試。' },
+        { type: 'heading', id: 'levers', text: '深入：三個降低帳單的槓桿，各有條件' },
+        '同一個例子（每次輸入 2,000、輸出 500 token，每天 1,000 次，一個月 30 天）。假設輸入裡有 1,500 token 是每次都一樣的開頭，開了 [[prompt caching]] 後，命中的部分 Opus 5.5 每百萬只收 $0.20：輸入從每次 $0.008 降到 $0.0023，一個月合計從約 540 美元降到約 369 美元。',
+        { type: 'table', head: ['槓桿', '省多少（Opus 5.5，查證於 2026-10-29）', '什麼時候不適用'], rows: [
+          ['prompt caching', '命中的輸入只收基本價的 5%；第一次寫入快取要多付 25%', '每次開頭都不一樣，或請求間隔超過快取時效'],
+          ['Batch API', '輸入、輸出都打 5 折', '需要即時回答的功能；結果要等批次跑完'],
+          ['縮短輸出', '輸出單價是輸入的 5 倍，省得最多', '回答需要完整說明時，太短反而要再問一次'],
+        ] },
+        '還有一個常被忽略的成本：Opus 5.5 這類會先思考再回答的模型，思考過程也以輸出 token 計費。帳單和 `usage` 對不上時，先檢查輸出 token 裡有多少是思考。',
       ],
-      tryit: {
-        q: ['在成本計算器把「每次輸出 token」拉大，再把「每次輸入 token」拉大。哪一個讓每次請求的費用漲得比較快？為什麼？'],
-        draft: '漲得比較快的是：＿＿\n原因：＿＿',
-        answer: ['同樣增加的 token 數，輸出漲得比較快：Opus 5.5 輸出單價是輸入的 5 倍（$20 對 $4）。', '但實務上輸入常常比輸出長很多（附了一堆文件），所以兩邊都要看。第一部 8-2 有完整的省錢方法。'],
-      },
     },
     mistakes: [
       { wrong: '以為開串流會讓回答更快產生完。', why: '總時間不變，只是更早開始看到字。', right: '串流改善 TTFT 的體感，不縮短總時間。' },
@@ -536,19 +450,7 @@ defineLessons({
       { wrong: '只看「平均每次多少錢」，不看每天請求數。', why: '每次很便宜，乘上每天上萬次就很可觀。', right: '用成本計算器算每月總額。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'TTFT 指的是什麼？', options: [
-        { text: '從送出到第一個字出現的時間', correct: true, why: 'Time To First Token。' },
-        { text: '從送出到整段回答完成的時間', why: '那是總時間。' },
-        { text: '每一個 token 平均要花的錢', why: '那是單價，不是時間。' },
-        { text: 'tokenizer 切完 token 所花的時間', why: '那只是其中一小段。' },
-      ] },
-      { level: '應用', type: 'mc', q: '使用者抱怨「按下去好像當掉了，過一陣子整段才一次跳出來」。最直接的改善是？', options: [
-        { text: '開啟串流，讓字在 TTFT 之後就逐字出現', correct: true, why: '總時間不變，但使用者很快看到進度。' },
-        { text: '換一個更貴的模型讓它回答更快', why: '更大的模型通常更慢，也沒解決「看不到進度」。' },
-        { text: '把 max_tokens 設得非常非常大', why: 'max_tokens 是上限，不會讓它更早出字。' },
-        { text: '請使用者把問題打得再長一點', why: '輸入越長，等第一個字越久。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['老闆問：「AI 功能一個月要花多少？哪裡最花錢？」用這一課的帳單回答他，至少提到兩個數字要怎麼取得。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['老闆問：「AI 功能一個月要花多少？哪裡最花錢？」用這一課的帳單回答他，至少提到兩個數字要怎麼取得。'], answer: [
         '最花錢的是 ⑤ 站：輸入 token 和輸出 token 各乘單價，再乘每月請求數。',
         '數字來源：每天請求數看後端日誌；每次 token 數看 API 回應裡的 `usage` 欄位（第一部 1-5）；單價查官方價目表並寫下查證日期。',
       ] },
@@ -558,7 +460,7 @@ defineLessons({
       '串流改善等待感，不改變總時間和費用。',
       '⑤ 站最慢也最貴：輸入＋輸出 token × 單價 × 次數。',
     ],
-    sources: ['claude-streaming', 'claude-pricing'],
+    sources: ['claude-streaming', 'claude-pricing', 'claude-batch'],
   },
 });
 </script>

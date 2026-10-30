@@ -10,7 +10,7 @@ defineTerms({
   '模型': { en: 'model', def: '讀文字、寫文字的那個東西本身。它不會執行程式、不會上網，也不記得上一次對話。', example: '`claude-opus-5-5` 是一個模型的 ID。', lesson: '0-1' },
   'AI 應用工程': { en: 'AI application engineering', def: '把模型接進產品的那一層工程：組請求、管對話、接工具與資料、控制成本、擋攻擊、量品質。', example: '做一個會查訂單的客服機器人，九成的程式碼在模型外面。', lesson: '0-1' },
   '無狀態': { en: 'stateless', def: '伺服器不保留上一次請求的任何資訊；每次請求都要自己帶齊需要的東西。', example: 'Messages API 是無狀態的：要模型「記得」前面的對話，就把前面的訊息一起送。', lesson: '1-2' },
-  'API 金鑰': { en: 'API key', def: '證明「這個請求是你送的、錢算你的」的一串密碼。拿到它的人可以用你的額度。', example: 'Claude 的金鑰以 `sk-ant-` 開頭，放在 `x-api-key` 標頭。', lesson: '0-2' },
+  'API 金鑰': { en: 'API key', def: '證明「這個請求是你送的、錢算你的」的一串密碼。拿到它的人可以用你的額度。', example: 'Claude 的金鑰以 `sk-ant-` 開頭，放在 `x-api-key` 或 `Authorization: Bearer` 標頭。', lesson: '0-2' },
   '環境變數': { en: 'environment variable', def: '作業系統替每個程式準備的一組「名稱＝值」設定，程式啟動時可以讀到。用來放金鑰，金鑰就不必寫進程式碼。', example: 'SDK 預設讀 `ANTHROPIC_API_KEY` 這個環境變數。', lesson: '0-2' },
   'SDK': { en: 'software development kit', def: '官方提供的程式庫，把 HTTP 請求、重試、型別、串流解析都包好，讓你用函式呼叫 API。', example: '`@anthropic-ai/sdk` 是 Claude 的 TypeScript SDK。', lesson: '0-2' },
   '後端': { en: 'backend', def: '跑在你自己伺服器上的程式。使用者看不到它的程式碼和環境變數，所以金鑰放這裡。', example: 'Node.js 寫的 `/api/chat` 路由。', lesson: '0-2' },
@@ -87,14 +87,14 @@ defineLessons({
         why: ['模型沒有記憶；「記得」是程式把資料重新送進去'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'model', label: '模型做的' }, { id: 'app', label: '你的程式做的' }, { id: 'api', label: 'API 做的' }], items: [
-          { text: '決定回覆的下一個字要寫什麼', answer: 'model', why: '這是模型唯一真正在做的事。' },
-          { text: '記得使用者五分鐘前說過的話', answer: 'app', why: 'API 沒有記憶；你的程式每次把對話歷史一起送出去（1-2）。' },
-          { text: '真的去查明天台北的天氣', answer: 'app', why: '模型只會說「我想查天氣」；呼叫天氣服務的是你的程式（模組 4）。' },
-          { text: '檢查請求帶的金鑰是不是有效', answer: 'api', why: '金鑰錯了，API 直接回 401，請求根本到不了模型。' },
-          { text: '把回答一個字一個字顯示在畫面上', answer: 'app', why: '模型送出的是一段一段的文字；畫出來的是你的前端（模組 2）。' },
-          { text: '算這次請求用了多少錢', answer: 'api', why: 'API 依輸入和輸出的 token 數計費，回應裡的 `usage` 告訴你用了多少（1-5）。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['決定回覆的下一個字要寫什麼', '模型做的', '這是模型唯一真正在做的事。'],
+          ['記得使用者五分鐘前說過的話', '你的程式做的', 'API 沒有記憶；你的程式每次把對話歷史一起送出去（1-2）。'],
+          ['真的去查明天台北的天氣', '你的程式做的', '模型只會說「我想查天氣」；呼叫天氣服務的是你的程式（模組 4）。'],
+          ['檢查請求帶的金鑰是不是有效', 'API 做的', '金鑰錯了，API 直接回 401，請求根本到不了模型。'],
+          ['把回答一個字一個字顯示在畫面上', '你的程式做的', '模型送出的是一段一段的文字；畫出來的是你的前端（模組 2）。'],
+          ['算這次請求用了多少錢', 'API 做的', 'API 依輸入和輸出的 token 數計費，回應裡的 `usage` 告訴你用了多少（1-5）。']
+        ] },
         { type: 'heading', id: 'series', text: '這一本在系列裡的位置' },
         { type: 'svg', svg: SERIES_MAP_SVG, caption: '第一部站在最上層：先學會用。想知道模型裡面在做什麼，再往下讀第二到第五部。' },
         { type: 'table', head: ['你想知道', '去哪一部'], rows: [
@@ -104,12 +104,30 @@ defineLessons({
           ['神經網路、反向傳播、PyTorch', '第四部'],
           ['為什麼模型吃 GPU 記憶體', '第五部'],
         ] },
+        { type: 'heading', id: 'workload', text: '一個客服功能，誰做了多少事' },
+        { type: 'widget', name: 'knobs', props: { title: '拉動輪數與工具次數，數一數模型和程式各做幾件事', sliders: [
+          { id: 'turns', label: '對話輪數', min: 1, max: 20, step: 1, value: 5, unit: '輪' },
+          { id: 'lookups', label: '每輪查資料庫', min: 0, max: 3, step: 1, value: 1, unit: '次' },
+          { id: 'tools', label: '每輪呼叫工具', min: 0, max: 3, step: 1, value: 1, unit: '次' },
+        ], compute: (v) => {
+          const modelCalls = v.turns * (1 + v.tools);
+          const appSteps = v.turns * (2 + v.lookups + v.tools + 1);
+          const share = modelCalls / (modelCalls + appSteps);
+          return { rows: [
+            { label: '模型被呼叫（每次只是讀文字、寫文字）', value: `${modelCalls} 次`, ratio: share },
+            { label: '程式做的事（讀寫歷史、查資料、執行工具、檢查輸出）', value: `${appSteps} 件`, ratio: 1 - share },
+            { label: '模型佔全部步驟的比例', value: `${Math.round(share * 100)}%`, ratio: share },
+          ], note: '預設 5 輪、每輪查 1 次資料、呼叫 1 次工具：模型被呼叫 10 次，程式做 25 件事，模型只佔約 29%。每多一次工具呼叫，模型就要多讀一次結果（模組 4），但執行工具的永遠是程式。' };
+        } } },
+        { type: 'heading', id: 'deep-boundary', text: '深入：模型和程式的界線正在移動' },
+        '「模型只讀寫文字」這件事沒有變，但有些原本要你寫程式的工作，API 現在可以代做。這些功能跑在 Anthropic 的伺服器上，不是模型突然會上網了。',
+        { type: 'table', head: ['原本由你的程式做', 'API 可以代做', '代價'], rows: [
+          ['自己串搜尋服務', '伺服器端工具（web search、code execution），可能回 `pause_turn`（4-1）', '少寫程式，但搜尋來源與執行環境你控制不了'],
+          ['對話太長時自己摘要舊訊息', '伺服器端壓縮（compaction）：在 API 裡摘要對話', '摘要掉的細節你看不到，除錯變難'],
+          ['自己存對話、跑 agent 迴圈', 'Managed Agents：有狀態的 session，在 Anthropic 端跑迴圈', '依 token 計費、沒有批次折扣，資料存在廠商那邊'],
+        ] },
+        '判斷要不要交出去，問兩件事：出錯時你需要看到每一步嗎？資料能不能離開你的系統？兩題有一題答「不行」，就留在自己的程式裡。',
       ],
-      tryit: {
-        q: ['你要做一個「幫員工查請假規定」的聊天機器人。把下面三件事，各自標上是模型做的還是程式做的：'],
-        draft: '1. 讀懂員工問的是特休還是病假：＿＿\n2. 從公司規章裡找出相關的段落：＿＿\n3. 把找到的段落和問題一起交給模型，寫成回答：＿＿',
-        answer: ['1 是模型做的：理解一句話的意思是它的強項。', '2 是程式做的：模型看不到你的規章，要程式先搜尋、再把結果送進去（這就是模組 6 的 RAG）。', '3 是兩者合作：程式負責組合，模型負責寫。'],
-      },
     },
     mistakes: [
       { wrong: '在 prompt 裡寫「請記住使用者的名字」，以為下次請求它就會記得。', why: '每次 API 請求都是獨立的，模型看不到上一次的任何東西。', right: '程式把名字存起來，每次請求時放進 system prompt 或對話歷史（1-2）。' },
@@ -117,21 +135,9 @@ defineLessons({
       { wrong: '覺得「AI 功能做不好」就一直換更大的模型。', why: '很多問題出在模型外面：資料沒送進去、prompt 沒寫清楚、輸出沒驗證。', right: '先檢查應用這一層：模型拿到的資料對嗎？指示清楚嗎？輸出有檢查嗎？（模組 8 的評估）' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下列哪一件事是**模型**本身在做的？', options: [
-        { text: '根據讀到的文字，寫出接下來的回覆', correct: true, why: '模型只做這件事：讀文字、寫文字。' },
-        { text: '把上一輪對話存起來，下次自動帶上', why: '模型沒有記憶，存與帶都是你的程式做的。' },
-        { text: '呼叫天氣服務，取得明天的降雨機率', why: '模型只能提出「想呼叫」；真的呼叫的是程式。' },
-        { text: '檢查請求帶來的金鑰有沒有權限', why: '金鑰是 API 在檢查，請求到不了模型。' },
-      ] },
-      { level: '應用', type: 'mc', q: '客服機器人回答了一個三個月前就改掉的退貨規定。最該先檢查哪裡？', options: [
-        { text: '程式送給模型的規章資料是不是舊版', correct: true, why: '模型只會根據讀到的文字回答；送進去的是舊規章，它就會照舊規章答。' },
-        { text: '模型是不是太小，該換更大的模型', why: '換模型解決不了「資料是舊的」；大模型照樣讀舊規章。' },
-        { text: 'prompt 有沒有寫「請使用最新的規定」', why: '模型不知道什麼是「最新」，它只看得到你送進去的那份。' },
-        { text: 'API 的回應是不是被快取住沒有更新', why: '每次請求模型都重新產生回應；問題在輸入的資料。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['有人說：「ChatGPT 網頁版就會記得我之前聊過什麼，所以模型有記憶。」根據這一課，你怎麼解釋？'], answer: [
-        '網頁版是一個**應用**，不是模型本身。記得之前聊過什麼，是那個應用把對話歷史（或整理過的摘要）存起來，在新的請求裡一起送給模型。',
-        '模型每次都是重新讀一遍。你自己用 API 做應用時，這件事要你的程式來做。',
+      { level: '深入思考', type: 'reveal', q: ['你要在自己的學習 App 做「跨對話的記憶」：使用者上週說過自己在準備多益，這週開新對話時 App 要記得。模型沒有記憶，這個功能要你的程式決定哪幾件事？'], answer: [
+        '先拆成程式的四個決定：**存什麼**（整段對話太長，通常請模型整理成幾條事實，例如「目標：多益 800 分」）、**存在哪**（資料庫，綁使用者帳號）、**什麼時候送進去**（每次新對話都放進 system，或只在相關時用搜尋挑出來，模組 6）、**怎麼刪**（使用者要能看到並刪掉記住的事）。',
+        '常見的錯誤想法是「把全部歷史都帶上就好」：token 會一路變多（1-2、1-5），舊的錯誤資訊也會一直被讀到。記憶越多不一定越好，挑對的幾條才是工程。',
       ] },
     ],
     keypoints: [
@@ -139,7 +145,7 @@ defineLessons({
       '記憶、工具、資料、檢查、畫面、成本，都是應用這一層的工作，也就是這一本要教的。',
       '看到 AI 功能先問：這件事是模型做的，還是程式做的？',
     ],
-    sources: ['claude-messages', 'claude-models'],
+    sources: ['claude-messages', 'claude-models', 'claude-pricing', 'claude-migration-20261021'],
   },
 
   '0-2': {
@@ -147,14 +153,6 @@ defineLessons({
       '申請 [[API 金鑰]]並放進環境變數，不寫進程式碼',
       '安裝 TypeScript SDK，送出第一個請求',
       '說出金鑰為什麼只能放在後端',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1）「讓 AI 記得使用者上次說了什麼」是誰的工作？', options: [
-        { text: '你的程式：存下對話，下次請求一起送', correct: true, why: 'API 是無狀態的，記憶要程式自己處理。' },
-        { text: '模型：它會自動記住同一個金鑰的對話', why: '模型不記得任何上一次的請求，跟金鑰無關。' },
-        { text: 'API：它會幫每個使用者保存對話紀錄', why: 'Messages API 不保存對話；每次請求都要帶齊。' },
-        { text: 'prompt：寫「請記住」模型就會記住', why: '寫在 prompt 裡也只在這一次請求有效。' },
-      ] },
     ],
     analogy: {
       text: ['[[API 金鑰]]像你的信用卡號碼：店家（API）只認號碼，不認人。誰拿到號碼，誰就能刷你的卡。', '所以金鑰只放在你自己控制的地方（[[後端]]的[[環境變數]]），不寫進程式碼、不放進瀏覽器、不貼到聊天室。'],
@@ -185,7 +183,7 @@ defineLessons({
       caption: '前端程式會整包下載到使用者的電腦；放在裡面的東西都等於公開。',
     },
     define: [
-      { term: 'API 金鑰', en: 'API key', def: '證明請求是你送的、錢算你的那串密碼。Claude 的金鑰放在 `x-api-key` 標頭。', example: '在 Claude Console 的 API Keys 頁面產生。' },
+      { term: 'API 金鑰', en: 'API key', def: '證明請求是你送的、錢算你的那串密碼。Claude API 接受放在 `x-api-key` 或 `Authorization: Bearer` 標頭；SDK 1.0 起用後者。', example: '在 Claude Console 的 API Keys 頁面產生。' },
       { term: '環境變數', en: 'environment variable', def: '作業系統替程式準備的「名稱＝值」設定。SDK 預設讀 `ANTHROPIC_API_KEY`。', example: '`export ANTHROPIC_API_KEY="..."`（zsh）。' },
       { term: 'SDK', en: 'software development kit', def: '官方程式庫，包好 HTTP、重試、型別與串流解析。', example: '`npm install @anthropic-ai/sdk`。' },
     ],
@@ -232,13 +230,16 @@ defineLessons({
         </svg>`, caption: '用 `block.type === "text"` 篩，就不會把空的思考區塊印出來。' },
         { type: 'callout', variant: 'tip', title: '印出來的 usage 是什麼', body: ['`usage` 裡的 `input_tokens` 和 `output_tokens` 就是這次要付錢的數量。1-5 會教你怎麼把它換算成錢。'] },
         { type: 'widget', name: 'checklist', props: { key: '0-2', items: ['金鑰只存在環境變數或 `.env` 檔', '`.env` 已經寫進 `.gitignore`', '程式碼裡搜尋不到 `sk-ant-`', '前端（瀏覽器）程式不直接呼叫 Claude API', '在 Console 設了每月花費上限'] } },
+        { type: 'heading', id: 'deep-keys', text: '深入：從個人電腦到正式上線，金鑰放哪裡' },
+        '每次開終端機都要重設環境變數很煩，所以開發時多半放在 `.env` 檔。正式上線時，`.env` 檔本身也成了要保護的東西，改由部署平台或密鑰管理服務注入。',
+        { type: 'table', head: ['階段', '放哪裡', '要注意'], rows: [
+          ['自己電腦練習', '`.env` 檔，用 `node --env-file=.env`（Node 20.6 起內建）或 dotenv 讀進來', '`.env` 寫進 `.gitignore`；另附一份沒有真值的 `.env.example`'],
+          ['團隊共用的測試環境', '每人各自一把金鑰，放在 Console 的不同 workspace', '一人一把才能分開撤銷、分開看用量'],
+          ['正式上線', '部署平台的環境變數或密鑰管理服務（secrets manager）', '定期輪換；舊金鑰確認沒流量再撤銷'],
+        ] },
+        '什麼時候可以讓瀏覽器直接呼叫？只有「使用者自己貼上自己的金鑰」的工具（BYOK，bring your own key）。TypeScript SDK 在瀏覽器裡預設拒絕執行，要明確加 `dangerouslyAllowBrowser: true`；這個名字就是在提醒你，正常產品不該這樣做。',
+        { type: 'legacy', title: '金鑰標頭的變化', rows: [['`x-api-key: sk-ant-…`（舊教學、cURL 範例）', 'API 兩種都接受；`@anthropic-ai/sdk` 1.0.0 起改送 `Authorization: Bearer sk-ant-…`，並預設 API 版本 `2026-10-21`']], note: '如果公司有代理伺服器或日誌過濾器在讀 `x-api-key`，升級 SDK 時要一起改成讀 `Authorization`，否則金鑰可能被原樣寫進日誌。' },
       ],
-      tryit: {
-        q: ['朋友傳來一段程式，說「照這樣做就能在網頁上直接聊天」。找出問題並寫出你的修法：'],
-        code: true,
-        draft: '// app.js（瀏覽器載入）\nconst res = await fetch("https://api.anthropic.com/v1/messages", {\n  headers: { "x-api-key": "sk-ant-api03-…" },\n  ...\n});',
-        answer: ['問題：金鑰寫在瀏覽器載入的檔案裡，任何訪客打開開發者工具都看得到，可以拿去刷你的額度。', '修法：瀏覽器改打你自己的後端（例如 `/api/chat`），後端從環境變數讀金鑰再呼叫 Claude API。2-3 會完整做一次。'],
-      },
     },
     mistakes: [
       { wrong: '把金鑰寫在程式碼裡，打算「上線前再拿掉」。', why: '只要 commit 過一次，金鑰就留在 git 歷史裡，刪掉檔案也還在。', right: '一開始就用環境變數；萬一真的 commit 了，立刻在 Console 撤銷那把金鑰，再產生新的。' },
@@ -246,19 +247,7 @@ defineLessons({
       { wrong: '在 PowerShell 用 `export ANTHROPIC_API_KEY=...`。', why: '`export` 是 bash／zsh 的語法，PowerShell 不認得。', right: 'PowerShell 用 `$env:ANTHROPIC_API_KEY = "..."`；macOS 的 zsh 才用 `export`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '不給參數的 `new Anthropic()` 會從哪裡拿金鑰？', options: [
-        { text: '環境變數 `ANTHROPIC_API_KEY`', correct: true, why: '這是 SDK 的預設來源；所以程式碼裡不必出現金鑰。' },
-        { text: '專案資料夾裡的 `package.json`', why: '`package.json` 放套件設定，SDK 不會去那裡找金鑰，也不該放。' },
-        { text: '瀏覽器的 localStorage', why: 'SDK 跑在後端，而且金鑰不該進瀏覽器。' },
-        { text: '第一次執行時跳出視窗請你輸入', why: 'SDK 不會互動式詢問；找不到金鑰就直接報錯。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你發現三天前 commit 的檔案裡有金鑰，repo 是公開的。第一件事該做什麼？', options: [
-        { text: '到 Console 撤銷那把金鑰，再產生一把新的', correct: true, why: '金鑰可能已經被掃走；只有撤銷才能讓它失效。清理 git 歷史是之後的事。' },
-        { text: '刪掉那個檔案，再 commit 一次', why: '舊的 commit 還在歷史裡，金鑰照樣查得到。' },
-        { text: '把 repo 改成私人的就好', why: '公開的那三天可能已經被複製；改私人不會讓金鑰失效。' },
-        { text: '先看用量有沒有異常，沒有就不用處理', why: '沒看到異常不代表沒外洩；被盜用可能在之後才發生。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要做一個手機 App，App 裡要能跟 Claude 聊天。根據這一課，金鑰應該放在哪裡？為什麼不能放在 App 裡？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要做一個手機 App，App 裡要能跟 Claude 聊天。根據這一課，金鑰應該放在哪裡？為什麼不能放在 App 裡？'], answer: [
         '放在你自己的後端伺服器；App 呼叫你的後端，後端再呼叫 Claude API。',
         'App 安裝檔會下載到每個使用者的手機，和網頁前端一樣可以被拆開來看，放在裡面的金鑰等於公開。後端還可以順便做登入檢查與用量限制，避免有人用你的 App 大量刷額度。',
       ] },
@@ -272,7 +261,7 @@ defineLessons({
       '`new Anthropic()` 會自己讀 `ANTHROPIC_API_KEY`；回應的 `content` 是陣列，要篩出文字區塊。',
       '萬一外洩，第一件事是撤銷金鑰，不是刪檔案。',
     ],
-    sources: ['claude-messages', 'ts-sdk', 'claude-pricing'],
+    sources: ['claude-messages', 'ts-sdk', 'claude-migration-20261021', 'claude-pricing'],
   },
 });
 </script>

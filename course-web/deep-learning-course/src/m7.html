@@ -3,29 +3,16 @@
    模組 7：PyTorch 入門，接上訓練迷你 GPT
    ========================================================================== */
 defineTerms({
-  'PyTorch': { en: 'PyTorch', def: '最常用的深度學習框架之一：提供 tensor、自動微分、神經網路層與優化器。', example: '2026-10 最新穩定版 2.14。', lesson: '7-1' },
+  'PyTorch': { en: 'PyTorch', def: '最常用的深度學習框架之一：提供 tensor、自動微分、神經網路層與優化器。', example: '2026-10-28 釋出 2.15（查證於 2026-10-30）。', lesson: '7-1' },
   'tensor': { en: 'tensor', def: '多維陣列：純量、向量、矩陣再往上推；可以放在 GPU 上，並記錄計算圖做自動微分。', example: '形狀 (32, 64, 128)。', lesson: '7-1' },
   'requires_grad': { en: 'requires_grad', def: '告訴 PyTorch「這個 tensor 要算梯度」；模型的參數預設就是 True。', example: 'w = torch.randn(3, requires_grad=True)。', lesson: '7-1' },
   'nn.Module': { en: 'nn.Module', def: 'PyTorch 裡所有網路層與模型的基底類別：在 __init__ 宣告層，在 forward 寫前向傳播。', example: 'class MiniGPT(nn.Module)。', lesson: '7-2' },
   '訓練迴圈': { en: 'training loop', def: '重複「拿一批 → 前向算損失 → 清梯度 → 反向 → 更新」的程式。', example: '五行程式就是訓練的全部。', lesson: '7-2' },
   '字元級語言模型': { en: 'character-level language model', def: '把每個字元當一個 token，預測下一個字元的模型；詞彙表很小，適合練習。', example: '莎士比亞全集約 65 種字元。', lesson: '7-3' },
+  '困惑度': { en: 'perplexity', def: 'e 的（平均 cross-entropy）次方；可以讀成模型每一步平均在幾個選項之間猶豫。', example: '損失 1.47 → 約 4.35。', lesson: '7-3' },
   'bigram': { en: 'bigram model', def: '只看前一個 token 來預測下一個的模型；可以單純用「數次數」得到。', example: '「台」後面最常接「北」。', lesson: '7-3' },
 });
 
-const REVIEW_M6 = [
-  { level: '回想', type: 'mc', q: '（回顧 6-3）Transformer 為什麼能平行訓練？', options: [
-    { text: '拿掉了依序相依的遞迴', correct: true, why: '每個位置同時算。' },
-    { text: '參數比 RNN 少很多', why: '不是原因。' },
-    { text: '不需要反向傳播', why: '一樣需要。' },
-    { text: '只處理短句', why: '不是原因。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 2-3）10 類分類，初始損失大約？', options: [
-    { text: 'ln 10 ≈ 2.3', correct: true, why: '每類約 1/10。' },
-    { text: '10', why: '要取 log。' },
-    { text: '0', why: '一開始最大。' },
-    { text: '0.1', why: '那是機率。' },
-  ] },
-];
 
 const CORPUS = '學習就是讓損失變小。模型先猜，再看錯多少，再往錯得少的方向走一步。走很多步之後，模型就學會了。學得好不好，要看沒看過的資料。看沒看過的資料，才知道是不是真的學會。';
 
@@ -36,7 +23,6 @@ defineLessons({
       '用 requires_grad 與 backward() 算出梯度',
       '把 3-4 的手寫自動微分對應到 PyTorch',
     ],
-    review: REVIEW_M6,
     analogy: {
       text: ['3-4 你自己做了一個能算梯度的計算機（Value）。[[PyTorch]] 是工廠量產版：一次處理整個[[tensor]]（很多數字），可以放到 GPU 上算，還附帶各種現成的層與優化器。', '用法幾乎一樣：建立要算梯度的 tensor（[[requires_grad]]＝True）、照常寫計算、呼叫 .backward()，梯度就出現在 .grad 裡。'],
       limit: ['Value 一次一個數字，PyTorch 一次一整個 tensor，所以形狀很重要：大多數錯誤都是形狀對不上（2-1）。'],
@@ -77,42 +63,28 @@ defineLessons({
           ['L.backward()', 'loss.backward()'],
           ['a.grad', 'a.grad'],
         ] },
+        { type: 'heading', id: 'tensor-traps', text: '深入：dtype、廣播、原地修改' },
+        { type: 'table', head: ['陷阱', '發生什麼', '怎麼避免'], rows: [
+          ['dtype', '預設 float32；大模型訓練常用 bfloat16 省一半記憶體', '混合精度用 torch.autocast，不要手動把所有東西轉成 16 位元'],
+          ['廣播（broadcasting）', '形狀 (3,) 和 (3, 1) 相加會變成 (3, 3)，不會報錯', '運算前印出 .shape，或用 assert 檢查'],
+          ['原地修改', 'x.add_(1) 這種帶底線的函式直接改 x；改到反向需要的值會報錯', '訓練程式裡少用原地修改'],
+          ['.grad 只在葉節點', '中間值的 .grad 是 None', '需要時對中間值呼叫 .retain_grad()'],
+        ] },
+        'bfloat16 和 float16 都是 16 位元。bfloat16 的指數位和 float32 一樣是 8 位，範圍夠大、不容易溢位，但精度較低；float16 精度高一點但範圍小，常要搭配損失縮放（loss scaling）。所以在支援的 GPU 上訓練多用 bfloat16（第五部）。',
+        '版本現況：PyTorch 2.15 在 2026-10-28 釋出，從這一版起需要 Python 3.11 以上（查證於 2026-10-30）。這一卷用到的 tensor、autograd、nn、optim 在 2.x 之間都很穩定，新版主要改進編譯器與硬體支援。',
       ],
-      tryit: {
-        q: ['x 的形狀是 (32, 256, 384)，W 的形狀是 (384, 65)。x @ W 的形狀是什麼？'],
-        draft: '形狀：＿',
-        answer: ['(32, 256, 65)：最後一維 384 和 W 的第一維對上，換成 65；前面的批次與長度保留。', '這正是語言模型最後一層：每個位置對 65 種字元各給一個 logit。'],
-      },
     },
     mistakes: [
       { wrong: '對不是純量的 tensor 直接呼叫 backward()。', why: 'backward() 預設要從一個數字（損失）出發。', right: '先把損失變成純量（例如 .mean()）。' },
       { wrong: '模型在 GPU、資料在 CPU。', why: '不同裝置的 tensor 不能一起算。', right: '模型與資料都 .to(device)。' },
       { wrong: '推論時也記錄計算圖。', why: '浪費記憶體與時間。', right: '推論包在 torch.no_grad() 裡。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '要讓 PyTorch 幫一個 tensor 算梯度，要設定？', options: [
-        { text: 'requires_grad=True', correct: true, why: '開始記錄計算圖。' },
-        { text: 'dtype=torch.int64', why: '整數不能算梯度。' },
-        { text: 'device="cuda"', why: '那是放在哪裡算。' },
-        { text: 'shape=(1,)', why: '形狀無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '(8, 100, 64) 的 float32 tensor 約占多少記憶體？', options: [
-        { text: '約 0.2 MB', correct: true, why: '51,200 × 4 位元組。' },
-        { text: '約 51 MB', why: '少除了 1,000。' },
-        { text: '約 2 MB', why: '多乘了 10。' },
-        { text: '約 0.05 MB', why: '忘了乘 4 位元組。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼推論時要用 torch.no_grad()？和第五部會講的「推論比訓練省資源」有什麼關係？'], answer: [
-        'no_grad 讓 PyTorch 不記錄計算圖、不保留給反向傳播用的中間值，省記憶體也省時間。',
-        '這就是推論比訓練省資源的原因之一：不用存中間值、不用算梯度、不用優化器的狀態（第五部 3）。',
-      ] },
-    ],
     keypoints: [
       'tensor：多維陣列，可以放 GPU、可以算梯度。',
       'requires_grad＝True → 計算 → loss.backward() → .grad。',
       '推論包在 torch.no_grad() 裡。',
     ],
-    sources: ['pytorch-autograd', 'pytorch-quickstart'],
+    sources: ['pytorch-autograd', 'pytorch-quickstart', 'pytorch-release', 'pytorch-amp'],
   },
 
   '7-2': {
@@ -120,20 +92,6 @@ defineLessons({
       '用 nn.Module 定義一個網路',
       '寫出標準的五行訓練迴圈',
       '說出每一行對應這一卷的哪個模組',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-1）推論時為什麼用 torch.no_grad()？', options: [
-        { text: '不記錄計算圖，省記憶體與時間', correct: true, why: '推論不需要梯度。' },
-        { text: '讓模型變得更準', why: '準確度不變。' },
-        { text: '讓梯度變成 0', why: '是不算梯度。' },
-        { text: '把模型搬到 GPU', why: '那是 .to(device)。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 4-1）梯度累積的寫法要點？', options: [
-        { text: '累積幾批才呼叫一次 step 與 zero_grad', correct: true, why: '梯度會累加。' },
-        { text: '每批都清梯度', why: '那就沒累積。' },
-        { text: '把學習率乘以批次數', why: '不是做法。' },
-        { text: '改用更大的模型', why: '無關。' },
-      ] },
     ],
     analogy: {
       text: ['做菜：先寫好食譜（[[nn.Module]]：有哪些材料、怎麼處理），然後每天照同樣的流程煮一次、試吃、調整（[[訓練迴圈]]）。', '整個深度學習的訓練，最後就濃縮成五行：拿一批、前向算損失、清梯度、反向傳播、更新。這一卷的每個模組，都對應其中一行。'],
@@ -166,12 +124,14 @@ defineLessons({
           <line x1="260" y1="75" x2="300" y2="75" class="stroke-ink" stroke-width="3"/>
           <text x="280" y="148" text-anchor="middle" font-size="14">兩條損失曲線一起看，才知道有沒有過擬合（第三部 5-1）</text>
         </svg>`, caption: '只看訓練損失會被過擬合騙。' },
+        { type: 'heading', id: 'debug-loop', text: '深入：訓練跑不起來時，先做這三件事' },
+        { type: 'list', ordered: true, items: [
+          '先讓模型背下一小批：只拿 4～8 筆資料重複訓練，損失應該能降到接近 0。降不下來代表程式有錯（形狀、損失、標籤），不是模型不夠大（Karpathy 2019）。',
+          '檢查初始損失：分類問題應該接近 ln(類別數)（2-3）。差很多代表初始化或最後一層有問題。',
+          '固定亂數種子（torch.manual_seed）再比較改動，不然兩次結果的差異可能只是運氣。',
+        ] },
+        'model.eval() 和 torch.no_grad() 做的是不同的事：eval() 只改變 dropout、batch norm 的行為，不會停止記錄計算圖；no_grad() 才是不記錄。驗證時兩個都要；純推論還可以用 torch.inference_mode()，比 no_grad 再省一點。',
       ],
-      tryit: {
-        q: ['如果把 opt.zero_grad() 整行刪掉，訓練會發生什麼事？'],
-        draft: '我的推測：＿',
-        answer: ['每一步的梯度會一直累加：第 100 步用的「梯度」其實是前 100 步的總和，越來越大，等於學習率越來越大，很容易發散或亂跳。', '這是新手最常見的 bug 之一，程式不會報錯，只是學得很怪。'],
-      },
     },
     mistakes: [
       { wrong: '忘了 zero_grad()。', why: '梯度會累加。', right: '每步（或每次累積完）清一次。' },
@@ -179,19 +139,7 @@ defineLessons({
       { wrong: '驗證時沒切 eval() 和 no_grad()。', why: 'dropout 等行為不對，還浪費記憶體。', right: '驗證前 model.eval()，用 torch.no_grad()。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一行負責算出梯度？', options: [
-        { text: 'loss.backward()', correct: true, why: '反向傳播。' },
-        { text: 'opt.step()，因為它會更新參數', why: 'step 用梯度，不算梯度。' },
-        { text: 'opt.zero_grad()，因為它處理梯度', why: '它是清掉梯度。' },
-        { text: 'model(X)，因為它是前向', why: '前向算的是輸出。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'nn.Linear(2, 16)＋nn.Linear(16, 1) 一共幾個參數？', options: [
-        { text: '65', correct: true, why: '2×16＋16 ＋ 16×1＋1。' },
-        { text: '48，只算權重', why: '還有 17 個偏差。' },
-        { text: '19，輸入加輸出', why: '要相乘。' },
-        { text: '32', why: '少算第二層。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['把上面的程式從 XOR 改成第三部的房價回歸（一個輸入、一個輸出），要改哪幾個地方？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['把上面的程式從 XOR 改成第三部的房價回歸（一個輸入、一個輸出），要改哪幾個地方？'], answer: [
         '一、第一層改成 nn.Linear(1, 16)，資料換成房價。二、損失換成 nn.MSELoss()（回歸，2-3）。',
         '三、最後輸出不要 sigmoid、不要 round。迴圈本身五行完全不用改：這就是深度學習框架的威力。',
       ] },
@@ -201,7 +149,7 @@ defineLessons({
       '訓練迴圈：前向算損失 → zero_grad → backward → step。',
       '驗證時用 eval() 與 no_grad()，兩條損失曲線一起看。',
     ],
-    sources: ['pytorch-quickstart', 'pytorch-adam'],
+    sources: ['pytorch-quickstart', 'pytorch-adam', 'karpathy-recipe', 'pytorch-autograd-notes'],
   },
 
   '7-3': {
@@ -209,20 +157,6 @@ defineLessons({
       '說出字元級語言模型的輸入與輸出',
       '用「數次數」做一個 bigram 模型並產生文字',
       '說明它和神經網路語言模型的差別',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-2）忘了 zero_grad 會怎樣？', options: [
-        { text: '梯度一直累加，學得很怪', correct: true, why: '等於學習率越來越大。' },
-        { text: '程式會直接報錯', why: '不會報錯。' },
-        { text: '完全沒影響', why: '影響很大。' },
-        { text: '模型會變小', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-3）語言模型的最後一層輸出是？', options: [
-        { text: '每個 token 一個 logit', correct: true, why: '再 softmax 成機率。' },
-        { text: '一個數字', why: '那是回歸。' },
-        { text: '一張圖片', why: '不是。' },
-        { text: '下一個 token 本身', why: '先是機率，再取樣。' },
-      ] },
     ],
     analogy: {
       text: ['小朋友學說話的第一步，是記住「這個字後面常常接什麼」：「謝」後面接「謝」、「早」後面接「安」。', '[[bigram]] 模型就是這樣：數一數訓練文字裡，每個字元後面各接了什麼、幾次，換成機率，就能一個字一個字往下接。這是最簡單的[[字元級語言模型]]，也是迷你 GPT 的起點。'],
@@ -256,12 +190,11 @@ defineLessons({
           <text x="420" y="122" text-anchor="middle" font-size="13" class="on-color">Transformer block × N</text>
           <text x="280" y="164" text-anchor="middle" font-size="13">輸入、輸出、損失、訓練迴圈都一樣；只有中間的模型變了</text>
         </svg>`, caption: '這就是第二部 0-1 那六站的最小實作。' },
+        { type: 'heading', id: 'lm-eval', text: '深入：沒看過的組合、困惑度、驗證文字' },
+        '只用數次數時，訓練文字沒出現過的接法機率是 0。驗證文字一出現這種接法，cross-entropy 就是 −log(0)，等於無限大。常見補救是平滑（smoothing）：每一格先加 1 再算比例，讓沒看過的接法也有很小的機率。',
+        '語言模型常報[[困惑度]]＝e 的（平均 cross-entropy）次方，可以讀成「模型每一步平均在幾個字之間猶豫」。損失 1.4697 對應困惑度約 4.35；完全亂猜 65 種字元時，困惑度就是 65。',
+        '評估一定要用模型沒看過的驗證文字。bigram 的訓練損失看起來不錯，常常只是記住了訓練文字的接法；nanoGPT 報告的 1.4697 也是驗證損失，不是訓練損失。',
       ],
-      tryit: {
-        q: ['在互動裡輸入「學」，它後面接什麼？按幾次「產生 40 個字」，為什麼句子看起來像中文但不通順？'],
-        draft: '「學」後面：＿\n不通順的原因：＿',
-        answer: ['短文裡「學」後面接「習」「得」「會」：互動上的長條會顯示各自的次數與比例。', '每一步只看前一個字，所以兩兩相鄰都合理，但沒有人在管整句的意思。要看更長的上下文，就需要 attention（7-4）。'],
-      },
     },
     mistakes: [
       { wrong: '以為 bigram 什麼都學不到。', why: '它學到了局部的接續規律，是很好的基準線。', right: '先做 bigram，再比較神經網路有沒有贏它。' },
@@ -269,19 +202,7 @@ defineLessons({
       { wrong: '以為字元級和 BPE 一樣。', why: '字元級的詞彙表小、序列長；BPE 相反（第二部 1-3）。', right: '練習用字元級，實際 LLM 用子詞。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'bigram 模型預測下一個字時看多少上下文？', options: [
-        { text: '前 1 個字', correct: true, why: 'bi＝兩個一組。' },
-        { text: '整篇文章', why: '那需要 attention。' },
-        { text: '前 10 個字', why: '只看 1 個。' },
-        { text: '完全不看', why: '要看前一個。' },
-      ] },
-      { level: '應用', type: 'mc', q: '詞彙表 65 個字元，bigram 表有幾格？', options: [
-        { text: '4,225', correct: true, why: '65 × 65。' },
-        { text: '130，65 乘 2', why: '是平方。' },
-        { text: '65', why: '每個字對每個字。' },
-        { text: '65 的 65 次方', why: '不是次方。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼「數次數」和「用梯度下降學一張表」最後得到差不多的結果？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼「數次數」和「用梯度下降學一張表」最後得到差不多的結果？'], answer: [
         '兩者都在找「讓訓練文字的 cross-entropy 最小」的機率表。對 bigram 這種簡單模型，數次數再正規化剛好就是最佳解。',
         '神經網路的好處是可以擴充：把那張表換成 Transformer，訓練方式完全不用改。',
       ] },
@@ -297,96 +218,14 @@ defineLessons({
 </script>
 
 <script>
-/* 7-4 迷你 GPT＋總複習（模組 1–7） */
-const REVIEW_12_DL = [
-  { level: '回想', type: 'mc', q: '（1-1）神經元的計算順序？', options: [
-    { text: '加權加總 → 加偏差 → 激活', correct: true, why: 'a＝激活(Σwx＋b)。' },
-    { text: '激活 → 加權加總 → 加偏差', why: '激活在最後。' },
-    { text: '加偏差 → 激活 → 加權', why: '順序錯。' },
-    { text: '只有加權加總', why: '少了兩步。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（1-3）為什麼一個神經元學不會 XOR？', options: [
-    { text: '決策邊界是一條直線', correct: true, why: 'XOR 不是線性可分。' },
-    { text: '資料只有四筆', why: '不是資料量問題。' },
-    { text: '學習率太小', why: '怎麼訓練都分不開。' },
-    { text: '沒有用 GPU', why: '無關。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（2-1）(16, 50) × (50, 10) 的結果形狀？', options: [
-    { text: '(16, 10)', correct: true, why: '中間 50 消掉。' },
-    { text: '(50, 50)', why: '不是。' },
-    { text: '(16, 50)', why: '輸出變 10。' },
-    { text: '(10, 16)', why: '順序錯。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（2-3）PyTorch 的 CrossEntropyLoss 該給什麼？', options: [
-    { text: 'logits', correct: true, why: '內部做 softmax。' },
-    { text: '先 softmax 過的機率', why: '會做兩次。' },
-    { text: 'one-hot 的預測', why: '不是。' },
-    { text: '損失本身', why: '不是。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（3-2）y＝4x、L＝y²，x＝1 時 dL/dx？', options: [
-    { text: '32', correct: true, why: '2y×4＝2×4×4。' },
-    { text: '8，只算 2y', why: '還要乘 4。' },
-    { text: '16，就是 L', why: '要算導數。' },
-    { text: '4，就是 dy/dx', why: '還要乘 dL/dy。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（3-4）自動微分的 backward() 第一步通常是？', options: [
-    { text: '拓撲排序', correct: true, why: '確保倒序正確。' },
-    { text: '把所有參數設成 0', why: '會丟掉模型。' },
-    { text: '把學習率加倍', why: '無關。' },
-    { text: '重新做一次前向', why: '前向已做完。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（4-2）梯度連續兩步都是 2，β＝0.9、v 從 0 開始，第二步的 v？', options: [
-    { text: '3.8', correct: true, why: '2 → 0.9×2＋2。' },
-    { text: '4，兩步相加', why: '舊的要乘 0.9。' },
-    { text: '2', why: '會累積。' },
-    { text: '1.8', why: '少加了新梯度。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（4-3）Adam 的步伐為什麼對梯度大小不敏感？', options: [
-    { text: '除以梯度平方平均的平方根', correct: true, why: '方向 ÷ √陡度。' },
-    { text: '學習率會自動變成 0', why: '不會。' },
-    { text: '它只看梯度的正負號以外什麼都不看', why: '它還看大小的平均。' },
-    { text: '它把梯度裁剪到 1', why: '那是梯度裁剪。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（5-2）32×32、3×3 卷積、補 1、步長 2，輸出邊長？', options: [
-    { text: '16', correct: true, why: '⌊(32−3＋2)÷2⌋＋1。' },
-    { text: '32', why: '步長 2 會縮小。' },
-    { text: '30', why: '那是不補邊、步長 1。' },
-    { text: '15', why: '要加 1。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（6-2）LSTM 比一般 RNN 好在哪？', options: [
-    { text: '記憶帶讓資訊傳得比較遠', correct: true, why: '遺忘閘接近 1。' },
-    { text: '可以整句平行計算', why: '仍要依序。' },
-    { text: '完全沒有參數', why: '有很多參數。' },
-    { text: '不需要反向傳播', why: '一樣需要。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（7-2）訓練迴圈中哪一行更新參數？', options: [
-    { text: 'opt.step()', correct: true, why: '用 .grad 更新。' },
-    { text: 'loss.backward()', why: '那是算梯度。' },
-    { text: 'opt.zero_grad()', why: '那是清梯度。' },
-    { text: 'model(x)', why: '那是前向。' },
-  ] },
-  { level: '遷移', type: 'mc', q: '（7-4）字元級迷你 GPT 一開始的損失應該接近 ln(65) ≈ 4.17，你看到 30，最可能？', options: [
-    { text: '損失或輸出層寫錯了', correct: true, why: '初始損失應接近 ln(詞彙表)。' },
-    { text: '模型太小', why: '大小不會讓初始損失變這麼大。' },
-    { text: '訓練資料太多', why: '無關。' },
-    { text: '一切正常', why: '不正常。' },
-  ] },
-];
+
 
 defineLessons({
   '7-4': {
     goals: [
       '讀懂一個約 60 行的迷你 GPT',
       '把每一段程式對應到第二部與這一卷的概念',
-      '用 12 題總複習確認整卷的重點',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-3）bigram 和迷你 GPT 最大的差別？', options: [
-        { text: '看多少上下文', correct: true, why: '1 個字 vs block size 個。' },
-        { text: '損失函數完全不同', why: '都是 cross-entropy。' },
-        { text: '訓練迴圈不同', why: '一樣。' },
-        { text: '一個用 GPU 一個不能', why: '都可以。' },
-      ] },
+      '用一頁地圖看懂整卷的架構與會過時的地方',
     ],
     analogy: {
       text: ['組裝一台電腦：你已經認識每個零件（CPU、記憶體、主機板），組裝只是照順序接起來。', '迷你 GPT 也是：token 向量表與位置向量（第二部模組 2）、Transformer block（attention＋前饋網路＋殘差＋layer norm，第二部模組 3、4）、輸出層與 cross-entropy（2-3）、AdamW（4-3）、訓練迴圈（7-2）。每個零件你都看過了。'],
@@ -439,14 +278,35 @@ defineLessons({
           ['AdamW', '優化器（4-3）'],
           ['torch.multinomial', '依機率取樣（第二部 7-1）'],
         ] },
-        { type: 'heading', id: 'final-review', text: '總複習：12 題' },
-        { type: 'quiz', key: '7-4:final', items: REVIEW_12_DL },
-      ],
-      tryit: {
-        q: ['跑上面的程式之前，先預測：如果 input.txt 有 65 種字元，第 0 步印出的損失大約是多少？如果遠大於這個數，你會先檢查什麼？'],
-        draft: '預測：＿\n要檢查：＿',
-        answer: ['約 ln 65 ≈ 4.17：一開始每個字元的機率差不多是 1/65。', '如果遠大於 4.17：先檢查輸出層的大小是不是 vocab、cross_entropy 的形狀（view(-1, vocab)）是不是對、目標 y 有沒有往後錯一格（2-3、7-2）。'],
-      },
+        { type: 'heading', id: 'map', text: '一頁地圖：整卷架構' },
+        { type: 'table', head: ['模組', '在訓練一輪的哪一步', '最重要的一個觀念或行動'], rows: [
+          ['0 從一條線到網路', '全部', '神經元＝邏輯回歸的推廣；隱藏層自己學特徵'],
+          ['1 神經元與激活', '前向', '層與層之間一定要有非線性，否則疊再多層也等於一層'],
+          ['2 前向傳播', '前向、損失', '每一層先寫下形狀；分類直接把 logits 交給 cross-entropy'],
+          ['3 反向傳播', '反向', '局部梯度 × 上游梯度，串連相乘、分岔相加；一次反向得到全部梯度'],
+          ['4 優化器', '更新', '從 AdamW＋暖身＋cosine 起步，看損失曲線調學習率'],
+          ['5 CNN', '模型架構', '圖片用卷積：權重共享、保留空間結構；做深靠殘差'],
+          ['6 RNN 到 Transformer', '模型架構', 'attention 用 n² 的計算換來一步的距離與平行化'],
+          ['7 PyTorch 與迷你 GPT', '全部', '先讓模型背下一小批，再放大；五行訓練迴圈不變'],
+        ] },
+        { type: 'heading', id: 'stale', text: '會過時的內容與更新方式' },
+        { type: 'table', head: ['內容', '這一卷寫的（2026-10）', '怎麼更新'], rows: [
+          ['PyTorch 版本與預設值', '2.15；Adam 預設 lr 0.001、betas (0.9, 0.999)', '看 PyTorch 官方 release 公告與 torch.optim 文件'],
+          ['nanoGPT／nanochat', 'nanoGPT 2025-11 起作者標為舊專案，建議看 nanochat', '看兩個 GitHub README 開頭'],
+          ['優化器', 'AdamW 是預設，Muon 等新優化器在競爭', '看大型模型的技術報告寫用了什麼'],
+          ['架構細節', 'RoPE、RMSNorm、SwiGLU 是常見的現代零件', '看新開源模型的設定檔（config）'],
+          ['不會過時的', '反向傳播、鏈鎖律、形狀、損失與優化器的原理', '不用更新'],
+        ] },
+        { type: 'heading', id: 'modern-gpt', text: '深入：這個迷你 GPT 和現在的模型差在哪' },
+        { type: 'table', head: ['零件', '這一課的程式', '現在常見的做法'], rows: [
+          ['位置資訊', '學出來的位置向量', 'RoPE 旋轉位置編碼（Llama 系列）'],
+          ['正規化', 'LayerNorm', 'RMSNorm：只除以均方根，不減平均，比較便宜'],
+          ['前饋網路', 'GELU', 'SwiGLU（1-2 的深入段落）'],
+          ['attention 實作', 'nn.MultiheadAttention', 'F.scaled_dot_product_attention，可以自動用 FlashAttention 類的核心（6-3）'],
+          ['token', '字元', 'BPE 子詞（第二部 1-3）'],
+        ] },
+        '這些都是換更好的零件，不是換骨架：向量表、Transformer block、輸出層、cross-entropy、AdamW、訓練迴圈的結構完全一樣。Karpathy 的 nanochat 用一份精簡程式示範從 tokenizer、預訓練到聊天介面的整條流程，是讀完這一卷之後的下一步。',
+              ],
     },
     mistakes: [
       { wrong: '忘了因果遮罩。', why: '訓練時偷看下一個字，損失很低但生成很差（第二部 3-4）。', right: '每個 block 的 attention 都加遮罩。' },
@@ -454,19 +314,7 @@ defineLessons({
       { wrong: '生成時把超過 block size 的序列整個丟進去。', why: '位置向量只有 block 個。', right: 'idx[:, -block:] 只取最後 block 個。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '迷你 GPT 用什麼讓模型看不到後面的字？', options: [
-        { text: '因果遮罩', correct: true, why: 'triu 遮罩。' },
-        { text: '位置向量', why: '那是提供順序。' },
-        { text: 'layer norm', why: '那是正規化。' },
-        { text: 'dropout', why: '不是這個用途。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'L＝4、d＝128，Transformer block 的參數約？', options: [
-        { text: '約 79 萬', correct: true, why: '12×4×128²＝786,432。' },
-        { text: '約 6 千', why: '忘了平方。' },
-        { text: '約 7,900 萬', why: '多乘 100。' },
-        { text: '約 20 萬', why: '少乘 4。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的迷你 GPT 生成的文字已經像樣，但常常前後不連貫。依這一卷與第二部，列出兩個可以改進的方向與代價。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的迷你 GPT 生成的文字已經像樣，但常常前後不連貫。依這一卷與第二部，列出兩個可以改進的方向與代價。'], answer: [
         '一、加大 block size：能看更長的上下文；代價是 attention 計算隨長度平方成長、記憶體變大（第二部 7-2）。',
         '二、加大模型（層數、d）並給更多資料：代價是訓練時間與算力（第二部 5-3）；資料不夠時反而會過擬合（第三部 5）。',
       ] },
@@ -476,7 +324,7 @@ defineLessons({
       '訓練迴圈和 7-2 完全一樣；初始損失約 ln(詞彙表)。',
       '這一卷的每個零件都在這 60 行裡。',
     ],
-    sources: ['nanogpt', 'nanochat', 'transformer'],
+    sources: ['nanogpt', 'nanochat', 'transformer', 'llama', 'pytorch-sdpa', 'pytorch-release'],
   },
 });
 </script>

@@ -24,14 +24,6 @@ defineLessons({
       '讓 TypeScript 從引數推斷型別參數',
       '寫一個泛型型別（例如 ApiResponse<T>）',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）any 最大的問題是？', options: [
-        { text: '關掉檢查而且會擴散', correct: true, why: '這課的泛型是 any 的正確替代方案之一。' },
-        { text: '執行比較慢', why: '型別不影響執行。' },
-        { text: '不能放物件', why: 'any 什麼都能放。' },
-        { text: '只能用在參數', why: '哪裡都能用。' },
-      ] },
-    ],
     analogy: {
       text: ['泛型像有標籤欄的保鮮盒：盒子設計只有一種，裝進去時貼上「咖哩」，拿出來時就知道是咖哩。any 像沒有標籤的盒子：拿出來時誰也不知道裡面是什麼。'],
       limit: ['保鮮盒的標籤是你手寫的；泛型的標籤大多由 TypeScript 從你放進去的東西自動推斷，不用每次寫 `<string>`。'],
@@ -69,60 +61,41 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function pair<A, B>(a: A, b: B): [A, B] {\n  return [a, b];\n}\n\nconst p = pair("年齡", 30);\n// 編輯器顯示 p 的型別是？',
-          predict: { q: 'p 的型別是？', options: ['[string, number]', '[any, any]', '(string | number)[]'], answer: 0 },
           output: 'const p: [string, number]',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'gen', label: '適合泛型' }, { id: 'plain', label: '一般型別就好' }],
-          items: [
-            { text: '回傳陣列最後一個元素的函式', answer: 'gen', why: '輸出型別跟著輸入陣列的元素型別。' },
-            { text: '計算兩個數字平均的函式', answer: 'plain', why: '永遠是 number。' },
-            { text: 'API 回應的外層包裝 `{ ok, data }`', answer: 'gen', why: 'data 的型別依 API 而不同。' },
-            { text: '把字串轉成大寫的函式', answer: 'plain', why: '永遠是 string。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['回傳陣列最後一個元素的函式', '適合泛型', '輸出型別跟著輸入陣列的元素型別。'],
+          ['計算兩個數字平均的函式', '一般型別就好', '永遠是 number。'],
+          ['API 回應的外層包裝 `{ ok, data }`', '適合泛型', 'data 的型別依 API 而不同。'],
+          ['把字串轉成大寫的函式', '一般型別就好', '永遠是 string。']
+        ] },
         { type: 'svg', svg: Fig.stack('泛型推斷的過程：呼叫 first(["a", "b"])；TypeScript 比對參數型別 T[] 與引數 string[]；推出 T 是 string；回傳型別 T | undefined 變成 string | undefined', [
           { title: '呼叫 first(["a", "b"])' },
           { title: '比對 T[] 與 string[]', tone: 3 },
           { title: '推出 T = string', tone: 2 },
           { title: '回傳 string | undefined', tone: 4 },
         ]), caption: '推斷不出來或推錯時，才自己寫 `first<string>(…)`。' },
+        { type: 'heading', id: 'deep-inference-tools', text: '深入：推斷的候選與控制推斷的工具' },
+        '同一個 T 出現在多個參數時，TypeScript 會收集候選再挑一個：`function same<T>(a: T, b: T)` 呼叫 `same(1, "x")` 時 T 推成 number，第二個引數報 TS2345，而不是自動變成 `number | string`。',
+        { type: 'table', head: ['工具', '版本', '用途'], rows: [
+          ['`<const T>`', 'TS 5.0', '像 as const 一樣推出最精確的字面型別，呼叫端不用自己加 as const'],
+          ['`NoInfer<T>`', 'TS 5.4', '指定某個參數「不參與推斷」，例如預設值不該把 T 擴大'],
+          ['`<T = unknown>`', '—', '型別參數的預設值，推不出來時使用'],
+        ] },
+        '什麼時候不用泛型：型別參數只出現一次、或函式對所有輸入做完全相同的事又不回傳它，用 unknown 或具體型別更好讀。',
       ],
-      tryit: {
-        q: ['寫一個泛型函式 `last`，回傳陣列最後一個元素：'],
-        draft: 'function last____(items: readonly ____[]): T | undefined {\n  return items[items.length - 1];\n}',
-        answer: ['`function last<T>(items: readonly T[]): T | undefined`。', '也可以寫 `items.at(-1)`，它的回傳型別本來就是 `T | undefined`。'],
-      },
     },
     mistakes: [
       { wrong: '泛型參數只出現一次：`function log<T>(x: T): void`。', why: 'T 沒有連結任何其他型別，等於 unknown，泛型沒有意義。', right: '改成 `(x: unknown): void`。' },
       { wrong: '每次呼叫都手寫型別參數 `first<string>(names)`。', why: '推斷做得到，手寫只是重複。', right: '交給推斷，推不出來時才寫。' },
       { wrong: '泛型函式裡 `return {} as T`。', why: '騙過檢查器，呼叫端拿到的不是真正的 T。', right: '讓呼叫端傳入需要的值或工廠函式。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '泛型相較於 any 最大的好處是？', options: [
-        { text: '保留輸入與輸出之間的型別關係', correct: true, why: '輸出型別跟著輸入走。' },
-        { text: '執行比較快，因為泛型會在編譯時展開', why: '型別不影響執行。' },
-        { text: '可以放任何型別', why: 'any 也可以，差別是型別資訊有沒有保留。' },
-        { text: '不需要寫型別', why: '兩者都可能不寫。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function wrap<T>(x: T) { return { value: x }; }`，`wrap(5)` 的型別是？', options: [
-        { text: '`{ value: number }`', correct: true, why: 'T 推斷為 number。' },
-        { text: '`{ value: 5 }`', why: '一般參數位置會放寬成 number（除非用 const 型別參數）。' },
-        { text: '`{ value: any }`', why: '泛型保留了型別。' },
-        { text: '`{ value: T }`', why: 'T 在呼叫時已經被決定。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['`Promise<T>` 也是泛型型別。`async function getUser(): Promise<User>` 中的 T 代表什麼？為什麼 await 之後就是 User？'], answer: [
-        'T 是「Promise 完成時會給你的值」的型別；Promise<User> 表示將來會得到 User。',
-        'await 的型別規則就是「取出 Promise<T> 的 T」，所以 `const u = await getUser()` 的 u 是 User。6-3 會再談 fetch 的 Promise 型別。',
-      ] },
-    ],
     keypoints: [
       '泛型讓輸出型別跟著輸入型別走，是 any 的正確替代。',
       '型別參數大多由引數推斷，不用手寫。',
       '泛型參數至少要出現兩次（連結輸入與輸出）才有意義。',
     ],
-    sources: ['ts-generics'],
+    sources: ['ts-generics', 'ts-50', 'ts-54'],
   },
 
   '3-2': {
@@ -130,14 +103,6 @@ defineLessons({
       '用 extends 約束型別參數',
       '用 keyof 與 T[K] 寫出安全的屬性存取',
       '寫一個只接受物件實際屬性名的函式',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-1）`function f<T>(x: T): void` 的問題是？', options: [
-        { text: 'T 只出現一次，沒有連結任何東西', correct: true, why: '直接寫 unknown 就好。' },
-        { text: '語法錯誤', why: '合法。' },
-        { text: 'void 不能和泛型一起用', why: '可以。' },
-        { text: 'T 一定要寫約束', why: '約束不是必須。' },
-      ] },
     ],
     analogy: {
       text: ['約束像餐廳的「需穿著正式服裝」：什麼人都可以來（泛型），但一定要穿西裝（有某個屬性），服務生才能幫你掛外套。keyof 像衣帽間的號碼牌清單：只能領清單上有的號碼。'],
@@ -176,26 +141,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Product = { id: number; title: string; price: number };\ntype Keys = keyof Product;\ntype PriceType = Product["price"];\ntype IdOrTitle = Product["id" | "title"];\n\n// 這三個型別分別是？',
-          predict: { q: 'IdOrTitle 是？', options: ['number | string', '"id" | "title"', 'Product'], answer: 0 },
           output: 'type Keys = "id" | "title" | "price"\ntype PriceType = number\ntype IdOrTitle = number | string',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '符合 T extends { length: number }' }, { id: 'no', label: '不符合' }],
-          items: [
-            { text: '`"hello"`', answer: 'ok', why: 'string 有 length。' },
-            { text: '`[1, 2, 3]`', answer: 'ok', why: '陣列有 length。' },
-            { text: '`42`', answer: 'no', why: 'number 沒有 length。' },
-            { text: '`{ length: 5, name: "x" }`', answer: 'ok', why: '結構符合：有 number 型別的 length。' },
-            { text: '`{ size: 5 }`', answer: 'no', why: '沒有 length。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`"hello"`', '符合 T extends { length: number }', 'string 有 length。'],
+          ['`[1, 2, 3]`', '符合 T extends { length: number }', '陣列有 length。'],
+          ['`42`', '不符合', 'number 沒有 length。'],
+          ['`{ length: 5, name: "x" }`', '符合 T extends { length: number }', '結構符合：有 number 型別的 length。'],
+          ['`{ size: 5 }`', '不符合', '沒有 length。']
+        ] },
         { type: 'svg', svg: Fig.vs('約束的雙向作用：對呼叫端，限制只能傳符合條件的型別；對函式內部，保證可以使用約束中的屬性', { title: '對呼叫端', lines: ['只能傳有 length 的', '`longest(1, 2)` 報錯'], tone: 3 }, { title: '對函式內部', lines: ['可以安心用', '`a.length`'], tone: 4 }), caption: '約束既是限制，也是保證。' },
+        { type: 'heading', id: 'deep-keyof-edges', text: '深入：Object.keys 為什麼不是 keyof T' },
+        '`Object.keys(user)` 的型別是 `string[]`，不是 `(keyof User)[]`。原因是結構型別：型別說是 User 的物件，執行時可能多帶其他屬性（1-3），回傳 keyof User 會是謊言。',
+        { type: 'table', head: ['情況', 'keyof 的結果', '注意'], rows: [
+          ['`keyof (A | B)`', '只有 A、B 共有的鍵', '聯合只能確定共同的部分'],
+          ['`keyof { [k: string]: X }`', '`string | number`', '因為 obj[1] 會被轉成 obj["1"]'],
+          ['寫入 `obj[k] = v`，k 是 `keyof T` 聯合', 'v 要符合所有屬性型別的交集', '用 `<K extends keyof T>(k: K, v: T[K])` 才安全'],
+        ] },
+        '確定物件沒有額外屬性時，可以寫 `(Object.keys(o) as (keyof typeof o)[])`，但這是斷言，要自己負責。',
       ],
-      tryit: {
-        q: ['寫一個 pluck：從物件陣列取出某個欄位的所有值，回傳型別要正確：'],
-        draft: 'function pluck<T, K extends ____ T>(items: T[], key: K): ____[] {\n  return items.map((it) => it[key]);\n}\n\nconst names = pluck(users, "name");   // string[]',
-        answer: ['`K extends keyof T`、回傳 `T[K][]`。', '傳 "id" 會得到 number[]，傳 "name" 得到 string[]，完全由 key 決定。'],
-      },
     },
     mistakes: [
       { wrong: '泛型函式裡直接存取 `x.length`，沒有約束。', why: 'TS2339：T 不一定有 length。', right: '`<T extends { length: number }>`。' },
@@ -203,19 +167,7 @@ defineLessons({
       { wrong: '以為 `keyof` 只會給字串。', why: '陣列、有索引簽章的型別會包含 number。', right: '只要字串鍵時寫 `Extract<keyof T, string>` 或 `keyof T & string`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`keyof { a: number; b: string }` 是？', options: [
-        { text: '`"a" | "b"`', correct: true, why: '所有鍵的字面型別聯合。' },
-        { text: '`number | string`', why: '那是值的型別，用 `T[keyof T]`。' },
-        { text: '`string`', why: '更精確，是字面型別聯合。' },
-        { text: '`["a", "b"]`', why: 'keyof 產生聯合，不是 tuple。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function f<T extends string>(x: T)`，哪個呼叫會報錯？', options: [
-        { text: '`f(1)`', correct: true, why: 'number 不符合 string 約束。' },
-        { text: '`f("a")`', why: '符合。' },
-        { text: '`f("a" as const)`', why: '字面型別是 string 的子型別，符合。' },
-        { text: '`f(String(1))`', why: '回傳 string，符合。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['表單函式庫常有 `register("email")` 這種 API，打錯欄位名會在編譯時報錯。它大概是怎麼用這課的工具做到的？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['表單函式庫常有 `register("email")` 這種 API，打錯欄位名會在編譯時報錯。它大概是怎麼用這課的工具做到的？'], answer: [
         '表單元件帶一個泛型 `TForm`（表單資料型別），`register` 的參數型別是 `keyof TForm`（巢狀欄位時用樣板字面型別產生 "address.city" 這種路徑，4-4）。',
         '所以只能傳存在的欄位名，回傳的值型別也能用 `TForm[K]` 精確推出。',
       ] },
@@ -233,14 +185,6 @@ defineLessons({
       '使用 Partial、Required、Readonly',
       '用 Pick、Omit 從既有型別衍生新型別',
       '用 Record 與 ReturnType 減少重複定義',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）`User["name"]` 取出的是？', options: [
-        { text: 'name 屬性的型別', correct: true, why: '索引存取型別。' },
-        { text: '字串 "name"', why: '那是字面型別 "name"。' },
-        { text: 'User 的所有鍵', why: '那是 keyof User。' },
-        { text: '執行時的 name 值', why: '這是型別層面的運算。' },
-      ] },
     ],
     analogy: {
       text: ['工具型別像影印機的功能鍵：「全部改成選填」（Partial）、「只印這幾欄」（Pick）、「遮掉密碼欄」（Omit）。原本的表格只有一份，需要不同版本時按一下就產生，不用重畫。'],
@@ -279,48 +223,31 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Status = "draft" | "published" | "archived";\nconst labels: Record<Status, string> = {\n  draft: "草稿",\n  published: "已發布",\n};',
-          predict: { q: 'tsc 會怎樣？', options: ['報錯：缺少 archived', '通過', '報錯：Record 不能用字面型別'], answer: 0 },
           output: "!app.ts:2:7 - error TS2741: Property 'archived' is missing in type '{ draft: string; published: string; }' but required in type 'Record<Status, string>'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'partial', label: 'Partial' }, { id: 'omit', label: 'Omit' }, { id: 'pick', label: 'Pick' }, { id: 'record', label: 'Record' }],
-          items: [
-            { text: 'PATCH API：只傳要修改的欄位', answer: 'partial', why: '全部變可選。' },
-            { text: '回傳給前端時去掉 passwordHash', answer: 'omit', why: '去掉特定欄位。' },
-            { text: '下拉選單只需要 id 和 label', answer: 'pick', why: '只保留需要的欄位。' },
-            { text: '每種語言對應一段翻譯文字', answer: 'record', why: '鍵是語言代碼聯合。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['PATCH API：只傳要修改的欄位', 'Partial', '全部變可選。'],
+          ['回傳給前端時去掉 passwordHash', 'Omit', '去掉特定欄位。'],
+          ['下拉選單只需要 id 和 label', 'Pick', '只保留需要的欄位。'],
+          ['每種語言對應一段翻譯文字', 'Record', '鍵是語言代碼聯合。']
+        ] },
         { type: 'svg', svg: Fig.vs('Pick 與 Omit 的差別：Pick 列出要保留的鍵，鍵打錯會報錯；Omit 列出要移除的鍵，鍵打錯不會報錯，要小心', { title: 'Pick<T, K>', lines: ['列出要留的', '打錯會報錯'], tone: 4 }, { title: 'Omit<T, K>', lines: ['列出要去掉的', '打錯不報錯'], tone: 2 }), caption: 'Omit 的 K 只要求是 string，所以 `Omit<User, "pasword">` 不會提醒你拼錯。' },
+        { type: 'heading', id: 'deep-utility-edges', text: '深入：工具型別的兩個陷阱' },
+        '第一，工具型別都是「淺」的：`Partial<User>` 只讓第一層可選，`address.city` 仍是必填；`Readonly` 也一樣。需要深層版本時要自己寫遞迴型別，或確認是不是真的需要。',
+        '第二，`Omit` 對聯合不會分配：`Omit<Cat | Dog, "id">` 只留下兩者共有的屬性，可辨識聯合的差異欄位全部消失。要保留時用分配版本：',
+        { type: 'code', lang: 'typescript', title: 'distributive-omit.ts', code: 'type DistributiveOmit<T, K extends PropertyKey> =\n  T extends unknown ? Omit<T, K> : never;\n\ntype Shape = { kind: "circle"; r: number; id: string } | { kind: "square"; size: number; id: string };\ntype NewShape = DistributiveOmit<Shape, "id">;   // 兩個成員都保留 r／size' },
+        { type: 'table', head: ['其他常用工具型別', '用途'], rows: [
+          ['`Parameters<F>`', '取出函式參數的 tuple，包裝函式時沿用原參數'],
+          ['`InstanceType<typeof C>`', '從類別建構子取出實例型別'],
+          ['`Awaited<T>`', '拆開（巢狀的）Promise'],
+          ['`NoInfer<T>`', '阻止推斷（TS 5.4）'],
+        ] },
       ],
-      tryit: {
-        q: ['為「更新商品」定義輸入型別：id 不能改、其他欄位都選填：'],
-        draft: 'interface Product { id: number; title: string; price: number }\ntype ProductPatch = ____<____<Product, "id">>;',
-        answer: ['`Partial<Omit<Product, "id">>`。', '由內往外讀：先去掉 id，再把剩下的變成可選。'],
-      },
     },
     mistakes: [
       { wrong: '為每個 API 手寫一份幾乎一樣的型別。', why: '欄位一多就不同步。', right: '從核心型別用 Pick、Omit、Partial 衍生。' },
       { wrong: '`Omit<User, "pasword">` 拼錯沒發現。', why: 'Omit 不檢查鍵是否存在。', right: '仔細檢查，或自訂 `StrictOmit<T, K extends keyof T>`。' },
       { wrong: '用 `Record<string, V>` 表示「固定幾個鍵」。', why: '任何字串鍵都可以，讀取時也不提醒鍵可能不存在。', right: '鍵是固定集合時用字面聯合：`Record<"a" | "b", V>`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`Partial<{ a: number; b: string }>` 是？', options: [
-        { text: '`{ a?: number; b?: string }`', correct: true, why: '所有屬性變可選。' },
-        { text: '`{ a: number }`', why: '那像是 Pick。' },
-        { text: '`{ a: number | undefined; b: string | undefined }` 而且必填', why: 'Partial 是加上 `?`。' },
-        { text: '`{}`', why: '屬性仍在，只是可選。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要確保每個 Status 都有對應的顏色，最適合的型別是？', options: [
-        { text: '`Record<Status, string>`', correct: true, why: '缺少任何一個狀態都會報錯。' },
-        { text: '`Record<string, string>`', why: '不會檢查缺少哪個狀態。' },
-        { text: '`Partial<Record<Status, string>>`', why: '全部變可選，就不會檢查缺漏了。' },
-        { text: '`string[]`', why: '無法對應狀態。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你用一個函式 `buildConfig()` 產生設定物件，想讓其他地方使用它的型別，但不想手寫一份 interface。怎麼做？'], answer: [
-        '`type Config = ReturnType<typeof buildConfig>;`：從函式回傳值推出型別。如果函式是 async，用 `Awaited<ReturnType<typeof buildConfig>>`。',
-        '好處是單一來源；缺點是型別由實作決定，實作改壞時型別跟著變。公開 API 仍建議明確定義介面。',
-      ] },
     ],
     keypoints: [
       '從核心型別用 Partial、Pick、Omit、Record 衍生，避免重複定義。',
@@ -336,17 +263,9 @@ defineLessons({
       '用 satisfies 檢查物件又不失去推斷',
       '分辨型別註記、as、satisfies 三者',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-3）`Record<Status, string>` 少寫一個狀態時會？', options: [
-        { text: '編譯錯誤：缺少屬性', correct: true, why: '每個鍵都必須有值。' },
-        { text: '自動補上空字串', why: '不會自動補值。' },
-        { text: '沒有錯誤', why: 'Record 會檢查。' },
-        { text: '執行時錯誤', why: '是編譯時。' },
-      ] },
-    ],
     analogy: {
       text: ['型別註記像穿上制服：所有人看起來都一樣（型別變成註記的那個），個人特色不見了。satisfies 像門口的服裝檢查：確認你符合規定就放行，但你還是穿著自己的衣服（保留精確型別）。as 像對保全說「我是員工」，他就不檢查了。'],
-      limit: ['服裝檢查只看規定的部分；satisfies 不會限制「多出來」的屬性（直接寫字面值時仍會做多餘屬性檢查）。'],
+      limit: ['服裝檢查員看不到你包包裡的東西；satisfies 也只在編譯時檢查程式碼裡寫死的值，從檔案或 API 讀進來的設定一樣要在執行時驗證（6-2）。'],
     },
     model: {
       svg: Fig.row('三種寫法的比較：型別註記 const c: Config 會檢查，但變數型別變成 Config、失去精確性；as Config 不檢查、直接相信；satisfies Config 會檢查，而且保留推斷出的精確型別', [
@@ -381,29 +300,28 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const a = ["red", "green"];\nconst b = ["red", "green"] as const;\n\ntype A = (typeof a)[number];\ntype B = (typeof b)[number];\n// A 和 B 分別是？',
-          predict: { q: 'B 是？', options: ['"red" | "green"', 'string', 'readonly string[]'], answer: 0 },
           output: 'type A = string\ntype B = "red" | "green"',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'sat', label: 'satisfies' }, { id: 'const', label: 'as const' }, { id: 'ann', label: '型別註記' }],
-          items: [
-            { text: '設定檔物件：要檢查格式，又要保留每個鍵的精確型別', answer: 'sat', why: '檢查 + 保留推斷。' },
-            { text: '從陣列 ["S", "M", "L"] 產生聯合型別', answer: 'const', why: '保留字面型別。' },
-            { text: '函式參數 `user: User`', answer: 'ann', why: '參數只能用註記。' },
-            { text: '變數之後會被重新指定成其他 User', answer: 'ann', why: '需要的就是寬一點的 User 型別。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['設定檔物件：要檢查格式，又要保留每個鍵的精確型別', 'satisfies', '檢查 + 保留推斷。'],
+          ['從陣列 ["S", "M", "L"] 產生聯合型別', 'as const', '保留字面型別。'],
+          ['函式參數 `user: User`', '型別註記', '參數只能用註記。'],
+          ['變數之後會被重新指定成其他 User', '型別註記', '需要的就是寬一點的 User 型別。']
+        ] },
         { type: 'svg', svg: Fig.stack('從常數陣列產生型別的步驟：寫常數陣列並加上 as const；用 typeof 取得陣列的型別；用 [number] 取出元素型別，得到字面聯合；執行時也能用這個陣列做下拉選單', [
           { title: '1. const SIZES = ["S", "M", "L"] as const', tone: 1 },
           { title: '2. typeof SIZES → readonly ["S", "M", "L"]', tone: 3 },
           { title: '3. (typeof SIZES)[number] → "S" | "M" | "L"', tone: 4 },
         ]), caption: '值與型別只寫一次：執行時用陣列，編譯時用聯合型別。' },
+        { type: 'heading', id: 'deep-satisfies-edges', text: '深入：satisfies 的細節與不該用的時候' },
+        'satisfies 也會做多餘屬性檢查，所以設定物件打錯鍵名一樣會被抓到。它會把目標型別當成「上下文」，所以 `theme.primary` 能保留 `"#0071e3"` 這種字面型別；加上 `as const satisfies Theme` 則連屬性都變唯讀。',
+        { type: 'table', head: ['需求', '用', '原因'], rows: [
+          ['變數之後會重新指定成其他值', '型別註記', 'satisfies 推出的型別太窄，重新指定時會報錯'],
+          ['函式庫匯出的公開常數', '型別註記', '.d.ts 裡的型別穩定，不會隨實作細節改變'],
+          ['設定檔、對照表、路由表', 'satisfies', '檢查 + 保留精確鍵名'],
+          ['已經驗證過、但 TS 推不出來的值', 'as（附註解）', '唯一不做檢查的選項'],
+        ] },
       ],
-      tryit: {
-        q: ['讓 config 被檢查符合 Config，同時 `config.port` 的型別保持 8080（字面型別）：'],
-        draft: 'type Config = { port: number; host: string };\nconst config = { port: 8080, host: "localhost" } ____ ____ Config;',
-        answer: ['`as const satisfies Config`。', 'as const 讓 port 保留 8080 字面型別並唯讀；satisfies 檢查結構符合 Config。順序是先 as const 再 satisfies。'],
-      },
     },
     mistakes: [
       { wrong: '用 `as Config` 代替 satisfies。', why: 'as 不檢查，少了屬性也不報錯。', right: '`satisfies Config`。' },
@@ -411,19 +329,7 @@ defineLessons({
       { wrong: '`as const` 之後想 push。', why: '已經是 readonly tuple。', right: '需要修改就複製一份 `[...SIZES]`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一個「不會」檢查值是否符合型別？', options: [
-        { text: '`value as Config`', correct: true, why: 'as 是斷言，不檢查。' },
-        { text: '`const c: Config = value`', why: '註記會檢查。' },
-        { text: '`value satisfies Config`', why: 'satisfies 會檢查。' },
-        { text: '把 value 傳給參數型別是 Config 的函式', why: '傳參數時會檢查。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`const c = { mode: "dark" } satisfies { mode: string }`，c.mode 的型別是？', options: [
-        { text: '`string`', correct: true, why: '物件屬性預設會放寬；要保留 "dark" 需加 as const。' },
-        { text: '`"dark"`', why: '沒有 as const 時屬性會被放寬成 string。' },
-        { text: '`{ mode: string }`', why: '那是整個物件的型別。' },
-        { text: '`any`', why: '有推斷。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['Vite、ESLint 等工具的設定檔常寫成 `export default { … } satisfies UserConfig`。和 `defineConfig({ … })` 相比，satisfies 的好處是什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['Vite、ESLint 等工具的設定檔常寫成 `export default { … } satisfies UserConfig`。和 `defineConfig({ … })` 相比，satisfies 的好處是什麼？'], answer: [
         '兩者都能檢查設定格式並提供自動完成。defineConfig 是工具提供的函式（執行時也會被呼叫）；satisfies 純粹是型別層面的檢查，不需要額外函式。',
         'satisfies 還保留設定物件的精確型別，其他檔案 import 這份設定時能拿到實際的值型別，而不是寬鬆的 UserConfig。',
       ] },

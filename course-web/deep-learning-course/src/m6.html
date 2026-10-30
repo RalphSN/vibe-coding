@@ -7,23 +7,11 @@ defineTerms({
   '隱藏狀態': { en: 'hidden state', def: 'RNN 用來記住「到目前為止讀了什麼」的向量；每讀一個 token 就更新一次。', example: 'h₃ 包含前三個字的資訊。', lesson: '6-1' },
   '長距離依賴': { en: 'long-range dependency', def: '句子裡相隔很遠的兩個字之間的關係，例如開頭的主詞決定結尾的動詞形式。', example: '「那些我昨天在市場遇到的人…都很友善」。', lesson: '6-2' },
   'LSTM': { en: 'long short-term memory', def: '加了「閘門」的 RNN：用遺忘閘、輸入閘、輸出閘控制記憶要保留、寫入、輸出多少，比較能記住遠處的資訊。Hochreiter、Schmidhuber 1997。', example: '2010 年代翻譯、語音常用。', lesson: '6-2' },
+  '沿時間反向傳播': { en: 'backpropagation through time, BPTT', def: '把 RNN 在時間上展開成一排，再做一般的反向傳播；梯度每往回一步都乘上同一個遞迴權重。', example: '截斷的 BPTT 每 k 步停止往回傳。', lesson: '6-1' },
+  'FlashAttention': { en: 'FlashAttention', def: '把 attention 切成小塊在 GPU 快取裡算完、不存整個 n×n 分數矩陣的實作；結果不變，記憶體大幅下降。Dao 等 2022。', example: 'PyTorch 的 scaled_dot_product_attention 可以用到這類核心。', lesson: '6-3' },
   '平行化': { en: 'parallelization', def: '很多計算同時做，不必等前一個做完；GPU 擅長這件事。', example: 'Transformer 訓練時整句一起算。', lesson: '6-3' },
 });
 
-const REVIEW_M5 = [
-  { level: '回想', type: 'mc', q: '（回顧 5-3）ResNet 讓很深的網路訓練得動，靠的是？', options: [
-    { text: '殘差連接', correct: true, why: '輸出＝x＋F(x)。' },
-    { text: '更大的卷積核', why: '不是關鍵。' },
-    { text: '拿掉所有激活函數', why: '會變成線性。' },
-    { text: '只用一層', why: '它做到 152 層。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 4-4）梯度消失的原因是？', options: [
-    { text: '小於 1 的局部梯度一路相乘', correct: true, why: '越乘越小。' },
-    { text: '學習率太大', why: '那常導致爆炸。' },
-    { text: '資料太多', why: '無關。' },
-    { text: '批次太大', why: '無關。' },
-  ] },
-];
 
 const RNN_SVG = `<svg viewBox="0 0 560 230" role="img" aria-label="RNN 展開：同一個單元一個時間點讀一個字，隱藏狀態 h 從左傳到右，每一步都用同一組權重">
   ${['我', '愛', '台', '北'].map((t, i) => `
@@ -42,7 +30,6 @@ defineLessons({
       '用互動算出一串輸入的隱藏狀態',
       '說出 RNN 為什麼一定要一步接一步算',
     ],
-    review: REVIEW_M5,
     analogy: {
       text: ['聽人講話時，你邊聽邊在腦中更新一段「目前的理解」：聽到下一個字，就用它修改理解，然後忘掉字本身，只留下理解。', '[[RNN]] 就是這樣讀文字：一次一個 token，把它和上一步的[[隱藏狀態]]混在一起，算出新的隱藏狀態。整句讀完，最後的 h 就是它對整句話的「摘要」。'],
       limit: ['你的理解可以很豐富，RNN 的 h 是一個固定長度的向量：一句話越長，要塞進同樣大小的空間，前面的細節就越容易被擠掉（6-2）。'],
@@ -74,12 +61,11 @@ defineLessons({
           ['計算順序', '必須等上一步的 h 算完', '可以全部同時算'],
         ] },
         { type: 'code', lang: 'python', title: 'RNN 一步一步讀（示意，NumPy）', code: 'import numpy as np\nW = np.random.randn(16, 8) * 0.1   # 輸入 8 維 → 隱藏 16 維\nU = np.random.randn(16, 16) * 0.1\nb = np.zeros(16)\n\nh = np.zeros(16)\nfor x in sequence:                  # sequence 是一串 8 維向量\n    h = np.tanh(W @ x + U @ h + b)  # 一定要等上一個 h 算完\nsummary = h                         # 整句話的「摘要」' },
+        { type: 'heading', id: 'bptt', text: '深入：RNN 怎麼訓練：沿時間反向傳播' },
+        'RNN 展開成一排之後，就是一個深度等於序列長度的網路。訓練用[[沿時間反向傳播]]：梯度從最後一步一路往回傳，每經過一步都乘上同一個 U。',
+        '因為每一步乘的是同一個矩陣，梯度大小大約跟著 U 最大特徵值的 T 次方走：小於 1 就消失，大於 1 就爆炸（6-2）。一般深網路每層權重不同，還有機會互相抵消；RNN 沒有。',
+        '序列很長時常用截斷的 BPTT：每 k 步就停止往回傳梯度，但隱藏狀態照樣往後帶。省記憶體，代價是模型很難學到超過 k 步的依賴。',
       ],
-      tryit: {
-        q: ['W＝1、U＝0.8，手算 h₁ 和 h₂（輸入 1、0，起點 h₀＝0）。'],
-        draft: 'h₁ ＝ ＿\nh₂ ＝ ＿',
-        answer: ['h₁ ＝ tanh(1×1 ＋ 0.8×0) ＝ tanh(1) ≈ 0.762。', 'h₂ ＝ tanh(1×0 ＋ 0.8×0.762) ＝ tanh(0.609) ≈ 0.544。可以用拉桿核對。'],
-      },
     },
     mistakes: [
       { wrong: '以為 RNN 每個時間點有不同的權重。', why: '同一組 W、U 用在每一步。', right: '權重共享，所以可以處理任意長度。' },
@@ -87,19 +73,7 @@ defineLessons({
       { wrong: '以為最後的 h 完整保存了整句話。', why: '固定大小的向量裝不下長句的所有細節。', right: '前面的資訊會被稀釋（6-2）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'RNN 的隱藏狀態怎麼更新？', options: [
-        { text: '用這一步的輸入和上一步的 h', correct: true, why: 'hₜ＝tanh(Wxₜ＋Uhₜ₋₁＋b)。' },
-        { text: '只看這一步的輸入', why: '那就沒有記憶。' },
-        { text: '把整句話一次讀進來', why: '一次讀一個。' },
-        { text: '隨機產生新的值', why: '是確定的計算。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一句 100 個字，RNN 至少要依序算幾步？', options: [
-        { text: '100', correct: true, why: '每個字一步。' },
-        { text: '1，一次算完', why: '要依序。' },
-        { text: '10，每 10 個字一步', why: '每個字都要。' },
-        { text: '100 的平方', why: '那是 attention 的配對數。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 RNN 的「權重共享」和 CNN 的「權重共享」是類似的想法？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 RNN 的「權重共享」和 CNN 的「權重共享」是類似的想法？'], answer: [
         'CNN 在空間上共享：同一個卷積核用在圖片每個位置。RNN 在時間上共享：同一組 W、U 用在每個時間點。',
         '兩者都假設「同樣的規律可能出現在任何位置」，因此參數少、又能處理不同大小的輸入。',
       ] },
@@ -117,20 +91,6 @@ defineLessons({
       '解釋 RNN 為什麼記不住遠處的資訊',
       '說出 LSTM 的閘門在做什麼',
       '說明 LSTM 改善了什麼、沒解決什麼',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-1）RNN 為什麼不能整句一起算？', options: [
-        { text: '每一步都需要上一步的 h', correct: true, why: '依序相依。' },
-        { text: '因為權重每一步都不同', why: '權重共享。' },
-        { text: '因為 GPU 不支援', why: '是演算法限制。' },
-        { text: '因為 tanh 太慢', why: '不是主因。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 3-2）鏈鎖律串連時是？', options: [
-        { text: '相乘', correct: true, why: '一路乘。' },
-        { text: '相加', why: '分岔才相加。' },
-        { text: '相減', why: '不是。' },
-        { text: '取最大', why: '不是。' },
-      ] },
     ],
     analogy: {
       text: ['傳話遊戲：第一個人說的話，經過 30 個人之後幾乎面目全非。每個人都只聽前一個人，每傳一次就損失一點。', 'RNN 的資訊（和訓練時的梯度）也是這樣一步一步傳：每一步都乘上一些小於 1 的數，距離一遠就消失了，[[長距離依賴]]很難學。[[LSTM]] 加了一條「記憶帶」和三個閘門，讓重要的資訊可以幾乎不變地往後傳。'],
@@ -175,42 +135,23 @@ defineLessons({
           <text x="280" y="148" text-anchor="middle" font-size="14">「都」要和遠處的「那些…人」對應</text>
           <text x="280" y="172" text-anchor="middle" font-size="13">RNN 要把這個資訊一路傳過 7 步</text>
         </svg>`, caption: '中文、英文都有很多這種關係；句子越長越難。' },
+        { type: 'heading', id: 'gru', text: '深入：GRU，以及 LSTM 的實務細節' },
+        'GRU（Cho 等 2014）把 LSTM 的三個閘門簡化成兩個（更新閘、重置閘），也沒有分開的記憶帶。權重組數從 4 組變 3 組，參數少約四分之一；很多任務上兩者表現接近，沒有一定誰比較好。',
+        '一個常見細節：把遺忘閘的偏差初始化成 1，讓模型一開始預設「記住」，訓練比較穩（Jozefowicz 等 2015 的大規模比較）。',
+        '翻譯時，LSTM 編碼器要把整句壓成一個固定長度的向量交給解碼器，句子一長品質就掉。Bahdanau 等 2014 的 attention 讓解碼器每一步都能回頭看編碼器的每個位置，這就是 6-3 的起點。',
       ],
-      tryit: {
-        q: ['倍數 0.7、距離 20 步，一般 RNN 剩多少？遺忘閘 0.98、距離 20 步，LSTM 剩多少？'],
-        draft: 'RNN：＿\nLSTM：＿',
-        answer: ['0.7²⁰ ≈ 0.0008。', '0.98²⁰ ≈ 0.668。差了將近一千倍：這就是 LSTM 能記得比較遠的原因（簡化示意）。'],
-      },
     },
     mistakes: [
       { wrong: '以為 LSTM 完全解決了長距離問題。', why: '它改善很多，但仍要一步步傳，而且不能平行。', right: 'Transformer 用 attention 直接連接（6-3）。' },
       { wrong: '以為閘門是人設定的開關。', why: '閘門的值是根據輸入算出來的，權重是訓練學的。', right: '模型自己學會什麼時候該記、該忘。' },
       { wrong: '以為梯度只會消失不會爆炸。', why: '倍數大於 1 時會爆炸。', right: '常搭配梯度裁剪（4-4）。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'LSTM 的遺忘閘決定什麼？', options: [
-        { text: '舊記憶要保留多少', correct: true, why: '接近 1 幾乎全留。' },
-        { text: '要寫入多少新資訊', why: '那是輸入閘。' },
-        { text: '這一步輸出多少', why: '那是輸出閘。' },
-        { text: '學習率', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'RNN 每步倍數 1.1，距離 50 步，梯度大約？', options: [
-        { text: '變得很大（約 117 倍）', correct: true, why: '1.1⁵⁰ ≈ 117。' },
-        { text: '變得很小', why: '大於 1 會變大。' },
-        { text: '剛好不變', why: '要等於 1 才不變。' },
-        { text: '變成 0', why: '不會。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['LSTM 的記憶帶和第二部的殘差連接有什麼共同點？'], answer: [
-        '兩者都提供一條「幾乎不被改變」的直通路：殘差是 x＋F(x)，LSTM 記憶帶是 c × 遺忘閘 ＋ 新資訊。',
-        '目的都是讓資訊與梯度能穿過很多步而不消失。',
-      ] },
-    ],
     keypoints: [
       'RNN 一步步傳，遠處的資訊與梯度會消失或爆炸。',
       'LSTM 用記憶帶與閘門，讓資訊傳得遠很多。',
       'LSTM 仍要依序計算，不能平行。',
     ],
-    sources: ['lstm', 'bahdanau'],
+    sources: ['lstm', 'bahdanau', 'gru', 'jozefowicz'],
   },
 
   '6-3': {
@@ -218,20 +159,6 @@ defineLessons({
       '比較 RNN 與 attention 在「兩個字之間的距離」',
       '說明 Transformer 為什麼能平行訓練',
       '說出 attention 付出的代價',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-2）LSTM 還沒解決的問題？', options: [
-        { text: '仍要依序計算，不能平行', correct: true, why: '一步接一步。' },
-        { text: '完全記不住任何東西', why: '比 RNN 好很多。' },
-        { text: '沒有可學的參數', why: '有很多參數。' },
-        { text: '只能處理圖片', why: '它處理序列。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 5-1）權重共享的好處？', options: [
-        { text: '參數少、可用在任何位置', correct: true, why: 'CNN 與 RNN 都是。' },
-        { text: '讓模型完全不需要訓練', why: '還是要訓練。' },
-        { text: '讓輸出一定更大', why: '無關。' },
-        { text: '讓梯度不會消失', why: '不是這個效果。' },
-      ] },
     ],
     analogy: {
       text: ['RNN 像傳話：第 1 個人的話要經過 99 個人才傳到第 100 個人。attention 像群組聊天：第 100 個人可以直接往上翻，看第 1 個人說了什麼。', 'Bahdanau 等（2014）先把 attention 加在 RNN 上做翻譯；Transformer（2017）乾脆把遞迴拿掉，只用 attention：任何兩個字之間都只差一步，而且整句可以[[平行化]]一起算。'],
@@ -256,13 +183,13 @@ defineLessons({
     ],
     examples: {
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'rnn', label: 'RNN／LSTM 的特性' }, { id: 'tf', label: 'Transformer 的特性' }], items: [
-          { text: '第 1 個字和第 100 個字之間要傳 99 步', answer: 'rnn', why: '依序傳遞。' },
-          { text: '訓練時整句的每個位置可以同時算', answer: 'tf', why: '沒有依序相依（加因果遮罩即可）。' },
-          { text: '計算量隨長度的平方成長', answer: 'tf', why: '每對都要算 attention。' },
-          { text: '記憶是一個固定大小的隱藏狀態', answer: 'rnn', why: 'h 的大小固定。' },
-          { text: '需要另外加位置資訊才知道順序', answer: 'tf', why: 'attention 本身不分順序（第二部 2-3）。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['第 1 個字和第 100 個字之間要傳 99 步', 'RNN／LSTM 的特性', '依序傳遞。'],
+          ['訓練時整句的每個位置可以同時算', 'Transformer 的特性', '沒有依序相依（加因果遮罩即可）。'],
+          ['計算量隨長度的平方成長', 'Transformer 的特性', '每對都要算 attention。'],
+          ['記憶是一個固定大小的隱藏狀態', 'RNN／LSTM 的特性', 'h 的大小固定。'],
+          ['需要另外加位置資訊才知道順序', 'Transformer 的特性', 'attention 本身不分順序（第二部 2-3）。']
+        ] },
         { type: 'table', head: ['', 'RNN／LSTM', 'Transformer'], rows: [
           ['兩個字的最遠距離', 'n 步', '1 步'],
           ['訓練時能否平行', '不能', '能（GPU 友善）'],
@@ -274,42 +201,36 @@ defineLessons({
           ${[[90, '1997', 'LSTM'], [230, '2014', 'RNN＋attention'], [370, '2017', 'Transformer'], [480, '之後', 'LLM']].map(([x, y, n]) => `<circle cx="${x}" cy="80" r="9" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="${x}" y="58" text-anchor="middle" font-size="14" font-weight="900">${y}</text><text x="${x}" y="110" text-anchor="middle" font-size="13">${n}</text>`).join('')}
           <text x="280" y="152" text-anchor="middle" font-size="13">第二部整卷講的就是最右邊這一格</text>
         </svg>`, caption: '出處：Hochreiter、Schmidhuber 1997；Bahdanau 等 2014；Vaswani 等 2017。' },
+        { type: 'widget', name: 'knobs', props: { title: '序列長度 n 的代價（實際計算，一層一個 attention 頭）', sliders: [
+          { id: 'n', label: '序列長度 n', min: 128, max: 32768, step: 128, value: 1024 },
+        ], compute: (v) => {
+          const pairs = v.n * v.n;
+          const mb = (pairs * 4) / 1e6;
+          return { rows: [
+            { label: 'RNN：必須依序算的步數', value: v.n.toLocaleString('en-US'), ratio: v.n / 32768 },
+            { label: 'RNN：第 1 個字到最後一個字的路徑', value: `${(v.n - 1).toLocaleString('en-US')} 步`, ratio: (v.n - 1) / 32768 },
+            { label: 'attention：任兩個字的路徑', value: '1 步', ratio: 1 / 32768 },
+            { label: 'attention 分數矩陣的格數 n²', value: pairs.toLocaleString('en-US'), ratio: pairs / (32768 * 32768) },
+            { label: '分數矩陣存成 float32（MB）', value: mb.toFixed(1), ratio: mb / 4295 },
+          ], note: 'n＝1,024：分數矩陣 1,048,576 格，約 4.2 MB。拉到 32,768：約 4,295 MB，一層一頭就超過 4 GB，這是 FlashAttention 不把整個矩陣存下來的原因。' };
+        } } },
+        { type: 'heading', id: 'attn-now', text: '深入：n² 的代價，現在怎麼處理' },
+        '[[FlashAttention]]（Dao 等 2022）不改變 attention 的結果，也不減少乘法次數。它把計算切成小塊在 GPU 晶片上的快取記憶體裡做完，不把 n×n 的分數矩陣寫回顯示記憶體，記憶體從和 n² 成正比降到和 n 成正比，也因為少搬資料而變快。',
+        '乘法次數的 n² 還在，所以也有人回頭做遞迴：Mamba（Gu、Dao 2023）這類狀態空間模型像 RNN 一樣用固定大小的狀態，成本隨長度線性成長，訓練時又能用平行掃描（parallel scan）在 GPU 上平行算。現在也有把 attention 層和這類層混用的混合模型。',
+        '推論時 Transformer 也有自己的「記憶」：KV 快取，存每個讀過的 token 的 key 與 value（第二部 7-2）。差別是它隨長度變大，RNN 的 h 永遠固定大小，這正是兩種架構取捨的核心。',
       ],
-      tryit: {
-        q: ['一句 1,000 個 token。RNN 訓練一次前向至少要依序算幾步？Transformer 每層的 attention 要算多少對？'],
-        draft: 'RNN：＿ 步\nTransformer：＿ 對',
-        answer: ['RNN：1,000 步，一步接一步。', 'Transformer：約 1,000 × 1,001 ÷ 2 ≈ 50 萬對（因果遮罩只算一半），但可以同時算。用平行的大量計算，換掉依序的長鏈。'],
-      },
     },
     mistakes: [
       { wrong: '以為 Transformer 處理長文完全沒有成本。', why: 'attention 的計算隨長度平方成長。', right: '長 context 很貴（第二部 7-2、第五部）。' },
       { wrong: '以為 attention 是 Transformer 才有的發明。', why: '2014 年就加在 RNN 上用了。', right: 'Transformer 的創新是「只用 attention」。' },
       { wrong: '以為 RNN 已經完全沒人用。', why: '某些即時、資源受限的場景仍有用途，也有新的遞迴架構在研究。', right: '依任務與資源選擇。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'Transformer 能平行訓練的主因？', options: [
-        { text: '拿掉了依序相依的遞迴', correct: true, why: '每個位置可以同時算。' },
-        { text: '參數比較少', why: '通常更多。' },
-        { text: '不需要反向傳播', why: '一樣需要。' },
-        { text: '只能處理短句', why: '不是原因。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'attention 中，任意兩個 token 之間的路徑長度？', options: [
-        { text: '1', correct: true, why: '直接相連。' },
-        { text: 'n，和 RNN 一樣', why: '那是 RNN。' },
-        { text: 'n²', why: '那是配對數。' },
-        { text: 'log n', why: '不是。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用這一卷學過的觀念，總結 Transformer 結合了哪些「老技巧」與哪個「新想法」。'], answer: [
-        '老技巧：全連接層與 GELU（模組 1、2）、反向傳播（3）、AdamW 與學習率排程（4）、殘差連接（5-3）、layer norm。',
-        '新想法：拿掉遞迴，只用 attention 讓每個位置直接看其他位置，換來平行化與短路徑。',
-      ] },
-    ],
     keypoints: [
       'RNN 距離遠、不能平行；attention 任兩點一步、可以平行。',
       '代價是計算量隨長度平方成長。',
       'Transformer＝老技巧（殘差、正規化、優化器）＋只用 attention。',
     ],
-    sources: ['bahdanau', 'transformer', 'lstm'],
+    sources: ['bahdanau', 'transformer', 'lstm', 'flashattention', 'mamba'],
   },
 });
 </script>

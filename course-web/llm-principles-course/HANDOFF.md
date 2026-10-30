@@ -37,4 +37,4 @@ sh ai-dev-rules/skills/course-web-neo-brutalism/scripts/build.sh course-web/llm-
 
 ## 下次查證
 
-**2027-01-22**：7-1 的 API 取樣參數、7-2 的 context window 數字。
+**2027-01-29**：7-1 的 API 取樣參數、7-2 的 context window 數字、6-4 的思考設定、0-1 與 6-4 的價格（2026-10-29 改版審查已重新查證一次）。

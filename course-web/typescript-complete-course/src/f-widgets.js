@@ -67,22 +67,22 @@ function makeStepper(el, count, draw, { interval = STEP_MS, start = 0 } = {}) {
   return { go, stop };
 }
 
-/* ---------- csrun：先預測，再看輸出 ---------- */
+/* ---------- csrun：按「執行」看輸出 ---------- */
 // props: { code, title?, file?, predict?: { q?, options: [文字], answer: index }, output: 字串（\n 分行，! 開頭的行顯示成錯誤） }
 // 頁面不執行 TypeScript，輸出是事先寫好的；推導依據記在 research-notes.md。
 Widgets.csrun = {
   render(props, id) {
     const p = props.predict;
     return `<div class="jw runner">
-      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '先預測，再看輸出')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '執行看看')}</span></div>
       <div class="code"><div class="code-head"><span class="lang">${esc(props.lang || 'TypeScript')}</span><span class="ttl">${esc(props.file || 'app.ts')}</span></div>
         <pre tabindex="0" aria-label="程式碼"><code class="language-${esc(props.hl || 'typescript')}">${esc(props.code)}</code></pre></div>
       ${p ? `<div class="run-predict" role="group" aria-label="預測">
         <span class="jw-note"><strong>先預測：</strong>${md(p.q || '執行後會印出什麼？')}</span>
         <div class="opts">${p.options.map((o, i) => `<button type="button" class="btn small nb-press" data-pick="${i}" aria-pressed="false">${esc(o)}</button>`).join('')}</div>
       </div>` : ''}
-      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 看輸出</button></div>
-      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（先預測，再按「看輸出」）</span></pre>
+      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 執行</button></div>
+      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（按「執行」看結果）</span></pre>
       <div class="run-verdict" aria-live="polite"></div>
     </div>`;
   },
@@ -163,23 +163,14 @@ Widgets.classify = {
 };
 
 
-/* ---------- herodemo：首頁的第一個預測 ---------- */
+/* ---------- herodemo：首頁的第一個範例 ---------- */
 const HERO_RUNNER = {
-  "title": "這門課的第一個問題",
+  "title": "型別錯誤在執行前就現身",
   "lang": "TypeScript",
   "hl": "typescript",
   "file": "app.ts",
   "code": "function total(prices: number[]) {\n  return prices.reduce((sum, p) => sum + p, 0);\n}\n\ntotal([\"100\", \"50\"]);",
-  "predict": {
-    "q": "tsc 檢查時會怎樣？",
-    "options": [
-      "通過，回傳 \"010050\"",
-      "型別錯誤",
-      "通過，回傳 150"
-    ],
-    "answer": 1
-  },
-  "output": "!app.ts:5:8 - error TS2322: Type 'string' is not assignable to type 'number'."
+  "output": "!app.ts:5:8 - error TS2322: Type 'string' is not assignable to type 'number'.\n（JavaScript 會默默回傳 \"010050\"；tsc 在執行前就擋下）"
 };
 Widgets.herodemo = {
   render(props, id) { return Widgets.csrun.render(HERO_RUNNER, id); },

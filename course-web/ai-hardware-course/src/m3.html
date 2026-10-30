@@ -8,23 +8,12 @@ defineTerms({
   '資料平行': { en: 'data parallelism', def: '每張 GPU 都有完整的模型，各自算不同的資料，再把梯度平均。', example: '8 張卡各算 1/8 的批次。', lesson: '3-2' },
   '模型平行': { en: 'model parallelism', def: '把模型切開放到好幾張 GPU 上，例如按層切（管線平行）或把一個矩陣切開（張量平行）。', example: '一張放不下時使用。', lesson: '3-2' },
   'GPU 小時': { en: 'GPU-hours', def: '用了幾張 GPU × 幾小時，是估算訓練成本的常用單位。', example: '1,000 張跑 24 小時＝24,000 GPU 小時。', lesson: '3-2' },
+  'ZeRO': { en: 'Zero Redundancy Optimizer', def: '資料平行時，把優化器狀態、梯度、甚至權重分散存到各張卡，而不是每張卡都存一份完整的做法。', example: '第 3 階段：每張卡只存 1/N。', lesson: '3-1' },
+  '計算最優': { en: 'compute-optimal', def: '在固定訓練算力下，讓模型品質最好的參數量與資料量搭配；Chinchilla 論文估計約每個參數 20 個 token。', example: '70B 模型配約 1.4 兆 token。', lesson: '3-2' },
+  '連續批次': { en: 'continuous batching', def: '每產生一個 token 就重新檢查批次：完成的請求離開、新的請求立刻補進來，不用等整批結束。', example: 'vLLM 等推論框架的預設做法。', lesson: '3-3' },
   '批次推論': { en: 'batched inference', def: '把很多請求合在一起算，讓權重搬一次給大家用，提高吞吐量。', example: 'API 服務的標準做法。', lesson: '3-3' },
 });
 
-const REVIEW_M2 = [
-  { level: '回想', type: 'mc', q: '（回顧 2-3）單人 decode 的速度上限？', options: [
-    { text: '頻寬 ÷ 權重大小', correct: true, why: '每 token 讀一次權重。' },
-    { text: '算力 ÷ 參數', why: '那是 compute-bound。' },
-    { text: '頻寬 × 參數', why: '是相除。' },
-    { text: '與硬體無關，只看模型寫得好不好', why: '直接相關。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 2-4）長度與人數都加倍，KV cache？', options: [
-    { text: '4 倍', correct: true, why: '兩個乘數。' },
-    { text: '2 倍', why: '兩個都加倍。' },
-    { text: '不變', why: '會變大。' },
-    { text: '減半', why: '相反。' },
-  ] },
-];
 
 const TRAIN_MEM_SVG = `<svg viewBox="0 0 560 230" role="img" aria-label="每個參數在混合精度 Adam 訓練時要存的東西：BF16 權重 2 位元組，BF16 梯度 2 位元組，FP32 主權重 4，Adam 的 m 4，Adam 的 v 4，共 16 位元組，推論只需要 2">
   <text x="20" y="28" font-size="15" font-weight="900">每個參數要存幾位元組</text>
@@ -42,7 +31,6 @@ defineLessons({
       '估算訓練一個模型至少需要多少記憶體',
       '說明 activation 為什麼也很佔空間',
     ],
-    review: REVIEW_M2,
     analogy: {
       text: ['看食譜做菜（推論）只需要食譜本身；研發新食譜（訓練）還要記錄每次嘗試的結果、改了什麼、改的方向對不對，桌上的筆記多好幾倍。', '訓練時每個參數除了權重，還要存梯度、FP32 的主權重、Adam 的兩個狀態（第四部 4-3），用[[混合精度訓練]]時加起來約 16 位元組，是推論（BF16 2 位元組）的 8 倍。前向的中間值（[[activation]]）也要留著給反向傳播。'],
       limit: ['研發筆記可以丟掉舊的，訓練的這些狀態每一步都要用；有一些技巧能少存（重算 activation、把狀態分散到很多張卡），但總量的量級不會變。'],
@@ -72,12 +60,16 @@ defineLessons({
           <text x="415" y="122" text-anchor="middle" font-size="13" class="on-color">批次 × 長度 × 層數</text>
           <text x="280" y="168" text-anchor="middle" font-size="13">第四部 2-2：「前向的值要記住」的硬體代價</text>
         </svg>`, caption: 'activation 的量和批次、長度、層數一起成長。' },
+        { type: 'heading', id: 'zero', text: '深入：16 位元組不必每張卡都存一份' },
+        '單純的資料平行，每張卡都存完整的權重、梯度與 Adam 狀態，64 張卡就有 64 份一模一樣的東西。[[ZeRO]] 的想法是把這些分散存：每張卡只負責 1/N，需要時再向其他卡要。',
+        { type: 'table', head: ['ZeRO 階段', '分散存放的東西', '7.5B 模型、64 張卡，每張要多少'], rows: [
+          ['不分散（一般資料平行）', '—', '120 GB'],
+          ['第 1 階段', '優化器狀態', '31.4 GB'],
+          ['第 2 階段', '＋梯度', '16.6 GB'],
+          ['第 3 階段', '＋權重本身', '1.9 GB'],
+        ], caption: 'ZeRO 論文（Rajbhandari 等 2019）的數字，只算模型狀態，不含 activation。' },
+        '代價是通訊：第 3 階段每一層算之前都要先把權重收集回來，網路慢時會拖累速度。PyTorch 的 FSDP 是同一類做法；另一條路是把 Adam 狀態量化成 8 位元，或換成狀態更少的優化器，直接縮小那 12 位元組。',
       ],
-      tryit: {
-        q: ['13B 模型用混合精度＋Adam 訓練，權重、梯度、優化器狀態共要多少？需要幾張 80 GB 的卡（只看這部分）？'],
-        draft: '總量：＿ GB\n至少：＿ 張',
-        answer: ['13 × 16 ＝ 208 GB。', '208 ÷ 80 → 至少 3 張；再加上 activation 會更多。而推論只要 26 GB（BF16），一張就夠。'],
-      },
     },
     mistakes: [
       { wrong: '用推論的記憶體估訓練。', why: '訓練每個參數要約 8 倍。', right: '訓練用 16 位元組／參數起算。' },
@@ -85,19 +77,7 @@ defineLessons({
       { wrong: '以為微調一定和預訓練一樣貴。', why: '可以只訓練一小部分參數（例如 LoRA）。', right: '依方法估算；QLoRA 能在單張 48 GB 卡微調 65B（4-1）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '混合精度＋Adam 訓練，每個參數約幾位元組？', options: [
-        { text: '16', correct: true, why: '2＋2＋4＋4＋4。' },
-        { text: '2，和推論一樣', why: '那是推論。' },
-        { text: '4，FP32 權重', why: '少算了梯度與狀態。' },
-        { text: '32', why: '多算了。' },
-      ] },
-      { level: '應用', type: 'mc', q: '訓練比推論多存的東西不包括？', options: [
-        { text: 'tokenizer 的詞彙表', correct: true, why: '兩者都一樣，而且很小。' },
-        { text: '梯度', why: '訓練才需要。' },
-        { text: 'Adam 的狀態', why: '訓練才需要。' },
-        { text: '前向的 activation', why: '訓練要留。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你只有一張 24 GB 的卡，想讓 7B 模型學會公司的語氣。全參數訓練放不下，有什麼方向？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你只有一張 24 GB 的卡，想讓 7B 模型學會公司的語氣。全參數訓練放不下，有什麼方向？'], answer: [
         '一、參數高效微調（例如 LoRA）：只訓練少量額外參數，梯度與優化器狀態大幅減少。二、搭配 4 位元量化的基底模型（QLoRA 的做法）。',
         '三、先評估是不是一定要微調：很多語氣需求用 prompt 與範例就能達到（第一部模組 3）。',
       ] },
@@ -115,20 +95,6 @@ defineLessons({
       '分辨資料平行與模型平行',
       '用 6ND 估算訓練要多少 GPU 小時',
       '說明 GPU 之間的通訊為什麼重要',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-1）7B 模型訓練（16 位元組／參數）？', options: [
-        { text: '112 GB', correct: true, why: '7 × 16。' },
-        { text: '14 GB，和推論時一樣', why: '那是推論。' },
-        { text: '56 GB', why: '少算一半。' },
-        { text: '7 GB', why: '那是 1 位元組。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-2）估算時間要用？', options: [
-        { text: '不含稀疏的峰值 × 利用率', correct: true, why: '實際達不到峰值。' },
-        { text: '含稀疏的峰值', why: '高估。' },
-        { text: '頻寬', why: '訓練通常算力卡住。' },
-        { text: '參數量', why: '要換成 FLOPs。' },
-      ] },
     ],
     analogy: {
       text: ['出版一本百科全書：可以請 8 個編輯每人校對不同的章節，最後彙整修改意見（[[資料平行]]）；書太大一個人搬不動時，就把書拆成幾冊，每人負責一冊（[[模型平行]]）。', '兩種做法都要開會溝通：資料平行要把梯度平均，模型平行要把中間結果傳給下一個人。溝通太慢，人再多也沒用：這是 GPU 之間要用高速互連的原因。'],
@@ -179,12 +145,14 @@ defineLessons({
           <text x="280" y="118" text-anchor="middle" font-size="14">張數加倍，計算時間減半，但通訊不一定跟著減少</text>
           <text x="280" y="146" text-anchor="middle" font-size="13">這是利用率無法接近 100% 的主因之一</text>
         </svg>`, caption: '示意比例。大規模訓練的工程重點之一，就是讓計算與通訊重疊。' },
+        { type: 'heading', id: 'scale-reality', text: '深入：參數與資料怎麼配，以及訓練會壞掉' },
+        'Chinchilla 論文（Hoffmann 等 2022）估計，[[計算最優]]的搭配約是每個參數 20 個 token。但這只看「訓練花最少」；模型要被用很多次時，推論成本更重要，所以業界傾向把小模型訓練得更久：Llama 3 的 8B 模型用了超過 15 兆 token，約每個參數 1,900 個。',
+        { type: 'table', head: ['選擇', '訓練成本', '推論成本'], rows: [
+          ['大模型、照計算最優的資料量', '在同樣品質下最低', '每次都要跑大模型，貴'],
+          ['小模型、遠超過計算最優的資料量', '比較高', '每次便宜，用量大時划算'],
+        ] },
+        '規模大了，故障也變成日常。Llama 3 405B 的技術報告記錄：在 54 天的預訓練期間共中斷 466 次，其中 419 次是非預期的，這些非預期中斷約 78% 屬於確認或疑似的硬體問題（GPU、HBM 等）。所以大規模訓練要定期存檔（checkpoint）、自動換掉壞的機器，這些時間都不在 6ND 的估算裡。',
       ],
-      tryit: {
-        q: ['用拉桿：70B、15 兆 token、利用率 40%。要多少 GPU 小時？用 8,192 張卡要幾天？'],
-        draft: 'GPU 小時：＿\n天數：＿',
-        answer: ['6 × 7×10¹⁰ × 1.5×10¹³ ＝ 6.3×10²⁴ FLOPs；÷（989×10¹² × 0.4）÷ 3,600 ≈ 442 萬 GPU 小時。', '÷ 8,192 ÷ 24 ≈ 22.5 天。這只是一次完整訓練；實際專案還有大量實驗。'],
-      },
     },
     mistakes: [
       { wrong: '以為 GPU 加倍，時間就剛好減半。', why: '通訊開銷不會等比例減少。', right: '要考慮擴展效率。' },
@@ -192,19 +160,7 @@ defineLessons({
       { wrong: '以為資料平行能解決「一張放不下」。', why: '資料平行每張卡都要放完整模型。', right: '放不下要模型平行或分散存放狀態。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '一張卡放不下模型時，要用哪種平行？', options: [
-        { text: '模型平行', correct: true, why: '把模型切開。' },
-        { text: '資料平行', why: '每張卡仍要完整模型。' },
-        { text: '只要換更快的 CPU', why: '不是 CPU 問題。' },
-        { text: '減少訓練資料', why: '和模型大小無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '1,000 張卡跑 30 天，約多少 GPU 小時？', options: [
-        { text: '72 萬', correct: true, why: '1,000 × 30 × 24。' },
-        { text: '3 萬', why: '忘了乘 24。' },
-        { text: '720 萬', why: '多一個 0。' },
-        { text: '1,000', why: '要乘時間。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼大型訓練叢集要花很多錢在網路設備上，而不只是買 GPU？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼大型訓練叢集要花很多錢在網路設備上，而不只是買 GPU？'], answer: [
         '資料平行每一步都要在所有卡之間平均梯度，模型平行每一層都要傳中間結果。網路慢，昂貴的 GPU 就在等。',
         '花在互連上的錢，是在提高 GPU 的利用率；利用率從 30% 提到 50%，等於多出很多張卡。',
       ] },
@@ -214,7 +170,7 @@ defineLessons({
       '訓練 GPU 小時 ≈ 6ND ÷ 有效算力 ÷ 3,600。',
       '通訊是擴展的瓶頸，互連和 GPU 一樣重要。',
     ],
-    sources: ['kaplan', 'zero', 'nvidia-h100'],
+    sources: ['kaplan', 'zero', 'nvidia-h100', 'chinchilla', 'llama3'],
   },
 
   '3-3': {
@@ -222,20 +178,6 @@ defineLessons({
       '分辨延遲與吞吐量',
       '說明批次推論怎麼降低每個 token 的成本',
       '把訓練成本與推論成本放在一起比較',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）訓練運算量的估算？', options: [
-        { text: '6 × 參數 × token', correct: true, why: 'Kaplan 通則。' },
-        { text: '2 × 參數', why: '那是推論每 token。' },
-        { text: '參數 × 層數 × 批次大小', why: '不是。' },
-        { text: '參數²', why: '不是。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-2）把請求合成批次的好處？', options: [
-        { text: '提高算術強度，算力用得更滿', correct: true, why: '權重搬一次大家用。' },
-        { text: '讓每個人的回答更準', why: '和品質無關。' },
-        { text: '減少權重大小', why: '權重不變。' },
-        { text: '不需要 KV cache', why: '一樣需要。' },
-      ] },
     ],
     analogy: {
       text: ['公車與計程車：計程車只載你一個人，出發快、到得快（延遲低），但每人成本高；公車等人坐滿才走，每個人慢一點，但每人成本低很多（吞吐量高）。', 'API 服務就像公車：把很多人的請求合成一批（[[批次推論]]），權重搬一次給大家用，每個 token 的成本大幅下降。代價是每個人可能要多等一點。'],
@@ -288,12 +230,15 @@ defineLessons({
           <text x="420" y="40" text-anchor="end" font-size="13" font-weight="900">推論累積</text>
           <text x="295" y="162" text-anchor="middle" font-size="13">使用量 →（示意）</text>
         </svg>`, caption: '這是為什麼量化、小模型、批次推論這些「省推論錢」的技術這麼重要。' },
+        { type: 'heading', id: 'serving', text: '深入：推論服務怎麼排程' },
+        '固定批次要等最長的那個請求寫完，其他人早就結束了，位置卻空著。[[連續批次]]每產生一個 token 就重新排一次，完成的請求立刻讓位給新請求，GPU 一直保持滿載，是現在推論框架的標準做法。',
+        { type: 'table', head: ['服務指標', '意思', '主要被誰影響'], rows: [
+          ['TTFT（第一個 token 的等待）', '從送出到看到第一個字', 'prefill，多半被算力卡住'],
+          ['每個 token 的間隔', '後面的字出得多快', 'decode，多半被頻寬卡住'],
+          ['吞吐量', '整台機器每秒產生的 token', '批次大小與 KV cache 空間'],
+        ] },
+        'prefill 和 decode 的瓶頸不同，混在同一批時會互相干擾：一個長 prompt 進來，所有人的下一個字都要等它。所以有些系統把兩者拆到不同的 GPU 上跑（prefill 與 decode 分離），各自用最適合的批次大小。',
       ],
-      tryit: {
-        q: ['用拉桿：批次從 1 拉到 64，整台吞吐量變幾倍？每個請求的速度變慢多少？'],
-        draft: '吞吐量：＿ 倍\n每人速度：＿',
-        answer: ['在這個簡化模型裡，批次 64 時每一步還是被頻寬卡住，時間幾乎不變：吞吐量約變 64 倍，每人速度幾乎不變。', '要到批次約 150 以上才會被算力卡住、每人開始變慢。真實系統還要讀 KV cache，轉折會更早出現。'],
-      },
     },
     mistakes: [
       { wrong: '用單人速度估算服務成本。', why: '服務商用批次，每個 token 便宜很多。', right: '看吞吐量。' },
@@ -301,19 +246,7 @@ defineLessons({
       { wrong: '以為訓練完就沒有硬體成本了。', why: '推論每天都在花。', right: '長期看推論成本。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '吞吐量指的是？', options: [
-        { text: '整台機器每秒產生的 token 總數', correct: true, why: '所有請求加總。' },
-        { text: '一個請求從送出到收到完整回答要等多久', why: '那是延遲。' },
-        { text: 'GPU 的頻寬', why: '那是硬體規格。' },
-        { text: '模型的參數量', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 decode 被頻寬卡住的範圍內，批次加倍，吞吐量大約？', options: [
-        { text: '加倍', correct: true, why: '每步時間幾乎不變。' },
-        { text: '不變', why: '每步多服務一倍的人。' },
-        { text: '減半', why: '相反。' },
-        { text: '變 4 倍', why: '是線性。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['第一部 8-2 提到 Batch API 打 5 折。用這一課說明服務商為什麼願意給折扣。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['第一部 8-2 提到 Batch API 打 5 折。用這一課說明服務商為什麼願意給折扣。'], answer: [
         'Batch API 不要求即時回應，服務商可以把請求排到機器空閒時、合成很大的批次一起算，吞吐量高、每個 token 的成本低。',
         '使用者用「等比較久」換便宜，正是延遲與吞吐量的取捨。',
       ] },
@@ -323,7 +256,7 @@ defineLessons({
       '在頻寬卡住的範圍內，批次加大幾乎免費地提高吞吐量。',
       '推論成本隨使用量累積，長期可能超過訓練。',
     ],
-    sources: ['nvidia-h100', 'kaplan'],
+    sources: ['nvidia-h100', 'kaplan', 'vllm'],
   },
 });
 </script>

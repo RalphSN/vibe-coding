@@ -74,7 +74,7 @@
 | 技術 | 證據 | 強度 | 課程處理 |
 |---|---|---|---|
 | 執行意圖 if-then（「如果 X 發生，我就做 Y」） | Gollwitzer 與 Sheeran（2006）整合分析 94 個測試，目標達成 d = 0.65；ADHD 兒童的抑制、轉換、延宕滿足都有改善（Gawrilow 等 2008、2011） | ✅ 一般族群／🟡 ADHD 只有兒童 | 主線技術；說明 ADHD 的證據來自兒童 |
-| 心理對比＋執行意圖（WOOP／MCII） | ADHD 風險的國中生自我調節進步較多（Gawrilow 等 2013） | 🟡 | 主線技術，標示證據範圍 |
+| 心理對比＋執行意圖（WOOP／MCII） | ADHD 風險的六、七年級學生自我調節進步較多（Gawrilow 等 2013） | 🟡 | 主線技術，標示證據範圍 |
 | 外在化（時間、步驟、提醒放在眼前） | Barkley 理論推論；CBT 手冊都使用 | 理論 ✅／效果 🟡 | 主線：看得到的時間、看得到的下一步 |
 | 把任務切小、第一步具體到能立刻做 | CBT 手冊的核心技巧；對應 TMT 的期望 | ✅（作為 CBT 組成） | 主線 |
 | 行為活化（先做再等動機） | CADDI 的主要結果 | 🟡 | 主線 |
@@ -127,3 +127,54 @@
 - Gawrilow et al. (2013). Mental contrasting with implementation intentions enhances self-regulation. *Motivation and Emotion*, 37, 134–145. https://www.socmot.uni-konstanz.de/sites/default/files/Gawrilow_et_al_2012_Mental_contrasting_with_implementation.pdf
 - Body doubling：VR 預印本 https://arxiv.org/html/2509.12153v1 ；2025 海報 https://www.ccsc.org/centralplains/2025/talks/talk-poster16/
 - 生成式 AI 與 ADHD：CHI '26 共同設計研究 https://arxiv.org/abs/2602.09381v1 ；專家評論 https://www.africanews.com/2024/08/19/ai-tools-for-adhd-boost-task-management/
+
+## 2026-10-29 改版審查
+
+> 範圍：拿掉測驗後補「深入」段落、篩選深入思考題、8-3 改成一頁地圖、逐課查證。標示同前：✅ 原文或官方頁確認；🟡 摘要或二手來源；⚠️ 未查證。
+
+### 修正的錯誤
+
+| 課 | 原本 | 修正後 | 出處 |
+|---|---|---|---|
+| 4-4 | 「教有 ADHD 風險的國中生使用」 | 「教六、七年級（約 11–13 歲）有或沒有 ADHD 風險的學生使用」；本筆記第 77 行的「國中生」同樣不精確 | Gawrilow 等 2013 摘要（socmot.uni-konstanz.de、ifp.nyu.edu）✅ |
+| 4-2 | 術語「決策負擔」定義為「選擇越多越容易累、越容易拖」 | 改成「回到長清單重新挑，挑的過程是分心入口」；深入段落說明自我耗損的重複研究結果接近零 | Hagger 等 2016（23 實驗室、2,141 人、d = 0.04）；Vohs 等 2021（36 實驗室、d = 0.06）🟡 |
+| 1-2 | 證據框只寫 2006 年 d = 0.65 | 保留並加註：2025 年 642 個測試的新整合分析 d = 0.27–0.66，較保守 | Sheeran、Listrom、Gollwitzer 2025（kops.uni-konstanz.de）✅ |
+
+### 補的子題（深入段落）
+
+| 課 | 子題 | 主要出處 | 可信度 |
+|---|---|---|---|
+| 0-1 | 執行功能理論的限制、要先排除的原因 | Willcutt 等 2005（83 篇、d ≈ 0.54、「不必要也不充分」） | 🟡 二手摘要 |
+| 0-2 | 算式是描述性模型；自訂截止日研究的重複失敗 | Data Colada #138、2026 Psychological Science 重複研究 | 🟡 |
+| 0-3 | 效果量 0.5 的意義、積極對照組 | Cohen's U3（d = 0.5 → 69%）、2017 整合分析 | ✅ |
+| 1-1 | GTD 與習慣養成的兩分鐘法則差別 | gettingthingsdone.com | 🟡 |
+| 1-2 | 2025 新整合分析與三個調節因子（條件句、動機、練習） | Sheeran 等 2025 | ✅ |
+| 1-3 | 手機「腦力流失」效應的重複研究不一致 | Ward 2017；2022 直接重複失敗（Acta Psychologica）；2023 整合分析支持 | 🟡 |
+| 1-4 | 行為活化起源與適用邊界 | Jacobson 等 1996（150 人拆解研究） | 🟡 |
+| 2-1 | 計畫謬誤經典研究、外部觀點 | Buehler 等 1994（33.9 vs 55.5 天、約三成準時） | 🟡 二手 |
+| 2-2 | 番茄鐘長度沒有標準答案、過度專注 | Biwer 等 2023（24/6 分鐘）；2025 年反向結果（PMC12292963） | ✅ |
+| 2-3 | 拆步驟估時、倍數失準情況 | Kruger 與 Evans 2004；後續結果不一致 | 🟡 |
+| 3-1 | GTD 的下一步與「等待中」清單 | GTD | 🟡 |
+| 3-2 | 滾動式規劃與前置時間的代價 | 專案管理常識 | ⚠️ 未另查來源 |
+| 3-3 | AI 個人方案的訓練設定 | Anthropic 2025-08-28 公告 ✅；OpenAI Data Controls FAQ（設定名稱來自第三方 2026 文章）🟡 |
+| 4-1 | 寫下計畫消除未完成目標的干擾、計畫太死的代價 | Masicampo 與 Baumeister 2011、2012 | 🟡 |
+| 4-2 | 自我耗損的重複研究 | Hagger 2016、Vohs 2021 | 🟡 |
+| 4-3 | 新起點效應、回顧時間的取捨 | Dai、Milkman、Riis 2014 | ⚠️ 依記憶，未另查原文 |
+| 4-4 | MCII 整合分析 g = 0.34；心理對比幫你放下做不到的願望 | Wang 等 2021 ✅；Oettingen 的期望調節 ⚠️ 未另查 |
+| 5-1 | GMT 起源（腦傷復健）、事件掛勾 vs. 定時鬧鐘 | GMT 起源 ⚠️ 未另查 |
+| 5-2 | 2.8 秒打斷讓順序錯誤約加倍；注意力殘留與 ready-to-resume plan | Altmann 等（MSU 新聞稿 2013，期刊 2014）🟡；Leroy 與 Glomb 2018 ✅ |
+| 5-3 | Scrum 的 Definition of Done、滿意解 | Scrum Guide 🟡 |
+| 6-1 | 拖延是短期情緒修復、負增強 | Sirois 與 Pychyl 2013 | ✅ |
+| 6-2 | 原諒自己與下次拖延（相關研究、自評） | Wohl 等 2010 | 🟡 |
+| 6-3 | SUDS 量表、暴露的基本觀察 | 行為治療常識 | ⚠️ 未另查 |
+| 7-1 | Google 日曆 Speedy meetings、Outlook 提早結束會議；AI 會議摘要的限制 | Microsoft Support ✅；Google 只有第三方說明 🟡 |
+| 7-2 | WHO 手術查核表（1.5%→0.8%、11%→7%，前後比較）、事前驗屍 | Haynes 等 2009 ✅；pre-mortem ⚠️ 未另查 |
+| 7-3 | 對 AI 越有信心、自評批判思考越少 | Lee 等 2025（CHI，319 人） | ✅ |
+| 8-1 | 習慣自動化中位數 66 天（18–254）、2024 回顧 59–66 天（4–335） | Lally 2010 🟡；Singh 等 2024（Healthcare 12(23):2488）🟡 |
+
+### 其他改動
+
+- 新增互動：5-2 加「被打斷的成本」試算拉桿（knobs，從 finance-psychology-course 複製）；6-2 加卡點診斷（stuckcheck）。
+- 深入思考題：從 27 題留 18 題；刪掉看課文就答得出的 0-3、1-1、1-2、2-2、3-1、3-2、4-4、5-1、6-1。
+- 8-3 從「總複習測驗」改成「全書一頁地圖」；c-data 課名與模組 8 說明同步。
+- 未查證：新的 Gawrilow 2013 樣本數、Altmann 研究的期刊年份（新聞稿 2013，課文寫 2014）、Google 日曆設定的官方頁。

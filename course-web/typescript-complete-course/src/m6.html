@@ -13,6 +13,7 @@ defineTerms({
   'Response.json': { en: 'Response.json()', def: 'fetch 回應的 json() 回傳 `Promise<any>`，型別資訊在這裡斷掉，要自己驗證。', example: '`const data: unknown = await res.json();`' },
   'TypeScript 7': { en: 'TypeScript 7', def: '2026-07 發布、以 Go 重寫的原生編譯器，速度約為 6.0 的 8–12 倍；7.0 沒有穩定的程式化 API。', example: '`npm i -D typescript`' },
   'typescript-eslint': { en: 'typescript-eslint', def: '讓 ESLint 理解 TypeScript 的工具，依賴 TypeScript 的程式化 API。', example: '`npm i -D typescript-eslint`' },
+  '程式化 API': { en: 'programmatic API', def: '讓其他工具在程式裡呼叫編譯器（建立 program、查詢型別）的介面；TypeScript 7.1 Beta 起以 typescript/sync、typescript/async 等入口提供。', example: 'typescript-eslint 的型別感知規則依賴它。' },
 });
 
 defineLessons({
@@ -21,14 +22,6 @@ defineLessons({
       '讀懂 tsconfig 的關鍵選項',
       '說出 strict 包含哪些檢查',
       '為新專案選一組建議設定',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-4）TypeScript 6 起 tsconfig 的 types 預設是？', options: [
-        { text: '空陣列，要自己列出', correct: true, why: '所以要寫 "types": ["node"]。' },
-        { text: '自動載入所有 @types', why: '那是 5.x 以前。' },
-        { text: '只載入 @types/node', why: '預設是空的。' },
-        { text: '沒有這個選項', why: '有。' },
-      ] },
     ],
     analogy: {
       text: ['tsconfig 像檢驗中心的檢驗標準：strict 是「全套健檢」，一次打開十幾項檢查。新專案直接用全套；舊專案從部分項目開始，逐步加嚴。'],
@@ -68,31 +61,32 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'tsconfig：strict 開啟',
           code: 'function greet(name) {\n  return "嗨，" + name;\n}\n\nlet title: string = null;',
-          predict: { q: '會出現幾個錯誤？', options: ['2 個', '0 個', '1 個'], answer: 0 },
           output: "!app.ts:1:16 - error TS7006: Parameter 'name' implicitly has an 'any' type.\n!app.ts:5:5 - error TS2322: Type 'null' is not assignable to type 'string'.\nFound 2 errors.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'in', label: '在 strict 裡' }, { id: 'out', label: '要另外開' }],
-          items: [
-            { text: 'noImplicitAny', answer: 'in', why: 'strict 的一部分。' },
-            { text: 'strictNullChecks', answer: 'in', why: 'strict 的一部分。' },
-            { text: 'noUncheckedIndexedAccess', answer: 'out', why: '影響範圍大，所以沒放進 strict。' },
-            { text: 'useUnknownInCatchVariables', answer: 'in', why: '4.4 起納入 strict。' },
-            { text: 'verbatimModuleSyntax', answer: 'out', why: '模組相關，不是 strict 的一部分。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['noImplicitAny', '在 strict 裡', 'strict 的一部分。'],
+          ['strictNullChecks', '在 strict 裡', 'strict 的一部分。'],
+          ['noUncheckedIndexedAccess', '要另外開', '影響範圍大，所以沒放進 strict。'],
+          ['useUnknownInCatchVariables', '在 strict 裡', '4.4 起納入 strict。'],
+          ['verbatimModuleSyntax', '要另外開', '模組相關，不是 strict 的一部分。']
+        ] },
         { type: 'svg', svg: Fig.stack('舊專案漸進開啟嚴格設定的順序：先開 noImplicitAny；再開 strictNullChecks；再開完整 strict；最後評估 noUncheckedIndexedAccess', [
           { title: '1. noImplicitAny', tone: 1 },
           { title: '2. strictNullChecks（錯誤最多、價值最高）', tone: 3 },
           { title: '3. 完整 strict', tone: 4 },
           { title: '4. noUncheckedIndexedAccess', tone: 2 },
         ]), caption: '每一步修完、合併後再開下一步。' },
+        { type: 'heading', id: 'deep-ts6-defaults', text: '深入：TypeScript 6.0 改了哪些預設值' },
+        { type: 'table', caption: 'TypeScript 6.0 官方公告（2026-10-30 查證）', head: ['選項', '6.0 起的預設或規則', '升級時的影響'], rows: [
+          ['strict', 'true', '舊專案沒寫就會突然多很多錯誤；要暫時維持舊行為就寫 false'],
+          ['module', 'esnext', 'CommonJS 專案要明確寫出'],
+          ['target', '最新（es2025）', 'es5 已棄用，最低 ES2015'],
+          ['types', '`[]`', '`["*"]` 可恢復自動載入所有 @types，但官方建議列清單'],
+          ['noUncheckedSideEffectImports', 'true', '副作用匯入的路徑打錯會報錯'],
+          ['esModuleInterop', '不能設成 false', '一律使用安全的互通行為'],
+        ] },
+        'strict 這個總開關會隨版本納入新的嚴格檢查，例如 TS 5.6 加入的 strictBuiltinIteratorReturn。升級後錯誤變多不一定是退步，先看新增的錯誤屬於哪個選項。另外 6.0 起，有 tsconfig 時直接 `tsc app.ts` 會報錯，要嘛用設定檔，要嘛加 `--ignoreConfig`。',
       ],
-      tryit: {
-        q: ['只想做型別檢查（由 Node 或打包工具負責執行），tsconfig 要開哪個選項？'],
-        draft: '{\n  "compilerOptions": {\n    "____": true\n  }\n}',
-        answer: ['`"noEmit": true`。', 'tsc 只檢查不產生 .js；搭配 `npx tsc` 或 `tsc --noEmit` 在 CI 執行。'],
-      },
     },
     mistakes: [
       { wrong: '為了減少錯誤把 strict 關掉。', why: '失去 null 與 any 的保護，問題延到執行時。', right: '保持 strict；舊專案逐步開啟。' },
@@ -100,19 +94,7 @@ defineLessons({
       { wrong: '關掉 skipLibCheck 去修第三方型別錯誤。', why: '浪費時間在不是你的程式碼上，檢查也變慢。', right: '一般開 skipLibCheck；確實需要時才關。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'TypeScript 6 起，沒有寫 strict 時預設是？', options: [
-        { text: 'true', correct: true, why: '6.0 把預設改成 strict。' },
-        { text: 'false', why: '那是 5.x 以前。' },
-        { text: '只開 noImplicitAny', why: '是整個 strict。' },
-        { text: '要看 target', why: '和 target 無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '開了 noUncheckedIndexedAccess，`const x = ["a"][0]` 的型別是？', options: [
-        { text: '`string | undefined`', correct: true, why: '索引讀取一律加上 undefined。' },
-        { text: '`string`，因為陣列字面值的元素一定存在', why: '那是沒開的情況。' },
-        { text: '`"a"`', why: '陣列元素型別是 string。' },
-        { text: '`undefined`', why: '仍包含 string。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['公司電腦（Windows）和家裡的 Mac 跑 tsc 結果不同，一台有錯一台沒有。可能的原因和處理方式？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['公司電腦（Windows）和家裡的 Mac 跑 tsc 結果不同，一台有錯一台沒有。可能的原因和處理方式？'], answer: [
         '常見原因：TypeScript 版本不同（全域安裝或不同的 lock 檔）、檔名大小寫在 macOS 不分、Windows 分（import 路徑大小寫寫錯）、types 依賴的 @types 版本不同。',
         '處理：TypeScript 裝在專案的 devDependencies 並 commit lock 檔、一律 `npx tsc`；開 forceConsistentCasingInFileNames（預設已開）抓出大小寫不一致；CI 用同一份設定檢查。',
       ] },
@@ -130,14 +112,6 @@ defineLessons({
       '說出為什麼外部資料一定要在執行時驗證',
       '用 Zod 定義 schema 並驗證資料',
       '用 z.infer 讓 schema 成為型別的單一來源',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-3）`JSON.parse` 的結果應該當成什麼型別？', options: [
-        { text: '`unknown`', correct: true, why: '這課用 Zod 把 unknown 驗證成具體型別。' },
-        { text: '直接 `as User`', why: '不做檢查。' },
-        { text: '`any`', why: '關掉檢查。' },
-        { text: '`never`', why: '不是。' },
-      ] },
     ],
     analogy: {
       text: ['型別是工廠裡的品管標準，Zod 是收貨口的驗貨員。工廠內部的零件都照標準做（型別保證），但外面送來的貨（API、表單、檔案）一定要在收貨口驗過才能進廠。'],
@@ -176,26 +150,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'import { z } from "zod";\n\nconst Order = z.object({ id: z.number(), qty: z.number().int().min(1) });\nconst r = Order.safeParse({ id: "7", qty: 0 });\nconsole.log(r.success);\nif (!r.success) console.log(r.error.issues.map((i) => i.path.join(".")));',
-          predict: { q: '有問題的欄位是哪些？', options: ['["id", "qty"]', '["qty"]', '沒有，success 為 true'], answer: 0 },
           output: "false\n[ 'id', 'qty' ]",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'validate', label: '要在執行時驗證' }, { id: 'trust', label: '信任型別即可' }],
-          items: [
-            { text: '外部 API 的回應', answer: 'validate', why: '你控制不了對方。' },
-            { text: '使用者送出的表單', answer: 'validate', why: '使用者可以送任何東西。' },
-            { text: '自己程式內部兩個函式之間傳遞的物件', answer: 'trust', why: '型別檢查已經保證。' },
-            { text: '從 localStorage 讀出的設定', answer: 'validate', why: '可能是舊版格式或被手動修改。' },
-            { text: '環境變數', answer: 'validate', why: '啟動時驗證一次，缺少就直接報錯。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['外部 API 的回應', '要在執行時驗證', '你控制不了對方。'],
+          ['使用者送出的表單', '要在執行時驗證', '使用者可以送任何東西。'],
+          ['自己程式內部兩個函式之間傳遞的物件', '信任型別即可', '型別檢查已經保證。'],
+          ['從 localStorage 讀出的設定', '要在執行時驗證', '可能是舊版格式或被手動修改。'],
+          ['環境變數', '要在執行時驗證', '啟動時驗證一次，缺少就直接報錯。']
+        ] },
         { type: 'svg', svg: Fig.vs('型別與 schema 的關係：手寫 interface 加另外寫驗證，兩份定義會不同步；用 schema 加 z.infer，只有一份定義，型別與驗證永遠一致', { title: 'interface + 手寫驗證', lines: ['兩份定義', '容易不同步'], tone: 5 }, { title: 'schema + z.infer', lines: ['一份定義', '永遠一致'], tone: 4 }), caption: '單一來源原則再次出現（3-3、4-1）。' },
+        { type: 'heading', id: 'deep-zod4', text: '深入：Zod 4 的細節與替代方案' },
+        '這課用 Zod 4 的寫法（2025-07 發布，2026-10-30 時 npm 最新為 4.6.7）：`z.email()` 改成頂層函式、錯誤用 `z.prettifyError` 格式化、可以用 `z.toJSONSchema()` 產生 JSON Schema 給文件或其他語言使用。',
+        { type: 'table', head: ['情況', '做法', '原因'], rows: [
+          ['有 transform 或 default 的 schema', '分清 `z.input` 與 `z.output`（z.infer 是 output）', '驗證前後的型別不同'],
+          ['表單欄位都是字串', '`z.coerce.number()`', '先轉型再驗證'],
+          ['套件想支援多種驗證庫', '接受 Standard Schema 介面', 'Zod、Valibot、ArkType 都實作了同一個介面'],
+          ['每秒處理大量訊息的熱路徑', '量測後再決定', '驗證有成本；可改成只驗關鍵欄位'],
+        ] },
+        '不適用的地方：程式內部已經有型別保證的資料不需要再驗；驗證只回答「格式對不對」，權限、商業規則（這個使用者能不能改這筆訂單）仍要另外檢查。',
       ],
-      tryit: {
-        q: ['為環境變數寫 schema：PORT 是數字（字串轉數字）、API_KEY 必填：'],
-        draft: 'const Env = z.object({\n  PORT: z.coerce.____().default(3000),\n  API_KEY: z.string().____(1),\n});\nexport const env = Env.____(process.env);',
-        answer: ['`z.coerce.number()`、`.min(1)`、`Env.parse(process.env)`。', '環境變數一律是字串，coerce 會先轉型再驗證；啟動時 parse 失敗就直接結束，比執行到一半才發現缺設定好。'],
-      },
     },
     mistakes: [
       { wrong: '`await res.json() as User`。', why: '只是騙過檢查器。', right: 'schema.parse 或 safeParse。' },
@@ -203,19 +177,7 @@ defineLessons({
       { wrong: 'interface 與 Zod schema 各寫一份。', why: '欄位一多就不同步。', right: '用 `z.infer` 從 schema 推出型別。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '為什麼 TypeScript 專案還需要 Zod 這類工具？', options: [
-        { text: '型別在執行時被擦除，外部資料需要執行時檢查', correct: true, why: '型別保護不到執行時才進來的資料。' },
-        { text: 'TypeScript 不能描述物件型別', why: '可以。' },
-        { text: '讓程式跑更快', why: '驗證會增加一點成本。' },
-        { text: '取代單元測試', why: '兩者用途不同。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`User.safeParse(data)` 失敗時會？', options: [
-        { text: '回傳 `{ success: false, error }`，不拋例外', correct: true, why: '適合要顯示錯誤的情況。' },
-        { text: '拋出 ZodError，訊息列出每個不合格的欄位', why: '那是 parse。' },
-        { text: '回傳 null', why: '回傳結果物件。' },
-        { text: '自動修正資料', why: '不會修正（除非有 coerce、default 等轉換）。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['前端表單與後端 API 都要驗證同一份資料。怎麼避免兩邊規則不一致？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['前端表單與後端 API 都要驗證同一份資料。怎麼避免兩邊規則不一致？'], answer: [
         '把 Zod schema 放在共用的套件（monorepo 的 shared 資料夾），前端表單用它即時顯示錯誤，後端 API 用它驗證請求本文。',
         '型別也一起從 schema 推出；任何一邊改規則，另一邊在編譯時就會看到差異。注意前端驗證只是體驗，後端一定要再驗一次（前端可以被繞過）。',
       ] },
@@ -225,7 +187,7 @@ defineLessons({
       '在邊界用 schema 驗證一次，內部信任型別。',
       '用 z.infer 讓 schema 成為型別的單一來源。',
     ],
-    sources: ['zod', 'ts-narrowing'],
+    sources: ['zod', 'zod-v4', 'standard-schema', 'ts-narrowing'],
   },
 
   '6-3': {
@@ -233,14 +195,6 @@ defineLessons({
       '為 async 函式寫出 Promise<T> 回傳型別',
       '知道 fetch 的 json() 在哪裡失去型別',
       '寫一個型別安全的 API 呼叫函式',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-2）parse 與 safeParse 的差別？', options: [
-        { text: 'parse 失敗拋例外，safeParse 回傳結果物件', correct: true, why: '依情境選用。' },
-        { text: 'safeParse 只檢查型別不檢查值，比較寬鬆', why: '兩者都會檢查。' },
-        { text: 'parse 比較快', why: '不是差別所在。' },
-        { text: '完全相同', why: '失敗時的行為不同。' },
-      ] },
     ],
     analogy: {
       text: ['Promise<T> 像外送的取餐單號：上面寫著「一份牛肉麵」（T），餐還沒好但你知道會拿到什麼。fetch 的 json() 卻像單號上寫「一份餐點」——到底是什麼，要打開才知道。'],
@@ -281,31 +235,30 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'app.ts（伺服器回應 404 與一段 JSON 錯誤訊息）',
           code: 'try {\n  const res = await fetch("/api/users/999");\n  console.log("狀態", res.status, res.ok);\n  const data = await res.json();\n  console.log("拿到資料", data);\n} catch (e) {\n  console.log("進入 catch");\n}',
-          predict: { q: '會進入 catch 嗎？', options: ['不會，fetch 不因 404 拋例外', '會，404 會拋例外', '會，json() 一定失敗'], answer: 0 },
           output: '狀態 404 false\n拿到資料 { error: \'user not found\' }',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'reject', label: 'fetch 會 reject（拋例外）' }, { id: 'resolve', label: 'fetch 正常回傳 Response' }],
-          items: [
-            { text: '伺服器回應 500', answer: 'resolve', why: 'HTTP 錯誤不會 reject，要看 res.ok。' },
-            { text: '網路斷線', answer: 'reject', why: '網路層失敗。' },
-            { text: '伺服器回應 404', answer: 'resolve', why: '要看 res.ok。' },
-            { text: 'AbortSignal 逾時', answer: 'reject', why: '中止會 reject（TimeoutError）。' },
-            { text: 'CORS 被擋', answer: 'reject', why: '瀏覽器回報網路錯誤。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['伺服器回應 500', 'fetch 正常回傳 Response', 'HTTP 錯誤不會 reject，要看 res.ok。'],
+          ['網路斷線', 'fetch 會 reject（拋例外）', '網路層失敗。'],
+          ['伺服器回應 404', 'fetch 正常回傳 Response', '要看 res.ok。'],
+          ['AbortSignal 逾時', 'fetch 會 reject（拋例外）', '中止會 reject（TimeoutError）。'],
+          ['CORS 被擋', 'fetch 會 reject（拋例外）', '瀏覽器回報網路錯誤。']
+        ] },
         { type: 'svg', svg: Fig.row('型別安全的 API 呼叫函式要做的四件事：設定逾時；檢查 res.ok；把 json 當 unknown；用 schema 驗證並回傳有型別的資料', [
           { title: '逾時', lines: ['`AbortSignal`', '`.timeout`'], tone: 1 },
           { title: '檢查狀態', lines: ['`res.ok`'], tone: 2 },
           { title: 'unknown', lines: ['`await res.json()`'], tone: 3 },
           { title: '驗證', lines: ['`schema.parse`'], tone: 4 },
         ]), caption: '寫一次，整個專案共用。' },
+        { type: 'heading', id: 'deep-async-errors', text: '深入：錯誤沒有型別，Promise 也會被遺忘' },
+        'TypeScript 沒有「這個函式會拋出哪些錯誤」的型別。`Promise<T>` 只描述成功的值，reject 的原因在 catch 裡一律是 unknown，所以 ApiError 這類自訂錯誤要用 instanceof 收斂。想讓錯誤出現在型別裡，可以改回傳 `{ ok: true; data } | { ok: false; error }` 的可辨識聯合（2-2）。',
+        { type: 'table', head: ['情況', '會發生什麼', '處理'], rows: [
+          ['伺服器回 204、內容是空的', '`res.json()` 拋 SyntaxError', '先看狀態碼或 content-length'],
+          ['逾時', 'reject 的是名稱為 TimeoutError 的 DOMException', '和使用者取消（AbortError）分開處理'],
+          ['同時要逾時又要可取消', '一個 signal 不夠', '`AbortSignal.any([userSignal, AbortSignal.timeout(ms)])`'],
+          ['呼叫 async 函式卻忘了 await', 'tsc 不報錯，錯誤變成未處理的 rejection', 'typescript-eslint 的 no-floating-promises'],
+        ] },
       ],
-      tryit: {
-        q: ['同時取得使用者與訂單，兩者互不相依：'],
-        draft: 'const [user, orders] = await Promise.____([\n  getJson(`/api/v1/users/${id}`, User),\n  getJson(`/api/v1/orders?user=${id}`, z.array(Order)),\n]);',
-        answer: ['`Promise.all([...])`。', 'TypeScript 會推出 `[User, Order[]]`，每個位置的型別都正確。任一個失敗時整個 Promise.all 失敗；需要「各自成功或失敗」用 Promise.allSettled。'],
-      },
     },
     mistakes: [
       { wrong: '以為 fetch 遇到 404、500 會進 catch。', why: '只有網路層失敗才 reject。', right: '檢查 `res.ok`。' },
@@ -313,19 +266,7 @@ defineLessons({
       { wrong: '沒有設定逾時。', why: '伺服器不回應時請求一直掛著。', right: '`AbortSignal.timeout(毫秒)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`async function f() { return 1; }` 的回傳型別是？', options: [
-        { text: '`Promise<number>`', correct: true, why: 'async 函式一定回傳 Promise。' },
-        { text: '`number`', why: '要 await 才是 number。' },
-        { text: '`Promise<1>`', why: '回傳值型別會放寬成 number。' },
-        { text: '`void`', why: '有回傳值。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`res.json()` 的回傳型別是？', options: [
-        { text: '`Promise<any>`', correct: true, why: '型別資訊在這裡斷掉。' },
-        { text: '`Promise<unknown>`', why: '標準 lib 定義成 any。' },
-        { text: '依照呼叫端的回傳型別自動推斷', why: '不會。' },
-        { text: '`object`', why: '是 Promise<any>。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['如果後端也是 TypeScript，有沒有辦法讓前端「不寫 schema 也能知道 API 的型別」？各有什麼取捨？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['如果後端也是 TypeScript，有沒有辦法讓前端「不寫 schema 也能知道 API 的型別」？各有什麼取捨？'], answer: [
         '方法一：後端產生 OpenAPI 規格，前端用工具產生型別與用戶端；方法二：共用 Zod schema 的 monorepo；方法三：tRPC 這類讓前端直接推斷後端路由型別的框架。',
         '取捨：共用型別省去重寫，但只在「前後端一起部署」時才可靠；對外公開或版本不同步的 API，仍需要在前端驗證回應。',
       ] },
@@ -335,7 +276,7 @@ defineLessons({
       'fetch 不因 4xx、5xx 拋例外，要檢查 res.ok。',
       'res.json() 是 any，接成 unknown 再用 schema 驗證。',
     ],
-    sources: ['mdn-fetch', 'zod'],
+    sources: ['mdn-fetch', 'mdn-abort', 'zod'],
   },
 
   '6-4': {
@@ -344,17 +285,9 @@ defineLessons({
       '知道哪些工具暫時還需要 TypeScript 6',
       '規劃一個專案從 5.x 升到 7 的步驟',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 6-1）TypeScript 6 起 strict 預設？', options: [
-        { text: '開啟', correct: true, why: '升級時舊專案可能突然多出很多錯誤。' },
-        { text: '關閉', why: '那是 5.x。' },
-        { text: '只對新檔案開啟', why: '不是。' },
-        { text: '沒有預設', why: '有預設值。' },
-      ] },
-    ],
     analogy: {
       text: ['TypeScript 7 像餐廳把整個廚房從瓦斯爐換成高效率的商用爐：菜單（語言）完全一樣，出菜速度快了十倍。但有些外包廠商（工具）的設備還接在舊瓦斯管上，暫時要保留一個舊爐子給他們用。'],
-      limit: ['換廚房的過渡期總會結束；TypeScript 團隊預計 7.1 提供新的程式化 API，屆時 typescript-eslint 等工具就能直接使用 7。'],
+      limit: ['換廚房的過渡期總會結束；7.1 Beta（2026-10-20）已經帶來新的程式化 API，等 7.1 正式版與各工具跟進後，typescript-eslint 等就能直接使用 7。'],
     },
     model: {
       svg: Fig.row('TypeScript 版本演進：5.x 是 JavaScript 編譯器，預設非 strict；6.0（2026-03）仍是 JavaScript 編譯器，改了預設值並棄用舊選項；7.0（2026-07）是 Go 原生編譯器，移除已棄用的選項，速度約快 10 倍', [
@@ -364,7 +297,7 @@ defineLessons({
       ]),
       caption: '6.0 是橋樑：先在 6.0 處理掉棄用警告，再換 7.0。',
       blocks: [
-        '[[TypeScript 7]] 是同一個語言、同一個 `tsc` 指令，只是編譯器用 Go 重寫，完整建置快 8–12 倍。差別在：6.0 棄用的選項（target es5、moduleResolution node10、baseUrl 等）在 7.0 移除；7.0 還沒有穩定的程式化 API，依賴它的工具（[[typescript-eslint]]、部分框架的範本型別檢查）暫時需要 6.x。',
+        '[[TypeScript 7]] 是同一個語言、同一個 `tsc` 指令，只是編譯器用 Go 重寫，完整建置快 8–12 倍。差別在：6.0 棄用的選項（target es5、moduleResolution node10、baseUrl 等）在 7.0 移除；7.0 沒有[[程式化 API]]，依賴它的工具（[[typescript-eslint]]、部分框架的範本型別檢查）暫時需要 6.x；新 API 在 7.1 Beta 才出現。',
         { type: 'table', caption: '升級時常遇到的變化', head: ['項目', '5.x', '6.0／7.0'], rows: [
           ['strict', '預設 false', '預設 **true**'],
           ['types', '自動載入所有 @types', '預設 `[]`，要列出'],
@@ -377,7 +310,7 @@ defineLessons({
     define: [
       { term: 'TypeScript 7', en: 'TypeScript 7.0', def: '原生（Go）編譯器；`npm install -D typescript` 安裝，指令仍是 tsc；語言語意與 6.0 相同。', example: '大型專案建置從數分鐘降到數十秒。' },
       { term: 'ignoreDeprecations', en: 'ignoreDeprecations', def: '`"ignoreDeprecations": "6.0"` 可暫時隱藏 6.0 的棄用警告；7.0 已移除那些選項，這招失效。', example: '只當過渡用。' },
-      { term: '程式化 API', en: 'programmatic API', def: '讓其他工具在程式裡呼叫 TypeScript 編譯器的介面；7.0 尚未穩定，預計 7.1 提供。', example: 'typescript-eslint 的型別感知規則依賴它。' },
+      { term: '程式化 API', en: 'programmatic API', def: '讓其他工具在程式裡呼叫 TypeScript 編譯器的介面；7.0 沒有，7.1 Beta（2026-10-20）起提供。', example: 'typescript-eslint 的型別感知規則依賴它。' },
     ],
     examples: {
       compare: [{
@@ -393,23 +326,19 @@ defineLessons({
         why: ['先在 6.0 清掉所有棄用警告，再升 7.0'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'same', label: '7.0 沒有改變' }, { id: 'diff', label: '7.0 改變了' }],
-          items: [
-            { text: 'TypeScript 語法與型別規則', answer: 'same', why: '語言語意與 6.0 相同。' },
-            { text: '編譯速度', answer: 'diff', why: '約快 8–12 倍。' },
-            { text: '指令名稱 tsc', answer: 'same', why: '正式版仍是 tsc（預覽版曾用 tsgo）。' },
-            { text: '6.0 已棄用的 tsconfig 選項', answer: 'diff', why: '7.0 移除。' },
-            { text: '程式化 API 的穩定性', answer: 'diff', why: '7.0 尚無穩定 API。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['TypeScript 語法與型別規則', '7.0 沒有改變', '語言語意與 6.0 相同。'],
+          ['編譯速度', '7.0 改變了', '約快 8–12 倍。'],
+          ['指令名稱 tsc', '7.0 沒有改變', '正式版仍是 tsc（預覽版曾用 tsgo）。'],
+          ['6.0 已棄用的 tsconfig 選項', '7.0 改變了', '7.0 移除。'],
+          ['程式化 API', '7.0 改變了', '7.0 沒有；7.1 Beta 起提供新 API。']
+        ] },
         { type: 'widget', name: 'csrun', props: {
           file: '終端機（大型專案，示意數字）',
-          title: '先預測，再看結果',
+          title: '比較 6.0 與 7.0 的建置時間',
           lang: 'BASH',
           hl: 'bash',
           code: '# 同一個專案，同一份 tsconfig\n$ npx -p typescript@6 tsc --noEmit --extendedDiagnostics\n$ npx -p typescript@7 tsc --noEmit --extendedDiagnostics',
-          predict: { q: '兩次型別檢查的錯誤數會？', options: ['相同，只有時間不同', '7 會多很多錯誤', '7 會少很多錯誤'], answer: 0 },
           output: 'TS 6.0：Errors 0　Total time 48.2s\nTS 7.0：Errors 0　Total time 4.6s\n（官方以 VS Code 原始碼測得 125.7s → 10.6s；此處數字為示意）',
         } },
         { type: 'svg', svg: Fig.stack('從 5.x 升級到 7 的步驟：先升到 6.0 並修正 strict 與 types 的新預設；清掉所有棄用警告；確認工具支援後換成 7.0；仍需要 6.x API 的工具暫時並存', [
@@ -418,12 +347,16 @@ defineLessons({
           { title: '3. 換 7.0，CI 比對錯誤數', tone: 4 },
           { title: '4. typescript-eslint 等暫時並存 6.x', tone: 2 },
         ]), caption: '每一步都在 CI 跑一次 tsc，確認錯誤數沒有意外變化。' },
+        { type: 'heading', id: 'deep-ts7-status', text: '深入：2026-10 的 TypeScript 7 現況' },
+        { type: 'table', caption: '2026-10-30 查證', head: ['項目', '狀態', '來源'], rows: [
+          ['npm latest', '7.0.2（7.0 正式版，2026-07-08 發布）', 'npm registry'],
+          ['7.1 Beta', '2026-10-20；新增 typescript/sync、typescript/async 等程式化 API；RC 預計約一個月後', '官方部落格'],
+          ['官方測得的速度', 'VS Code 原始碼完整建置 125.7 秒 → 10.6 秒', 'InfoQ 引述官方公告'],
+          ['typescript-eslint、Volar 等改用新 API', '尚未正式支援', '僅第三方預估 2027 Q1'],
+        ] },
+        '7.0 能平行處理解析、檢查與輸出，所以 CPU 核心越多差距越大；CI 機器核心少時，加速幅度會比公告的 8–12 倍小。7.1 Beta 還加入讓 Vue、Svelte、Astro 檔案也能被檢查的 content mappers，不過要另外開 `--runExternalCode`，正式專案先等正式版。',
+        '升級的判斷原則：tsc 只是檢查工具，換成 7 不會改變你輸出的 JavaScript 行為；真正的風險在於依賴舊 API 的周邊工具。先在 CI 並跑 6 與 7、比對錯誤數，再決定切換。',
       ],
-      tryit: {
-        q: ['舊專案升到 6.0 後出現大量 strictNullChecks 錯誤，又不能一次修完。暫時的做法是？'],
-        draft: '{\n  "compilerOptions": {\n    "strict": ____,\n    "noImplicitAny": true\n  }\n}',
-        answer: ['明確寫 `"strict": false`，再逐項開啟（6-1 的漸進順序）。', '這只是過渡：6.0 改預設是為了讓新專案預設安全；舊專案應該排時程逐步開回 strict。'],
-      },
     },
     mistakes: [
       { wrong: '從 5.x 直接跳到 7.0。', why: '棄用選項在 7.0 直接移除，錯誤訊息不如 6.0 的棄用提示清楚。', right: '先升 6.0 清掉警告，再換 7.0。' },
@@ -431,19 +364,7 @@ defineLessons({
       { wrong: '以為 7.0 會抓到更多或更少錯誤。', why: '型別規則相同，結果應該一致。', right: '結果不同時通常是設定差異或已知問題，對照官方的相容性清單。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'TypeScript 7.0 最大的改變是？', options: [
-        { text: '編譯器用 Go 重寫，速度大幅提升', correct: true, why: '語言本身不變。' },
-        { text: '新增大量語法與新的型別規則', why: '語言語意與 6.0 相同。' },
-        { text: '改用新的指令名稱', why: '仍是 tsc。' },
-        { text: '不再支援 strict', why: 'strict 預設開啟。' },
-      ] },
-      { level: '應用', type: 'mc', q: '2026-10 專案用 typescript-eslint 的型別感知規則，該怎麼安排？', options: [
-        { text: 'tsc 用 7.0，lint 工具暫時依賴 6.x', correct: true, why: '7.0 尚無穩定的程式化 API。' },
-        { text: '全部停在 5.x', why: '沒必要放棄 7.0 的速度。' },
-        { text: '移除 typescript-eslint', why: '不需要。' },
-        { text: '等 7.0 自動相容', why: '要等 7.1 的新 API 與工具更新。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要向主管說明「為什麼值得花兩天升級到 TypeScript 7」。你會怎麼說？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要向主管說明「為什麼值得花兩天升級到 TypeScript 7」。你會怎麼說？'], answer: [
         '效益：型別檢查快約 10 倍，CI 時間與編輯器回應速度都改善；6.0 的新預設（strict、types）讓專案更安全；越晚升級，累積的棄用項目越多。',
         '風險與成本：依賴編譯器 API 的工具暫時要並存 6.x；舊的 tsconfig 選項要改寫。提出分步計畫（先 6.0、再 7.0），每步都有 CI 驗證，可以隨時回退。',
       ] },
@@ -451,9 +372,9 @@ defineLessons({
     keypoints: [
       'TypeScript 7 = 同一個語言 + Go 原生編譯器，約快 10 倍。',
       '先升 6.0 處理新預設與棄用警告，再換 7.0。',
-      '依賴編譯器 API 的工具（typescript-eslint 等）暫時需要 6.x。',
+      '依賴編譯器 API 的工具（typescript-eslint 等）在 7.1 正式版普及前暫時需要 6.x。',
     ],
-    sources: ['ts-70', 'ts-60'],
+    sources: ['ts-70', 'ts-71-beta', 'npm-typescript', 'infoq-ts7', 'ts-60'],
   },
 });
 </script>

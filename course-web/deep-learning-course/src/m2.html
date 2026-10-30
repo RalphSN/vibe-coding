@@ -7,23 +7,11 @@ defineTerms({
   '全連接層': { en: 'fully connected layer / linear layer', def: '每個輸入都連到每個輸出的層：輸出＝激活(x·W＋b)。PyTorch 叫 nn.Linear。', example: '2 個輸入、3 個輸出：W 是 2×3。', lesson: '2-1' },
   '批次': { en: 'batch', def: '一次一起算的一組樣本；把多筆輸入疊成矩陣，一次矩陣乘法就算完。', example: '64 筆一批。', lesson: '2-1' },
   '形狀': { en: 'shape', def: '矩陣或 tensor 每一維的大小，例如 (批次, 特徵)。寫程式最常見的錯就是形狀對不上。', example: '(64, 784)。', lesson: '2-1' },
+  'FLOPs': { en: 'floating-point operations', def: '浮點運算次數；一次乘法加一次加法算 2 次。用來估算模型的計算量。', example: '一層全連接約 2 × B × 輸入 × 輸出。', lesson: '2-1' },
+  '梯度檢查點': { en: 'gradient checkpointing', def: '只存部分層的中間值，反向時再重算缺的前向，用多一點計算換大量記憶體。', example: 'Chen 等 2016。', lesson: '2-2' },
   'cross-entropy': { en: 'cross-entropy loss', def: '分類用的損失：−log(給正確類別的機率)；二元時就是 log loss。', example: '正確類別機率 0.7 → 約 0.357。', lesson: '2-3' },
 });
 
-const REVIEW_M1 = [
-  { level: '回想', type: 'mc', q: '（回顧 1-3）為什麼層與層之間要有激活函數？', options: [
-    { text: '沒有的話，疊再多層也等於一層', correct: true, why: '線性疊線性還是線性。' },
-    { text: '讓數字變小，避免溢位', why: '主要目的是非線性。' },
-    { text: '讓輸出一定落在 0 到 1 之間', why: 'ReLU 沒有上限。' },
-    { text: '讓訓練不需要梯度', why: '還是需要梯度。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 1-1）x＝[2, 0]、w＝[1, 5]、b＝−1，ReLU 輸出？', options: [
-    { text: '1', correct: true, why: 'z＝2＋0−1。' },
-    { text: '11，因為 5 也要乘上去', why: 'x₂ 是 0。' },
-    { text: '0，因為 b 是負的', why: 'z 還是正的。' },
-    { text: '−1，就是 b', why: '要加權重項。' },
-  ] },
-];
 
 const SMALL_NET = { w: [[0.4, -0.5], [0.6, 0.2]], b: [0.1, 0.3], v: [1.5, -1], c: 0.2 };
 
@@ -34,7 +22,6 @@ defineLessons({
       '算出每一層輸入、權重、輸出的形狀',
       '說出為什麼要一次算一批',
     ],
-    review: REVIEW_M1,
     analogy: {
       text: ['學校統計成績：每位學生有三科分數，每個獎項對三科有不同的加權。把「所有學生 × 三科」排成一張表、「三科 × 每個獎項的權重」排成另一張表，相乘一次就得到「每位學生在每個獎項的總分」。', '一個[[全連接層]]就是這件事：輸入（[[批次]] × 特徵）乘上權重（特徵 × 神經元），一次矩陣乘法算完整層、整批的加權加總，再加偏差、過激活。'],
       limit: ['成績單只算一次，網路每一層都要算一次；而且[[形狀]]對不上（例如特徵數不同）就完全不能乘，這是寫深度學習程式最常見的錯誤。'],
@@ -79,12 +66,11 @@ defineLessons({
           <text x="280" y="148" text-anchor="middle" font-size="14">784 ≠ 512：前一層的輸出數要等於下一層的輸入數</text>
           <text x="280" y="174" text-anchor="middle" font-size="13">PyTorch 會報「mat1 and mat2 shapes cannot be multiplied」</text>
         </svg>`, caption: '寫網路時，先把每一層的形狀寫在註解裡，可以省下很多除錯時間。' },
+        { type: 'heading', id: 'linear-detail', text: '深入：PyTorch 的權重是「倒過來」存的' },
+        '課文寫 Z＝XW＋b，W 的形狀是 (輸入, 輸出)。PyTorch 的 nn.Linear 把權重存成 (輸出, 輸入)，計算 y＝xAᵀ＋b（官方文件 2.15 版）。數學完全一樣，只是看 model.weight.shape 時要知道它是倒過來的。',
+        '計算量常用 [[FLOPs]] 表示：一次乘法加一次加法算 2 個浮點運算，所以一層約 2 × B × 輸入 × 輸出 FLOPs。上面拉桿的乘法次數乘 2，就是論文與 GPU 規格上用的數字。',
+        'nn.Linear 預設從均勻分布 U(−√k, √k) 抽初始權重，k＝1 ÷ 輸入數。輸入越多，初始權重越小，讓加總的大小不會隨輸入數暴增（4-4 的深入段落）。',
       ],
-      tryit: {
-        q: ['用上面程式的 X、W、b，手算第 2 筆（x＝[0, 2]）的 Z 三個值。'],
-        draft: 'z₁ ＝ ＿\nz₂ ＝ ＿\nz₃ ＝ ＿',
-        answer: ['z₁ ＝ 0×0.4 ＋ 2×0.6 ＋ 0.1 ＝ 1.3；z₂ ＝ 0×(−0.5) ＋ 2×0.2 ＋ 0.3 ＝ 0.7；z₃ ＝ 0×1 ＋ 2×0 − 1 ＝ −1。', '和程式印出的第二列 [1.3, 0.7, −1.0] 一樣；過 ReLU 後變成 [1.3, 0.7, 0]。'],
-      },
     },
     mistakes: [
       { wrong: '一筆一筆用迴圈算。', why: '很慢，也浪費 GPU。', right: '疊成批次，一次矩陣乘法。' },
@@ -92,19 +78,7 @@ defineLessons({
       { wrong: '前一層輸出 128，下一層輸入寫成 256。', why: '形狀對不上無法相乘。', right: '相鄰兩層的數字要一致。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'X 的形狀 (32, 10)，W 的形狀 (10, 4)，XW 的形狀？', options: [
-        { text: '(32, 4)', correct: true, why: '保留批次，換成輸出數。' },
-        { text: '(10, 10)，兩個中間的數相乘', why: '中間的數會消掉。' },
-        { text: '(32, 10)，和輸入一樣', why: '輸出變成 4。' },
-        { text: '(4, 32)，順序倒過來', why: '順序是 (批次, 輸出)。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'nn.Linear(784, 128) 有多少參數（含偏差）？', options: [
-        { text: '100,480', correct: true, why: '784×128＋128。' },
-        { text: '100,352，只算權重', why: '還有 128 個偏差。' },
-        { text: '912，兩數相加', why: '要相乘。' },
-        { text: '784，只算輸入', why: '每個輸入連到每個輸出。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一個 784 → 128 → 64 → 10 的網路，寫出每一層的權重形狀，並算總參數。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一個 784 → 128 → 64 → 10 的網路，寫出每一層的權重形狀，並算總參數。'], answer: [
         '權重：(784, 128)、(128, 64)、(64, 10)；偏差：128、64、10。',
         '參數：100,352＋128 ＋ 8,192＋64 ＋ 640＋10 ＝ 109,386。',
       ] },
@@ -114,7 +88,7 @@ defineLessons({
       '形狀：(B, 輸入) × (輸入, 輸出) → (B, 輸出)；中間要對得上。',
       '一次算一批：同一組權重給整批共用。',
     ],
-    sources: ['pytorch-quickstart'],
+    sources: ['pytorch-quickstart', 'pytorch-linear'],
   },
 
   '2-2': {
@@ -122,14 +96,6 @@ defineLessons({
       '手算一個 2 → 2 → 1 網路的前向傳播',
       '看出 ReLU 怎麼讓某些神經元「關掉」',
       '算出這筆資料的損失',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-1）(B, 5) × (5, 3) 的結果形狀？', options: [
-        { text: '(B, 3)', correct: true, why: '保留批次。' },
-        { text: '(5, 5)', why: '中間的 5 會消掉。' },
-        { text: '(B, 5)', why: '輸出變 3。' },
-        { text: '(3, B)', why: '順序不對。' },
-      ] },
     ],
     analogy: {
       text: ['工廠兩道工序：第一站兩位師傅各自加工（隱藏層），第二站主管看兩位師傅的成品決定最終產品（輸出層）。', '前向傳播就是把原料一站一站送過去，每站都用固定的配方（權重）。下面用一組小數字手算一次，每一步都可以拿互動核對。'],
@@ -189,12 +155,16 @@ defineLessons({
           <text x="280" y="146" text-anchor="middle" font-size="14">每一格算出來的值都要記住</text>
           <text x="280" y="170" text-anchor="middle" font-size="13">反向傳播會用到它們（模組 3）</text>
         </svg>`, caption: '這也是訓練比推論更吃記憶體的原因之一：中間值要留著（第五部 3）。' },
+        { type: 'heading', id: 'memory', text: '深入：訓練時記憶體花在哪裡' },
+        { type: 'table', head: ['記憶體項目', '推論', '訓練'], rows: [
+          ['參數', '要', '要'],
+          ['激活值（前向的中間值）', '算完下一層就能丟', '要留到反向傳播用完'],
+          ['梯度', '不用', '每個參數一份'],
+          ['優化器狀態', '不用', 'Adam 每個參數再多兩份（4-3）'],
+        ] },
+        '激活值和批次大小、層數成正比，大模型訓練時常常比參數本身還佔記憶體。這是 7-1 拉桿裡「一個中間值就幾十 MB」要乘上層數的原因。',
+        '[[梯度檢查點]]用計算換記憶體：只存部分層的中間值，反向時再把缺的那段前向重算一次。Chen 等 2016 的做法讓記憶體從和層數成正比降到約平方根，代價是多做約一次前向。',
       ],
-      tryit: {
-        q: ['輸入改成 x＝[0, 2]，答案還是 1。手算 h₁、h₂、ŷ 和損失。'],
-        draft: 'h₁ ＝ ＿\nh₂ ＝ ＿\nŷ ＝ ＿\n損失 ＝ ＿',
-        answer: ['z₁ ＝ 0 ＋ 1.2 ＋ 0.1 ＝ 1.3 → h₁ ＝ 1.3；z₂ ＝ 0 ＋ 0.4 ＋ 0.3 ＝ 0.7 → h₂ ＝ 0.7。', 'ŷ ＝ 1.5×1.3 − 0.7 ＋ 0.2 ＝ 1.45；損失 ＝ 0.45² ≈ 0.203。用互動拉 x₁＝0、x₂＝2 核對。'],
-      },
     },
     mistakes: [
       { wrong: '忘了每一層都要加偏差。', why: '偏差是每個神經元自己的參數。', right: '每層：加權加總＋偏差，再激活。' },
@@ -202,19 +172,7 @@ defineLessons({
       { wrong: '以為被 ReLU 關掉的神經元沒用。', why: '換一筆資料它可能就打開了。', right: '不同輸入點亮不同神經元。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '這筆資料 h₂ 為什麼是 0？', options: [
-        { text: '它的加總是 −0.1，ReLU 輸出 0', correct: true, why: '負數被關掉。' },
-        { text: '它的權重全部都是 0', why: '權重不是 0。' },
-        { text: 'x₂ 太小所以被忽略', why: '是整體加總為負。' },
-        { text: '網路出錯了', why: '這是正常行為。' },
-      ] },
-      { level: '應用', type: 'mc', q: '如果答案是 2，這筆資料（ŷ＝1.4）的平方誤差？', options: [
-        { text: '0.36', correct: true, why: '(1.4−2)²。' },
-        { text: '0.6，忘了平方', why: '要平方。' },
-        { text: '0.16，用了原本的答案', why: '答案改成 2。' },
-        { text: '−0.6，殘差本身', why: '平方後是正的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同樣的網路結構，如果把所有 ReLU 拿掉，對 x＝[1, 0.5] 的輸出會變成多少？為什麼結果不同？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同樣的網路結構，如果把所有 ReLU 拿掉，對 x＝[1, 0.5] 的輸出會變成多少？為什麼結果不同？'], answer: [
         '沒有 ReLU 時 h₂ ＝ −0.1 不會變 0：ŷ ＝ 1.5×0.8 ＋ (−1)×(−0.1) ＋ 0.2 ＝ 1.5。',
         '差別在 ReLU 把負的中間值關掉了。有了這種開關，網路對不同區域的輸入才能用不同的「組合」，這就是非線性的來源。',
       ] },
@@ -224,7 +182,7 @@ defineLessons({
       'ReLU 會讓某些神經元在某些輸入下關掉。',
       '中間值要記住，反向傳播會用到。',
     ],
-    sources: ['rumelhart-1986'],
+    sources: ['rumelhart-1986', 'checkpointing'],
   },
 
   '2-3': {
@@ -232,20 +190,6 @@ defineLessons({
       '依問題類型選輸出層與損失',
       '算出 softmax ＋ cross-entropy 的損失',
       '知道 PyTorch 為什麼常把 softmax 包進損失函數',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）回歸問題的輸出層通常？', options: [
-        { text: '不加激活', correct: true, why: '要能輸出任何數。' },
-        { text: '一定要加 ReLU', why: '就預測不到負數。' },
-        { text: '一定要加 sigmoid', why: '會被限制在 0～1。' },
-        { text: '加 softmax', why: 'softmax 給分類。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-1）nn.Linear(10, 3) 有幾個參數？', options: [
-        { text: '33', correct: true, why: '10×3＋3。' },
-        { text: '30，只算權重', why: '加 3 個偏差。' },
-        { text: '13', why: '要相乘。' },
-        { text: '3', why: '那只是偏差。' },
-      ] },
     ],
     analogy: {
       text: ['同一台機器，最後的出口要依產品換模具：倒出液體（數字）、壓成兩種形狀之一（是／否）、或分裝到好幾個格子（多類別）。', '輸出層與損失也要配對：回歸用線性輸出＋MSE；二元分類用 sigmoid＋log loss；多類別用 softmax＋[[cross-entropy]]。前面的隱藏層可以完全一樣。'],
@@ -292,12 +236,11 @@ defineLessons({
           <text x="420" y="120" text-anchor="middle" font-size="14" class="on-color">再另外做 softmax</text>
           <text x="280" y="178" text-anchor="middle" font-size="13">合在一起算也比較不容易數值溢位</text>
         </svg>`, caption: '程式跑得動但學得很差，是這類錯誤最麻煩的地方。' },
+        { type: 'heading', id: 'stable-ce', text: '深入：為什麼要把 softmax 和 log 合在一起算' },
+        'softmax 要算 eˣ。logit 是 100 時，e¹⁰⁰ 約 2.7×10⁴³，超過 float32 的上限（約 3.4×10³⁸），會變成無限大。標準做法是先把每個 logit 減掉最大值，結果不變但不會溢位；上面拉桿的程式就是這樣寫的。',
+        '合在一起還有第二個好處：log(softmax) 可以直接寫成「logit − logsumexp」，不必先算出很小的機率再取 log，避開 log(0)＝−∞。PyTorch 的 CrossEntropyLoss 內部就是 log_softmax 加上負對數似然。',
+        'CrossEntropyLoss 還有 label_smoothing 參數：把正確答案的目標從 100% 改成例如 90%，其餘平分給其他類，減少模型過度自信。代價是輸出的機率意義改變了，要拿它當「信心」解讀時要小心。',
       ],
-      tryit: {
-        q: ['logits [1, 1, 1]、正確答案第 0 類。softmax 機率與 cross-entropy 各是多少？'],
-        draft: '機率：＿\n損失：＿',
-        answer: ['三類都是 1/3。', '損失 ＝ −ln(1/3) ＝ ln 3 ≈ 1.099：這是「完全沒學」時三分類的損失。訓練一開始的損失大約就是 ln(類別數)，可以拿來檢查程式有沒有寫錯。'],
-      },
     },
     mistakes: [
       { wrong: '多類別問題用 MSE。', why: '梯度在答錯時太小，學得慢。', right: 'softmax＋cross-entropy。' },
@@ -305,19 +248,7 @@ defineLessons({
       { wrong: '多標籤問題用 softmax。', why: '標籤可以同時成立，不該互相競爭。', right: '每個標籤各自 sigmoid＋log loss。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '多類別分類常用的輸出與損失？', options: [
-        { text: 'softmax＋cross-entropy', correct: true, why: '標準配對。' },
-        { text: 'ReLU＋MSE，因為最簡單', why: '不適合分類。' },
-        { text: '線性輸出＋MAE', why: '那是回歸。' },
-        { text: 'sigmoid＋MSE', why: '不是標準做法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '10 類問題，訓練剛開始的損失大約？', options: [
-        { text: 'ln 10 ≈ 2.3', correct: true, why: '每類約 1/10。' },
-        { text: '10，就是類別數', why: '要取 log。' },
-        { text: '0，因為還沒開始學', why: '一開始損失最大。' },
-        { text: '0.1，就是每類的機率', why: '損失是 −log。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的 5 分類模型一開始的損失是 25。可能哪裡寫錯了？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的 5 分類模型一開始的損失是 25。可能哪裡寫錯了？'], answer: [
         '合理的初始損失約 ln 5 ≈ 1.6。25 太大，常見原因：損失用錯（例如用 MSE 對沒有正規化的數字）、標籤格式錯（給了 one-hot 卻用錯 API）、初始權重太大讓 logits 極端。',
         '先檢查損失函數與標籤格式，再看最後一層輸出的數值範圍。',
       ] },
@@ -327,7 +258,7 @@ defineLessons({
       'PyTorch 的 CrossEntropyLoss 直接吃 logits。',
       '初始損失約 ln(類別數)，可以用來檢查程式。',
     ],
-    sources: ['pytorch-quickstart'],
+    sources: ['pytorch-quickstart', 'pytorch-ce'],
   },
 });
 </script>

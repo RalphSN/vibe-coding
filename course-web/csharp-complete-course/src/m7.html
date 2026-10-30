@@ -22,14 +22,6 @@ defineLessons({
       '依例外型別分別處理，順序由具體到一般',
       '用 finally 確保清理一定會執行',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-3）例外和編譯錯誤最大的差別是？', options: [
-        { text: '例外是執行到一半才發生，編譯錯誤讓程式根本不會執行', correct: true, why: '0-3 的兩個時間點。' },
-        { text: '例外比較嚴重，編譯錯誤只是排版上的提醒', why: '嚴重程度不是區分依據。' },
-        { text: '例外只會在 Windows 發生', why: '跨平台都一樣。' },
-        { text: '編譯錯誤可以用 try/catch 處理', why: 'try/catch 處理的是執行時的例外。' },
-      ] },
-    ],
     analogy: {
       text: ['try／catch 像爬山時的安全繩：try 是爬的路段，catch 是「如果滑倒就由這條繩子接住」，finally 是「不管有沒有滑倒，下山後都要把裝備收好」。'],
       limit: ['安全繩接住就沒事；catch 接住後程式不會自動「回到原地繼續爬」，而是從 catch 之後繼續。而且繩子要選對：只接得住「滑倒」的繩子，接不住「落石」（不同型別的例外）。'],
@@ -74,18 +66,14 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'Console.WriteLine(Test());\n\nstring Test()\n{\n    try\n    {\n        Console.WriteLine("A");\n        return "B";\n    }\n    finally\n    {\n        Console.WriteLine("C");\n    }\n}',
-          predict: { q: '印出的順序是？', options: ['A B C', 'A C B', 'A B'], answer: 1 },
           output: 'A\nC\nB',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'catch', label: '該在這裡 catch' }, { id: 'let', label: '讓它往外拋' }],
-          items: [
-            { text: '讀使用者選的檔案，檔案不存在', answer: 'catch', why: '預期中的情況，可以提示使用者重選。' },
-            { text: '程式內部的 bug 造成 NullReferenceException', answer: 'let', why: '這是程式錯誤，抓了也不知道怎麼救，應該修程式。' },
-            { text: '呼叫外部 API 逾時，可以重試', answer: 'catch', why: '有明確的處理方式（重試或降級）。' },
-            { text: '資料庫連線字串設定錯誤', answer: 'let', why: '設定錯誤需要人修，讓程式在啟動時就明確失敗。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['讀使用者選的檔案，檔案不存在', '該在這裡 catch', '預期中的情況，可以提示使用者重選。'],
+          ['程式內部的 bug 造成 NullReferenceException', '讓它往外拋', '這是程式錯誤，抓了也不知道怎麼救，應該修程式。'],
+          ['呼叫外部 API 逾時，可以重試', '該在這裡 catch', '有明確的處理方式（重試或降級）。'],
+          ['資料庫連線字串設定錯誤', '讓它往外拋', '設定錯誤需要人修，讓程式在啟動時就明確失敗。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="catch 的順序：具體的 FileNotFoundException 要放在一般的 IOException 前面，再放 Exception；順序顛倒時後面的 catch 永遠不會被執行，編譯器報 CS0160">
           <rect x="10" y="40" width="170" height="70" style="fill:var(--m1)" class="stroke-ink" stroke-width="4"/>
           <text x="95" y="82" text-anchor="middle" font-size="14" font-weight="900" class="on-color mono">FileNotFound…</text>
@@ -96,12 +84,16 @@ defineLessons({
           <g class="stroke-ink" stroke-width="4"><path d="M180 75 H195"/><path d="M365 75 H380"/></g>
           <text x="280" y="150" text-anchor="middle" font-size="15">具體 → 一般；顛倒時編譯器報 CS0160</text>
         </svg>`, caption: 'catch 由上往下比對，子類別放前面。' },
+        { type: 'heading', id: 'deep-exceptions', text: '深入：例外的成本、過濾器與沒人接的例外' },
+        '拋出例外要建立物件、擷取堆疊追蹤、往上找 catch，成本遠高於一般方法呼叫（微秒等級）。只要不是每秒發生上萬次，這個成本不重要；.NET 9 也換了新的例外處理實作，拋出與捕捉明顯變快。真正的理由是語意：例外只留給真的異常，讀程式的人才能信任它。',
+        '`catch (Exception ex) when (Log(ex))`，讓 Log 回傳 false，就能記錄例外卻不攔截它。過濾器執行時堆疊還沒展開，除錯器能看到出錯當下的區域變數，這是 `catch { Log(); throw; }` 做不到的。',
+        { type: 'table', head: ['例外', '能不能 catch', '建議'], rows: [
+          ['`StackOverflowException`', '不能，程式直接結束', '改寫遞迴、修正無窮呼叫'],
+          ['`OutOfMemoryException`', '技術上可以', '通常無法恢復，讓程式結束'],
+          ['`OperationCanceledException`', '可以', '是正常的取消，交給上層（8-3）'],
+          ['沒有任何 catch 的例外', '—', '主控台程式印出並以非 0 結束代碼結束；ASP.NET Core 接住後回 500，繼續服務其他請求'],
+        ] },
       ],
-      tryit: {
-        q: ['讓這段只在 HTTP 404 時回傳 null，其他錯誤照常往外拋：'],
-        draft: 'try\n{\n    return await http.GetStringAsync(url);\n}\ncatch (HttpRequestException ex) ____ (ex.StatusCode == HttpStatusCode.NotFound)\n{\n    return null;\n}',
-        answer: ['`when`。', '例外過濾器在「決定要不要抓」時就判斷，不成立時例外直接往外傳，堆疊追蹤完整保留，比在 catch 裡 if 再 throw 乾淨。'],
-      },
     },
     mistakes: [
       { wrong: '`catch (Exception) { }` 包住整個方法。', why: '所有錯誤都消失，程式帶著錯誤狀態繼續執行。', right: '只抓能處理的型別；抓 Exception 時至少記錄日誌並重新拋出。' },
@@ -109,19 +101,7 @@ defineLessons({
       { wrong: '用例外控制一般流程，例如用 Parse 失敗來判斷輸入是不是數字。', why: '例外成本高，而且讓讀者以為發生了異常狀況。', right: '用 TryParse、TryGetValue 這類 TryXxx 方法。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'try 裡執行了 return，finally 會執行嗎？', options: [
-        { text: '會，在真正離開方法之前執行', correct: true, why: 'finally 在任何離開 try 的路徑上都會執行。' },
-        { text: '不會，return 直接離開方法', why: 'return 也要先經過 finally。' },
-        { text: '只有發生例外時才會', why: '沒有例外時也會執行。' },
-        { text: '編譯錯誤：try 裡不能 return', why: 'try 裡可以 return。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 catch 裡要記錄日誌後把例外往外拋，正確寫法是？', options: [
-        { text: '`Log(ex); throw;`', correct: true, why: '保留原本的堆疊追蹤。' },
-        { text: '`Log(ex); throw ex;`', why: '會重設堆疊追蹤，失去出錯位置。' },
-        { text: '`Log(ex); throw new Exception();`', why: '丟失原本的型別、訊息與堆疊。' },
-        { text: '`Log(ex); return;`', why: '這是吞掉例外，呼叫端不知道失敗了。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一支每晚執行的批次程式處理 1000 筆資料，第 37 筆格式錯誤就整支停掉。你會怎麼調整 try/catch 的位置？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一支每晚執行的批次程式處理 1000 筆資料，第 37 筆格式錯誤就整支停掉。你會怎麼調整 try/catch 的位置？'], answer: [
         '把 try/catch 放在「每一筆」的處理外面，而不是整個迴圈外面：單筆失敗時記錄筆號、原始資料與例外訊息，然後 continue。',
         '最後回報「成功 999 筆、失敗 1 筆」並讓結束代碼非 0，讓排程系統知道要通知人。但像資料庫連不上這種「每一筆都會失敗」的錯誤，應該讓它直接中止，不要重試 1000 次。',
       ] },
@@ -139,14 +119,6 @@ defineLessons({
       '判斷什麼情況該拋例外、什麼情況該回傳結果',
       '用防衛子句檢查參數',
       '包裝例外時保留內部例外',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 7-1）`catch (Exception ex) { throw ex; }` 的問題是？', options: [
-        { text: '堆疊追蹤被重設，看不到原本出錯的位置', correct: true, why: '要用 `throw;`。' },
-        { text: '例外型別會變成 Exception', why: '型別不變，問題是堆疊。' },
-        { text: '編譯錯誤', why: '語法合法，只有分析器警告 CA2200。' },
-        { text: '會造成無窮迴圈', why: '只是往外拋一次。' },
-      ] },
     ],
     analogy: {
       text: ['例外像大樓的火警警報：只在真的出事時響。「電梯客滿」不該拉火警，告訴下一個人「請等下一班」（回傳結果）就好；「電梯纜線斷了」才拉警報（拋例外）。'],
@@ -193,19 +165,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'try\n{\n    Withdraw(100m, 500m);\n}\ncatch (InsufficientFundsException ex)\n{\n    Console.WriteLine($"{ex.Message}（差 {ex.Shortage}）");\n}\n\nvoid Withdraw(decimal balance, decimal amount)\n{\n    if (amount > balance)\n        throw new InsufficientFundsException(amount - balance);\n}\n\nclass InsufficientFundsException(decimal shortage)\n    : Exception("餘額不足")\n{\n    public decimal Shortage => shortage;\n}',
-          predict: { q: '會印出什麼？', options: ['餘額不足（差 400）', '餘額不足（差 -400）', '程式中止'], answer: 0 },
           output: '餘額不足（差 400）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'throw', label: '拋例外' }, { id: 'result', label: '回傳結果（bool／null／Result）' }],
-          items: [
-            { text: '`Divide(a, b)` 收到 b = 0', answer: 'throw', why: '呼叫端違反了方法的前提，是程式錯誤。' },
-            { text: '登入時密碼錯誤', answer: 'result', why: '每天發生很多次，是預期的業務結果。' },
-            { text: '`LoadConfig()` 發現設定檔 JSON 損毀', answer: 'throw', why: '方法無法完成承諾，而且需要人介入。' },
-            { text: '搜尋商品沒有符合的結果', answer: 'result', why: '空結果是正常情況，回傳空清單即可。' },
-            { text: '建構子收到 null 的必要參數', answer: 'throw', why: '防衛子句：ArgumentNullException。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`Divide(a, b)` 收到 b = 0', '拋例外', '呼叫端違反了方法的前提，是程式錯誤。'],
+          ['登入時密碼錯誤', '回傳結果（bool／null／Result）', '每天發生很多次，是預期的業務結果。'],
+          ['`LoadConfig()` 發現設定檔 JSON 損毀', '拋例外', '方法無法完成承諾，而且需要人介入。'],
+          ['搜尋商品沒有符合的結果', '回傳結果（bool／null／Result）', '空結果是正常情況，回傳空清單即可。'],
+          ['建構子收到 null 的必要參數', '拋例外', '防衛子句：ArgumentNullException。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="例外包裝鏈：最外層 ImportException 說明匯入失敗，InnerException 是 FormatException 說明第 5 行不是數字，保留了完整的原因鏈">
           <rect x="20" y="30" width="250" height="100" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
           <text x="145" y="68" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">ImportException</text>
@@ -216,12 +184,15 @@ defineLessons({
           <path d="M270 80 H300" class="stroke-ink" stroke-width="4"/>
           <text x="285" y="158" text-anchor="middle" font-size="15">外層說「做什麼失敗」，內層說「為什麼」</text>
         </svg>`, caption: '日誌記錄 `ex.ToString()` 會連同 InnerException 一起印出。' },
+        { type: 'heading', id: 'deep-result', text: '深入：例外、Try 模式與 Result 物件的取捨' },
+        { type: 'table', head: ['做法', '優點', '缺點'], rows: [
+          ['拋例外', '不會被默默忽略，帶堆疊追蹤', '成本高；方法簽章看不出會拋什麼'],
+          ['`bool TryXxx(out T)`', '快，.NET 內建慣例', '只能說成功或失敗，說不出原因'],
+          ['Result 物件（成功值或錯誤）', '帶原因，型別上看得到可能失敗', '.NET 沒有內建，要自己寫或用套件；呼叫端仍可能不檢查'],
+        ] },
+        'C# 沒有 Java 的 checked exception，方法簽章看不出會拋什麼，所以要用 XML 文件的 `<exception cref="…">` 寫清楚，IDE 的提示就是從這裡來的。自訂例外只在「呼叫端會針對它 catch」時才值得新增；只是想要清楚的訊息，用內建的 `InvalidOperationException`、`ArgumentException` 就好。',
+        '要在別的地方重新拋出已經捕捉的例外又保留原本的堆疊（例如跨執行緒傳遞），用 `ExceptionDispatchInfo.Capture(ex).Throw()`。await 把 Task 裡的例外丟回呼叫端時，用的就是這個機制。',
       ],
-      tryit: {
-        q: ['用一行防衛子句，讓 name 是 null、空字串或只有空白時拋例外：'],
-        draft: 'void Register(string name)\n{\n    ArgumentException.____(name);\n    // …\n}',
-        answer: ['`ArgumentException.ThrowIfNullOrWhiteSpace(name);`（.NET 8 起）。', '例外訊息會自動帶上參數名稱 name，因為這些方法用了 CallerArgumentExpression。'],
-      },
     },
     mistakes: [
       { wrong: '`throw new Exception("錯誤");`', why: '呼叫端只能 catch Exception，無法分辨是哪種錯誤；訊息也沒說是什麼失敗。', right: '用具體型別（ArgumentException、InvalidOperationException 或自訂例外），訊息寫出「什麼失敗、用了什麼輸入」。' },
@@ -229,19 +200,7 @@ defineLessons({
       { wrong: '業務規則失敗（例如庫存不足）在高流量 API 裡一律拋例外。', why: '例外成本高，大量發生時拖慢效能，日誌也被淹沒。', right: '預期中的業務失敗回傳結果物件，例外留給真的異常。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '方法收到不合法的參數（例如負數的數量），最適合拋哪種例外？', options: [
-        { text: '`ArgumentOutOfRangeException`', correct: true, why: '明確指出是參數超出允許範圍。' },
-        { text: '`Exception`', why: '太籠統，呼叫端無法分辨。' },
-        { text: '`NullReferenceException`', why: '這個例外留給執行環境，不應該自己拋。' },
-        { text: '`InvalidCastException`', why: '和轉型無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`User Get(int id) => db.Find(id) ?? throw new KeyNotFoundException();` 找不到時會？', options: [
-        { text: '拋出 KeyNotFoundException', correct: true, why: '`?? throw` 在左邊是 null 時拋例外。' },
-        { text: '回傳 null', why: '`??` 右邊是 throw，不會回傳 null。' },
-        { text: '編譯錯誤：throw 不能放在 ?? 右邊', why: 'C# 7 起支援 throw 運算式。' },
-        { text: '回傳一個空的 User', why: '沒有任何程式碼建立空的 User。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你在設計付款 API：卡片過期、餘額不足、網路逾時、程式 bug 四種失敗。哪些該用例外？API 回應又該怎麼對應？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你在設計付款 API：卡片過期、餘額不足、網路逾時、程式 bug 四種失敗。哪些該用例外？API 回應又該怎麼對應？'], answer: [
         '卡片過期、餘額不足是預期的業務結果：回傳結果物件，API 回應 422 與明確的錯誤代碼。',
         '網路逾時是外部異常：可以拋例外後由上層重試，最終仍失敗就回應 503。程式 bug 讓它往外拋，由全域錯誤處理記錄並回應 500，不把堆疊追蹤送給客戶端。',
       ] },
@@ -259,14 +218,6 @@ defineLessons({
       '說出為什麼檔案、連線用完要釋放',
       '用 using 宣告自動呼叫 Dispose',
       '分辨垃圾回收管的記憶體與需要 Dispose 的資源',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 7-1）try 裡拋了例外而且沒有 catch 抓到，finally 會執行嗎？', options: [
-        { text: '會，執行完例外才繼續往外拋', correct: true, why: '這正是 using 背後的機制。' },
-        { text: '不會，程式立刻中止', why: 'finally 會先執行。' },
-        { text: '只有在 Debug 模式才會', why: '和建置模式無關。' },
-        { text: '要看例外型別', why: '任何例外都一樣。' },
-      ] },
     ],
     analogy: {
       text: ['IDisposable 像圖書館的書：借了一定要還，不然下一個人借不到。using 就像借書時設好的「自動歸還」：不管你看完、看到一半睡著、還是被叫走，離開座位時書就自動還回去。'],
@@ -312,19 +263,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'using (var a = new Res("A"))\n{\n    using var b = new Res("B");\n    Console.WriteLine("工作中");\n}\nConsole.WriteLine("結束");\n\nclass Res(string name) : IDisposable\n{\n    public void Dispose() => Console.WriteLine($"釋放 {name}");\n}',
-          predict: { q: '「釋放 A」和「釋放 B」誰先印？', options: ['A 先', 'B 先', '只會印 A'], answer: 1 },
           output: '工作中\n釋放 B\n釋放 A\n結束',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'using', label: '要 using' }, { id: 'gc', label: '交給 GC 就好' }],
-          items: [
-            { text: '`File.OpenRead(path)` 回傳的 FileStream', answer: 'using', why: '握著檔案控制代碼。' },
-            { text: '`new List<int>()`', answer: 'gc', why: '只有記憶體，沒有實作 IDisposable。' },
-            { text: '`new SqlConnection(cs)`', answer: 'using', why: '握著資料庫連線，不還會耗盡連線池。' },
-            { text: '`new StringBuilder()`', answer: 'gc', why: '純記憶體物件。' },
-            { text: '`new HttpClient()`', answer: 'gc', why: '例外：HttpClient 設計成長期重用，不該每次 using；用 IHttpClientFactory 或共用一個實例。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`File.OpenRead(path)` 回傳的 FileStream', '要 using', '握著檔案控制代碼。'],
+          ['`new List<int>()`', '交給 GC 就好', '只有記憶體，沒有實作 IDisposable。'],
+          ['`new SqlConnection(cs)`', '要 using', '握著資料庫連線，不還會耗盡連線池。'],
+          ['`new StringBuilder()`', '交給 GC 就好', '純記憶體物件。'],
+          ['`new HttpClient()`', '交給 GC 就好', '例外：HttpClient 設計成長期重用，不該每次 using；用 IHttpClientFactory 或共用一個實例。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="GC 與 Dispose 分工：GC 回收受控記憶體，時間不確定；Dispose 立刻釋放檔案、連線等系統資源，由你決定時間">
           <rect x="10" y="20" width="260" height="140" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
           <text x="140" y="55" text-anchor="middle" font-size="19" font-weight="900" class="on-color">GC</text>
@@ -336,12 +283,15 @@ defineLessons({
           <text x="420" y="125" text-anchor="middle" font-size="16" class="on-color">你決定何時</text>
           <path d="M270 90 H290" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: '兩者分工：記憶體交給 GC，系統資源由你用 using 釋放。' },
+        { type: 'heading', id: 'deep-gc', text: '深入：GC 的分代與 Dispose 之後' },
+        'GC 把物件分成第 0、1、2 代：新物件在第 0 代，活過一次回收就升一代。大部分物件在第 0 代就死掉，所以這一代的回收很便宜；85,000 位元組以上的物件直接放進大型物件堆積（LOH），回收成本高，這也是 2-4 建議用 ArrayPool 重複使用大陣列的原因。',
+        'Dispose 之後物件仍在記憶體裡，只是資源已經釋放。再呼叫它的方法應該拋 `ObjectDisposedException`，.NET 7 起可以一行寫 `ObjectDisposedException.ThrowIf(_disposed, this);`。',
+        { type: 'table', head: ['介面', '釋放寫法', '例子'], rows: [
+          ['`IDisposable`', '`using var x = …;`', 'FileStream、StreamReader'],
+          ['`IAsyncDisposable`', '`await using var x = …;`', '資料庫連線、非同步寫入的串流'],
+          ['兩者都有', '在 async 方法裡優先 `await using`', 'DbContext、Utf8JsonWriter'],
+        ] },
       ],
-      tryit: {
-        q: ['把下面改成 using 宣告，確保 reader 一定會被釋放：'],
-        draft: 'var reader = new StreamReader("data.txt");\nstring first = reader.ReadLine() ?? "";\nreader.Dispose();\n\n// 改成：\n____ var reader = new StreamReader("data.txt");\nstring first = reader.ReadLine() ?? "";',
-        answer: ['`using var reader = new StreamReader("data.txt");`，並刪掉最後的 Dispose。', '如果只是要讀全部文字，`File.ReadAllText` 或 `File.ReadLines` 內部已經處理好開關檔案。'],
-      },
     },
     mistakes: [
       { wrong: '每個請求都 `using var client = new HttpClient();`。', why: '頻繁建立與釋放會讓 socket 卡在 TIME_WAIT，高流量時耗盡連接埠。', right: '共用一個 HttpClient，或在 ASP.NET Core 用 IHttpClientFactory。' },
@@ -349,19 +299,7 @@ defineLessons({
       { wrong: '自己實作 IDisposable 時，寫一個解構函式（finalizer）。', why: '只有直接握著非受控控制代碼時才需要；多寫會拖慢 GC。', right: '一般類別只包裝其他 IDisposable，Dispose 裡呼叫它們的 Dispose 即可。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'using 宣告的物件在什麼時候 Dispose？', options: [
-        { text: '所在的程式區塊結束時', correct: true, why: 'using var 的範圍是包住它的大括號。' },
-        { text: 'GC 執行時', why: 'GC 不會呼叫 Dispose（除非有 finalizer）。' },
-        { text: '程式結束時', why: '會在區塊結束時就釋放。' },
-        { text: '下一行程式執行前', why: '整個區塊結束才釋放。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪個物件「不」需要 using？', options: [
-        { text: '`List<string>`', correct: true, why: '沒有實作 IDisposable，只有記憶體。' },
-        { text: '`FileStream`', why: '握著檔案控制代碼。' },
-        { text: '`StreamWriter`', why: '握著底層 Stream，且 Dispose 時才會把緩衝寫入。' },
-        { text: '`SqlConnection`', why: '握著資料庫連線。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一個長時間執行的服務，跑了幾天後出現「too many open files」錯誤。你會從哪裡開始查？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一個長時間執行的服務，跑了幾天後出現「too many open files」錯誤。你會從哪裡開始查？'], answer: [
         '典型原因是某處建立了 IDisposable（FileStream、Process、HttpResponseMessage）卻沒有 Dispose，資源慢慢累積到系統上限。',
         '搜尋所有 `new FileStream`、`File.Open*`、`Process.Start` 等呼叫，確認都有 using；開啟 CA2000 分析器規則（Dispose objects before losing scope）讓編譯器幫你找。',
       ] },

@@ -1487,9 +1487,9 @@ const COURSES = [
     ['4-1', '機率分布|與期望值'],
     ['4-2', '指數|與 softmax'],
   ]},
-  { id: 5, title: '對數與 cross-entropy：|損失怎麼算', short: '對數', desc: '對數把乘法變加法；cross-entropy 用 −log 衡量猜得多差。', lessons: [
+  { id: 5, title: '對數與 cross-entropy：|損失怎麼算', short: '對數', desc: '對數把乘法變加法；cross-entropy 用 −log 衡量猜得多差；最後附全書一頁地圖。', lessons: [
     ['5-1', '對數：|把乘法變加法'],
-    ['5-2', 'cross-entropy|＋總複習'],
+    ['5-2', 'cross-entropy|＋一頁地圖'],
   ]},
 ];
 
@@ -1553,6 +1553,13 @@ defineSources({
   'word2vec': { title: 'Mikolov 等｜Efficient Estimation of Word Representations in Vector Space（2013）', url: 'https://arxiv.org/abs/1301.3781' },
   'pt-linear': { title: 'PyTorch 2.14 文件｜torch.nn.Linear', url: 'https://docs.pytorch.org/docs/2.14/generated/torch.nn.Linear.html' },
   'pt-ce': { title: 'PyTorch 2.14 文件｜torch.nn.CrossEntropyLoss', url: 'https://docs.pytorch.org/docs/2.14/generated/torch.nn.CrossEntropyLoss.html' },
+  'kaplan': { title: 'Kaplan 等｜Scaling Laws for Neural Language Models（2020）：訓練運算量 C ≈ 6N 每 token', url: 'https://arxiv.org/abs/2001.08361' },
+  'nissim2020': { title: 'Nissim、van Noord、van der Goot｜Fair Is Better than Sensational: Man Is to Doctor as Woman Is to Doctor（Computational Linguistics 46(2), 2020）', url: 'https://aclanthology.org/2020.cl-2.7/' },
+  'palm': { title: 'Chowdhery 等｜PaLM: Scaling Language Modeling with Pathways（2022）：SwiGLU、線性層不用偏差', url: 'https://arxiv.org/abs/2204.02311' },
+  'flashattn': { title: 'Dao 等｜FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness（2022）', url: 'https://arxiv.org/abs/2205.14135' },
+  'nucleus': { title: 'Holtzman 等｜The Curious Case of Neural Text Degeneration（2019）：nucleus（top-p）取樣', url: 'https://arxiv.org/abs/1904.09751' },
+  'ieee754': { title: 'PyTorch 2.14 文件｜torch.finfo（float32、float16、bfloat16 的範圍與精度）', url: 'https://docs.pytorch.org/docs/2.14/type_info.html' },
+  'attnsink': { title: 'Xiao 等｜Efficient Streaming Language Models with Attention Sinks（2023）', url: 'https://arxiv.org/abs/2309.17453' },
   'micrograd': { title: 'Andrej Karpathy｜micrograd（MIT）', url: 'https://github.com/karpathy/micrograd' },
 });
 </script>
@@ -1565,6 +1572,7 @@ defineTerms({
   '矩陣': { en: 'matrix', def: '排成列與行的一格一格數字；一層神經網路的權重就是一個矩陣。', example: '2 列 3 行的矩陣，形狀寫成 2×3。', lesson: '2-1' },
   '梯度': { en: 'gradient', def: '每個參數各自的斜率排成的向量；指向「損失上升最快」的方向，所以訓練往反方向走。', example: 'f＝w₁²＋3w₂² 在 (1, 1) 的梯度是 (2, 6)。', lesson: '3-2' },
   'softmax': { en: 'softmax', def: '把一串任意的分數變成加起來是 1 的機率：每個分數取 e 的次方，再除以總和。', example: '(2, 1, 0) → (0.665, 0.245, 0.090)。', lesson: '4-2' },
+  'FLOP': { en: 'floating-point operation', def: '一次浮點數的加法或乘法；用來估算模型要算多少。', example: '一次「乘完再加」＝ 2 FLOP。', lesson: '0-1' },
   'cross-entropy': { en: 'cross-entropy', def: '分類與語言模型最常用的損失：正確答案拿到的機率取 −log。猜對且有把握時接近 0，越沒把握越大。', example: '正確答案機率 0.665 → 損失 0.41。', lesson: '5-2' },
 });
 
@@ -1612,7 +1620,7 @@ defineLessons({
             { label: 'w₁·x₁', value: a.toFixed(2), ratio: Math.min(1, Math.abs(a) / 6) },
             { label: 'w₂·x₂', value: b.toFixed(2), ratio: Math.min(1, Math.abs(b) / 6) },
             { label: '分數（相加）', value: s.toFixed(2), ratio: Math.min(1, Math.abs(s) / 12) },
-          ], note: '一個 70B 模型產生一個字，大約要做 1,400 億次這種「乘完再加」。數學不難，難的是數量。' };
+          ], note: '一個 70B 模型產生一個字，大約要做 700 億次這種「乘完再加」（約 1,400 億次浮點運算）。數學不難，難的是數量。' };
         } } },
         { type: 'table', head: ['你在其他卷卡在…', '翻這一課'], rows: [
           ['embedding、相似度、向量資料庫', '1-1、1-2'],
@@ -1628,42 +1636,32 @@ defineLessons({
           ${[['聽過名字', 10], ['看得懂公式', 147], ['能手算小例子', 284], ['能推導、證明', 421]].map(([t, x]) => `<text x="${x + 63}" y="190" text-anchor="middle" font-size="13">${t}</text>`).join('')}
           <path d="M147 40 L405 40" style="stroke:var(--m1)" stroke-width="6"/><text x="276" y="30" text-anchor="middle" font-size="14" font-weight="900">這本的範圍</text>
         </svg>`, caption: '目標是 L1–L2：知道每個符號在算什麼，能用小數字驗算。' },
+        { type: 'heading', id: 'deep-count', text: '深入：一個字要算多少次' },
+        '每個權重在前向時只參與一次「乘完再加」，一次乘加算 2 次浮點運算（[[FLOP]]）。所以參數有 N 個的模型，產生一個 token 約要 2N FLOP；訓練還要反向傳播（3-3），反向約是前向的 2 倍，每個 token 合計約 6N。這條估算出自 Kaplan 等 2020 的 scaling laws 論文，它忽略了 attention 分數那部分（2-2），context 很長時會低估。',
+        { type: 'table', head: ['情境（N ＝ 700 億）', '估算', '數量級'], rows: [
+          ['推論：產生 1 個 token', '2N', '約 1.4 × 10¹¹ FLOP'],
+          ['訓練：看過 1 個 token', '6N', '約 4.2 × 10¹¹ FLOP'],
+          ['訓練：看過 15 兆個 token', '6N × 15 × 10¹²', '約 6.3 × 10²⁴ FLOP'],
+        ], caption: '這就是為什麼訓練要上千張 GPU 跑好幾個月，而推論一張到幾張就夠。' },
+        { type: 'table', head: ['這本沒教、但其他卷會碰到的數學', '在哪裡出現', '先知道這一句就好'], rows: [
+          ['平均數與變異數', 'LayerNorm、RMSNorm（第四部）', '把一個向量的數字拉回「平均 0、大小差不多」的範圍'],
+          ['低秩分解（矩陣拆成兩個瘦矩陣相乘）', '微調用的 LoRA', 'd×d 的更新改成 (d×r)(r×d)，r 很小，參數少很多'],
+          ['浮點數格式', '量化、混合精度（第五部）', '位元越少越省記憶體，但能表示的範圍與精度變小（5-1 深入）'],
+          ['動量與自適應學習率', 'Adam 優化器（第四部）', '每個參數各自調步伐，狹長的碗走得比較順（3-2 深入）'],
+        ] },
       ],
-      tryit: {
-        q: ['用拉桿：讓分數剛好等於 0。你調了哪個數？還有沒有別的組合也可以？'],
-        draft: '我的組合：＿\n另一個組合：＿',
-        answer: ['例如 x₁＝2、x₂＝1、w₁＝0.5、w₂＝−1：1 ＋（−1）＝ 0。', '組合有無限多種：只要 w₁·x₁ 和 w₂·x₂ 互相抵消就好。訓練就是在這麼多組合裡，找一組讓整體預測最準的權重。'],
-      },
     },
     mistakes: [
       { wrong: '覺得要先學完微積分和線性代數才能讀其他卷。', why: '模型只用到少數幾個概念，而且多半是加減乘除。', right: '卡住時再翻對應的課。' },
       { wrong: '把公式裡的符號當成要背的東西。', why: '符號只是縮寫，背了不懂也用不上。', right: '每個公式都用小數字手算一次。' },
       { wrong: '以為模型裡有很深奧的數學在「思考」。', why: '每一步都是乘、加、取指數、取對數；能力來自數量和訓練。', right: '把模型想成很大量的簡單運算。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '模型產生一個字時（前向），下面哪一個工具「不會」用到？', options: [
-        { text: '梯度', correct: true, why: '梯度只在訓練、往回調權重時才算。' },
-        { text: '矩陣乘法，因為每一層都要用到它', why: '每一層都在做矩陣乘法。' },
-        { text: '點積', why: 'attention 用點積決定要看哪些字。' },
-        { text: 'softmax，把分數變成機率再選字', why: '選字前要先變成機率。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你在第二部讀到「Q 和 K 做點積再除以 √d」看不懂。先翻哪一課？', options: [
-        { text: '1-2', correct: true, why: '點積與 cosine：衡量兩個向量像不像。' },
-        { text: '3-3，鏈鎖律講的是往回傳遞', why: '那是反向傳播。' },
-        { text: '5-1，對數把乘法變成加法的那一課', why: '那是損失的部分。' },
-        { text: '2-2', why: '形狀有關，但先要懂點積。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['看上面的地圖，用自己的話說：「模型產生一個字」和「模型學會一件事」各經過哪幾個工具？'], answer: [
-        '產生一個字：token 變成向量 → 每一層做矩陣乘法（attention 裡用點積）→ softmax 變成機率 → 選一個字。',
-        '學會一件事：先做一次上面的前向，用 cross-entropy（−log）算猜得多差，再用梯度往回調每個權重，讓下次猜得好一點。',
-      ] },
-    ],
     keypoints: [
       '五個工具：向量與點積、矩陣乘法、梯度、softmax、cross-entropy。',
       '產生文字只用前向；訓練才需要梯度。',
       '卡在哪裡就翻哪一課，每個公式都用小數字算一次。',
     ],
-    sources: ['dlbook', '3b1b-nn'],
+    sources: ['dlbook', '3b1b-nn', 'kaplan'],
   },
 });
 </script>
@@ -1694,14 +1692,6 @@ defineLessons({
       '說出向量就是一串有順序的數字',
       '算出向量的長度、相加、乘一個數',
       '知道 embedding 為什麼要用向量表示意思',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1）模型產生一個字（前向）時，哪一個工具用不到？', options: [
-        { text: '梯度', correct: true, why: '只有訓練時才算梯度。' },
-        { text: '矩陣乘法，因為那只在訓練時用', why: '每一層都在做矩陣乘法。' },
-        { text: 'softmax', why: '選字前要先變成機率。' },
-        { text: '向量，因為文字直接進模型', why: 'token 要先變成向量。' },
-      ] },
     ],
     analogy: {
       text: ['描述一杯手搖飲：甜度 3 分、冰塊 7 分、珍珠 1 份。寫成 (3, 7, 1)，就是一個三維[[向量]]。兩杯飲料的三個數字都很接近，喝起來就很像。', '模型把每個 token 變成一個向量，只是不是 3 個數字，而是數百到數千個（[[維度]]）。每個數字不像「甜度」那樣有清楚的名字，但整串數字合起來，意思相近的字就會落在附近，這就是 [[embedding]]。'],
@@ -1763,12 +1753,15 @@ defineLessons({
           <text x="470" y="134" text-anchor="middle" font-size="13" font-weight="900">＋ 女人</text>
           <text x="470" y="158" text-anchor="middle" font-size="13">≈ 女王</text>
         </svg>`, caption: 'Mikolov 等 2013（word2vec）的經典例子：同一種關係（男 → 女）在空間裡是同一個方向。示意圖，不是實際座標。' },
+        { type: 'heading', id: 'deep-analogy', text: '深入：類比算式沒有看起來那麼神' },
+        '「國王 − 男人 ＋ 女人」算出來的向量，最接近的詞其實常常還是「國王」本身。原始的評估方式會把題目裡的三個詞排除，才輪到「女王」。Nissim 等 2020 指出，用這種排除規則去找「性別偏見」的類比，結果會被放大。',
+        '所以向量加減能抓到一部分關係，但不是每種關係都剛好是一個固定方向。拿來當直覺很好；拿來當證據，要先問「有沒有排除輸入詞、最近的前幾名是什麼」。',
+        { type: 'table', head: ['維度 d', '兩個隨機方向的 cosine 大約落在', '白話'], rows: [
+          ['2', '−1 到 1 都很常見', '隨便兩支箭頭，像或不像都有可能'],
+          ['300（word2vec）', '±0.06 左右（約 1/√d）', '隨機的兩個詞幾乎垂直'],
+          ['3,000', '±0.02 左右', '「0.2」在高維已經算相當像'],
+        ], caption: '高維空間裡，隨機向量幾乎都互相垂直。所以「cosine 多少才算像」沒有通用門檻，要看模型與資料，實際拿幾組已知的相似、不相似來校準。' },
       ],
-      tryit: {
-        q: ['手算：a ＝ (6, 8)，長度是多少？3a 的長度呢？'],
-        draft: '|a| ＝ ＿\n|3a| ＝ ＿',
-        answer: ['|a| ＝ √(36＋64) ＝ √100 ＝ 10。', '|3a| ＝ 30：乘一個數，長度就乘那個數（取絕對值），方向不變。可以用上面的拉桿驗算。'],
-      },
     },
     mistakes: [
       { wrong: '長度直接把數字加起來：(3, 4) → 7。', why: '箭頭是斜的，不是走兩段路。', right: '平方、加總、開根號：5。' },
@@ -1776,19 +1769,7 @@ defineLessons({
       { wrong: '兩個向量維度不同也拿來相加。', why: '相加要一個位置對一個位置。', right: '先確認維度一樣；不同模型的 embedding 不能混用。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '(1, 2) ＋ (3, −1) ＝？', options: [
-        { text: '(4, 1)', correct: true, why: '1＋3、2＋(−1)。' },
-        { text: '(3, −2)，對應位置相乘的結果', why: '那是相乘。' },
-        { text: '5', why: '相加的結果還是向量。' },
-        { text: '(4, 3)', why: '2＋(−1) ＝ 1。' },
-      ] },
-      { level: '應用', type: 'mc', q: '(5, 12) 的長度是？', options: [
-        { text: '13', correct: true, why: '√(25＋144) ＝ √169。' },
-        { text: '17，兩個數字加起來', why: '不能直接相加。' },
-        { text: '169', why: '還要開根號。' },
-        { text: '60', why: '那是相乘。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['推薦系統把每部電影表示成向量（例如 (動作, 浪漫, 喜劇) 的程度）。使用者看過的電影向量加總起來，可以拿來做什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['推薦系統把每部電影表示成向量（例如 (動作, 浪漫, 喜劇) 的程度）。使用者看過的電影向量加總起來，可以拿來做什麼？'], answer: [
         '加總（或平均）得到「使用者口味」向量，再找跟這個向量最接近的電影推薦。',
         '這就是 embedding 的用法：東西變成向量後，「像不像」就能用數學算（下一課的點積與 cosine）。真實系統的維度更多，而且每一維沒有名字。',
       ] },
@@ -1798,7 +1779,7 @@ defineLessons({
       '長度 ＝ √（平方總和）；乘一個數只改長度。',
       'embedding 讓意思相近的東西落在附近。',
     ],
-    sources: ['3b1b-la', 'word2vec', 'dlbook'],
+    sources: ['3b1b-la', 'word2vec', 'nissim2020', 'dlbook'],
   },
 
   '1-2': {
@@ -1806,14 +1787,6 @@ defineLessons({
       '手算兩個向量的點積',
       '用 cosine 判斷兩個向量像不像',
       '說出 attention 為什麼用點積、為什麼除以 √d',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）(6, 8) 的長度？', options: [
-        { text: '10', correct: true, why: '√100。' },
-        { text: '14，兩個數字加起來', why: '不能直接相加。' },
-        { text: '100', why: '還要開根號。' },
-        { text: '48', why: '那是相乘。' },
-      ] },
     ],
     analogy: {
       text: ['兩個人填同一份口味問卷（甜、辣、酸，喜歡 +、討厭 −）。每一題兩人答案相乘：都喜歡或都討厭得正分，一個喜歡一個討厭得負分；全部加起來就是[[點積]]。分數越高，口味越合。', '但兩人「多熱情」也會影響總分：每題都打滿分的人，跟誰都高分。[[cosine 相似度]]把兩人的熱情（[[長度]]）除掉，只看方向像不像。'],
@@ -1867,12 +1840,27 @@ defineLessons({
           <path d="M260 110 L300 110 M410 110 L440 110" class="stroke-ink" stroke-width="3"/>
           <text x="280" y="210" text-anchor="middle" font-size="13">點積越大 ＝ 越相關 ＝ 越要看它</text>
         </svg>`, caption: 'Vaswani 等 2017：softmax(QKᵀ/√d)V。維度 d 越大，點積的數值越大，除以 √d 把它拉回適當範圍，避免 softmax 太極端、梯度變得很小。' },
+        { type: 'heading', id: 'deep-sqrt-d', text: '深入：為什麼剛好是 √d' },
+        '假設 Q 和 K 的每個數字都是平均 0、變異數 1 的隨機數。點積是 d 項乘積相加，每項變異數是 1，加起來變異數是 d，典型大小（標準差）就是 √d。除以 √d 之後，不管 d 是 64 還是 128，分數的典型大小都回到 1 左右。這是論文附註裡的推理，不是試出來的常數。',
+        { type: 'widget', name: 'knobs', props: { title: '維度 d 變大，點積的典型大小跟著變大（實際計算）', sliders: [
+          { id: 'd', label: '維度 d', min: 4, max: 1024, step: 4, value: 64 },
+        ], compute: (v) => {
+          const sd = Math.sqrt(v.d);
+          const top = Math.exp(sd) / (Math.exp(sd) + 1);
+          const scaled = Math.exp(1) / (Math.exp(1) + 1);
+          return { rows: [
+            { label: '點積的典型大小 √d', value: sd.toFixed(1), ratio: Math.min(1, sd / 32) },
+            { label: '除以 √d 之後', value: '1.0', ratio: 1 / 32 },
+            { label: '兩個分數差一個 √d 時，softmax 給大的那個', value: top.toFixed(4), ratio: top },
+            { label: '除以 √d 後只差 1，softmax 給大的那個', value: scaled.toFixed(3), ratio: scaled },
+          ], note: '預設 d ＝ 64：沒縮放時，差一個標準差（8）就讓 softmax 給出 0.9997，幾乎只看一個字；縮放後只差 1，是 0.731，還會分一些注意力給別人。' };
+        } } },
+        { type: 'table', head: ['用哪一種', '什麼時候', '什麼時候不適用'], rows: [
+          ['cosine', '只在乎方向，例如語意搜尋', '有一邊是零向量時沒有定義（除以 0）'],
+          ['點積', '模型訓練時就用點積（長度也帶資訊，例如熱門程度）', '長度沒意義時，長的向量會一直贏'],
+          ['歐氏距離', '分群、找最近的點', '高維時距離都差不多，區分力下降'],
+        ], caption: '原則：用 embedding 模型訓練時用的那一種；說明文件沒寫時，先把長度統一成 1，三種排名就會一樣。' },
       ],
-      tryit: {
-        q: ['手算：a ＝ (1, 2, 2)、b ＝ (2, 1, −2)。點積和 cosine 各是多少？'],
-        draft: '點積 ＝ ＿\ncosine ＝ ＿',
-        answer: ['點積 ＝ 2 ＋ 2 − 4 ＝ 0。', '長度都是 3，cosine ＝ 0 ÷ 9 ＝ 0：兩個向量互相垂直，在這個空間裡「不相關」。'],
-      },
     },
     mistakes: [
       { wrong: '點積越大就一定越像。', why: '長度大的向量點積本來就大。', right: '要比方向就用 cosine，或先把長度統一成 1。' },
@@ -1880,19 +1868,7 @@ defineLessons({
       { wrong: '以為 attention 的 √d 是隨便加的常數。', why: '它和維度有關：維度越大，點積的變異越大。', right: '除以 √d 讓分數不會隨維度暴增。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '(2, 0)·(0, 5) ＝？', options: [
-        { text: '0', correct: true, why: '2×0 ＋ 0×5。兩個向量垂直。' },
-        { text: '10，兩個數字相乘', why: '要對應位置相乘。' },
-        { text: '7', why: '不是全部相加。' },
-        { text: '(0, 0)', why: '點積的結果是一個數字。' },
-      ] },
-      { level: '應用', type: 'mc', q: '向量資料庫裡，文件 A 和問題的點積是 8，文件 B 是 6。但 A 的長度是 B 的 2 倍。用 cosine 看，誰比較像？', options: [
-        { text: 'B', correct: true, why: 'A 的 cosine 是 8 ÷ (2L × |q|) ＝ 4/(L|q|)，B 是 6/(L|q|)，B 較大。' },
-        { text: 'A，因為點積比較大，就代表比較相似', why: '點積被長度放大了。' },
-        { text: '一樣像', why: '算出來不一樣。' },
-        { text: '資訊不夠，無法判斷', why: '長度比例已經足夠算。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['做照片搜尋：每張照片和每段文字都變成同一個空間的向量。使用者輸入「海邊的夕陽」，系統怎麼找照片？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['做照片搜尋：每張照片和每段文字都變成同一個空間的向量。使用者輸入「海邊的夕陽」，系統怎麼找照片？'], answer: [
         '把這句話變成向量，跟每張照片的向量算 cosine（或長度統一後的點積），取最大的幾張。',
         '前提是文字和照片的 embedding 來自同一個模型、同一個空間；不同模型的向量不能互相比較（1-1 的常見錯誤）。',
       ] },
@@ -1915,6 +1891,8 @@ defineTerms({
   '偏差': { en: 'bias', def: '每個輸出各加的一個常數，讓輸出不必經過 0。', example: 'y ＝ Wx ＋ b 的 b。', lesson: '2-1' },
   '活化函數': { en: 'activation function', def: '每一層算完加權加總後套上的非線性函數；沒有它，再多層都等於一層。', example: 'ReLU：負的變 0、正的不變。', lesson: '2-1' },
   '形狀': { en: 'shape', def: '矩陣有幾列、幾行，寫成「列×行」。', example: '32×768：32 個 token、每個 768 維。', lesson: '2-2' },
+  '萬能逼近定理': { en: 'universal approximation theorem', def: '只有一個隱藏層、但夠寬，加上非線性活化函數，就能把任何連續函數逼近到想要的精度。只保證存在，不保證學得到或寬度合理。', example: '用很多個 ReLU 折線拼出一條曲線。', lesson: '2-1' },
+  '算術強度': { en: 'arithmetic intensity', def: '每從記憶體搬 1 byte 資料，做幾次運算。太低時 GPU 在等資料，不是在算。', example: '一次只處理 1 個 token 的矩陣乘法約 1 FLOP/byte。', lesson: '2-2' },
   '批次': { en: 'batch', def: '一次一起送進模型的很多筆資料；疊成矩陣，一次矩陣乘法全部算完。', example: '32 個 token 疊成 32 列。', lesson: '2-2' },
 });
 
@@ -1927,14 +1905,6 @@ defineLessons({
       '手算矩陣乘向量',
       '說出「一列 ＝ 一個神經元」',
       '算出一層網路有幾個參數',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）(1, 2, 3)·(1, 0, 1) ＝？', options: [
-        { text: '4', correct: true, why: '1 ＋ 0 ＋ 3。' },
-        { text: '6，全部數字加起來', why: '要對應相乘再加。' },
-        { text: '(1, 0, 3)', why: '點積的結果是一個數字。' },
-        { text: '0', why: '這兩個向量不垂直。' },
-      ] },
     ],
     analogy: {
       text: ['評審團有兩位評審，每位對「外觀、口味、價格」三項各有自己的看重程度。同一份參賽作品的三項分數，第一位評審用他的權重加總、第二位用他的權重加總，就得到兩個總分。', '[[矩陣]]就是把每位評審的權重排成一列；[[矩陣乘向量]]就是「每位評審各做一次點積」。一層神經網路做的就是這件事，再加上[[偏差]]和[[活化函數]]。'],
@@ -1997,12 +1967,15 @@ y = torch.relu(layer(x))   # 先 Wx ＋ b，再 ReLU` },
           <text x="415" y="128" text-anchor="middle" font-size="13" class="on-color">大模型裡的一層</text>
           <text x="280" y="186" text-anchor="middle" font-size="14" font-weight="900" class="mono">參數 ＝ 輸入數 × 輸出數 ＋ 輸出數</text>
         </svg>`, caption: '模型的「70B 參數」，就是很多層這種矩陣裡的數字全部加起來。' },
+        { type: 'heading', id: 'deep-activation', text: '深入：活化函數與偏差的實務選擇' },
+        '理論上，只要一層夠寬，加上非線性就能逼近任何連續函數（[[萬能逼近定理]]）。但「夠寬」可能寬到不實際，疊多層通常用少得多的參數就做到同樣的事，這是深度網路的實際理由。',
+        { type: 'table', head: ['活化函數', '公式的白話', '用在哪', '代價'], rows: [
+          ['ReLU', '負的變 0、正的不變', '早期 CNN、很多小網路', '輸入一直是負的，斜率永遠 0，神經元「死掉」不再學'],
+          ['GELU', '負的不是直接切掉，而是平滑地壓小', 'BERT、GPT-2 等', '比 ReLU 多算一點'],
+          ['SwiGLU', '一條路算值、另一條路算「開多大的門」，兩者相乘', 'PaLM、Llama 系列', '前饋層要 3 個矩陣，不是 2 個'],
+        ] },
+        '偏差也不是一定要有：PaLM 的論文寫明線性層都不用偏差，Llama 3 的 attention 層設定也是不用偏差。PaLM 給的理由是拿掉之後大模型訓練更穩定；而且每層都有正規化會重新調整數字的位移，偏差能做的事不多。所以「參數 ＝ 輸入 × 輸出 ＋ 輸出」是有偏差時的算法，算現代 LLM 時常常只有前一項。',
       ],
-      tryit: {
-        q: ['手算：同一層（W、b 同上圖），輸入 x ＝ (2, 0, −1)，兩個輸出各是多少？經過 ReLU 呢？'],
-        draft: '神經元 1：＿\n神經元 2：＿',
-        answer: ['神經元 1：2 ＋ 0 − 1 ＋ 0 ＝ 1，ReLU 後是 1。', '神經元 2：1 − 0 − 2 ＋ 1 ＝ 0，ReLU 後是 0。用上面的拉桿可以驗算。'],
-      },
     },
     mistakes: [
       { wrong: '以為一個神經元是一個數字。', why: '一個神經元有一整列權重，外加一個偏差。', right: '一列權重 ＋ 一個 b ＝ 一個神經元。' },
@@ -2010,21 +1983,9 @@ y = torch.relu(layer(x))   # 先 Wx ＋ b，再 ReLU` },
       { wrong: '覺得活化函數可有可無。', why: '沒有它，好幾層矩陣乘法可以合併成一層。', right: '每層之間都要有非線性。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '權重矩陣 5×10 的一層，輸入和輸出各幾維？', options: [
-        { text: '輸入 10、輸出 5', correct: true, why: '（輸出數 × 輸入數）。' },
-        { text: '輸入 5、輸出 10，照寫的順序', why: '順序剛好相反。' },
-        { text: '都是 50', why: '50 是權重數。' },
-        { text: '都是 15', why: '不是相加。' },
-      ] },
-      { level: '應用', type: 'mc', q: '輸入 100 維、輸出 20 維的一層，參數量？', options: [
-        { text: '2,020', correct: true, why: '100×20 ＋ 20。' },
-        { text: '2,000，權重全部就是這麼多', why: '忘了 20 個偏差。' },
-        { text: '120', why: '要相乘。' },
-        { text: '2,100', why: '偏差是輸出數，不是輸入數。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['有人說：「把兩層都不加活化函數，可以省計算，效果一樣。」為什麼不對？'], answer: [
-        'W₂(W₁x) ＝ (W₂W₁)x：兩個矩陣可以先乘成一個矩陣，所以兩層等於一層，表達能力沒有變多。',
-        '加了 ReLU 之類的非線性，兩層才真的比一層能表達更複雜的關係。這就是「深度」有用的前提。',
+      { level: '深入思考', type: 'reveal', q: ['Transformer 的前饋層先 768 進 3072 出，再 3072 進 768 出，都有偏差。這兩層共有幾個參數？用 16 位元（2 bytes）存，佔多少記憶體？'], answer: [
+        '第一層 768 × 3072 ＋ 3072 ＝ 2,362,368；第二層 3072 × 768 ＋ 768 ＝ 2,360,064；合計 4,722,432 個。',
+        '每個 2 bytes，約 9.4 MB。常見的錯誤是只算一層，或把 768 × 3072 當成兩層共用；兩個矩陣形狀互為轉置，但數字是各自獨立學的。',
       ] },
     ],
     keypoints: [
@@ -2032,7 +1993,7 @@ y = torch.relu(layer(x))   # 先 Wx ＋ b，再 ReLU` },
       '一層網路：y ＝ 活化(Wx ＋ b)。',
       '參數 ＝ 輸入 × 輸出 ＋ 輸出。',
     ],
-    sources: ['pt-linear', '3b1b-la', '3b1b-nn'],
+    sources: ['pt-linear', '3b1b-la', '3b1b-nn', 'palm'],
   },
 
   '2-2': {
@@ -2040,14 +2001,6 @@ y = torch.relu(layer(x))   # 先 Wx ＋ b，再 ReLU` },
       '用形狀規則判斷兩個矩陣能不能相乘',
       '說出為什麼要把很多 token 疊成一個矩陣',
       '估算矩陣乘法的運算量',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-1）輸入 4 維、輸出 3 維的一層，權重形狀？', options: [
-        { text: '3×4', correct: true, why: '（輸出 × 輸入）。' },
-        { text: '4×3，先寫輸入再寫輸出', why: 'PyTorch 的 weight 是（out, in）。' },
-        { text: '7', why: '形狀是兩個數字。' },
-        { text: '12×1', why: '是矩陣，不是一長條。' },
-      ] },
     ],
     analogy: {
       text: ['上一課是一份作品給評審團打分。比賽有 32 份作品時，不用叫評審團開 32 次會：把 32 份作品的分數排成一張表，一次全部算完。', '這張表就是[[批次]]：32 個 token 疊成 32 列的矩陣，乘上權重矩陣，一次得到 32 個輸出。GPU 最擅長這種一次算一大片的工作。'],
@@ -2088,7 +2041,7 @@ y = torch.relu(layer(x))   # 先 Wx ＋ b，再 ReLU` },
           ], note: '預設值：32 個 token、768 維、輸出 3072 維 → 輸出 32×3072，約 7,550 萬次乘法。m 加倍，運算量加倍，但權重數不變。' };
         } } },
         { type: 'table', head: ['在模型的哪裡', '形狀', '說明'], rows: [
-          ['一層全連接', '(token 數×d) × (d×4d)', 'Transformer 的前饋層常把維度放大 4 倍再縮回來'],
+          ['一層全連接', '(token 數×d) × (d×4d)', '原始 Transformer 的前饋層把維度放大 4 倍再縮回來；Llama 3 8B 用 SwiGLU，是 4096 → 14336（3.5 倍）'],
           ['attention 分數 QKᵀ', '(n×d) × (d×n) ＝ n×n', '每個 token 對每個 token 一個分數'],
           ['乘上 V', '(n×n) × (n×d) ＝ n×d', '依分數把資訊加權加總'],
         ], caption: 'QKᵀ 是 n×n：context 長度加倍，這一步的分數變 4 倍。這是長 context 貴的原因之一。' },
@@ -2103,13 +2056,24 @@ X @ bad                    # ValueError：中間的 768 和 3072 對不上` },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="attention 分數矩陣 n×n：context 從 4 個 token 變 8 個，格子從 16 格變 64 格">
           ${[[4, 30], [8, 300]].map(([n, x0]) => { const s = 18; return Array.from({ length: n * n }, (_, i) => `<rect x="${x0 + (i % n) * s}" y="${30 + Math.floor(i / n) * s}" width="${s}" height="${s}" style="fill:var(--${n === 4 ? 'm1' : 'm4'})" class="stroke-ink" stroke-width="1.5"/>`).join('') + `<text x="${x0 + (n * s) / 2}" y="${n * s + 56}" text-anchor="middle" font-size="14" font-weight="900">n ＝ ${n}：${n * n} 格</text>`; }).join('')}
           <path d="M140 80 L280 80" class="stroke-ink" stroke-width="3"/><text x="210" y="70" text-anchor="middle" font-size="13" font-weight="900">長度 ×2</text><text x="210" y="102" text-anchor="middle" font-size="13">分數 ×4</text>
-        </svg>`, caption: '長度 ×10，分數格子 ×100。很多長 context 的技巧都在想辦法少算這張表。' },
+        </svg>`, caption: '長度 ×10，分數格子 ×100。很多長 context 的技巧都在想辦法少算或少存這張表。' },
+        { type: 'heading', id: 'deep-intensity', text: '深入：同樣的乘法，為什麼有時快、有時慢' },
+        'GPU 算乘法很快，但把權重從記憶體搬進來比較慢。一次只處理 1 個 token（m ＝ 1）時，每搬 1 個 byte 的權重只做約 1 次運算，GPU 大半時間在等資料；這叫受記憶體頻寬限制。把 m 加大，權重搬一次就被重複用 m 次，每 byte 做的運算數（[[算術強度]]）跟著上升。',
+        { type: 'widget', name: 'knobs', props: { title: '(m×k) × (k×k)，16 位元：每搬 1 byte 做幾次運算（實際計算）', sliders: [
+          { id: 'm', label: 'm：一次處理幾個 token', min: 1, max: 512, step: 1, value: 1 },
+          { id: 'k', label: 'k：維度', min: 512, max: 8192, step: 512, value: 4096 },
+        ], compute: (v) => {
+          const flops = 2 * v.m * v.k * v.k;
+          const bytes = 2 * (v.m * v.k + v.k * v.k + v.m * v.k);
+          const ai = flops / bytes;
+          return { rows: [
+            { label: '運算量（FLOP）', value: flops.toLocaleString(), ratio: Math.min(1, flops / (2 * 512 * 8192 * 8192)) },
+            { label: '要搬的資料（bytes）', value: bytes.toLocaleString(), ratio: Math.min(1, bytes / (2 * (2 * 512 * 8192 + 8192 * 8192))) },
+            { label: '算術強度（FLOP / byte）', value: ai.toFixed(1), ratio: Math.min(1, ai / 500) },
+          ], note: '預設 m ＝ 1、k ＝ 4096：強度約 1.0，記憶體是瓶頸。m 拉到 32 約 31.5，256 約 227.6；權重一樣多，運算卻多了好幾百倍。這就是推論服務要把很多使用者的請求湊成一批的原因。' };
+        } } },
+        'attention 的 n×n 表也有同樣的問題。FlashAttention（Dao 等 2022）沒有少算任何一格，它把表切成小塊、在 GPU 晶片上的快速記憶體裡算完就丟，不把整張表寫回記憶體，結果和原本完全一樣但快很多。真的「少算」的是另一類做法，例如只看附近一段的滑動視窗 attention，那會改變結果。',
       ],
-      tryit: {
-        q: ['(10×64) × (64×64) × (64×5) 最後是什麼形狀？中間有哪些數字「消失」了？'],
-        draft: '形狀：＿\n消失的：＿',
-        answer: ['先算前兩個：(10×64) × (64×64) ＝ 10×64；再乘 (64×5) ＝ 10×5。', '消失的是每次相乘中間對上的 64。可以想成：10 個 token 各經過兩層，最後每個 token 剩 5 個數字。'],
-      },
     },
     mistakes: [
       { wrong: '(3×4) × (3×4) 可以相乘。', why: '中間是 4 和 3，對不上。', right: '其中一個轉置：(3×4) × (4×3)。' },
@@ -2117,19 +2081,7 @@ X @ bad                    # ValueError：中間的 768 和 3072 對不上` },
       { wrong: '以為批次變大，權重也要變多。', why: '權重是 k×n，跟 m 無關。', right: '批次只影響運算量與輸出大小。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '(5×3) × (3×7) 的結果形狀？', options: [
-        { text: '5×7', correct: true, why: '留下外面的 5 和 7。' },
-        { text: '3×3，中間的數字留下來', why: '中間的會消失。' },
-        { text: '15×21', why: '形狀不是各自相乘。' },
-        { text: '不能乘', why: '中間都是 3，可以乘。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'context 從 2,000 個 token 變成 8,000 個，attention 分數矩陣變成幾倍？', options: [
-        { text: '16 倍', correct: true, why: '(8000/2000)² ＝ 16。' },
-        { text: '4 倍，跟長度一樣比例增加', why: '分數表是 n×n，要平方。' },
-        { text: '8 倍', why: '沒有這個比例。' },
-        { text: '不變', why: '分數表隨長度變大。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['PyTorch 報錯：mat1 and mat2 shapes cannot be multiplied (32x512 and 768x3072)。你會怎麼找原因？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['PyTorch 報錯：mat1 and mat2 shapes cannot be multiplied (32x512 and 768x3072)。你會怎麼找原因？'], answer: [
         '中間的數字對不上：輸入每個 token 是 512 維，這一層卻預期 768 維。',
         '常見原因：前一層的輸出維度設錯，或換了 embedding 模型、維度不同。把 nn.Linear 的 in_features 改成 512，或修正前一層讓它輸出 768。',
       ] },
@@ -2139,7 +2091,7 @@ X @ bad                    # ValueError：中間的 768 和 3072 對不上` },
       '很多 token 疊成一個矩陣，一次算完。',
       '運算量約 2mkn；attention 分數表是 n×n。',
     ],
-    sources: ['3b1b-la', 'attention', 'pt-linear'],
+    sources: ['3b1b-la', 'attention', 'pt-linear', 'flashattn'],
   },
 });
 </script>
@@ -2155,6 +2107,7 @@ defineTerms({
   '學習率': { en: 'learning rate', def: '每一步沿著梯度反方向走多遠的倍數；太小走很慢，太大會衝過頭。', example: '0.1、0.001。', lesson: '3-2' },
   '梯度下降': { en: 'gradient descent', def: '一直重複「算梯度 → 往反方向走一小步」，讓損失越來越小。', example: 'w ← w − 學習率 × 梯度。', lesson: '3-2' },
   '鏈鎖律': { en: 'chain rule', def: '一連串函數接在一起時，整體的斜率等於每一段的斜率相乘。', example: 'A 帶 B 轉 2 倍、B 帶 C 轉 3 倍 → A 帶 C 轉 6 倍。', lesson: '3-3' },
+  'activation checkpointing': { en: 'activation checkpointing', def: '前向時只保存部分層的中間結果，反向需要時再重算其他的；多花約一次前向的時間，換很多記憶體。', example: '長 context 訓練常開啟。', lesson: '3-3' },
   '反向傳播': { en: 'backpropagation', def: '從損失開始往回，用鏈鎖律一層一層算出每個權重的梯度。', example: 'PyTorch 的 loss.backward()。', lesson: '3-3' },
 });
 
@@ -2166,14 +2119,6 @@ defineLessons({
       '說出導數就是某一點的斜率',
       '用「動一點點」估算導數',
       '用斜率的正負判斷權重該加還是減',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）(5×3) × (3×7) 的形狀？', options: [
-        { text: '5×7', correct: true, why: '留下外面兩個。' },
-        { text: '3×3，中間的數字留下來', why: '中間的消失。' },
-        { text: '15×21', why: '不是各自相乘。' },
-        { text: '不能相乘', why: '中間都是 3。' },
-      ] },
     ],
     analogy: {
       text: ['你在一片起霧的山坡上，看不到山谷在哪，只感覺得到腳下的坡度。腳下往右是上坡，就往左走；往右是下坡，就往右走。', '[[導數]]就是腳下的坡度（[[斜率]]）。訓練模型時，山的高度是[[損失]]，你站的位置是權重。不需要看到整座山，只要知道腳下的斜率，就知道往哪邊走會變低。'],
@@ -2232,12 +2177,16 @@ defineLessons({
           <text x="460" y="48" text-anchor="middle" font-size="13" class="mono">斜率 ＝ 2(1−4) ＝ −6</text>
           <text x="460" y="74" text-anchor="middle" font-size="13" class="mono">1 − 0.1×(−6) ＝ 1.6</text>
         </svg>`, caption: '損失 L(w) ＝ (w − 4)²。斜率是負的（下坡往右），所以 w 往右走；0.1 是學習率（下一課）。' },
+        { type: 'heading', id: 'deep-numeric', text: '深入：h 不是越小越好' },
+        '數學上 h 趨近 0 就得到導數，但電腦的浮點數只有有限位數。h 小到 10⁻¹² 時，f(x＋h) 和 f(x) 幾乎一樣，相減只剩最後幾位的捨入誤差，再除以很小的 h 就把誤差放大。改用「兩邊各動 h」的中央差分 (f(x＋h) − f(x−h)) ÷ 2h，誤差小得多。',
+        { type: 'table', head: ['h（f ＝ eˣ，在 x ＝ 1，64 位元浮點數）', '只往右：誤差', '兩邊各動：誤差'], rows: [
+          ['0.1', '0.14', '0.0045'],
+          ['10⁻⁴', '1.4 × 10⁻⁴', '4.5 × 10⁻⁹'],
+          ['10⁻⁸', '6.6 × 10⁻⁹', '6.6 × 10⁻⁹'],
+          ['10⁻¹²', '4.3 × 10⁻⁴（變差）', '2.1 × 10⁻⁴（變差）'],
+        ], caption: '用 node 實際算出的誤差。h 太大是公式不準，h 太小是捨入誤差；中間有一個最好的範圍。' },
+        '所以訓練時不用數值微分：參數有幾十億個，每個都要多算一次前向，而且不夠準。它的實際用途是「梯度檢查」，在小網路上拿來比對自己寫的反向傳播有沒有寫錯。另一個邊界是不可微的點：ReLU 在 0 沒有斜率，PyTorch 直接規定那裡的梯度是 0，實務上幾乎不會剛好落在 0。',
       ],
-      tryit: {
-        q: ['損失 L(w) ＝ (w − 4)²，現在 w ＝ 6。斜率是多少？w 應該變大還是變小？用學習率 0.1 走一步，w 變成多少？'],
-        draft: '斜率：＿\n方向：＿\n新的 w：＿',
-        answer: ['斜率 ＝ 2(6 − 4) ＝ 4，正的（上坡）。', 'w 應該變小：6 − 0.1 × 4 ＝ 5.6，更接近谷底 4。'],
-      },
     },
     mistakes: [
       { wrong: '沿著斜率的方向走。', why: '斜率指向上坡，損失會變大。', right: '往反方向：w − 學習率 × 斜率。' },
@@ -2245,19 +2194,7 @@ defineLessons({
       { wrong: '用很大的 h 估導數。', why: 'h 大時估計會偏掉（例如 x² 會差 h）。', right: 'h 要很小；實務上直接用公式或自動微分。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'f(x) ＝ x² 在 x ＝ −3 的導數？', options: [
-        { text: '−6', correct: true, why: '2 × (−3)。' },
-        { text: '9，把 x 代進去算出來的值', why: '那是 f(−3)，不是斜率。' },
-        { text: '6', why: '負號不能丟。' },
-        { text: '0', why: '只有 x ＝ 0 時是 0。' },
-      ] },
-      { level: '應用', type: 'mc', q: '某個權重的損失斜率是 +2.5。下一步這個權重會？', options: [
-        { text: '變小', correct: true, why: '正斜率 ＝ 上坡，往反方向。' },
-        { text: '變大，跟著斜率的方向走', why: '那會讓損失變大。' },
-        { text: '不變', why: '斜率不是 0。' },
-        { text: '變成 0', why: '只走一小步。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你是咖啡店老闆，試著調整售價：漲 1 元，每天利潤少了 30 元。用「斜率」的語言描述，下一步該怎麼做？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你是咖啡店老闆，試著調整售價：漲 1 元，每天利潤少了 30 元。用「斜率」的語言描述，下一步該怎麼做？'], answer: [
         '利潤對售價的斜率約是 −30：往漲價方向是下坡。要讓利潤變大（爬上坡），就往反方向：降一點價。',
         '注意這裡是「要變大」，所以順著上坡走；訓練模型是「要讓損失變小」，所以往下坡走。斜率只告訴你方向，走多遠要另外決定（學習率）。',
       ] },
@@ -2275,14 +2212,6 @@ defineLessons({
       '算出兩個參數的梯度',
       '說出梯度指向上坡、所以要往反方向走',
       '判斷學習率太小或太大的症狀',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-1）損失 (w − 4)² 在 w ＝ 6 的斜率？', options: [
-        { text: '4', correct: true, why: '2 × (6 − 4)。' },
-        { text: '2，就是 6 減 4', why: '還要乘 2。' },
-        { text: '−4', why: 'w 在谷底右邊，是上坡。' },
-        { text: '0', why: '那是谷底 w ＝ 4。' },
-      ] },
     ],
     analogy: {
       text: ['回到起霧的山坡，現在可以往東西、南北兩個方向走。你先只往東試一步，感覺坡度；再只往北試一步，感覺坡度。這兩個數字就是兩個[[偏導數]]。', '兩個數字排成一個向量，就是[[梯度]]：它指向「最陡的上坡」。往它的反方向走一小步，重複很多次，就是[[梯度下降]]。每步走多遠，由[[學習率]]決定。'],
@@ -2334,12 +2263,16 @@ defineLessons({
           ], note: '每一步 w 變成 w × (1 − 2 × 學習率)。學習率 0.5 一步就到谷底；超過 0.5 會跳過谷底；超過 1 就越跳越遠。' };
         } } },
         { type: 'widget', name: 'optim2d', props: { title: '狹長的碗 f ＝ ½(w₁² ＋ 10w₂²)：看 SGD 怎麼走（另外兩條線是第四部的優化器）', lr: 0.15, steps: 20, note: '先只看 SGD（一般的梯度下降）那條線：陡的方向（w₂）來回晃，平的方向（w₁）走得慢。把學習率拉到 0.2 以上，陡的方向會發散。' } },
+        { type: 'heading', id: 'deep-direction', text: '深入：為什麼梯度剛好是最陡的方向' },
+        '往某個長度 1 的方向 u 走一點點，損失的變化率是梯度和 u 的點積。用 1-2 的公式：點積 ＝ |梯度| × |u| × cos(夾角)，夾角 0 度時最大。所以「和梯度同方向」就是最陡的上坡，正反方向就是最陡的下坡，和梯度垂直的方向則是沿著等高線走、損失不變。',
+        { type: 'table', head: ['狹長的碗 f ＝ ½(w₁² ＋ 10w₂²)', '平的方向 w₁', '陡的方向 w₂'], rows: [
+          ['斜率對位置的比例（曲率）', '1', '10'],
+          ['每步 w 乘上', '1 − 學習率', '1 − 10 × 學習率'],
+          ['不發散的條件', '學習率 < 2', '學習率 < 0.2'],
+          ['學習率 0.15，走 20 步後剩下', '0.85²⁰ ≈ 3.9%', '(−0.5)²⁰ ≈ 0.0001%，但一路正負來回跳'],
+        ], caption: '學習率被最陡的方向卡住，平的方向只能慢慢走。曲率差越多倍，梯度下降越吃虧；動量、Adam 這類優化器就是為了這個問題。' },
+        '實務上的梯度也不是用全部資料算的。每一步只抽一小批資料（例如 1,000 句）算梯度，當作整體梯度的估計，這叫隨機梯度下降（SGD）。估計有雜訊，但一步便宜很多，而且雜訊有時反而幫忙晃出平台。',
       ],
-      tryit: {
-        q: ['f ＝ w₁² ＋ 3w₂²，從 (2, −1) 出發。梯度是多少？學習率 0.1 走一步之後在哪？'],
-        draft: '梯度：＿\n新位置：＿',
-        answer: ['梯度 ＝ (2×2, 6×(−1)) ＝ (4, −6)。', '新位置 ＝ (2 − 0.4, −1 ＋ 0.6) ＝ (1.6, −0.4)。兩個都往 0 靠近；w₂ 的梯度是負的，所以往正的方向走。'],
-      },
     },
     mistakes: [
       { wrong: '學習率越大，訓練越快。', why: '太大會跳過谷底甚至發散。', right: '從小的開始試，看損失有沒有穩定下降。' },
@@ -2347,21 +2280,9 @@ defineLessons({
       { wrong: '以為梯度下降一定找到最低點。', why: '可能卡在平台或局部的小坑。', right: '大模型實務上找到「夠好」的點就行。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '梯度指向哪裡？', options: [
-        { text: '損失上升最快的方向', correct: true, why: '所以訓練往反方向走。' },
-        { text: '損失下降最快的方向，直接照著走', why: '要加負號才是下坡。' },
-        { text: '谷底的位置', why: '梯度只看腳下，不知道谷底在哪。' },
-        { text: '隨機方向', why: '是算出來的。' },
-      ] },
-      { level: '應用', type: 'mc', q: '訓練時損失變成 NaN（數字爆掉）。最可能先調整什麼？', options: [
-        { text: '把學習率調小', correct: true, why: '太大會發散，數字越來越大。' },
-        { text: '把學習率調大，讓它更快跳出去', why: '會更快發散。' },
-        { text: '增加訓練步數', why: '已經發散，走更多步沒用。' },
-        { text: '換一個更大的模型', why: '問題在步伐。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一個 70B 模型訓練一步，梯度有幾個數字？這對 GPU 記憶體代表什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一個 70B 模型訓練一步，梯度有幾個數字？這對 GPU 記憶體代表什麼？'], answer: [
         '每個參數一個偏導數，所以梯度也有 700 億個數字，和模型一樣大。',
-        '訓練時記憶體要同時放權重、梯度，還有優化器的狀態；這就是訓練比推論需要多好幾倍記憶體的原因（第五部）。',
+        '訓練時記憶體要同時放權重、梯度，還有優化器的狀態。常見的混合精度 ＋ Adam 每個參數約 16 bytes（16 位元權重與梯度各 2、32 位元主權重 4、Adam 的兩個狀態各 4），700 億 × 16 ≈ 1.12 TB，還沒算中間結果；推論只要 16 位元權重約 140 GB。這就是訓練要切到很多張 GPU 的原因（第五部）。',
       ] },
     ],
     keypoints: [
@@ -2377,14 +2298,6 @@ defineLessons({
       '用鏈鎖律算出一連串計算的導數',
       '說出反向傳播就是從損失往回用鏈鎖律',
       '手算一個權重的梯度',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）f ＝ w₁² ＋ 3w₂² 在 (1, 1) 的梯度？', options: [
-        { text: '(2, 6)', correct: true, why: '(2w₁, 6w₂)。' },
-        { text: '(1, 3)，就是兩項前面的係數', why: '要乘上次方的 2。' },
-        { text: '4', why: '那是函數值；梯度是向量。' },
-        { text: '(0, 0)', why: '那是谷底。' },
-      ] },
     ],
     analogy: {
       text: ['三個齒輪咬在一起：A 轉 1 圈，B 轉 2 圈；B 轉 1 圈，C 轉 3 圈。A 轉 1 圈，C 轉幾圈？2 × 3 ＝ 6 圈。', '這就是[[鏈鎖律]]：一連串的計算，整體的斜率等於每一段的斜率相乘。神經網路從權重到損失要經過很多步，[[反向傳播]]就是從損失開始，往回一段一段乘，算出每個權重的梯度。'],
@@ -2430,12 +2343,15 @@ print(w.grad)                  # tensor(-16.)` },
           <path d="M110 90 L220 48 M110 110 L220 152 M330 48 L440 90 M330 152 L440 110" class="stroke-ink" stroke-width="3"/>
           <text x="385" y="104" text-anchor="middle" font-size="13" font-weight="900" class="mono">2 ＋ 5 ＝ 7</text>
         </svg>`, caption: '同一個值影響好幾個地方時，梯度要「加總」。PyTorch 的 .grad 用 ＋＝ 累加，就是這個原因；每一步訓練前要先清零（optimizer.zero_grad()）。' },
+        { type: 'heading', id: 'deep-reverse', text: '深入：為什麼是「反向」' },
+        '鏈鎖律也可以從輸入往前乘（前向模式），但那樣一次只能得到「一個輸入」對所有輸出的影響。神經網路是幾十億個輸入（權重）、一個輸出（損失），從損失往回乘，一趟就得到全部權重的梯度。反向一趟的成本大約是前向的 2 倍，和參數有多少個無關。',
+        { type: 'table', head: ['方法', '要幾趟才拿到 N 個權重的梯度', '準不準'], rows: [
+          ['數值微分（3-1 深入）', 'N ＋ 1 趟前向', '有捨入誤差'],
+          ['前向模式自動微分', 'N 趟', '精確'],
+          ['反向模式（反向傳播）', '1 趟前向 ＋ 1 趟反向', '精確'],
+        ], caption: '輸出少、輸入多的時候，反向模式贏；這正是訓練模型的情況。' },
+        '代價是記憶體：往回乘時要用到前向每一步的中間值（例如 err ＝ −4、x ＝ 2），所以前向時全部都得先存著。模型很深、context 很長時，這些中間值比權重還佔空間。[[activation checkpointing]] 只存一部分，反向時需要再重算，用多算一次前向換記憶體。',
       ],
-      tryit: {
-        q: ['同一個例子，但 w ＝ 6（預測 12，答案 10）。∂L/∂w 是多少？w 該變大還是變小？'],
-        draft: '誤差：＿\n∂L/∂w：＿\n方向：＿',
-        answer: ['誤差 ＝ 12 − 10 ＝ 2；∂L/∂w ＝ 2 × 2 × 1 × x ＝ 4 × 2 ＝ 8。', '正的：w 該變小，因為預測太大了。'],
-      },
     },
     mistakes: [
       { wrong: '把每一段的斜率相加。', why: '一條鏈上是相乘（齒輪）。', right: '同一條路相乘；不同的路才相加。' },
@@ -2443,19 +2359,7 @@ print(w.grad)                  # tensor(-16.)` },
       { wrong: '以為反向傳播是另一種學習方法。', why: '它只是「算梯度」的方法。', right: '反向傳播算梯度，梯度下降負責更新。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'A 轉 1 圈讓 B 轉 4 圈，B 轉 1 圈讓 C 轉 0.5 圈。A 轉 1 圈，C 轉幾圈？', options: [
-        { text: '2', correct: true, why: '4 × 0.5。' },
-        { text: '4.5，兩段加起來', why: '一條鏈上要相乘。' },
-        { text: '8', why: '是乘 0.5，不是除。' },
-        { text: '0.5', why: '還要乘第一段的 4。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'L ＝ (w·x − t)²，w ＝ 1、x ＝ 3、t ＝ 5。∂L/∂w ＝？', options: [
-        { text: '−12', correct: true, why: '誤差 −2；2 × (−2) × 3。' },
-        { text: '4，就是誤差的平方', why: '那是損失本身。' },
-        { text: '−4', why: '還要乘 x ＝ 3。' },
-        { text: '12', why: '誤差是負的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['網路很深時（例如 50 層），每一層的斜率如果都是 0.5，傳到第 1 層的梯度大約變成多少？這會造成什麼問題？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['網路很深時（例如 50 層），每一層的斜率如果都是 0.5，傳到第 1 層的梯度大約變成多少？這會造成什麼問題？'], answer: [
         '0.5⁵⁰ ≈ 8.9 × 10⁻¹⁶，幾乎是 0：前面幾層的權重幾乎不會動，這叫梯度消失。',
         '反過來，每層斜率都是 2 時會爆炸成很大的數。第四部的殘差連接、正規化，都是為了讓這串乘法維持在 1 附近。',
       ] },
@@ -2491,14 +2395,6 @@ defineLessons({
       '說出機率分布的兩個條件',
       '算出一個分布的期望值',
       '知道語言模型輸出的是條件機率',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-3）一條鏈上每一段的斜率是 2、3、0.5，整體斜率？', options: [
-        { text: '3', correct: true, why: '2 × 3 × 0.5。' },
-        { text: '5.5，三段的斜率加起來', why: '同一條路要相乘。' },
-        { text: '6', why: '還要乘 0.5。' },
-        { text: '0.5', why: '只看了最後一段。' },
-      ] },
     ],
     analogy: {
       text: ['氣象預報說明天「降雨機率 70%」：不是說會下 70% 的雨，而是「像明天這樣的天氣，100 天裡大約 70 天會下雨」。下雨 70%、不下 30%，加起來 100%，這就是一個[[機率分布]]。', '語言模型也在做預報：看了前面的字，對「下一個字」的每一種可能各給一個機率。這是[[條件機率]]：P(下一個字｜前面的字)。然後[[取樣]]，從中抽一個。'],
@@ -2546,12 +2442,16 @@ defineLessons({
           <text x="280" y="180" text-anchor="middle" font-size="14" class="mono">0.1 ＋ 0.9 ＋ 3.0 ＝ 4.0</text>
           <text x="280" y="204" text-anchor="middle" font-size="13">沒有任何一則評價是 4 星，但平均是 4.0</text>
         </svg>`, caption: '期望值不一定是「會出現的結果」，它是長期的平均。訓練時的損失，也是「所有訓練資料的平均」。' },
+        { type: 'heading', id: 'deep-sampling', text: '深入：從一個字到一整句，以及怎麼抽' },
+        '一整句的機率，等於每一步的條件機率相乘：P(我, 愛, 貓) ＝ P(我) × P(愛｜我) × P(貓｜我, 愛)。這叫機率的鏈鎖律，語言模型就是靠它把「預測下一個字」變成「生成一整段」。一長串相乘會變得極小，所以實務上都改用 log 相加（5-1）。',
+        { type: 'table', head: ['抽法', '怎麼做', '取捨'], rows: [
+          ['貪婪（greedy）', '每步都拿機率最高的', '穩定，但容易一直重複同樣的句子'],
+          ['直接取樣', '照整個分布抽', '多樣，但尾巴上幾萬個低機率 token 加起來不少，偶爾抽到怪字'],
+          ['top-k', '只留機率最高的 k 個，重新正規化再抽', 'k 固定；分布很集中或很分散時都不太合適'],
+          ['top-p（nucleus）', '從高到低累加到 p（例如 0.9）為止，只在這些裡面抽', '候選數量隨分布自動伸縮；Holtzman 等 2019 提出'],
+        ], caption: '例：機率 0.5、0.2、0.15、0.1、0.05，top-p ＝ 0.9 時累加到 0.95 才超過，留前 4 個；分布集中時可能只留 1 個。' },
+        '期望值也有不適用的時候。分布很偏或有極端值時，平均會被少數結果拉走：大部分評價 5 星、少數 1 星的商品，平均 4.0 看不出「有一群人非常不滿」。同理，平均損失下降，不代表每一種輸入都變好，要再分組看。',
       ],
-      tryit: {
-        q: ['抽獎：1% 機會中 1,000 元，其他什麼都沒有。一張券賣 20 元，值得買嗎？用期望值說明。'],
-        draft: '期望值：＿\n結論：＿',
-        answer: ['期望值 ＝ 0.01 × 1000 ＋ 0.99 × 0 ＝ 10 元。', '花 20 元換平均 10 元，長期每張虧 10 元。期望值說的是「重複很多次」的平均，單次還是可能中獎。'],
-      },
     },
     mistakes: [
       { wrong: '機率 0.9 就是「一定會」。', why: '10 次裡大約有 1 次不會。', right: '機率是長期比例；取樣時低機率的也會被抽到。' },
@@ -2559,19 +2459,7 @@ defineLessons({
       { wrong: '期望值就是最可能出現的結果。', why: '例子裡最常見的是 5 星，期望值卻是 4.0。', right: '最可能的叫眾數；期望值是加權平均。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '四個結果的機率是 0.5、0.2、0.2、x。x ＝？', options: [
-        { text: '0.1', correct: true, why: '加總要是 1。' },
-        { text: '0.2，跟前兩個小的一樣', why: '加起來會超過 1。' },
-        { text: '0.25', why: '不是平均分。' },
-        { text: '任何數都可以', why: '加總必須是 1。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一個遊戲：60% 得 10 分、40% 扣 5 分。期望值？', options: [
-        { text: '4 分', correct: true, why: '6 − 2。' },
-        { text: '5 分，就是 10 和 −5 的中間', why: '要用機率加權。' },
-        { text: '10 分', why: '那只是最常見的結果。' },
-        { text: '2.5 分', why: '6 − 2 ＝ 4。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同一個問題問 ChatGPT 兩次，答案措辭不一樣。用這一課的語言解釋原因。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同一個問題問 ChatGPT 兩次，答案措辭不一樣。用這一課的語言解釋原因。'], answer: [
         '模型每一步給出的是下一個 token 的機率分布，再取樣抽一個；機率不是 1 的字都可能被抽到。',
         '前面抽到的字不同，後面的條件機率也跟著變，整段回答就分岔了。把 temperature 調低（下一課）可以讓結果更穩定。',
       ] },
@@ -2581,7 +2469,7 @@ defineLessons({
       '期望值：結果 × 機率，再加總。',
       '語言模型輸出 P(下一個字｜前文)，再取樣。',
     ],
-    sources: ['dlbook', '3b1b-nn'],
+    sources: ['dlbook', '3b1b-nn', 'nucleus'],
   },
 
   '4-2': {
@@ -2589,14 +2477,6 @@ defineLessons({
       '手算三個數字的 softmax',
       '說出指數為什麼讓大的更大',
       '解釋 temperature 怎麼改變分布',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-1）機率分布一定要滿足？', options: [
-        { text: '每個 0～1，加總是 1', correct: true, why: '兩個條件。' },
-        { text: '每個都一樣大，才算公平', why: '可以不一樣。' },
-        { text: '最大的那個要超過 0.5', why: '沒有這個規定。' },
-        { text: '加總是 100', why: '用百分比時才是 100%。' },
-      ] },
     ],
     analogy: {
       text: ['班上投票，候選人的「人氣分數」有正有負（[[logits]]）。要把分數變成「得票率」，有兩個要求：每個都是正的，而且加起來是 100%。', '[[softmax]] 的做法是：每個分數先取[[指數]] eˣ（負的也會變成正的），再除以總和。指數的特性是「差 1 分就差 2.7 倍」，所以分數領先的人得票率會被拉得更開。'],
@@ -2653,12 +2533,15 @@ def softmax(z, T=1.0):
 
 print(softmax([2, 1, 0]))         # [0.665 0.245 0.090]
 print(softmax([1002, 1001, 1000]))  # 一樣的結果，不會變成 nan` },
+        { type: 'heading', id: 'deep-softmax', text: '深入：softmax 的三個性質' },
+        { type: 'table', head: ['性質', '算式', '用在哪'], rows: [
+          ['加同一個數不變', 'softmax(z ＋ c) ＝ softmax(z)', '先減最大值防溢位（上面的程式碼）'],
+          ['乘同一個數會變', 'softmax(z ÷ T) 隨 T 改變', 'temperature；attention 的 ÷√d 也是同一件事'],
+          ['兩個選項時就是 sigmoid', 'softmax(z, 0) 的第一個 ＝ 1 ÷ (1 ＋ e⁻ᶻ)', '二元分類；z ＝ 2 時兩者都是 0.881'],
+        ] },
+        '名字裡的「soft」是相對 argmax（直接挑最大的那個，給 1，其他給 0）。T 趨近 0 時 softmax 就變成 argmax，T 很大時變成平均分配。argmax 的斜率幾乎到處是 0，沒辦法用梯度訓練；softmax 處處有斜率，才能接上 3-3 的反向傳播。',
+        '它的邊界是「一定要分完」：機率加起來必須是 1，所以模型沒辦法說「每個選項都不像」。attention 裡就算沒有一個字值得看，也得把注意力分出去，Xiao 等 2023 觀察到很多模型會把大量注意力丟給第一個 token，並用這個「沒有選項可以不選」的性質來解釋。',
       ],
-      tryit: {
-        q: ['手算 softmax(0, 0)。再算 softmax(ln 3, 0)，也就是 e 的次方剛好是 3 和 1 的情況。'],
-        draft: 'softmax(0, 0) ＝ ＿\nsoftmax(ln 3, 0) ＝ ＿',
-        answer: ['e⁰ ＝ 1、1，總和 2 → (0.5, 0.5)。分數一樣，機率就一樣。', 'e 的次方是 3 和 1，總和 4 → (0.75, 0.25)。分數差 ln 3 ≈ 1.1，機率差 3 倍。'],
-      },
     },
     mistakes: [
       { wrong: '直接用 logits 除以總和當機率。', why: 'logits 可以是負數，除完會出現負的「機率」。', right: '先取指數，再除以總和。' },
@@ -2666,19 +2549,7 @@ print(softmax([1002, 1001, 1000]))  # 一樣的結果，不會變成 nan` },
       { wrong: '以為 temperature 0 就是「最準」。', why: 'T 很小只是一直挑最高的那個，不保證正確。', right: '要穩定就調低 T；要多樣就調高。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'softmax 的第一步是？', options: [
-        { text: '每個分數取 eˣ', correct: true, why: '讓每個數都是正的。' },
-        { text: '除以分數的總和，直接變成比例', why: '負數會出問題。' },
-        { text: '只留最大的', why: '那是 argmax。' },
-        { text: '取平方', why: '平方會讓負的大分數變大。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'logits (2, 1, 0) 用 temperature 0.5，第一名的機率會？', options: [
-        { text: '變大', correct: true, why: '除以 0.5 拉大差距：0.665 → 0.867。' },
-        { text: '變小，因為 temperature 變小了', why: 'T 小讓分布更集中。' },
-        { text: '不變', why: '差距變了，機率就變。' },
-        { text: '變成 0.5', why: '那是分數相同的情況。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['attention 裡也有 softmax（1-2）。如果點積沒有除以 √d，分數可能都很大、差距也很大。softmax 之後會發生什麼事？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['attention 裡也有 softmax（1-2）。如果點積沒有除以 √d，分數可能都很大、差距也很大。softmax 之後會發生什麼事？'], answer: [
         '差距很大時，softmax 幾乎把全部機率給最大的那一個（接近 1），其他接近 0：attention 只看一個字。',
         '這時 softmax 的斜率也接近 0，梯度很小、學不動。除以 √d 等於把 temperature 調高，讓分數回到合理範圍，這正是 Vaswani 等 2017 給的理由。',
       ] },
@@ -2688,7 +2559,7 @@ print(softmax([1002, 1001, 1000]))  # 一樣的結果，不會變成 nan` },
       '只有分數的差距有影響；差 1 約差 2.7 倍。',
       'temperature 小 → 集中；大 → 分散。',
     ],
-    sources: ['attention', 'dlbook', '3b1b-nn'],
+    sources: ['attention', 'dlbook', '3b1b-nn', 'attnsink'],
   },
 });
 </script>
@@ -2700,85 +2571,14 @@ defineTerms({
   '對數': { en: 'logarithm', def: '「要幾次方才會等於這個數」。ln 是以 e 為底的對數；log₂ 以 2 為底。', example: 'ln(e³) ＝ 3；log₂ 8 ＝ 3。', lesson: '5-1' },
   '下溢': { en: 'underflow', def: '數字小到電腦表示不了，直接變成 0。', example: '0.5 的 1000 次方在 float32 會變 0。', lesson: '5-1' },
   'perplexity': { en: 'perplexity', def: 'e 的（平均 cross-entropy）次方；可以讀成「模型平均在幾個選項之間猶豫」。', example: 'cross-entropy 0.41 → perplexity 約 1.5。', lesson: '5-2' },
+  'log-sum-exp': { en: 'log-sum-exp', def: '計算 log(Σ eˣ) 時先減掉最大值再算，結果一樣但不會溢位或下溢。', example: 'log(e¹⁰⁰⁰ ＋ e¹⁰⁰⁰) ＝ 1000 ＋ ln 2。', lesson: '5-1' },
+  'entropy': { en: 'entropy', def: '一個分布本身有多不確定；所有選項一樣可能時最大，只有一個選項時是 0。', example: '公平硬幣是 1 位元。', lesson: '5-2' },
+  'KL 散度': { en: 'KL divergence', def: '用分布 q 去近似真實分布 p 時多付出的代價；兩者一樣時是 0，永遠不會是負的。', example: 'cross-entropy ＝ entropy ＋ KL。', lesson: '5-2' },
   'one-hot': { en: 'one-hot', def: '只有正確答案那一格是 1、其他都是 0 的向量。', example: '正確答案是第 1 個：(1, 0, 0)。', lesson: '5-2' },
 });
 
 const NEG_LOG_PATH = Array.from({ length: 50 }, (_, i) => { const p = 0.02 + i * 0.02; return `${i ? 'L' : 'M'}${(60 + p * 460).toFixed(1)} ${(200 - -Math.log(p) * 42).toFixed(1)}`; }).join(' ');
 
-const REVIEW_12_MATH = [
-  { level: '回想', type: 'mc', q: '(5, 12) 的長度？', options: [
-    { text: '13', correct: true, why: '√(25＋144)。' },
-    { text: '17，兩個數字加起來', why: '要平方再開根號。' },
-    { text: '60', why: '那是相乘。' },
-    { text: '169', why: '還沒開根號。' },
-  ] },
-  { level: '回想', type: 'mc', q: 'cosine 相似度是 0，代表兩個向量？', options: [
-    { text: '垂直', correct: true, why: '不相關。' },
-    { text: '方向剛好相反，意思完全對立', why: '相反是 −1。' },
-    { text: '一模一樣', why: '一樣是 1。' },
-    { text: '長度都是 0', why: 'cosine 不看長度。' },
-  ] },
-  { level: '應用', type: 'mc', q: '輸入 512 維、輸出 128 維的一層，參數量？', options: [
-    { text: '65,664', correct: true, why: '512×128 ＋ 128。' },
-    { text: '65,536，就是兩個維度相乘', why: '忘了 128 個偏差。' },
-    { text: '640', why: '要相乘。' },
-    { text: '66,048', why: '偏差是輸出數 128，不是 512。' },
-  ] },
-  { level: '應用', type: 'mc', q: '(64×10) × (10×3) × (3×1) 的形狀？', options: [
-    { text: '64×1', correct: true, why: '每次留下外面兩個。' },
-    { text: '10×3，中間的維度留下來', why: '中間的會消失。' },
-    { text: '64×3', why: '還要乘最後一個。' },
-    { text: '不能乘', why: '中間都對得上。' },
-  ] },
-  { level: '回想', type: 'mc', q: 'f(x) ＝ x² 在 x ＝ 5 的導數？', options: [
-    { text: '10', correct: true, why: '2x。' },
-    { text: '25，就是把 5 代進去', why: '那是函數值。' },
-    { text: '5', why: '要乘 2。' },
-    { text: '0', why: '只有谷底是 0。' },
-  ] },
-  { level: '應用', type: 'mc', q: '某權重的梯度是 −3、學習率 0.1，權重現在是 2。走一步後？', options: [
-    { text: '2.3', correct: true, why: '2 − 0.1 × (−3)。' },
-    { text: '1.7，梯度是負的所以要減', why: '減一個負數是加。' },
-    { text: '−1', why: '要乘學習率。' },
-    { text: '2', why: '梯度不是 0，會動。' },
-  ] },
-  { level: '應用', type: 'mc', q: 'L ＝ (w·x − t)²，w ＝ 2、x ＝ 1、t ＝ 5。∂L/∂w ＝？', options: [
-    { text: '−6', correct: true, why: '誤差 −3；2 × (−3) × 1。' },
-    { text: '9，就是誤差的平方', why: '那是損失。' },
-    { text: '−3', why: '還要乘 2。' },
-    { text: '6', why: '誤差是負的。' },
-  ] },
-  { level: '回想', type: 'mc', q: '一個遊戲 50% 得 4 分、50% 得 0 分，期望值？', options: [
-    { text: '2', correct: true, why: '0.5×4 ＋ 0.5×0。' },
-    { text: '4，因為那是能拿到的分數', why: '要用機率加權。' },
-    { text: '0', why: '一半機會得 4 分。' },
-    { text: '0.5', why: '那是機率。' },
-  ] },
-  { level: '應用', type: 'mc', q: 'logits (3, 3, 3) 的 softmax？', options: [
-    { text: '各 1/3', correct: true, why: '差距都是 0。' },
-    { text: '各 1，因為分數都一樣高', why: '加總要是 1。' },
-    { text: '(1, 0, 0)', why: '沒有誰比較大。' },
-    { text: '各 3/9，再取 e 的次方', why: '直接就是 1/3。' },
-  ] },
-  { level: '應用', type: 'mc', q: '想讓模型的回答更有變化，temperature 該？', options: [
-    { text: '調高', correct: true, why: '分布變平，冷門字也有機會。' },
-    { text: '調低，讓每個字的機率更集中', why: '那會更固定。' },
-    { text: '設成 0', why: '幾乎只會挑第一名。' },
-    { text: '和 temperature 無關', why: '它就是在控制這件事。' },
-  ] },
-  { level: '應用', type: 'mc', q: '正確答案的機率是 0.1，cross-entropy 約？', options: [
-    { text: '2.30', correct: true, why: '−ln 0.1。' },
-    { text: '0.10，跟機率一樣', why: '要取 −ln。' },
-    { text: '0.90', why: '不是 1 − p。' },
-    { text: '10', why: '不是 1/p。' },
-  ] },
-  { level: '遷移', type: 'mc', q: '一個模型在測試資料上的 perplexity 從 20 降到 10。代表？', options: [
-    { text: '平均更有把握', correct: true, why: '正確字的機率平均變高了。' },
-    { text: '模型變小了，所以猶豫的選項比較少', why: 'perplexity 和模型大小無關。' },
-    { text: '回答變長了', why: '和長度無關。' },
-    { text: '準確率剛好加倍', why: 'perplexity 不是準確率。' },
-  ] },
-];
 
 defineLessons({
   '5-1': {
@@ -2786,14 +2586,6 @@ defineLessons({
       '說出對數把乘法變成加法',
       '算出常見機率的 −ln',
       '解釋為什麼模型用 log 機率而不是機率本身',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-2）softmax(0, 0) ＝？', options: [
-        { text: '(0.5, 0.5)', correct: true, why: '1 ÷ 2。' },
-        { text: '(0, 0)，因為分數都是 0', why: 'e⁰ ＝ 1，不是 0。' },
-        { text: '(1, 1)', why: '加總要是 1。' },
-        { text: '(1, 0)', why: '沒有誰比較大。' },
-      ] },
     ],
     analogy: {
       text: ['地震規模每加 1，能量約變 32 倍；聲音每加 10 分貝，強度變 10 倍。人類習慣把「一直相乘」的量，改用「加了幾格」來描述，數字就不會大到或小到難以處理。', '[[對數]]就是這把尺：log(a × b) ＝ log a ＋ log b。一句話的機率是每個 token 機率相乘，越乘越小；取對數之後變成相加，一句話再長也不會[[下溢]]。'],
@@ -2843,12 +2635,15 @@ defineLessons({
           <text x="430" y="144" font-size="15" font-weight="900" class="mono">相加 ＝ −6</text>
           <text x="280" y="192" text-anchor="middle" font-size="13">上排是機率；下排是 log₂ 機率。2⁻⁶ ＝ 1/64，兩邊說的是同一件事</text>
         </svg>`, caption: '乘法變加法：電腦處理一長串加法，比處理一長串越來越小的乘法穩定得多。' },
+        { type: 'heading', id: 'deep-float', text: '深入：浮點數能裝多小的數' },
+        { type: 'table', head: ['格式', '最小的正常數', '最大', '有效精度（相對）', '常用在'], rows: [
+          ['float32', '約 1.2 × 10⁻³⁸', '約 3.4 × 10³⁸', '約 10⁻⁷', '訓練時的主權重、損失'],
+          ['float16', '約 6.1 × 10⁻⁵', '65,504', '約 10⁻³', '推論；訓練時要配合 loss scaling'],
+          ['bfloat16', '約 1.2 × 10⁻³⁸', '約 3.4 × 10³⁸', '約 8 × 10⁻³', '現在大模型訓練最常用'],
+        ], caption: '數字依 IEEE 754 與 PyTorch torch.finfo。比最小正常數更小的還有一段「次正常數」，float32 最小約 1.4 × 10⁻⁴⁵，再小就變 0，所以 0.5ⁿ 在 n 約 150 時下溢。' },
+        'float16 的範圍很窄：機率 10⁻⁵ 在 float16 已經掉進精度很差的次正常數區，梯度更小就直接變 0。bfloat16 用較少的精度換到和 float32 一樣的範圍，所以大模型改用它，幾乎不必再處理下溢。',
+        '取 log 之後還有一個常見的需求：從 log 機率算回「log（總和）」。直接 e 次方再相加會溢位或下溢，做法和 softmax 一樣先減最大值：log Σ eˣⁱ ＝ m ＋ log Σ e^(xᵢ − m)，m 是最大的 xᵢ。這叫 [[log-sum-exp]]，PyTorch 的 log_softmax 和 CrossEntropyLoss 裡面就是這樣算的。',
       ],
-      tryit: {
-        q: ['不用計算機：log₂(1/8) ＝？ −ln(1) ＝？如果每個 token 的 −ln p 都是 0.7，100 個 token 加起來是多少？'],
-        draft: 'log₂(1/8)：＿\n−ln(1)：＿\n100 個 token：＿',
-        answer: ['log₂(1/8) ＝ −3（2⁻³ ＝ 1/8）；−ln(1) ＝ 0。', '100 × 0.7 ＝ 70。平均每個 token 是 0.7，這個「平均」就是下一課的 cross-entropy。'],
-      },
     },
     mistakes: [
       { wrong: '以為 log 機率是正數。', why: '機率小於 1，log 是負的。', right: '加一個負號，變成越小越好的正數。' },
@@ -2856,19 +2651,7 @@ defineLessons({
       { wrong: '混用 ln 和 log₂ 的數字比較。', why: '兩者差 ln 2 ≈ 0.693 倍。', right: '比較前先確認底數；PyTorch 用 ln。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'ln(a × b) 等於？', options: [
-        { text: 'ln a ＋ ln b', correct: true, why: '乘法變加法。' },
-        { text: 'ln a × ln b，乘法一樣保留', why: '對數把乘法變成加法。' },
-        { text: 'ln(a ＋ b)', why: '這是不同的東西。' },
-        { text: 'a × ln b', why: '沒有這條規則。' },
-      ] },
-      { level: '應用', type: 'mc', q: '−ln(0.01) 約是？', options: [
-        { text: '4.6', correct: true, why: '2 × 2.303。' },
-        { text: '0.01，跟機率本身一樣', why: '要取對數。' },
-        { text: '100', why: '那是 1/p。' },
-        { text: '−4.6', why: '前面有負號，所以是正的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['語音辨識要比較兩個候選句子哪個比較可能。兩句長度不同（一句 5 個字、一句 20 個字）。直接比較「每個字機率相乘」公平嗎？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['語音辨識要比較兩個候選句子哪個比較可能。兩句長度不同（一句 5 個字、一句 20 個字）。直接比較「每個字機率相乘」公平嗎？'], answer: [
         '不公平：每多一個字就多乘一個小於 1 的數，長句的機率天生比較小。',
         '常見做法是比較「平均每個字的 log 機率」（總和 ÷ 字數），這和下一課的 cross-entropy、perplexity 是同一個想法。',
       ] },
@@ -2878,7 +2661,7 @@ defineLessons({
       '−ln p：機率 1 是 0，機率越小越大。',
       '用 log 相加，長句子也不會下溢。',
     ],
-    sources: ['dlbook', '3b1b-calc'],
+    sources: ['dlbook', '3b1b-calc', 'ieee754'],
   },
 
   '5-2': {
@@ -2886,20 +2669,6 @@ defineLessons({
       '手算一個 token 的 cross-entropy',
       '用 perplexity 解讀損失',
       '說出 softmax ＋ cross-entropy 的梯度是「機率 − 答案」',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-1）−ln(0.5) 約是？', options: [
-        { text: '0.69', correct: true, why: 'ln 2。' },
-        { text: '0.5，跟機率一樣', why: '要取對數。' },
-        { text: '2', why: '那是 1/p。' },
-        { text: '−0.69', why: '負號抵消了。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 4-2）logits (2, 1, 0) 的 softmax 第一名？', options: [
-        { text: '0.665', correct: true, why: '7.39 ÷ 11.11。' },
-        { text: '0.667，就是 2 ÷ 3', why: '要先取指數。' },
-        { text: '1', why: '不會全部給第一名。' },
-        { text: '0.5', why: '那是兩個分數相同時。' },
-      ] },
     ],
     analogy: {
       text: ['考選擇題，老師要求你寫出每個選項的「信心」，加起來 100%。正確答案你只給了 10%？扣很多分；給了 90%？只扣一點；給了 100%？不扣分。扣分方式是 −ln（你給正確答案的信心）。', '這就是 [[cross-entropy]]。它不只看你有沒有猜對，還看你多有把握：猜對但很猶豫也會被扣分，猜錯又很有把握扣最多。語言模型訓練時，每一個位置都在做這樣一題。'],
@@ -2969,15 +2738,29 @@ print(logits.grad)                  # tensor([[-0.3348, 0.2447, 0.0900]])` },
           ['p ＝ 0.090', '2.41', '11.1', '像在 11 個選項間猶豫'],
           ['5 萬個 token 隨便猜', '10.82', '50,000', '完全沒學到東西'],
         ], caption: '剛開始訓練的語言模型，損失大約是 ln（詞彙表大小）；訓練就是把它一路往下壓。' },
-        { type: 'heading', id: 'final-review', text: '總複習：12 題' },
-        '最後一課，把五個工具一起複習。每題都對應前面的一課；答錯的話，回去翻那一課的「三個重點」。',
-        { type: 'quiz', key: '5-2:final', items: REVIEW_12_MATH },
+        { type: 'heading', id: 'deep-ce', text: '深入：cross-entropy 的下限在哪裡' },
+        'cross-entropy 可以拆成兩項：資料本身的不確定性（[[entropy]]），加上模型的分布和真實分布差多遠（[[KL 散度]]）。訓練只能把 KL 壓到 0，壓不掉 entropy。語言本來就有很多合理的下一個字，所以語言模型的 loss 不會降到 0；降到 0 通常代表在背訓練資料。',
+        { type: 'table', head: ['想比較的東西', '能不能直接比 loss 或 perplexity', '改用什麼'], rows: [
+          ['同一個模型、訓練前後', '可以', '—'],
+          ['兩個模型，tokenizer 相同、資料相同', '可以', '—'],
+          ['兩個模型，tokenizer 不同', '不行：一個 token 代表的字數不同', '每個 byte 的位元數（bits per byte）：總 −log₂ 機率 ÷ 文字的 byte 數'],
+          ['訓練集 vs 驗證集', '可以，看差距', '差距越拉越大代表過度擬合'],
+        ], caption: 'bits per byte 把分母從「token 數」換成「原始文字長度」，切法不同的模型才能放在同一把尺上。' },
+        { type: 'heading', id: 'map', text: '全書一頁地圖' },
+        { type: 'table', head: ['模組', '工具', '最重要的一個觀念', '在模型的哪裡'], rows: [
+          ['1', '向量與點積', '點積大 ＝ 方向接近；要比方向就用 cosine', 'embedding、attention 的 Q·K'],
+          ['2', '矩陣乘法', '(m×k)(k×n) ＝ m×n；一列權重 ＝ 一個神經元', '每一層、參數量、運算量'],
+          ['3', '導數與梯度', '往梯度反方向走一小步；反向傳播用鏈鎖律一趟算完', '訓練的每一步'],
+          ['4', '機率與 softmax', '取 eˣ 再除以總和；只有差距有影響', '選下一個字、temperature、attention 權重'],
+          ['5', '對數與 cross-entropy', '損失 ＝ −ln（正確答案的機率）；梯度 ＝ 機率 − 答案', 'loss、perplexity'],
+        ], caption: '卡住時先找這張表的那一列，再翻對應模組的「三個重點」。' },
+        { type: 'table', head: ['會過時的內容', '這本寫的', '怎麼更新'], rows: [
+          ['PyTorch API 與預設值', '2.14 文件（nn.Linear、CrossEntropyLoss）', '看 docs.pytorch.org 對應版本的頁面，特別是 reduction 等預設參數'],
+          ['模型規模與結構', '70B、Llama 3 8B 的 SwiGLU 3.5 倍', '看模型卡或 config.json 的 hidden_size、intermediate_size'],
+          ['數值格式', 'float32、float16、bfloat16', '新的 8 位元、4 位元格式持續出現，看 GPU 與框架文件'],
+          ['數學本身', '向量、矩陣、導數、機率、對數', '不會過時'],
+        ], caption: '建議每 3 個月重新查證一次前三列（下次：2027-01）。' },
       ],
-      tryit: {
-        q: ['某一步，模型給正確答案的機率是 0.25。cross-entropy 是多少？perplexity 呢？（ln 4 ≈ 1.386）'],
-        draft: 'cross-entropy：＿\nperplexity：＿',
-        answer: ['cross-entropy ＝ −ln 0.25 ＝ ln 4 ≈ 1.39。', 'perplexity ＝ e^1.39 ＝ 4：剛好像在 4 個選項之間平均猶豫。'],
-      },
     },
     mistakes: [
       { wrong: '模型最後先做 softmax，再丟進 CrossEntropyLoss。', why: '它裡面已經有 softmax，會做兩次。', right: '直接把 logits 丟進去。' },
@@ -2985,19 +2768,7 @@ print(logits.grad)                  # tensor([[-0.3348, 0.2447, 0.0900]])` },
       { wrong: '直接比較不同詞彙表模型的 perplexity。', why: 'token 切法不同，每個 token 的難度也不同。', right: '只在同一個 tokenizer、同一份資料上比較。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'cross-entropy（one-hot 答案）等於？', options: [
-        { text: '−ln（正確答案的機率）', correct: true, why: '其他項乘 0 都消失了。' },
-        { text: '1 − 正確答案的機率，越接近 1 越好', why: '要取對數。' },
-        { text: '所有機率的總和', why: '總和永遠是 1。' },
-        { text: '最大的那個機率', why: '要看正確答案。' },
-      ] },
-      { level: '應用', type: 'mc', q: '機率是 (0.7, 0.2, 0.1)、正確答案是第 2 個。對三個 logits 的梯度？', options: [
-        { text: '(0.7, −0.8, 0.1)', correct: true, why: 'p − y：第 2 格減 1。' },
-        { text: '(−0.3, 0.2, 0.1)，第 1 個要減 1', why: '正確答案是第 2 個。' },
-        { text: '(0.7, 0.2, 0.1)', why: '還要減 one-hot。' },
-        { text: '(0, −1, 0)', why: '那只是 −y。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['訓練報告寫：「驗證集 loss 從 3.0 降到 2.3」。用 perplexity 換算，模型進步了多少？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['訓練報告寫：「驗證集 loss 從 3.0 降到 2.3」。用 perplexity 換算，模型進步了多少？'], answer: [
         'e^3.0 ≈ 20.1、e^2.3 ≈ 10.0：從「像在 20 個選項間猶豫」變成「像在 10 個之間」，猶豫的程度減半。',
         'loss 只差 0.7 看起來不多，換成 perplexity 比較有感；但它還是平均值，不代表每個問題都答得比較好，最後仍要用實際任務評估（第一部的評估章節）。',
       ] },
@@ -3007,7 +2778,7 @@ print(logits.grad)                  # tensor([[-0.3348, 0.2447, 0.0900]])` },
       'perplexity ＝ e^CE：平均在幾個選項間猶豫。',
       'softmax ＋ cross-entropy 的梯度 ＝ 機率 − 答案。',
     ],
-    sources: ['pt-ce', 'dlbook', '3b1b-nn'],
+    sources: ['pt-ce', 'dlbook', '3b1b-nn', 'pt-linear'],
   },
 });
 </script>
@@ -3523,12 +3294,12 @@ Views.home = () => {
     <h2 class="section-title"><span class="label" style="--chip:var(--m2)">怎麼用</span><span class="phrase">本站的使用方式</span></h2>
     <div class="content" style="margin:0">
       <ul>
-        <li>每個單元的結構都一樣：3 件事 → 暖身回顧 → 比喻 → 心智模型 → 定義 → 範例 → 常見錯誤 → 練習 → 三個重點。</li>
+        <li>每個單元的結構都一樣：3 件事 → 比喻 → 心智模型 → 定義 → 範例與深入 → 常見錯誤 → 深入思考（部分單元）→ 三個重點。</li>
         <li>全書主軸是<strong>六個數學工具在模型裡的位置</strong>：${journeyHtml(null)}每一課的標題上方都會標出它是哪一個。</li>
         <li>這本是工具書：不用照順序讀。讀其他卷卡在數學時，翻到對應的課；每課最後都列出「在系列的哪裡會用到」。</li>
         <li>只用加減乘除與一點點符號；每個公式都附白話與小數字的手算例子。頁面裡的拉桿都是實際計算。</li>
         <li>主要帶你到 L1–L2：看得懂公式在做什麼、能手算小例子。嚴謹的證明不在這本的範圍。</li>
-        <li>練習的答案預設隱藏；選擇題送出後，每個選項都有解析。</li>
+        <li>本書不出測驗；部分單元附 1–2 題深入思考題，答案預設隱藏，想過再展開。</li>
         <li>鍵盤：<kbd>←</kbd> <kbd>→</kbd> 切換上一課與下一課，<kbd>/</kbd> 搜尋。頂部列可以調整字級、切換到系列的其他卷。</li>
         <li>進度只存在這台電腦的瀏覽器裡，不會上傳${Store.persistent() ? '' : '（目前瀏覽器不允許儲存，關閉分頁後會消失）'}。</li>
       </ul>
@@ -3584,7 +3355,7 @@ const SECTION_DEFS = [
   ['define', '正式定義'],
   ['examples', '範例'],
   ['mistakes', '常見錯誤'],
-  ['practice', '練習'],
+  ['practice', '深入思考'],
   ['lab', '動手做'],
   ['keypoints', '三個重點'],
 ];
@@ -3660,7 +3431,7 @@ Views.lesson = ({ id }) => {
     ${c ? `<div class="done-row" id="done-row">
       ${isDone
         ? `<span class="stamp">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`}
+        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`}
     </div>` : ''}
     <nav class="lesson-nav" aria-label="上一課與下一課">
       ${prev ? `<a class="prev nb-press" href="#/l/${prev.id}" rel="prev"><span class="dir">← 上一課</span><span class="ttl">${renderPhrases(`${prev.id} ${prev.title}`)}</span></a>` : ''}
@@ -3729,7 +3500,7 @@ function onClick(e) {
   const { action: name, id } = action.dataset;
   if (name === 'done') markDone(id, true);
   if (name === 'undone') markDone(id, false);
-  if (name === 'reset' && window.confirm('確定要清除所有學習進度與測驗紀錄嗎？字級與目錄寬度不會被清除。')) {
+  if (name === 'reset' && window.confirm('確定要清除所有學習進度嗎？字級與目錄寬度不會被清除。')) {
     Store.reset();
     render();
     announce('學習進度已清除');
@@ -3742,7 +3513,7 @@ function markDone(id, isDone) {
   if (row) {
     row.innerHTML = isDone
       ? `<span class="stamp animate">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`;
+      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`;
     const focusTarget = $('button', row);
     if (focusTarget) focusTarget.focus();
   }

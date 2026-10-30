@@ -8,24 +8,11 @@ defineTerms({
   'llama.cpp': { en: 'llama.cpp', def: '用 C/C++ 寫的開放模型推論引擎，支援 1.5～8 位元量化與 Apple Silicon，MIT 授權。', example: '讀取 GGUF 檔。', lesson: '5-1' },
   '晶圓代工': { en: 'foundry', def: '替別人製造晶片的工廠；設計公司畫好電路，交給代工廠生產。', example: '台積電 2Q26 市占 72.5%。', lesson: '5-2' },
   '先進封裝': { en: 'advanced packaging', def: '把 GPU 晶片和 HBM 等多顆晶片緊密封裝在一起的技術，AI 晶片高度依賴它。', example: '台積電的 CoWoS。', lesson: '5-2' },
+  'CoWoS': { en: 'Chip on Wafer on Substrate', def: '台積電的先進封裝技術：把 GPU 晶片和好幾疊 HBM 並排放在一片矽中介層上，再接到基板；晶片之間的連線又短又密。', example: 'H100、Blackwell、Rubin 都用這類封裝。', lesson: '5-2' },
   'PUE': { en: 'Power Usage Effectiveness', def: '資料中心總用電 ÷ 機器本身用電；越接近 1 代表散熱等額外用電越少。', example: 'PUE 1.2：每 1 度給機器，另用 0.2 度在散熱等。', lesson: '5-3' },
   '液冷': { en: 'liquid cooling', def: '用液體帶走晶片熱量的散熱方式；高功率 AI 機櫃越來越常用。', example: '直接貼在晶片上的冷板。', lesson: '5-3' },
 });
 
-const REVIEW_M4 = [
-  { level: '回想', type: 'mc', q: '（回顧 4-1）本地部署最常見的量化等級？', options: [
-    { text: '4 位元', correct: true, why: '大小與品質的平衡。' },
-    { text: '32 位元', why: '那是 FP32。' },
-    { text: '1 位元', why: '太低。' },
-    { text: '不量化', why: '常常放不下。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 4-3）選模型的建議順序？', options: [
-    { text: '從小往大試，用評估集決定', correct: true, why: '省錢。' },
-    { text: '一律最大', why: '太貴。' },
-    { text: '一律最小', why: '可能不夠。' },
-    { text: '看名字決定', why: '要評估。' },
-  ] },
-];
 
 const LOCAL_GPUS = [
   { name: 'M4 Pro 64 GB', gb: 48, note: 'M4 Pro 最高 64 GB 統一記憶體、273 GB/s；預設約 75% 可給 GPU（第三方說法）。' },
@@ -47,7 +34,6 @@ defineLessons({
       '用 Ollama 在本機跑一個模型並呼叫它的 API',
       '說出本地部署的優點與限制',
     ],
-    review: REVIEW_M4,
     analogy: {
       text: ['自己在家煮咖啡：前期要買機器，之後每杯幾乎不花錢、豆子不出門；去咖啡店買（雲端 API）不用設備，但每杯都要付錢，豆子也要交給別人。', '[[本地部署]]就是在家煮：用 [[Ollama]] 或 [[llama.cpp]] 下載開放權重的模型，資料不離開你的電腦。能跑多大的模型，取決於這一卷講的記憶體與頻寬。'],
       limit: ['家裡的咖啡機品質有上限，本地能跑的開放模型通常比最強的雲端模型小、能力也有差距；而且維護、更新、安全都要自己負責。'],
@@ -94,12 +80,16 @@ defineLessons({
           ['能力', '受限於能跑的模型大小', '可用最強的模型'],
           ['維運', '自己更新、自己負責安全', '服務商負責'],
         ] },
+        { type: 'heading', id: 'local-tools', text: '深入：工具怎麼選，以及兩個常踩的坑' },
+        { type: 'table', head: ['工具', '適合', '說明'], rows: [
+          ['[[Ollama]]', '個人電腦、想快速開始', '一行指令下載與執行，內建本機 API；底層用 llama.cpp 等引擎'],
+          ['[[llama.cpp]]', '想控制每個細節', '直接讀 GGUF，可選量化等級、context 長度、放幾層到 GPU'],
+          ['MLX', 'Apple Silicon 的 Mac', 'Apple 的機器學習框架，針對統一記憶體設計'],
+          ['vLLM 等伺服器框架', '多人同時使用的服務', '連續批次與 PagedAttention（2-4、3-3），以 NVIDIA GPU 為主'],
+        ] },
+        '第一個坑是 context 長度。把 context 從 8K 調到 128K，KV cache 會跟著長大十幾倍（2-4），原本放得下的模型可能突然放不下或變慢；先用需要的長度，不要直接開到最大。',
+        '第二個坑是安全。Ollama 預設只聽本機的 127.0.0.1:11434；把環境變數 OLLAMA_HOST 設成 0.0.0.0 會讓同一個網路的人都能用，這個 API 本身沒有帳號驗證，要開放就放在有驗證的反向代理後面。模型名稱與標籤（例如 gemma4 的不同大小）會更新，以 ollama.com/library 為準。',
       ],
-      tryit: {
-        q: ['用上面的互動：你的 M4 Pro（48 GB 可用）用 4 位元，最大大約能跑幾 B 的模型（預留 2 GB）？速度上限大約多少？'],
-        draft: '最大：約 ＿ B\n速度上限：約 ＿ token/s',
-        answer: ['(48 − 2) ÷ 0.5 ≈ 92B；實務上 70B 等級的 4 位元模型（約 35 GB）放得下。', '速度上限 ≈ 273 GB/s ÷ 35 GB ≈ 7.8 token/s，能用但偏慢；8B 4 位元則約 68 token/s（2-3）。'],
-      },
     },
     mistakes: [
       { wrong: '只看放不放得下，不看速度。', why: '放得下但每秒只有幾個 token，可能不實用。', right: '同時算記憶體與頻寬。' },
@@ -107,19 +97,7 @@ defineLessons({
       { wrong: '把本機 API 直接開放到網路上。', why: '任何人都能用你的機器，甚至攻擊它。', right: '只在本機或內網使用，需要時加上驗證（第一部 0-2 的安全原則）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Ollama 本機 API 的位址？', options: [
-        { text: 'localhost:11434', correct: true, why: '官方範例。' },
-        { text: 'api.anthropic.com', why: '那是 Claude API。' },
-        { text: 'localhost:80', why: '不是預設。' },
-        { text: '不需要位址', why: '要呼叫 API 就需要。' },
-      ] },
-      { level: '應用', type: 'mc', q: '16 GB 筆電（約 10 GB 可用）想跑模型，哪個比較可行？', options: [
-        { text: '8B 模型 4 位元（約 4 GB）', correct: true, why: '放得下，還有空間給 KV cache。' },
-        { text: '70B 模型 BF16（140 GB）', why: '放不下。' },
-        { text: '30B 模型 BF16（60 GB）', why: '放不下。' },
-        { text: '13B 模型 BF16（26 GB）', why: '放不下。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['公司法務部要用 AI 讀內部合約，但資料不能離開公司。本地部署和雲端 API 各有什麼考量？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['公司法務部要用 AI 讀內部合約，但資料不能離開公司。本地部署和雲端 API 各有什麼考量？'], answer: [
         '本地部署：資料不出公司，符合要求；但能跑的模型較小，長合約的理解力可能不足，還要自己維護。',
         '雲端 API：能力強，但要確認服務商的資料處理條款、區域與合約是否符合公司規定。也可以混合：敏感的在本地，去識別化後的再用雲端。',
       ] },
@@ -129,7 +107,7 @@ defineLessons({
       'Ollama／llama.cpp＋量化模型，是本地部署最常見的組合。',
       '本地：資料不出門、成本固定；雲端：能力強、免維運。',
     ],
-    sources: ['ollama', 'llamacpp', 'apple-m4pro'],
+    sources: ['ollama', 'ollama-faq', 'ollama-gemma4', 'llamacpp', 'apple-m4pro'],
   },
 
   '5-2': {
@@ -137,20 +115,6 @@ defineLessons({
       '說出 AI 晶片從設計到伺服器的主要環節',
       '用數字說明晶圓代工的集中程度',
       '說出 HBM 與先進封裝為什麼是瓶頸',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-1）本地部署最大的限制？', options: [
-        { text: '能跑的模型大小受記憶體限制', correct: true, why: '2-1。' },
-        { text: '一定要網路才能用', why: '下載後可離線。' },
-        { text: '資料會送到外部', why: '不會。' },
-        { text: '完全不需要硬體', why: '需要。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-2）H100 的頻寬？', options: [
-        { text: '3.35 TB/s', correct: true, why: '官方規格。' },
-        { text: '273 GB/s', why: '那是 M4 Pro。' },
-        { text: '22 TB/s', why: '那是 Rubin。' },
-        { text: '80 GB', why: '那是容量。' },
-      ] },
     ],
     analogy: {
       text: ['一台高級跑車：引擎設計在一家公司，引擎在另一家工廠鑄造，再送到組裝廠和變速箱、輪胎裝在一起，最後交車。任何一個環節產能不夠，整台車就交不出來。', 'AI 晶片也是：設計公司畫電路 → [[晶圓代工]]廠製造 → [[先進封裝]]把 GPU 和 HBM 封在一起 → 伺服器廠組成整機 → 送進資料中心。台灣在製造、封裝、伺服器組裝都佔很大比重。'],
@@ -170,56 +134,56 @@ defineLessons({
           ['中芯', '超過 30 億美元', '5.4%'],
           ['前十大合計', '約 534.9 億美元', '—'],
         ], caption: 'TrendForce 2026-09-09 發布。台積電一家的營收，大約是前十大合計的七成多。' },
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'design', label: '晶片設計' }, { id: 'fab', label: '製造與封裝' }, { id: 'mem', label: '記憶體' }, { id: 'server', label: '伺服器與資料中心' }], items: [
-          { text: '設計 GPU 的電路與架構', answer: 'design', why: '例如 NVIDIA 是設計公司，不自己製造晶圓。' },
-          { text: '用最先進製程把電路做在晶圓上', answer: 'fab', why: '晶圓代工。' },
-          { text: '把 GPU 晶片和 HBM 封裝在同一個基板上', answer: 'fab', why: '先進封裝。' },
-          { text: '生產堆疊式的高頻寬記憶體', answer: 'mem', why: 'HBM 由少數記憶體廠供應。' },
-          { text: '把 8 張 GPU、網路、電源裝成整台伺服器與機櫃', answer: 'server', why: '伺服器組裝。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['設計 GPU 的電路與架構', '晶片設計', '例如 NVIDIA 是設計公司，不自己製造晶圓。'],
+          ['用最先進製程把電路做在晶圓上', '製造與封裝', '晶圓代工。'],
+          ['把 GPU 晶片和 HBM 封裝在同一個基板上', '製造與封裝', '先進封裝。'],
+          ['生產堆疊式的高頻寬記憶體', '記憶體', 'HBM 由少數記憶體廠供應。'],
+          ['把 8 張 GPU、網路、電源裝成整台伺服器與機櫃', '伺服器與資料中心', '伺服器組裝。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="HBM 市占依來源與時間不同：SK hynix 約五成到六成，三星與美光分食其餘">
           <text x="20" y="28" font-size="15" font-weight="900">HBM 營收市占（2026，依來源不同）</text>
           <rect x="20" y="50" width="290" height="40" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="165" y="76" text-anchor="middle" font-size="14" font-weight="900" class="on-color">SK hynix 約 50～58%</text>
-          <rect x="310" y="50" width="230" height="40" class="fill-surface stroke-ink" stroke-width="3"/><text x="425" y="76" text-anchor="middle" font-size="14">三星、美光</text>
+          <rect x="310" y="50" width="230" height="40" class="fill-surface stroke-ink" stroke-width="3"/><text x="425" y="76" text-anchor="middle" font-size="14">Q2：三星 33%、美光 18%</text>
           <text x="280" y="124" text-anchor="middle" font-size="13">Counterpoint：Q1 58%、Q2 50%；IDC（SK hynix SEC 文件）：Q1 56.4%</text>
           <text x="280" y="152" text-anchor="middle" font-size="13">數字依研究機構與季度差很多，引用時要寫出處</text>
         </svg>`, caption: 'HBM 的產能和先進封裝一樣，是 AI 晶片能出貨多少的關鍵。' },
+        { type: 'widget', name: 'knobs', props: { title: '能出貨幾顆 AI 晶片，由最窄的環節決定（示意計算）', sliders: [
+          { id: 'fab', label: '晶圓製造能做出的 GPU 晶片', min: 1, max: 30, step: 1, value: 10, unit: '萬顆／月' },
+          { id: 'pkg', label: '先進封裝產能', min: 1, max: 30, step: 1, value: 6, unit: '萬顆／月' },
+          { id: 'hbm', label: 'HBM 供應（夠裝幾顆 GPU）', min: 1, max: 30, step: 1, value: 8, unit: '萬顆份／月' },
+          { id: 'srv', label: '伺服器組裝與電源散熱零件', min: 1, max: 30, step: 1, value: 12, unit: '萬顆份／月' },
+        ], compute: (v) => {
+          const stages = [['晶圓製造', v.fab], ['先進封裝', v.pkg], ['HBM', v.hbm], ['伺服器組裝', v.srv]];
+          const ship = Math.min(...stages.map(([, x]) => x));
+          const top = Math.max(...stages.map(([, x]) => x));
+          const neck = stages.filter(([, x]) => x === ship).map(([n]) => n).join('、');
+          return { rows: [
+            ...stages.map(([n, x]) => ({ label: n, value: `${x} 萬`, ratio: x / top })),
+            { label: '實際能出貨', value: `${ship} 萬顆／月`, ratio: ship / top },
+            { label: '瓶頸', value: neck, ratio: ship / top },
+          ], note: '預設：先進封裝只有 6 萬，其他環節再多也只能出貨 6 萬顆。把晶圓製造拉到 20，出貨量不會變；把封裝拉高，瓶頸會移到 HBM（8 萬）。數字是示意，不代表真實產能。' };
+        } } },
+        { type: 'heading', id: 'packaging', text: '深入：為什麼封裝和 HBM 會變成瓶頸' },
+        'GPU 每秒要搬好幾 TB 的資料（模組 2），這麼多條線只能在極短的距離內接上，所以 HBM 必須緊貼在 GPU 旁邊。[[CoWoS]] 這類先進封裝把 GPU 和好幾疊 HBM 並排放在矽中介層上；晶片越做越大、HBM 越疊越多，每片晶圓能做的封裝數量就越少。',
+        { type: 'table', head: ['HBM 世代', '介面寬度', '每疊頻寬（規格上限）'], rows: [
+          ['HBM3', '1,024 位元', '約 0.8 TB/s'],
+          ['HBM4（JEDEC 2025-04 發布）', '2,048 位元', '最高約 2 TB/s'],
+        ], caption: 'HBM4 的數字來自 JEDEC 標準發布新聞稿；各家產品實際速度不同。Rubin 每顆 22 TB/s，是多疊 HBM4 加總的結果。' },
+        'HBM 是把很多層 DRAM 晶片疊起來、用垂直穿孔（TSV）連接，良率比一般 DRAM 難做，同樣的晶圓面積產出的容量也比較少。所以 HBM 擴產會排擠一般記憶體的產能，這是 AI 熱潮期間一般 DRAM 價格跟著波動的原因之一（🟡 產業普遍觀察）。',
       ],
-      tryit: {
-        q: ['為什麼一家公司可以「設計」最強的 AI 晶片，卻不自己「製造」？'],
-        draft: '我的回答：＿',
-        answer: ['最先進的晶圓廠投資極大、技術門檻極高，集中在少數代工廠做，對設計公司更划算；設計公司專心做架構與軟體。', '這種分工讓台積電這類代工廠成為整個 AI 產業的關鍵節點：它的產能、良率、製程進度，直接影響 AI 晶片能出多少貨。'],
-      },
     },
     mistakes: [
       { wrong: '以為 GPU 公司自己製造晶片。', why: '多數 AI 晶片設計公司把製造交給代工廠。', right: '分清設計、製造、封裝。' },
       { wrong: '以為只要晶圓產能夠就能出貨。', why: 'HBM 與先進封裝也是瓶頸。', right: '整條供應鏈都要跟上。' },
       { wrong: '引用市占數字不寫來源與時間。', why: '不同機構、不同季度差很多。', right: '寫清楚機構與期間。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '依 TrendForce，台積電 2Q26 晶圓代工市占約？', options: [
-        { text: '72.5%', correct: true, why: '2026-09 發布。' },
-        { text: '5.9%', why: '那是三星。' },
-        { text: '30%，和三星差不多', why: '低估很多。' },
-        { text: '100%', why: '還有其他廠商。' },
-      ] },
-      { level: '應用', type: 'mc', q: '把 GPU 和 HBM 封在一起的環節叫？', options: [
-        { text: '先進封裝', correct: true, why: '例如 CoWoS。' },
-        { text: '晶圓代工', why: '那是製造晶片本身。' },
-        { text: '伺服器組裝', why: '那是整機。' },
-        { text: '晶片設計', why: '那是畫電路。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['新聞說「AI 晶片缺貨」。用這一課的供應鏈，列出三個可能卡住的環節。'], answer: [
-        '一、最先進製程的晶圓產能；二、先進封裝產能；三、HBM 供應。',
-        '另外伺服器組裝、電源與散熱零件、資料中心的電力也可能卡住（5-3）。看到「缺貨」時，要問是哪一個環節。',
-      ] },
-    ],
     keypoints: [
       '設計 → 晶圓製造 → 先進封裝＋HBM → 伺服器組裝 → 資料中心。',
       '台積電 2Q26 晶圓代工市占 72.5%（TrendForce）。',
       'HBM 與先進封裝也是出貨瓶頸。',
     ],
-    sources: ['trendforce-2q26', 'hbm-share'],
+    sources: ['trendforce-2q26', 'hbm-share', 'jedec-hbm4'],
   },
 
   '5-3': {
@@ -227,14 +191,6 @@ defineLessons({
       '估算一群 GPU 的用電',
       '說出 PUE 的意思',
       '用 IEA 的數字說明資料中心用電的規模與趨勢',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-2）AI 晶片出貨的瓶頸不包括？', options: [
-        { text: 'tokenizer 的詞彙表大小', correct: true, why: '和硬體供應無關。' },
-        { text: '先進封裝產能', why: '是瓶頸之一。' },
-        { text: 'HBM 供應', why: '是瓶頸之一。' },
-        { text: '晶圓產能', why: '是瓶頸之一。' },
-      ] },
     ],
     analogy: {
       text: ['一台大功率的電暖器，插上電就發熱；一千台放在同一個房間，不只電費驚人，還得開超強的冷氣把熱排出去。', 'GPU 也是：H100 最大功耗 700 W，上萬張放在一起就是幾十 MW 等級。算上散熱等額外用電（用 [[PUE]] 表示），資料中心的電力與冷卻，已經是 AI 擴張最大的限制之一；功率越來越高的機櫃也越來越常用[[液冷]]。'],
@@ -270,153 +226,58 @@ defineLessons({
             { label: 'IT 用電', value: `${(it / 1e6).toFixed(1)} MW`, ratio: Math.min(1, it / 2e8) },
             { label: '總用電（× PUE）', value: `${(total / 1e6).toFixed(1)} MW`, ratio: Math.min(1, total / 2e8) },
             { label: '全年滿載用電', value: `${twh.toFixed(2)} TWh`, ratio: Math.min(1, twh / 2) },
-          ], note: '預設：1 萬張 700 W、其他部分 +50%、PUE 1.2：約 12.6 MW，全年滿載約 0.11 TWh。這是示意估算（其他部分與 PUE 的比例是假設值）。對照：IEA 估計全球資料中心 2024 年約 415 TWh。' };
+          ], note: '預設：1 萬張 700 W、其他部分 +50%、PUE 1.2：約 12.6 MW，全年滿載約 0.11 TWh。這是示意估算（其他部分與 PUE 的比例是假設值）。對照：IEA 估計全球資料中心 2025 年約 485 TWh。' };
         } } },
-        { type: 'table', head: ['IEA《Energy and AI》', '數字'], rows: [
-          ['全球資料中心用電（2024）', '約 415 TWh，約全球用電 1.5%'],
-          ['2030 年預估', '約 945 TWh（比日本現在全國用電略多）'],
-          ['主要推力', 'AI 專用資料中心的用電預估成長超過 4 倍'],
-        ], caption: '透過 IEA 新聞稿的多方轉述（本次無法直接開啟 IEA 頁面，標為 🟡）；預估有很大的不確定性。' },
-        { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="資料中心用電從 2024 年約 415 TWh 成長到 2030 年約 945 TWh 的長條對照">
+        { type: 'table', head: ['IEA 數字', '內容'], rows: [
+          ['全球資料中心用電（2024）', '約 415 TWh，約全球用電 1.5%（2025-04《Energy and AI》）'],
+          ['全球資料中心用電（2025）', '約 485 TWh，一年成長約 17%；同期全球用電只成長約 3%（2026-04 更新）'],
+          ['2030 年預估', '約 950 TWh，約是 2024 年的兩倍多（2026-04 更新；2025 年版是 945）'],
+          ['主要推力', 'AI 專用資料中心成長最快，2030 年用電預估約為現在的三倍'],
+        ], caption: '2026 年數字來自 IEA 新聞稿與多家媒體轉述（IEA 網頁本次 403 無法直接開啟，標為 🟡）；預估有很大的不確定性。' },
+        { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="全球資料中心用電：2024 年約 415 TWh、2025 年約 485 TWh、2030 年預估約 950 TWh 的長條對照">
           <text x="20" y="30" font-size="15" font-weight="900">全球資料中心用電（IEA）</text>
           <text x="20" y="74" font-size="14">2024</text><rect x="80" y="54" width="${415 / 2.2}" height="30" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="${90 + 415 / 2.2}" y="75" font-size="14" font-weight="900">約 415 TWh</text>
-          <text x="20" y="124" font-size="14">2030</text><rect x="80" y="104" width="${945 / 2.2}" height="30" style="fill:var(--m7)" class="stroke-ink" stroke-width="2"/><text x="${70 + 945 / 2.2}" y="125" font-size="14" font-weight="900" text-anchor="end" class="on-color">約 945 TWh</text>
-          <text x="280" y="166" text-anchor="middle" font-size="13">預估值，實際取決於 AI 普及速度與效率提升</text>
+          <text x="20" y="114" font-size="14">2025</text><rect x="80" y="94" width="${485 / 2.2}" height="30" style="fill:var(--m4)" class="stroke-ink" stroke-width="2"/><text x="${90 + 485 / 2.2}" y="115" font-size="14" font-weight="900">約 485 TWh</text>
+          <text x="20" y="154" font-size="14">2030</text><rect x="80" y="134" width="${950 / 2.2}" height="30" style="fill:var(--m7)" class="stroke-ink" stroke-width="2"/><text x="${70 + 950 / 2.2}" y="155" font-size="14" font-weight="900" text-anchor="end" class="on-color">預估約 950 TWh</text>
+          <text x="280" y="196" text-anchor="middle" font-size="13">2030 是預估值，實際取決於 AI 普及速度與效率提升</text>
         </svg>`, caption: '電力已經和晶片一樣，是決定 AI 能擴張多快的關鍵資源。' },
+        { type: 'heading', id: 'rack-density', text: '深入：一個機櫃從十幾 kW 變成 120 kW' },
+        '傳統伺服器機櫃常見十幾 kW，用冷氣吹就散得掉。一個 GB200 NVL72 機櫃裝 72 顆 GPU，第三方估計約 120 kW；SemiAnalysis 指出每櫃遠超過 40 kW 時空氣就帶不走這麼多熱，必須改用直接貼在晶片上的[[液冷]]冷板。',
+        { type: 'table', head: ['限制', '為什麼卡住', '常見對策'], rows: [
+          ['電網接入', '新的大型負載要排隊等變電站與輸電線', '選在電力充足的地點、自建發電或簽長期購電合約'],
+          ['設備交期', 'IEA 2026 年點名燃氣渦輪機、變壓器供應吃緊', '提早採購、模組化電力設備'],
+          ['散熱與用水', '高密度機櫃要液冷，冷卻塔會蒸發用水', '閉迴路液冷、乾式冷卻（用水少但耗電較多）'],
+        ] },
+        '這裡有一個取捨：省水的乾式冷卻要多花電，省電的蒸發式冷卻要用水。所以 PUE 低不代表環境負擔一定低，業界另外用 WUE（每度電用多少公升水）一起看。',
       ],
-      tryit: {
-        q: ['1,000 張 GPU、每張平均 700 W、其他部分 +50%、PUE 1.3。總用電幾 MW？'],
-        draft: 'IT：＿ MW\n總用電：＿ MW',
-        answer: ['IT：1,000 × 700 × 1.5 ＝ 1.05 MW。', '總用電：1.05 × 1.3 ≈ 1.37 MW。可以用拉桿核對（PUE 設 130）。'],
-      },
     },
     mistakes: [
       { wrong: '只算 GPU 的功耗。', why: 'CPU、網路、散熱都要電。', right: 'IT 用電 × PUE。' },
       { wrong: '把最大功耗當成平均用電。', why: '負載會變動。', right: '估算時寫清楚假設。' },
       { wrong: '把預估值當成確定的事實。', why: 'IEA 自己也說不確定性很大。', right: '引用時寫「預估」與出處。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'PUE 的定義？', options: [
-        { text: '總用電 ÷ IT 用電', correct: true, why: '越接近 1 越省。' },
-        { text: 'IT 用電 ÷ 總用電', why: '倒過來了。' },
-        { text: 'GPU 數 ÷ 機櫃數', why: '不是。' },
-        { text: '電費 ÷ 營收', why: '不是。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'IEA 估計 2024 年全球資料中心用電約？', options: [
-        { text: '415 TWh，約全球 1.5%', correct: true, why: 'IEA 報告。' },
-        { text: '945 TWh', why: '那是 2030 預估。' },
-        { text: '15 TWh', why: '低估很多。' },
-        { text: '全球用電的一半，已經超過所有工廠', why: '高估很多。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼新的 AI 資料中心選址時，電力和水（散熱）常常比土地更重要？'], answer: [
-        '高密度 AI 機櫃需要大量、穩定的電力，以及強力的散熱（液冷、冷卻塔）；電網接不上，有地也蓋不起來。',
-        '這也讓電力供應、再生能源、電網建設成為 AI 產業的一部分。',
-      ] },
-    ],
     keypoints: [
       '總用電＝IT 用電 × PUE；GPU 的電幾乎全變成熱。',
       'H100 最大 700 W；上萬張是幾十 MW 等級。',
-      'IEA：資料中心 2024 約 415 TWh，2030 預估約 945 TWh。',
+      'IEA：資料中心 2025 年約 485 TWh，2030 預估約 950 TWh。',
     ],
-    sources: ['iea-energy-ai', 'nvidia-h100'],
+    sources: ['iea-energy-ai', 'iea-2026', 'nvidia-h100', 'gb200-rack'],
   },
 });
 </script>
 
 <script>
-/* 5-4 台灣的位置＋總複習（模組 1–5） */
-const REVIEW_12_HW = [
-  { level: '回想', type: 'mc', q: '（0-1）推論一個 token 約多少 FLOPs？', options: [
-    { text: '2 × 參數', correct: true, why: '一乘一加。' },
-    { text: '6 × 參數', why: '那是訓練。' },
-    { text: '參數²', why: '不是。' },
-    { text: '和參數無關', why: '成正比。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（1-2）H100 規格表 FP16 1,979 TFLOPS（含稀疏），估算時用？', options: [
-    { text: '約 989，再乘利用率', correct: true, why: '不含稀疏約一半。' },
-    { text: '直接用 1,979', why: '高估。' },
-    { text: '3,958', why: '那是 FP8 含稀疏。' },
-    { text: '3.35', why: '那是頻寬。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（1-3、2-1）34B 模型 BF16 的權重？', options: [
-    { text: '68 GB', correct: true, why: '34 × 2。' },
-    { text: '34 GB', why: '那是 8 位元。' },
-    { text: '17 GB', why: '那是 4 位元。' },
-    { text: '136 GB', why: '那是 FP32。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（2-2）H100 的 roofline 轉折點約？', options: [
-    { text: '295 FLOP／位元組', correct: true, why: '989 ÷ 3.35。' },
-    { text: '1 FLOP／位元組，所有運算都一樣', why: '那是 decode 的強度。' },
-    { text: '3.35', why: '那是頻寬。' },
-    { text: '80', why: '那是容量。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（2-3）頻寬 2 TB/s 跑 20 GB 的權重，單人 decode 上限？', options: [
-    { text: '約 100 token/s', correct: true, why: '2,000 ÷ 20。' },
-    { text: '約 10 token/s', why: '少了 10 倍。' },
-    { text: '約 40 token/s', why: '算錯。' },
-    { text: '約 1,000 token/s', why: '多了 10 倍。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（2-4）GQA 的作用？', options: [
-    { text: '多個頭共用 K、V，縮小 KV cache', correct: true, why: '長 context 才可行。' },
-    { text: '讓模型參數加倍', why: '不是。' },
-    { text: '提高訓練精度', why: '不是。' },
-    { text: '取代量化', why: '可以一起用。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（3-1）20B 模型混合精度＋Adam 訓練，權重＋梯度＋優化器約？', options: [
-    { text: '320 GB', correct: true, why: '20 × 16。' },
-    { text: '40 GB', why: '那是推論 BF16。' },
-    { text: '80 GB，剛好一張 H100', why: '少算了。' },
-    { text: '20 GB', why: '少算很多。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（3-2）一張卡放不下模型，要用？', options: [
-    { text: '模型平行', correct: true, why: '把模型切開。' },
-    { text: '資料平行', why: '每張仍要完整模型。' },
-    { text: '更大的批次', why: '更放不下。' },
-    { text: '更高的精度', why: '更大。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（3-3）在頻寬卡住的範圍內，批次加倍，吞吐量？', options: [
-    { text: '約加倍', correct: true, why: '每步時間幾乎不變。' },
-    { text: '不變', why: '每步服務更多人。' },
-    { text: '減半', why: '相反。' },
-    { text: '變 4 倍', why: '線性。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（4-1）量化到 4 位元，對 decode 速度？', options: [
-    { text: '上限約快 4 倍（相對 BF16）', correct: true, why: '搬的資料少 4 倍。' },
-    { text: '一定變慢', why: '通常變快。' },
-    { text: '完全沒影響', why: '有影響。' },
-    { text: '只影響訓練', why: '推論也受惠。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（5-2）依 TrendForce，台積電 2Q26 晶圓代工市占？', options: [
-    { text: '72.5%', correct: true, why: '2026-09 發布。' },
-    { text: '5.9%', why: '那是三星。' },
-    { text: '50%', why: '低估。' },
-    { text: '90%，所有晶片都在台灣做', why: '那是 AI 伺服器組裝的產業估計。' },
-  ] },
-  { level: '遷移', type: 'mc', q: '（5-3）1,000 張 GPU、平均 500 W、其他 +40%、PUE 1.25，總用電約？', options: [
-    { text: '0.875 MW', correct: true, why: '1,000×500×1.4×1.25。' },
-    { text: '0.5 MW，只算 GPU', why: '少算其他與 PUE。' },
-    { text: '0.7 MW，忘了 PUE', why: '要乘 1.25。' },
-    { text: '8.75 MW', why: '多一個 0。' },
-  ] },
-];
+
 
 defineLessons({
   '5-4': {
     goals: [
       '說出台灣廠商在 AI 硬體供應鏈的主要角色',
-      '分辨產業數字的出處與性質（統計 vs 估計）',
-      '用 12 題總複習確認整卷的估算能力',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 5-3）總用電的估算？', options: [
-        { text: 'IT 用電 × PUE', correct: true, why: '加上散熱等。' },
-        { text: 'GPU 數 × 700', why: '只算了 GPU 最大功耗。' },
-        { text: 'IT 用電 ÷ PUE', why: '是相乘。' },
-        { text: '和散熱無關', why: '有關。' },
-      ] },
+      '用一頁地圖串起全書的估算：放得下嗎、跑多快、要多少錢、吃多少電',
+      '知道這一卷哪些數字會過時、去哪裡更新',
     ],
     analogy: {
-      text: ['一部電影的片尾名單：導演、編劇、攝影、剪接、配樂…觀眾記得的是導演，但少了任何一組，電影就拍不出來。', 'AI 的片尾名單裡，台灣出現在好幾個關鍵位置：[[晶圓代工]]（台積電）、[[先進封裝]]與封測、AI 伺服器組裝、電源與散熱零件，還有 IC 設計公司。這一課把它們放在地圖上，最後用總複習收尾。'],
+      text: ['一部電影的片尾名單：導演、編劇、攝影、剪接、配樂…觀眾記得的是導演，但少了任何一組，電影就拍不出來。', 'AI 的片尾名單裡，台灣出現在好幾個關鍵位置：[[晶圓代工]]（台積電）、[[先進封裝]]與封測、AI 伺服器組裝、電源與散熱零件，還有 IC 設計公司。這一課先把它們放在地圖上，再用一頁地圖把整卷串起來。'],
       limit: ['片尾名單是固定的，產業位置會變：各國在擴建產能、供應鏈在分散；這一課的數字查證於 2026-10，之後要更新。'],
     },
     model: {
@@ -438,54 +299,69 @@ defineLessons({
           ['台灣廠商組裝的 AI 伺服器比例', '約九成', '產業估計，多方轉述，口徑不一'],
           ['HBM 市占（SK hynix）', '約 50～58%', '依機構與季度差很多'],
         ], caption: '引用時要分清楚「統計」與「估計」，並寫出處與時間。' },
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'fab', label: '晶圓代工' }, { id: 'pkg', label: '封裝與封測' }, { id: 'server', label: '伺服器組裝' }, { id: 'parts', label: '電源與散熱' }], items: [
-          { text: '用最先進製程生產 GPU 晶片', answer: 'fab', why: '晶圓代工。' },
-          { text: '把 GPU 和 HBM 封裝在一起', answer: 'pkg', why: '先進封裝。' },
-          { text: '把 8 張 GPU、主機板、網路裝成整台機櫃交給雲端業者', answer: 'server', why: 'ODM 組裝。' },
-          { text: '高功率機櫃的電源供應與液冷零件', answer: 'parts', why: '電源與散熱。' },
-        ] } },
+        { type: 'table', head: ['環節', '台灣的角色', '對應課程'], rows: [
+          ['用最先進製程生產 GPU 晶片', '晶圓代工', '5-2'],
+          ['把 GPU 和 HBM 封裝在一起', '先進封裝與封測', '5-2'],
+          ['把 8 張 GPU、主機板、網路裝成整台機櫃交給雲端業者', 'ODM 伺服器組裝', '3-2'],
+          ['高功率機櫃的電源供應與液冷零件', '電源與散熱', '5-3'],
+        ] },
+        { type: 'heading', id: 'map', text: '全書一頁地圖' },
+        { type: 'table', head: ['模組', '核心問題', '最重要的一個觀念或行動', '速算公式'], rows: [
+          ['0 起點', '一個 token 背後有哪些硬體？', '先問三題：放得下嗎、跑多快、要多少錢', '推論 ≈ 2N FLOPs／token'],
+          ['1 GPU', '為什麼要 GPU？算得多快？', '用不含稀疏的峰值，再乘利用率', '時間 ≈ 2mnk ÷（峰值 × 利用率）'],
+          ['2 記憶體', '放得下嗎？為什麼產生文字慢？', '推論先看記憶體容量與頻寬，不是 TFLOPS', '權重 GB ≈ 十億參數 × 位元組；單人 decode ≲ 頻寬 ÷ 權重'],
+          ['3 訓練與推論', '訓練為什麼貴？推論怎麼省？', '訓練每參數約 16 位元組；推論靠批次攤平成本', '訓練 ≈ 6ND FLOPs'],
+          ['4 變小', '怎麼讓模型便宜？', '從小模型往大試，用自己的評估集決定量化等級', '4 位元 ≈ BF16 的 1/4（再多抓一成）'],
+          ['5 部署與產業', '能不能本地跑？晶片從哪來？', '本地先算容量與速度；引用產業數字寫出處與時間', '總用電 ＝ IT 用電 × PUE'],
+        ] },
+        { type: 'widget', name: 'knobs', props: { title: '全書估算器：看到一個模型，估出要什麼硬體（實際計算）', sliders: [
+          { id: 'n', label: '參數量（dense 模型）', min: 1, max: 1000, step: 1, value: 70, unit: '十億' },
+          { id: 'b', label: '推論時每個參數的位元', min: 4, max: 16, step: 4, value: 16 },
+          { id: 'gb', label: '每張卡的記憶體', min: 16, max: 288, step: 8, value: 80, unit: 'GB' },
+          { id: 'bw', label: '每張卡的頻寬', min: 0.2, max: 22, step: 0.05, value: 3.35, unit: 'TB/s' },
+        ], compute: (v) => {
+          const weights = (v.n * v.b) / 8;
+          const cards = Math.max(1, Math.ceil((weights * 1.1) / v.gb));
+          const tps = (v.bw * 1000 * cards) / weights;
+          const trainGb = v.n * 16;
+          const trainCards = Math.ceil(trainGb / v.gb);
+          return { rows: [
+            { label: '權重大小', value: `${weights.toFixed(1)} GB`, ratio: Math.min(1, weights / 2000) },
+            { label: '推論至少幾張卡（含一成預留）', value: `${cards} 張`, ratio: Math.min(1, cards / 32) },
+            { label: '單人 decode 上限（各卡頻寬相加）', value: `${tps.toFixed(1)} token/s`, ratio: Math.min(1, tps / 200) },
+            { label: '訓練的模型狀態（16 位元組／參數）', value: `${trainGb.toLocaleString('en-US')} GB`, ratio: Math.min(1, trainGb / 16000) },
+            { label: '訓練至少幾張卡（不含 activation）', value: `${trainCards} 張`, ratio: Math.min(1, trainCards / 200) },
+          ], note: '預設：70B、BF16、H100（80 GB、3.35 TB/s）。權重 140 GB，含一成預留至少 2 張卡；兩張卡頻寬相加，單人上限約 48 token/s（和 3-3 的估算一致）。同一個模型要訓練，光模型狀態就要 1,120 GB、至少 14 張卡。這些都是理想上限，沒算 KV cache（2-4）與通訊。' };
+        } } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="整卷回顧：六層硬體，從晶圓與封裝到推論服務，每一層對應一個模組">
           ${[['晶圓與封裝', '5-2'], ['GPU 晶片', '1'], ['記憶體', '2'], ['伺服器與互連', '3-2'], ['資料中心', '5-3'], ['推論服務', '3-3、4、5-1']].map(([a, b], i) => `<rect x="${10 + i * 92}" y="40" width="84" height="100" style="fill:var(--m${i})" class="stroke-ink" stroke-width="3"/><text x="${52 + i * 92}" y="82" text-anchor="middle" font-size="12" font-weight="900" class="on-color">${a}</text><text x="${52 + i * 92}" y="110" text-anchor="middle" font-size="12" class="on-color">${b}</text>`).join('')}
           <text x="280" y="170" text-anchor="middle" font-size="13">回到首頁那張圖：每一層你都能估算了</text>
         </svg>`, caption: '從下往上：晶片怎麼來、怎麼算、放在哪、怎麼一起算、吃多少電、最後怎麼服務你。' },
-        { type: 'heading', id: 'final-review', text: '總複習：12 題' },
-        { type: 'quiz', key: '5-4:final', items: REVIEW_12_HW },
+        { type: 'heading', id: 'shifting', text: '深入：台灣的位置正在怎麼變' },
+        '先進製程正在往海外擴：台積電在美國亞利桑那、日本熊本已有量產廠，德國德勒斯登的廠在建。但最先進的製程與大部分 [[CoWoS]] 先進封裝仍集中在台灣，AI 伺服器的組裝則有一部分移到墨西哥、美國等靠近客戶的地方（🟡 產業報導）。',
+        '對台灣來說，取捨在於「分散風險」與「保住最難的那一段」：客戶要求供應鏈分散，廠商就把較成熟的環節搬出去，留下研發與最先進的量產。看產業新聞時，先問搬走的是哪一個環節、哪一代製程。',
+        { type: 'heading', id: 'expiry', text: '深入：這一卷哪些內容會過時' },
+        { type: 'table', head: ['內容', '多久會變', '怎麼更新'], rows: [
+          ['GPU 規格（容量、頻寬、算力）', '每年一代', 'NVIDIA 等廠商的官方規格頁與技術部落格；注意「含稀疏」與精度'],
+          ['API 價格與模型名稱（4-3）', '幾個月', '各家官方價格頁'],
+          ['本地模型名稱與標籤（5-1）', '幾個月', 'ollama.com/library、模型的官方模型卡'],
+          ['晶圓代工、HBM 市占（5-2）', '每季', 'TrendForce、Counterpoint 等季度報告，寫出機構與季度'],
+          ['資料中心用電（5-3）', '每年', 'IEA 年度報告與更新'],
+          ['2N、6ND、16 位元組、頻寬 ÷ 權重、roofline', '幾乎不變', '—'],
+        ], caption: '數字會變，估算的方法不會。下次建議查證日期：2027-01。' },
       ],
-      tryit: {
-        q: ['找一則最近的 AI 硬體新聞（例如新 GPU、新資料中心、產能），用這一卷的觀念寫三句分析：它影響哪一層？影響容量、速度還是成本？台灣在哪個環節？'],
-        draft: '新聞：＿\n影響的層：＿\n影響：＿\n台灣的環節：＿',
-        answer: ['範例（新一代 GPU 的記憶體容量與頻寬都大幅提升）：影響「記憶體」與「GPU」兩層；容量讓更大的模型單卡放得下，頻寬讓 decode 變快（2-1、2-3）。', '台灣的環節：晶圓代工與先進封裝（製造這顆晶片）、伺服器組裝（裝成機櫃）。'],
-      },
     },
     mistakes: [
       { wrong: '把產業估計當成精確統計。', why: '口徑與方法不同，數字差很多。', right: '寫出處、時間與性質。' },
       { wrong: '以為台灣只有台積電。', why: '封測、伺服器組裝、零組件、IC 設計都有重要廠商。', right: '看整條供應鏈。' },
-      { wrong: '以為產業位置不會變。', why: '各地都在擴產、供應鏈在分散。', right: '定期更新數字。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '把 GPU 和 HBM 封在一起屬於哪個環節？', options: [
-        { text: '先進封裝', correct: true, why: '例如 CoWoS。' },
-        { text: '伺服器組裝', why: '那是整機。' },
-        { text: 'IC 設計', why: '那是畫電路。' },
-        { text: '電源與散熱', why: '那是零件。' },
-      ] },
-      { level: '應用', type: 'mc', q: '「台灣組裝約九成 AI 伺服器」這個數字屬於？', options: [
-        { text: '產業估計，要註明出處與口徑', correct: true, why: '多方轉述、口徑不一。' },
-        { text: '政府公布的官方統計', why: '不是。' },
-        { text: '台積電的財報數字', why: '不是。' },
-        { text: '完全沒有根據的傳言', why: '有來源，只是估計。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用這一卷學到的東西，向一位不懂技術的家人解釋「為什麼 AI 需要台灣」。'], answer: [
-        '範例：AI 模型要用很多很強的晶片來算，這些最先進的晶片大部分是在台灣做出來、封裝好、再裝成伺服器送到世界各地的資料中心。',
-        '所以台灣不是做 AI 模型的地方，而是讓 AI 模型能跑起來的「工廠」之一。',
-      ] },
+      { wrong: '用最新規格表的大數字直接套公式。', why: '規格常標「含稀疏」或 FP4，和你實際用的精度不同。', right: '先換成你用的精度、不含稀疏，再估算（1-2、1-3）。' },
     ],
     keypoints: [
       '台灣：晶圓代工、先進封裝與封測、AI 伺服器組裝、電源與散熱、IC 設計。',
-      '分清統計與估計，寫出處與時間。',
-      '整卷的估算：放得下嗎、跑多快、要多少錢、吃多少電。',
+      '整卷的估算：放得下嗎、跑多快、要多少錢、吃多少電，各有一條速算公式。',
+      '規格、價格、市占、用電數字會過時；估算方法不會。',
     ],
-    sources: ['trendforce-2q26', 'taiwan-servers', 'amcham-ai'],
+    sources: ['trendforce-2q26', 'taiwan-servers', 'amcham-ai', 'hbm-share'],
   },
 });
 </script>

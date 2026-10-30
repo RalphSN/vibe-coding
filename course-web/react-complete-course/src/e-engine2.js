@@ -99,10 +99,10 @@ Views.styleguide = () => {
       ${tabsBlock({ label: '作業系統', tabs: [{ label: 'Windows', blocks: ['`winget install OpenJS.NodeJS.LTS`'] }, { label: 'macOS', blocks: ['`brew install node`'] }] })}
     </section>
 
-    <section class="sg-block"><h2>摺疊與測驗</h2>
+    <section class="sg-block"><h2>摺疊（深入思考）</h2>
       <div class="quiz-list">
         ${quizItem(sampleQuiz, 'styleguide:q:0')}
-        ${quizItem({ type: 'reveal', level: '遷移', q: '先想一想：為什麼答案要先藏起來？', answer: ['先嘗試提取記憶，再看答案，記得比較牢（提取練習）。'] }, 'styleguide:r:0')}
+        ${quizItem({ type: 'reveal', level: '深入思考', q: '先想一想：為什麼解析要先收起來？', answer: ['先自己推理一次，再看解析，比較容易發現自己的盲點。'] }, 'styleguide:r:0')}
       </div>
     </section>
 
@@ -114,8 +114,8 @@ Views.styleguide = () => {
       ${renderWidget({ name: 'checklist', props: { key: 'sg', items: ['第一項', '第二項', '第三項'] } })}
     </section>
 
-    <section class="sg-block"><h2>csrun：預測再看結果</h2>
-      ${renderWidget({ name: 'csrun', props: { code: '<p>{1 + 1}</p>', predict: { options: ['1 + 1', '2'], answer: 1 }, output: '2' } })}
+    <section class="sg-block"><h2>csrun：執行再看結果</h2>
+      ${renderWidget({ name: 'csrun', props: { code: '<p>{1 + 1}</p>', output: '2' } })}
     </section>
     <section class="sg-block"><h2>classify</h2>
       ${renderWidget({ name: 'classify', props: { buckets: [{ id: 'p', label: 'props' }, { id: 's', label: 'state' }], items: [{ text: '父元件傳進來的標題', answer: 'p', why: '由外部決定。' }, { text: '輸入框目前的文字', answer: 's', why: '元件自己記住、會變。' }] } })}

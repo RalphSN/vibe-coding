@@ -57,20 +57,6 @@ defineLessons({
       '判斷一個功能需不需要串流',
       '知道長輸出為什麼一定要用串流',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-3）讀回應時，第一個要看的欄位是？', options: [
-        { text: '`stop_reason`', correct: true, why: '先知道為什麼停，才知道 content 能不能用。' },
-        { text: '`content[0].text`', why: '第一格不一定是文字，也可能被截斷。' },
-        { text: '`id`', why: 'id 是編號，回報問題時才用。' },
-        { text: '`model`', why: '你送的就是這個模型，不用先看。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-5）同樣 1,000 token，Opus 5.5 的輸入和輸出哪個貴？', options: [
-        { text: '輸出，是輸入的 5 倍', correct: true, why: '$20 對 $4（每百萬 token）。' },
-        { text: '輸入，因為要讀比較多東西', why: '輸入便宜；輸出是 5 倍。' },
-        { text: '一樣貴，都按 token 計費', why: '都按 token，但單價不同。' },
-        { text: '要看有沒有開串流', why: '串流不改變單價。' },
-      ] },
-    ],
     analogy: {
       text: ['不[[串流]]像去餐廳點了一桌菜，廚房要等全部做好才一起上：你盯著空桌子坐十分鐘。串流像熱炒店：好一道上一道，第一道兩分鐘就上桌，你可以邊吃邊等。', '兩種方式**全部上完的時間差不多**，差的是第一道菜多久上桌（[[TTFT]]），以及等待時你有沒有事做。'],
       limit: ['菜一道一道上，每一道都是完整的；串流送來的是半句話，你的畫面要能顯示「還沒說完」的狀態。而且邊上菜邊吃，中途想喊停也比較容易（2-4）。'],
@@ -106,12 +92,15 @@ defineLessons({
           <text x="305" y="116" font-size="15" class="on-color">・思考 token 多</text>
           <text x="305" y="148" font-size="15" class="on-color">・工具來回好幾輪</text>
         </svg>`, caption: '串流不會讓模型變快；它讓使用者早一點看到東西。真正變快要調左右兩欄（8-3）。' },
+        { type: 'heading', id: 'deep-stream-cost', text: '深入：串流的代價，什麼時候寧可不串' },
+        '串流把「先檢查再給人看」的順序拆掉了：字已經出現在畫面上，你才知道整段內容。需要事後把關的情境，要想清楚取捨。',
+        { type: 'table', head: ['需求', '串流會遇到的問題', '常見做法'], rows: [
+          ['輸出要先過內容審查', '有問題的句子已經被看到', '不串流；或逐句緩衝，每句檢查完才放出'],
+          ['輸出是 JSON，要驗證才能用', '半個 JSON 無法驗證（3-5）', '後端串流避免逾時，前端只顯示進度'],
+          ['回答要附正確引用（6-4）', '引用在文字之後才確定', '先顯示文字，結束後再補上出處連結'],
+        ] },
+        'Opus 5.5 的思考預設不顯示（`display: "omitted"`），模型想得越久，串流畫面上的空白就越久。effort 高的功能可以改用 `display: "summarized"` 讓思考摘要先流出來，或至少顯示「正在思考」，讓等待有東西可看（2-2）。',
       ],
-      tryit: {
-        q: ['把下面三個功能分成「要串流」和「不用串流」，各寫一句理由：'],
-        draft: 'A. 客服聊天視窗：＿＿\nB. 每晚把 2 萬則評論分類成正負面：＿＿\nC. 產生一份 3 萬字的技術文件草稿：＿＿',
-        answer: ['A 要串流：使用者在畫面前等，TTFT 決定體感。', 'B 不用：沒人在等，改用 Batch API 還便宜一半。', 'C 要串流：就算沒人盯著看，輸出這麼長不串流可能撞到 HTTP 逾時；可以串流後用 `finalMessage()` 拿完整結果。'],
-      },
     },
     mistakes: [
       { wrong: '以為開了串流，模型就會比較快寫完。', why: '串流不改變模型產生的速度，總時間差不多。', right: '串流改善的是 TTFT 與體感；要縮短總時間，就縮短輸出、降低 effort 或換較小的模型（8-3）。' },
@@ -119,19 +108,7 @@ defineLessons({
       { wrong: '所有功能都開串流，包括晚上跑的批次工作。', why: '沒人在等就不需要；而且批次工作有更便宜的 Batch API。', right: '有人在畫面前等才串流；背景大量工作用 Batch API（8-2）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '串流主要改善了哪一個數字？', options: [
-        { text: '第一個字出現的時間（TTFT）', correct: true, why: '第一個字提早出現；總時間差不多。' },
-        { text: '整段回應寫完的總時間', why: '模型產生速度沒變，總時間差不多。' },
-        { text: '每個 token 的價格', why: '串流不改變價格。' },
-        { text: '模型回答的正確率', why: '串流只改變傳送方式，不改變內容。' },
-      ] },
-      { level: '應用', type: 'mc', q: '使用者抱怨「按下送出後要等 6 秒才有反應」，回答本身其實很短。最先該檢查什麼？', options: [
-        { text: 'effort 太高，模型先想很久才開始寫', correct: true, why: '回答短卻等很久，多半是 TTFT 長；思考越多，第一個字越晚。' },
-        { text: '輸出是不是太長，要請模型把回答講短一點', why: '題目說回答本身很短；問題在開始之前。' },
-        { text: '前端是不是沒有開串流', why: '回答很短時，開不開串流差不多；等待發生在第一個字之前。' },
-        { text: '網路頻寬不夠，回應下載得太慢', why: '回應只有幾百 byte，頻寬不是瓶頸。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你在做「上傳合約，產生 20 頁審閱報告」的功能，使用者上傳後會去喝咖啡。要不要串流？畫面上該顯示什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你在做「上傳合約，產生 20 頁審閱報告」的功能，使用者上傳後會去喝咖啡。要不要串流？畫面上該顯示什麼？'], answer: [
         '要用串流的 API（長輸出避免逾時），但不一定要把字逐一顯示給使用者看。',
         '畫面可以顯示進度（例如「已產生約 3,000 字」或目前寫到哪一節），完成後通知使用者；後端用 `finalMessage()` 拿完整報告存起來。',
       ] },
@@ -149,20 +126,6 @@ defineLessons({
       '讀懂一筆 SSE 事件的 `event:`、`data:` 與空行',
       '說出 Claude 串流的事件順序，知道文字在哪一種事件裡',
       '分辨「正常結束」和「中途出錯」的事件',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-1）`max_tokens` 設到 64,000 時，為什麼建議用串流？', options: [
-        { text: '整段寫完可能超過 HTTP 連線的等待時間', correct: true, why: 'SDK 也會檢查並要求你改用串流。' },
-        { text: '串流時每個 token 比較便宜', why: '價格一樣。' },
-        { text: '不串流時 max_tokens 最多只能設 4,096', why: '沒有這個限制；問題是逾時。' },
-        { text: '串流時模型寫得比較快', why: '產生速度一樣。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-1）回應裡的 `usage` 告訴你什麼？', options: [
-        { text: '這次用了多少輸入與輸出 token', correct: true, why: '計費就看它。' },
-        { text: '這把金鑰還剩多少額度', why: '額度在 Console 看。' },
-        { text: '這次請求用了幾秒', why: 'usage 不含時間。' },
-        { text: '模型的 context window 有多大', why: '那要查 Models API。' },
-      ] },
     ],
     analogy: {
       text: ['[[SSE]] 像傳真機一張一張吐紙：每張紙上方寫著這是哪一類（`event:`），下面是內容（`data:`），一張紙印完會空一行再印下一張。', '你的程式就是站在傳真機旁邊的人，每吐一張就看標題決定怎麼處理：是新的文字就貼到牆上，是「結束」就收工。'],
@@ -209,13 +172,15 @@ defineLessons({
         { type: 'code', lang: 'typescript', title: '用 SDK 逐一處理事件', code: 'const stream = client.messages.stream({ model: "claude-opus-5-5", max_tokens: 1024, messages });\n\nfor await (const event of stream) {\n  if (event.type === "content_block_delta" && event.delta.type === "text_delta") {\n    process.stdout.write(event.delta.text);   // 新的一段文字\n  }\n  if (event.type === "message_delta") {\n    console.log("\\n停止原因：", event.delta.stop_reason);\n  }\n}' },
         { type: 'code', lang: 'text', title: '中途出錯時（HTTP 已經是 200）', code: 'event: error\ndata: {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}' },
         { type: 'callout', variant: 'tip', title: '為什麼不能只看 HTTP 狀態碼', body: ['串流開始時伺服器已經回了 200；之後才發生的錯誤只能用一筆 `error` 事件告訴你。SDK 會把它變成例外丟出來，你的程式要接住（2-4）。'] },
+        { type: 'heading', id: 'deep-sse-parse', text: '深入：自己解析 SSE 時最容易漏的規則' },
+        { type: 'table', head: ['規格規則', '漏掉會怎樣'], rows: [
+          ['一筆事件可以有多行 `data:`，要用換行接起來', '只取第一行，長內容被截掉'],
+          ['換行可以是 `\\n`、`\\r\\n` 或 `\\r`', '只認 `\\n` 的解析器，遇到 Windows 伺服器就收不到事件'],
+          ['`data:` 後面的第一個空白要去掉，其他保留', '文字開頭多一個空白，或把有意義的空白吃掉'],
+          ['`id:` 和 `retry:` 也是合法欄位', '把它們當成內容顯示出來'],
+        ] },
+        '工具呼叫的參數也是串流送來的：`content_block_delta` 裡的 `input_json_delta` 每次只帶一小段 JSON 字串，要累積到 `content_block_stop` 才能 `JSON.parse`（模組 4）。思考區塊用 `thinking_delta`，最後還有一筆 `signature_delta`；把思考原樣放回歷史時，簽章不能少。',
       ],
-      tryit: {
-        q: ['下面是收到的事件。補完：畫面上會顯示什麼？`stop_reason` 是什麼？'],
-        code: true,
-        draft: 'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"明天"}}\n\nevent: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"會下雨"}}\n\nevent: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":6}}\n\n畫面：＿＿＿＿\nstop_reason：＿＿＿＿',
-        answer: ['畫面：「明天會下雨」（兩筆 `text_delta` 接起來）。', '`stop_reason` 是 `end_turn`，在 `message_delta` 裡；輸出 6 個 token。'],
-      },
     },
     mistakes: [
       { wrong: '每收到一個網路封包就當成一筆完整事件來解析。', why: '一筆事件可能被切在兩個封包裡，直接 `JSON.parse` 會失敗。', right: '用 SDK（它會等到空行才算一筆）；自己解析時要累積到空行再處理。' },
@@ -223,19 +188,7 @@ defineLessons({
       { wrong: '串流開始回了 200，就當作這次一定成功。', why: '錯誤可能在中途以 `error` 事件出現（例如過載）。', right: '用 try/catch 包住串流迴圈，並檢查有沒有收到 `message_stop`（2-4）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '新的一段文字在哪一種事件裡？', options: [
-        { text: '`content_block_delta` 的 text_delta', correct: true, why: '`delta.type` 是 `text_delta` 時，每筆帶一小段文字。' },
-        { text: '`message_start`，`message.content` 裡', why: '開始時 content 是空的。' },
-        { text: '`message_delta`，`delta.text` 裡', why: 'message_delta 帶的是 stop_reason 與用量。' },
-        { text: '`ping`，每隔幾秒送一次', why: 'ping 只是保持連線。' },
-      ] },
-      { level: '應用', type: 'mc', q: '畫面顯示到一半就停了，log 裡最後收到的是一般的 `content_block_delta`，之後沒有 `message_stop`。最合理的判斷是？', options: [
-        { text: '串流中途被中斷，回應不完整', correct: true, why: '正常結束一定有 message_delta 與 message_stop；沒有就是被切斷或出錯。' },
-        { text: '模型說完了，只是沒送 stop 事件', why: '正常結束一定會送 message_stop。' },
-        { text: '撞到了 max_tokens 上限', why: '撞到上限也會正常收到 message_delta（stop_reason 是 max_tokens）。' },
-        { text: '前端顯示太慢，資料其實都收到了', why: 'log 顯示資料沒有收完。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你想在畫面上顯示「AI 正在思考…」，等真正的回答文字開始出現時才換掉。根據事件順序，你要監聽哪幾種事件、怎麼判斷？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你想在畫面上顯示「AI 正在思考…」，等真正的回答文字開始出現時才換掉。根據事件順序，你要監聽哪幾種事件、怎麼判斷？'], answer: [
         '送出後先顯示「正在思考」。監聽 `content_block_start`：區塊類型是 `thinking` 時繼續顯示思考中；出現 `text` 區塊、或收到第一筆 `text_delta` 時，換成回答文字。',
         '收到 `message_stop` 才把狀態改成完成；中途收到錯誤就顯示錯誤（2-4）。',
       ] },
@@ -253,20 +206,6 @@ defineLessons({
       '架一個後端代理：金鑰留在後端，把文字串流轉給瀏覽器',
       '在瀏覽器用 `fetch` 加 `ReadableStream` 逐段讀取並顯示',
       '說出 `EventSource` 為什麼不適合直接呼叫 LLM',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）Claude 串流裡，`stop_reason` 在哪一種事件？', options: [
-        { text: '`message_delta`', correct: true, why: '最後才知道怎麼結束。' },
-        { text: '`message_start`', why: '開始時還不知道。' },
-        { text: '`content_block_start`', why: '那是區塊開始。' },
-        { text: '`ping`', why: 'ping 不帶內容。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 0-2）為什麼瀏覽器不能直接帶金鑰呼叫 Claude API？', options: [
-        { text: '前端程式碼人人看得到，金鑰等於公開', correct: true, why: '所以要後端代理。' },
-        { text: '瀏覽器不能送 POST 請求', why: '可以；問題在安全。' },
-        { text: 'Claude API 不接受來自瀏覽器的 JSON', why: '格式一樣；問題在金鑰。' },
-        { text: '瀏覽器的請求一定比較慢', why: '速度不是原因。' },
-      ] },
     ],
     analogy: {
       text: ['[[後端代理]]像餐廳的傳菜口：客人（瀏覽器）不能進廚房（Claude API），只能跟服務生點餐。服務生拿著店裡的帳號（金鑰）去廚房下單，菜好一道就從傳菜口遞出一道。', '客人那邊要有人一道一道接（[[ReadableStream]]），接到就擺上桌。'],
@@ -326,25 +265,41 @@ defineLessons({
           <text x="301" y="188" font-size="15" class="on-color">「退」＋「款」</text>
         </svg>`, caption: '英文字母一個位元組不會被切開，所以這個錯誤常常只在中文環境出現。' },
         { type: 'code', lang: 'typescript', title: 'React：把每一段接到畫面上', code: 'const [reply, setReply] = useState("");\n\nasync function send(question: string): Promise<void> {\n  setReply("");\n  // 用函式形式更新：每一段都接在「最新的」內容後面\n  await streamChat([{ role: "user", content: question }], (chunk) => setReply((prev) => prev + chunk));\n}' },
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'browser', label: '瀏覽器' }, { id: 'backend', label: '你的後端' }, { id: 'api', label: 'Claude API' }], items: [
-          { text: '讀 `ANTHROPIC_API_KEY`', answer: 'backend', why: '金鑰只在後端的環境變數裡。' },
-          { text: '檢查 messages 的長度與格式', answer: 'backend', why: '外部輸入要在伺服器端驗證；瀏覽器的檢查可以被繞過。' },
-          { text: '用 `TextDecoder` 把位元組轉成文字', answer: 'browser', why: '瀏覽器收到的是位元組，要自己解碼。' },
-          { text: '產生 `content_block_delta` 事件', answer: 'api', why: 'SSE 事件是 Claude API 送出來的。' },
-          { text: '決定 system prompt 與模型名稱', answer: 'backend', why: '放在後端，使用者改不到；放前端的話任何人都能改。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['讀 `ANTHROPIC_API_KEY`', '你的後端', '金鑰只在後端的環境變數裡。'],
+          ['檢查 messages 的長度與格式', '你的後端', '外部輸入要在伺服器端驗證；瀏覽器的檢查可以被繞過。'],
+          ['用 `TextDecoder` 把位元組轉成文字', '瀏覽器', '瀏覽器收到的是位元組，要自己解碼。'],
+          ['產生 `content_block_delta` 事件', 'Claude API', 'SSE 事件是 Claude API 送出來的。'],
+          ['決定 system prompt 與模型名稱', '你的後端', '放在後端，使用者改不到；放前端的話任何人都能改。']
+        ] },
         { type: 'table', head: ['做法', '可以 POST 嗎', '適合'], rows: [
           ['`EventSource`', '✗ 只能 GET、不能加自訂標頭', '伺服器推播通知；不適合送一大段對話'],
           ['`fetch` ＋ `ReadableStream`', '✓', '本課的做法：POST 對話、逐段讀'],
           ['後端轉成 SSE 再給瀏覽器', '✓（用 fetch 讀）', '要分辨多種事件時：文字、工具狀態、錯誤、結束（2-4）'],
         ] },
+        { type: 'heading', id: 'connections', text: '代理要撐住多少條同時開著的連線' },
+        { type: 'widget', name: 'knobs', props: { title: '同時開著的串流連線＝每秒請求數 × 每次串流秒數', sliders: [
+          { id: 'rpm', label: '尖峰每分鐘請求', min: 10, max: 6000, step: 10, value: 600, unit: '次' },
+          { id: 'sec', label: '平均每次串流多久', min: 1, max: 120, step: 1, value: 20, unit: '秒' },
+          { id: 'cap', label: '一台後端能同時維持的連線', min: 50, max: 5000, step: 50, value: 500, unit: '條' },
+        ], compute: (v) => {
+          const open = Math.round(v.rpm / 60 * v.sec);
+          const servers = Math.max(1, Math.ceil(open / v.cap));
+          return { rows: [
+            { label: '同時開著的連線', value: `${open.toLocaleString('en-US')} 條`, ratio: open / 12000 },
+            { label: '至少需要幾台後端', value: `${servers} 台`, ratio: servers / 24 },
+            { label: '單台使用率', value: `${Math.round(open / (servers * v.cap) * 100)}%`, ratio: open / (servers * v.cap) },
+          ], note: `每秒 ${(v.rpm / 60).toFixed(1)} 個請求、每個開 ${v.sec} 秒，平均就有 ${open} 條連線同時開著。預設值是 600 次／分鐘 × 20 秒＝200 條。回答變長、effort 變高，秒數變長，連線數跟著等比增加。` };
+        } } },
+        { type: 'heading', id: 'deep-proxy', text: '深入：串流在你的電腦正常，上線後卻一次全部出現' },
+        '最常見的原因是中間有東西在「緩衝」：它把資料收集到一定量才往下送，串流就失去意義。這類問題在本機測不出來，因為本機沒有那些中間層。',
+        { type: 'table', head: ['中間層', '為什麼會緩衝', '常見處理'], rows: [
+          ['反向代理（例如 nginx）', '預設會緩衝上游回應', '關閉這條路由的代理緩衝；nginx 可由後端送 `X-Accel-Buffering: no`'],
+          ['壓縮中介軟體（gzip）', '湊滿一塊才壓縮', '串流路由不壓縮，或每段都 flush'],
+          ['Serverless 函式', '有些平台等函式結束才回傳，或有執行時間上限', '確認平台支援串流回應與最長執行時間'],
+        ] },
+        '另外，瀏覽器在 HTTP/1.1 下對同一個網域只開少量連線（Chrome 是 6 條）；使用者開很多分頁、每頁都掛著串流時，新的請求會排隊。改用 HTTP/2 可以讓多個串流共用一條連線。',
       ],
-      tryit: {
-        q: ['這段 React 程式在串流時，畫面只會出現最後一小段。找出問題並改寫：'],
-        code: true,
-        draft: 'await streamChat(messages, (chunk) => setReply(reply + chunk));',
-        answer: ['`reply` 是這次渲染時的舊值，每一段都接在同一個舊值後面，前面的段落就被覆蓋了。', '改成函式形式：`setReply((prev) => prev + chunk)`，每次都拿最新的值往後接。'],
-      },
     },
     mistakes: [
       { wrong: '用 `EventSource` 直接連 Claude API。', why: '`EventSource` 只能 GET、不能加自訂標頭，送不了對話內容，而且金鑰會暴露。', right: '瀏覽器用 `fetch` POST 到自己的後端，再讀 `res.body` 的串流。' },
@@ -352,19 +307,7 @@ defineLessons({
       { wrong: '讓前端決定 `model` 和 `system`，後端照單全收。', why: '任何人都能改成最貴的模型、或改掉你的規則。', right: '前端只送對話內容；模型、system、max_tokens 都由後端決定，並驗證輸入。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '為什麼瀏覽器不用 `EventSource` 直接接 LLM 串流？', options: [
-        { text: '只能 GET，送不了對話內容與標頭', correct: true, why: 'WHATWG 標準的 EventSource 只有 withCredentials 一個選項。' },
-        { text: '它不支援 UTF-8，中文會亂碼', why: 'SSE 一律是 UTF-8。' },
-        { text: '它斷線後不會自動重連', why: '剛好相反，它會自動重連。' },
-        { text: '它只能在 Node.js 裡用', why: 'EventSource 是瀏覽器 API。' },
-      ] },
-      { level: '應用', type: 'mc', q: '串流的中文回答偶爾出現「�」，英文回答都正常。最可能的原因是？', options: [
-        { text: '解碼沒加 `{ stream: true }`', correct: true, why: '英文一個字元一個位元組不會被切開；中文 3 個位元組可能跨兩段。' },
-        { text: '模型輸出了不合法的中文字', why: '模型輸出的是合法文字；亂碼發生在你的解碼。' },
-        { text: '後端的 content-type 沒寫 charset', why: '前端用 TextDecoder 預設就是 UTF-8；問題在分段解碼。' },
-        { text: '網路封包遺失，資料不完整', why: 'TCP 會保證資料完整到達；問題是被切在哪裡。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的後端除了文字，還想告訴前端「模型正在查資料庫」這種狀態。只轉純文字的做法會遇到什麼問題？你會怎麼改？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的後端除了文字，還想告訴前端「模型正在查資料庫」這種狀態。只轉純文字的做法會遇到什麼問題？你會怎麼改？'], answer: [
         '純文字串流分不出「這段是回答」還是「這段是狀態」；也沒辦法在中途告訴前端出錯了（HTTP 已經是 200）。',
         '改成後端自己送 SSE 格式：`event: text`、`event: status`、`event: error`、`event: done`，前端用 fetch 讀串流、依 event 種類分別處理。',
       ] },
@@ -382,20 +325,6 @@ defineLessons({
       '做一個「停止生成」按鈕，前後端都真的停下來',
       '分辨正常結束、使用者停止、連線中斷三種結局',
       '決定被中斷的部分回答要怎麼處理',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）React 串流時，為什麼要寫 `setReply((prev) => prev + chunk)`？', options: [
-        { text: '每一段都接在最新的內容後面，不會被舊值覆蓋', correct: true, why: '直接用 reply 會拿到舊的渲染值。' },
-        { text: '這樣 React 才會用串流模式渲染', why: 'React 沒有這種模式；是狀態更新的寫法問題。' },
-        { text: '函式形式比較省記憶體', why: '重點是拿到最新值，不是記憶體。' },
-        { text: '這是 TextDecoder 規定的寫法，不這樣寫會亂碼', why: '兩者無關。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-2）串流中途發生過載錯誤，你會收到什麼？', options: [
-        { text: '一筆 `error` 事件，HTTP 狀態仍是 200', correct: true, why: '錯誤發生時標頭早就送出了。' },
-        { text: 'HTTP 狀態碼變成 529', why: '狀態碼在一開始就送了，不能改。' },
-        { text: '`stop_reason` 變成 `overloaded`', why: '沒有這個 stop_reason。' },
-        { text: '什麼都不會收到，連線一直開著', why: 'API 會送 error 事件告訴你。' },
-      ] },
     ],
     analogy: {
       text: ['停止生成像在熱炒店喊「後面的菜不用了」：只跟服務生（瀏覽器）說不夠，服務生要跑去廚房（後端 → Claude API）叫停，否則廚房照煮、照收錢。', '[[AbortController]] 就是那聲吆喝，要一路傳到廚房。'],
@@ -463,12 +392,15 @@ defineLessons({
           ['已停止', '使用者按停止（`AbortError`）', '保留文字＋「已停止」標記', '看產品：通常存並標記，或讓使用者選'],
           ['失敗', '收到 `error`，或串流結束卻沒收到 `done`', '保留文字＋錯誤訊息＋重試按鈕', '✗ 不存，重試時重新產生'],
         ] },
+        { type: 'heading', id: 'deep-abort', text: '深入：中止之後，用量怎麼記、怎麼接著寫' },
+        '用量記在最後的 `message_delta` 裡；中途停止就收不到，`usage` 會缺一筆。要對帳時，可以用 `countTokens` 量已收到的文字當估計值，並在紀錄裡標明「中止，估計值」。',
+        { type: 'table', head: ['想做的事', '不能用的做法', '可以用的做法'], rows: [
+          ['從中斷處接著寫', '把半段回答放成最後一則 assistant（預填，新模型回 400）', '把半段放回歷史，再加一則 user：「從『……』之後接著寫」'],
+          ['重試失敗的請求', '直接重送，假設結果一樣', '重送會產生新的回答；有副作用的工具呼叫要能分辨是否已執行過（4-4）'],
+          ['斷線後恢復同一條串流', '用 `Last-Event-ID` 向 Claude 要剩下的部分', 'Claude 的串流不能續傳；只能重新請求'],
+        ] },
+        '什麼時候不提供停止按鈕？輸出很短（一兩句）時，按鈕還沒按到就結束了，只會增加畫面複雜度；有副作用的 agent 執行到一半時，停止也要先確認哪些步驟已經做了（7-2）。',
       ],
-      tryit: {
-        q: ['同事的停止按鈕只寫了前端：`controller.abort()`。上線後帳單沒有因為使用者常按停止而變少。補完你的解釋：'],
-        draft: '原因：＿＿＿＿\n要補的程式：＿＿＿＿',
-        answer: ['原因：前端中止了 fetch，但後端沒發現，仍在跟 Claude API 要資料，模型繼續產生、繼續計費。', '要補：後端監聽連線關閉（`res.on("close")`），沒寫完就呼叫 `stream.abort()`。'],
-      },
     },
     mistakes: [
       { wrong: '停止按鈕只把畫面上的串流隱藏起來。', why: '請求還在跑，後端與 API 都在產生、計費。', right: '前端 `controller.abort()`，後端在連線關閉時 `stream.abort()`。' },
@@ -476,19 +408,7 @@ defineLessons({
       { wrong: '串流結束（`done` 為 true）就當作成功，沒檢查有沒有收到結束事件。', why: '連線中斷時串流一樣會結束，但回應不完整。', right: '後端在正常結束時送一筆 `done` 事件；前端沒收到它就當作失敗。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '後端要在哪個時機呼叫 `stream.abort()`？', options: [
-        { text: '瀏覽器的連線關閉，但回應還沒寫完的時候', correct: true, why: '這表示使用者停止或離開了，後面的字不用再產生。' },
-        { text: '每收到一段文字之後', why: '那會讓串流立刻停止。' },
-        { text: '收到 `message_stop` 之後', why: '那時已經正常結束，不需要中止。' },
-        { text: '後端程式啟動的時候', why: '那時還沒有任何串流。' },
-      ] },
-      { level: '應用', type: 'mc', q: '使用者回報：「回答寫到一半就沒了，也沒有錯誤訊息。」log 顯示後端收到了 API 的 error 事件。你的前端最該補什麼？', options: [
-        { text: '後端轉送 error 事件，前端收到就顯示錯誤和重試', correct: true, why: '錯誤發生在 200 之後，只能用事件告訴前端。' },
-        { text: '前端改成檢查 HTTP 狀態碼是不是 200', why: '串流開始時就是 200，之後的錯誤看不到。' },
-        { text: '把 `max_tokens` 調大，避免回答在中途被截斷切掉', why: '這不是截斷，是 API 中途出錯。' },
-        { text: '前端加長 fetch 的逾時時間', why: '連線不是逾時，是收到錯誤後結束。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你做的是「AI 寫信」功能：使用者常在第二段就按停止，然後說「改成比較正式的語氣」。被停止的那段信要不要放進對話歷史？說出你的取捨。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你做的是「AI 寫信」功能：使用者常在第二段就按停止，然後說「改成比較正式的語氣」。被停止的那段信要不要放進對話歷史？說出你的取捨。'], answer: [
         '放進去並標記為「已停止」通常比較好：使用者接著說「改正式一點」，模型需要知道剛剛寫了什麼才能改。',
         '但要讓模型知道它是不完整的（例如在下一則 user 訊息裡說明「上一封信被中途停止」），也要注意不完整的內容不能拿去寄出。如果使用者是因為方向完全錯而停止，提供「捨棄並重寫」的選項。',
       ] },

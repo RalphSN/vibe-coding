@@ -7,23 +7,11 @@ defineTerms({
   '鏈鎖律': { en: 'chain rule', def: '一連串函式的導數＝每一段的導數相乘：∂L/∂x＝∂L/∂y × ∂y/∂x。', example: 'y＝3x＋1、L＝y² → ∂L/∂x＝2y × 3。', lesson: '3-2' },
   '局部梯度': { en: 'local gradient', def: '一個節點的輸出對它自己輸入的導數，只看這個節點本身。', example: '乘法 a·b 對 a 的局部梯度是 b。', lesson: '3-2' },
   '反向傳播': { en: 'backpropagation', def: '從損失開始，沿計算圖往回走，用鏈鎖律把梯度一路乘回每個參數。', example: 'Rumelhart、Hinton、Williams 1986。', lesson: '3-3' },
+  '正向模式': { en: 'forward-mode autodiff', def: '自動微分的一種：從一個輸入出發，一次算出它對所有輸出的導數；輸入少、輸出多時划算。', example: '算一個參數對很多輸出的影響。', lesson: '3-1' },
+  '反向模式': { en: 'reverse-mode autodiff', def: '自動微分的一種：從一個輸出出發，一次算出它對所有輸入的導數；反向傳播就是它。', example: '損失對幾百萬個參數。', lesson: '3-1' },
   '自動微分': { en: 'automatic differentiation', def: '程式在計算時記下計算圖，之後自動做反向傳播算出所有梯度；PyTorch 的 autograd 就是這個。', example: 'loss.backward()。', lesson: '3-4' },
 });
 
-const REVIEW_M2 = [
-  { level: '回想', type: 'mc', q: '（回顧 2-3）PyTorch 的 CrossEntropyLoss 吃什麼？', options: [
-    { text: 'logits', correct: true, why: '內部自己做 softmax。' },
-    { text: '先 softmax 過的機率', why: '會做兩次 softmax。' },
-    { text: '取過 log 的機率再取負', why: '那是損失本身。' },
-    { text: 'one-hot 後的預測', why: '預測要給 logits。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 2-2）前向傳播的中間值為什麼要記住？', options: [
-    { text: '反向傳播要用', correct: true, why: '算局部梯度需要它們。' },
-    { text: '為了印出來好看', why: '有實際用途。' },
-    { text: '下一筆資料會用到', why: '每筆各算各的。' },
-    { text: '推論時一定要存', why: '推論可以不存。' },
-  ] },
-];
 
 const GRAPH_SIMPLE = [
   { id: 'a', op: 'leaf', value: 2 }, { id: 'b', op: 'leaf', value: -3 }, { id: 'c', op: 'leaf', value: 10 },
@@ -59,7 +47,6 @@ defineLessons({
       '在計算圖上做一次前向傳播',
       '說出計算圖為什麼讓求梯度變簡單',
     ],
-    review: REVIEW_M2,
     analogy: {
       text: ['做一道菜的食譜：切菜 → 炒 → 加醬 → 收汁。每一步只做一件小事，用上一步的結果。', '[[計算圖]]就是公式的食譜：把 L＝(a·b＋c)² 拆成「乘、加、平方」三個節點。每個節點都很簡單，簡單到我們知道它自己的導數；把這些小導數接起來，就能算出整個公式的梯度。'],
       limit: ['食譜是一條線，計算圖可以分岔又合流（一個值被好幾個節點用到）；那時候梯度要把每一條路的貢獻加起來（3-3）。'],
@@ -87,12 +74,11 @@ defineLessons({
           ['ReLU(u)', '負數變 0', 'u＞0 時 1，否則 0'],
           ['tanh(u)', 'S 形壓縮', '1 − tanh(u)²'],
         ], caption: '每種節點的局部梯度都很簡單：反向傳播只需要這張表加上鏈鎖律。' },
+        { type: 'heading', id: 'ad-modes', text: '深入：為什麼是「反向」，不是「正向」' },
+        '自動微分有兩個方向。[[正向模式]]從一個輸入出發，一次算出這個輸入對所有輸出的導數；[[反向模式]]從一個輸出出發，一次算出這個輸出對所有輸入的導數。',
+        '訓練只有一個輸出（損失），卻有幾百萬個參數，所以反向模式跑一次就夠，正向模式要跑幾百萬次。反過來，輸入很少、輸出很多的問題，正向模式比較划算（Baydin 等的綜述）。',
+        'PyTorch 預設「邊執行邊建圖」（define-by-run）：每次前向都重建一張新的計算圖，所以 Python 的 if、for 可以直接寫在模型裡。代價是 Python 的額外開銷；PyTorch 2.0 起的 torch.compile 會把圖擷取下來再最佳化。',
       ],
-      tryit: {
-        q: ['把 c 改成 0（a＝2、b＝−3 不變），前向算 L，再猜 ∂L/∂a 會是多少。'],
-        draft: 'L ＝ ＿\n∂L/∂a ＝ ＿',
-        answer: ['d ＝ −6、e ＝ −6、L ＝ 36。', '∂L/∂e ＝ 2e ＝ −12；∂L/∂d ＝ −12；∂L/∂a ＝ b × (−12) ＝ −3 × (−12) ＝ 36。3-2 會說明為什麼是這樣乘。'],
-      },
     },
     mistakes: [
       { wrong: '想一次對整個大公式求導。', why: '公式一大就很容易算錯。', right: '拆成小節點，每個節點只管自己的局部梯度。' },
@@ -100,19 +86,7 @@ defineLessons({
       { wrong: '忘了葉節點也包含參數。', why: '我們要的正是參數的梯度。', right: '權重、偏差都是葉節點。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '乘法節點 u×v 對 u 的局部梯度是？', options: [
-        { text: 'v', correct: true, why: 'u 每多 1，結果多 v。' },
-        { text: 'u，就是它自己', why: '是另一個輸入。' },
-        { text: '1，和加法一樣', why: '加法才是 1。' },
-        { text: 'u×v，就是結果', why: '不是結果本身。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'a＝3、b＝2、c＝−5，L＝(a×b＋c)² 是多少？', options: [
-        { text: '1', correct: true, why: '6−5＝1，平方 1。' },
-        { text: '121，加錯了正負號', why: 'c 是 −5。' },
-        { text: '−1，忘了平方', why: '平方後是正的。' },
-        { text: '36，忘了加 c', why: 'c 要加進去。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一個有 100 萬個參數的網路，為什麼還是可以用「每個節點只管自己的局部梯度」的方法算出所有梯度？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一個有 100 萬個參數的網路，為什麼還是可以用「每個節點只管自己的局部梯度」的方法算出所有梯度？'], answer: [
         '不管網路多大，它都是由加、乘、激活這幾種簡單運算組成的計算圖。每個節點的局部梯度都很簡單。',
         '反向傳播只要從輸出往回走一次，每個節點做一次「局部梯度 × 從後面傳來的梯度」，就能得到所有參數的梯度，計算量和前向傳播差不多。',
       ] },
@@ -122,7 +96,7 @@ defineLessons({
       '每種節點的局部梯度都很簡單（加 1、乘換另一個、平方 2u）。',
       '前向算值，反向算梯度。',
     ],
-    sources: ['micrograd'],
+    sources: ['micrograd', 'autodiff-survey', 'pytorch-compile'],
   },
 
   '3-2': {
@@ -130,20 +104,6 @@ defineLessons({
       '寫出鏈鎖律',
       '用鏈鎖律算出兩層組合函式的導數',
       '用「推一點點」驗證鏈鎖律的結果',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-1）平方節點 u² 的局部梯度？', options: [
-        { text: '2u', correct: true, why: '平方的導數。' },
-        { text: 'u，就是自己', why: '少了 2 倍。' },
-        { text: '1，和加法一樣', why: '不是加法。' },
-        { text: 'u²，就是結果', why: '不是結果。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-2）ReLU 在 z＝−1 的斜率？', options: [
-        { text: '0', correct: true, why: '負數區是平的。' },
-        { text: '1', why: '正數區才是 1。' },
-        { text: '−1', why: '不是負的。' },
-        { text: '0.5', why: '那是別的函式。' },
-      ] },
     ],
     analogy: {
       text: ['齒輪組：第一個齒輪轉 1 圈，第二個轉 3 圈；第二個轉 1 圈，第三個轉 2 圈。那第一個轉 1 圈，第三個轉幾圈？3 × 2 ＝ 6 圈。', '[[鏈鎖律]]就是這樣：x 影響 y，y 影響 L，x 對 L 的影響＝每一段的[[局部梯度]]相乘。不管中間有幾段，都是一路乘過去。'],
@@ -191,12 +151,11 @@ defineLessons({
           <line x1="330" y1="45" x2="440" y2="90" class="stroke-ink" stroke-width="3"/><line x1="330" y1="151" x2="440" y2="106" class="stroke-ink" stroke-width="3"/>
           <text x="280" y="198" text-anchor="middle" font-size="14" font-weight="900">∂L/∂x ＝ 路線 1 的乘積 ＋ 路線 2 的乘積</text>
         </svg>`, caption: '一個值被用在好幾個地方時，梯度要「累加」：這是自動微分程式裡用 ＋＝ 的原因。' },
+        { type: 'heading', id: 'jacobian', text: '深入：向量版的鏈鎖律與梯度檢查' },
+        '課文的 x、y 都是一個數字。真實網路裡它們是向量，局部梯度變成一整個矩陣（Jacobian），鏈鎖律變成矩陣相乘。',
+        '反向傳播從不真的建出這些大矩陣，只算「上游梯度向量 × Jacobian」（vector-Jacobian product）。一層 4096 → 4096 的 Jacobian 有 16,777,216 個元素，但向量乘它的計算量和前向同一個量級。',
+        '自己寫新的運算時，用拉桿裡的「推一點點」做梯度檢查：中央差分 (f(x＋h) − f(x−h)) ÷ 2h、h 約 1e-5，並用 float64 算。float32 只有約 7 位有效數字，差分容易出假警報；PyTorch 的 torch.autograd.gradcheck 也要求 float64 輸入。',
       ],
-      tryit: {
-        q: ['L＝(2x − 1)³，x＝1。用鏈鎖律算 dL/dx。（提示：u³ 的導數是 3u²）'],
-        draft: 'u ＝ 2x − 1 ＝ ＿\ndL/du ＝ ＿\ndu/dx ＝ ＿\ndL/dx ＝ ＿',
-        answer: ['u ＝ 1；dL/du ＝ 3u² ＝ 3；du/dx ＝ 2。', 'dL/dx ＝ 3 × 2 ＝ 6。'],
-      },
     },
     mistakes: [
       { wrong: '把局部梯度相加而不是相乘。', why: '串連的每一段是相乘的關係。', right: '串連：相乘；分岔再合流：各路相加。' },
@@ -204,19 +163,7 @@ defineLessons({
       { wrong: '一個值被用兩次時，只算其中一條路。', why: '兩條路都會影響 L。', right: '梯度累加（＋＝）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'x 經過 y 到 L，dL/dx 等於？', options: [
-        { text: 'dL/dy × dy/dx', correct: true, why: '鏈鎖律。' },
-        { text: 'dL/dy ＋ dy/dx', why: '串連要相乘。' },
-        { text: 'dL/dy ÷ dy/dx', why: '不是相除。' },
-        { text: '只要 dL/dy 就好', why: '少了一段。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'y＝5x、L＝y²，x＝2 時 dL/dx？', options: [
-        { text: '100', correct: true, why: 'y＝10，2y×5＝100。' },
-        { text: '20，只算 2y', why: '還要乘 5。' },
-        { text: '10，就是 y', why: '要算導數。' },
-        { text: '50，2x 乘 5 再乘 5', why: '用錯了中間值。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一個網路有 50 層，每層的局部梯度大約都是 0.5。從損失傳到第一層，梯度大約剩多少？這說明了什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一個網路有 50 層，每層的局部梯度大約都是 0.5。從損失傳到第一層，梯度大約剩多少？這說明了什麼？'], answer: [
         '0.5⁵⁰ ≈ 8.9 × 10⁻¹⁶，幾乎是 0。',
         '鏈鎖律是一路相乘，局部梯度小於 1 時，深網路前面的層幾乎收不到梯度（梯度消失，4-4）。殘差連接、ReLU、好的初始化都是為了對付這個問題。',
       ] },
@@ -226,7 +173,7 @@ defineLessons({
       '分岔再合流：各條路的梯度相加。',
       '局部梯度要用前向的值，所以先前向再反向。',
     ],
-    sources: ['rumelhart-1986'],
+    sources: ['rumelhart-1986', 'autodiff-survey'],
   },
 
   '3-3': {
@@ -234,20 +181,6 @@ defineLessons({
       '在 2-2 的小網路上走完一次反向傳播',
       '算出權重的梯度並更新一次',
       '說出反向傳播的成本為什麼和前向差不多',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）一個值被兩條路用到，它的梯度？', options: [
-        { text: '兩條路的貢獻相加', correct: true, why: '都會影響 L。' },
-        { text: '只取比較大的那條', why: '兩條都要算。' },
-        { text: '兩條路相乘', why: '串連才相乘。' },
-        { text: '取平均', why: '是相加。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-2）小網路 x＝[1, 0.5] 的 ŷ？', options: [
-        { text: '1.4', correct: true, why: '1.5×0.8＋0.2。' },
-        { text: '1.5，沒有 ReLU 時的值', why: '有 ReLU。' },
-        { text: '0.8，就是 h₁', why: '還要乘 1.5 加 0.2。' },
-        { text: '0.16，那是損失', why: '問的是 ŷ。' },
-      ] },
     ],
     analogy: {
       text: ['餐廳客訴：菜太鹹。主管往回查：是醬料多了？還是廚師加鹽多了？每一站依照「它對最後結果的影響有多大」分擔責任。', '[[反向傳播]]就是在分責任：從損失出發，沿著計算圖往回走，每個節點把收到的梯度乘上自己的局部梯度，分給它的輸入。走到葉節點，就得到每個權重「該為損失負多少責任」。'],
@@ -283,42 +216,23 @@ defineLessons({
           <text x="280" y="134" text-anchor="middle" font-size="14">不管有幾個參數，一次反向就得到全部梯度</text>
           <text x="280" y="158" text-anchor="middle" font-size="13">對比「推一點點」：每個參數都要多算一次損失</text>
         </svg>`, caption: '這是反向傳播能訓練幾十億參數模型的關鍵。' },
+        { type: 'heading', id: 'bp-cost', text: '深入：反向傳播的成本到底多少' },
+        '一次反向約是前向的 2 倍計算：每一層要做「對輸入的梯度」和「對權重的梯度」兩個矩陣乘法，前向只有一個。所以訓練一步約是前向的 3 倍。',
+        '這就是常見的估算「訓練每個 token 約 6N 次浮點運算」（N 是參數量）：前向 2N、反向 4N（Kaplan 等 2020）。例如 1 億參數的模型看 100 億個 token，約需 6×10¹⁸ FLOPs。',
+        '反向傳播要用前向的中間值，所以真正的瓶頸常是記憶體（2-2 的深入段落）。計算多花一點只是比較慢，記憶體不夠就完全跑不起來。',
       ],
-      tryit: {
-        q: ['如果答案 y 改成 2（ŷ 還是 1.4），∂L/∂err 和 ∂L/∂w₁ 會變成多少？更新後 w₁ 是變大還是變小？'],
-        draft: '∂L/∂err ＝ ＿\n∂L/∂w₁ ＝ ＿\nw₁ 變大／變小',
-        answer: ['err ＝ 1.4 − 2 ＝ −0.6，∂L/∂err ＝ 2 × (−0.6) ＝ −1.2。', '一路乘回去：∂L/∂h ＝ 1.5 × (−1.2) ＝ −1.8，∂L/∂w₁ ＝ x₁ × (−1.8) ＝ −1.8。梯度是負的，更新後 w₁ 變大，讓 ŷ 往 2 靠近。'],
-      },
     },
     mistakes: [
       { wrong: '以為反向傳播是另一種學習演算法。', why: '它只是「算梯度」的方法；更新參數是優化器的事。', right: '反向傳播算梯度，優化器用梯度更新（模組 4）。' },
       { wrong: '被 ReLU 關掉的分支也照樣傳梯度。', why: 'ReLU 在負數的局部梯度是 0。', right: '關掉的神經元這一次不會被更新。' },
       { wrong: '每次更新前忘了把舊梯度清掉。', why: '梯度是累加的，會疊上上一批的。', right: 'PyTorch 每步要 optimizer.zero_grad()（7-2）。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '反向傳播的起點是什麼？', options: [
-        { text: '損失對自己的梯度＝1', correct: true, why: '從輸出往回乘。' },
-        { text: '輸入資料的梯度', why: '那是終點附近。' },
-        { text: '隨機產生一個梯度', why: '是確定的。' },
-        { text: '學習率', why: '學習率是更新用的。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'w₁ 的梯度是 1.2，學習率 0.1，更新後的 w₁（原本 0.4）？', options: [
-        { text: '0.28', correct: true, why: '0.4 − 0.12。' },
-        { text: '0.52，把梯度加上去', why: '要減。' },
-        { text: '1.6，0.4 加 1.2', why: '要乘學習率並相減。' },
-        { text: '0.12，就是學習率乘梯度', why: '要從 0.4 減。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼說「反向傳播讓訓練大模型變得可行」？如果用「推一點點」算 10 億個參數的梯度會怎樣？'], answer: [
-        '推一點點：每個參數都要多做一次前向傳播才能看損失變多少，10 億個參數就要 10 億次前向，完全不可行。',
-        '反向傳播：一次前向＋一次反向（成本大約是前向的兩三倍）就得到全部 10 億個梯度。',
-      ] },
-    ],
     keypoints: [
       '反向傳播：從損失往回，每個節點「局部梯度 × 上游梯度」分給輸入。',
       '得到梯度後，優化器才更新參數。',
       '一次反向就得到全部梯度，成本和前向同一個量級。',
     ],
-    sources: ['rumelhart-1986', 'micrograd'],
+    sources: ['rumelhart-1986', 'micrograd', 'kaplan', 'checkpointing'],
   },
 
   '3-4': {
@@ -326,20 +240,6 @@ defineLessons({
       '讀懂一個約 30 行的自動微分程式',
       '說出 Value 物件需要記住哪三件事',
       '把它對應到 PyTorch 的 autograd',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-3）反向傳播算出梯度之後，誰負責更新參數？', options: [
-        { text: '優化器', correct: true, why: '例如 SGD、Adam。' },
-        { text: '反向傳播自己', why: '它只算梯度。' },
-        { text: '損失函數', why: '損失只負責算錯多少。' },
-        { text: '資料', why: '資料不會更新參數。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 3-1）tanh(u) 的局部梯度？', options: [
-        { text: '1 − tanh(u)²', correct: true, why: '表上的公式。' },
-        { text: 'tanh(u)，就是自己', why: '不是自己。' },
-        { text: '2u', why: '那是平方。' },
-        { text: '1', why: '那是加法。' },
-      ] },
     ],
     analogy: {
       text: ['寫日記：每做一件事，就記下「用了什麼、做了什麼」。之後要追溯原因，翻日記往回看就好。', '[[自動微分]]的做法一樣：每個數字包成一個 Value 物件，做運算時記下「我的輸入是誰」和「怎麼把梯度傳回去」。呼叫 backward() 時，照記錄的相反順序往回走。這就是 Karpathy 的 micrograd（約 100 行）和 PyTorch autograd 的核心想法。'],
@@ -367,12 +267,15 @@ defineLessons({
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="對照：自己寫的 Value 與 PyTorch tensor；data 對 data，grad 對 grad，_backward 對 grad_fn，backward 對 backward">
           ${[['我們的 Value', 'PyTorch tensor'], ['.data', '.data／.item()'], ['.grad', '.grad'], ['._backward', '.grad_fn'], ['.backward()', '.backward()']].map(([a, b], i) => `<text x="150" y="${30 + i * 32}" text-anchor="middle" font-size="14" ${i === 0 ? 'font-weight="900"' : 'class="mono"'}>${a}</text><text x="410" y="${30 + i * 32}" text-anchor="middle" font-size="14" ${i === 0 ? 'font-weight="900"' : 'class="mono"'}>${b}</text>${i ? `<line x1="230" y1="${26 + i * 32}" x2="330" y2="${26 + i * 32}" class="stroke-ink" stroke-width="2" stroke-dasharray="4 3"/>` : ''}`).join('')}
         </svg>`, caption: '差別在 PyTorch 處理的是整個 tensor，並可以在 GPU 上算。' },
+        { type: 'heading', id: 'vs-pytorch', text: '深入：micrograd 沒處理、PyTorch 必須處理的事' },
+        { type: 'table', head: ['問題', 'micrograd', 'PyTorch'], rows: [
+          ['誰的 .grad 會留下來', '每個 Value 都有', '預設只有葉節點（參數）；中間值要先呼叫 retain_grad()'],
+          ['backward 之後的計算圖', '一直留著', '預設釋放；要再 backward 一次得加 retain_graph=True'],
+          ['原地修改（in-place）', '不檢查', '改到反向需要的值，backward 時會報錯'],
+          ['二階導數', '不支援', 'create_graph=True 可以對梯度再微分'],
+        ] },
+        '這些差異來自同一個取捨：大模型的記憶體很貴，PyTorch 預設只留下訓練一定需要的東西。看到「Trying to backward through the graph a second time」這類錯誤時，原因通常就在這張表裡。',
       ],
-      tryit: {
-        q: ['在上面的 tanh 神經元，x₁ 的梯度是多少？為什麼 w₂ 的梯度是 0？'],
-        draft: '∂o/∂x₁ ＝ ＿\nw₂ 的梯度為 0 的原因：＿',
-        answer: ['n ＝ 0.8814，o ＝ tanh(n) ≈ 0.7071，∂o/∂n ＝ 1 − 0.5 ＝ 0.5。∂o/∂x₁ ＝ w₁ × 0.5 ＝ −1.5。', 'w₂ 的局部梯度是 x₂，而 x₂ ＝ 0：這個輸入是 0，調 w₂ 完全不會影響輸出。'],
-      },
     },
     mistakes: [
       { wrong: '_backward 裡用 ＝ 而不是 ＋＝。', why: '一個值被用兩次時，第二條路會蓋掉第一條。', right: '梯度一律累加。' },
@@ -380,19 +283,7 @@ defineLessons({
       { wrong: '以為 PyTorch 的 autograd 是完全不同的東西。', why: '核心想法一樣，只是對象是 tensor。', right: '把 micrograd 當成 autograd 的縮小版來理解。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Value 物件的 grad 存的是？', options: [
-        { text: '最終輸出對這個值的梯度', correct: true, why: '∂L/∂這個值。' },
-        { text: '這個值自己的數字', why: '那是 data。' },
-        { text: '這個值的輸入是誰', why: '那是 _prev。' },
-        { text: '學習率', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'backward() 為什麼要先做拓撲排序？', options: [
-        { text: '確保往回傳時，上游梯度已經算完', correct: true, why: '倒序走才正確。' },
-        { text: '讓程式跑得比較快', why: '是為了正確性。' },
-        { text: '把重複的節點刪掉', why: '不會刪節點。' },
-        { text: '幫參數排大小', why: '和大小無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['要讓這個 Value 支援 ReLU，_backward 該怎麼寫？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['要讓這個 Value 支援 ReLU，_backward 該怎麼寫？'], answer: [
         'out ＝ Value(max(0, self.data), (self,))；_backward 裡寫 self.grad ＋＝ (1 if out.data ＞ 0 else 0) × out.grad。',
         '也就是局部梯度：正數時 1、否則 0（3-1 的表）。',
       ] },
@@ -402,7 +293,7 @@ defineLessons({
       'backward()：拓撲排序，倒序呼叫每個節點的 _backward，梯度累加。',
       'PyTorch autograd 是同一個想法在 tensor 上的版本。',
     ],
-    sources: ['micrograd', 'pytorch-autograd'],
+    sources: ['micrograd', 'pytorch-autograd', 'pytorch-autograd-notes'],
   },
 });
 </script>

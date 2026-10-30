@@ -25,14 +25,6 @@ defineLessons({
       '用 TryGetValue 安全地查字典',
       '說出為什麼「在 List 裡找東西」會隨資料變多而變慢',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）陣列和 List 最大的差別是？', options: [
-        { text: '陣列長度固定，List 可以增減', correct: true, why: '這就是 2-3 提到「需要 Add 就用 List」的原因。' },
-        { text: '陣列只能放數字，List 可以放任何型別', why: '陣列也可以放任何型別。' },
-        { text: '陣列是實值型別，List 是參考型別', why: '兩者都是參考型別。' },
-        { text: '陣列的索引從 1 開始', why: '都從 0 開始。' },
-      ] },
-    ],
     analogy: {
       text: ['List 像排隊的隊伍：可以一直有人加入，要找「穿紅衣服的人」得從頭看到尾。Dictionary 像寄物櫃：拿號碼牌（鍵）直接打開那一格，不管有幾百格都一樣快。HashSet 像門口的簽到名單：只關心「有沒有來過」。'],
       limit: ['寄物櫃號碼是連續的；Dictionary 的鍵可以是任何型別（字串、record），靠雜湊算出放哪一格。如果鍵的雜湊寫得很差，所有東西擠在同一格，就會慢得像排隊。'],
@@ -83,19 +75,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var stock = new Dictionary<string, int> { ["蘋果"] = 3 };\nstock["香蕉"] = 5;\nstock["蘋果"] += 2;\nConsole.WriteLine(stock["蘋果"]);\nConsole.WriteLine(stock.TryGetValue("西瓜", out var n));\nConsole.WriteLine(stock["西瓜"]);',
-          predict: { q: '最後一行 `stock["西瓜"]` 會怎樣？', options: ['印出 0', '拋出 KeyNotFoundException', '印出空白'], answer: 1 },
           output: '5\nFalse\n!Unhandled exception. System.Collections.Generic.KeyNotFoundException: The given key \'西瓜\' was not present in the dictionary.',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'list', label: 'List' }, { id: 'dict', label: 'Dictionary' }, { id: 'set', label: 'HashSet' }],
-          items: [
-            { text: '購物車裡的商品，要照加入順序顯示', answer: 'list', why: '有順序、可能重複（同商品兩次）。' },
-            { text: '用學號查學生資料', answer: 'dict', why: '鍵（學號）→ 值（學生）。' },
-            { text: '記錄已經寄過信的 Email，避免重複寄', answer: 'set', why: '只需要知道「有沒有」。' },
-            { text: '每個單字出現幾次', answer: 'dict', why: '單字 → 次數。' },
-            { text: '排行榜前 10 名', answer: 'list', why: '有順序。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['購物車裡的商品，要照加入順序顯示', 'List', '有順序、可能重複（同商品兩次）。'],
+          ['用學號查學生資料', 'Dictionary', '鍵（學號）→ 值（學生）。'],
+          ['記錄已經寄過信的 Email，避免重複寄', 'HashSet', '只需要知道「有沒有」。'],
+          ['每個單字出現幾次', 'Dictionary', '單字 → 次數。'],
+          ['排行榜前 10 名', 'List', '有順序。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="查詢次數隨資料量的變化：List 的 Contains 隨筆數線性增加，1 千筆比 1 千次、100 萬筆比 100 萬次；HashSet 幾乎固定">
           <path d="M60 170 H540 M60 170 V20" class="stroke-ink" stroke-width="3" fill="none"/>
           <path d="M60 170 L520 30" class="stroke-ink" stroke-width="5" fill="none" style="stroke:var(--m5)"/>
@@ -105,12 +93,18 @@ defineLessons({
           <text x="300" y="195" text-anchor="middle" font-size="14">資料筆數 →</text>
           <text x="40" y="95" text-anchor="middle" font-size="14" transform="rotate(-90 40 95)">比較次數</text>
         </svg>`, caption: '示意圖：List 找值的成本和筆數成正比（O(n)），HashSet 與 Dictionary 平均是常數（O(1)）。' },
+        { type: 'heading', id: 'deep-hash', text: '深入：雜湊表怎麼運作，以及其他集合' },
+        'Dictionary 先用鍵的 `GetHashCode()` 決定放進哪一桶，再用 `Equals` 確認是不是同一個鍵。兩個條件缺一不可：Equals 相等的兩個物件，GetHashCode 必須相同；鍵放進去之後也不能再改內容，否則雜湊值變了就再也找不到。',
+        'List 與 Dictionary 滿了會自動擴容（配置更大的陣列並複製）。事先知道大約筆數時，`new Dictionary<string, int>(capacity: 10_000)` 可以省掉多次擴容；字串鍵要忽略大小寫時傳入 `StringComparer.OrdinalIgnoreCase`，不要每次 ToLower。',
+        { type: 'table', head: ['集合', '特性', '適合'], rows: [
+          ['`Queue<T>`', '先進先出', '排隊處理工作'],
+          ['`Stack<T>`', '後進先出', '復原（undo）紀錄'],
+          ['`SortedDictionary<K,V>`', '依鍵排序，查詢 O(log n)', '需要依序列出的對照表'],
+          ['`PriorityQueue<T,P>`', '依優先順序取出（.NET 6）', '排程、最短路徑'],
+          ['`FrozenDictionary<K,V>`', '建立後不能改，查詢最快（.NET 8）', '啟動時載入、之後只讀的設定'],
+          ['`ConcurrentDictionary<K,V>`', '多執行緒同時讀寫安全', '跨請求共用的快取'],
+        ] },
       ],
-      tryit: {
-        q: ['用 Dictionary 統計每個字出現幾次：'],
-        draft: 'string[] words = ["a", "b", "a"];\nvar count = new Dictionary<string, int>();\nforeach (var w in words)\n    count[w] = count.____(w) + 1;',
-        answer: ['`count.GetValueOrDefault(w) + 1`。', '鍵不存在時 GetValueOrDefault 回傳 0，不會拋例外。下一課會看到用 LINQ 的 `CountBy` 一行完成。'],
-      },
     },
     mistakes: [
       { wrong: '`dict[key]` 讀一個可能不存在的鍵。', why: '不存在時拋 KeyNotFoundException。', right: '`TryGetValue` 或 `GetValueOrDefault`。' },
@@ -118,19 +112,7 @@ defineLessons({
       { wrong: '在大的 List 上反覆 Contains。', why: '每次都從頭比對。', right: '先轉成 HashSet 再查。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`HashSet<int> s = [1, 1, 2];` 的 Count 是？', options: [
-        { text: '`2`', correct: true, why: 'HashSet 不存重複元素。' },
-        { text: '`3`', why: '重複的 1 只會存一次。' },
-        { text: '編譯錯誤：不能有重複值', why: '可以寫，只是重複的會被忽略。' },
-        { text: '拋出 ArgumentException', why: 'HashSet 不會因重複而拋例外。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要依商品編號快速查價格，資料有 50 萬筆，該用哪個？', options: [
-        { text: '`Dictionary<int, decimal>`', correct: true, why: '用鍵查值，平均常數時間。' },
-        { text: '`List<(int Id, decimal Price)>` 再用迴圈找', why: '每次查詢最多比對 50 萬次。' },
-        { text: '`HashSet<decimal>`', why: 'HashSet 只存值，沒有鍵值對應。' },
-        { text: '`decimal[]`，用編號當索引', why: '只有編號從 0 連續時才可行，而且可能浪費大量空間。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用 record 當 Dictionary 的鍵可以嗎？用一般 class 當鍵會有什麼問題？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['用 record 當 Dictionary 的鍵可以嗎？用一般 class 當鍵會有什麼問題？'], answer: [
         'record 可以：它自動依內容產生 Equals 與 GetHashCode，兩個內容相同的 record 會被視為同一個鍵。',
         '一般 class 預設比參考：你用 `new Key(1, "A")` 存，再用另一個 `new Key(1, "A")` 查，會查不到。要嘛改用 record，要嘛覆寫 Equals 與 GetHashCode。',
       ] },
@@ -148,14 +130,6 @@ defineLessons({
       '用 Where、Select、OrderBy 寫出查詢',
       '讀懂 lambda `x => …`',
       '把一段 foreach 改寫成 LINQ',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-1）`dict["x"]` 在鍵不存在時會？', options: [
-        { text: '拋出 KeyNotFoundException', correct: true, why: '要安全讀取用 TryGetValue。' },
-        { text: '回傳 null', why: '索引子不會回傳 null，而是拋例外。' },
-        { text: '回傳型別的預設值', why: '那是 GetValueOrDefault 的行為。' },
-        { text: '自動新增這個鍵', why: '讀取不會新增；指定 `dict["x"] = v` 才會。' },
-      ] },
     ],
     analogy: {
       text: ['LINQ 像點菜時對服務生說「我要不辣的、主菜類、照價格排序」，而不是自己走進廚房一盤一盤翻。你描述要什麼，怎麼找交給它。'],
@@ -214,7 +188,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'int[] n = [5, 3, 8, 1, 9, 2];\nvar q = n.Where(x => x > 2)\n         .OrderByDescending(x => x)\n         .Select(x => x * 10);\nConsole.WriteLine(string.Join(", ", q));\nConsole.WriteLine(n.Any(x => x > 8));\nConsole.WriteLine(n.FirstOrDefault(x => x > 100));',
-          predict: { q: '第一行會印出什麼？', options: ['90, 80, 50, 30', '50, 30, 80, 90', '30, 50, 80, 90'], answer: 0 },
           output: '90, 80, 50, 30\nTrue\n0',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="Where 與 Select 的差別：Where 改變元素數量但不改內容，6 個變 4 個；Select 不改數量但改內容，每個數字乘以 10">
@@ -230,12 +203,16 @@ defineLessons({
           <text x="420" y="155" text-anchor="middle" font-size="15" class="on-color mono">[5,3] → [50,30]</text>
           <path d="M270 95 H290" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: '分不清時問自己：我要「少幾個」還是「變成別的」？' },
+        { type: 'heading', id: 'deep-linq', text: '深入：LINQ 的成本與 First、Single 的差別' },
+        'LINQ 每一步都是一個列舉器物件，lambda 也是委派呼叫，所以在極熱的迴圈裡會比手寫 for 慢一些。不過 .NET 8 到 10 持續最佳化：對陣列的 `Sum`、`Max` 會用 SIMD 向量化，`Where(…).Select(…)` 會合併成一個列舉器。一般程式先寫清楚的 LINQ，量測後才把熱點改成迴圈。',
+        { type: 'table', head: ['方法', '找不到時', '找到多個時', '表達的意圖'], rows: [
+          ['`First`', '拋例外', '取第一個', '一定有，取第一個'],
+          ['`FirstOrDefault`', '回傳 default', '取第一個', '可能沒有'],
+          ['`Single`', '拋例外', '拋例外', '一定剛好一個（例如用主鍵查）'],
+          ['`SingleOrDefault`', '回傳 default', '拋例外', '最多一個'],
+        ] },
+        '查詢語法（`from … where … select`）編譯後就是方法語法，能力相同；有多個 from、join 或要用 `let` 暫存中間值時比較好讀。近幾版新增的方法也值得認得：.NET 6 的 `Chunk`、`DistinctBy`、`MaxBy`，.NET 9 的 `Index()`（同時取得索引與元素）。',
       ],
-      tryit: {
-        q: ['把這段迴圈改成一行 LINQ：'],
-        draft: 'int total = 0;\nforeach (var o in orders)\n    if (o.IsPaid) total += o.Amount;\n\n// 改成：\nint total = orders.____(o => o.IsPaid).____(o => o.Amount);',
-        answer: ['`orders.Where(o => o.IsPaid).Sum(o => o.Amount);`', 'Sum 會立刻執行並回傳一個數字（不是序列）。'],
-      },
     },
     mistakes: [
       { wrong: '`list.Where(x => x > 0);` 以為 list 被篩選了。', why: 'LINQ 不修改原集合，回傳新的序列；沒接住就什麼都沒發生。', right: '`var positive = list.Where(x => x > 0).ToList();`' },
@@ -243,19 +220,7 @@ defineLessons({
       { wrong: '`.Count() > 0` 判斷有沒有元素。', why: '可能把整個序列數完。', right: '`.Any()`，找到一個就停。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '要把 `List<Person>` 變成只有名字的 `List<string>`，用哪個方法？', options: [
-        { text: '`Select`', correct: true, why: 'Select 把每個元素轉成別的東西。' },
-        { text: '`Where`', why: 'Where 只篩選，元素仍然是 Person。' },
-        { text: '`OrderBy`', why: 'OrderBy 只排序。' },
-        { text: '`Any`', why: 'Any 回傳 bool。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`int[] a = [1, 2, 3]; a.FirstOrDefault(x => x > 5)` 的結果是？', options: [
-        { text: '`0`', correct: true, why: '找不到時回傳 int 的預設值 0。' },
-        { text: '`null`', why: 'int 不能是 null；預設值是 0。' },
-        { text: '拋出 InvalidOperationException', why: '那是 First 的行為。' },
-        { text: '`-1`', why: 'LINQ 不用 -1 表示找不到。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['FirstOrDefault 找不到時回傳 0，但如果陣列裡真的有 0 呢？你怎麼分辨「找到 0」和「沒找到」？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['FirstOrDefault 找不到時回傳 0，但如果陣列裡真的有 0 呢？你怎麼分辨「找到 0」和「沒找到」？'], answer: [
         '用 .NET 6 起的多載指定預設值：`a.FirstOrDefault(x => x > 5, -1)`，或先用 `Any` 判斷。',
         '另一種寫法是把元素轉成可為 null：`a.Select(x => (int?)x).FirstOrDefault(x => x > 5)`，找不到時得到 null。',
       ] },
@@ -273,14 +238,6 @@ defineLessons({
       '說出 LINQ 查詢「什麼時候真的執行」',
       '辨認重複列舉造成的重複計算',
       '知道什麼時候該用 ToList 具體化',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-2）`list.Where(x => x > 0);` 單獨一行，list 會怎樣？', options: [
-        { text: '完全不變，回傳的結果沒人接住', correct: true, why: 'LINQ 不修改原集合；這行甚至還沒執行篩選（這課的重點）。' },
-        { text: 'list 只剩正數', why: 'LINQ 從不修改來源。' },
-        { text: '編譯錯誤：沒有使用回傳值', why: '合法，最多有分析器提示。' },
-        { text: '拋出例外', why: '沒有任何會拋例外的操作。' },
-      ] },
     ],
     analogy: {
       text: ['LINQ 查詢像一份食譜，不是一盤菜。`var q = list.Where(…)` 只是寫好食譜；每次 foreach，就照食譜煮一次。煮兩次就花兩倍時間，而且如果冰箱的食材（來源資料）變了，第二次煮出來的也不一樣。'],
@@ -306,17 +263,14 @@ defineLessons({
       caption: 'Where、Select、OrderBy 都是延遲的；ToList、Count、Sum、First 會立刻執行。',
       blocks: [
         '[[延遲執行]]：查詢在被列舉時才執行，而且每次列舉都重新執行。需要重複使用結果，或來源資料之後會改變時，用 ToList／ToArray [[具體化]]。',
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'lazy', label: '延遲（還沒執行）' }, { id: 'now', label: '立刻執行' }],
-          items: [
-            { text: '`.Where(…)`', answer: 'lazy', why: '回傳 IEnumerable，等被列舉才篩選。' },
-            { text: '`.ToList()`', answer: 'now', why: '具體化：立刻跑完並存起來。' },
-            { text: '`.Select(…)`', answer: 'lazy', why: '回傳 IEnumerable。' },
-            { text: '`.Count()`', answer: 'now', why: '要回傳一個數字，必須跑完。' },
-            { text: '`.OrderBy(…)`', answer: 'lazy', why: '定義時不排序，第一次取元素時才排序。' },
-            { text: '`.First()`', answer: 'now', why: '立刻取出一個元素（取到就停）。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`.Where(…)`', '延遲（還沒執行）', '回傳 IEnumerable，等被列舉才篩選。'],
+          ['`.ToList()`', '立刻執行', '具體化：立刻跑完並存起來。'],
+          ['`.Select(…)`', '延遲（還沒執行）', '回傳 IEnumerable。'],
+          ['`.Count()`', '立刻執行', '要回傳一個數字，必須跑完。'],
+          ['`.OrderBy(…)`', '延遲（還沒執行）', '定義時不排序，第一次取元素時才排序。'],
+          ['`.First()`', '立刻執行', '立刻取出一個元素（取到就停）。']
+        ] },
       ],
     },
     define: [
@@ -340,7 +294,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var list = new List<int> { 1, 2, 3 };\nvar q = list.Where(x => x > 1);\nlist.Add(10);\nConsole.WriteLine(q.Count());\n\nvar snap = list.Where(x => x > 1).ToList();\nlist.Add(20);\nConsole.WriteLine(snap.Count);',
-          predict: { q: '第一個 `q.Count()` 印出什麼？（Add(10) 發生在定義查詢之後）', options: ['2', '3', '4'], answer: 1 },
           output: '3\n3',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="延遲查詢看到的是列舉當下的資料：定義 q 時 list 是 1、2、3；Add 10 之後才 Count，所以篩出 2、3、10 共 3 個">
@@ -355,12 +308,15 @@ defineLessons({
           <text x="280" y="135" text-anchor="middle" font-size="15">Add(10)</text>
           <text x="470" y="135" text-anchor="middle" font-size="15">這時才篩選</text>
         </svg>`, caption: '延遲查詢看到的是「執行那一刻」的資料，不是「定義那一刻」的。' },
+        { type: 'heading', id: 'deep-queryable', text: '深入：IEnumerable 與 IQueryable' },
+        '同樣寫 `.Where(…)`，對 List 呼叫的是 `Enumerable.Where`（收委派，在記憶體跑）；對 EF Core 的 DbSet 呼叫的是 `Queryable.Where`（收運算式樹，翻成 SQL）。差別只在變數的型別：把 IQueryable 指定給 `IEnumerable<T>` 變數後，後面的 Where 就變成在記憶體篩選，整張表會先被讀回來。',
+        { type: 'table', head: ['', 'IEnumerable<T>', 'IQueryable<T>'], rows: [
+          ['lambda 變成', '委派 `Func<T, bool>`', '運算式樹 `Expression<Func<T, bool>>`'],
+          ['在哪裡執行', 'C# 程式的記憶體裡', '交給提供者（例如資料庫）'],
+          ['能用任何 C# 方法', '可以', '只能用提供者翻譯得了的'],
+        ] },
+        '延遲執行也延遲了例外：查詢裡的除以零或 null，會在 foreach 或 ToList 那一行才拋出，堆疊追蹤指向列舉的位置，而不是定義查詢的位置。除錯時要往回找定義查詢的程式碼。',
       ],
-      tryit: {
-        q: ['這段程式會讀檔幾次？怎麼改成只讀一次？'],
-        draft: 'var lines = File.ReadLines("big.log")\n                .Where(l => l.Contains("ERROR"));\nConsole.WriteLine($"錯誤 {lines.Count()} 筆");\nforeach (var l in lines.Take(5)) Console.WriteLine(l);',
-        answer: ['兩次：Count 讀一遍，foreach 又從頭讀（ReadLines 本身也是延遲的）。', '改成 `var lines = File.ReadLines("big.log").Where(…).ToList();`。如果錯誤行非常多，只具體化需要的部分，或在同一個 foreach 裡同時計數與印出前 5 筆。'],
-      },
     },
     mistakes: [
       { wrong: '方法回傳 `IEnumerable<T>` 的延遲查詢，呼叫端用了好幾次。', why: '每次使用都重跑，可能重複查資料庫或 API。', right: '確定只用一次才回傳延遲查詢；否則回傳 `List<T>` 或 `IReadOnlyList<T>`。' },
@@ -368,19 +324,7 @@ defineLessons({
       { wrong: '在查詢的 lambda 裡修改外部變數（例如計數器）。', why: '執行時機與次數不確定，計數結果會隨列舉次數翻倍。', right: 'lambda 保持無副作用；要計數就用 Count。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`var q = list.Select(x => Slow(x));` 這行執行時，Slow 被呼叫幾次？', options: [
-        { text: '0 次', correct: true, why: 'Select 是延遲的，列舉前不會呼叫 Slow。' },
-        { text: '每個元素一次', why: '那是列舉之後才會發生的事。' },
-        { text: '1 次', why: '沒有任何元素被處理。' },
-        { text: '取決於 list 的大小', why: '在這行，不管多大都是 0 次。' },
-      ] },
-      { level: '應用', type: 'mc', q: '承上，接著寫 `q.Count(); q.ToList();`，Slow 總共被呼叫幾次？（list 有 3 個元素）', options: [
-        { text: '6 次', correct: true, why: 'Count 列舉一次（3 次），ToList 再列舉一次（3 次）。' },
-        { text: '3 次', why: '延遲查詢不會記住上一次的結果。' },
-        { text: '0 次，Count 與 ToList 都不會觸發 Select', why: '兩者都要列舉整個序列，每個元素都會經過 Select。' },
-        { text: '9 次', why: '只列舉了兩次。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['EF Core 的 `db.Orders.Where(…)` 也是延遲的。如果在 foreach 裡又對每筆訂單查一次它的明細，會發生什麼？這和本課的關係是？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['EF Core 的 `db.Orders.Where(…)` 也是延遲的。如果在 foreach 裡又對每筆訂單查一次它的明細，會發生什麼？這和本課的關係是？'], answer: [
         '外層 foreach 執行一次 SQL 取訂單，迴圈內每筆再發一次 SQL，100 筆訂單就是 101 次查詢（N+1 問題）。',
         '延遲執行讓「查詢何時送出」不明顯。解法是一次查好：用 `Include` 或投影 `Select(o => new { o.Id, o.Items })`，最後 ToList，模組 9 的 EF Core 會再提到。',
       ] },
@@ -398,14 +342,6 @@ defineLessons({
       '用 GroupBy 分組並對每組彙總',
       '用 .NET 9 起的 CountBy、AggregateBy 簡化常見統計',
       '用 ToDictionary 把結果變成查詢表',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-3）哪一個方法會「立刻」執行查詢？', options: [
-        { text: '`Sum`', correct: true, why: '要回傳一個數字，必須跑完整個序列。' },
-        { text: '`Where`', why: '延遲。' },
-        { text: '`Select`', why: '延遲。' },
-        { text: '`OrderBy`', why: '延遲。' },
-      ] },
     ],
     analogy: {
       text: ['GroupBy 像把一疊發票依「店家」分成好幾疊，再對每一疊算總金額。CountBy 像只數每家有幾張，不用真的分成好幾疊。'],
@@ -460,7 +396,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'string[] fruits = ["蘋果", "香蕉", "蘋果", "芒果", "蘋果", "香蕉"];\nvar top = fruits.CountBy(f => f)\n                .OrderByDescending(kv => kv.Value)\n                .First();\nConsole.WriteLine($"{top.Key} {top.Value}");\n\nvar groups = fruits.GroupBy(f => f.Length);\nConsole.WriteLine(groups.Count());',
-          predict: { q: '第一行輸出是？', options: ['蘋果 3', '香蕉 2', '蘋果 1'], answer: 0 },
           output: '蘋果 3\n1',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="選擇方法：要每組的元素清單用 GroupBy；只要每組的數量用 CountBy；只要每組的累計值（例如加總）用 AggregateBy">
@@ -477,12 +412,16 @@ defineLessons({
           <text x="280" y="145" text-anchor="middle" font-size="14" class="on-color">.NET 9 起</text>
           <text x="465" y="145" text-anchor="middle" font-size="14" class="on-color">.NET 9 起</text>
         </svg>`, caption: '需要元素本身時才 GroupBy；只要統計數字時用後兩個。' },
+        { type: 'heading', id: 'deep-grouping', text: '深入：GroupBy 的記憶體、ToLookup 與穩定排序' },
+        'GroupBy 雖然是延遲的，但第一次取元素時要把整個來源讀完才能分組，所以不適合無限序列或超大串流。對資料庫查詢時，EF Core 會把 GroupBy 加彙總翻成 SQL 的 GROUP BY，在資料庫端算完只傳回結果。',
+        { type: 'table', head: ['方法', '執行時機', '結果', '查不存在的鍵'], rows: [
+          ['`GroupBy`', '延遲', '`IGrouping` 序列', '—（要自己找）'],
+          ['`ToLookup`', '立刻', '`ILookup`，可用鍵查', '回傳空序列，不拋例外'],
+          ['`ToDictionary`', '立刻', 'Dictionary', '拋 KeyNotFoundException'],
+          ['`CountBy`', '延遲', '`KeyValuePair<K, int>` 序列', '—'],
+        ] },
+        'OrderBy 是穩定排序：鍵相同的元素保持原本順序。「先依金額、再依日期」要寫 `OrderBy(金額).ThenBy(日期)`；寫兩次 OrderBy 時，第二次會以日期為主重新排序，金額只剩下在日期相同時的先後。',
       ],
-      tryit: {
-        q: ['把學生依班級分組，算出每班平均分數，並轉成 Dictionary：'],
-        draft: 'var avg = students\n    .GroupBy(s => s.____)\n    .ToDictionary(g => g.____, g => g.Average(s => s.Score));',
-        answer: ['`GroupBy(s => s.ClassName)`、`ToDictionary(g => g.Key, …)`。', '結果是 `Dictionary<string, double>`；之後 `avg["三年二班"]` 就能直接查。'],
-      },
     },
     mistakes: [
       { wrong: '`ToDictionary(p => p.Name)`，但名字有重複。', why: '鍵重複時拋 ArgumentException。', right: '用唯一的鍵（Id），或先 GroupBy；也可用 `ToLookup` 允許一鍵多值。' },
@@ -490,19 +429,7 @@ defineLessons({
       { wrong: '在 .NET 8 專案用 CountBy，編譯失敗。', why: 'CountBy、AggregateBy 是 .NET 9 新增的。', right: '升級到 .NET 10（建議），或改用 GroupBy 寫法。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`IGrouping<string, Order>` 的 `Key` 代表什麼？', options: [
-        { text: '這一組的分組依據值', correct: true, why: '例如 GroupBy(o => o.Country) 時，Key 就是國家。' },
-        { text: '這組第一筆訂單', why: '元素要列舉 IGrouping 本身才拿得到。' },
-        { text: '這組的筆數', why: '筆數要用 Count()。' },
-        { text: '這組在結果中的索引', why: 'Key 是分組值，不是位置。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`["a","b","a"].CountBy(x => x)` 的結果包含哪些項目？', options: [
-        { text: '`(a, 2)`、`(b, 1)`', correct: true, why: '每個鍵與它出現的次數。' },
-        { text: '`(a, 1)`、`(b, 1)`、`(a, 1)`', why: 'CountBy 會合併相同的鍵。' },
-        { text: '`2`', why: 'CountBy 回傳鍵值對序列，不是單一數字。' },
-        { text: '`(2, a)`、`(1, b)`', why: 'Key 是元素，Value 是次數。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要做一份「每月每個商品類別的營收」報表。用 LINQ 怎麼分兩層？用匿名型別或 tuple 當鍵可以嗎？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要做一份「每月每個商品類別的營收」報表。用 LINQ 怎麼分兩層？用匿名型別或 tuple 當鍵可以嗎？'], answer: [
         '可以用複合鍵一次分組：`orders.GroupBy(o => (o.Date.Month, o.Category)).Select(g => new { g.Key.Month, g.Key.Category, Revenue = g.Sum(o => o.Amount) })`。',
         'tuple 與匿名型別都依內容比較相等，所以適合當鍵。.NET 9 起也能寫 `AggregateBy(o => (o.Date.Month, o.Category), 0m, (s, o) => s + o.Amount)`。',
       ] },

@@ -3,6 +3,9 @@
    模組 4：分類與邏輯回歸
    ========================================================================== */
 defineTerms({
+  'odds': { en: 'odds', def: '勝算：p ÷ (1 − p)。邏輯回歸的 z 就是 odds 取自然對數。', example: 'p＝0.8 → odds＝4。', lesson: '4-2' },
+  '校準': { en: 'calibration', def: '模型說 70% 的那些樣本，真的約七成是陽性；機率可以照字面解讀。', example: 'CalibratedClassifierCV。', lesson: '4-2' },
+  '最大概似估計': { en: 'maximum likelihood estimation', def: '找讓「實際觀察到的資料」出現機率最大的參數；log loss 就是由它推出來的。', example: '最小化 log loss。', lesson: '4-3' },
   '決策邊界': { en: 'decision boundary', def: '特徵空間裡把不同類別分開的那條線（或面）；落在哪一邊就判成哪一類。', example: '驚嘆號超過 3 個就判為垃圾信。', lesson: '4-1' },
   '邏輯回歸': { en: 'logistic regression', def: '先算 z＝w·x＋b，再用 sigmoid 把 z 變成 0～1 的機率；名字有「回歸」，其實是分類模型。', example: '預測一封信是垃圾信的機率。', lesson: '4-2' },
   'sigmoid': { en: 'sigmoid', def: 'σ(z)＝1 ÷ (1＋e^(−z))：把任何數字壓到 0～1 之間；z＝0 時是 0.5。', example: 'σ(2) ≈ 0.88。', lesson: '4-2' },
@@ -11,20 +14,6 @@ defineTerms({
   '閾值': { en: 'threshold', def: '機率超過多少才判為陽性；預設常用 0.5，但可以依需求調整。', example: '詐騙偵測用 0.3。', lesson: '4-1' },
 });
 
-const REVIEW_M3 = [
-  { level: '回想', type: 'mc', q: '（回顧 3-4）學習率太大最典型的症狀？', options: [
-    { text: '損失越來越大', correct: true, why: '發散。' },
-    { text: '損失下降得非常非常慢', why: '那是太小。' },
-    { text: '模型一步就收斂到最低點', why: '太大反而跨過谷底。' },
-    { text: '訓練資料的筆數自己變少', why: '無關。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 3-3）w＝1、∂L/∂w＝2、學習率 0.5，新的 w？', options: [
-    { text: '0', correct: true, why: '1 − 0.5 × 2。' },
-    { text: '2，因為梯度是正的要往上加', why: '要減。' },
-    { text: '1.5，只加上學習率', why: '算錯了。' },
-    { text: '−1，就是 1 減掉梯度 2', why: '忘了乘學習率。' },
-  ] },
-];
 
 /* 4-1：信件裡的驚嘆號數量與是否為垃圾信（教學用資料） */
 const SPAM = [[0, 0], [1, 0], [1, 0], [2, 0], [2, 1], [3, 0], [3, 1], [4, 1], [5, 1], [6, 0], [7, 1], [8, 1]];
@@ -37,7 +26,6 @@ defineLessons({
       '說出決策邊界的意思',
       '用一個閾值手動做一次分類並算正確率',
     ],
-    review: REVIEW_M3,
     analogy: {
       text: ['機場安檢：行李通過 X 光機，螢幕上出現一個「可疑程度」，超過某條線就要開箱檢查。那條線就是判斷的界線。', '分類模型也是：先算出一個分數，再看它落在[[決策邊界]]的哪一邊。只有一個特徵時，邊界是一個點（[[閾值]]）；兩個特徵時是一條線；更多特徵時是一個面。'],
       limit: ['安檢人員還會看行李的形狀、問問題，模型只會看特徵；而且真實資料常常無法用一條直線完美分開，總會有一些判錯。'],
@@ -86,12 +74,32 @@ defineLessons({
           <text x="${50 + 6 * 56}" y="60" text-anchor="middle" font-size="14" font-weight="900">判為垃圾</text>
           <text x="280" y="156" text-anchor="middle" font-size="13">驚嘆號數量（一個特徵）→ 邊界就是一個閾值</text>
         </svg>`, caption: '一個特徵：一個點；兩個特徵：一條線；更多特徵：一個平面。' },
+        { type: 'heading', id: 'deep-xor', text: '深入：一條直線分不開的資料' },
+        '邏輯回歸的決策邊界一定是直線（或平面）。經典的反例是 XOR：兩個特徵同號是一類、異號是另一類，四個角落交錯，怎麼畫一條直線都會錯一半。',
+        { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="XOR：右上和左下是圓點，左上和右下是方點，任何一條直線都分不開；加入 x1 乘 x2 這個特徵後，一個閾值就能分開">
+  <rect x="20" y="20" width="240" height="180" class="fill-surface stroke-ink" stroke-width="3"/>
+  <line x1="140" y1="23" x2="140" y2="197" class="stroke-ink" stroke-width="1" stroke-dasharray="4 4"/>
+  <line x1="23" y1="110" x2="257" y2="110" class="stroke-ink" stroke-width="1" stroke-dasharray="4 4"/>
+  <circle cx="200" cy="60" r="10" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>
+  <circle cx="80" cy="160" r="10" style="fill:var(--m0)" class="stroke-ink" stroke-width="2"/>
+  <rect x="70" y="50" width="20" height="20" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/>
+  <rect x="190" y="150" width="20" height="20" style="fill:var(--m3)" class="stroke-ink" stroke-width="2"/>
+  <text x="140" y="222" text-anchor="middle" font-size="14">一條直線分不開</text>
+  <rect x="300" y="20" width="240" height="180" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/>
+  <text x="420" y="74" text-anchor="middle" font-size="16" font-weight="900" class="on-color">加一個特徵 x₁·x₂</text>
+  <text x="420" y="110" text-anchor="middle" font-size="14" class="on-color">圓點：同號 → 乘積為正</text>
+  <text x="420" y="140" text-anchor="middle" font-size="14" class="on-color">方點：異號 → 乘積為負</text>
+  <text x="420" y="172" text-anchor="middle" font-size="14" class="on-color">一個閾值（0）就分開</text>
+  <text x="420" y="222" text-anchor="middle" font-size="14">特徵換對了，直線就夠用</text>
+</svg>`, caption: '虛線是兩個特徵的 0。圓點和方點交錯在對角，任何直線都只能切對一半。' },
+        '解法有兩種：自己加特徵（像 x₁·x₂ 這種交互項，見 1-2 的深入段落），或換能畫彎曲邊界的模型。後者自由度高，也更需要模組 5 的驗證方法。',
+        { type: 'table', head: ['模型', '邊界形狀', '特性'], rows: [
+          ['邏輯回歸', '直線或平面', '快、好解釋，要靠特徵處理非線性'],
+          ['決策樹', '一格一格的階梯', '能處理非線性，單棵容易過擬合'],
+          ['k 近鄰', '跟著資料點彎曲', '不用訓練，但預測時要比對所有資料'],
+          ['神經網路（第四部）', '幾乎任意彎曲', '最自由，需要最多資料與調整'],
+        ] },
       ],
-      tryit: {
-        q: ['把閾值從 0 拉到 9，找出判對最多的閾值。那時候錯了哪幾封？'],
-        draft: '最佳閾值：＿\n判對：＿ / 12\n錯的：＿',
-        answer: ['閾值 2、3、4 都判對 9 封，是最多的，沒有任何閾值能更好。', '以閾值 4 為例，錯的是 (2,1)、(3,1) 兩封驚嘆號少的垃圾信，以及 (6,0) 這封驚嘆號多的正常信。只靠一個特徵分不乾淨；加入更多特徵（例如有沒有連結）通常能改善。'],
-      },
     },
     mistakes: [
       { wrong: '以為分類模型只輸出「是或否」。', why: '大部分分類模型先輸出機率，再用閾值決定。', right: '保留機率，閾值依需求調整（模組 6）。' },
@@ -99,19 +107,7 @@ defineLessons({
       { wrong: '只看正確率。', why: '兩種錯的代價可能差很多（誤擋重要信 vs 漏掉垃圾信）。', right: '分開看兩種錯（模組 6）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '只有一個特徵時，決策邊界是？', options: [
-        { text: '一個閾值', correct: true, why: '數線上的一個點。' },
-        { text: '一條在平面上的斜線', why: '那是兩個特徵。' },
-        { text: '一個在三維空間的平面', why: '那是三個特徵。' },
-        { text: '不存在，一個特徵無法分類', why: '可以，就是一個閾值。' },
-      ] },
-      { level: '應用', type: 'mc', q: '閾值設成 0（驚嘆號 ≥ 0 就判垃圾），結果？', options: [
-        { text: '全部判垃圾，6 封對、6 封錯', correct: true, why: '12 封裡有 6 封是垃圾信。' },
-        { text: '全部判正常，所以一封都抓不到', why: '方向反了。' },
-        { text: '12 封全部都判對', why: '正常信會被誤判。' },
-        { text: '程式無法計算，閾值不能是 0', why: '可以算。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['醫院用一個指數篩檢某種疾病。閾值設低和設高，各有什麼代價？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['醫院用一個指數篩檢某種疾病。閾值設低和設高，各有什麼代價？'], answer: [
         '設低：幾乎不會漏掉病人，但很多健康的人被叫回來複檢（焦慮、成本）。',
         '設高：誤報少，但會漏掉一些真的生病的人。要依疾病的嚴重度、複檢的成本來選，這就是模組 6 的 precision 與 recall。',
       ] },
@@ -129,20 +125,6 @@ defineLessons({
       '說出 sigmoid 做什麼',
       '算出 σ(0)、σ(大正數)、σ(大負數)',
       '說明邏輯回歸＝線性分數＋sigmoid',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-1）分類模型通常先輸出什麼？', options: [
-        { text: '每個類別的機率', correct: true, why: '再用閾值決定。' },
-        { text: '一個沒有上下限的任意數字', why: '那是回歸。' },
-        { text: '所有特徵的平均值', why: '無關。' },
-        { text: '訓練資料裡最像的那一筆', why: '那是另一種方法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-2）y＝w·x＋b，w＝2、b＝−3、x＝1 的值？', options: [
-        { text: '−1', correct: true, why: '2 − 3。' },
-        { text: '5，因為 2 加 3', why: 'b 是負的。' },
-        { text: '1，因為 3 減 2', why: '順序錯了。' },
-        { text: '−6，因為 2 乘 −3', why: 'b 是加，不是乘。' },
-      ] },
     ],
     analogy: {
       text: ['溫度計可以從零下到幾百度，但「會不會下雪」的機率只能在 0% 到 100% 之間。你需要一個轉換器，把任何溫度變成合理的機率。', '[[sigmoid]] 就是這個轉換器：輸入任何數字，輸出 0～1 之間的值，0 對應 0.5，越大越接近 1，越小越接近 0。[[邏輯回歸]]＝先算 z＝w·x＋b，再算 σ(z)。'],
@@ -197,12 +179,17 @@ defineLessons({
           <rect x="470" y="50" width="80" height="70" style="fill:var(--m2)" class="stroke-ink" stroke-width="3"/><text x="510" y="90" text-anchor="middle" font-size="15" font-weight="900" class="on-color">機率</text>
           <text x="280" y="160" text-anchor="middle" font-size="13">「回歸」指的是前半段的線性分數；整個模型做的是分類</text>
         </svg>`, caption: '這個「線性＋非線性函式」的組合，就是第四部神經元的原型。' },
+        { type: 'heading', id: 'deep-odds', text: '深入：係數怎麼解讀，以及什麼時候會壞掉' },
+        'sigmoid 的反函數是 z＝ln(p ÷ (1−p))，其中 p ÷ (1−p) 叫[[odds]]（勝算）。所以 x 每多 1，odds 就乘上 e^w；w＝1 時，每多一個驚嘆號，「是垃圾信」的勝算變成約 2.7 倍。',
+        { type: 'table', head: ['p', 'odds', 'z（log odds）'], rows: [
+          ['0.5', '1', '0'],
+          ['0.8', '4', '≈ 1.39'],
+          ['0.2', '0.25', '≈ −1.39'],
+          ['0.99', '99', '≈ 4.6'],
+        ] },
+        '如果資料能被一條線完美分開，最佳的 w 會趨近無限大（越陡 log loss 越小），訓練停不下來。所以 scikit-learn 的 `LogisticRegression` 預設就帶 L2 正則化（`C＝1.0`，C 越小懲罰越重，見 5-3）；1.8 版起改用 `l1_ratio` 指定 L1 或 L2，舊的 `penalty` 參數預計在 1.10 版移除。',
+        '輸出的機率也要檢查[[校準]]：把模型說 70% 的那些樣本挑出來，真的約七成是陽性，才算校準得好。scikit-learn 的 `CalibratedClassifierCV` 可以事後修正。',
       ],
-      tryit: {
-        q: ['w＝1、b＝−3.5。驚嘆號 3 個和 4 個的信，機率各是多少？哪一封會被判為垃圾信？'],
-        draft: 'x＝3：z＝＿，機率＝＿\nx＝4：z＝＿，機率＝＿',
-        answer: ['x＝3：z＝−0.5，σ ≈ 0.38，判正常。x＝4：z＝0.5，σ ≈ 0.62，判垃圾。', '邊界在 x＝3.5：一封多一個驚嘆號，就跨過了邊界。'],
-      },
     },
     mistakes: [
       { wrong: '因為名字有「回歸」，以為邏輯回歸是預測數字。', why: '它輸出的是類別機率。', right: '邏輯回歸是分類模型。' },
@@ -210,19 +197,7 @@ defineLessons({
       { wrong: '以為機率 0.5 一定是邊界的最佳選擇。', why: '閾值要依兩種錯的代價決定。', right: '0.5 只是預設（模組 6）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'σ(0) 是多少？', options: [
-        { text: '0.5', correct: true, why: '1 ÷ (1＋1)。' },
-        { text: '0，因為輸入是 0 所以輸出也是 0', why: 'e⁰＝1。' },
-        { text: '1，因為 e 的 0 次方等於 1', why: '要代入公式。' },
-        { text: '無法計算，因為會除以 0', why: '分母是 2。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'w＝2、b＝−4，x 是多少時機率剛好 0.5？', options: [
-        { text: '2', correct: true, why: 'z＝2×2−4＝0。' },
-        { text: '4，就是 b 的絕對值', why: '要除以 w。' },
-        { text: '0.5，就是機率本身', why: 'x 和機率不同。' },
-        { text: '−2，就是 b 除以 w', why: '少了負號。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['邏輯回歸的 w 很大（例如 50）會怎樣？從曲線的形狀說明。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['邏輯回歸的 w 很大（例如 50）會怎樣？從曲線的形狀說明。'], answer: [
         'σ(w·x＋b) 在邊界附近變得非常陡，幾乎是一個階梯：稍微過邊界就接近 100%，稍微不到就接近 0%。',
         '這代表模型「非常有把握」；如果資料其實有重疊，這種過度自信會在 log loss 上被重罰（4-3），也是過擬合的徵兆（模組 5）。',
       ] },
@@ -232,7 +207,7 @@ defineLessons({
       '邏輯回歸＝σ(w·x＋b)，是分類模型。',
       '邊界在 z＝0；w 越大，邊界附近越陡。',
     ],
-    sources: ['sklearn-linear'],
+    sources: ['sklearn-linear', 'sklearn-logreg', 'sklearn-calibration'],
   },
 
   '4-3': {
@@ -240,20 +215,6 @@ defineLessons({
       '寫出二元分類的 log loss',
       '解釋為什麼分類不用 MSE',
       '說出 log loss 對「有把握卻答錯」罰得特別重',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-2）σ(4) 大約是？', options: [
-        { text: '0.98', correct: true, why: '很接近 1。' },
-        { text: '4，因為 sigmoid 不改變正數', why: 'sigmoid 壓到 0～1。' },
-        { text: '0.5，因為所有正數都是 0.5', why: '只有 0 是 0.5。' },
-        { text: '0.02，因為大的數會變小', why: '那是 σ(−4)。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-3）MSE 對什麼特別敏感？', options: [
-        { text: '大的錯誤', correct: true, why: '平方放大。' },
-        { text: '殘差的正負號', why: '平方後不分正負。' },
-        { text: '資料的欄位名稱', why: '無關。' },
-        { text: '預測值剛好是 0', why: '無關。' },
-      ] },
     ],
     analogy: {
       text: ['氣象預報說「明天 99% 不會下雨」，結果下大雨；另一家說「60% 不會下雨」，也下雨了。兩家都錯，但你會更氣第一家：它太有把握了。', '[[log loss]] 就是這樣算分：答案是 1 時，損失是 −log(p)；答案是 0 時，損失是 −log(1−p)。給正確答案的機率越低，罰得越重，而且是急遽變重。'],
@@ -307,35 +268,20 @@ defineLessons({
           <text x="420" y="118" text-anchor="middle" font-size="14" class="on-color">錯得越離譜，推得越用力</text>
           <text x="280" y="178" text-anchor="middle" font-size="13">配上 sigmoid，log loss 的梯度剛好是（p − y）× x，非常乾淨</text>
         </svg>`, caption: '邏輯回歸的梯度＝(預測機率 − 答案) × x，和線性回歸的形式幾乎一樣。' },
+        { type: 'heading', id: 'deep-mle', text: '深入：log loss 從哪裡來' },
+        '假設每筆資料彼此獨立，模型給「整份資料的正確答案」的機率，是每一筆機率的乘積。幾千個小數相乘會小到電腦存不下，取 log 後變成加總；再加負號、取平均，就是 log loss。所以最小化 log loss，就是找讓實際發生的答案機率最大的參數，叫[[最大概似估計]]。',
+        '它也給了一條基準線：永遠預測「陽性比例」這個固定機率。陽性佔一半時，這樣做的 log loss 是 ln 2 ≈ 0.693；陽性佔 10% 時約 0.325。模型的 log loss 高於基準線，就是連猜都不如。',
+        { type: 'table', head: ['', 'MSE＋sigmoid', 'log loss＋sigmoid'], rows: [
+          ['損失地形', '不是凸的，可能卡住', '凸的，只有一個谷底（1-4）'],
+          ['答得很離譜時的梯度', '接近 0，學不動', '約等於 (p − y)·x，錯越多推越大'],
+          ['單筆懲罰上限', '1', '沒有上限'],
+        ] },
       ],
-      tryit: {
-        q: ['兩個模型對同一封垃圾信（y＝1）：A 說 0.6，B 說 0.95。各自的 log loss？另一封正常信（y＝0）：A 說 0.4，B 說 0.95。各自的 log loss？加總後哪個比較好？'],
-        draft: '垃圾信：A ＿、B ＿\n正常信：A ＿、B ＿\n加總：A ＿、B ＿',
-        answer: ['垃圾信：A −ln 0.6 ≈ 0.51；B −ln 0.95 ≈ 0.05。正常信：A −ln 0.6 ≈ 0.51；B −ln 0.05 ≈ 3.00。', '加總 A ≈ 1.02，B ≈ 3.05：B 雖然第一封很準，但第二封過度自信地答錯，整體反而差。'],
-      },
     },
     mistakes: [
       { wrong: '分類問題也用 MSE 當損失。', why: '懲罰有上限、答錯時梯度很小。', right: '用 log loss（cross-entropy）。' },
       { wrong: '以為 log loss 只看答對答錯。', why: '它看給正確答案多少機率。', right: '同樣答對，0.9 比 0.51 的損失小很多。' },
       { wrong: '讓模型輸出剛好 0 或 1 的機率。', why: 'log 0 是無限大；答錯一次損失就爆掉。', right: '機率保持在 0 和 1 之間（sigmoid 本來就不會等於 0 或 1）。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '真實答案 1、預測 0.5，log loss 約？', options: [
-        { text: '0.69', correct: true, why: '−ln 0.5。' },
-        { text: '0.5，就是 1 減掉 0.5', why: '要取對數。' },
-        { text: '0.25，就是 0.5 的平方', why: '那是 MSE。' },
-        { text: '0，因為 0.5 剛好在中間', why: '0 要預測 1 才是。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪一種錯在 log loss 上被罰得最重？', options: [
-        { text: '說 99% 是垃圾信，結果是正常信', correct: true, why: '−ln 0.01 ≈ 4.6。' },
-        { text: '說 55% 是垃圾信，結果是正常信', why: '−ln 0.45 ≈ 0.8。' },
-        { text: '說 50% 是垃圾信，結果是垃圾信', why: '≈ 0.69。' },
-        { text: '說 90% 是垃圾信，結果真的是垃圾信', why: '答對，≈ 0.1。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['第二部說 LLM 的預訓練損失是 −log(給正確 token 的機率)。它和這一課的 log loss 是什麼關係？'], answer: [
-        '是同一個概念的多類別版本（cross-entropy）：二元分類有 2 個類別，LLM 每一步有幾萬個類別（詞彙表裡的每個 token）。',
-        '兩者都只看「給正確答案多少機率」，過度自信地答錯都會被重罰。',
-      ] },
     ],
     keypoints: [
       'log loss：−log(給正確答案的機率)。',
@@ -350,20 +296,6 @@ defineLessons({
       '用 softmax 把多個分數變成機率',
       '分辨「多類別」與「多標籤」',
       '知道類別之間的機率是互相競爭的',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-3）分類常用的損失是？', options: [
-        { text: 'log loss', correct: true, why: '也叫 cross-entropy。' },
-        { text: 'MSE，和回歸用的一樣', why: '分類不適合。' },
-        { text: '正確率本身直接當損失', why: '正確率不好微分。' },
-        { text: '參數的總和', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 4-2）w＝1、b＝0、x＝0 的 sigmoid 輸出？', options: [
-        { text: '0.5', correct: true, why: 'z＝0。' },
-        { text: '0，因為 x 是 0', why: 'σ(0) 不是 0。' },
-        { text: '1，因為 w 是 1', why: '要代入公式。' },
-        { text: '無法計算', why: '可以算。' },
-      ] },
     ],
     analogy: {
       text: ['投票選班長：每個候選人得到一些支持度，最後換算成得票率，全部加起來 100%。某人得票率上升，別人的就會下降。', '多類別分類也是：模型給每個類別一個分數，[[softmax]] 把它們變成加起來是 1 的機率。二元分類的 sigmoid 其實就是只有兩個類別的 softmax。'],
@@ -412,12 +344,16 @@ defineLessons({
           <text x="140" y="172" text-anchor="middle" font-size="13">加起來 100%</text>
           <text x="420" y="172" text-anchor="middle" font-size="13">加起來 180%，也合理</text>
         </svg>`, caption: '先想清楚「一筆資料能不能同時屬於好幾類」，再選輸出的形式。' },
+        { type: 'heading', id: 'deep-softmax-practice', text: '深入：實作 softmax 的兩個細節' },
+        '直接算 e^1000 會溢位成無限大。實作時先把每個分數減掉最大值再取指數：結果完全一樣（softmax 只看差距），但最大的指數變成 e⁰＝1，不會溢位。上面互動的程式就是這樣算的。',
+        '多類別還有一種做法叫一對其餘（one-vs-rest）：每個類別訓練一個「是不是我」的二元分類器。scikit-learn 1.9 的 `LogisticRegression` 遇到三類以上時，預設（lbfgs）直接最佳化 softmax 的多類別 log loss；舊的 `multi_class` 參數已經拿掉，要一對其餘就包一層 `OneVsRestClassifier`。',
+        { type: 'table', head: ['做法', '輸出', '什麼時候用'], rows: [
+          ['softmax（多項式）', '一組加總為 1 的機率', '類別互斥，預設選擇'],
+          ['一對其餘', '每類一個分數，加總不一定為 1', '類別很多、想分開訓練或除錯'],
+          ['每類一個 sigmoid', '各自 0～1', '多標籤（可以同時屬於好幾類）'],
+        ] },
+        '溫度（temperature）是另一個常見的調整：分數先除以 T 再做 softmax。T 小於 1 讓機率更集中，大於 1 更平均；LLM 取樣時調的溫度就是這個（第二部）。',
       ],
-      tryit: {
-        q: ['三個分數都設成 0，機率各多少？再把「貓」設成 5、其他設成 0，貓的機率大約多少？'],
-        draft: '都是 0：＿\n貓＝5：＿',
-        answer: ['都是 0：各 33.3%。', '貓＝5：e⁵ ≈ 148.4，總和 ≈ 150.4，貓 ≈ 98.7%。分數差 5 就幾乎全拿走了。'],
-      },
     },
     mistakes: [
       { wrong: '多標籤問題用 softmax。', why: 'softmax 強迫機率加總為 1，同時有好幾個標籤的時候會互相壓低。', right: '多標籤用每個標籤各自的 sigmoid。' },
@@ -425,19 +361,7 @@ defineLessons({
       { wrong: '以為分數全部加大會讓機率更集中。', why: '一起加同一個數，softmax 不變。', right: '只有分數之間的差距才有影響。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'softmax 的輸出有什麼特性？', options: [
-        { text: '全部是正數，加起來是 1', correct: true, why: '就是機率分布。' },
-        { text: '可能有負數，總和沒有限制', why: '取指數後都是正數。' },
-        { text: '每個值都是 0 或 1', why: '是 0～1 之間的連續值。' },
-        { text: '和分數大小成正比', why: '先取指數，不是正比。' },
-      ] },
-      { level: '應用', type: 'mc', q: '判斷一張照片裡「有沒有貓、有沒有狗、有沒有人」，三者可能同時出現。輸出該用？', options: [
-        { text: '三個各自的 sigmoid', correct: true, why: '多標籤。' },
-        { text: '一個 softmax，因為有三個類別', why: '會強迫加總為 1。' },
-        { text: '一個回歸數字，代表照片的分數', why: '要分別判斷三件事。' },
-        { text: 'k-means 分成三群', why: '有標籤，是監督式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼說「sigmoid 是只有兩個類別的 softmax」？用分數 z 和 0 兩個類別驗證。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼說「sigmoid 是只有兩個類別的 softmax」？用分數 z 和 0 兩個類別驗證。'], answer: [
         '兩個類別分數是 z 和 0：softmax 給第一類的機率是 e^z ÷ (e^z ＋ e^0) ＝ e^z ÷ (e^z ＋ 1)。',
         '上下同除 e^z 得到 1 ÷ (1 ＋ e^(−z))，就是 σ(z)。',
       ] },
@@ -447,7 +371,7 @@ defineLessons({
       '多類別用 softmax，多標籤用各自的 sigmoid。',
       'sigmoid 是兩類別的 softmax；只有分數的差距有影響。',
     ],
-    sources: ['sklearn-linear'],
+    sources: ['sklearn-linear', 'sklearn-logreg'],
   },
 });
 </script>

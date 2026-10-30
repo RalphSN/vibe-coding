@@ -3,6 +3,9 @@
    模組 6：評估指標：accuracy、precision、recall
    ========================================================================== */
 defineTerms({
+  'ROC 曲線': { en: 'ROC curve', def: '把閾值從高掃到低，畫出 recall（縱軸）對誤報率（橫軸）的曲線。', example: '越靠左上越好。', lesson: '6-2' },
+  'AUC': { en: 'area under the curve', def: '曲線下的面積；ROC AUC 等於隨機一個陽性的分數高於隨機一個陰性的機率。', example: '0.5 是亂猜，1 是完美排序。', lesson: '6-2' },
+  '基準率': { en: 'base rate / prevalence', def: '陽性在整體裡佔的比例。', example: '詐騙佔 1%。', lesson: '6-3' },
   '混淆矩陣': { en: 'confusion matrix', def: '把預測與真實答案交叉成 2×2 的表：TP、FP、FN、TN 四格。', example: '抓到的詐騙、誤報、漏掉的詐騙、正確放行。', lesson: '6-1' },
   'TP／FP／FN／TN': { en: 'true/false positive/negative', def: 'TP 判陽性且真的是；FP 判陽性但其實不是（誤報）；FN 判陰性但其實是（漏掉）；TN 判陰性且真的不是。', example: 'FP：正常信被丟進垃圾桶。', lesson: '6-1' },
   'accuracy': { en: 'accuracy', def: '全部判對的比例：(TP＋TN) ÷ 全部。', example: '100 筆判對 90 筆：90%。', lesson: '6-1' },
@@ -12,20 +15,6 @@ defineTerms({
   '不平衡資料': { en: 'imbalanced data', def: '某一類遠少於另一類的資料，例如詐騙只佔 1%。', example: '永遠猜「不是詐騙」也有 99% accuracy。', lesson: '6-3' },
 });
 
-const REVIEW_M5 = [
-  { level: '回想', type: 'mc', q: '（回顧 5-4）先用全部資料做標準化再切訓練／測試，問題是？', options: [
-    { text: '測試資料的資訊洩漏到訓練', correct: true, why: '平均與標準差用到了測試集。' },
-    { text: '標準化會讓資料筆數變少', why: '筆數不變。' },
-    { text: '標準化只能用在測試集', why: '相反。' },
-    { text: '完全沒有問題，這是標準做法', why: '會洩漏。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 5-1）訓練誤差小、驗證誤差大是？', options: [
-    { text: '過擬合', correct: true, why: '背了訓練資料。' },
-    { text: '欠擬合', why: '訓練誤差也會大。' },
-    { text: '剛好', why: '驗證差。' },
-    { text: '學習率太大', why: '那會讓訓練誤差也不穩。' },
-  ] },
-];
 
 /* 20 筆交易：模型給的「詐騙分數」與真實答案（教學用資料） */
 const FRAUD = [
@@ -51,7 +40,6 @@ defineLessons({
       '用四格算出 accuracy',
       '說出兩種錯（誤報與漏掉）的差別',
     ],
-    review: REVIEW_M5,
     analogy: {
       text: ['煙霧偵測器有兩種失敗：沒有火卻一直響（誤報），真的失火卻沒響（漏掉）。兩種都是錯，但代價差很多。', '[[混淆矩陣]]把所有預測分成四格：抓到（TP）、誤報（FP）、漏掉（FN）、正確放行（TN）。[[accuracy]] 只看「對角線佔多少」，把兩種錯混在一起；後面的指標會把它們分開。'],
       limit: ['煙霧偵測器的陽性是「有火」；分類問題的「陽性」是你自己定義的那一類（通常是要抓的那一類），定義反過來，四格也會跟著對調。'],
@@ -80,12 +68,16 @@ defineLessons({
           <text x="330" y="106" font-size="14">上色的對角線 ÷ 全部</text>
           <text x="330" y="130" font-size="13">兩種錯被混在一起算</text>
         </svg>`, caption: '6-3 會看到 accuracy 在不平衡資料上有多會騙人。' },
+        { type: 'heading', id: 'deep-cost', text: '深入：從四格到「總成本」' },
+        '混淆矩陣真正的用法，是乘上每一格的代價。期望成本＝FP 數 × 誤報一次的成本＋FN 數 × 漏掉一次的成本；6-4 會用它直接選閾值。',
+        { type: 'table', head: ['指標', '公式', '問的問題'], rows: [
+          ['accuracy', '(TP＋TN) ÷ 全部', '整體對幾成'],
+          ['recall（敏感度）', 'TP ÷ (TP＋FN)', '真的陽性抓到幾成（6-2）'],
+          ['特異度（specificity）', 'TN ÷ (TN＋FP)', '真的陰性正確放行幾成'],
+          ['誤報率（FPR）', 'FP ÷ (FP＋TN)', '陰性被誤判的比例，等於 1 − 特異度'],
+        ] },
+        '多類別時，混淆矩陣是 n × n：列是真實類別、欄是預測類別，對角線以外的每一格都在說「哪兩類最常被搞混」。scikit-learn 的 `confusion_matrix` 也是列為真實、欄為預測，和本課的圖一樣。',
       ],
-      tryit: {
-        q: ['閾值 0.5 時，四格各是多少？accuracy 是多少？'],
-        draft: 'TP ＿、FN ＿、FP ＿、TN ＿\naccuracy ＝ ＿',
-        answer: ['閾值 0.5：分數 ≥ 0.5 的有 9 筆，其中 6 筆是詐騙（TP 6）、3 筆正常（FP 3）。分數 < 0.5 的 11 筆裡有 2 筆詐騙（FN 2）、9 筆正常（TN 9）。', 'accuracy ＝ (6 ＋ 9) ÷ 20 ＝ 75%。可以用互動核對。'],
-      },
     },
     mistakes: [
       { wrong: '只報 accuracy。', why: '兩種錯被混在一起，看不出哪種多。', right: '至少附上混淆矩陣。' },
@@ -93,19 +85,7 @@ defineLessons({
       { wrong: '以為誤報和漏掉一樣嚴重。', why: '代價依情境而定。', right: '先問業務：哪一種錯比較貴。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '正常的信被判成垃圾信，在混淆矩陣是哪一格？（陽性＝垃圾信）', options: [
-        { text: 'FP', correct: true, why: '判陽性，其實是陰性。' },
-        { text: 'FN，因為它其實是正常信', why: 'FN 是陽性被判成陰性。' },
-        { text: 'TP，因為它被判成垃圾信', why: '它其實不是垃圾信。' },
-        { text: 'TN，因為它本來就是正常信', why: '它被判錯了。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'TP 40、FP 10、FN 20、TN 130，accuracy？', options: [
-        { text: '85%', correct: true, why: '(40＋130) ÷ 200。' },
-        { text: '80%，因為 40 除以 50', why: '那是 precision。' },
-        { text: '67%，因為 40 除以 60', why: '那是 recall。' },
-        { text: '65%，因為 130 除以 200', why: '少算了 TP。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你負責機場行李的危險物品偵測。FP 和 FN 各是什麼？你會比較在意哪一種？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你負責機場行李的危險物品偵測。FP 和 FN 各是什麼？你會比較在意哪一種？'], answer: [
         'FP：安全的行李被攔下開箱（耗時、旅客不便）。FN：危險物品沒被發現（可能造成嚴重後果）。',
         '通常更在意 FN，所以會把閾值設低，寧可多開箱；代價是排隊變長，要用人力與流程來吸收。',
       ] },
@@ -123,20 +103,6 @@ defineLessons({
       '算出 precision 與 recall',
       '說出調閾值時兩者怎麼此消彼長',
       '依情境決定要偏重哪一個',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-1）FN 是？', options: [
-        { text: '真的陽性卻判成陰性', correct: true, why: '漏掉。' },
-        { text: '真的陰性卻判成陽性', why: '那是 FP。' },
-        { text: '真的陽性也判成陽性', why: '那是 TP。' },
-        { text: '真的陰性也判成陰性', why: '那是 TN。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 4-1）閾值設得很低，會怎樣？', options: [
-        { text: '判陽性的變多', correct: true, why: '門檻低。' },
-        { text: '判陽性的變少', why: '相反。' },
-        { text: '完全沒影響', why: '直接影響判斷。' },
-        { text: '模型參數會改變', why: '閾值不是參數。' },
-      ] },
     ],
     analogy: {
       text: ['用漁網捕魚：網眼小、網子大，幾乎每條魚都撈到（[[recall]] 高），但也撈上一堆垃圾；網眼大、網子小，撈上來的幾乎都是魚（[[precision]] 高），但很多魚溜走了。', 'precision 問「你說是的裡面，對了幾成」；recall 問「真的是的裡面，你抓到幾成」。調閾值就是換網子：通常一個上升，另一個就下降。'],
@@ -177,12 +143,16 @@ defineLessons({
           <text x="505" y="152" text-anchor="end" font-size="13" font-weight="900">recall</text>
           <text x="290" y="194" text-anchor="middle" font-size="14">閾值 →（示意趨勢）</text>
         </svg>`, caption: '一般趨勢；小資料上 precision 不一定每一步都上升。' },
+        { type: 'heading', id: 'deep-curves', text: '深入：不選閾值也能比較模型' },
+        '把閾值從 1 掃到 0，每個閾值算一組數字，就得到兩種曲線：[[ROC 曲線]]畫 recall 對誤報率，PR 曲線畫 precision 對 recall。曲線下的面積（[[AUC]]）把整條曲線濃縮成一個數。',
+        'ROC AUC 有一個直觀的意思：隨機挑一個陽性和一個陰性，模型給陽性的分數比較高的機率。上面 20 筆交易有 8 筆詐騙、12 筆正常，96 種配對中有 79 種排對，ROC AUC ≈ 0.82。',
+        { type: 'table', head: ['', 'ROC AUC', 'PR 曲線（average precision）'], rows: [
+          ['隨機猜的基準', '0.5', '等於陽性比例（詐騙 1% 時是 0.01）'],
+          ['不平衡資料', '誤報率的分母是大量陰性，看起來偏樂觀', '直接反映誤報有多少，比較誠實'],
+          ['適合', '類別比例差不多、想比整體排序能力', '少數類是重點：詐騙、罕見疾病'],
+        ] },
+        '推薦與搜尋常用 precision@k：只看排在前 k 名的結果有幾成是對的。它不需要閾值，直接對應「首頁只有 5 格」這類限制。',
       ],
-      tryit: {
-        q: ['銀行說：「被擋下的交易裡，至少要 70% 真的是詐騙」。在 20 筆資料上，最低可以把閾值設到多少？那時 recall 是多少？'],
-        draft: '閾值：＿\nrecall：＿',
-        answer: ['最低是 0.65：判陽性 7 筆，TP 5、FP 2，precision 71%、recall 63%。再降到 0.6，precision 就掉到 63%（5/8），不符合要求。', '做法：在互動上從高往低拉，找 precision 仍 ≥ 70% 的最低閾值。這就是用業務要求去選閾值：在滿足 precision 的前提下，讓 recall 盡量高。'],
-      },
     },
     mistakes: [
       { wrong: '把 precision 和 recall 的分母搞混。', why: '一個看「判為陽性的」，一個看「真的陽性」。', right: 'precision 問說是的對不對；recall 問該抓的抓到沒。' },
@@ -190,19 +160,7 @@ defineLessons({
       { wrong: '用預設閾值 0.5 就上線。', why: '0.5 不一定符合業務需求。', right: '用驗證集選閾值。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'recall 的公式？', options: [
-        { text: 'TP ÷ (TP＋FN)', correct: true, why: '真的陽性裡抓到幾成。' },
-        { text: 'TP ÷ (TP＋FP)，判陽性的裡面對幾成', why: '那是 precision。' },
-        { text: '(TP＋TN) ÷ 全部', why: '那是 accuracy。' },
-        { text: 'FP ÷ (FP＋TN)', why: '那是誤報率。' },
-      ] },
-      { level: '應用', type: 'mc', q: '癌症初篩，最在意「不要漏掉病人」，該偏重哪個？', options: [
-        { text: 'recall', correct: true, why: '漏掉就是 FN。' },
-        { text: 'precision，因為誤報比較麻煩', why: '這裡最怕漏掉。' },
-        { text: 'accuracy，因為它最全面', why: '會把漏掉藏起來。' },
-        { text: '都不用看，看模型參數就好', why: '要看指標。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['推薦系統要在首頁放 5 個商品。你比較在意 precision 還是 recall？為什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['推薦系統要在首頁放 5 個商品。你比較在意 precision 還是 recall？為什麼？'], answer: [
         '通常更在意 precision：首頁只有 5 格，放上去的要盡量是使用者真的有興趣的（說是的要準）。',
         'recall（使用者有興趣的商品有幾成被推到）在這個情境比較次要，因為位置有限，本來就不可能全部推。',
       ] },
@@ -220,20 +178,6 @@ defineLessons({
       '說明不平衡資料為什麼會讓 accuracy 騙人',
       '算出 F1',
       '知道不平衡資料要看哪些指標',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-2）precision 的分母是？', options: [
-        { text: '判為陽性的全部', correct: true, why: 'TP＋FP。' },
-        { text: '真的陽性的全部', why: '那是 recall 的分母。' },
-        { text: '所有資料', why: '那是 accuracy。' },
-        { text: '真的陰性的全部', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 6-1）TP 5、FP 5、FN 5、TN 85，accuracy？', options: [
-        { text: '90%', correct: true, why: '(5＋85) ÷ 100。' },
-        { text: '50%，就是 5 除以 10', why: '那是 precision。' },
-        { text: '85%，只看 TN', why: '少算 TP。' },
-        { text: '5%，只看 TP', why: '要看對角線。' },
-      ] },
     ],
     analogy: {
       text: ['一個天氣預報員在沙漠城市每天都說「明天不會下雨」，一年下來準確率 98%。聽起來很厲害，但他從來沒預報對任何一場雨。', '這就是[[不平衡資料]]的陷阱：陽性很少時，什麼都不做也能有很高的 accuracy。要看 precision、recall，或把兩者合起來的 [[F1]]。'],
@@ -284,35 +228,29 @@ defineLessons({
           ${[['換指標', 'P、R、F1'], ['調閾值', '用驗證集選'], ['重新加權', '少數類錯了罰重一點'], ['補資料', '多收集少數類']].map(([a, b], i) => `<rect x="${10 + i * 138}" y="30" width="128" height="100" style="fill:var(--m${[4, 3, 5, 0][i]})" class="stroke-ink" stroke-width="3"/><text x="${74 + i * 138}" y="70" text-anchor="middle" font-size="15" font-weight="900" class="on-color">${a}</text><text x="${74 + i * 138}" y="100" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
           <text x="280" y="166" text-anchor="middle" font-size="13">第一步永遠是：不要只看 accuracy</text>
         </svg>`, caption: '重新加權和第一部 1-3 的「不對稱損失」是同一個想法。' },
+        { type: 'heading', id: 'deep-base-rate', text: '深入：陽性越罕見，precision 越難看' },
+        '同一個模型，放到陽性比例不同的地方，precision 會差很多。這是貝氏定理：precision＝（[[基準率]] × recall）÷（基準率 × recall ＋（1 − 基準率）× 誤報率）。',
+        { type: 'widget', name: 'knobs', props: { title: '同一個模型換到不同基準率（實際計算）', sliders: [
+          { id: 'prev', label: '陽性比例（基準率）', min: 0.1, max: 50, step: 0.1, value: 1, unit: '%' },
+          { id: 'rec', label: 'recall', min: 50, max: 100, step: 1, value: 90, unit: '%' },
+          { id: 'spec', label: '特異度（陰性正確放行的比例）', min: 80, max: 99.9, step: 0.1, value: 95, unit: '%' },
+        ], compute: (v) => {
+          const tp = (v.prev / 100) * (v.rec / 100);
+          const fp = (1 - v.prev / 100) * (1 - v.spec / 100);
+          const prec = tp / (tp + fp);
+          return { rows: [
+            { label: 'precision', value: (prec * 100).toFixed(1) + '%', ratio: prec },
+            { label: '每 1 萬筆：抓到的陽性', value: Math.round(tp * 10000) + ' 筆', ratio: Math.min(1, tp * 2) },
+            { label: '每 1 萬筆：誤報', value: Math.round(fp * 10000) + ' 筆', ratio: Math.min(1, fp * 2) },
+          ], note: '預設：基準率 1%、recall 90%、特異度 95%，precision 只有約 15.4%：每 1 萬筆抓到 90 筆陽性，卻有 495 筆誤報。把基準率拉到 20%，同一個模型的 precision 變成約 81.8%。' };
+        } } },
+        'F1 也可以調比重：F-beta 的 β 大於 1 時偏重 recall，小於 1 時偏重 precision，F2 常用在「漏掉比較貴」的篩檢。重抽樣（複製少數類、減少多數類）會改變訓練資料的基準率，模型輸出的機率也會跟著偏，上線前要重新校準或重選閾值。',
       ],
-      tryit: {
-        q: ['precision 0.8、recall 0.4，F1 是多少？'],
-        draft: 'F1 ＝ 2 × ＿ × ＿ ÷ (＿ ＋ ＿) ＝ ＿',
-        answer: ['F1 ＝ 2 × 0.8 × 0.4 ÷ (0.8 ＋ 0.4) ＝ 0.64 ÷ 1.2 ≈ 0.53。', '算術平均是 0.6；F1 比較低，因為 recall 拖了後腿。'],
-      },
     },
     mistakes: [
       { wrong: '在不平衡資料上只報 accuracy。', why: '永遠猜多數類也有很高的 accuracy。', right: '看 precision、recall、F1，並和基準線比。' },
       { wrong: '用算術平均合併 precision 和 recall。', why: '一個極高、一個極低時，算術平均看起來還不錯。', right: '用 F1（調和平均）。' },
       { wrong: '把 F1 當成萬用指標。', why: 'F1 假設兩種錯一樣重要。', right: '代價不對稱時，直接看 precision 或 recall，或給權重。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '詐騙只佔 1%，「永遠說正常」的模型 accuracy 約？', options: [
-        { text: '99%', correct: true, why: '99% 的交易本來就正常。' },
-        { text: '1%，因為它一個詐騙都沒抓到', why: '那是 recall 的感覺，accuracy 不是。' },
-        { text: '50%，因為只有兩個類別', why: '要看比例。' },
-        { text: '0%，因為模型什麼都沒學到', why: 'accuracy 很高，這正是陷阱。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'precision 1.0、recall 0.1，F1 約？', options: [
-        { text: '0.18', correct: true, why: '2 × 1 × 0.1 ÷ 1.1。' },
-        { text: '0.55，兩者的平均', why: '那是算術平均。' },
-        { text: '1.0，因為 precision 是滿分', why: 'F1 被低的拉下。' },
-        { text: '0.1，就是 recall 本身', why: '要代公式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事說：「我們的罕見疾病模型 accuracy 99.5%，可以上線了。」你會先問什麼？'], answer: [
-        '一、這個疾病在資料裡佔多少？如果佔 0.5%，永遠說「沒病」也有 99.5%。',
-        '二、recall 是多少（真的有病的人抓到幾成）？precision 呢？在臨床上漏掉病人的代價很高，recall 通常比 accuracy 重要得多。',
-      ] },
     ],
     keypoints: [
       '不平衡資料上，accuracy 會騙人；先和「永遠猜多數類」比。',
@@ -325,99 +263,17 @@ defineLessons({
 </script>
 
 <script>
-/* 6-4 選對指標＋總複習（模組 1–6） */
-const REVIEW_12_ML = [
-  { level: '回想', type: 'mc', q: '（1-1）預測時拿不到的資訊被當成特徵，叫做？', options: [
-    { text: '資料洩漏', correct: true, why: '評估會虛高。' },
-    { text: '過擬合，因為模型太複雜', why: '過擬合是背雜訊。' },
-    { text: '正則化，因為多了一項限制', why: '無關。' },
-    { text: 'one-hot 編碼，因為欄位變多', why: '無關。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（1-3）殘差 [2, 0, −4] 的 MSE？', options: [
-    { text: '約 6.67', correct: true, why: '(4＋0＋16) ÷ 3。' },
-    { text: '2，就是絕對值的平均', why: '那是 MAE。' },
-    { text: '−0.67，殘差直接平均', why: '要先平方。' },
-    { text: '20，平方相加但不用平均', why: '要除以 3。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（2-2）k-means 的兩個步驟？', options: [
-    { text: '分配、移動中心', correct: true, why: '反覆到收斂。' },
-    { text: '預測、和標籤比對誤差', why: '沒有標籤。' },
-    { text: '探索、利用', why: '那是強化學習。' },
-    { text: '切資料、做交叉驗證', why: '那是評估。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（2-3）ε＝0 的 ε-greedy 最大的風險？', options: [
-    { text: '早期運氣決定一切，錯過更好的選項', correct: true, why: '完全不探索。' },
-    { text: '會一直隨機亂拉，平均很差', why: '那是 ε＝1。' },
-    { text: '程式無法執行', why: '可以執行。' },
-    { text: '中獎率會被改變', why: '真實中獎率不變。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（3-3）w＝0、∂L/∂w＝−10、學習率 0.1，新的 w？', options: [
-    { text: '1', correct: true, why: '0 − 0.1 × (−10)。' },
-    { text: '−1，往梯度的方向走', why: '要往反方向。' },
-    { text: '−10，直接換成梯度', why: '要乘學習率並相減。' },
-    { text: '0.1，就是學習率', why: '要乘梯度。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（3-4）損失越來越大、甚至變成無限大，最可能是？', options: [
-    { text: '學習率太大', correct: true, why: '發散。' },
-    { text: '學習率太小，所以走不動', why: '太小只會很慢。' },
-    { text: '資料太多，電腦算不完', why: '不會讓損失變大。' },
-    { text: '模型已經收斂', why: '收斂時損失穩定。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（4-2）w＝1、b＝−2、x＝2，σ(z) 是？', options: [
-    { text: '0.5', correct: true, why: 'z＝0。' },
-    { text: '0，因為 z 是 0', why: 'σ(0)＝0.5。' },
-    { text: '2，就是 x', why: '要代入公式。' },
-    { text: '1，因為 w 是 1', why: '要算 z。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（4-3）分類問題為什麼用 log loss 而不是 MSE？', options: [
-    { text: '對有把握卻答錯罰得更重', correct: true, why: 'MSE 最多罰到 1。' },
-    { text: 'MSE 只能用在正整數上', why: '不是這個原因。' },
-    { text: 'log loss 計算比較快', why: '原因是懲罰的形狀。' },
-    { text: 'MSE 會讓模型參數變多', why: '無關。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（5-1）次數 9 的多項式穿過全部 10 個訓練點，驗證誤差很大。該怎麼辦？', options: [
-    { text: '降低次數或加正則化', correct: true, why: '過擬合。' },
-    { text: '把次數再加到 20 次', why: '會更過擬合。' },
-    { text: '把驗證資料也拿去訓練', why: '就無法評估了。' },
-    { text: '什麼都不做，訓練誤差已經 0', why: '新資料表現差。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（5-2）挑選 λ 要用哪份資料？', options: [
-    { text: '驗證集', correct: true, why: 'λ 是超參數。' },
-    { text: '測試集，因為最客觀', why: '用了就不客觀。' },
-    { text: '訓練集，資料最多', why: '會選到過擬合的設定。' },
-    { text: '隨便哪一份都可以', why: '要分清楚。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（6-2）TP 30、FP 10、FN 20，precision 與 recall？', options: [
-    { text: 'precision 75%、recall 60%', correct: true, why: '30÷40、30÷50。' },
-    { text: 'precision 60%、recall 75%', why: '兩個對調了。' },
-    { text: 'precision 50%、recall 50%', why: '算錯分母。' },
-    { text: '無法計算，缺少 TN', why: '這兩個不需要 TN。' },
-  ] },
-  { level: '遷移', type: 'mc', q: '（6-3）罕見疾病只佔 0.5%，模型 accuracy 99.5%。你最該先檢查什麼？', options: [
-    { text: 'recall：真的有病的人抓到幾成', correct: true, why: '永遠說沒病也有 99.5%。' },
-    { text: '訓練時間有多長', why: '和這個問題無關。' },
-    { text: '模型用了多少參數', why: '先看是否真的有用。' },
-    { text: '學習率是不是 0.01', why: '先看指標。' },
-  ] },
-];
+
 
 defineLessons({
   '6-4': {
     goals: [
       '依情境選出最重要的指標',
       '把指標連回業務上的代價',
-      '用 12 題總複習找出要回頭讀的單元',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-3）F1 是什麼的調和平均？', options: [
-        { text: 'precision 與 recall', correct: true, why: '2PR÷(P＋R)。' },
-        { text: 'accuracy 與 recall', why: '不是。' },
-        { text: '訓練誤差與驗證誤差', why: '不是。' },
-        { text: 'TP 與 TN', why: '不是。' },
-      ] },
+      '用一頁地圖看懂全書架構，知道哪些內容會過時',
     ],
     analogy: {
-      text: ['選車：通勤族看油耗、家庭看空間、跑山的人看操控。沒有「最好的車」，只有最符合用途的車。', '指標也是：先問「這個模型做錯時，誰付出什麼代價」，再選指標與閾值。這一課也把整卷串起來，最後用 12 題總複習確認你掌握了學習迴圈的每一站。'],
+      text: ['選車：通勤族看油耗、家庭看空間、跑山的人看操控。沒有「最好的車」，只有最符合用途的車。', '指標也是：先問「這個模型做錯時，誰付出什麼代價」，再選指標與閾值。這一課也把整卷串起來：最後是全書一頁地圖，列出每個模組最重要的一件事，以及哪些內容會過時。'],
       limit: ['選車的條件比較穩定，模型的業務需求會變（例如詐騙手法改變、客訴增加），指標和閾值也要定期重新檢視。'],
     },
     model: {
@@ -434,31 +290,59 @@ defineLessons({
     define: [
       { term: '業務代價', en: 'business cost', def: '每一種錯在真實世界的成本。', example: '漏掉一筆詐騙損失 2 萬元。' },
       { term: '基準線', en: 'baseline', def: '最簡單做法的分數。', example: '永遠猜多數類。' },
-      { term: '總複習', en: 'review', def: '涵蓋模組 1–6 的 12 題。', example: '每題標出單元。' },
+      { term: '期望成本', en: 'expected cost', def: 'FP 數 × 誤報成本＋FN 數 × 漏掉成本。', example: '用它挑最便宜的閾值。' },
     ],
     examples: {
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'recall', label: '最看 recall' }, { id: 'precision', label: '最看 precision' }, { id: 'f1', label: '兩者平衡（F1）' }], items: [
-          { text: '新生兒罕見疾病初篩（之後還有確診檢查）', answer: 'recall', why: '漏掉的代價極高，誤報有後續檢查可以排除。' },
-          { text: '自動凍結疑似盜用的帳號（凍結會讓客人無法使用）', answer: 'precision', why: '誤凍正常帳號的代價高。' },
-          { text: '從大量履歷裡挑出要給主管看的 10 份', answer: 'precision', why: '名額少，放進來的要準。' },
-          { text: '偵測工廠產品瑕疵，漏掉與誤判的成本差不多', answer: 'f1', why: '兩種錯都要顧。' },
-          { text: '搜尋法院判決時，律師不想漏掉任何相關案例', answer: 'recall', why: '漏掉比多看幾份不相關的更糟。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['新生兒罕見疾病初篩（之後還有確診檢查）', '最看 recall', '漏掉的代價極高，誤報有後續檢查可以排除。'],
+          ['自動凍結疑似盜用的帳號（凍結會讓客人無法使用）', '最看 precision', '誤凍正常帳號的代價高。'],
+          ['從大量履歷裡挑出要給主管看的 10 份', '最看 precision', '名額少，放進來的要準。'],
+          ['偵測工廠產品瑕疵，漏掉與誤判的成本差不多', '兩者平衡（F1）', '兩種錯都要顧。'],
+          ['搜尋法院判決時，律師不想漏掉任何相關案例', '最看 recall', '漏掉比多看幾份不相關的更糟。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="整卷回顧：學習迴圈六站，加上過擬合與評估兩個外圈">
           ${['資料', '模型', '預測', '損失', '梯度', '更新'].map((t, i) => `<rect x="${10 + i * 92}" y="40" width="84" height="56" style="fill:var(--m${i})" class="stroke-ink" stroke-width="3"/><text x="${52 + i * 92}" y="74" text-anchor="middle" font-size="14" font-weight="900" class="on-color">${t}</text>`).join('')}
           <rect x="10" y="116" width="268" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="144" y="146" text-anchor="middle" font-size="14" font-weight="900">模組 5：別背答案（泛化）</text>
           <rect x="282" y="116" width="268" height="50" class="fill-surface stroke-ink" stroke-width="3"/><text x="416" y="146" text-anchor="middle" font-size="14" font-weight="900">模組 6：用對的尺量（指標）</text>
           <text x="280" y="192" text-anchor="middle" font-size="13">模組 1–4 是迴圈本身；模組 5–6 讓你誠實地知道它學得好不好</text>
         </svg>`, caption: '第四部會把「模型」換成神經網路，但這個迴圈完全不變。' },
-        { type: 'heading', id: 'final-review', text: '總複習：12 題' },
-        { type: 'quiz', key: '6-4:final', items: REVIEW_12_ML },
-      ],
-      tryit: {
-        q: ['挑一個你熟悉的工作情境，寫出：陽性是什麼、FP 與 FN 各是什麼、你會優先看哪個指標。'],
-        draft: '情境：＿\n陽性：＿\nFP：＿　FN：＿\n優先看：＿',
-        answer: ['範例（客服信件分類「需要主管處理」）：陽性＝需要主管；FP＝主管收到不需要處理的信（浪費時間）；FN＝該處理的沒送到主管（客訴升級）。', '如果客訴升級的代價比較高，優先看 recall，再用 precision 控制主管的負擔不要太重。'],
-      },
+        { type: 'widget', name: 'knobs', props: { title: '用總成本選閾值：6-1 那 20 筆交易（實際計算）', sliders: [
+          { id: 't', label: '閾值', min: 0, max: 1, step: 0.05, value: 0.3 },
+          { id: 'cfn', label: '漏掉一筆詐騙的損失', min: 1000, max: 50000, step: 1000, value: 20000, unit: '元' },
+          { id: 'cfp', label: '誤擋一筆正常交易的成本', min: 100, max: 5000, step: 100, value: 500, unit: '元' },
+        ], compute: (v) => {
+          const count = (t) => { let fp = 0; let fn = 0; FRAUD.forEach(({ score, label }) => { if (score >= t) { if (!label) fp += 1; } else if (label) fn += 1; }); return { fp, fn, cost: fp * v.cfp + fn * v.cfn }; };
+          const here = count(Math.round(v.t * 100) / 100);
+          let best = { t: 0, cost: Infinity };
+          for (let i = 0; i <= 20; i += 1) { const c = count(i / 20).cost; if (c < best.cost) best = { t: i / 20, cost: c }; }
+          return { rows: [
+            { label: '誤擋（FP）', value: here.fp + ' 筆', ratio: here.fp / 12 },
+            { label: '漏掉（FN）', value: here.fn + ' 筆', ratio: here.fn / 8 },
+            { label: '這個閾值的總成本', value: here.cost.toLocaleString() + ' 元', ratio: Math.min(1, here.cost / 160000) },
+            { label: '這組成本下最便宜的閾值', value: best.t.toFixed(2) + '（' + best.cost.toLocaleString() + ' 元）', ratio: Math.min(1, best.cost / 160000) },
+          ], note: '預設：漏掉一筆 2 萬元、誤擋一筆 500 元。閾值 0.3 的總成本 23,000 元；最便宜的是 0.25（誤擋 6 筆、漏掉 0 筆，3,000 元）。把誤擋成本拉高，最佳閾值就往右移：這就是「先問哪種錯貴」的計算版。' };
+        } } },
+        { type: 'heading', id: 'book-map', text: '全書一頁地圖' },
+        { type: 'table', head: ['模組', '核心觀念', '最重要的一個行動'], rows: [
+          ['0 起點', '學習＝自動化的「試、看誤差、調整」', '先確認問題真的需要從資料學（0-1）'],
+          ['1 三要素', '資料、模型、損失', '只用預測當下拿得到的特徵；損失要反映哪種錯比較貴'],
+          ['2 三種學習', '有答案、沒答案、只有獎勵', '先看手上有什麼樣的回饋，再選做法'],
+          ['3 梯度下降', '往梯度反方向走一小步', '一定要畫損失曲線，用它調學習率'],
+          ['4 分類', '分數 → 機率 → 閾值', '分類用 log loss；保留機率，閾值依代價決定'],
+          ['5 過擬合', '目標是泛化，不是訓練誤差', '先切資料再前處理；測試集只用一次'],
+          ['6 指標', '兩種錯的代價不同', '先問哪種錯貴，再選指標，永遠附上基準線'],
+        ] },
+        { type: 'table', head: ['會過時的內容', '為什麼會變', '怎麼更新'], rows: [
+          ['scikit-learn 的參數名稱與預設值（2-2 的 `n_init`、4-2 的 `l1_ratio`、4-4 的多類別做法）', '新版會棄用、改名參數', '查官方文件與 changelog；本書查證到 1.9.1（2026-10-30）'],
+          ['跨卷提到的 LLM 訓練方法（2-3 的 RLHF、推理模型）', '訓練方法演進很快', '看第二部的最新版'],
+          ['Google Machine Learning Crash Course 的章節', '課程會改版', '從參考資料頁的連結重新進入'],
+          ['數學與定義（MSE、梯度、sigmoid、precision）', '不會變', '不用更新'],
+        ] },
+        { type: 'heading', id: 'deep-after-launch', text: '深入：上線之後，指標還要繼續看' },
+        '離線算出的指標只代表「那一份測試資料」。上線後要持續看三件事：分數的分布有沒有移動（資料漂移）、真實標籤回來後指標有沒有下降、不同族群（地區、新舊客戶）的指標是否差很多。',
+        '整體 recall 90%，可能是某個族群 98%、另一個族群只有 60%；只看平均會把問題藏起來。這是 5-4 那個「換一家醫院就掉分」案例的日常版本。',
+              ],
     },
     mistakes: [
       { wrong: '先選指標，再想業務需求。', why: '指標要反映真實代價。', right: '先問哪種錯比較貴。' },
@@ -466,19 +350,7 @@ defineLessons({
       { wrong: '不和基準線比較就宣稱模型很好。', why: '最簡單的做法可能就有很高的分數。', right: '報告時附上基準線。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '選指標的第一步是？', options: [
-        { text: '定義陽性並問哪種錯比較貴', correct: true, why: '指標反映代價。' },
-        { text: '直接用 accuracy，因為最常見', why: '可能騙人。' },
-        { text: '先把閾值設成 0.5', why: '閾值在後面。' },
-        { text: '先訓練最大的模型', why: '和選指標無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '電商要「自動退款」給疑似被重複扣款的客人，錢一退就收不回。最看哪個指標？', options: [
-        { text: 'precision', correct: true, why: '誤退的錢收不回。' },
-        { text: 'recall，盡量讓每個客人都拿到', why: '誤退代價高。' },
-        { text: 'accuracy，因為最全面', why: '可能不平衡。' },
-        { text: '都不重要，退錢一定是好事', why: '要考慮代價。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同一個詐騙偵測模型，用在「自動擋下交易」和「標記給人工複查」兩種用途。閾值應該一樣嗎？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同一個詐騙偵測模型，用在「自動擋下交易」和「標記給人工複查」兩種用途。閾值應該一樣嗎？'], answer: [
         '不一樣。自動擋下會直接影響客人，誤報代價高，閾值要高（偏重 precision）。',
         '標記給人工複查時，誤報只是讓審查員多看一筆，閾值可以低一些（偏重 recall），讓更少的詐騙漏網。同一個模型可以有兩個閾值。',
       ] },
@@ -488,7 +360,7 @@ defineLessons({
       '永遠和基準線比較；不平衡時不要只看 accuracy。',
       '同一個模型，不同用途可以用不同閾值。',
     ],
-    sources: ['sklearn-eval'],
+    sources: ['sklearn-eval', 'sklearn-calibration'],
   },
 });
 </script>

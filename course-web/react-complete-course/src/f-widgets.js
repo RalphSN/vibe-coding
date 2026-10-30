@@ -67,22 +67,22 @@ function makeStepper(el, count, draw, { interval = STEP_MS, start = 0 } = {}) {
   return { go, stop };
 }
 
-/* ---------- csrun：先預測，再看輸出 ---------- */
+/* ---------- csrun：執行，再看輸出 ---------- */
 // props: { code, title?, file?, predict?: { q?, options: [文字], answer: index }, output: 字串（\n 分行，! 開頭的行顯示成錯誤） }
 // 頁面不執行 TSX，輸出是事先寫好的；推導依據記在 research-notes.md。
 Widgets.csrun = {
   render(props, id) {
     const p = props.predict;
     return `<div class="jw runner">
-      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '先預測，再看輸出')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '執行，看輸出')}</span></div>
       <div class="code"><div class="code-head"><span class="lang">${esc(props.lang || 'TSX')}</span><span class="ttl">${esc(props.file || 'App.tsx')}</span></div>
         <pre tabindex="0" aria-label="程式碼"><code class="language-${esc(props.hl || 'typescript')}">${esc(props.code)}</code></pre></div>
       ${p ? `<div class="run-predict" role="group" aria-label="預測">
         <span class="jw-note"><strong>先預測：</strong>${md(p.q || '執行後會印出什麼？')}</span>
         <div class="opts">${p.options.map((o, i) => `<button type="button" class="btn small nb-press" data-pick="${i}" aria-pressed="false">${esc(o)}</button>`).join('')}</div>
       </div>` : ''}
-      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 看輸出</button></div>
-      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（先預測，再按「看輸出」）</span></pre>
+      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 執行</button></div>
+      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（按「執行」看結果）</span></pre>
       <div class="run-verdict" aria-live="polite"></div>
     </div>`;
   },
@@ -163,23 +163,14 @@ Widgets.classify = {
 };
 
 
-/* ---------- herodemo：首頁的第一個預測 ---------- */
+/* ---------- herodemo：首頁的第一個範例 ---------- */
 const HERO_RUNNER = {
-  "title": "這門課的第一個問題",
+  "title": "連呼叫兩次 setCount 的結果",
   "lang": "TSX",
   "hl": "typescript",
   "file": "Counter.tsx",
   "code": "function Counter() {\n  const [count, setCount] = useState(0);\n  function handleClick() {\n    setCount(count + 1);\n    setCount(count + 1);\n  }\n  return <button onClick={handleClick}>{count}</button>;\n}",
-  "predict": {
-    "q": "按一下按鈕後顯示多少？",
-    "options": [
-      "2",
-      "1",
-      "0"
-    ],
-    "answer": 1
-  },
-  "output": "1\n（兩次都是 setCount(0 + 1)：state 是這次渲染的快照）"
+  "output": "按一下後顯示：1\n（兩次都是 setCount(0 + 1)：state 是這次渲染的快照）"
 };
 Widgets.herodemo = {
   render(props, id) { return Widgets.csrun.render(HERO_RUNNER, id); },
