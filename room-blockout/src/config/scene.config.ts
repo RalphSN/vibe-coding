@@ -1,10 +1,14 @@
 // scene.config.json 的型別。單位：公尺、秒、角度（度）。
-// 座標：原點在房間地板中心；+X 東、-Z 北、+Y 上。
+// 座標：原點在房屋外框中心的地面；+X 東、-Z 北、+Y 上。
 
-export type FurnitureType = 'bed' | 'desk' | 'chair' | 'bookcase' | 'wardrobe';
+export type FurnitureType = 'bed' | 'desk' | 'chair' | 'bookcase' | 'wardrobe' | 'counter' | 'island' | 'sofa' | 'bath' | 'table';
 export type ClipRole = 'idle' | 'walk' | 'run' | 'jumpStart' | 'jumpLoop' | 'jumpLand';
+export type OpeningKind = 'door' | 'slider' | 'window';
+export type FloorKind = 'room' | 'deck';
 
-export const FURNITURE_TYPES: FurnitureType[] = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe'];
+export const FURNITURE_TYPES: FurnitureType[] = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe', 'counter', 'island', 'sofa', 'bath', 'table'];
+export const OPENING_KINDS: OpeningKind[] = ['door', 'slider', 'window'];
+export const FLOOR_KINDS: FloorKind[] = ['room', 'deck'];
 export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'jumpStart', 'jumpLoop', 'jumpLand'];
 
 export interface Sizes { width: number; depth: number; height: number }
@@ -16,16 +20,39 @@ export interface Spot { x: number; z: number }
  */
 export interface FurnitureItem extends Sizes, Spot { type: FurnitureType; label: string; rotation: number }
 
-/** 門窗。offset：北牆的 +往東、東牆的 +往南；sill 是窗台離地高度（門沒有）。 */
-export interface Opening { offset: number; width: number; height: number; sill?: number }
+/** 軸對齊的長方形範圍（世界座標）。 */
+export interface Rect { minX: number; maxX: number; minZ: number; maxZ: number }
 
-export interface RoomConfig { width: number; depth: number; height: number; wallThickness: number }
+/** 牆上的開口。offset：從牆的起點（x1, z1）量到開口中心；sill 是窗台離地高度（門沒有）。slider 是拉門。 */
+export interface Opening { label: string; kind: OpeningKind; offset: number; width: number; height: number; sill?: number }
+
+/** 一段牆（中心線從 (x1, z1) 到 (x2, z2)，只支援東西向或南北向）。 */
+export interface Wall { label: string; x1: number; z1: number; x2: number; z2: number; openings: Opening[] }
+
+/** 可以站、可以擺家具的地板：室內房間或木平台（和室內同高）。 */
+export interface FloorArea extends Rect { label: string; kind: FloorKind }
+
+/** 平台邊的欄杆（中心線）。 */
+export interface Railing { label: string; x1: number; z1: number; x2: number; z2: number; height: number }
+
+/** 台階：實心方塊，height 是頂面高度。 */
+export interface Step extends Rect { label: string; height: number }
+
+export interface HouseConfig {
+  wallHeight: number;
+  wallThickness: number;
+  floors: FloorArea[];
+  walls: Wall[];
+  railings: Railing[];
+  steps: Step[];
+}
 
 export interface SceneSection {
-  room: RoomConfig;
-  openings: { northWindow: Opening; eastWindow: Opening; door: Opening };
-  /** 房門外的一小塊地板，置中對齊房門。 */
-  outsideFloor: { width: number; depth: number };
+  house: HouseConfig;
+  /** 房屋外框往外多大一片草地可以走（m），邊緣有隱形圍欄。 */
+  groundMargin: number;
+  /** 第一次進入第一人稱時站的位置；facing 是面向（度，0 朝北、90 朝西，逆時針）。 */
+  spawn: { x: number; z: number; facing: number };
   /** 編輯器吸附：格線、牆邊／家具邊吸附距離、尺寸步進、窗前要留的空間。 */
   rules: { gridSnap: number; edgeSnap: number; sizeSnap: number; windowClearance: number };
 }
@@ -35,6 +62,8 @@ export interface CharacterConfig {
   scale: number;
   /** 碰撞半徑：身體當成邊長 2 × radius 的方塊。 */
   radius: number;
+  /** 比腳高這麼多以內的表面直接走上去（m），更高要跳。 */
+  stepHeight: number;
   /** 走路／按住 Shift 跑步的移動速度（m/s）。 */
   walkSpeed: number;
   runSpeed: number;
@@ -103,14 +132,43 @@ function missingNumbers(value: unknown, keys: string[]): string[] {
   return keys.filter((key) => typeof value[key] !== 'number' || !Number.isFinite(value[key]));
 }
 
+const RECT_KEYS = ['minX', 'maxX', 'minZ', 'maxZ'];
+const SEGMENT_KEYS = ['x1', 'z1', 'x2', 'z2'];
+
+// 陣列裡每一項檢查數字欄位與 label，路徑寫成 scene.house.walls[3].x1 這種格式。
+function collectListIssues(list: unknown, path: string, numbers: string[], extra: (item: Record<string, unknown>, at: string) => string[]): string[] {
+  if (!Array.isArray(list)) return [path];
+  return list.flatMap((item: unknown, index) => {
+    const at = `${path}[${index}]`;
+    if (!isObject(item)) return [at];
+    const issues = missingNumbers(item, numbers).map((key) => `${at}.${key}`);
+    if (typeof item.label !== 'string') issues.push(`${at}.label`);
+    return [...issues, ...extra(item, at)];
+  });
+}
+
+function collectOpeningIssues(wall: Record<string, unknown>, at: string): string[] {
+  const issues: string[] = [];
+  if (SEGMENT_KEYS.every((key) => typeof wall[key] === 'number') && wall.x1 !== wall.x2 && wall.z1 !== wall.z2) {
+    issues.push(`${at}（牆只能東西向或南北向）`);
+  }
+  issues.push(...collectListIssues(wall.openings, `${at}.openings`, ['offset', 'width', 'height'], (opening, path) =>
+    (OPENING_KINDS.some((kind) => kind === opening.kind) ? [] : [`${path}.kind（要是 ${OPENING_KINDS.join('／')}）`])));
+  return issues;
+}
+
 function collectSceneIssues(scene: unknown): string[] {
   if (!isObject(scene)) return ['scene'];
-  const issues = missingNumbers(scene.room, ['width', 'depth', 'height', 'wallThickness']).map((key) => `scene.room.${key}`);
-  const openings = isObject(scene.openings) ? scene.openings : {};
-  for (const name of ['northWindow', 'eastWindow', 'door']) {
-    issues.push(...missingNumbers(openings[name], ['offset', 'width', 'height']).map((key) => `scene.openings.${name}.${key}`));
-  }
-  issues.push(...missingNumbers(scene.outsideFloor, ['width', 'depth']).map((key) => `scene.outsideFloor.${key}`));
+  const house = scene.house;
+  if (!isObject(house)) return ['scene.house'];
+  const issues = missingNumbers(house, ['wallHeight', 'wallThickness']).map((key) => `scene.house.${key}`);
+  issues.push(...collectListIssues(house.floors, 'scene.house.floors', RECT_KEYS, (floor, at) =>
+    (FLOOR_KINDS.some((kind) => kind === floor.kind) ? [] : [`${at}.kind（要是 ${FLOOR_KINDS.join('／')}）`])));
+  issues.push(...collectListIssues(house.walls, 'scene.house.walls', SEGMENT_KEYS, collectOpeningIssues));
+  issues.push(...collectListIssues(house.railings, 'scene.house.railings', [...SEGMENT_KEYS, 'height'], () => []));
+  issues.push(...collectListIssues(house.steps, 'scene.house.steps', [...RECT_KEYS, 'height'], () => []));
+  issues.push(...missingNumbers(scene, ['groundMargin']).map((key) => `scene.${key}`));
+  issues.push(...missingNumbers(scene.spawn, ['x', 'z', 'facing']).map((key) => `scene.spawn.${key}`));
   issues.push(...missingNumbers(scene.rules, ['gridSnap', 'edgeSnap', 'sizeSnap', 'windowClearance']).map((key) => `scene.rules.${key}`));
   return issues;
 }
@@ -129,7 +187,7 @@ function collectFurnitureIssues(furniture: unknown): string[] {
 
 function collectCharacterIssues(character: unknown): string[] {
   if (!isObject(character)) return ['character'];
-  const numbers = ['scale', 'radius', 'walkSpeed', 'runSpeed', 'turnSpeed', 'jumpHeight', 'gravity', 'fadeSeconds', 'landLockSeconds', 'turnToMoveSeconds', 'maxMoveTurn', 'legTurnLimit'];
+  const numbers = ['scale', 'radius', 'stepHeight', 'walkSpeed', 'runSpeed', 'turnSpeed', 'jumpHeight', 'gravity', 'fadeSeconds', 'landLockSeconds', 'turnToMoveSeconds', 'maxMoveTurn', 'legTurnLimit'];
   const issues = missingNumbers(character, numbers).map((key) => `character.${key}`);
   issues.push(...missingNumbers(character.clipSpeeds, ['walk', 'run']).map((key) => `character.clipSpeeds.${key}`));
   const clips = isObject(character.clips) ? character.clips : {};
