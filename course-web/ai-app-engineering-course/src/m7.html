@@ -64,20 +64,6 @@ defineLessons({
       '用四個問題判斷一件事值不值得做成 agent',
       '知道為什麼官方建議「從最簡單的做起」',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 6-5）資料是即時變動的庫存數字，最適合用什麼交給模型？', options: [
-        { text: '工具', correct: true, why: '回答時即時查。' },
-        { text: 'RAG', why: '索引裡會是舊數字。' },
-        { text: '直接放進 system', why: '放進去就過時了。' },
-        { text: '微調模型', why: '不需要也不實際。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 4-3）工具迴圈什麼時候繼續下一輪？', options: [
-        { text: '`stop_reason` 是 `tool_use`', correct: true, why: '其他情況都要結束或處理。' },
-        { text: '`stop_reason` 是 `end_turn`', why: '那是結束。' },
-        { text: '每次都繼續，直到使用者說停', why: '要依 stop_reason 與上限。' },
-        { text: '`stop_reason` 是 `max_tokens`', why: '那要先處理截斷。' },
-      ] },
-    ],
     analogy: {
       text: ['[[workflow]] 像照食譜做菜：步驟是寫好的，廚師只負責把每一步做好。[[agent]] 像請廚師「用冰箱裡的東西做一頓晚餐」：他自己決定做什麼、先煮什麼、味道不對再調。', '照食譜穩定、好預測；自由發揮能處理沒想到的情況，但可能花更多時間和材料，偶爾翻車。'],
       limit: ['真的廚師翻車了你看得到；agent 的錯誤可能藏在第 12 步的某次工具呼叫裡，要有紀錄才查得到。另外 agent 每一步都在燒 token，「多試幾次」的成本比廚師多煮一鍋高很多。'],
@@ -107,13 +93,13 @@ defineLessons({
     ],
     examples: {
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'single', label: '單一呼叫' }, { id: 'workflow', label: 'workflow' }, { id: 'agent', label: 'agent' }], items: [
-          { text: '把每則評論標成正面或負面', answer: 'single', why: '一次輸入一次輸出，不需要多步。' },
-          { text: '每份新合約：抽條款 → 和範本比對 → 產生差異報告', answer: 'workflow', why: '步驟固定，可以事先寫好，每步之間還能檢查。' },
-          { text: '「把這個專案升級到新版框架，讓測試都通過」', answer: 'agent', why: '要讀哪些檔、改什麼、跑幾次測試，無法事先寫死；而且測試能抓到錯誤。' },
-          { text: '客服：先判斷類別，再交給退款或技術流程', answer: 'workflow', why: '這是「路由」：分類之後的流程是固定的（7-3）。' },
-          { text: '「幫我研究三家競爭對手最近半年的動向，寫成報告」', answer: 'agent', why: '要搜什麼、讀幾篇、何時夠了，都要依途中發現決定。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['把每則評論標成正面或負面', '單一呼叫', '一次輸入一次輸出，不需要多步。'],
+          ['每份新合約：抽條款 → 和範本比對 → 產生差異報告', 'workflow', '步驟固定，可以事先寫好，每步之間還能檢查。'],
+          ['「把這個專案升級到新版框架，讓測試都通過」', 'agent', '要讀哪些檔、改什麼、跑幾次測試，無法事先寫死；而且測試能抓到錯誤。'],
+          ['客服：先判斷類別，再交給退款或技術流程', 'workflow', '這是「路由」：分類之後的流程是固定的（7-3）。'],
+          ['「幫我研究三家競爭對手最近半年的動向，寫成報告」', 'agent', '要搜什麼、讀幾篇、何時夠了，都要依途中發現決定。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="四個檢查：任務複雜到難以事先寫步驟嗎；成果值得多花的成本嗎；模型做得到這類任務嗎；錯了能被發現與復原嗎。四個都是才做 agent">
           <rect x="10" y="10" width="265" height="110" class="fill-surface stroke-ink" stroke-width="3"/>
           <text x="26" y="40" font-size="15" font-weight="900">① 複雜度</text>
@@ -129,12 +115,29 @@ defineLessons({
           <text x="301" y="190" font-size="14" class="on-color">錯了抓得到、救得回嗎？</text>
           <text x="301" y="214" font-size="13" class="on-color">（測試、審查、可回復）</text>
         </svg>`, caption: '四個都是「是」才做 agent；任何一個「否」，先退回比較簡單的做法。' },
+        { type: 'heading', id: 'compound', text: '步驟一多，錯誤會疊起來' },
+        { type: 'widget', name: 'knobs', props: { title: '每一步都可能出錯時，整個任務全對的機率', sliders: [
+          { id: 'steps', label: '任務需要幾步', min: 1, max: 40, step: 1, value: 10, unit: '步' },
+          { id: 'p', label: '每一步做對的機率', min: 80, max: 99.9, step: 0.1, value: 97, unit: '%' },
+          { id: 'fix', label: '出錯時能被發現並修正的比例', min: 0, max: 100, step: 5, value: 0, unit: '%' },
+        ], compute: (v) => {
+          const fail = 1 - v.p / 100;
+          const stepOk = 1 - fail * (1 - v.fix / 100);
+          const all = stepOk ** v.steps;
+          return { rows: [
+            { label: '每一步實際的成功率（含修正）', value: `${(stepOk * 100).toFixed(1)}%`, ratio: stepOk },
+            { label: `${v.steps} 步全部做對`, value: `${(all * 100).toFixed(1)}%`, ratio: all },
+          ], note: `預設每步 97%、10 步、沒有修正機制，全對只剩約 73.7%。把「能被發現並修正」拉到 80%（例如每步跑測試），10 步全對回到約 94%。agent 適合錯誤看得見的任務，原因就在這裡。` };
+        } } },
+        { type: 'heading', id: 'deep-agent-cost', text: '深入：agent 為什麼特別適合寫程式，不適合寄信' },
+        '上面的拉桿說明了一件事：agent 的可靠度不只看模型多聰明，更看「每一步出錯時有沒有回饋」。寫程式有編譯器、測試、型別檢查，錯了馬上看得到；寄信、轉帳、刪檔做錯了，下一步才發現時已經來不及。',
+        { type: 'table', head: ['任務', '回饋來源', '適合 agent 嗎'], rows: [
+          ['修 bug、升級套件', '測試、編譯、型別檢查', '✓ 回饋快又客觀'],
+          ['研究、整理資料', '來源可以交叉比對，但需要人判斷', '可以，最後要人審'],
+          ['對外寄信、付款', '做完才知道錯，而且收不回來', '✗ 改成 workflow＋確認閘門（4-4）'],
+        ] },
+        'Anthropic 2025 年分享多 agent 研究系統的經驗：單一 agent 用的 token 約是一般聊天的 4 倍，多 agent 系統約 15 倍。所以 agent 要用在「成果值得這麼多 token」的任務上（四個檢查的第二項）。',
       ],
-      tryit: {
-        q: ['用四個檢查評估「讓 agent 自動回覆所有客訴信並直接寄出」：'],
-        draft: '複雜度：＿＿\n價值：＿＿\n能力：＿＿\n錯誤代價：＿＿\n結論：＿＿',
-        answer: ['複雜度：中等，多數客訴可以分類後套流程。價值：高。能力：撰寫回覆做得到。', '錯誤代價：高，寄出就收不回，錯誤承諾可能造成損失；而且客訴信是不可信的外部內容（8-4）。', '結論：先做 workflow（分類 → 產生草稿 → 人審核後寄出），不要做全自動 agent。'],
-      },
     },
     mistakes: [
       { wrong: '所有 AI 功能都做成 agent，因為「比較聰明」。', why: 'agent 比較貴、比較慢、比較難測試；固定流程的事情用 workflow 更穩。', right: '從單一呼叫開始，不夠才加步驟，真的需要彈性才用 agent。' },
@@ -142,19 +145,7 @@ defineLessons({
       { wrong: '用 agent 處理每次都一樣的步驟。', why: '每次都讓模型重新決定一樣的事，浪費 token 又增加變數。', right: '固定的步驟寫成程式（workflow），只在需要判斷的地方用模型。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'workflow 和 agent 最大的差別是？', options: [
-        { text: '下一步由程式決定，還是由模型決定', correct: true, why: '這是控制權的差別。' },
-        { text: '有沒有用到工具；用了工具的就是 agent', why: '兩者都可以用工具。' },
-        { text: '用的是不是最大的模型', why: '和模型大小無關。' },
-        { text: '有沒有用串流', why: '和串流無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '「每週把銷售報表整理成摘要寄給主管」：步驟每週都一樣。最適合？', options: [
-        { text: 'workflow：讀報表 → 產生摘要 → 檢查 → 寄出', correct: true, why: '步驟固定，寫成程式最穩、最便宜。' },
-        { text: 'agent：讓模型每週自己決定要做哪些事、做幾步', why: '每週都一樣，不需要模型重新規劃。' },
-        { text: '協調者－工人：拆給多個 agent', why: '過度設計。' },
-        { text: '不用 AI，全部人工', why: '摘要正是模型擅長的事。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事想做一個「自動處理所有 IT 報修單」的 agent，可以重設密碼、安裝軟體、刪除帳號。用這一課的四個檢查，提出你的修改建議。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同事想做一個「自動處理所有 IT 報修單」的 agent，可以重設密碼、安裝軟體、刪除帳號。用這一課的四個檢查，提出你的修改建議。'], answer: [
         '複雜度與價值：高，報修種類多，agent 有幫助。能力：大部分做得到。錯誤代價：刪除帳號、安裝軟體影響大而且難復原。',
         '建議：讀取與診斷讓 agent 自動做；重設密碼走身分確認；安裝軟體與刪除帳號需要人工核准，或乾脆不提供這些工具。並記錄每一步，出事時查得到（7-2、8-5）。',
       ] },
@@ -164,7 +155,7 @@ defineLessons({
       '四個檢查：複雜度、價值、能力、錯誤代價；都通過才做 agent。',
       '從最簡單的做法開始，真的需要才往 agent 移。',
     ],
-    sources: ['effective-agents'],
+    sources: ['effective-agents', 'multi-agent-research'],
   },
 
   '7-2': {
@@ -172,20 +163,6 @@ defineLessons({
       '說出 agent 迴圈的本質：就是 4-3 的工具迴圈，加上停止條件',
       '設計步數、token 與時間上限，以及收尾方式',
       '處理迴圈越跑 context 越長的問題',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-1）錯誤代價很高的任務，交給 agent 前最該加什麼？', options: [
-        { text: '人工確認或可回復機制', correct: true, why: '讓錯誤能被抓到、救得回。' },
-        { text: '更高的 effort', why: '不能取代確認。' },
-        { text: '更長的 system prompt', why: 'prompt 不是安全邊界。' },
-        { text: '更多工具', why: '更多工具只會增加風險。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 4-3）工具失敗時該怎麼回傳？', options: [
-        { text: 'tool_result 加 is_error 與說明', correct: true, why: '模型才知道失敗了。' },
-        { text: '不回傳', why: '每個 tool_use 都要有結果。' },
-        { text: '回傳「成功」，避免模型重試浪費 token', why: '會讓模型誤以為完成。' },
-        { text: '結束整段對話', why: '模型與使用者都不知道原因。' },
-      ] },
     ],
     analogy: {
       text: ['agent 迴圈像派一個新人去跑腿辦事：你給他一份工具清單、一筆零用金（token 預算）、一個回報時間。他每做完一件就看結果決定下一件。', '好的交代會說清楚：做到什麼程度算完成、零用金用完就回來報告、遇到要花大錢的事先打電話問你（[[停止條件]]）。'],
@@ -252,12 +229,15 @@ defineLessons({
           ['時間（例如 5 分鐘）', '使用者不能無限等待', '停下，改成背景任務並通知'],
           ['task budget（beta）', '讓模型自己看著預算收尾', '模型會在預算內收斂；仍要搭配上面的硬上限'],
         ] },
+        { type: 'heading', id: 'deep-context-mgmt', text: '深入：迴圈跑得久，靠的是管理 context' },
+        { type: 'table', head: ['做法', '怎麼做', '取捨'], rows: [
+          ['工具結果精簡', '工具只回需要的欄位、前幾筆', '最便宜；需要細節時要多一個工具（4-4）'],
+          ['清掉舊的工具結果', '幾輪之前的大段結果換成一句「已讀過，重點是…」', '模型可能需要回頭看原文；而且改動前綴會讓快取失效'],
+          ['伺服器端壓縮', '由 API 在對話太長時自動摘要', '少寫程式；摘要掉的細節你看不到'],
+          ['把筆記寫到外面', '用 memory 工具把進度寫進檔案，需要時再讀', '跨 session 也記得；要自己管理檔案的權限'],
+        ] },
+        '另一個常見的失敗是「繞圈」：同一個工具用同樣的參數一直呼叫。程式可以記錄最近幾次呼叫，同樣的呼叫出現第三次就停下來回報，比等到輪數上限才停省很多。',
       ],
-      tryit: {
-        q: ['你的 agent 在某些任務上一直重複呼叫同一個搜尋工具，參數只差一點點。寫出兩個你會加的機制：'],
-        draft: '1. ＿＿＿＿\n2. ＿＿＿＿',
-        answer: ['1. 程式偵測重複：同一個工具、相似參數連續出現 3 次，就在 tool_result 裡提示「已經搜過類似的關鍵字，結果相同，請換方向或總結」，或直接停止。', '2. 硬上限：輪數與 token 上限，到了就停下並把進度交給人；同時檢查搜尋工具的描述與回傳，是不是沒有給模型足夠的資訊判斷「找不到」。'],
-      },
     },
     mistakes: [
       { wrong: '只在 prompt 寫「請在 10 步內完成」，程式沒有上限。', why: '模型不一定遵守；出狀況時迴圈和帳單都沒有上限。', right: '輪數、token、時間上限由程式強制；prompt 只是補充。' },
@@ -265,19 +245,7 @@ defineLessons({
       { wrong: '到了上限就丟例外，什麼都不留。', why: '使用者不知道做到哪，之前花的 token 全部浪費。', right: '回傳目前進度與紀錄，讓人可以接手或從中斷處繼續。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'agent 迴圈的上限應該由誰強制？', options: [
-        { text: '你的程式', correct: true, why: 'prompt 只是建議，程式才能保證。' },
-        { text: '模型自己', why: '模型可能不遵守。' },
-        { text: 'system prompt', why: 'prompt 不是強制機制。' },
-        { text: '使用者手動按停止', why: '使用者可能不在場。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'agent 跑到第 15 輪時，每輪輸入已經超過 30 萬 token，回應變得很慢。最對症的改法是？', options: [
-        { text: '讓工具結果精簡，並摘要或清除舊的工具結果', correct: true, why: '問題是歷史膨脹。' },
-        { text: '把 max_tokens 調大', why: '那是輸出上限，和輸入膨脹無關。' },
-        { text: '換一個 context window 更大的模型', why: '只是延後問題，成本照樣上升。' },
-        { text: '把 effort 調到 max', why: '會更慢更貴。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要上線一個「幫使用者整理雲端硬碟」的 agent。寫出它的三種停止條件，並說明每一種停下時要給使用者看什麼。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要上線一個「幫使用者整理雲端硬碟」的 agent。寫出它的三種停止條件，並說明每一種停下時要給使用者看什麼。'], answer: [
         '完成：列出做了哪些搬移與重新命名，並提供一鍵復原。',
         '到達上限（例如 50 個檔案或 5 分鐘）：顯示已處理與未處理的清單，問要不要繼續。',
         '需要人決定：遇到刪除、或要移動別人共享給你的檔案時，停下來列出這些項目請使用者確認（4-4）。',
@@ -297,20 +265,6 @@ defineLessons({
       '依情境選擇模式',
       '知道多數問題用前三種就夠了',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-2）agent 迴圈的三種停止條件是？', options: [
-        { text: '完成、到達上限、需要人決定', correct: true, why: '三種都要有。' },
-        { text: '完成、發生錯誤、使用者關掉視窗離開', why: '少了上限與確認。' },
-        { text: '只有模型說完成', why: '會遇到停不下來的時候。' },
-        { text: '每 10 輪停一次', why: '那是上限的一種，不完整。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 6-3）兩段式檢索的第二段通常用什麼？', options: [
-        { text: 'reranker', correct: true, why: '只重排前幾十筆。' },
-        { text: 'BM25', why: '那是第一段的一部分。' },
-        { text: '更大的 embedding', why: '不是精排。' },
-        { text: 'temperature', why: '已移除。' },
-      ] },
-    ],
     analogy: {
       text: ['五種模式像廚房的五種分工：**鏈**是流水線（洗 → 切 → 炒）；**[[路由]]**是點菜時分給熱炒區或甜點區；**平行**是三個爐子同時開；**[[協調者－工人]]**是主廚看訂單臨時分工；**[[評估者－優化者]]**是試吃員嚐了說「太鹹」，廚師改到合格。'],
       limit: ['廚房的分工是人排的、很穩定；這些模式的每一格都是一次模型呼叫，會有成本與出錯的機率。分工越細，總呼叫次數越多，不是越複雜越好。'],
@@ -326,13 +280,13 @@ defineLessons({
     ],
     examples: {
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'chain', label: '鏈' }, { id: 'route', label: '路由' }, { id: 'parallel', label: '平行' }, { id: 'orch', label: '協調者－工人' }, { id: 'eval', label: '評估者－優化者' }], items: [
-          { text: '客服信先分成退款、物流、帳號，各走不同的回覆流程', answer: 'route', why: '先分類，再交給專門流程。' },
-          { text: '產生行銷文案 → 檢查有沒有違反廣告法 → 修改語氣', answer: 'chain', why: '固定的三步，前一步的輸出是下一步的輸入。' },
-          { text: '同時檢查一份程式碼的安全、效能、可讀性，再合併報告', answer: 'parallel', why: '三個面向互不相依，可以同時做。' },
-          { text: '「研究這個市場」：主 agent 決定要研究哪些子題，分派給子 agent 各自搜尋', answer: 'orch', why: '子任務是什麼要看情況決定，所以由協調者動態拆。' },
-          { text: '翻譯一篇文章，另一個模型依術語表挑錯，改到沒有錯為止', answer: 'eval', why: '產出與評分來回，直到通過標準。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['客服信先分成退款、物流、帳號，各走不同的回覆流程', '路由', '先分類，再交給專門流程。'],
+          ['產生行銷文案 → 檢查有沒有違反廣告法 → 修改語氣', '鏈', '固定的三步，前一步的輸出是下一步的輸入。'],
+          ['同時檢查一份程式碼的安全、效能、可讀性，再合併報告', '平行', '三個面向互不相依，可以同時做。'],
+          ['「研究這個市場」：主 agent 決定要研究哪些子題，分派給子 agent 各自搜尋', '協調者－工人', '子任務是什麼要看情況決定，所以由協調者動態拆。'],
+          ['翻譯一篇文章，另一個模型依術語表挑錯，改到沒有錯為止', '評估者－優化者', '產出與評分來回，直到通過標準。']
+        ] },
         { type: 'table', head: ['模式', '適合', '小心'], rows: [
           ['鏈', '步驟固定、每步可以檢查', '一步錯，後面全錯；每步都要驗證'],
           ['路由', '輸入種類差很多', '分類錯了會走錯流程；分類本身要評估'],
@@ -355,12 +309,31 @@ defineLessons({
           <rect x="190" y="134" width="360" height="52" style="fill:var(--m7)" class="stroke-ink" stroke-width="3"/>
           <text x="206" y="166" font-size="14" class="on-color">10 則複雜問題 → 大模型 agent</text>
         </svg>`, caption: '比例是示意；重點是只讓真正需要的少數走最貴的路。' },
+        { type: 'widget', name: 'knobs', props: { title: '路由省多少，分錯又會怎樣（每則成本是假設，換成你量到的數字）', sliders: [
+          { id: 'msgs', label: '每天訊息', min: 1000, max: 100000, step: 1000, value: 10000, unit: '則' },
+          { id: 'easy', label: '簡單、可以走便宜路徑的比例', min: 0, max: 100, step: 5, value: 90, unit: '%' },
+          { id: 'agent', label: '大模型 agent 每則成本', min: 0.01, max: 1, step: 0.01, value: 0.2, unit: '美元' },
+          { id: 'cheap', label: '便宜路徑每則成本', min: 0.001, max: 0.05, step: 0.001, value: 0.005, unit: '美元' },
+          { id: 'err', label: '分類把難題分成簡單的比例', min: 0, max: 30, step: 1, value: 5, unit: '%' },
+        ], compute: (v) => {
+          const router = v.msgs * 0.0005;
+          const allAgent = v.msgs * v.agent;
+          const routed = router + v.msgs * (v.easy / 100) * v.cheap + v.msgs * (1 - v.easy / 100) * v.agent;
+          const missed = Math.round(v.msgs * (1 - v.easy / 100) * (v.err / 100));
+          return { rows: [
+            { label: '全部走 agent：每天', value: `$${allAgent.toFixed(0)}`, ratio: allAgent / 100000 },
+            { label: '先路由（分類每則 $0.0005）：每天', value: `$${routed.toFixed(0)}`, ratio: routed / 100000 },
+            { label: '難題被分到簡單路徑：每天', value: `${missed} 則`, ratio: missed / 30000 },
+          ], note: `預設 1 萬則、九成簡單：全走 agent 每天約 $2000，先路由約 $250。代價是每天約 50 則難題被送去簡單路徑，答得不好；所以分類要評估（8-1），簡單路徑也要能「轉回」難題流程。` };
+        } } },
+        { type: 'heading', id: 'deep-multi-agent', text: '深入：分工越細，越要付協調的成本' },
+        { type: 'table', head: ['多 agent 的代價', '為什麼', '怎麼減輕'], rows: [
+          ['token 倍增', '每個子 agent 都要讀自己的指示與資料；Anthropic 的經驗是約 15 倍於一般聊天', '只在子任務真的互相獨立、可以平行時才拆'],
+          ['交接時資訊遺失', '協調者寫給子 agent 的任務說明太短，子 agent 只能猜', '交接寫清楚目標、範圍、輸出格式、不要做什麼'],
+          ['除錯困難', '錯誤可能在協調、交接或某個子 agent', '每個子 agent 的輸入輸出都記錄下來'],
+        ] },
+        '什麼時候不要拆？子任務需要頻繁共享中間結果（例如一起改同一份程式碼），拆開反而要一直同步；這時一個 agent 依序做，通常比較穩。',
       ],
-      tryit: {
-        q: ['你要做「把 50 頁的技術規格書翻成英文，術語要和公司術語表一致」。選一個或組合幾個模式，畫出你的流程：'],
-        draft: '＿＿＿＿',
-        answer: ['例如：先**平行**：把 50 頁依章節切開，同時翻譯（章節互不相依）。再**評估者－優化者**：另一個呼叫依術語表檢查每章，挑出不一致的詞，翻譯者修改，最多 2 輪。最後用程式做**鏈**的最後一步：合併並檢查格式。', '整個流程的步驟是固定的，所以仍然是 workflow，不需要 agent。'],
-      },
     },
     mistakes: [
       { wrong: '一開始就用協調者－工人，拆出好幾個子 agent。', why: '呼叫次數與成本倍增，出錯時很難知道是哪一層的問題。', right: '先試鏈、路由、平行；子任務真的無法事先預測時才用協調者。' },
@@ -368,19 +341,7 @@ defineLessons({
       { wrong: '路由的分類從不評估。', why: '分類錯了，後面的流程再好也沒用。', right: '用一批標好的訊息量分類正確率（8-1）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一種模式最適合「先分類，再交給專門流程」？', options: [
-        { text: '路由', correct: true, why: '這就是路由的定義。' },
-        { text: '鏈', why: '鏈是固定順序。' },
-        { text: '平行', why: '平行是同時做。' },
-        { text: '評估者－優化者', why: '那是產出與評分來回。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你要檢查一份合約的 12 個條款是否符合公司政策，條款之間互不相依。最適合？', options: [
-        { text: '平行：12 個條款同時檢查，再合併', correct: true, why: '互不相依，同時做最快。' },
-        { text: '鏈：一個條款接一個條款', why: '可行但慢，沒必要。' },
-        { text: '協調者－工人：讓 agent 決定怎麼拆', why: '拆法很明確，不需要模型決定。' },
-        { text: '單一呼叫一次檢查全部', why: '可行，但 12 個條款一起看容易漏；平行更穩。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的團隊想做一個「每天自動寫產業新聞摘要」的系統。說說你會用哪些模式、哪些步驟寫成固定流程、哪裡才需要模型自己決定。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的團隊想做一個「每天自動寫產業新聞摘要」的系統。說說你會用哪些模式、哪些步驟寫成固定流程、哪裡才需要模型自己決定。'], answer: [
         '固定流程：抓新聞來源 → 每篇做摘要（**平行**）→ 依主題分組 → 寫成日報（**鏈**）。',
         '可能需要模型決定的只有「哪幾篇值得放進日報」：可以用一次呼叫依標準打分排序，而不必做成 agent。',
         '最後加**評估者**：依格式與事實檢查清單檢查日報，最多一輪修改。',
@@ -391,7 +352,7 @@ defineLessons({
       '多數問題用前三種就夠；越後面越貴、越難除錯。',
       '每種模式都要有驗證與上限：分類要評估、評估迴圈要限輪數。',
     ],
-    sources: ['effective-agents', 'claude-pricing'],
+    sources: ['effective-agents', 'multi-agent-research', 'claude-pricing'],
   },
 
   '7-4': {
@@ -399,20 +360,6 @@ defineLessons({
       '說出 MCP 解決的問題：N 個應用 × M 個工具的重複整合',
       '分清 host、client、server 三個角色',
       '分辨 server 的三種元件：tools、resources、prompts，以及各由誰控制',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-3）步驟固定、前一步輸出是下一步輸入的模式是？', options: [
-        { text: '鏈', correct: true, why: 'prompt chaining。' },
-        { text: '路由', why: '路由是先分類。' },
-        { text: '平行', why: '平行是同時做。' },
-        { text: '協調者－工人', why: '那是動態拆任務。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 4-1）一般工具（不是伺服器端工具）由誰執行？', options: [
-        { text: '你的程式', correct: true, why: '模型只提出呼叫。' },
-        { text: '模型', why: '模型不執行。' },
-        { text: 'Anthropic', why: '那是伺服器端工具。' },
-        { text: '使用者', why: '除非你這樣設計。' },
-      ] },
     ],
     analogy: {
       text: ['[[MCP]] 像 USB-C：以前每台電腦和每種裝置都要專用的線（每個 AI 應用都要自己寫一遍 GitHub 整合、資料庫整合），現在大家都用同一種接頭。', '裝置這一側是 [[MCP server]]（GitHub、資料庫、行事曆），電腦這一側是 [[MCP host]]（Claude Code、你的應用）。插上就能用。'],
@@ -457,12 +404,12 @@ defineLessons({
           ['Resources', '應用程式', '附加給模型的資料', '檔案內容、git 歷史'],
           ['Prompts', '使用者', '預先寫好的提示範本', '斜線指令、選單裡的範本'],
         ], caption: '依 MCP 2026-07-28 規格的「控制權」分類。' },
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'tools', label: 'Tools' }, { id: 'resources', label: 'Resources' }, { id: 'prompts', label: 'Prompts' }], items: [
-          { text: '模型決定要不要呼叫「建立日曆事件」', answer: 'tools', why: '由模型決定何時用的動作。' },
-          { text: '編輯器自動把目前開啟的檔案內容附給模型', answer: 'resources', why: '應用程式決定附上哪些資料。' },
-          { text: '使用者在選單裡選「產生週報」範本', answer: 'prompts', why: '使用者主動選用的範本。' },
-          { text: '模型決定查詢某張資料表', answer: 'tools', why: '模型控制的動作。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['模型決定要不要呼叫「建立日曆事件」', 'Tools', '由模型決定何時用的動作。'],
+          ['編輯器自動把目前開啟的檔案內容附給模型', 'Resources', '應用程式決定附上哪些資料。'],
+          ['使用者在選單裡選「產生週報」範本', 'Prompts', '使用者主動選用的範本。'],
+          ['模型決定查詢某張資料表', 'Tools', '模型控制的動作。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="MCP 三個角色：使用者面對 host，例如 Claude Code；host 裡有多個 client，每個 client 連到一個 server；server 背後才是真正的服務，例如 GitHub 或資料庫">
           <rect x="10" y="10" width="300" height="210" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
           <text x="160" y="40" text-anchor="middle" font-size="15" font-weight="900" class="on-color">MCP host（AI 應用）</text>
@@ -478,12 +425,21 @@ defineLessons({
           <text x="450" y="176" text-anchor="middle" font-size="14" class="on-color">資料庫 MCP server</text>
         </svg>`, caption: '一個 client 連一個 server；host 可以同時連很多個。' },
         { type: 'callout', variant: 'tip', title: '和模組 4 的關係', body: ['MCP 的 tools 最後一樣變成模型看到的工具定義（name、description、schema），一樣經過 tool_use → 執行 → tool_result。MCP 改變的是「工具從哪裡來、誰來執行」，不是工具呼叫本身。'] },
+        { type: 'widget', name: 'ragtrace', props: { chip: 'MCP', title: '一次 MCP 工具呼叫，從 server 到模型再回來', scenarios: [{ label: '查公司知識庫', stages: [
+          { title: '問 server 有哪些工具', body: ['host 裡的 client 對知識庫 server 送 `tools/list`，拿回工具清單：名稱 `search_kb`、描述、參數 schema。'] },
+          { title: '轉成模型看得懂的工具', body: ['host 把清單轉成 Messages API 的 `tools` 陣列（4-2）。對模型來說，它和你自己寫的工具沒有差別。'] },
+          { title: '模型提出呼叫', body: [{ type: 'code', lang: 'json', code: '{ "type": "tool_use", "name": "search_kb", "input": { "query": "特休怎麼計算" } }' }] },
+          { title: 'client 轉成 MCP 請求', body: ['host 看到 `tool_use`，由對應的 client 送出 JSON-RPC 的 `tools/call`（7-5 有完整格式）。真正去查資料的是 server。'] },
+          { title: '結果送回模型', body: ['server 回傳內容，host 把它包成 `tool_result` 放進下一則 user 訊息。這段內容來自外部，要當成不可信資料（8-4）。'] },
+        ] }] } },
+        { type: 'heading', id: 'deep-mcp-when', text: '深入：什麼時候不需要 MCP' },
+        { type: 'table', head: ['情況', '建議', '原因'], rows: [
+          ['只有你自己的一個應用要用這個工具', '直接寫成一般工具（模組 4）', '多一層協定只是多一層維護'],
+          ['工具要給很多 AI 應用（Claude Code、桌面版、別人的產品）用', '做成 MCP server', '做一次，到處能用'],
+          ['想用別人做好的整合（GitHub、行事曆）', '用現成的 MCP server', '不用自己重寫；但先過 7-5 的安全檢查'],
+        ] },
+        'MCP server 可以隨時改變自己的工具清單。工具描述變了，模型的行為就可能跟著變，而你的程式一行都沒改；所以重要的 server 要記錄它每次回傳的工具清單，必要時固定版本（7-5）。',
       ],
-      tryit: {
-        q: ['你們公司有一套內部知識庫，三個團隊各自做了 AI 助手（客服、業務、工程），都想查知識庫。用 MCP 的觀點，你會怎麼建議？'],
-        draft: '＿＿＿＿',
-        answer: ['把知識庫做成一個 MCP server：提供 `search_kb` 這類 tool，也可以把常用文件做成 resources。', '三個團隊的助手各自實作（或使用現成的）MCP client 連上去，就不用各寫一套知識庫整合。權限檢查放在 server 端，依呼叫者身分過濾（5-3）。'],
-      },
     },
     mistakes: [
       { wrong: '以為 MCP 是一個新的模型或 AI 服務。', why: 'MCP 是協定，像 HTTP；它不產生文字，只定義應用和工具怎麼溝通。', right: '把它理解成「工具的標準接頭」。' },
@@ -491,19 +447,7 @@ defineLessons({
       { wrong: '把所有東西都做成 tools。', why: '有些只是要附給模型讀的資料（resources），有些是給使用者選的範本（prompts）。', right: '依「誰控制」選元件：模型決定用→tools；應用附上→resources；使用者選→prompts。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'MCP 的 tools 由誰決定何時使用？', options: [
-        { text: '模型', correct: true, why: 'tools 是模型控制的。' },
-        { text: '使用者', why: '使用者控制的是 prompts。' },
-        { text: '應用程式', why: '應用程式控制的是 resources。' },
-        { text: 'MCP server', why: 'server 提供能力，不決定何時用。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你有 4 個 AI 應用要接 5 個內部系統。不用 MCP 大約要寫幾套整合？用 MCP 呢？', options: [
-        { text: '約 20 套；用 MCP 約 9 個實作', correct: true, why: '4 × 5 ＝ 20；4 個 client ＋ 5 個 server ＝ 9。' },
-        { text: '約 9 套；用 MCP 反而要約 20 個實作', why: '剛好相反。' },
-        { text: '約 5 套；用 MCP 只要 1 個', why: '每個應用和每個系統都需要實作一次。' },
-        { text: '一樣多，MCP 只是換個名字', why: 'MCP 把乘法變加法。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要替自己的 SaaS 產品「提供 AI 整合」。比較兩種做法：替每個 AI 應用分別寫外掛，或做一個 MCP server。說出 MCP 的好處與你要額外注意的事。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要替自己的 SaaS 產品「提供 AI 整合」。比較兩種做法：替每個 AI 應用分別寫外掛，或做一個 MCP server。說出 MCP 的好處與你要額外注意的事。'], answer: [
         '好處：做一次，所有支援 MCP 的應用都能用；之後新出的 AI 應用也不用再寫一次。',
         '要注意：server 要做好身分驗證與權限（每個請求檢查「這個使用者能不能動這筆資料」）；tools 的描述要寫好（4-2）；高風險動作在 server 或 host 端要有確認機制。',
       ] },
@@ -521,20 +465,6 @@ defineLessons({
       '分清 MCP 的兩種標準傳輸：stdio 與 Streamable HTTP',
       '說出 2026-07-28 規格最大的改變：無狀態、拿掉初始化握手',
       '知道用 MCP 時的安全原則，以及 Claude API 的 MCP connector',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-4）resources 由誰控制？', options: [
-        { text: '應用程式', correct: true, why: '應用決定附上哪些資料。' },
-        { text: '模型', why: '模型控制 tools。' },
-        { text: '使用者', why: '使用者控制 prompts。' },
-        { text: '沒有人控制', why: '每種元件都有控制者。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-2）SSE 的 MIME type 是？', options: [
-        { text: '`text/event-stream`', correct: true, why: 'MCP 的 Streamable HTTP 也用到它。' },
-        { text: '`application/json`，因為 SSE 內容是 JSON', why: '那是一般 JSON。' },
-        { text: '`text/plain`', why: '那是純文字。' },
-        { text: '`application/sse`', why: '沒有這個 MIME type。' },
-      ] },
     ],
     analogy: {
       text: ['[[stdio]] 像在同一張桌上傳紙條：host 自己把 server 叫來坐在旁邊（啟動子行程），一行一張紙條（每行一個 JSON 訊息）。[[Streamable HTTP]] 像打客服專線：server 在遠端，每件事打一通電話（每則訊息一個 POST），簡單的當場回答（JSON），長的就在這通電話裡慢慢講（SSE 串流）。', '2026-07-28 版規格把「電話要先報身分、建立會話」那一步拿掉了：每通電話自己帶齊資訊，任何一位接線生都能接。'],
@@ -568,17 +498,17 @@ defineLessons({
     define: [
       { term: 'JSON-RPC', en: 'JSON-RPC', def: 'MCP 訊息的格式：用 JSON 寫出方法名稱、參數、結果。MCP 規定必須是 UTF-8。', example: '`tools/call` 呼叫一個工具。' },
       { term: '無狀態', en: 'stateless (MCP 2026-07-28)', def: '新版規格拿掉 `initialize` 握手與 `Mcp-Session-Id`；每個請求在 `_meta` 自己帶協定版本與用戶端能力，任何一台 server 都能回應。', example: 'server 可以放在負載平衡後面任意擴充。' },
-      { term: 'MCP connector', en: 'MCP connector', def: 'Claude API 的 beta 功能：在 Messages API 請求裡直接連遠端 MCP server，不用自己寫 MCP client。', example: '`mcp_servers` ＋ `tools: [{ type: "mcp_toolset" }]`，beta `mcp-client-2025-11-20`。' },
+      { term: 'MCP connector', en: 'MCP connector', def: 'Claude API 的 beta 功能：在 Messages API 請求裡直接連遠端 MCP server，不用自己寫 MCP client。只能連公開的 HTTP server，不能連本機 stdio。', example: '`mcp_servers` ＋ `tools: [{ type: "mcp_toolset" }]`，beta `mcp-client-2025-11-20` 或較新的 `mcp-client-2026-09-15`。' },
     ],
     examples: {
       blocks: [
         { type: 'code', lang: 'json', title: '一則 MCP 工具呼叫（JSON-RPC，示意）', code: '{\n  "jsonrpc": "2.0",\n  "id": 7,\n  "method": "tools/call",\n  "params": {\n    "name": "search_kb",\n    "arguments": { "query": "特休怎麼計算" },\n    "_meta": { "...": "每個請求帶協定版本與用戶端能力（2026-07-28 起）" }\n  }\n}' },
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'stdio', label: 'stdio' }, { id: 'http', label: 'Streamable HTTP' }], items: [
-          { text: '讀寫你自己電腦上的檔案的 MCP server', answer: 'stdio', why: '本機工具，host 直接啟動子行程最簡單。' },
-          { text: '公司架在雲端、全員共用的知識庫 server', answer: 'http', why: '遠端、多人使用，用 HTTP 並做身分驗證。' },
-          { text: 'SaaS 廠商提供給所有客戶的官方 server', answer: 'http', why: '遠端服務，透過網路連線。' },
-          { text: '開發時在本機跑的資料庫查詢工具', answer: 'stdio', why: '本機開發用途。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['讀寫你自己電腦上的檔案的 MCP server', 'stdio', '本機工具，host 直接啟動子行程最簡單。'],
+          ['公司架在雲端、全員共用的知識庫 server', 'Streamable HTTP', '遠端、多人使用，用 HTTP 並做身分驗證。'],
+          ['SaaS 廠商提供給所有客戶的官方 server', 'Streamable HTTP', '遠端服務，透過網路連線。'],
+          ['開發時在本機跑的資料庫查詢工具', 'stdio', '本機開發用途。']
+        ] },
         { type: 'table', head: ['', '舊規格（你會在舊教學看到）', '2026-07-28'], rows: [
           ['連線開始', '先送 `initialize` 握手、協商能力', '拿掉握手；每個請求自己帶版本與能力'],
           ['會話', '`Mcp-Session-Id` 標頭綁住一台 server', '拿掉；任何 server 實例都能回應'],
@@ -594,37 +524,32 @@ defineLessons({
           <text x="26" y="150" font-size="14" class="on-color">4. 它回傳的內容當成不可信資料（8-4）</text>
           <text x="26" y="176" font-size="14" class="on-color">5. 寄信、刪除、付款等工具要人確認（4-4）</text>
         </svg>`, caption: 'MCP 讓接工具變容易，也讓「接錯工具」變容易。' },
+        { type: 'widget', name: 'ragtrace', props: { chip: '規格對照', title: '同一個工具呼叫，舊規格與 2026-07-28 各要幾步', scenarios: [
+          { label: '舊規格（2025-11-25 以前）', stages: [
+            { title: '握手', body: ['client 先送 `initialize`，交換雙方支援的版本與能力，再送一則 `initialized` 通知。'] },
+            { title: '綁定會話', body: ['Streamable HTTP 的 server 回一個 `Mcp-Session-Id`，之後每個請求都要帶它。'] },
+            { title: '呼叫工具', body: ['送 `tools/call`。負載平衡要把同一個 session 的請求一直送到同一台 server，否則那台不認得這個 session。'] },
+          ] },
+          { label: '2026-07-28', stages: [
+            { title: '直接呼叫', body: ['送 `tools/call`，在 `_meta` 的 `io.modelcontextprotocol/protocolVersion` 寫明協定版本；HTTP 上同時帶 `MCP-Protocol-Version` 標頭。'] },
+            { title: '任何一台都能回', body: ['沒有 session，server 不必記得你；負載平衡可以把請求送到任何一台。'] },
+            { title: '版本不合時', body: ['server 不支援這個版本，就回 `UnsupportedProtocolVersionError` 並列出它支援的版本；client 換版本重送。想先問清楚，可以呼叫 `server/discover`。'] },
+          ] },
+        ] } },
         { type: 'code', lang: 'typescript', title: 'Claude API 的 MCP connector（beta）', code: 'const reply = await client.beta.messages.create({\n  model: "claude-opus-5-5",\n  max_tokens: 4096,\n  betas: ["mcp-client-2025-11-20"],\n  // 兩邊都要：mcp_servers 宣告連線，tools 裡放對應的 mcp_toolset\n  mcp_servers: [{ type: "url", url: "https://kb.example.com/mcp", name: "kb" }],\n  tools: [{ type: "mcp_toolset", mcp_server_name: "kb" }],\n  messages: [{ role: "user", content: "特休怎麼計算？" }],\n});' },
+        { type: 'heading', id: 'deep-mcp-connector', text: '深入：MCP connector 的限制，與固定工具清單' },
+        { type: 'table', head: ['項目', '現況（2026-10 查證）', '影響'], rows: [
+          ['能連哪種 server', '公開的 HTTP server（Streamable HTTP 或 SSE）', '本機 stdio server 不能直接連；公司內網的要另外開放'],
+          ['驗證', '`mcp_servers` 可帶 `authorization_token`（OAuth access token）', 'OAuth 流程要你自己跑完，拿到 token 再放進請求'],
+          ['beta 版本', '`mcp-client-2025-11-20`；較新的 `mcp-client-2026-09-15` 可以固定工具清單', '舊的 `mcp-client-2025-04-04` 已棄用'],
+        ] },
+        '`mcp-client-2026-09-15` 會在回應裡記錄 server 這次回傳的工具清單（`mcp_tool_listing` 區塊）；把整則 assistant 訊息原樣放回歷史，之後的請求就沿用這份清單。server 中途改了工具，也不會在對話進行到一半時改變模型看到的東西。',
       ],
-      tryit: {
-        q: ['你在舊教學裡看到「MCP 連線要先送 initialize，之後每個請求帶 Mcp-Session-Id」。用 2026-07-28 規格，改寫這段描述：'],
-        draft: '＿＿＿＿',
-        answer: ['「2026-07-28 版拿掉了 initialize 握手和 Mcp-Session-Id。每個請求在 `_meta` 裡自己帶協定版本與用戶端能力，需要時可以用 `server/discover` 查 server 的能力；任何一台 server 實例都能處理任何請求。」', '舊版 server 仍然存在，新的 client 與 server 會偵測對方版本並退回相容做法。'],
-      },
     },
     mistakes: [
       { wrong: '照舊教學實作 session 管理，把使用者黏在同一台 server。', why: '2026-07-28 規格已經是無狀態，session 黏著會讓擴充變難。', right: '依新規格實作：每個請求自帶資訊；需要相容舊版時再處理退回。' },
       { wrong: '遠端 MCP server 不做身分驗證，因為「網址沒人知道」。', why: '網址會外流；任何人都能呼叫你的工具。', right: '每個請求驗證身分，並檢查這個身分能不能做這件事。' },
       { wrong: '只寫 `mcp_servers`，沒加 `mcp_toolset`。', why: 'Claude API 的 MCP connector 兩邊都要，少一邊會被拒絕。', right: '`mcp_servers` 宣告連線，`tools` 放同名的 `mcp_toolset`，並加 beta header。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'MCP 2026-07-28 規格拿掉了什麼？', options: [
-        { text: '`initialize` 握手與 `Mcp-Session-Id`', correct: true, why: '協定變成無狀態。' },
-        { text: 'JSON-RPC 訊息格式', why: '仍然用 JSON-RPC。' },
-        { text: 'stdio 傳輸', why: 'stdio 仍是標準傳輸。' },
-        { text: 'tools、resources、prompts', why: '三種元件仍在。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你要讓全公司 500 人的 AI 助手都能查內部知識庫。MCP server 該用哪種傳輸？', options: [
-        { text: 'Streamable HTTP，並做身分驗證', correct: true, why: '遠端、多人使用。' },
-        { text: 'stdio，在每個人的電腦上各跑一份 server', why: '每台都要部署與更新，而且資料庫連線散落各處。' },
-        { text: '不用 MCP，直接把知識庫塞進 prompt', why: '資料量大、有權限差異，不適合（6-5）。' },
-        { text: '用 EventSource 直接連', why: 'EventSource 只能 GET，不是 MCP 的傳輸方式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事在網路上找到一個「自動幫你回 email」的 MCP server，想裝到公司的 AI 助手上。用這一課的檢查清單，列出你要問的三個問題。'], answer: [
-        '1. 誰做的？原始碼看得到嗎？有在維護嗎？',
-        '2. 它要哪些權限？能讀全部信件、能寄信嗎？能不能只給它讀取，寄信要人確認？',
-        '3. 它會把信件內容送到哪裡？信件是不可信的外部內容，裡面的指示會不會被當成命令（8-4）？',
-      ] },
     ],
     keypoints: [
       'stdio：本機子行程、一行一個 JSON；Streamable HTTP：遠端、每則訊息一個 POST，回 JSON 或 SSE。',

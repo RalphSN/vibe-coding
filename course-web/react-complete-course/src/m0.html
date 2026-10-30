@@ -12,6 +12,7 @@ defineTerms({
   'JSX': { en: 'JSX', def: '在 JavaScript 裡寫類似 HTML 的語法，編譯後變成 React 元素（一般物件）。', example: '`<h1 className="title">{name}</h1>`' },
   'Vite': { en: 'Vite', def: '前端建置工具：開發時啟動很快、存檔立刻更新畫面，也負責打包正式版。', example: '`npm create vite@latest`' },
   'Fragment': { en: 'Fragment', def: '`<>…</>`：把多個元素包成一組，又不在 DOM 多加一層。', example: '`<><h1 /><p /></>`' },
+  '協調': { en: 'reconciliation', def: 'React 比對新舊兩棵元素樹、找出最少 DOM 變更的過程。', example: '型別不同就整棵換掉；清單靠 key 對應。' },
   '屬性': { en: 'JSX attribute', def: '寫在 JSX 標籤上的值；HTML 的 class 要寫 className、for 要寫 htmlFor。', example: '`<label htmlFor="email">`' },
 });
 
@@ -36,11 +37,12 @@ defineLessons({
       caption: '你只負責「state → JSX」這一步；更新 DOM 交給 React。',
       blocks: [
         '[[React]] 採用[[宣告式]]：[[元件]]是一個函式，輸入資料、回傳 [[JSX]]。資料改變時 React 重新[[渲染]]，比對前後差異，只更新需要改的 [[DOM]]。和[[命令式]]直接操作 DOM 相比，畫面永遠和資料一致。',
-        { type: 'table', caption: '2026-10-16 查證的版本', head: ['項目', '狀態'], rows: [
+        { type: 'table', caption: '2026-10-30 查證的版本', head: ['項目', '狀態'], rows: [
+          ['Vite', '8（2026-03-12），改用 Rolldown 打包'],
           ['React', '19.3（2026-09-09），ViewTransition 與 Fragment Refs 轉為穩定'],
           ['React 19.2', '2025-10-01：Activity、useEffectEvent'],
           ['React Compiler', '1.0（2025-10-07），自動記憶化'],
-          ['React Foundation', '2026-02 起由 Linux Foundation 託管'],
+          ['React Foundation', '2026-02-24 正式成立，由 Linux Foundation 託管'],
         ] },
       ],
     },
@@ -63,45 +65,28 @@ defineLessons({
         why: ['畫面越複雜，宣告式的好處越明顯'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'decl', label: '宣告式（描述結果）' }, { id: 'imp', label: '命令式（下指令）' }],
-          items: [
-            { text: '`{isLoggedIn ? <Avatar /> : <LoginButton />}`', answer: 'decl', why: '描述兩種狀態下的畫面。' },
-            { text: '`el.classList.add("active")`', answer: 'imp', why: '直接修改 DOM。' },
-            { text: '`<li className={done ? "done" : ""}>`', answer: 'decl', why: 'class 由狀態決定。' },
-            { text: '`list.appendChild(document.createElement("li"))`', answer: 'imp', why: '一步步建立 DOM。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`{isLoggedIn ? <Avatar /> : <LoginButton />}`', '宣告式（描述結果）', '描述兩種狀態下的畫面。'],
+          ['`el.classList.add("active")`', '命令式（下指令）', '直接修改 DOM。'],
+          ['`<li className={done ? "done" : ""}>`', '宣告式（描述結果）', 'class 由狀態決定。'],
+          ['`list.appendChild(document.createElement("li"))`', '命令式（下指令）', '一步步建立 DOM。']
+        ] },
         { type: 'svg', svg: Fig.vs('命令式與宣告式：命令式要記得每個要改的地方，容易不一致；宣告式只改資料，畫面由資料推導，永遠一致', { title: '命令式', lines: ['改資料', '再手動改每處畫面', '容易漏'], tone: 5 }, { title: '宣告式（React）', lines: ['只改資料', '畫面自動推導'], tone: 4 }), caption: '「單一事實來源」：資料是唯一的真相，畫面只是它的投影。' },
+        { type: 'widget', name: 'csrun', props: { title: 'JSX 編譯後是什麼', code: 'const el = <h1 className="title">你好</h1>;\nconsole.log(el.type);\nconsole.log(el.props);', output: 'h1\n{ className: "title", children: "你好" }\n（JSX 只是描述畫面的一般物件；React 拿這些物件和上一次比對，再決定要改哪些 DOM）' } },
+        { type: 'heading', id: 'deep-render-commit', text: '深入：渲染、提交與協調' },
+        '[[渲染]]分兩個階段：render 階段呼叫元件函式，算出新的元素樹；commit 階段才把差異寫進 [[DOM]]。render 階段可能被中斷、重做或丟棄（並行渲染），所以元件函式必須是純的：同樣的 props 與 state，回傳同樣的 JSX。',
+        '比對新舊兩棵樹的過程叫[[協調]]。一般的樹比對演算法是 O(n³)，React 用兩個假設把成本降到 O(n)：型別不同就整棵子樹換掉；同一層的清單用 key 對應（1-2）。',
+        { type: 'table', caption: '宣告式什麼時候不適用', head: ['情境', '為什麼宣告式不划算', '常見做法'], rows: [
+          ['Canvas 繪圖、每秒 60 格的遊戲', '每格都重建元件樹，成本太高', '用 ref 拿到 canvas，在 requestAnimationFrame 裡命令式繪製'],
+          ['整合會自己改 DOM 的函式庫（地圖、編輯器）', 'React 和函式庫會互相覆蓋', '交給 ref + Effect 管理一個空容器（3-3）'],
+          ['幾乎沒有互動的靜態頁', '多載入 React 執行環境卻沒有好處', '靜態 HTML，或框架的靜態輸出'],
+        ] },
       ],
-      tryit: {
-        q: ['用一句話說明「畫面 = f(狀態)」，並指出下面哪個是 f：'],
-        draft: 'function Greeting({ name }) {\n  return <h1>哈囉，{name}</h1>;\n}\n\nf 是：____\n狀態是：____',
-        answer: ['f 是 Greeting 這個元件函式；狀態（這裡是 props 的 name）是輸入。', '同樣的 name 一定得到同樣的畫面；name 改變時，React 再呼叫一次 Greeting 取得新畫面。'],
-      },
     },
     mistakes: [
       { wrong: '在 React 元件裡用 document.querySelector 改畫面。', why: 'React 下次渲染時會把你的修改覆蓋掉，畫面和資料不一致。', right: '改 state，讓 React 更新 DOM；真的要碰 DOM 用 ref（3-3）。' },
       { wrong: '以為 React 是完整框架，路由、資料抓取都內建。', why: 'React 是 UI 函式庫；路由、伺服器渲染由框架（Next.js、React Router）提供。', right: '依需求選工具（6-4）。' },
       { wrong: '照著 2020 年以前的教學寫 class 元件。', why: '現在的 React 以函式元件與 Hook 為主。', right: '一律寫函式元件。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'React 的主要工作是？', options: [
-        { text: '依資料計算畫面，並把差異更新到 DOM', correct: true, why: '你描述結果，它負責更新。' },
-        { text: '取代 HTML 與 CSS', why: '最後仍然是 HTML 與 CSS。' },
-        { text: '負責資料庫存取', why: '那是後端的工作。' },
-        { text: '讓 JavaScript 跑得更快', why: '不是它的目的。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下列哪一個寫法最符合 React 的思維？', options: [
-        { text: '`<p>{cart.length} 件商品</p>`', correct: true, why: '畫面直接由資料推導。' },
-        { text: '加入購物車時順便 `p.textContent = …`', why: '命令式地手動更新。' },
-        { text: '用 setInterval 每秒檢查並更新畫面', why: '不必要，React 依 state 變化更新。' },
-        { text: '在全域變數存 count 再手動重新整理頁面', why: '完全不是 React 的方式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼「畫面 = f(狀態)」能減少 bug？舉一個用 jQuery 時常見、在 React 裡不會發生的錯誤。'], answer: [
-        '畫面只由狀態決定，所以不會出現「資料改了、某處畫面沒改」。',
-        '例如購物車：jQuery 時代加入商品後要同時更新右上角數量、清單、總價三個地方，漏改一處就不一致；React 裡三處都從同一個 cart 狀態算出來，不可能不一致。',
-      ] },
     ],
     keypoints: [
       'React 是宣告式：你描述某狀態下的畫面，它負責更新 DOM。',
@@ -116,14 +101,6 @@ defineLessons({
       '用 Vite 建立 React 專案並啟動',
       '看懂專案的主要檔案',
       '寫出並使用第一個元件',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1）「宣告式」的意思是？', options: [
-        { text: '描述結果，不寫一步步怎麼改', correct: true, why: 'React 負責怎麼改。' },
-        { text: '先宣告所有變數', why: '和變數宣告無關。' },
-        { text: '一定要用 TypeScript', why: '無關。' },
-        { text: '直接操作 DOM', why: '那是命令式。' },
-      ] },
     ],
     analogy: {
       text: ['Vite 像廚房裡的備料台：你專心做菜（寫元件），它負責把食材洗好切好（轉換 JSX 與 TypeScript）、即時端給試吃的人（瀏覽器），出餐時再幫你裝盒（打包）。'],
@@ -163,60 +140,41 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Badge() {\n  console.log("渲染 Badge");\n  return <span>新</span>;\n}\n\nexport default function App() {\n  return (\n    <div>\n      <Badge />\n      <Badge />\n      <Badge />\n    </div>\n  );\n}',
-          predict: { q: '主控台會印出幾次「渲染 Badge」？（不考慮開發模式的 StrictMode）', options: ['3 次', '1 次', '0 次'], answer: 0 },
           output: '渲染 Badge\n渲染 Badge\n渲染 Badge\n（開發模式開了 StrictMode 時會各多呼叫一次，用來幫你發現不純的程式）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'dev', label: '開發時用' }, { id: 'prod', label: '上線前用' }],
-          items: [
-            { text: '`npm run dev`', answer: 'dev', why: '開發伺服器，存檔立即更新。' },
-            { text: '`npm run build`', answer: 'prod', why: '產生最佳化的正式版。' },
-            { text: '`npm run preview`', answer: 'prod', why: '本機預覽 build 的結果。' },
-            { text: '熱更新（HMR）', answer: 'dev', why: '開發時的功能。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`npm run dev`', '開發時用', '開發伺服器，存檔立即更新。'],
+          ['`npm run build`', '上線前用', '產生最佳化的正式版。'],
+          ['`npm run preview`', '上線前用', '本機預覽 build 的結果。'],
+          ['熱更新（HMR）', '開發時用', '開發時的功能。']
+        ] },
         { type: 'svg', svg: Fig.stack('從啟動到畫面出現：瀏覽器載入 index.html；執行 main.tsx；createRoot 在 #root 建立 React 根；渲染 App 與它裡面的所有元件', [
           { title: '1. 載入 index.html', tone: 1 },
           { title: '2. 執行 src/main.tsx', tone: 3 },
           { title: '3. createRoot(#root).render(<App />)', tone: 2 },
           { title: '4. App 與子元件被渲染成畫面', tone: 4 },
         ]), caption: '畫面一片空白時，先看主控台有沒有錯誤，再確認 #root 存在。' },
+        { type: 'heading', id: 'deep-vite-dev-build', text: '深入：開發與正式版為什麼不一樣' },
+        'Vite 開發時不打包：瀏覽器用原生 ES 模組逐檔請求，Vite 只即時轉換被請求的檔案，所以專案再大啟動都快。`npm run build` 才打包、壓縮、切分程式碼；Vite 8（2026-03-12）起改用 Rolldown 打包，取代原本 esbuild ＋ Rollup 的組合。',
+        'Vite 8 需要 Node.js 20.19+ 或 22.12+，建立專案失敗時先用 `node -v` 確認。開發與正式版行為不完全相同：StrictMode 的重複呼叫只在開發模式、環境變數在建置時才替換，所以上線前一定要 `npm run preview` 看一次正式版。',
+        { type: 'table', caption: '什麼時候不用 Vite 起手', head: ['你的情況', '建議'], rows: [
+          ['學習、單頁應用、內部工具', 'Vite 最合適'],
+          ['公開網站，需要 SEO 與伺服器渲染', '用框架（6-4），框架內部多半也用 Vite 或自己的打包器'],
+          ['既有網站只想加一個互動區塊', '在那一頁掛一個 React 根（createRoot），不必整站改寫'],
+        ] },
       ],
-      tryit: {
-        q: ['新增一個 Footer 元件，顯示「© 2026」，並放在 App 的最下面：'],
-        draft: 'function ____() {\n  return <footer>© 2026</footer>;\n}\n\nexport default function App() {\n  return (\n    <main>\n      <h1>哈囉</h1>\n      ____\n    </main>\n  );\n}',
-        answer: ['`function Footer()`、`<Footer />`。', '元件可以放在同一個檔案；變大之後再拆成 Footer.tsx 並 export。'],
-      },
     },
     mistakes: [
       { wrong: '元件名稱小寫開頭。', why: '被當成 HTML 標籤。', right: 'PascalCase：`ProductCard`。' },
       { wrong: '在元件函式裡面再定義另一個元件。', why: '每次渲染都產生新的元件型別，子元件的狀態會一直被重置，效能也差。', right: '元件都定義在最外層。' },
       { wrong: '照舊教學用 create-react-app。', why: 'CRA 已停止維護（2025 年官方宣布棄用）。', right: '用 Vite 或框架。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'Vite 專案中，把 App 掛到頁面上的是哪個檔案？', options: [
-        { text: '`src/main.tsx`', correct: true, why: '呼叫 createRoot().render(<App />)。' },
-        { text: '`src/App.tsx`', why: '它是元件本身。' },
-        { text: '`vite.config.ts`', why: '那是建置設定。' },
-        { text: '`package.json`', why: '那是套件設定。' },
-      ] },
-      { level: '應用', type: 'mc', q: '寫了 `<card />`（小寫）想使用 Card 元件，會怎樣？', options: [
-        { text: '被當成未知的 HTML 標籤，不會呼叫 Card', correct: true, why: '小寫開頭被視為 DOM 元素。' },
-        { text: 'React 自動把它對應到大寫的 Card 元件', why: '不會自動轉換，大小寫有意義。' },
-        { text: '編譯錯誤', why: '可以編譯，只是行為不對（TypeScript 會提示未知的內建元素）。' },
-        { text: '畫面顯示文字「card」', why: '不會顯示文字。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事問「為什麼不在 index.html 直接寫 HTML，而要用元件？」你怎麼回答？'], answer: [
-        '元件可以重複使用、接受資料（props），並把畫面、邏輯、狀態放在一起；同一張商品卡片寫一次，傳入不同商品就能顯示一百張。',
-        '純 HTML 適合不會變的內容；只要畫面會依資料或操作改變，元件能讓「資料 → 畫面」維持一致。',
-      ] },
-    ],
     keypoints: [
       '用 `npm create vite@latest` 建專案，`npm run dev` 開發。',
       'main.tsx 把 App 掛到 #root；之後都在元件裡工作。',
       '元件大寫開頭、定義在最外層。',
     ],
-    sources: ['vite', 'react-frameworks'],
+    sources: ['vite', 'vite8', 'react-frameworks'],
   },
 
   '0-3': {
@@ -224,14 +182,6 @@ defineLessons({
       '寫出合法的 JSX（單一根元素、標籤要關閉）',
       '用大括號放入 JavaScript 運算式',
       '分辨 JSX 屬性與 HTML 屬性的差異',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 0-2）為什麼元件不能定義在另一個元件裡？', options: [
-        { text: '每次渲染都產生新元件型別，子元件狀態被重置', correct: true, why: '定義在最外層。' },
-        { text: '語法錯誤', why: '語法合法，所以才危險。' },
-        { text: '只能有一個元件', why: '可以有很多。' },
-        { text: 'TypeScript 不允許巢狀函式，編譯會失敗', why: '允許，但不建議。' },
-      ] },
     ],
     analogy: {
       text: ['JSX 像填空的邀請卡範本：固定的文字照印，`{ }` 是填空格，可以放任何「算得出一個值」的東西——名字、日期、計算結果。'],
@@ -245,7 +195,8 @@ defineLessons({
       ]),
       caption: 'JSX 編譯後是函式呼叫，所以要遵守 JavaScript 的規則。',
       blocks: [
-        '[[JSX]] 看起來像 HTML，其實是 JavaScript。多個元素要用 [[Fragment]] 包成一個。[[屬性]]用 camelCase：className、htmlFor、onClick；style 接收物件。大括號裡放運算式。',
+        '[[JSX]] 看起來像 HTML，其實是 JavaScript。多個元素要用 [[Fragment]] 包成一個。',
+        '[[屬性]]用 camelCase：className、htmlFor、onClick；style 接收物件。大括號裡放運算式。',
         { type: 'code', lang: 'tsx', title: 'Profile.tsx', code: 'const user = { name: "阿明", avatar: "/a.png", followers: 1280 };\n\nexport default function Profile() {\n  return (\n    <>\n      <img src={user.avatar} alt={`${user.name} 的頭像`} className="avatar" />\n      <h2 style={{ fontSize: 24, marginBottom: 8 }}>{user.name}</h2>\n      <p>追蹤者：{user.followers.toLocaleString()}</p>\n      <label htmlFor="bio">自我介紹</label>\n      <textarea id="bio" />\n    </>\n  );\n}' },
       ],
     },
@@ -270,26 +221,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const items = 3;\nconst price = 120;\n\nexport default function Summary() {\n  return (\n    <p>\n      {items} 件，共 {items * price} 元\n      {items > 5 ? "（免運）" : "（運費 60）"}\n    </p>\n  );\n}',
-          predict: { q: '畫面顯示什麼？', options: ['3 件，共 360 元（運費 60）', '{items} 件，共 {items * price} 元', '3 件，共 360 元（免運）'], answer: 0 },
           output: '3 件，共 360 元（運費 60）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '可以放進 { }' }, { id: 'no', label: '不能直接放' }],
-          items: [
-            { text: '`{user.name}`', answer: 'ok', why: '運算式，得到一個值。' },
-            { text: '`{price * 0.9}`', answer: 'ok', why: '運算式。' },
-            { text: '`{if (ok) { "是" }}`', answer: 'no', why: 'if 是陳述式；改用 `{ok ? "是" : "否"}`。' },
-            { text: '`{items.map((x) => <li>{x}</li>)}`', answer: 'ok', why: 'map 回傳陣列，是運算式（還需要 key，1-2）。' },
-            { text: '`{for (const x of items) {}}`', answer: 'no', why: 'for 是陳述式。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`{user.name}`', '可以放進 { }', '運算式，得到一個值。'],
+          ['`{price * 0.9}`', '可以放進 { }', '運算式。'],
+          ['`{if (ok) { "是" }}`', '不能直接放', 'if 是陳述式；改用 `{ok ? "是" : "否"}`。'],
+          ['`{items.map((x) => <li>{x}</li>)}`', '可以放進 { }', 'map 回傳陣列，是運算式（還需要 key，1-2）。'],
+          ['`{for (const x of items) {}}`', '不能直接放', 'for 是陳述式。']
+        ] },
         { type: 'svg', svg: Fig.vs('JSX 不是字串也不是 HTML：JSX 編譯成函式呼叫，產生描述畫面的物件；React 再根據這些物件建立或更新真正的 DOM', { title: 'JSX', lines: ['`<h1>{name}</h1>`'], tone: 3 }, { title: '編譯後', lines: ['`jsx("h1", {…})`', '→ 一般物件'], tone: 4 }), caption: '大括號裡的字串會自動跳脫，可以防止 XSS（不要用 dangerouslySetInnerHTML 插入使用者內容）。' },
+        { type: 'heading', id: 'deep-jsx-transform', text: '深入：JSX 轉換與自動跳脫的邊界' },
+        'React 17 起使用「新的 JSX 轉換」：編譯器自動從 `react/jsx-runtime` 匯入 `jsx()`，所以檔案不用再寫 `import React from "react"`。舊教學檔案開頭都有這行，現在可以省略。',
+        '自動跳脫只保護「文字內容」。`href={userInput}` 若是 `javascript:` 開頭的網址仍可能執行程式；React 19 對這種網址會擋下並警告，但從使用者來的網址最好先檢查只允許 http、https。',
+        { type: 'table', caption: '大括號裡放不同的值會怎樣', head: ['寫法', '結果', '原因'], rows: [
+          ['`{true}`、`{false}`、`{null}`、`{undefined}`', '什麼都不顯示', '方便寫 `{cond && <X />}`'],
+          ['`{0}`、`{NaN}`', '顯示 0、NaN', '數字會被當成文字渲染（1-2 的陷阱）'],
+          ['`{[1, 2]}`', '顯示 12', '陣列的每一項依序渲染'],
+          ['`{{ a: 1 }}` 放在子元素位置', '執行時錯誤', '物件不能當成子元素'],
+        ] },
       ],
-      tryit: {
-        q: ['讓按鈕在 disabled 為 true 時加上 class「btn-off」，否則是「btn-on」：'],
-        draft: 'const disabled = true;\n<button className={____} disabled={____}>送出</button>',
-        answer: ['`className={disabled ? "btn-off" : "btn-on"}`、`disabled={disabled}`。', '屬性值要動態時一律用大括號；寫成 `"disabled"`（字串）就永遠是同一個值。'],
-      },
     },
     mistakes: [
       { wrong: '元件回傳兩個並列的元素。', why: 'JSX 一次只能回傳一個根。', right: '用 `<>…</>` 包起來。' },
@@ -297,19 +248,7 @@ defineLessons({
       { wrong: '`style="color: red"`。', why: 'style 要物件。', right: '`style={{ color: "red" }}`（外層大括號是運算式、內層是物件）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'JSX 中 HTML 的 class 屬性要寫成？', options: [
-        { text: '`className`', correct: true, why: 'class 是 JavaScript 保留字。' },
-        { text: '`class`', why: '會有警告且不建議。' },
-        { text: '`cssClass`', why: '沒有這個屬性。' },
-        { text: '`styleName`', why: '沒有這個屬性。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`<p>{"<b>粗體</b>"}</p>` 會顯示？', options: [
-        { text: '文字 `<b>粗體</b>`，不會變粗', correct: true, why: 'React 自動跳脫字串，防止 XSS。' },
-        { text: '粗體的「粗體」，因為 b 標籤會被解析', why: '字串不會被當成 HTML。' },
-        { text: '編譯錯誤', why: '合法。' },
-        { text: '什麼都不顯示', why: '會顯示原始文字。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['後端回傳一段 Markdown 轉好的 HTML，要顯示在頁面上。為什麼不能直接 `{html}`？要用什麼，風險是什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['後端回傳一段 Markdown 轉好的 HTML，要顯示在頁面上。為什麼不能直接 `{html}`？要用什麼，風險是什麼？'], answer: [
         '`{html}` 會把它當純文字顯示（跳脫）。要插入 HTML 得用 `dangerouslySetInnerHTML={{ __html: html }}`。',
         '名稱刻意寫「dangerous」：內容若含使用者輸入，可能被插入惡意 script（XSS）。必須先用 DOMPurify 之類的工具清洗，只允許安全的標籤。',
       ] },
@@ -319,7 +258,7 @@ defineLessons({
       '大括號放運算式；屬性用 camelCase（className、htmlFor）。',
       '字串會自動跳脫，插入 HTML 要先清洗。',
     ],
-    sources: ['react-jsx'],
+    sources: ['react-jsx', 'react-19'],
   },
 });
 </script>

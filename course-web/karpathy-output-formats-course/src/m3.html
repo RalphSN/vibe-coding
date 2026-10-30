@@ -54,12 +54,12 @@ defineLessons({
         why: ['明確指出要補什麼', '維持同樣好讀的寫法'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'check', label: '一定要核對' }, { id: 'ok', label: '可以先相信' }], items: [
-          { text: '圖上的箭頭方向（誰傳資料給誰）', answer: 'check', why: '方向錯了，整個理解都錯。' },
-          { text: '互動網頁算出來的金額', answer: 'check', why: '公式可能寫錯，用已知答案試算。' },
-          { text: '影片裡出現的年份和數字', answer: 'check', why: '影片最難逐幀檢查。' },
-          { text: '文字版裡一句「這是一種快取機制」的描述', answer: 'ok', why: '概念性的描述可以先接受，之後在別的資料裡會再遇到。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['圖上的箭頭方向（誰傳資料給誰）', '一定要核對', '方向錯了，整個理解都錯。'],
+          ['互動網頁算出來的金額', '一定要核對', '公式可能寫錯，用已知答案試算。'],
+          ['影片裡出現的年份和數字', '一定要核對', '影片最難逐幀檢查。'],
+          ['文字版裡一句「這是一種快取機制」的描述', '可以先相信', '概念性的描述可以先接受，之後在別的資料裡會再遇到。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="核對難度：規範文字最容易核對，一張圖中等，互動網頁中等，解說影片最難；格式越豐富越要多核對">
           <g font-size="16">
             <text x="10" y="28" font-weight="900">越往右，錯誤越不容易被發現</text>
@@ -69,42 +69,36 @@ defineLessons({
             <rect x="415" y="50" width="135" height="160" class="f4 stroke-ink" stroke-width="3"/><text x="482" y="76" text-anchor="middle" class="on-color" font-weight="900">4 影片</text>
           </g>
         </svg>`, caption: '長條越高，越需要花心思核對。' },
+        { type: 'heading', id: 'deep-verify-math', text: '深入：為什麼要挑重點核對，而不是隨便看看' },
+        '一張圖、一個網頁裡有很多「事實」：每條箭頭、每個數字都算一個。就算每個事實出錯的機率很小，事實一多，整份成品「至少有一個錯」的機率就很高。拉拉看：',
+        { type: 'widget', name: 'knobs', props: { title: '成品裡藏著幾個錯（實際計算；假設每個事實出錯的機率相同、彼此獨立）', sliders: [
+          { id: 'n', label: '成品裡的事實數（箭頭、數字、標籤）', min: 5, max: 100, step: 5, value: 20, unit: '個' },
+          { id: 'p', label: '每個事實出錯的機率', min: 1, max: 20, step: 1, value: 5, unit: '%' },
+          { id: 'k', label: '你隨機抽查幾個', min: 0, max: 100, step: 5, value: 5, unit: '個' },
+        ], compute: (v) => {
+          const k = Math.min(v.k, v.n);
+          const expected = v.n * v.p / 100;
+          const atLeastOne = 1 - (1 - v.p / 100) ** v.n;
+          const left = expected * (1 - k / v.n);
+          return { rows: [
+            { label: '預期的錯誤數', value: `${expected.toFixed(2)} 個`, ratio: expected / 20 },
+            { label: '至少有一個錯的機率', value: `${Math.round(atLeastOne * 100)}%`, ratio: atLeastOne },
+            { label: `抽查 ${k} 個後，預期還剩`, value: `${left.toFixed(2)} 個`, ratio: left / 20 },
+          ], note: `${v.n} 個事實、每個 ${v.p}% 會錯：預期 ${expected.toFixed(2)} 個錯，至少一個錯的機率 ${Math.round(atLeastOne * 100)}%。隨機抽查 ${k} 個，平均只抓到 ${Math.round(k / v.n * 100)}% 的錯。所以要先核對「錯了會改變結論」的那幾個，不是隨機看幾個。` };
+        } } },
+        { type: 'table', caption: '每一級怎麼核對最省力', head: ['格式', '核對方法', '為什麼有效'], rows: [
+          ['1 規範文字', '請 AI 列出它省略了什麼', '簡潔版的風險是漏，不是錯'],
+          ['2 一張圖', '把每條箭頭念成一句話：「A 把什麼傳給 B」，再對照原始資料', '把圖還原成文字，錯誤就看得見'],
+          ['3 互動網頁', '用極端值和外部試算器對照（見 2-3 的深入思考題）', '公式錯了，極端值最先露餡'],
+          ['4 解說影片', '先請 AI 交出分鏡與旁白的文字稿，核對文字稿，再渲染', '核對文字比逐幀看影片快得多'],
+        ] },
+        '請同一個 AI「檢查自己的答案」有用但有限：它常重複同樣的錯誤假設。換一個模型交叉比對，或回到原始資料，抓錯的效果比較好；兩個模型都同意，也不等於正確。',
       ],
-      tryit: {
-        q: ['挑一個你最近想搞懂的概念，實際做一次 A/B 對照，記下差別。'],
-        draft: '概念：____\n問法 A 的回答有幾段？____\n問法 B 的回答有幾段？哪個比較好懂？____\n我要追問的細節：____',
-        answer: ['沒有標準答案。重點是親眼看到差別：多數人會發現 B 版短很多，但也會少一些細節，這正是第 2 步要追問的地方。'],
-      },
     },
     mistakes: [
       { wrong: '一開始就做互動網頁或影片。', why: '最費工、最難核對；還沒確定問題問得對，就花了最多時間。', right: '先從第 1 級開始，看懂大方向再決定要不要往上。' },
       { wrong: '簡潔版看完就結束，以為什麼都懂了。', why: '原文實測，簡潔版省略了多種優化技術。', right: '在簡潔版的基礎上追問省略的部分。' },
       { wrong: '圖或網頁看起來很專業，就不核對。', why: '原文：圖表、網頁和影片裡的錯誤，比寫在文字裡更不容易發現。', right: '重要的數字和結論，對照文字版確認。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '原文建議新手從哪裡開始？', options: [
-        { text: '第 1 級：點名 ASD-STE100', correct: true, why: '不用換工具，差別馬上看得出來。' },
-        { text: '直接做互動網頁，最有成就感', why: '原文建議先從第 1 級開始。' },
-        { text: '先安裝 Manim', why: '那是第 4 級才需要的準備。' },
-        { text: '先學會 Mermaid 語法，之後畫圖比較方便', why: '不需要先學語法，AI 會寫，貼到編輯器就能看。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你用互動網頁看懂了房貸計算，接下來最該做的是？', options: [
-        { text: '用已知答案的數字試算核對', correct: true, why: '格式越豐富越要核對，公式可能寫錯。' },
-        { text: '直接分享給朋友', why: '還沒核對就分享，錯誤會跟著傳出去。' },
-        { text: '要求 AI 做成影片', why: '先確認內容正確，再考慮更費工的格式。' },
-        { text: '刪掉網頁，改回去讀一般的文字說明', why: '它還有用，只是要先核對。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用自己的話，把原文的三個建議濃縮成一句你會貼在螢幕旁的提醒。'], answer: [
-        '參考：「先短，再深，最後對一下。」或「從第 1 級開始，懂了再追問，漂亮的更要核對。」',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-4）解說影片為什麼最難核對？', options: [
-        { text: '錯誤藏在某一幀裡，我們很少逐幀檢查', correct: true, why: '所以影片留給值得反覆看的主題，並對照文字版。' },
-        { text: '影片一定比較不準確，因為是 AI 自動產生的', why: '不一定不準，而是錯了很難發現。' },
-        { text: '影片沒有文字', why: '影片可能有字幕和旁白，問題是不易逐一確認。' },
-        { text: '影片都是英文', why: '和語言無關。' },
-      ] },
     ],
     keypoints: [
       '新手路線：先第 1 級 A/B 對照 → 再追問細節 → 最後核對。',
@@ -117,9 +111,16 @@ defineLessons({
   '3-2': {
     layout: 'reference',
     minutes: 10,
-    sources: ['bnext', 'x-post', 'ste-home', 'mermaid', 'manim'],
+    sources: ['bnext', 'x-post', 'ste-home', 'ste-tcworld', 'mermaid', 'manim', 'manim-ce', 'manim-voiceover', 'elevenlabs-qs'],
     blocks: [
-      '這一頁是可以直接帶走的工具。輸入你想搞懂的主題，挑一級，複製提示詞貼到 ChatGPT、Claude 或 Gemini。下面還有 10 題總複習。',
+      '這一頁是全書的一頁地圖，也是可以直接帶走的工具。先看全書架構和每個模組最重要的一件事，再用提示詞產生器挑一級，複製貼到 ChatGPT、Claude 或 Gemini。',
+      { type: 'heading', id: 'map', text: '全書架構' },
+      { type: 'table', caption: '4 個模組、每個模組最重要的一件事', head: ['模組', '單元', '最重要的行動或觀念'], rows: [
+        ['0 原文', '0-1', '先讀原文：本書是導讀與延伸，不是全文轉載'],
+        ['1 為什麼換格式有效', '1-1、1-2', '先問「主題有沒有結構、會被看幾次」，再決定停在哪一級'],
+        ['2 四種輸出格式', '2-1 到 2-4', '指令裡同時寫格式、內容、限制；影片要在 AI agent 裡做，金鑰放環境變數'],
+        ['3 動手用', '3-1、3-2', '先第 1 級問兩次，懂了再追問，最後挑「錯了會改變結論」的地方核對'],
+      ] },
       { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="使用流程：輸入主題，選一級格式，複製提示詞，貼到 AI，最後核對">
         <g font-size="16" font-weight="900">
           <rect x="10" y="60" width="96" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="58" y="100" text-anchor="middle">輸入主題</text>
@@ -148,69 +149,15 @@ defineLessons({
         </g>
         <g class="stroke-ink" stroke-width="3"><path d="M170 70 H200 M360 70 H390"/></g>
       </svg>`, caption: '不管用哪一級，都照這三步走。' },
-      { type: 'heading', id: 'quiz', text: '總複習測驗' },
-      { type: 'quiz', key: '3-2:final', items: [
-        { level: '原文', type: 'mc', q: '卡帕西的核心主張是？', options: [
-          { text: '想讓複雜概念好懂，直接改變 AI 的輸出格式', correct: true, why: '這是原文開頭說的「簡單解法」。' },
-          { text: '提示詞要寫得越長越好', why: '原文沒有這樣說。' },
-          { text: '一定要用最新的模型', why: '重點是格式，不是模型。' },
-          { text: '不要讓 AI 解釋新概念', why: '正好相反。' },
-        ] },
-        { level: '1-1', type: 'mc', q: '為什麼文字比較難懂複雜概念？', options: [
-          { text: '文字是線性的，讀者要自己在腦中拼出架構', correct: true, why: '圖、網頁、影片直接呈現全貌。' },
-          { text: '文字一定有錯字', why: '和錯字無關。' },
-          { text: '文字不能表達流程', why: '可以，但讀者要自己拼。' },
-          { text: '文字比較慢產生', why: '產生速度不是重點。' },
-        ] },
-        { level: '1-2', type: 'mc', q: '「But even better」在原文裡的作用是？', options: [
-          { text: '卡帕西用它帶出下一級更好懂、更有互動性的格式', correct: true, why: '介紹完前三級都會補上這句。' },
-          { text: '表示前一級沒有用', why: '是更好，不是沒用。' },
-          { text: '是一個提示詞範本', why: '它是貼文裡的轉折句。' },
-          { text: '是 ASD-STE100 的規則', why: '和規範無關。' },
-        ] },
-        { level: '2-1', type: 'mc', q: '用中文點名 ASD-STE100，代表什麼？', options: [
-          { text: '借用它的清晰寫作原則，輸出不代表符合規範', correct: true, why: '它是英文規範，原文特別提醒。' },
-          { text: '輸出會自動符合國際標準', why: '只是借用原則。' },
-          { text: 'AI 會改用英文回答', why: '你指定中文，它就用中文。' },
-          { text: '只有航太業可以這樣用', why: '任何人都可以借用。' },
-        ] },
-        { level: '2-1', type: 'mc', q: '原文五條規則中，每句建議不超過幾個字？', options: [
-          { text: '30 個字', correct: true, why: '「句子要短，每句盡量不超過30個字」。' },
-          { text: '10 個字', why: '10 字是畫圖時「每個標籤」的上限。' },
-          { text: '20 個字', why: '20 是 ASD-STE100 流程類英文句子的單字上限。' },
-          { text: '沒有限制', why: '有，是規則 1。' },
-        ] },
-        { level: '2-2', type: 'mc', q: '畫圖指令裡為什麼要寫「不要用長篇文字」？', options: [
-          { text: '避免 AI 只是把文字搬進方框', correct: true, why: '要的是結構，不是切段的文章。' },
-          { text: '因為圖片不能有字', why: '可以有字，只是要短。' },
-          { text: '為了省錢', why: '和費用無關。' },
-          { text: '因為 Mermaid 不支援中文', why: '和語言無關。' },
-        ] },
-        { level: '2-3', type: 'mc', q: 'AI 給你一段 HTML，聊天介面沒有預覽。怎麼看？', options: [
-          { text: '存成 .html 檔，用瀏覽器打開', correct: true, why: '原文的做法。' },
-          { text: '貼到 Mermaid 編輯器', why: '那是看 Mermaid 圖的方法。' },
-          { text: '存成 .txt 用記事本打開', why: '只會看到程式碼。' },
-          { text: '一定要架網站', why: '單一 HTML 檔不需要架站。' },
-        ] },
-        { level: '2-4', type: 'mc', q: '做解說影片為什麼要在 AI agent 工具裡進行？', options: [
-          { text: '要實際執行程式並渲染成影片檔', correct: true, why: '一般聊天介面不一定做得到。' },
-          { text: 'agent 工具的模型比較聰明', why: '差別在能不能執行程式。' },
-          { text: '因為影片太大，聊天介面放不下', why: '重點是執行與渲染。' },
-          { text: '因為只有 agent 能配音', why: '配音靠 ElevenLabs 或替代方案。' },
-        ] },
-        { level: '3-1', type: 'mc', q: '看懂簡潔版之後，原文建議的下一步是？', options: [
-          { text: '再請 AI 補上省略的細節', correct: true, why: '先抓重點再追問，比一開始就啃長文省力。' },
-          { text: '直接做影片', why: '先把內容弄清楚。' },
-          { text: '換一個 AI 重問', why: '原文建議的是追問。' },
-          { text: '停止，已經夠了', why: '簡潔版會省略細節。' },
-        ] },
-        { level: '3-1', type: 'mc', q: '哪一個最需要對照文字版核對？', options: [
-          { text: '解說影片裡出現的關鍵數字', correct: true, why: '格式越豐富，錯誤越不容易發現。' },
-          { text: '文字版裡的一句概念描述', why: '文字最容易核對。' },
-          { text: '提示詞範本本身的每一個字', why: '範本來自原文，不需要核對數字。' },
-          { text: '你自己輸入的主題', why: '那是你寫的。' },
-        ] },
+      { type: 'heading', id: 'stale', text: '會過時的內容與更新方式' },
+      { type: 'table', caption: '這本書哪些地方會隨時間改變（最後查證：2026-10-29）', head: ['內容', '目前寫的', '怎麼更新'], rows: [
+        ['ASD-STE100 版本', 'Issue 9（2025-01）', '看 ASD-STE100 官網的下載頁；Issue 10 預定 2028 年'],
+        ['Manim 版本與安裝方式', 'Community v0.22.1，建議用 uv', '看 docs.manim.community 的安裝頁與 changelog'],
+        ['配音服務與環境變數名稱', 'ElevenLabs、gTTS、Coqui；`ELEVENLABS_API_KEY`／`ELEVEN_API_KEY`', '看 ElevenLabs 與 manim-voiceover 的官方文件'],
+        ['能執行程式的 AI agent', 'Claude Code、Codex', '工具名稱與能力變化快，以各家官網為準'],
+        ['聊天介面能不能直接顯示 Mermaid 或 HTML 預覽', '依產品而定', '直接試：貼一段 Mermaid 程式碼，看會不會變成圖'],
       ] },
+      '不太會過時的是方法本身：文字是線性的、格式決定理解成本、越豐富越要核對。工具換了，這三件事照樣適用。',
       { type: 'callout', variant: 'tip', title: '原文', body: ['[《數位時代》：如何讓AI變身「科普大師」？大神卡帕西推4種輸出技巧，提示詞範例一次看](https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100)'] },
     ],
   },

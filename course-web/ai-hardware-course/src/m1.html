@@ -7,17 +7,12 @@ defineTerms({
   '平行運算': { en: 'parallel computing', def: '很多運算同時做；前提是這些運算彼此不需要等對方的結果。', example: '矩陣乘法裡的每一格都可以同時算。', lesson: '1-1' },
   'Tensor Core': { en: 'Tensor Core', def: 'NVIDIA GPU 裡專門做小塊矩陣乘加的運算單元，比一般核心快很多，通常搭配低精度。', example: 'FP16、BF16、FP8。', lesson: '1-3' },
   'BF16': { en: 'bfloat16', def: '16 位元的浮點格式：數值範圍和 FP32 一樣大、精度較低；訓練大模型最常用。', example: '每個數 2 位元組。', lesson: '1-3' },
+  '阿姆達爾定律': { en: "Amdahl's law", def: '程式裡無法平行的那一部分，決定了加再多核心也追不過去的速度上限。', example: '有 5% 必須依序做：最多快 20 倍。', lesson: '1-1' },
+  'MFU': { en: 'model FLOPs utilization', def: '模型理論上需要的運算量 ÷（時間 × 峰值算力）；比較不同訓練系統效率的常用指標。', example: 'PaLM 540B 訓練約 46%。', lesson: '1-2' },
+  '微縮放': { en: 'microscaling', def: '把數字分成小組，每組共用一個縮放因子的低位元格式；讓 4 位元也能涵蓋大小差很多的數值。', example: 'NVFP4：每 16 個數一個縮放因子。', lesson: '1-3' },
   '稀疏': { en: 'sparsity', def: '矩陣裡有很多 0 時跳過不算的加速方式；規格表上「含稀疏」的數字通常是不含的兩倍。', example: 'H100 FP16：1,979（含稀疏）vs 約 989（不含）。', lesson: '1-3' },
 });
 
-const REVIEW_M0 = [
-  { level: '回想', type: 'mc', q: '（回顧 0-1）70B 模型推論一個 token 約多少 FLOPs？', options: [
-    { text: '1,400 億', correct: true, why: '2 × 700 億。' },
-    { text: '700 億，每個參數一次', why: '一乘一加是 2 次。' },
-    { text: '4,200 億，6 倍', why: '6N 是訓練。' },
-    { text: '70 億', why: '少了 10 倍。' },
-  ] },
-];
 
 defineLessons({
   '1-1': {
@@ -26,7 +21,6 @@ defineLessons({
       '說出什麼樣的工作適合 GPU',
       '估算核心數差異帶來的速度差',
     ],
-    review: REVIEW_M0,
     analogy: {
       text: ['批改 10 萬份選擇題考卷：請 8 位教授（[[CPU]]）很慢；請 1 萬位工讀生（GPU）每人只會對答案，但同時開工，很快就改完。', '神經網路的運算就像改選擇題：大量「相乘再相加」、彼此不用等，正好適合[[平行運算]]。反過來，像寫一篇需要前後呼應的文章，一萬個工讀生也幫不上忙。'],
       limit: ['工讀生之間不用溝通，GPU 核心則要共用記憶體、要等資料送到；資料送得不夠快，核心再多也是閒著（模組 2）。'],
@@ -65,12 +59,12 @@ defineLessons({
             { label: 'GPU 快幾倍', value: `${(tc / tg).toFixed(0)} 倍`, ratio: Math.min(1, tc / tg / 500) },
           ], note: '數字是**示意**的模型：只看核心數與單核速度，不看記憶體。重點是比例：只要工作夠多、彼此獨立，核心數量會壓過單核速度。' };
         } } },
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'gpu', label: '適合 GPU' }, { id: 'cpu', label: '適合 CPU' }], items: [
-          { text: '一層神經網路的矩陣乘法', answer: 'gpu', why: '大量獨立的乘加。' },
-          { text: '解析一個 JSON 請求、檢查欄位、決定下一步', answer: 'cpu', why: '依序、有很多判斷。' },
-          { text: '把 1,000 張圖片同時縮小', answer: 'gpu', why: '每張、每個像素都獨立。' },
-          { text: 'tokenizer 依序套用 BPE 合併規則', answer: 'cpu', why: '前後相依，通常在 CPU 上跑（第二部 1-2）。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['一層神經網路的矩陣乘法', '適合 GPU', '大量獨立的乘加。'],
+          ['解析一個 JSON 請求、檢查欄位、決定下一步', '適合 CPU', '依序、有很多判斷。'],
+          ['把 1,000 張圖片同時縮小', '適合 GPU', '每張、每個像素都獨立。'],
+          ['tokenizer 依序套用 BPE 合併規則', '適合 CPU', '前後相依，通常在 CPU 上跑（第二部 1-2）。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="AI 服務裡的分工：CPU 處理請求、tokenizer、排程；GPU 做模型的矩陣運算">
           <rect x="20" y="40" width="250" height="100" style="fill:var(--m4)" class="stroke-ink" stroke-width="3"/>
           <text x="145" y="72" text-anchor="middle" font-size="15" font-weight="900" class="on-color">CPU</text>
@@ -82,12 +76,16 @@ defineLessons({
           <text x="415" y="122" text-anchor="middle" font-size="13" class="on-color">attention、前饋網路</text>
           <text x="280" y="170" text-anchor="middle" font-size="13">序章 2-1 的六站裡，只有「GPU 上的模型」那一站在 GPU</text>
         </svg>`, caption: '兩者分工合作，不是誰取代誰。' },
+        { type: 'heading', id: 'amdahl', text: '深入：核心再多也有上限' },
+        '[[阿姆達爾定律]]：如果一件工作有比例 s 必須依序做，其餘可以平行，那麼核心再多，速度最多也只快 1 ÷ s 倍。5% 必須依序做，上限就是 20 倍；這也是 GPU 只接手「矩陣乘法」這種幾乎 100% 可平行的部分的原因。',
+        'GPU 還有一個設計取捨：它不像 CPU 用大快取和複雜的預測去縮短「每一次」等資料的時間，而是準備大量執行緒輪流上場，一批在等資料時換另一批算。這招要成立，前提是同時有足夠多的獨立工作；工作太少時，GPU 的核心多半閒著。',
+        { type: 'table', head: ['必須依序做的比例 s', '核心無限多時最多快幾倍'], rows: [
+          ['50%', '2 倍'],
+          ['10%', '10 倍'],
+          ['1%', '100 倍'],
+          ['0.1%', '1,000 倍'],
+        ], caption: '上限 ＝ 1 ÷ s。真實系統還有搬資料與同步的成本，達不到這個上限。' },
       ],
-      tryit: {
-        q: ['把「GPU 每個核心慢幾倍」拉到 20，GPU 還快嗎？再把工作數降到 1（百萬），結果呢？'],
-        draft: '慢 20 倍：＿\n工作少時：＿',
-        answer: ['在示意模型裡，GPU 仍然快很多：16,000 個核心就算每個慢 20 倍，數量也多 1,000 倍。', '工作數改變不了這個比例（模型是線性的）；但真實世界工作太少時，把資料搬到 GPU 的固定成本會讓 GPU 不划算，這是示意模型沒算到的。'],
-      },
     },
     mistakes: [
       { wrong: '以為 GPU 每個核心都比 CPU 強。', why: '剛好相反，GPU 核心比較簡單。', right: 'GPU 贏在數量。' },
@@ -95,19 +93,7 @@ defineLessons({
       { wrong: '以為 AI 服務完全不用 CPU。', why: '請求處理、tokenizer、排程都在 CPU。', right: 'CPU 管流程，GPU 做運算。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'GPU 適合什麼樣的工作？', options: [
-        { text: '大量彼此獨立、相同的運算', correct: true, why: '平行運算。' },
-        { text: '一步接一步、前後相依的工作', why: '那是 CPU 的強項。' },
-        { text: '需要很多 if 判斷的流程', why: 'CPU 比較適合。' },
-        { text: '讀寫硬碟裡的檔案', why: '和 GPU 運算無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下面哪一件事最可能在 CPU 上做？', options: [
-        { text: '把 HTTP 請求解析成 messages', correct: true, why: '依序與判斷。' },
-        { text: 'attention 層裡面的大型矩陣乘法運算', why: '在 GPU。' },
-        { text: '前饋網路的乘加', why: '在 GPU。' },
-        { text: '一次算 64 張圖片的卷積', why: '在 GPU。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 2012 年的 AlexNet 是「深度學習＋GPU」組合的轉捩點（序章 1-3）？用這一課的觀念說明。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 2012 年的 AlexNet 是「深度學習＋GPU」組合的轉捩點（序章 1-3）？用這一課的觀念說明。'], answer: [
         '卷積網路的運算幾乎全是大量獨立的乘加，正好適合 GPU；用 CPU 訓練要花太久，網路做不大。',
         'AlexNet 用兩張 GPU 在合理時間內訓練出夠大的網路，成績大幅領先，證明了這個組合可行。',
       ] },
@@ -117,7 +103,7 @@ defineLessons({
       '大量獨立的乘加（矩陣乘法）適合 GPU。',
       'AI 服務裡 CPU 管流程，GPU 做模型運算。',
     ],
-    sources: ['alexnet'],
+    sources: ['alexnet', 'amdahl'],
   },
 
   '1-2': {
@@ -125,14 +111,6 @@ defineLessons({
       '算出矩陣乘法的運算量',
       '把一層網路的運算量換算成時間',
       '說出「峰值算力」為什麼常常達不到',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）GPU 贏在哪？', options: [
-        { text: '核心數量', correct: true, why: '單核比較簡單。' },
-        { text: '每個核心都比 CPU 快', why: '相反。' },
-        { text: '時脈比較高', why: '不是主因。' },
-        { text: '不需要記憶體', why: '一樣需要。' },
-      ] },
     ],
     analogy: {
       text: ['做一張大表格：每一格都是「某一列 × 某一欄，對應相乘再相加」。表格有 m 列、n 欄，每一格要做 k 次乘加，總共就是 m × n × k 次。', '矩陣乘法（m×k）·（k×n）約要 2mnk 個 [[FLOPs]]（一乘一加算兩次）。GPU 的規格表寫著每秒能做多少，兩者相除就是理論上最快的時間。'],
@@ -180,12 +158,14 @@ defineLessons({
           <text x="410" y="122" text-anchor="middle" font-size="13">等資料、通訊、程式效率</text>
           <text x="280" y="166" text-anchor="middle" font-size="13">估算時一定要乘上利用率，不能直接用峰值</text>
         </svg>`, caption: '利用率高低，是工程團隊最常努力的地方之一。' },
+        { type: 'heading', id: 'mfu', text: '深入：真實訓練用到幾成算力' },
+        '業界用 [[MFU]] 比較訓練效率：拿模型理論上需要的運算量（6ND，見 3-2），除以「實際花的時間 × 峰值算力」。重算 activation（3-1）多做的運算不算進去，所以 MFU 比硬體實際忙碌的比例低一點。',
+        { type: 'table', head: ['公開的訓練紀錄', 'MFU'], rows: [
+          ['PaLM 540B（Google，2022）', '約 46%'],
+          ['Llama 3 405B（Meta，2024，BF16）', '約 38～43%'],
+        ], caption: '取自兩篇技術報告。上萬張卡的大規模訓練，能用到四成多已經是頂尖水準。' },
+        '利用率還和矩陣形狀有關。[[Tensor Core]] 一次處理固定大小的小方塊，維度不是 64 或 128 的倍數時，邊角那一塊也要整塊算，等於白做；所以模型的維度常常選成 4,096、8,192 這種數字。',
       ],
-      tryit: {
-        q: ['m＝1、k＝8,192、n＝8,192 的矩陣乘法（產生一個 token 時的一層）要多少 FLOPs？權重有多少個數字？'],
-        draft: 'FLOPs：＿\n權重數字：＿',
-        answer: ['2 × 1 × 8,192 × 8,192 ≈ 1.34 × 10⁸ FLOPs。', '權重 8,192 × 8,192 ≈ 6,700 萬個數字（BF16 約 134 MB）。每個權重只用到一次乘加，搬它的時間比算它的時間長很多：這就是 2-3 的主題。'],
-      },
     },
     mistakes: [
       { wrong: '直接用含稀疏的峰值估算。', why: '一般模型的權重不是半數為 0 的格式。', right: '用不含稀疏的數字，再乘利用率。' },
@@ -193,19 +173,7 @@ defineLessons({
       { wrong: '忘了「一乘一加」算兩次 FLOPs。', why: '會低估一半。', right: '2mnk。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '(m×k)·(k×n) 的運算量約？', options: [
-        { text: '2mnk', correct: true, why: 'mn 格 × k 次乘加 × 2。' },
-        { text: 'mnk，一格一次', why: '一乘一加是 2 次。' },
-        { text: 'm＋n＋k', why: '是相乘。' },
-        { text: '(mnk)²', why: '不是平方。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'H100 規格表寫 FP16 1,979 TFLOPS（含稀疏），一般估算用多少？', options: [
-        { text: '約 989，再乘利用率', correct: true, why: '不含稀疏約一半。' },
-        { text: '1,979，規格表寫多少就用多少', why: '含稀疏要特殊格式。' },
-        { text: '3,958', why: '那是 FP8 含稀疏。' },
-        { text: '3.35', why: '那是頻寬 TB/s。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同一個模型，「一次處理 4,096 個 token」和「一次只產生 1 個 token」，GPU 利用率為什麼差很多？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['同一個模型，「一次處理 4,096 個 token」和「一次只產生 1 個 token」，GPU 利用率為什麼差很多？'], answer: [
         '4,096 個 token：每個權重搬一次、用 4,096 次，算的比搬的多，GPU 忙著算。',
         '1 個 token：每個權重搬一次只用一次，GPU 大部分時間在等資料。這就是 prefill 快、decode 慢的原因（2-3）。',
       ] },
@@ -215,7 +183,7 @@ defineLessons({
       '時間 ≈ FLOPs ÷（不含稀疏的峰值 × 利用率）。',
       'm 很小時，算力不是瓶頸，搬資料才是。',
     ],
-    sources: ['nvidia-h100', 'kaplan'],
+    sources: ['nvidia-h100', 'kaplan', 'palm', 'llama3'],
   },
 
   '1-3': {
@@ -223,20 +191,6 @@ defineLessons({
       '說出 FP32、BF16、FP8 等精度的差別',
       '說明低精度為什麼更快、更省記憶體',
       '知道 Tensor Core 在做什麼',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）估算時為什麼要乘利用率？', options: [
-        { text: '實際很難達到峰值', correct: true, why: '等資料、通訊等。' },
-        { text: '因為規格表寫錯了', why: '峰值是理想值。' },
-        { text: '為了讓數字變大', why: '會變小。' },
-        { text: '只有 CPU 需要', why: 'GPU 也需要。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 0-1）8B 模型一個 token 約？', options: [
-        { text: '16 GFLOPs', correct: true, why: '2×8×10⁹。' },
-        { text: '8 GFLOPs', why: '少乘 2。' },
-        { text: '48 GFLOPs', why: '那是訓練的 6N。' },
-        { text: '1.6 GFLOPs', why: '少了 10 倍。' },
-      ] },
     ],
     analogy: {
       text: ['記帳時，金額寫到小數點後十位，算得很慢、本子很快寫滿；四捨五入到元，算得快、本子省，而且大多數時候結果差不多。', '神經網路也不需要太多位數：用 16 位元的 [[BF16]] 代替 32 位元，記憶體省一半、搬得快一倍；[[Tensor Core]] 專門把這種低精度的小矩陣乘加做得非常快。'],
@@ -278,12 +232,18 @@ defineLessons({
           <text x="415" y="122" text-anchor="middle" font-size="13" class="on-color">很小的更新不會被吃掉</text>
           <text x="280" y="170" text-anchor="middle" font-size="13">這也是訓練每個參數要 16 位元組的原因（3-1）</text>
         </svg>`, caption: '「混合精度」：該快的地方快，該準的地方準。' },
+        { type: 'heading', id: 'formats', text: '深入：同樣 16 位元，為什麼訓練偏好 BF16' },
+        '浮點數分成「指數」（管範圍）和「尾數」（管精細度）。FP16 指數只有 5 位元，最大只能表示 65,504，訓練時梯度太小會變成 0、太大會溢位，要另外做 loss scaling；BF16 把指數放大到 8 位元、和 FP32 同範圍，犧牲尾數，換來幾乎不用調就能穩定訓練。',
+        { type: 'table', head: ['格式', '指數／尾數位元', '特色'], rows: [
+          ['FP32', '8／23', '範圍大、精細'],
+          ['FP16', '5／10', '精細但範圍小，訓練要 loss scaling'],
+          ['BF16', '8／7', '範圍和 FP32 一樣，精細度低'],
+          ['FP8（E4M3／E5M2）', '4／3 或 5／2', '前者精細、後者範圍大，常分別用在前向與梯度'],
+          ['NVFP4（Blackwell 起）', '2／1 ＋ 分組縮放', '每 16 個數共用一個 FP8 縮放因子'],
+          ['MXFP4（OCP 標準）', '2／1 ＋ 分組縮放', '每 32 個數共用一個 2 的次方縮放因子'],
+        ], caption: '查證於 2026-10：NVIDIA 技術部落格與 OCP Microscaling 規格。' },
+        '4 位元浮點只能表示十幾個值，單靠它一定不夠用，所以新格式都採用[[微縮放]]：一小組數字共用一個縮放因子，等於每組各自決定「尺度」。這和 4-1 量化的分組做法是同一個想法，只是做進了硬體。',
       ],
-      tryit: {
-        q: ['學習率 1×10⁻⁴、梯度 0.01，更新量是 10⁻⁶。如果權重是 1.0、只用很粗糙的格式（只能表示到小數點後 3 位），更新後會怎樣？'],
-        draft: '更新後：＿\n問題：＿',
-        answer: ['1.0 − 0.000001 ＝ 0.999999，四捨五入到小數點後 3 位還是 1.000：更新被吃掉了。', '這就是混合精度要保留 FP32 主權重的原因：很多小更新累積起來才有效果，低精度會把它們全部抹掉。'],
-      },
     },
     mistakes: [
       { wrong: '以為精度越高模型一定越好。', why: '多數情況 BF16 和 FP32 結果差不多，但慢一倍、多一倍記憶體。', right: '選夠用的精度。' },
@@ -291,21 +251,9 @@ defineLessons({
       { wrong: '換算記憶體時忘了位元組數。', why: '同樣參數，FP32 是 BF16 的兩倍大。', right: 'GB ≈ 十億參數 × 每個數的位元組。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'BF16 每個數幾位元組？', options: [
-        { text: '2', correct: true, why: '16 位元。' },
-        { text: '4，和 FP32 一樣', why: 'FP32 才是 4。' },
-        { text: '1', why: '那是 8 位元。' },
-        { text: '16', why: '是 16 位元，不是 16 位元組。' },
-      ] },
-      { level: '應用', type: 'mc', q: '13B 模型用 BF16 存，權重約多大？', options: [
-        { text: '26 GB', correct: true, why: '13 × 2。' },
-        { text: '13 GB', why: '那是 1 位元組／參數。' },
-        { text: '52 GB', why: '那是 FP32。' },
-        { text: '6.5 GB', why: '那是 4 位元。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['新一代 GPU 一直強調 FP8、FP4 的算力。為什麼廠商要往低精度發展？對使用者有什麼影響？'], answer: [
-        '同樣的晶片面積與電力，低精度能做更多運算、搬更少資料；推論尤其受惠。',
-        '對使用者：同樣的錢能跑更大的模型或更多請求；但要確認低精度不會讓品質明顯下降（4-1 量化）。',
+      { level: '深入思考', type: 'reveal', q: ['某新 GPU 的新聞寫「FP4 推論 40 PFLOPS（含稀疏）」。你的服務用 BF16 權重、主要在做單人聊天（decode）。這個數字對你有多少意義？'], answer: [
+        '第一步換算：不含稀疏約 20 PFLOPS；BF16 位元數是 FP4 的 4 倍，峰值約再除以 4，剩下約 5 PFLOPS。第二步：單人 decode 被頻寬卡住（2-3），連這 5 PFLOPS 都用不到 1%。',
+        '結論：這個數字只有在「把模型量化到 FP4」而且「大批次服務」時才接近有意義；你該先看的是記憶體頻寬與容量。常見的錯誤是直接拿標題數字和舊卡的 BF16 數字相比。',
       ] },
     ],
     keypoints: [
@@ -313,7 +261,7 @@ defineLessons({
       '精度減半：記憶體與搬運減半，峰值算力約翻倍。',
       '訓練用混合精度：計算低精度、主權重高精度。',
     ],
-    sources: ['nvidia-h100'],
+    sources: ['nvidia-h100', 'nvfp4', 'ocp-mx'],
   },
 });
 </script>

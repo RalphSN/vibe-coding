@@ -89,3 +89,62 @@
 - Antigravity CLI 的官方文件（目前多為第三方來源）。
 - 三個 AI CLI 的旗標名稱、權限模式名稱。
 - PowerShell 7.7 或下一個 LTS 的發布狀態。
+
+---
+
+## 2026-10-29 改版審查
+
+> 改版內容：拿掉測驗、每課補「深入：」段落、8-3 改成一頁地圖、內容重新查證。查證日期 2026-10-29（部分 2026-10-30 補查）。
+
+### 修正的錯誤
+
+| 課 | 原本 | 修正後 | 出處 | 可信度 |
+|---|---|---|---|---|
+| 1-2 | `echo "售價 $100"` 一律印出「售價 00」 | bash 印「售價 00」；zsh 把 `$100` 當成第 100 個參數，印「售價 」 | https://zsh.sourceforge.io/Doc/Release/Expansion.html | 🟡 依 zsh 手冊的參數展開規則，未實機執行 |
+| 4-3 | Windows `sudo` 在目前視窗以管理員執行那一個指令 | 預設模式 `forceNewWindow` 會開新視窗；另有 disableInput、inline | https://learn.microsoft.com/en-us/windows/advanced-settings/sudo/ | ✅ |
+| 6-1 | `winget install --id Python.Python.3.13 -e` | Python 官方改推 Python install manager：`winget install --id 9NQ7512CXL7T -e` | https://docs.python.org/3/using/windows.html | ✅ |
+| 6-3 深入思考題 | 「npm 用各系統的預設 shell 執行 script」 | Windows 預設 `cmd.exe`、POSIX 預設 `/bin/sh` | https://docs.npmjs.com/cli/v12/commands/npm-run/ | ✅ |
+| 6-4 | `py -3.13` 指定版本、py 是啟動器 | Python install manager 提供 `py`／`python`；`py -V:3.15`；舊啟動器與完整安裝程式已被取代（3.16 起不提供） | https://docs.python.org/3/using/windows.html | ✅ |
+| 7-1、8-2 | Antigravity 專案說明檔「⚠️ 檔名未確認」 | 讀 `GEMINI.md` 與 `AGENTS.md` | https://antigravity.google/docs/cli/gcli-migration | ✅ |
+| 7-1、7-4 | Antigravity 安裝網址與旗標「僅第三方來源」 | 官方文件已確認 install.sh／install.ps1、`-p`、`-c`、`--output-format text｜json｜stream-json`、`--dangerously-skip-permissions`；拿掉「未確認」區塊 | https://antigravity.google/docs/getting-started?tab=cli 、https://antigravity.google/docs/cli/reference | ✅ |
+| 7-4 | `agy` 指定對話用 `--conversation <id>` | 官方 reference 未列出，刪除 | 同上 | ✅（刪除） |
+| 7-2 | Claude Code 預設模式為 default | v2.1.283 起互動對話預設以 `auto` 啟動；`default` 介面上叫 Manual（別名 `manual`）；`-p` 以 default 啟動，v2.1.302 起需要核准的動作會被拒絕 | https://code.claude.com/docs/en/permission-modes | ✅ |
+| 7-1 | Claude Code 用 brew 安裝 | `brew install --cask claude-code`（穩定通道約晚一週；另有 `claude-code@latest`） | https://code.claude.com/docs/en/setup | ✅ |
+| 7-3 | `--ask-for-approval` 有 `untrusted`、`on-request`、`never` | 官方文件只剩 `on-request`、`never`；`untrusted` 在 0.149（2026-08）移除、`on-failure` 在 0.143 移除、`--full-auto` 在 0.147 移除 | https://learn.chatgpt.com/docs/developer-commands?surface=cli （可用值 ✅）；https://blakecrosley.com/blog/codex-untrusted-approval-policy-retired （版本號 🟡 僅第三方） | ✅／🟡 |
+| 7-3 | 安裝只有 npm、brew | 另有官方腳本 `curl -fsSL https://chatgpt.com/codex/install.sh ｜ sh`；第一次執行 `codex` 會引導登入 | https://learn.chatgpt.com/docs/codex/cli | ✅ |
+
+### 補的子題（深入段落，35 課）
+
+- 模組 0：PTY／ConPTY、換哪一層會變什麼、換預設 shell、登入 shell 的 `-`、SIGINT 與 Ctrl+Z／Ctrl+R／Ctrl+D。
+- 模組 1：`--` 與 `-`、GNU 與 BSD 選項順序、shell 展開順序與 bash／zsh 切字差異、內建指令查法、特殊結束代碼 126／127／130、pipefail。
+- 模組 2：大小寫、MAX_PATH、WSL 路徑；`ls` 偵測終端機、`cd -`／`pushd`；`mv` 跨磁碟、BSD 與 GNU `cp` 差異；regex 的 `-F`／`-E`、ripgrep。
+- 模組 3：isatty 與緩衝、PowerShell 六條串流；管線同時執行、7.4 位元組保留；PowerShell 不支援 `<`；`A && B || C` 陷阱、`set -e`。
+- 模組 4：三種變數範圍、`setx` 1024 字元截斷；查找順序、`hash -r`、Windows 系統／使用者 PATH；755／644、資料夾 x、macOS 隱私保護、執行原則不是安全邊界；登入 shell 讀的設定檔。
+- 模組 5：`#!/bin/sh` 是 dash、`env bash`、`set -euo pipefail`；zsh 陣列與 `nonomatch`；Format-* 放最後、`-ceq`；cmd delayed expansion、`%%f`、`chcp 65001`；無法直接翻譯的寫法。
+- 模組 6：套件來源與 `winget pin`、雙安裝路線；git 復原工具表與 reflog；semver、`npm ci`、postinstall、`npx -y`、npm script-shell；Python 3.15、install manager、uv；curl 不把 404 當失敗、ssh 主機指紋與 `~/.ssh/config`。
+- 模組 7：三家設計取捨、AGENTS.md 跨工具慣例、Claude Code 新預設與 Windows 上的 shell、Codex 旗標變化、Antigravity 搬遷對照、各層防線的可靠度；7-1 新增 AI CLI 指令拆解器。
+- 8-1：救援方式表、`--force-with-lease` 的漏洞與 `--force-if-includes`、secret scanning。
+
+### 新查證的事實
+
+| 事實 | 來源 | 可信度 |
+|---|---|---|
+| Gemini CLI 2026-06-18 對 AI Pro／Ultra／免費 Code Assist 帳號停止；Standard／Enterprise 授權與付費 API 金鑰仍可用 | https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/ | ✅（原本 🟡 升級） |
+| Antigravity 權限：規則在 `~/.gemini/antigravity-cli/settings.json`；toolPermission：strict、request-review、proceed-in-sandbox、always-proceed；`--mode=auto`（預覽） | https://antigravity.google/docs/permissions?tab=cli | ✅ |
+| Python 3.15.0 於 2026-10-09 發布 | https://www.python.org/downloads/release/python-3150/ | ✅ |
+| PowerShell 7.4 起重新導向保留外部程式的位元組；`<` 保留未實作；只能把其他串流併到 1 號 | https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection | ✅ |
+| Claude Code 在原生 Windows 有 Git for Windows 時用 Git Bash，否則用 PowerShell | https://code.claude.com/docs/en/setup | ✅ |
+| ConPTY 隨 2018 年秋季 Windows 10 更新推出（課文寫 1809） | https://devblogs.microsoft.com/commandline/windows-command-line-introducing-the-windows-pseudo-console-conpty/ | 🟡 官方部落格只寫「Fall 2018」 |
+
+### 未查證
+
+- 2-3：BSD `cp -r src/` 只複製內容、GNU `rm -I` 超過 3 個檔案才問，依 man page 記憶撰寫，未重新開文件核對。
+- 4-1：`setx` 截斷 1024 字元，依記憶撰寫。
+- 6-1：`winget pin` 指令，依記憶撰寫。
+- 7-5：各工具對允許規則與 `&&` 串接的處理細節，課文只寫「各工具不同，查官方文件」。
+- 8-1：`--force-if-includes` 自 Git 2.30 起，依記憶撰寫。
+
+### 下次重新查證：2027-01-29
+
+- 三家 AI CLI 的旗標、權限模式與預設值（變動最快）。
+- PowerShell 7.7 的發布狀態；Python install manager 的指令。

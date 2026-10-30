@@ -1913,7 +1913,7 @@ defineLessons({
             { label: '當初的成本對結果的影響', value: '0 元', ratio: 0 },
           ], note: `當初花了多少，完全不在計算裡；改動「買進成本」這根拉桿，結果一點都不會變。決定只取決於你對未來的預期。` };
         } } },
-        { type: 'heading', id: 'regret', text: '作為與不作為的後悔' },
+        { type: 'heading', id: 'regret', text: '深入：作為與不作為的後悔' },
         { type: 'table', head: ['', '作為的後悔', '不作為的後悔'], rows: [
           ['例子', '買了之後跌了', '沒買，後來大漲'],
           ['短期感受', '通常比較強烈', '比較弱'],
@@ -1999,7 +1999,7 @@ defineLessons({
             { label: `${v.years} 年後（假設市場 7%）`, value: `${Math.round(after).toLocaleString()} 元（不交易 ${Math.round(base).toLocaleString()}）`, ratio: Math.min(1, after / base) },
           ], note: '預設：一年週轉 200%（等於一年把所有持股換兩次），光是手續費與證交稅每年就吃掉約 0.94 個百分點，還沒算買賣時機的損失。台灣的研究也指出，散戶落後市場的部分約三分之二來自交易成本。' };
         } } },
-        { type: 'heading', id: 'daytrade', text: '台灣的當沖研究' },
+        { type: 'heading', id: 'daytrade', text: '深入：台灣的當沖研究' },
         'Barber、Lee、Liu、Odean 等人用台灣 1992 到 2006 年的資料研究當沖交易者：當沖者整體的績效是負的，多數人不賺錢，而且很多人在持續虧損後仍然繼續交易。作者的解讀是：這和過度自信、以及「選擇性地記住賺錢的經驗」一致，而不是理性地在學習自己的能力。',
         { type: 'table', head: ['過度自信的表現', '對策'], rows: [
           ['頻繁交易', '把交易次數與成本記錄下來，每年檢視'],
@@ -2078,7 +2078,7 @@ defineLessons({
             { label: '兩者都投入', value: `${paid.toLocaleString()} 元`, ratio: Math.min(1, paid / steady) },
           ], note: `虛構的 10 年年報酬：${MARKET_PATH.join('%、')}%。追高者的規則：前一年下跌，就停止投入（錢放 1.5% 現金）並賣出部分持股；前一年大漲超過 15%，就把累積的現金全部投入；其他年份照常投入。預設賣出 50% 時，追高者期末約 1,135,604 元，穩定投入者約 1,324,964 元，少了約 14%。即使把賣出比例設成 0（約 1,271,120 元），光是「跌了就停投、漲了才追」，結果仍然落後。` };
         } } },
-        { type: 'heading', id: 'sources', text: 'FOMO 從哪裡來' },
+        { type: 'heading', id: 'sources', text: '深入：FOMO 從哪裡來' },
         { type: 'table', head: ['來源', '為什麼會放大 FOMO'], rows: [
           ['社群與通訊群組', '只看得到別人賺錢的截圖，看不到虧損'],
           ['新聞標題', '「創新高」「錯過這波就沒了」吸引點閱'],
@@ -3162,7 +3162,7 @@ const SECTION_DEFS = [
   ['define', '正式定義'],
   ['examples', '詳細說明'],
   ['mistakes', '常見錯誤'],
-  ['practice', '練習'],
+  ['practice', '深入思考'],
   ['lab', '動手做'],
   ['keypoints', '三個重點'],
 ];
@@ -3238,7 +3238,7 @@ Views.lesson = ({ id }) => {
     ${c ? `<div class="done-row" id="done-row">
       ${isDone
         ? `<span class="stamp">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`}
+        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`}
     </div>` : ''}
     <nav class="lesson-nav" aria-label="上一課與下一課">
       ${prev ? `<a class="prev nb-press" href="#/l/${prev.id}" rel="prev"><span class="dir">← 上一課</span><span class="ttl">${renderPhrases(`${prev.id} ${prev.title}`)}</span></a>` : ''}
@@ -3307,7 +3307,7 @@ function onClick(e) {
   const { action: name, id } = action.dataset;
   if (name === 'done') markDone(id, true);
   if (name === 'undone') markDone(id, false);
-  if (name === 'reset' && window.confirm('確定要清除所有學習進度與測驗紀錄嗎？字級與目錄寬度不會被清除。')) {
+  if (name === 'reset' && window.confirm('確定要清除所有學習進度嗎？字級與目錄寬度不會被清除。')) {
     Store.reset();
     render();
     announce('學習進度已清除');
@@ -3320,7 +3320,7 @@ function markDone(id, isDone) {
   if (row) {
     row.innerHTML = isDone
       ? `<span class="stamp animate">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`;
+      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`;
     const focusTarget = $('button', row);
     if (focusTarget) focusTarget.focus();
   }

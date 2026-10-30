@@ -16,20 +16,17 @@ defineTerms({
   'null': { en: 'null', def: '「刻意表示沒有值」：由程式設計者自己放進去的空值。', example: '`user.avatar = null` 表示「確定沒有頭像」。' },
 });
 
+defineTerms({
+  '字素': { en: 'grapheme cluster', def: '使用者眼中的「一個字」；可能由好幾個 Unicode 碼位組成，例如國旗、家庭 emoji、加了聲調符號的字母。', example: '`🇹🇼` 是 1 個字素、2 個碼位、4 個 UTF-16 單位。' },
+  '包裝物件': { en: 'wrapper object', def: '對原始值讀屬性或呼叫方法時，引擎暫時建立的物件（String、Number、Boolean 等），用完就丟。', example: '`"java".toUpperCase()` 背後暫時用了一個 String 物件。' },
+});
+
 defineLessons({
   '1-1': {
     goals: [
       '說出 JavaScript 的七種原始值與物件',
       '知道 `typeof` 的兩個怪癖：null 與陣列',
       '寫出能正確判斷「這是一般物件」的條件',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1）在 Node.js 執行 `typeof document`，結果是？', options: [
-        { text: "`'undefined'`", correct: true, why: 'document 是瀏覽器的設備，Node.js 沒有；typeof 對不存在的名字不會報錯，回傳字串 undefined。' },
-        { text: "`'object'`", why: '那是在瀏覽器裡的結果。Node.js 沒有網頁，也就沒有 document。' },
-        { text: '拋出 ReferenceError', why: '直接讀 `document` 才會拋錯；`typeof` 是少數可以安全檢查不存在名字的寫法。' },
-        { text: "`'null'`", why: 'typeof 從來不會回傳 null 這個字串。' },
-      ] },
     ],
     analogy: {
       text: ['超商的寄物：零錢、一張紙條這種小東西，店員直接收下、放在櫃檯（原始值）。一個大行李箱，店員給你一張號碼牌，箱子放到後面的倉庫（物件）；你手上拿的是號碼牌，不是箱子。'],
@@ -90,7 +87,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "console.log(typeof null);\nconsole.log(typeof []);\nconsole.log(Array.isArray([]), Array.isArray({}));\nconsole.log(typeof function () {});",
-          predict: { q: '第一行 `typeof null` 會印出什麼？', options: ['null', 'object', 'undefined'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="判斷流程：先問是不是 null，是就不是一般物件；不是的話問 typeof 是不是 object；是的話再問是不是陣列；都通過才是一般物件">
           <rect x="10" y="10" width="160" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -106,35 +102,21 @@ defineLessons({
           <text x="470" y="182" text-anchor="middle" font-size="18" font-weight="900" class="on-color">一般物件</text>
           <g class="stroke-ink" stroke-width="4"><path d="M170 45 H200 M360 45 H390 M470 80 V140"/></g>
         </svg>`, caption: '三關都過才是一般物件。順序也有意義：先排除 null，後面讀屬性才安全。' },
+        { type: 'heading', id: 'deep-boxing', text: '深入：原始值為什麼能呼叫方法，以及 typeof 以外的判斷' },
+        '原始值不是物件，卻能寫 `"java".toUpperCase()`：引擎在讀屬性的那一刻建立一個暫時的[[包裝物件]]，借用 `String.prototype` 上的方法，用完就丟。所以對原始值「加屬性」沒有意義：在嚴格模式下 `s.tag = 1` 會拋出 TypeError，非嚴格模式則安靜地消失。不要用 `new String("a")` 自己建包裝物件，它的 typeof 是 `"object"`，而且 `new Boolean(false)` 在 if 裡是 truthy。',
+        { type: 'table', caption: '判斷型別的工具與限制', head: ['工具', '適合', '限制'], rows: [
+          ['`typeof`', '原始值、函式', 'null 與陣列都是 `"object"`'],
+          ['`Array.isArray`', '陣列', '只回答「是不是陣列」'],
+          ['`x instanceof Date`', '自己的 class、內建物件', '跨 iframe 或 Node.js 的 `vm` 時會失敗：每個環境有自己一份 Date'],
+          ['`Object.prototype.toString.call(x)`', '需要精確標籤時', '回傳 `"[object Null]"`、`"[object Date]"` 這種字串，可被 `Symbol.toStringTag` 改寫'],
+        ] },
+        '什麼時候不需要這麼小心：資料是你自己的程式產生、型別由 TypeScript 檢查過的，就相信型別。執行期檢查只放在資料「進門」的地方：API 回應、JSON 檔、表單、localStorage（8-4）。',
       ],
-      tryit: {
-        q: ['補完下面的判斷，讓它只在 `v` 是陣列時回傳 true：'],
-        draft: 'function isList(v) {\n  return ____;\n}',
-        answer: ['`Array.isArray(v)`。', '不要用 `typeof v === "object"`：一般物件和 null 也會通過。'],
-      },
     },
     mistakes: [
       { wrong: '用 `typeof x === "object"` 判斷 x 是一個物件，然後直接讀 `x.name`。', why: 'x 是 null 時也會通過，讀屬性就拋出 `TypeError: Cannot read properties of null`。', right: '加上 `x !== null`；要排除陣列再加 `!Array.isArray(x)`。' },
       { wrong: '以為 `typeof []` 是 `"array"`。', why: 'typeof 沒有 array 這個結果，陣列是物件的一種。', right: '判斷陣列一律用 `Array.isArray`。' },
       { wrong: '以為 TypeScript 型別寫了 `string`，執行時就一定是字串。', why: '型別在編譯後全部消失；從 API、JSON、表單來的資料，執行時是什麼都有可能。', right: '外部資料在執行時用 typeof、Array.isArray 再檢查一次（8-4 會完整示範）。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '下面哪一個「不是」原始值？', options: [
-        { text: '`[1, 2]`', correct: true, why: '陣列是物件，可以被修改，typeof 是 object。' },
-        { text: '`null`', why: '雖然 typeof null 是 object，null 仍是七種原始值之一，這是 typeof 的歷史錯誤。' },
-        { text: '`10n`', why: 'BigInt 是原始值，typeof 是 bigint。' },
-        { text: '`Symbol("id")`', why: 'Symbol 是原始值，typeof 是 symbol。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`const data = JSON.parse(text)`，你想確認 data 是一般物件才讀 `data.theme`。哪個條件最正確？', options: [
-        { text: "`typeof data === 'object'`", why: 'text 是 `"null"` 或 `"[]"` 時也會通過，讀 theme 可能拋錯或讀到 undefined。' },
-        { text: "`data !== null && typeof data === 'object' && !Array.isArray(data)`", correct: true, why: '同時排除 null 與陣列，只剩一般物件。' },
-        { text: "`data instanceof Array === false`", why: 'null、數字、字串也都不是陣列，這個條件幾乎什麼都放行。' },
-        { text: "`typeof data === 'object' && data !== undefined && data.length === undefined`", why: '只排除了 null 和 undefined，陣列、字串、數字都會通過。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事說：「我們用 TypeScript，`data` 的型別寫成 `Settings`，所以不用檢查。」你會怎麼說服他在讀設定檔時加上執行期檢查？'], answer: [
-        'TypeScript 的型別只在編譯時存在，`JSON.parse` 的結果在執行時可能是任何東西：使用者改壞的檔案、舊版格式、null。',
-        '型別註記等於「我保證它長這樣」，但保證不了外部資料。所以在資料進門的地方（讀檔、API 回應）用 typeof、Array.isArray 檢查一次，後面的程式才能放心相信型別。',
-      ] },
     ],
     keypoints: [
       '值分成七種原始值和物件；原始值不能被修改，陣列與函式都是物件。',
@@ -149,14 +131,6 @@ defineLessons({
       '解釋為什麼 `0.1 + 0.2 !== 0.3`',
       '說出安全整數的上限，以及超過時會發生什麼',
       '處理金額時，用整數或容許誤差的比較',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-1）`typeof NaN` 是什麼？', options: [
-        { text: "`'number'`", correct: true, why: 'NaN 是浮點數規格裡「無效的計算結果」，仍屬於 number。' },
-        { text: "`'NaN'`", why: 'typeof 沒有 NaN 這個結果。' },
-        { text: "`'undefined'`", why: 'NaN 是一個有值的 number，不是「沒有值」。' },
-        { text: "`'object'`", why: '只有 null 有這個怪癖。' },
-      ] },
     ],
     analogy: {
       text: ['記帳本每一格只寫得下小數點後四位。你想記「三分之一」，只好寫 0.3333；三筆加起來得到 0.9999，不是 1。每一筆只差一點點，加起來就看得出來了。改成用「分」記整數，就沒有這個問題。'],
@@ -203,7 +177,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "console.log(0.1 + 0.2, 0.1 + 0.2 === 0.3);\nconsole.log(9007199254740993);\nconsole.log(1.005.toFixed(2));\nconsole.log(Math.abs(0.1 + 0.2 - 0.3) < Number.EPSILON);",
-          predict: { q: '`1.005.toFixed(2)` 會印出什麼？', options: ['1.01', '1.00', '1.005'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="三種處理方式對照：金額用整數的分；比較小數用容許誤差；大整數 ID 用字串或 BigInt">
           <rect x="10" y="10" width="170" height="190" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
@@ -219,12 +192,15 @@ defineLessons({
           <text x="465" y="96" text-anchor="middle" font-size="16" class="on-color">用字串傳</text>
           <text x="465" y="130" text-anchor="middle" font-size="16" class="on-color">要計算用 BigInt</text>
         </svg>`, caption: '三種最常見的情境，各有固定的處理方式。' },
+        { type: 'heading', id: 'deep-float', text: '深入：2⁵³ 從哪裡來、EPSILON 的陷阱與 Math.sumPrecise' },
+        '尾數有 52 位，加上規格裡省略不寫、永遠是 1 的開頭位，等於有 53 位二進位有效數字。整數不超過 2⁵³ 時，每一個都能剛好用 53 位表示；超過之後，相鄰可表示的數字間隔變成 2、4、8……所以 `9007199254740992 + 1` 還是 9007199254740992。',
+        '`Number.EPSILON` 是「1 附近」相鄰兩個數字的間隔（2⁻⁵²）。數字一大，誤差也跟著變大，固定拿 EPSILON 比較就會失效：`(0.1 + 0.2) * 1e6` 和 `300000` 的差值遠大於 EPSILON。實務上依領域定容許誤差（例如座標 `1e-9`），或用相對誤差 `Math.abs(a - b) <= 1e-9 * Math.max(Math.abs(a), Math.abs(b))`。',
+        { type: 'table', caption: 'ES2026 的 Math.sumPrecise（支援版本來自 MDN browser-compat-data，2026-10-29 查證）', head: ['寫法', '`[1e20, 0.1, -1e20]` 的結果', '支援'], rows: [
+          ['一般 `reduce` 相加', '`0`：0.1 被 1e20 吞掉', '所有環境'],
+          ['`Math.sumPrecise(arr)`', '`0.1`：整串一起精確加總，最後才捨入一次', 'Chrome 147、Firefox 137、Safari 26.2；Node.js 26 還沒有'],
+        ] },
+        '什麼時候浮點數就夠了：物理模擬、圖表座標、統計平均，這些本來就是近似值，差 10⁻¹⁵ 沒有人在意。只有「每一分錢都要對得上」的金額與「要拿來當 ID 比對」的大整數，才需要換整數單位、字串或 BigInt。',
       ],
-      tryit: {
-        q: ['補完 `isClose(a, b)`，讓 `isClose(0.1 + 0.2, 0.3)` 回傳 true：'],
-        draft: 'const TOLERANCE = 1e-9;\nfunction isClose(a, b) {\n  return ____ < TOLERANCE;\n}',
-        answer: ['`Math.abs(a - b)`。', '比較兩數之差的絕對值，而不是直接用 `===`。容許誤差的大小依情境決定；`Number.EPSILON` 只適合比較 1 附近的數。'],
-      },
     },
     mistakes: [
       { wrong: '用 `===` 比較兩個計算出來的小數。', why: '兩邊可能各差一點點，明明「應該相等」卻得到 false。', right: '比較差值的絕對值是否小於容許誤差。' },
@@ -232,19 +208,7 @@ defineLessons({
       { wrong: '把資料庫的 64 位元 ID 用 number 傳給前端。', why: '超過安全整數後會失準，兩個不同的 ID 可能變成同一個數字。', right: 'API 用字串傳 ID；真的要計算時用 BigInt。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '為什麼 `0.1 + 0.2` 不等於 `0.3`？', options: [
-        { text: '0.1 和 0.2 在二進位都寫不完，存進去就各有誤差', correct: true, why: '捨去後的誤差在相加時累積，大到顯示出來。' },
-        { text: 'JavaScript 的加法有 bug，其他語言不會', why: 'Python、C# 的 double 也一樣，這是 IEEE 754 浮點數的特性。' },
-        { text: '因為 number 只能存 15 位小數', why: '問題不是位數不夠顯示，而是二進位根本寫不完 0.1。' },
-        { text: '要先用 parseFloat 轉換才會精確', why: 'parseFloat 得到的還是同一個浮點數，誤差一樣在。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`Number.isSafeInteger(2 ** 53)` 的結果是？', options: [
-        { text: 'true，因為 2 的 53 次方能被精確表示', why: '它本身能被表示，但 2⁵³ 與 2⁵³ + 1 會變成同一個值，所以不算安全。' },
-        { text: 'false，安全範圍只到 2⁵³ − 1', correct: true, why: 'Node.js 22.13 實測：false。安全整數的上限是 9007199254740991。' },
-        { text: '拋出 RangeError', why: '這只是一個判斷函式，不會拋錯。' },
-        { text: 'true，因為它是整數', why: '是整數不代表是安全整數。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要做一個匯率換算：台幣金額乘上 0.031 換成美元，再加總很多筆。用「換成分」的方法夠嗎？要注意什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要做一個匯率換算：台幣金額乘上 0.031 換成美元，再加總很多筆。用「換成分」的方法夠嗎？要注意什麼？'], answer: [
         '不夠。乘上匯率之後會出現很多位小數，四捨五入到分會在每一筆遺失資訊，加總後的誤差可能比直接用浮點數還大。',
         '做法：先加總原始的台幣（整數），最後才換算一次並四捨五入；或使用專門的十進位運算函式庫。重點是「只在最後捨入一次」。',
       ] },
@@ -254,7 +218,7 @@ defineLessons({
       '整數在 ±(2⁵³ − 1) 以內才精確；超過要用字串或 BigInt。',
       '金額存整數最小單位、小數用容許誤差比較，toFixed 只用在顯示。',
     ],
-    sources: ['mdn-number'],
+    sources: ['mdn-number', 'mdn-bcd'],
   },
 
   '1-3': {
@@ -262,20 +226,6 @@ defineLessons({
       '說明字串為什麼「不能被修改」，以及方法為什麼回傳新字串',
       '用樣板字串組合文字',
       '知道 `length` 算的不一定是「看到的字數」',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-2）購物車要加總 `[19.9, 0.29]`，下列哪個做法最可靠？', options: [
-        { text: '每筆先換成整數的分再加總', correct: true, why: '換成整數的分再加，最後只轉換一次。' },
-        { text: '直接相加，最後再用 `toFixed(2)` 修成兩位小數', why: 'toFixed 只修飾顯示，而且有 1.005 這類捨入陷阱，也會回傳字串。' },
-        { text: '每筆 `p * 100` 加總，不用 Math.round', why: '`0.29 * 100` 是 28.999999999999996，不捨入會把誤差帶進整數。' },
-        { text: '用 BigInt 存小數', why: 'BigInt 只能存整數，不能直接存 19.9。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 0-3）錯誤訊息 `TypeError: Cannot read properties of undefined` 代表什麼？', options: [
-        { text: '對 undefined 讀了屬性', correct: true, why: '點的左邊是 undefined，任何屬性都讀不到。' },
-        { text: '要讀的屬性名稱拼錯了', why: '拼錯只會讀到 undefined，不會拋錯；拋錯的是「對 undefined 再往下讀」。' },
-        { text: '用到的變數沒有先宣告', why: '沒宣告的名字會是 ReferenceError。' },
-        { text: '程式有語法錯誤，引擎讀不懂這一行程式碼', why: '語法錯誤是 SyntaxError，而且在執行前就擋下。' },
-      ] },
     ],
     analogy: {
       text: ['字串像刻在石碑上的字：你不能把其中一個字挖掉換掉，只能另外刻一塊新的石碑。「把 java 改成大寫」其實是照著舊碑刻一塊寫著 JAVA 的新碑，舊的那塊原封不動。'],
@@ -330,7 +280,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const word = 'java';\nconst upper = word.toUpperCase();\nconsole.log(word, upper);\nconsole.log('😀'.length, [...'😀'].length, '台灣'.length);\nconst n = 3;\nconsole.log(`第 ${n} 課，共 ${n * 2} 頁`);",
-          predict: { q: '`"😀".length` 會印出多少？', options: ['1', '2', '4'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="length 與實際字數對照：台灣 length 2、看到 2 個字；emoji 笑臉 length 2、看到 1 個字；用展開運算子算出 1">
           <rect x="10" y="10" width="540" height="56" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -346,42 +295,26 @@ defineLessons({
           <text x="260" y="177" font-size="18" class="mono on-color">2</text>
           <text x="440" y="177" font-size="18" class="on-color">1</text>
         </svg>`, caption: '中文字大多是一個單位，emoji 要兩個。要算「看到的字數」，用 `[...s].length`。' },
+        { type: 'heading', id: 'deep-grapheme', text: '深入：「一個字」有三種算法' },
+        '1-3 用 `[...s].length` 算字數，它算的是 Unicode 碼位（code point）。但有些字由好幾個碼位組成：國旗是兩個地區代碼、家庭 emoji 是好幾個人加上連接符號。使用者眼中的「一個字」叫[[字素]]，要用 `Intl.Segmenter` 才算得準（Chrome 87、Safari 14.1、Firefox 125、Node.js 16 起，MDN browser-compat-data 2026-10-29 查證）。',
+        { type: 'widget', name: 'runner', props: {
+          title: '三種長度，一次比較',
+          code: "const seg = new Intl.Segmenter('zh-Hant', { granularity: 'grapheme' });\nconst count = (s) => [...seg.segment(s)].length;\nfor (const s of ['台灣', '😀', '🇹🇼', '👨‍👩‍👧']) {\n  console.log(s, s.length, [...s].length, count(s));\n}\nconsole.log('é' === 'e\\u0301', 'é' === 'e\\u0301'.normalize('NFC'));",
+        } },
+        '最後一行是另一個坑：「é」可以存成一個碼位，也可以存成「e」加上一個組合用的聲調符號，畫面一模一樣，`===` 卻是 false。比對使用者輸入（帳號、搜尋）前先 `normalize("NFC")`。中文字幾乎都是一個單位，所以只做中文介面時不容易踩到；有暱稱、留言這類自由輸入時才要處理。',
       ],
-      tryit: {
-        q: ['補完 `shout(text)`：回傳去掉前後空白、轉大寫、加上驚嘆號的新字串。`shout("  hi ")` 要得到 `"HI!"`。'],
-        draft: 'function shout(text) {\n  return ____;\n}',
-        answer: ['`text.trim().toUpperCase() + "!"`（也可以用樣板字串寫）。', '每個方法都回傳新字串，所以可以一路串下去；原本的 text 完全沒變。'],
-      },
     },
     mistakes: [
       { wrong: '呼叫 `name.trim()` 後，以為 name 已經沒有空白了。', why: '方法回傳新字串，name 本身不會變。', right: '寫成 `name = name.trim()`，或把結果存到新變數。' },
       { wrong: '用 `s.length` 限制「最多 10 個字」，結果使用者打 emoji 就超過。', why: 'length 算的是 UTF-16 單位，一個 emoji 算 2。', right: '要算看到的字數用 `[...s].length`。' },
       { wrong: '在樣板字串裡用單引號或雙引號。', why: '`${}` 只在反引號裡有作用；在單引號裡會原樣印出 ${n} 這四個字。', right: '確認字串外面是反引號，不是單引號或雙引號。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`const s = "abc"; s.toUpperCase(); console.log(s);` 印出什麼？', options: [
-        { text: '`abc`', correct: true, why: '字串不能被修改，toUpperCase 的結果沒有被接住。' },
-        { text: '`ABC`，已經被轉成大寫', why: '這是把結果存起來才會得到的值。' },
-        { text: '拋出 TypeError', why: '呼叫方法本身是合法的，只是結果被丟掉了。' },
-        { text: '`undefined`', why: 's 仍然指向原本的字串 "abc"。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`"a,b,,c".split(",")` 的結果是？', options: [
-        { text: "`['a', 'b', '', 'c']`", correct: true, why: '兩個逗號中間是空字串，也會變成一個元素。' },
-        { text: "`['a', 'b', 'c']`，空的片段被略過", why: 'split 不會自動略過空的片段。' },
-        { text: "`'abc'`", why: 'split 一定回傳陣列。' },
-        { text: "`['a,b,,c']`", why: '那是找不到分隔符號時的結果；這裡有逗號。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['暱稱欄位規定「最多 8 個字」。目前用 `nickname.length <= 8` 檢查，有使用者回報打了 5 個 emoji 就被擋。說明原因，並寫出修正後的條件。'], answer: [
-        '每個 emoji 在 UTF-16 裡佔 2 個單位，5 個 emoji 的 length 是 10，所以超過 8。',
-        '修正：`[...nickname].length <= 8`，展開運算子會依「字元」切開。（少數組合 emoji，例如家庭、國旗，由好幾個字元組成，要更精確可以用 `Intl.Segmenter`，屬於進階用法。）',
-      ] },
-    ],
     keypoints: [
       '字串不能被修改，所有方法都回傳新字串；要保留結果就存進變數。',
       '樣板字串用反引號，`${}` 裡可以放任何運算式。',
       'length 算的是 UTF-16 單位，emoji 算 2；要算看到的字數用 `[...s].length`。',
     ],
-    sources: ['mdn-string'],
+    sources: ['mdn-string', 'mdn-bcd'],
   },
 
   '1-4': {
@@ -389,20 +322,6 @@ defineLessons({
       '說出 undefined 會從哪四個地方出現',
       '分清 undefined 與 null 的用途',
       '知道預設參數只對 undefined 生效',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-3）`"  hi ".trim().toUpperCase()` 的結果是？', options: [
-        { text: "`'HI'`", correct: true, why: '先去掉前後空白，再轉大寫；每一步都回傳新字串。' },
-        { text: "`'  HI '`", why: 'trim 會去掉前後空白。' },
-        { text: "`'hi'`", why: '後面還有 toUpperCase。' },
-        { text: '拋出 TypeError，因為字串不能被修改', why: '方法不修改原字串，而是回傳新的，所以完全合法。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-1）`typeof null` 是？', options: [
-        { text: "`'object'`", correct: true, why: '第一版 JavaScript 的錯誤，為了相容保留至今。' },
-        { text: "`'null'`", why: 'typeof 沒有這個結果。' },
-        { text: "`'undefined'`", why: 'null 與 undefined 的 typeof 不同。' },
-        { text: '拋出錯誤', why: 'typeof 對任何值都不會拋錯。' },
-      ] },
     ],
     analogy: {
       text: ['問卷上的一題，留白沒填和寫上「無」是兩件事：留白可能是忘了、還沒填、或這題根本沒發給你（undefined）；寫「無」是填的人明確告訴你答案就是沒有（null）。'],
@@ -456,7 +375,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "function greet(name = '朋友') {\n  return `嗨，${name}`;\n}\nconsole.log(greet(), greet(undefined), greet(null));\nconsole.log(JSON.stringify({ a: undefined, b: null }));\nconsole.log(null == undefined, null === undefined);",
-          predict: { q: '`greet(null)` 回傳什麼？', options: ['嗨，朋友', '嗨，null', '拋出 TypeError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="處理沒有值的三種寫法：?. 安全地往下讀；?? 換成預設值；=== null 或 === undefined 精確判斷">
           <rect x="10" y="10" width="170" height="170" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/>
@@ -472,12 +390,17 @@ defineLessons({
           <text x="465" y="100" text-anchor="middle" font-size="16" class="on-color">要分清楚時</text>
           <text x="465" y="130" text-anchor="middle" font-size="16" class="on-color">精確判斷</text>
         </svg>`, caption: '三個工具：`?.` 與 `??` 把 null 和 undefined 一起處理；要分開就用 `===`。3-2 會詳細介紹前兩個。' },
+        { type: 'heading', id: 'deep-absence', text: '深入：API 裡「沒有值」的四種寫法' },
+        '前後端交換 JSON 時，「沒有值」至少有四種寫法，意思都不同。很多 bug 來自兩邊對它們的理解不一樣：',
+        { type: 'table', head: ['JSON 裡', '前端讀到', '常見意思'], rows: [
+          ['欄位不存在', '`undefined`', '「這次沒提到」：在 PATCH 更新裡代表不要改'],
+          ['`"avatar": null`', '`null`', '「確定沒有」：在 JSON Merge Patch（RFC 7396）裡代表刪除這個欄位'],
+          ['`"name": ""`', '空字串', '「有，但是空的」：使用者把欄位清空'],
+          ['`"tags": []`', '空陣列', '「有清單，裡面沒東西」'],
+        ] },
+        '要分清「欄位不存在」和「欄位存在但值是 undefined」，用 `Object.hasOwn(obj, "a")` 或 `"a" in obj`；`obj.a === undefined` 兩種都會是 true。這在合併設定（`{ ...defaults, ...user }`）時很重要：user 裡寫了 `theme: undefined` 會把預設值蓋掉。',
+        '什麼時候不用分這麼細：純前端內部的狀態，團隊約定只用一種（多半是 null）就好。只有在資料要跨邊界（API、資料庫、localStorage）時，才需要把四種寫法的意思寫進 API 文件。',
       ],
-      tryit: {
-        q: ['`user` 可能沒有 `profile`。補完下面這行，讓它在沒有 profile 時得到 `"匿名"`，而且不會拋錯：'],
-        draft: "const nickname = user.profile____nickname ____ '匿名';",
-        answer: ["`const nickname = user.profile?.nickname ?? '匿名';`", '`?.` 讓 profile 不存在時直接得到 undefined 而不拋錯；`??` 把 undefined 換成「匿名」。'],
-      },
     },
     mistakes: [
       { wrong: '以為傳 null 會觸發預設參數。', why: '預設參數只在值是 undefined 時生效；null 是「有給的值」。', right: '呼叫端不要傳 null；或在函式裡用 `name ?? "朋友"` 同時處理兩者。' },
@@ -485,19 +408,7 @@ defineLessons({
       { wrong: '寫 `if (user.profile.name)` 檢查有沒有名字。', why: 'profile 本身是 undefined 時，讀 `.name` 就拋出 TypeError。', right: '用 `user.profile?.name`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下列哪一個「不會」得到 undefined？', options: [
-        { text: '`JSON.parse("null")`', correct: true, why: '這會得到 null，是 JSON 裡明確寫的值。' },
-        { text: '`let x; x`（宣告了但沒有指定值）', why: '宣告了沒給值，是 undefined。' },
-        { text: '`[1, 2][5]`', why: '超出範圍的元素是 undefined。' },
-        { text: '沒有 return 的函式的回傳值', why: '函式沒有 return 時回傳 undefined。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`JSON.stringify({ name: "阿明", age: undefined, team: null })` 的結果是？', options: [
-        { text: '`{"name":"阿明","team":null}`', correct: true, why: 'undefined 的屬性被丟掉，null 保留。' },
-        { text: '`{"name":"阿明","age":undefined,"team":null}`', why: 'JSON 沒有 undefined 這個值，不能這樣寫。' },
-        { text: '`{"name":"阿明","age":null,"team":null}`', why: 'undefined 不會被轉成 null，而是整個屬性消失。' },
-        { text: '`{"name":"阿明"}`', why: 'null 是合法的 JSON 值，會被保留。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['API 回傳的使用者資料裡，`avatar` 有時是 null、有時整個沒有這個欄位。你的團隊要決定前端怎麼表示「沒有頭像」，你會建議什麼規則？為什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['API 回傳的使用者資料裡，`avatar` 有時是 null、有時整個沒有這個欄位。你的團隊要決定前端怎麼表示「沒有頭像」，你會建議什麼規則？為什麼？'], answer: [
         '建議：在資料進門的地方統一成一種，例如 `avatar: data.avatar ?? null`，之後整個前端只用 null 表示「沒有頭像」。',
         '理由：兩種混用時，到處都要寫兩種判斷，很容易漏；統一後只要 `avatar === null` 就夠了，存回 JSON 時也不會讓欄位消失。',
       ] },
@@ -507,7 +418,7 @@ defineLessons({
       '預設參數只對 undefined 生效；JSON 會丟掉 undefined 的屬性、保留 null。',
       '讀可能不存在的東西用 `?.`，給預設值用 `??`，要分開判斷才用 `===`。',
     ],
-    sources: ['mdn-types', 'mdn-nullish'],
+    sources: ['mdn-types', 'mdn-nullish', 'rfc7396'],
   },
 });
 </script>

@@ -9,23 +9,11 @@ defineTerms({
   'memory-bound': { en: 'memory-bound', def: '速度被搬資料的頻寬限制，算力閒著。', example: '產生文字（decode）。', lesson: '2-3' },
   'compute-bound': { en: 'compute-bound', def: '速度被算力限制，資料搬得夠快。', example: '訓練、prefill。', lesson: '2-3' },
   'KV cache': { en: 'KV cache', def: '推論時存下每個 token 每一層的 K、V，避免重算；長度越長佔越多記憶體（第二部 7-3）。', example: '每個 token × 層數 × 2 × 維度 × 位元組。', lesson: '2-4' },
+  '推測解碼': { en: 'speculative decoding', def: '先讓小模型猜接下來幾個 token，再由大模型一次驗證；權重搬一次能確認好幾個 token，輸出分布和原本相同。', example: '論文在 T5-XXL 上快 2～3 倍。', lesson: '2-3' },
+  'PagedAttention': { en: 'PagedAttention', def: 'vLLM 把 KV cache 切成固定大小的「頁」按需配置的做法，像作業系統的虛擬記憶體，大幅減少浪費。', example: '浪費從 60～80% 降到 4% 以下。', lesson: '2-4' },
   'GQA': { en: 'grouped-query attention', def: '讓好幾個 attention 頭共用同一組 K、V，以縮小 KV cache 的做法。', example: '32 個頭共用 8 組 K、V：KV cache 變 1/4。', lesson: '2-4' },
 });
 
-const REVIEW_M1 = [
-  { level: '回想', type: 'mc', q: '（回顧 1-3）70B 模型用 BF16 存，權重約？', options: [
-    { text: '140 GB', correct: true, why: '70 × 2。' },
-    { text: '70 GB', why: '那是 1 位元組／參數。' },
-    { text: '280 GB', why: '那是 FP32。' },
-    { text: '35 GB', why: '那是 4 位元。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 1-2）m＝1 時矩陣乘法的瓶頸常是？', options: [
-    { text: '搬權重的時間', correct: true, why: '每個權重只用一次。' },
-    { text: '算力不夠，GPU 算不完', why: '運算量很小。' },
-    { text: '硬碟太慢', why: '權重已在 VRAM。' },
-    { text: '網路延遲', why: '不是這裡的瓶頸。' },
-  ] },
-];
 
 const GPUS = [
   { name: '消費級 24 GB', gb: 24, note: '24 GB 是消費級顯示卡常見的上限等級（示意）。' },
@@ -41,7 +29,6 @@ defineLessons({
       '判斷一張卡放不放得下',
       '說出放不下時有哪些選擇',
     ],
-    review: REVIEW_M1,
     analogy: {
       text: ['開餐廳前先看廚房：冰箱放不下所有食材，再厲害的廚師也做不出整套菜。', '跑模型也一樣：權重、[[KV cache]] 都要放進 GPU 的 [[VRAM]]（或 Apple 的[[統一記憶體]]）裡才算得快。放不下，就要換更大的卡、用好幾張卡，或把模型變小（模組 4）。'],
       limit: ['冰箱放不下還能分批去倉庫拿，模型權重放到一般記憶體或硬碟時也「能跑」，但每產生一個 token 都要慢很多倍（2-3），實用上等於跑不動。'],
@@ -75,12 +62,15 @@ defineLessons({
           ${[['換更大的卡', '最直接、最貴', 'm1'], ['好幾張卡', '要高速互連（3-2）', 'm3'], ['模型變小', '量化、小模型（模組 4）', 'm5']].map(([a, b, c], i) => `<rect x="${10 + i * 185}" y="30" width="170" height="110" style="fill:var(--${c})" class="stroke-ink" stroke-width="3"/><text x="${95 + i * 185}" y="78" text-anchor="middle" font-size="16" font-weight="900" class="on-color">${a}</text><text x="${95 + i * 185}" y="108" text-anchor="middle" font-size="13" class="on-color">${b}</text>`).join('')}
           <text x="280" y="168" text-anchor="middle" font-size="13">實務上常常三種一起用</text>
         </svg>`, caption: '放到 CPU 記憶體或硬碟「能跑但很慢」，不算真正的解法。' },
+        { type: 'heading', id: 'hidden-costs', text: '深入：算得出來的權重，和實際吃掉的記憶體' },
+        '「參數 × 位元組」只是起點。執行框架本身、暫存的計算結果、KV cache 都要空間；實務上常在權重之外再預留 10～20% 起跳，長 context 時更多（2-4）。',
+        { type: 'table', head: ['情況', '估算時要注意'], rows: [
+          ['[[MoE]] 模型', '每個 token 只用一部分專家，但全部專家都要放在記憶體裡：用「總參數」算容量'],
+          ['權重放不下，改放 CPU 記憶體', '每個 token 都要經過 PCIe 搬一次；PCIe 5.0 x16 單向理論約 64 GB/s，比 H100 的 HBM 慢 50 倍左右'],
+          ['Apple 統一記憶體', 'macOS 預設只讓 GPU 用一部分（大容量機型約 75%，第三方說法），可以用系統參數調高，但會擠壓系統本身'],
+        ] },
+        '所以「放得下」要分兩種意思：權重全部在 GPU 記憶體裡，才是 2-3 那種速度；只要有一部分在外面，速度就由最慢的那段路決定。',
       ],
-      tryit: {
-        q: ['用互動：70B 模型，在 M4 Pro（48 GB 可用）上，BF16 和 4 位元各需要幾台？'],
-        draft: 'BF16：＿\n4 位元：＿',
-        answer: ['BF16：140＋2 ＝ 142 GB，需要 3 台（只看容量）。', '4 位元：35＋2 ＝ 37 GB，一台放得下。這就是本地跑大模型幾乎都用量化的原因（4-1、5-1）。'],
-      },
     },
     mistakes: [
       { wrong: '只看參數量，不看精度。', why: '同一個 70B，BF16 和 4 位元差 4 倍。', right: '參數 × 每個數的位元組。' },
@@ -88,19 +78,7 @@ defineLessons({
       { wrong: '以為統一記憶體全部都能給 GPU。', why: '系統與其他程式也要用。', right: '預留一部分（M4 Pro 的 75% 是第三方說法，以實測為準）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '估算推論權重記憶體的公式？', options: [
-        { text: '參數 × 每個數的位元組', correct: true, why: '例如 8B × 2 ＝ 16 GB。' },
-        { text: '參數 × 層數，層數越多越佔空間', why: '層數已經包含在參數裡。' },
-        { text: '參數 ÷ 位元組', why: '是相乘。' },
-        { text: '只看層數', why: '要看參數。' },
-      ] },
-      { level: '應用', type: 'mc', q: '13B 模型 4 位元量化，權重約？', options: [
-        { text: '6.5 GB', correct: true, why: '13 × 0.5。' },
-        { text: '13 GB', why: '那是 8 位元。' },
-        { text: '26 GB', why: '那是 BF16。' },
-        { text: '52 GB，和 FP32 一樣大', why: '那是 FP32。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['公司想在一台 24 GB 顯示卡的機器上跑 30B 模型給內部用。怎麼評估可不可行？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['公司想在一台 24 GB 顯示卡的機器上跑 30B 模型給內部用。怎麼評估可不可行？'], answer: [
         'BF16 要 60 GB，放不下；8 位元 30 GB，還是放不下；4 位元約 15 GB，加上 KV cache 與暫存有機會放得下。',
         '接著要評估 4 位元的品質是否夠用（4-1），以及同時有幾個人用、對話多長（KV cache，2-4）。',
       ] },
@@ -118,20 +96,6 @@ defineLessons({
       '說出算術強度的意思',
       '用 roofline 判斷一個運算被算力還是頻寬卡住',
       '算出 H100 的轉折點',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-1）8B、BF16 的權重？', options: [
-        { text: '16 GB', correct: true, why: '8 × 2。' },
-        { text: '8 GB', why: '那是 8 位元。' },
-        { text: '32 GB', why: '那是 FP32。' },
-        { text: '4 GB', why: '那是 4 位元。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-2）矩陣乘法運算量？', options: [
-        { text: '2mnk', correct: true, why: '一乘一加。' },
-        { text: 'mnk', why: '少乘 2。' },
-        { text: 'm＋n＋k', why: '要相乘。' },
-        { text: 'mn', why: '少了 k。' },
-      ] },
     ],
     analogy: {
       text: ['廚師（算力）很快，但食材要從倉庫用推車運過來（頻寬）。如果每一車食材只夠炒一道菜，廚師大部分時間在等推車；如果一車食材能做一百道菜，推車就不是問題，換廚師忙不過來。', '[[算術強度]]就是「每運來 1 位元組，能做幾次運算」。低於某個轉折點，速度被頻寬卡住；高於它，才被算力卡住。這張判斷圖叫 [[roofline]]。'],
@@ -184,42 +148,27 @@ defineLessons({
           <rect x="420" y="50" width="120" height="80" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="480" y="94" text-anchor="middle" font-size="13" font-weight="900" class="on-color">算術強度 ×4</text>
           <text x="280" y="166" text-anchor="middle" font-size="13">這是 API 服務能便宜的關鍵：批次推論（3-3）</text>
         </svg>`, caption: '一個人用很浪費，很多人一起用才划算。' },
+        { type: 'heading', id: 'memory-wall', text: '深入：轉折點一代比一代高' },
+        '算力每一代成長得比頻寬快，轉折點就跟著往右移：同一個 decode 工作，在新卡上離「算力卡住」更遠。這個現象常被稱為「記憶體牆」，也是 HBM 越疊越多層、越做越寬的原因（5-2）。',
+        { type: 'table', head: ['硬體與精度', '峰值算力 ÷ 頻寬', '轉折點（FLOP／位元組）'], rows: [
+          ['H100，BF16 不含稀疏', '989 TFLOPS ÷ 3.35 TB/s', '約 295'],
+          ['H100，FP8 不含稀疏', '1,979 ÷ 3.35', '約 591'],
+          ['Rubin，NVFP4 推論', '50 PFLOPS ÷ 22 TB/s', '約 2,270'],
+        ], caption: 'Rubin 的 50 PFLOPS 是 NVIDIA 公布的 FP4 推論數字（2026-07）；不同精度不能直接比，表格只看趨勢。' },
+        'roofline 也有看不到的東西：它假設資料只從主記憶體搬一次。真實的 kernel 會把常用資料留在晶片上的快取與共享記憶體重複使用，FlashAttention 這類最佳化，做的就是減少回到 HBM 的次數，讓算術強度變高。',
       ],
-      tryit: {
-        q: ['用拉桿：H100 上，一次要處理多少個 token，才會從「頻寬卡住」變成「算力卡住」？'],
-        draft: '大約：＿ 個',
-        answer: ['約 295 個（989 ÷ 3.35）。', '少於這個數，GPU 的算力用不滿；這就是推論服務要把很多請求合成一批的原因。'],
-      },
     },
     mistakes: [
       { wrong: '只比較 GPU 的 TFLOPS 選卡。', why: 'decode 被頻寬卡住，TFLOPS 高也沒用。', right: '推論同時看頻寬。' },
       { wrong: '以為 roofline 的上限就是實際速度。', why: '它是理想上限。', right: '實際還要打折。' },
       { wrong: '以為一次處理一個請求最快。', why: '單一請求的延遲短，但總吞吐量差。', right: '延遲與吞吐量要取捨（3-3）。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '轉折點怎麼算？', options: [
-        { text: '峰值算力 ÷ 頻寬', correct: true, why: '兩條線的交點。' },
-        { text: '頻寬 ÷ 峰值算力', why: '倒過來了。' },
-        { text: '算力 × 頻寬', why: '是相除。' },
-        { text: '參數量 ÷ 層數', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一次只產生一個 token（decode），H100 最可能被誰卡住？', options: [
-        { text: '記憶體頻寬', correct: true, why: '算術強度約 1。' },
-        { text: '算力，乘加運算太多', why: '算力用不滿。' },
-        { text: '硬碟速度', why: '權重已在 HBM。' },
-        { text: 'CPU', why: '模型運算在 GPU。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['兩張卡：A 算力高、頻寬普通；B 算力普通、頻寬很高。你要做「單人聊天、追求每個字出得快」，選哪張？'], answer: [
-        '選 B：單人聊天主要是 decode，每個 token 都要把整份權重搬一次，速度由頻寬決定。',
-        '如果是大批次訓練或大量離線處理，算力比較重要，才考慮 A。',
-      ] },
-    ],
     keypoints: [
       '算術強度＝FLOPs ÷ 位元組；低於轉折點被頻寬卡住。',
       'H100 轉折點約 295；decode 約 1，遠低於它。',
       '把請求合成批次，提高算術強度。',
     ],
-    sources: ['nvidia-h100'],
+    sources: ['nvidia-h100', 'nvidia-rubin'],
   },
 
   '2-3': {
@@ -227,20 +176,6 @@ defineLessons({
       '用「頻寬 ÷ 權重大小」估算產生文字的速度上限',
       '比較不同硬體跑同一個模型的速度',
       '說明量化為什麼能讓 decode 變快',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）decode 的算術強度約？', options: [
-        { text: '1 FLOP／位元組', correct: true, why: '每個權重用一次。' },
-        { text: '295，和 H100 轉折點一樣', why: '那是 H100 轉折點。' },
-        { text: '1,000', why: '那是大批次。' },
-        { text: '0', why: '還是有運算。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-3）同樣參數，4 位元比 BF16？', options: [
-        { text: '小 4 倍', correct: true, why: '0.5 vs 2 位元組。' },
-        { text: '小 2 倍', why: '那是 8 位元。' },
-        { text: '一樣大', why: '位元少就小。' },
-        { text: '大 4 倍', why: '相反。' },
-      ] },
     ],
     analogy: {
       text: ['抄寫一本書：每寫一個字，你都得把整本參考書從頭翻到尾一次。你寫字再快也沒用，速度取決於翻書的速度。', '一個人用模型產生文字時（batch 1），每產生一個 token，GPU 都要把全部權重從記憶體讀一次。所以速度上限 ≈ [[頻寬]] ÷ 權重大小：這就是 [[memory-bound]]。'],
@@ -285,12 +220,14 @@ defineLessons({
           <rect x="20" y="96" width="100" height="40" style="fill:var(--m3)" class="stroke-ink" stroke-width="3"/><text x="140" y="122" font-size="14" font-weight="900">4 位元：35 GB → 快 4 倍</text>
           <text x="280" y="168" text-anchor="middle" font-size="13">量化不只省記憶體，也直接加快產生文字（4-1）</text>
         </svg>`, caption: '這是 memory-bound 最重要的推論：搬得少就快。' },
+        { type: 'heading', id: 'beat-the-limit', text: '深入：三種突破單人上限的方法' },
+        { type: 'table', head: ['做法', '原理', '代價'], rows: [
+          ['[[推測解碼]]', '小模型先猜 k 個 token，大模型一次驗證；權重搬一次確認好幾個', '要多跑一個小模型；猜錯率高時效果有限'],
+          ['張量平行（多張卡）', '每張卡只放一部分權重，各自讀自己那份，總頻寬相加', '每一層都要在卡之間交換結果，互連要夠快（3-2）'],
+          ['[[MoE]]', '每個 token 只讀啟用的專家，要搬的權重變少', '總參數仍要放得下；批次大時各請求用到的專家不同，優勢變小'],
+        ] },
+        '推測解碼不會改變輸出：Leviathan 等 2023 證明，用特定的接受與拒絕規則，結果的機率分布和大模型自己一個一個產生完全相同。它把 decode 從「搬一次、用一次」變成「搬一次、驗好幾個」，本質上是在提高 2-2 的算術強度。',
       ],
-      tryit: {
-        q: ['算一算：頻寬 1 TB/s 的卡跑 13B 8 位元模型，單人上限約幾 token／秒？'],
-        draft: '權重：＿ GB\n上限：＿ token/s',
-        answer: ['權重 13 × 1 ＝ 13 GB。', '1,000 ÷ 13 ≈ 77 token/s。實際會更低（還要讀 KV cache、有額外開銷）。'],
-      },
     },
     mistakes: [
       { wrong: '以為算力加倍，聊天速度就加倍。', why: 'decode 被頻寬卡住。', right: '看頻寬與權重大小。' },
@@ -298,21 +235,9 @@ defineLessons({
       { wrong: '以為多張卡一定讓單人聊天更快。', why: '切開模型後卡與卡之間要通訊，單人延遲不一定改善。', right: '多張卡主要解決放不下與總吞吐量。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '單人 decode 速度上限的估算？', options: [
-        { text: '頻寬 ÷ 權重大小', correct: true, why: '每個 token 讀一次權重。' },
-        { text: '算力 ÷ 參數量', why: '那是 compute-bound 的估法。' },
-        { text: '頻寬 × 權重大小', why: '是相除。' },
-        { text: '和硬體無關', why: '直接相關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '同一台機器，模型從 BF16 改成 4 位元，單人 decode 上限大約？', options: [
-        { text: '快 4 倍', correct: true, why: '要搬的資料少 4 倍。' },
-        { text: '一樣快', why: '要搬的變少了。' },
-        { text: '慢 4 倍', why: '方向反了。' },
-        { text: '快 16 倍', why: '是 4 倍。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你用 M4 Pro 跑 8B 4 位元模型，實測約 50 token/s，比 68 的上限低。列出兩個可能的原因。'], answer: [
-        '一、除了權重，還要讀 KV cache（對話越長越多）；二、軟體與系統開銷、記憶體實際可達頻寬低於規格。',
-        '上限 68 是理想值；實測達到 70%～90% 就算不錯。',
+      { level: '深入思考', type: 'reveal', q: ['一個 MoE 模型總參數 1,200 億、每個 token 啟用 50 億。量化到 4 位元後，能在 M4 Pro 64 GB（GPU 預設約可用 48 GB）上跑嗎？如果能，單人 decode 的上限大約多少？'], answer: [
+        '容量看總參數：1,200 億 × 0.5 位元組 ＝ 60 GB，超過 48 GB，預設設定下放不下；要調高系統給 GPU 的上限，或換更大記憶體的機器。',
+        '速度看啟用參數：每個 token 只讀 50 億 × 0.5 ＝ 2.5 GB，273 ÷ 2.5 ≈ 109 token/s 上限。常見的錯誤是用總參數算速度（得到約 4.6），或用啟用參數算容量（以為只要 2.5 GB）。',
       ] },
     ],
     keypoints: [
@@ -320,7 +245,7 @@ defineLessons({
       '量化讓權重變小，decode 直接變快。',
       '上限是理想值，實測會更低。',
     ],
-    sources: ['nvidia-h100', 'nvidia-rubin', 'apple-m4pro'],
+    sources: ['nvidia-h100', 'nvidia-rubin', 'apple-m4pro', 'spec-decoding'],
   },
 
   '2-4': {
@@ -328,20 +253,6 @@ defineLessons({
       '估算 KV cache 佔多少記憶體',
       '說明長 context 與多人同時使用為什麼很貴',
       '知道 GQA 等做法如何縮小 KV cache',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）量化對 decode 速度的影響？', options: [
-        { text: '權重變小，搬得少，變快', correct: true, why: 'memory-bound。' },
-        { text: '沒有影響', why: '有影響。' },
-        { text: '一定變慢', why: '通常變快。' },
-        { text: '只影響訓練，推論速度完全不變', why: '推論也受惠。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-1）VRAM 裡除了權重還有？', options: [
-        { text: 'KV cache 與暫存', correct: true, why: '推論時。' },
-        { text: '整份訓練資料，推論時也要載入', why: '推論不需要。' },
-        { text: '作業系統', why: '在 CPU 記憶體。' },
-        { text: '什麼都沒有', why: '還有 KV cache。' },
-      ] },
     ],
     analogy: {
       text: ['客服中心每通電話都要開一份筆記，記下客人說過的每一句。電話越長、同時接的電話越多，桌上的筆記就堆得越高。', '[[KV cache]] 就是那堆筆記：每個 token、每一層都存一份 K 與 V（第二部 7-3）。長 context、很多人同時聊天時，它可能比模型本身還大。[[GQA]] 讓好幾個頭共用同一份筆記，堆得低一點。'],
@@ -391,12 +302,16 @@ defineLessons({
           <text x="280" y="134" text-anchor="middle" font-size="14">剩下的空間全給 KV cache：放得下幾個人，就能同時服務幾個人</text>
           <text x="280" y="160" text-anchor="middle" font-size="13">這也是長 context 請求比較貴的原因</text>
         </svg>`, caption: '權重是一次性成本，KV cache 是每個人、每個 token 的成本。' },
+        { type: 'heading', id: 'kv-engineering', text: '深入：KV cache 的工程做法' },
+        '早期的推論系統替每個請求預先保留「最長可能長度」的連續空間，大部分沒用到。vLLM 的論文量到這種做法浪費 60～80% 的 KV cache 記憶體；[[PagedAttention]] 改成切頁、用到才配置，浪費降到 4% 以下，同一張卡能服務的人數因此大幅增加。',
+        { type: 'table', head: ['做法', '省多少', '出處'], rows: [
+          ['GQA（8 組 K、V 給 64 個頭）', 'KV cache 變 1/8', '模型設計'],
+          ['MLA（把 K、V 壓成低維的潛在向量）', 'DeepSeek-V2 比自家 67B 模型少 93.3%', 'DeepSeek-V2 論文'],
+          ['KV cache 量化到 FP8', '約一半', '推論框架常見選項'],
+          ['前綴共用（prefix caching）', '相同 system prompt 只存一份', 'API 的 prompt caching'],
+        ] },
+        '這些做法可以疊加。代價也要記得：量化 KV cache 可能影響長文的準確度，MLA 要在訓練時就採用，不能事後套在現成模型上。',
       ],
-      tryit: {
-        q: ['用拉桿預設值，計算一個人 32 千 token 的 KV cache。如果 GQA 比例改成 1，會變多少？'],
-        draft: 'GQA 1/8：＿ GB\n不共用：＿ GB',
-        answer: ['每 token：2 × 80 × 8,192 × 0.125 × 2 ≈ 0.328 MB；32,000 token ≈ 10.5 GB。', '不共用（比例 1）：每 token ≈ 2.62 MB，32,000 token ≈ 83.9 GB：一個人就比一張 H100 還大。GQA 讓長 context 變得可行。'],
-      },
     },
     mistakes: [
       { wrong: '只用權重大小估算能服務多少人。', why: '每個人都有自己的 KV cache。', right: 'VRAM ＝ 權重 ＋ 所有人的 KV cache ＋ 暫存。' },
@@ -404,21 +319,9 @@ defineLessons({
       { wrong: '以為 KV cache 可以在不同使用者之間共用。', why: '每個人的對話內容不同。', right: '只有相同前綴才能共用（prompt caching 的概念）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'KV cache 每個 token 的公式裡，2 代表什麼？', options: [
-        { text: 'K 和 V 各一份', correct: true, why: '兩種向量。' },
-        { text: 'BF16 的 2 位元組', why: '位元組另外乘。' },
-        { text: '兩個使用者', why: '人數另外乘。' },
-        { text: '兩層', why: '層數另外乘。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'context 長度加倍、同時服務的人數也加倍，KV cache 總量？', options: [
-        { text: '變 4 倍', correct: true, why: '兩個都是乘上去的。' },
-        { text: '變 2 倍', why: '兩個因素都加倍。' },
-        { text: '不變', why: '會變大。' },
-        { text: '變 8 倍', why: '只有兩個因素。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼有些 API 對超長的 context 收比較高的費用，或要求另外開啟？用這一課解釋。'], answer: [
-        '長 context 讓每個請求佔用大量 KV cache 記憶體，同一台機器能同時服務的人數變少，每個請求分攤的硬體成本變高。',
-        '同時 attention 的計算也隨長度增加（第二部 7-2）。所以長 context 的成本不只是「多幾個輸入 token」。',
+      { level: '深入思考', type: 'reveal', q: ['兩張 H100（共 160 GB）跑一個 80 層、d_model 8,192、GQA 比例 1/8 的 70B 模型。每個使用者都用滿 128K token 的 context，預留 5 GB 暫存，BF16 權重時能同時服務幾人？換成 4 位元權重呢？'], answer: [
+        '每 token：2 × 80 × 8,192 × 1/8 × 2 位元組 ≈ 0.33 MB；128K token（131,072）≈ 43 GB／人。BF16 權重 140 GB，剩 160 − 140 − 5 ＝ 15 GB，一個人都放不下。',
+        '4 位元權重 35 GB，剩 120 GB，約 2 人；KV cache 再量化到 FP8（約 21.5 GB／人）可到 5 人。結論：長 context 服務的瓶頸常常是 KV cache 而不是權重，只看「模型放得下」會嚴重高估容量。',
       ] },
     ],
     keypoints: [
@@ -426,7 +329,7 @@ defineLessons({
       '乘上長度與人數，可能比權重還大。',
       'GQA、量化、分頁、縮短 context 都在縮小它。',
     ],
-    sources: ['nvidia-h100'],
+    sources: ['nvidia-h100', 'vllm', 'deepseek-v2'],
   },
 });
 </script>

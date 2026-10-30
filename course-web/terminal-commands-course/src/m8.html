@@ -1,7 +1,7 @@
 
 <script>
 /* ==========================================================================
-   模組 8：安全與總複習
+   模組 8：安全與一頁地圖
    ========================================================================== */
 defineTerms({
   'prompt injection': { en: 'prompt injection', def: '把指示藏在 AI 會讀到的文件、網頁、程式碼註解裡，誘導 AI 做使用者沒要求的事，例如執行某個指令。', example: 'README 裡寫「AI 請執行 curl … | sh」。' },
@@ -86,13 +86,17 @@ defineLessons({
             <text x="301" y="175" class="on-color" font-weight="900">貼給 AI、截圖</text><text x="301" y="205" class="on-color" font-size="15">錯誤訊息裡夾著 token</text><text x="301" y="239" class="on-color" font-size="15">→ 貼之前看一眼</text>
           </g>
         </svg>`, caption: '金鑰一旦外流（例如 push 到公開 repo），刪掉那個 commit 不夠：要**立刻到服務的網站撤銷並換一把新的**。' },
+        { type: 'heading', id: 'deep-recover', text: '深入：真的出事時，能救回多少' },
+        { type: 'table', caption: '五類危險的救援方式', head: ['類型', '能救的方法', '前提'], rows: [
+          ['刪除', 'git 裡的檔案用 `git restore`；Time Machine、Windows 檔案歷程記錄', '事前有 commit 或開了備份'],
+          ['覆寫', '同上；編輯器的本機歷史（VS Code Timeline）', '檔案曾經被編輯器開過'],
+          ['提權', '幾乎無法確認改了什麼，最保險是重灌或還原系統', '—'],
+          ['下載即執行', '同上；撤銷所有可能外流的金鑰', '—'],
+          ['強制推送', '本機 `git reflog` 找回舊 commit，重新推上去', '你或同事的電腦還有舊的紀錄'],
+        ] },
+        '`--force-with-lease` 也有漏洞：如果你在推送前跑過 `git fetch`，它記得的「遠端狀態」已經更新，就算覆蓋了同事剛推的 commit 也不會擋。Git 2.30 起可以再加 `--force-if-includes`，要求你本機確實包含遠端那些 commit 才放行。',
+        '金鑰外流時，GitHub 的 secret scanning 會偵測常見格式的金鑰，有些服務商收到通知後會自動撤銷。這是補救，不是防線：從推送那一刻起就可能被抓走，所以第一步永遠是到服務網站撤銷並換新。',
       ],
-      tryit: {
-        q: ['把這行改得更安全，並說明你改了什麼：'],
-        code: true,
-        draft: 'PowerShell：\nGet-ChildItem C:\\Users\\you\\Downloads -Recurse | Remove-Item -Recurse -Force\n\n改寫：____',
-        answer: ['先預覽：`Get-ChildItem C:\\Users\\you\\Downloads -Recurse -Filter *.tmp`，確認清單後再加 `| Remove-Item -WhatIf`，最後才拿掉 `-WhatIf`。', '改了三件事：縮小範圍（`-Filter *.tmp`）、先預覽、用 `-WhatIf` 演練。'],
-      },
     },
     mistakes: [
       { wrong: '覺得「我只是照官方教學」，所以 `curl … | sh` 一定安全。', why: '網址打錯一個字、或教學本身被竄改，你就會執行別人的程式。', right: '確認網域是官方的（例如 `claude.ai`、`brew.sh`），從官方網站複製，不從論壇或聊天訊息複製。' },
@@ -100,34 +104,8 @@ defineLessons({
       { wrong: '發現 `.env` 被 push 上 GitHub，刪掉檔案再 commit 就以為沒事了。', why: 'git 歷史裡還有它，而且可能已經被自動掃描抓走。', right: '立刻撤銷並更換金鑰；把 `.env` 加進 `.gitignore`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`chmod -R 777 .` 的主要問題是？', options: [
-        { text: '讓目前資料夾所有檔案對所有人都可讀、寫、執行', correct: true, why: '777 是三組都 rwx，`-R` 遞迴到所有子資料夾。' },
-        { text: '會刪除目前資料夾', why: 'chmod 只改權限，不刪除。' },
-        { text: '需要網路連線', why: '和網路無關。' },
-        { text: '只對 Windows 有效', why: 'chmod 是 macOS／Linux 的指令。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`git push` 被拒絕，訊息說遠端有新的 commit。下列哪個做法最安全？', options: [
-        { text: '`git push --force`', why: '會蓋掉遠端別人的 commit。' },
-        { text: '`git pull`，確認合併結果後再 `git push`', correct: true, why: '先把遠端的改動拿回來，再上傳。' },
-        { text: '`git reset --hard` 後再 push', why: '會丟掉你本機還沒保存的改動。' },
-        { text: '刪掉 repo 重新 clone', why: '你本機的 commit 會跟著消失。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要寫一份「團隊新人使用終端機與 AI 工具的三條規則」。根據這門課，你會寫哪三條？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要寫一份「團隊新人使用終端機與 AI 工具的三條規則」。根據這門課，你會寫哪三條？'], answer: [
         '參考：① 看懂再按允許：用拆解法讀每一段，看不懂就問（1-1、7-5）。② 先存檔再動手：重要改動都在 git 裡，讓 AI 改之前先 commit（6-2）。③ 秘密不進指令、不進 git：用環境變數和 .gitignore（4-1、8-1）。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 7-5）AI 提議 `npm test && git push --force`。你會？', options: [
-        { text: '拒絕並改寫：拿掉 --force，或只允許 npm test', correct: true, why: '後半段是強制推送，範圍大又難復原。' },
-        { text: '允許，因為開頭是 npm test', why: '危險藏在 && 後面，每一段都要看。' },
-        { text: '允許，因為有 && 會先跑測試', why: '測試通過後還是會強制推送。' },
-        { text: '改成 sudo 執行', why: 'sudo 只會讓風險變大。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-3）`rm` 和資源回收筒的關係是？', options: [
-        { text: '不經過資源回收筒，直接刪除', correct: true, why: '所以刪除前要先預覽。' },
-        { text: '先放進資源回收筒', why: '那是 GUI 的行為。' },
-        { text: '加 -i 就會進資源回收筒', why: '-i 只是詢問，不會進回收筒。' },
-        { text: '只有 macOS 會進回收筒', why: '兩邊都不會。' },
       ] },
     ],
     keypoints: [
@@ -135,13 +113,13 @@ defineLessons({
       '每類都有安全寫法：先預覽、`-i`、`-WhatIf`、`--force-with-lease`、官方網址。',
       '金鑰不進指令、不進 git；外流了要撤銷換新，不是只刪檔案。',
     ],
-    sources: ['rm', 'ps-overview', 'git-docs', 'cc-permission-modes'],
+    sources: ['rm', 'ps-overview', 'git-docs', 'git-push', 'cc-permission-modes'],
   },
 
   '8-2': {
     layout: 'reference',
     minutes: 10,
-    sources: ['ps-diff', 'bash-manual', 'win-cmd', 'git-docs', 'npm-cli', 'cc-cli', 'codex-ref', 'agy-cheatsheet'],
+    sources: ['ps-diff', 'bash-manual', 'win-cmd', 'git-docs', 'npm-cli', 'cc-cli', 'codex-ref', 'agy-reference'],
     blocks: [
       '這一頁是查閱用的速查表。每一行都標了出處單元，忘記意思就回去看那一課。上方的對照器可以切換任務，下面是依主題分類的表格。',
       { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="指令文法總整理：程式、子指令、選項、參數四種零件，加上連接符號管線、重新導向、和和、或或、分號，以及變數">
@@ -207,7 +185,7 @@ defineLessons({
         ['非互動', '`claude -p "…"`', '`codex exec "…"`', '`agy -p "…"`'],
         ['接續', '`claude -c`', '`codex resume`', '`agy -c`'],
         ['唯讀起步', '`--permission-mode plan`', '`--sandbox read-only`', '`/permissions` 設定'],
-        ['說明檔', '`CLAUDE.md`', '`AGENTS.md`', '—'],
+        ['說明檔', '`CLAUDE.md`（也讀 `AGENTS.md`）', '`AGENTS.md`', '`GEMINI.md`、`AGENTS.md`'],
         ['看全部選項', '`claude --help`', '`codex --help`', '`agy --help`'],
       ] },
       { type: 'heading', id: 'danger', text: '停下來的字樣' },
@@ -217,121 +195,31 @@ defineLessons({
 
   '8-3': {
     layout: 'reference',
-    minutes: 15,
-    sources: ['bash-manual', 'ps-overview', 'git-docs', 'cc-cli', 'codex-ref'],
+    minutes: 10,
+    sources: ['bash-manual', 'ps-lifecycle', 'cc-permission-modes', 'codex-ref', 'agy-reference', 'gcli-transition', 'py-315', 'win-sudo'],
     blocks: [
-      '15 題，混合模組 0 到 8。每題都標了出處，答錯就回去複習那一課。最後有一個「拆解挑戰」：貼上你在網路上看到的任何指令，看看能不能說出每一塊在做什麼。',
-      { type: 'svg', svg: `<svg viewBox="0 0 560 300" role="img" aria-label="題目分佈長條圖：模組 0 一題、模組 1 兩題、模組 2 兩題、模組 3 兩題、模組 4 兩題、模組 5 兩題、模組 6 兩題、模組 7 一題、模組 8 一題">
-        <text x="10" y="30" font-size="20" font-weight="900">各模組題數</text>
-        <g class="stroke-ink" stroke-width="3">
-          <rect x="30" y="200" width="44" height="50" style="fill:var(--m0)"/>
-          <rect x="88" y="150" width="44" height="100" style="fill:var(--m1)"/>
-          <rect x="146" y="150" width="44" height="100" style="fill:var(--m2)"/>
-          <rect x="204" y="150" width="44" height="100" style="fill:var(--m3)"/>
-          <rect x="262" y="150" width="44" height="100" style="fill:var(--m4)"/>
-          <rect x="320" y="150" width="44" height="100" style="fill:var(--m5)"/>
-          <rect x="378" y="150" width="44" height="100" style="fill:var(--m6)"/>
-          <rect x="436" y="200" width="44" height="50" style="fill:var(--m7)"/>
-          <rect x="494" y="200" width="44" height="50" style="fill:var(--m8)"/>
-        </g>
-        <g class="stroke-ink" stroke-width="3"><path d="M20 250 H550"/></g>
-        <g font-size="17" text-anchor="middle">
-          <text x="52" y="276">0</text><text x="110" y="276">1</text><text x="168" y="276">2</text><text x="226" y="276">3</text><text x="284" y="276">4</text><text x="342" y="276">5</text><text x="400" y="276">6</text><text x="458" y="276">7</text><text x="516" y="276">8</text>
-          <text x="52" y="190">1</text><text x="110" y="140">2</text><text x="168" y="140">2</text><text x="226" y="140">2</text><text x="284" y="140">2</text><text x="342" y="140">2</text><text x="400" y="140">2</text><text x="458" y="190">1</text><text x="516" y="190">1</text>
-        </g>
-      </svg>`, caption: '模組 1–6 是看懂指令的基礎，所以題數最多。' },
-      { type: 'heading', id: 'quiz', text: '總複習測驗' },
-      { type: 'quiz', key: '8-3:final', items: [
-        { level: '0-1', type: 'mc', q: '「同一個 Windows Terminal 視窗可以開 PowerShell，也可以開 Ubuntu」說明了什麼？', options: [
-          { text: '終端機和 shell 是兩層不同的東西', correct: true, why: '終端機是視窗，shell 是裡面跑的翻譯官。' },
-          { text: 'PowerShell 和 bash 是同一個程式', why: '它們是不同的 shell，語法也不同。' },
-          { text: 'Windows Terminal 本身就是一個 shell', why: '它是終端機 App，不負責解讀指令。' },
-          { text: 'Ubuntu 是 PowerShell 的外掛', why: 'Ubuntu 是透過 WSL 執行的 Linux。' },
-        ] },
-        { level: '1-1', type: 'mc', q: '`docker compose up -d --build` 裡，`up` 是什麼？', options: [
-          { text: '參數', why: '參數是要處理的對象，這裡沒有。' },
-          { text: '子指令（compose 底下的動作）', correct: true, why: 'docker 的子指令 compose，再往下的動作是 up；`-d`、`--build` 是選項。' },
-          { text: '選項', why: '選項多以減號開頭。' },
-          { text: '程式', why: '程式是 docker。' },
-        ] },
-        { level: '1-2', type: 'mc', q: 'zsh 中 `echo "使用者：$USER"` 和 `echo \'使用者：$USER\'` 的差別？', options: [
-          { text: '雙引號會把 $USER 換成你的名字，單引號照原樣印出', correct: true, why: '雙引號展開變數，單引號完全不動。' },
-          { text: '兩者完全一樣', why: '單引號不會展開變數。' },
-          { text: '單引號會換成名字，雙引號照原樣', why: '剛好相反。' },
-          { text: '單引號會報錯', why: '不會報錯，只是不展開。' },
-        ] },
-        { level: '2-1', type: 'mc', q: '目前在 `~/projects/web/src`，`cd ../../api` 會到哪裡？', options: [
-          { text: '`~/projects/api`', correct: true, why: '上兩層到 projects，再往下到 api。' },
-          { text: '`~/projects/web/api`', why: '那只上了一層。' },
-          { text: '`~/api`', why: '那要上三層。' },
-          { text: '`/api`', why: '那是從根目錄開始的絕對路徑。' },
-        ] },
-        { level: '2-3', type: 'mc', q: '刪除一批檔案前，最好的習慣是？', options: [
-          { text: '用 `ls` 預覽同一個萬用字元會選到哪些檔案', correct: true, why: '先看再刪；rm 不經過資源回收筒。' },
-          { text: '加上 -f 讓它不要問', why: '-f 讓刪除更不受控制。' },
-          { text: '用 sudo 確保刪得掉', why: '刪不掉通常是有原因的，sudo 會讓風險變大。' },
-          { text: '先清空資源回收筒', why: 'rm 跟資源回收筒無關。' },
-        ] },
-        { level: '3-2', type: 'mc', q: '`cat names.txt | sort | uniq -c | sort -rn | head -n 3` 的結果是？', options: [
-          { text: '出現次數最多的前 3 個名字和次數', correct: true, why: '排序 → 合併計數 → 依次數由大到小 → 取前 3。' },
-          { text: '名字依字母排序的前 3 個', why: '中間的 uniq -c 和 sort -rn 改成依次數排序了。' },
-          { text: '檔案的前 3 行', why: '那只需要 head。' },
-          { text: '出現次數最少的 3 個名字', why: '`-r` 是由大到小。' },
-        ] },
-        { level: '3-3', type: 'mc', q: '想把正常輸出和錯誤都存進 `run.log`，哪一行正確？', options: [
-          { text: '`npm start > run.log 2>&1`', correct: true, why: '先把 1 接到檔案，再把 2 接到 1 的位置。' },
-          { text: '`npm start 2>&1 > run.log`', why: '順序反了，錯誤會留在畫面上。' },
-          { text: '`npm start | run.log`', why: '`|` 後面要接程式。' },
-          { text: '`npm start >> run.log`', why: '只接 stdout。' },
-        ] },
-        { level: '4-1', type: 'mc', q: 'PowerShell 中暫時設定環境變數 `PORT` 為 3000：', options: [
-          { text: '`$env:PORT = 3000`', correct: true, why: 'PowerShell 用 env: 前綴。' },
-          { text: '`export PORT=3000`', why: '那是 bash／zsh。' },
-          { text: '`set PORT=3000`', why: '那是 cmd；在 PowerShell 是 Set-Variable。' },
-          { text: '`PORT=3000`', why: 'PowerShell 不認得這種寫法。' },
-        ] },
-        { level: '4-2', type: 'mc', q: '剛裝好的工具在同一個終端機說找不到指令，最先試什麼？', options: [
-          { text: '關掉終端機重開', correct: true, why: 'PATH 是開視窗時讀的；安裝程式改的是新視窗。' },
-          { text: '用 sudo 執行', why: '和權限無關。' },
-          { text: '把 PATH 整個換成安裝資料夾', why: '會讓其他指令都找不到。' },
-          { text: '重新安裝三次', why: '先重開終端機。' },
-        ] },
-        { level: '5-3', type: 'mc', q: 'PowerShell 找出大於 10MB 的檔案：', options: [
-          { text: '`Get-ChildItem | Where-Object Length -gt 10MB`', correct: true, why: '用 -gt 比較 Length 欄位。' },
-          { text: '`Get-ChildItem | Where-Object { Length > 10MB }`', why: '`>` 是重新導向，會建立檔案。' },
-          { text: '`ls -l | sort -k5`', why: '這是 bash 的文字處理寫法。' },
-          { text: '`dir /s 10MB`', why: '這是 cmd 的寫法，而且意思不對。' },
-        ] },
-        { level: '5-5', type: 'mc', q: '一行指令結尾是 `^`，下一行繼續。這是哪種方言？', options: [
-          { text: 'cmd', correct: true, why: 'cmd 用 ^ 續行。' },
-          { text: 'PowerShell', why: 'PowerShell 用反引號。' },
-          { text: 'bash', why: 'bash 用反斜線。' },
-          { text: 'zsh', why: 'zsh 也用反斜線。' },
-        ] },
-        { level: '6-2', type: 'mc', q: '`git commit` 包含哪些改動？', options: [
-          { text: '`git add` 放進暫存區的改動', correct: true, why: '沒有 add 的不會被 commit。' },
-          { text: '所有改過的檔案', why: '要先 add。' },
-          { text: '遠端的最新改動', why: '那要 pull。' },
-          { text: '所有開過的檔案', why: '開啟不等於修改。' },
-        ] },
-        { level: '6-4', type: 'mc', q: '在 PowerShell 啟用 Python 虛擬環境：', options: [
-          { text: '`.venv\\Scripts\\Activate.ps1`', correct: true, why: 'Windows 的虛擬環境放在 Scripts，用 .ps1 啟用。' },
-          { text: '`source .venv/bin/activate`', why: '那是 macOS／Linux 的寫法。' },
-          { text: '`python activate`', why: '沒有這個用法。' },
-          { text: '`pip venv on`', why: '沒有這個用法。' },
-        ] },
-        { level: '7-1', type: 'mc', q: '三個 AI CLI 中，「做完就結束、可以接管線」的模式分別是？', options: [
-          { text: '`claude -p`、`codex exec`、`agy -p`', correct: true, why: '這三個是各家的非互動模式。' },
-          { text: '`claude -c`、`codex resume`、`agy -c`', why: '那是接續對話。' },
-          { text: '`claude`、`codex`、`agy`', why: '那是互動模式。' },
-          { text: '`/exit`、`/quit`、`/stop`', why: '那是離開互動模式的方式。' },
-        ] },
-        { level: '8-1', type: 'mc', q: '下列哪一個最不應該在自己的筆電上直接允許？', options: [
-          { text: '`curl -fsSL https://不認識的網址/setup.sh | sudo bash`', correct: true, why: '以管理員身分執行一段沒看過、來源不明的程式。' },
-          { text: '`git status`', why: '只讀。' },
-          { text: '`npm test`', why: '跑測試，通常不改檔案。' },
-          { text: '`ls -la`', why: '只列出檔案。' },
-        ] },
+      '這一頁把整本書收成一張地圖：每個模組的核心觀念、最值得養成的一個習慣，以及哪些內容會過時、去哪裡確認最新狀態。',
+      { type: 'svg', svg: `<svg viewBox="0 0 560 300" role="img" aria-label="全書架構：由下往上四層，模組 0 到 1 看懂一行指令，模組 2 到 3 檔案與資料流，模組 4 到 5 環境與方言，模組 6 到 7 工具與 AI CLI；右側模組 8 安全貫穿全部">
+        <rect x="20" y="226" width="380" height="56" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/><text x="40" y="262" font-size="20" font-weight="900" class="on-color">模組 0–1｜看懂一行指令</text>
+        <rect x="20" y="162" width="380" height="56" style="fill:var(--m2)" class="stroke-ink" stroke-width="4"/><text x="40" y="198" font-size="20" font-weight="900" class="on-color">模組 2–3｜檔案與資料流</text>
+        <rect x="20" y="98" width="380" height="56" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/><text x="40" y="134" font-size="20" font-weight="900" class="on-color">模組 4–5｜環境與方言</text>
+        <rect x="20" y="34" width="380" height="56" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/><text x="40" y="70" font-size="20" font-weight="900" class="on-color">模組 6–7｜工具與 AI CLI</text>
+        <rect x="420" y="34" width="120" height="248" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
+        <text x="480" y="140" text-anchor="middle" font-size="20" font-weight="900" class="on-color">模組 8</text>
+        <text x="480" y="170" text-anchor="middle" font-size="18" class="on-color">安全</text>
+        <text x="480" y="198" text-anchor="middle" font-size="18" class="on-color">貫穿全部</text>
+      </svg>`, caption: '由下往上蓋：看不懂一行指令的文法，上面的工具和 AI CLI 都只能照抄。安全習慣則是每一層都要用。' },
+      { type: 'heading', id: 'map', text: '全書一頁地圖' },
+      { type: 'table', caption: '每個模組最重要的一件事', head: ['模組', '核心觀念', '最值得養成的一個習慣'], rows: [
+        ['0 終端機是什麼', '終端機是視窗、shell 是翻譯官、作業系統負責做事', '打字前看提示字元，確認現在是哪個 shell'],
+        ['1 指令的文法', '程式＋子指令＋選項＋參數；結束代碼 0 才是成功', '看不懂的指令先拆成四個位置，再查 `--help`'],
+        ['2 檔案與路徑', '絕對與相對路徑；`rm` 不進資源回收筒', '刪除前先用 `ls` 預覽同一個樣式'],
+        ['3 資料流', 'stdin／stdout／stderr；`>` 覆寫、`&&` 成功才繼續', '後一步依賴前一步就用 `&&`，存記錄用 `> log 2>&1`'],
+        ['4 環境', '環境變數、PATH 的順序、管理員權限', '找不到指令先重開終端機再查 PATH；不反射性加 sudo'],
+        ['5 方言', '同一件事四種寫法，差在變數、選項、導向', '照抄前先判斷方言，只翻 shell 的部分'],
+        ['6 跨平台工具', '套件管理器、git、npm、venv、curl、ssh', '讓 AI 動手前先 commit 一個存檔點'],
+        ['7 AI CLI', '六格共同結構、權限光譜', '陌生專案先用唯讀模式，看懂指令再允許'],
+        ['8 安全', '刪除、覆寫、提權、下載即執行、強制', '看到「停下來的字樣」就重讀一次整行（8-2）'],
       ] },
       { type: 'svg', svg: `<svg viewBox="0 0 560 330" role="img" aria-label="學習地圖：上課前，終端機是未知的未知，連不懂什麼都說不出來；上完課，大部分變成已知：文法、路徑、管線、PATH、方言、工具、AI CLI；還不懂的部分變成已知的未知，例如 shell 腳本的迴圈與函式、正規表示式、Docker、權限的細節，你知道它們的名字和去哪裡查">
         <g font-size="18">
@@ -353,8 +241,18 @@ defineLessons({
         </g>
         <g class="stroke-ink" stroke-width="5"><path d="M210 160 H250"/></g>
       </svg>`, caption: '黃色那一格不是失敗，而是這門課的目標：你知道它們叫什麼、在哪裡查（`--help`、`man`、`Get-Help`、官方文件），需要時就能自己學。' },
-      { type: 'heading', id: 'challenge', text: '拆解挑戰' },
-      '把你在 README、教學、AI 回覆裡看到的任何一行指令貼進來。能說出每一塊的角色，就達成這門課的目標了：從「完全看不懂」到「知道它在做什麼，也知道還不懂的部分該查哪裡」。',
+      { type: 'heading', id: 'outdated', text: '會過時的內容與更新方式' },
+      '文法、路徑、管線、重新導向、結束代碼、PATH 這些幾十年沒變，學一次就能一直用。會變的集中在下面這張表，每一列都寫了怎麼自己確認最新狀態。',
+      { type: 'table', caption: '截至 2026-10-29 的狀態（下次查證：2027-01-29）', head: ['內容', '目前狀態', '怎麼確認最新'], rows: [
+        ['AI CLI 的旗標與權限模式', 'Claude Code 互動對話預設以 `auto` 啟動；Codex 的 `-a` 只剩 `on-request`、`never`；Antigravity 已有官方 CLI 文件', '`claude --help`、`codex --help`、`agy --help`；參考資料頁的官方文件'],
+        ['Gemini CLI', '一般帳號 2026-06-18 停用，改用 `agy`；企業授權與付費 API 金鑰仍可用', 'Google Developers Blog 的公告'],
+        ['PowerShell 版本', '7.6 LTS（2026-03 發布）；Windows 內建 5.1 不再加新功能', '`$PSVersionTable.PSVersion`；PowerShell support lifecycle 頁'],
+        ['Python 的安裝方式', 'Windows 改用 Python install manager；最新版 3.15（2026-10-09）', 'python.org/downloads；`py list --online`'],
+        ['Windows 的 sudo', 'Windows 11 24H2 起可在設定中開啟', 'Microsoft Learn「Sudo for Windows」'],
+        ['套件 ID、版本號', '課程裡的範例輸出版本是示意', '`winget search`、`brew info`、`npm view 套件 version`'],
+      ] },
+      { type: 'heading', id: 'challenge', text: '拆解器：隨時拿來用' },
+      '把你在 README、教學、AI 回覆裡看到的任何一行指令貼進來，看每一塊的角色。說得出每一塊在做什麼、不懂的部分知道該查哪裡，就是這門課要帶你到的地方。',
       { type: 'widget', name: 'anatomy', props: { presets: [
         { cmd: 'git log --oneline --graph | head -n 20' },
         { cmd: 'docker run -d -p 8080:80 --name web nginx' },

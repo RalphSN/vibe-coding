@@ -78,48 +78,20 @@ defineLessons({
             <text x="400" y="190" class="on-color" font-size="15">3-2 會細講</text>
           </g>
         </svg>`, caption: '這個模組的四課，全都是在講「怎麼改接這幾條管子」。' },
+        { type: 'heading', id: 'deep-fd', text: '深入：程式知道自己接的是螢幕還是水管' },
+        '0、1、2 正式名稱是**檔案描述元**（file descriptor）。程式可以問作業系統「我的 stdout 接的是終端機嗎」，再決定輸出長什麼樣子。',
+        { type: 'table', caption: '同一個程式，接螢幕和接水管的差別', head: ['程式', '接螢幕時', '接管線或檔案時'], rows: [
+          ['`ls`', '排成好幾欄、有顏色', '一行一個、沒有顏色'],
+          ['`git log`', '用分頁器（less）一頁一頁顯示', '全部直接輸出'],
+          ['Python 的 `print`', '每印一行就送出', '累積一批才送出，看起來像「卡住」；加 `python -u` 可以改善'],
+        ] },
+        'PowerShell 不只三條管子，而是六條：Success（1）、Error（2）、Warning（3）、Verbose（4）、Debug（5）、Information（6）。`Write-Host` 從 PowerShell 5.0 起走 6 號，所以 `> 檔案` 存不到它印的字，要用 `6>` 或 `*>`。',
       ],
-      tryit: {
-        q: ['執行 `cp a.txt b.txt c.txt backup/ > log.txt`，其中 b.txt 不存在。猜猜看：`log.txt` 裡會有什麼？畫面上會看到什麼？'],
-        draft: 'log.txt：____\n畫面：____',
-        answer: ['log.txt：幾乎是空的，cp 成功時不印東西到 stdout。', '畫面：`cp: b.txt: No such file or directory`，因為錯誤走 stderr，沒有被 `>` 接走。'],
-      },
     },
     mistakes: [
       { wrong: '用 `> log.txt` 存執行記錄，事後打開卻找不到錯誤訊息。', why: '`>` 只接 stdout；錯誤走 stderr，當時只印在畫面上就消失了。', right: '要一起存就加 `2>&1`（下一課）：`npm test > log.txt 2>&1`。' },
       { wrong: '以為「畫面上是紅字」才是 stderr。', why: '顏色是終端機或程式自己加的，很多程式的 stderr 也是一般顏色；有些程式甚至把錯誤印到 stdout。', right: '想確認哪些是 stderr，用 `2>/dev/null` 丟掉 stderr，看還剩下什麼。' },
       { wrong: '執行 `sort` 後畫面停住，以為當機了。', why: '沒給檔名時，`sort` 在等 stdin，也就是等你從鍵盤輸入。', right: '輸入完按 {kbd:Ctrl+D}（macOS／Linux）結束輸入；或直接 {kbd:Ctrl+C} 中斷。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '程式的錯誤訊息預設從哪一條通道輸出？', options: [
-        { text: 'stdin（0）', why: 'stdin 是輸入，不是輸出。' },
-        { text: 'stdout（1）', why: 'stdout 是正常結果；錯誤另外有一條。' },
-        { text: 'stderr（2）', correct: true, why: '錯誤與警告走 stderr，和正常結果分開。' },
-        { text: '寫進系統記錄檔', why: '少數服務程式會寫系統記錄，但一般指令的錯誤是走 stderr 到畫面。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`python app.py > out.txt` 執行時畫面還是跳出一段 Traceback 錯誤。為什麼？', options: [
-        { text: 'out.txt 寫入失敗，所以改印到畫面', why: '寫入失敗會有另外的錯誤訊息；這裡是正常行為。' },
-        { text: 'Traceback 走 stderr，`>` 只改接了 stdout', correct: true, why: 'Python 把錯誤寫到 stderr，所以仍出現在畫面上。' },
-        { text: 'Python 不支援重新導向', why: '支援；stdout 的內容確實被寫進 out.txt 了。' },
-        { text: '要用 `>>` 才能接住錯誤', why: '`>>` 只是「附加」而不是「覆寫」，一樣只接 stdout。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼「把正常結果和錯誤分成兩條管子」對自動化很重要？舉一個例子。'], answer: [
-        '參考：例如 `ls *.txt | wc -l` 想算有幾個 txt 檔。如果錯誤訊息也混進 stdout，就會被算進行數，結果錯誤。分開之後，下一個程式只收到乾淨的資料，錯誤仍顯示給人看。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-4）想找出 `app.log` 裡所有含 ERROR 的行，用哪個工具？', options: [
-        { text: '`grep ERROR app.log`', correct: true, why: 'grep 在內容裡找符合的行。' },
-        { text: '`find ERROR app.log`', why: 'find 依名稱找檔案，不看內容。' },
-        { text: '`head ERROR app.log`', why: 'head 只看開頭幾行，不會過濾。' },
-        { text: '`ls ERROR app.log`', why: 'ls 列出檔案，不讀內容。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-4）怎麼知道上一個指令是否成功？', options: [
-        { text: '看畫面上有沒有出現紅色的字', why: '顏色不可靠；要看結束代碼。' },
-        { text: '看結束代碼：0 是成功', correct: true, why: 'zsh／bash `echo $?`、PowerShell `$?` 或 `$LASTEXITCODE`。' },
-        { text: '看有沒有輸出', why: '很多成功的指令完全不輸出。' },
-        { text: '看指令跑了多久', why: '時間和成功與否無關。' },
-      ] },
     ],
     keypoints: [
       '每個程式有三條管子：stdin（0）進、stdout（1）正常出、stderr（2）錯誤出。',
@@ -201,50 +173,19 @@ defineLessons({
             <text x="26" y="232" class="on-color mono">LastWriteTime = 2026/10/7</text>
           </g>
         </svg>`, caption: '這是 PowerShell 和 bash 最大的差別（5-3 會再深入）。好消息是：`|` 的意思一樣，都是「接到下一站」。' },
+        { type: 'heading', id: 'deep-pipe', text: '深入：管線的每一站是同時在跑' },
+        '管線不是「第一站全部跑完，才交給第二站」。每一站同時啟動，資料一邊產生一邊往下流；最後一站提早結束時（例如 `head -n 1` 拿到一行就走），前面的程式會收到通知跟著停下。所以 `cat 很大的檔案 | head -n 3` 很快就結束。',
+        { type: 'table', caption: '管線的三個實務細節', head: ['細節', '影響', '做法'], rows: [
+          ['結束代碼看最後一站', '`npm test | tee log.txt` 測試失敗也回傳 0（1-4 深入段）', '腳本裡加 `set -o pipefail`'],
+          ['PowerShell 5.1 會把外部程式的輸出轉成文字行', '用管線傳圖片、壓縮檔這類二進位資料會壞掉', 'PowerShell 7.4 起保留原始位元組；或改用檔案傳'],
+          ['`cat 檔 | grep 字`', '多開一個程式，結果一樣', '`grep 字 檔` 也可以；初學時用 cat 開頭比較好讀，不用刻意改'],
+        ] },
       ],
-      tryit: {
-        q: ['補完這條 zsh 管線：列出目前資料夾的檔名，只留 `.md` 結尾的，再算有幾個。'],
-        code: true,
-        draft: 'ls | ____ | ____',
-        answer: ['`ls | grep "\\.md$" | wc -l`（`\\.md$` 代表「以 .md 結尾」；簡單版 `grep md` 也可以，但會誤抓檔名中間有 md 的）。', 'PowerShell：`(Get-ChildItem -Filter *.md).Count` 或 `Get-ChildItem *.md | Measure-Object`。'],
-      },
     },
     mistakes: [
       { wrong: '`cat names.txt | uniq`，以為重複的名字都會被移除。', why: '`uniq` 只合併**相鄰**的重複行；沒排序的話，不相鄰的重複會留下來。', right: '先排序：`sort names.txt | uniq`，或直接 `sort -u names.txt`。' },
       { wrong: '在 PowerShell 照抄 bash 的 `ls -l | sort -k5 -rn`。', why: 'PowerShell 的 `sort` 是 `Sort-Object`，它不認得 `-k5 -rn`；輸送帶上也不是文字行。', right: '用 PowerShell 的寫法：`Get-ChildItem | Sort-Object Length -Descending`。' },
       { wrong: '寫了一條很長的管線，結果不對，不知道哪一段出錯。', why: '管線一次跑完，看不到中間的資料。', right: '從左邊開始，一次加一段執行，看每一站的輸出（就像上面的動畫）。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`A | B` 的意思是？', options: [
-        { text: '先執行 A，A 成功才執行 B', why: '那是 `&&`（3-4）。管線是把資料接過去，兩者同時在跑。' },
-        { text: 'A 的 stdout 接到 B 的 stdin', correct: true, why: '這就是管線：A 的正常輸出變成 B 的輸入。' },
-        { text: '把 A 的輸出寫進名為 B 的檔案', why: '寫進檔案用的是 `>`（3-3）。' },
-        { text: 'A 或 B 擇一執行', why: '在 usage 說明裡 `a|b` 是二選一，但在 shell 裡 `|` 是管線。' },
-      ] },
-      { level: '應用', type: 'mc', q: '想知道 `access.log` 裡有幾行含 `404`，哪一條最合適？', options: [
-        { text: '`grep 404 access.log | wc -l`', correct: true, why: 'grep 留下含 404 的行，wc -l 數行數。（`grep -c 404 access.log` 也可以。）' },
-        { text: '`wc -l access.log | grep 404`', why: '順序反了：先算出總行數，再在「數字」裡找 404，結果沒有意義。' },
-        { text: '`cat access.log > grep 404`', why: '`>` 會建立一個叫 grep 的檔案，不是接到 grep 程式。' },
-        { text: '`grep 404 | wc -l access.log`', why: 'grep 沒有檔名會等鍵盤輸入；wc 則直接算整個檔案。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['看到 `history | grep git | tail -n 5`，不執行，說出它在做什麼。'], answer: [
-        '參考：列出指令歷史 → 只留含 git 的 → 取最後 5 行。也就是「我最近打過的 5 個 git 指令」。',
-        '拆解法一樣適用：每一站都是「程式＋選項＋參數」，`|` 是把它們接起來的連接符號。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-1）`sort -rn` 裡的 `-rn` 最可能是？', options: [
-        { text: '兩個短選項 `-r` 和 `-n` 合併', correct: true, why: '反向（r）＋依數字（n）。' },
-        { text: '一個叫 rn 的長選項', why: '長選項要兩個減號。' },
-        { text: '一個參數，代表檔名', why: '減號開頭通常是選項。' },
-        { text: 'sort 的子指令', why: 'sort 沒有子指令。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-4）`head -n 3 file.txt` 做什麼？', options: [
-        { text: '只顯示前 3 行', correct: true, why: 'head 看開頭，`-n 3` 指定 3 行。' },
-        { text: '只顯示最後 3 行', why: '那是 tail。' },
-        { text: '刪除前 3 行', why: 'head 只讀不改。' },
-        { text: '找出含數字 3 的行', why: '那是 grep 3。' },
-      ] },
     ],
     keypoints: [
       '`|` 把左邊的 stdout 接到右邊的 stdin，從左往右讀。',
@@ -334,13 +275,15 @@ defineLessons({
           <rect x="10" y="180" width="540" height="50" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
           <text x="280" y="212" text-anchor="middle" font-size="18" class="on-color">ls &gt; grep txt → 建出一個叫 grep 的檔案</text>
         </svg>`, caption: '最常見的混淆：該用 `|` 卻用了 `>`。記法：**檔案用 `>`，程式用 `|`**。' },
+        { type: 'heading', id: 'deep-redirect', text: '深入：三種 shell 的重新導向不完全一樣' },
+        { type: 'table', caption: '容易踩到的差異', head: ['寫法', 'zsh／bash', 'PowerShell'], rows: [
+          ['`程式 < input.txt`', '從檔案讀 stdin', '**不支援**（「reserved for future use」）；改用 `Get-Content input.txt | 程式`'],
+          ['`1>&2`（把正常輸出併到錯誤）', '可以', '不行，只能把其他管子併到 1 號'],
+          ['`>|` 強制覆寫', '開了 `noclobber` 之後用它強制覆寫', '沒有；用 `Out-File -Force`'],
+          ['一邊看一邊存', '`npm test 2>&1 | tee test.log`', '`npm test 2>&1 | Tee-Object test.log`'],
+        ] },
+        'PowerShell 7.4 起，把外部程式的 stdout 用 `>` 存檔時會保留原始位元組，所以 `curl -s 網址 > file.zip` 在 7.4 以後不會被弄壞；5.1 和更早的 7.x 會把它當文字重新編碼。',
       ],
-      tryit: {
-        q: ['用 zsh 寫一行：執行 `npm install`，正常訊息丟掉，錯誤訊息存到 `install-errors.txt`。'],
-        code: true,
-        draft: 'npm install ____ ____',
-        answer: ['`npm install > /dev/null 2> install-errors.txt`', 'PowerShell：`npm install > $null 2> install-errors.txt`。'],
-      },
     },
     mistakes: [
       { wrong: '想把結果加到記錄檔最後，卻打成 `>`。', why: '`>` 會清空檔案再寫入，之前的記錄全部消失。', right: '附加用 `>>`。在 zsh 可以 `setopt noclobber` 讓 `>` 拒絕覆寫已存在的檔案。' },
@@ -348,35 +291,9 @@ defineLessons({
       { wrong: '在 PowerShell 寫 `> /dev/null`。', why: 'Windows 沒有 `/dev/null` 這個路徑，PowerShell 會報錯或建出奇怪的檔案。', right: 'PowerShell 用 `> $null` 或 `| Out-Null`；cmd 用 `> NUL`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`>` 和 `>>` 的差別是？', options: [
-        { text: '`>` 覆寫檔案，`>>` 附加到最後', correct: true, why: '這是兩者唯一的差別，都只改接 stdout。' },
-        { text: '`>` 寫 stdout，`>>` 寫 stderr', why: 'stderr 用的是 `2>`；`>>` 一樣是 stdout。' },
-        { text: '`>>` 寫入速度比較快', why: '速度沒有差別，差在會不會清空原內容。' },
-        { text: '`>` 用在檔案，`>>` 用在資料夾', why: '兩者都只能寫進檔案。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你想讓 `build.log` 同時收到正常輸出和錯誤，哪一行正確？', options: [
-        { text: '`npm run build 2>&1 > build.log`', why: '順序反了：錯誤會被接到「畫面」，因為當時 1 號還沒改接。' },
-        { text: '`npm run build > build.log 2>&1`', correct: true, why: '先把 1 接到檔案，再把 2 接到 1 現在的位置。' },
-        { text: '`npm run build >> build.log`', why: '只附加 stdout，錯誤仍在畫面上。' },
-        { text: '`npm run build | build.log`', why: '`|` 後面要接程式，build.log 不是程式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['很多安裝教學會寫 `xxx > /dev/null 2>&1`。為什麼作者要這樣寫？什麼時候你**不應該**照抄？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['很多安裝教學會寫 `xxx > /dev/null 2>&1`。為什麼作者要這樣寫？什麼時候你**不應該**照抄？'], answer: [
         '參考：作者想讓指令安靜執行，不要洗版。但這也把**錯誤訊息一起丟掉了**，失敗時你什麼都看不到。',
         '初學、第一次執行、或出問題時，把這段拿掉，看完整的輸出。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）`rm` 刪除的檔案會進資源回收筒嗎？', options: [
-        { text: '會，可以從資源回收筒還原', why: '那是滑鼠刪除的行為。' },
-        { text: '不會，直接刪除', correct: true, why: '和 `>` 覆寫一樣，不會有第二次機會。' },
-        { text: '只有加 `-f` 才不會', why: '加不加 `-f` 都不經過資源回收筒。' },
-        { text: '在 macOS 會，在 Windows 不會', why: '兩邊的終端機刪除都不經過資源回收筒。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-2）`echo "價格 $5" > p.txt` 在 zsh 寫進檔案的是？', options: [
-        { text: '`價格 $5`', why: '雙引號裡 `$5` 會被當成變數（第 5 個參數），通常是空的。' },
-        { text: '`價格 `（$5 變成空字串）', correct: true, why: '雙引號會展開變數；要保留字面的 `$` 用單引號。' },
-        { text: '錯誤：找不到變數', why: 'shell 不會報錯，空變數就是空字串。' },
-        { text: '`價格 5`', why: '`$5` 整個被換掉，不是只拿掉 `$`。' },
       ] },
     ],
     keypoints: [
@@ -455,13 +372,15 @@ defineLessons({
           <text x="475" y="140" text-anchor="middle" font-size="18">沒有執行</text>
           <text x="280" y="200" text-anchor="middle" font-size="18" class="mono">npm ci &amp;&amp; npm test &amp;&amp; npm run deploy</text>
         </svg>`, caption: '一長串 `&&` 像骨牌：中間任何一塊倒不下去，後面的都不會動。' },
+        { type: 'heading', id: 'deep-chain', text: '深入：`A && B || C` 不是「如果…否則…」' },
+        '很多人把 `A && B || C` 讀成「A 成功就 B，否則 C」。實際上 `&&` 和 `||` 由左往右依序判斷：A 成功但 **B 失敗**時，C 也會執行。',
+        { type: 'table', caption: '`mkdir out && cp a.txt out/ || echo 失敗` 的三種結果', head: ['mkdir', 'cp', '會不會印「失敗」'], rows: [
+          ['成功', '成功', '不會'],
+          ['成功', '失敗', '**會**（cp 失敗觸發 `||`）'],
+          ['失敗', '沒執行', '會'],
+        ] },
+        '在腳本裡，`cd` 失敗後繼續往下跑最危險，因為後面的指令會在錯的資料夾執行。常見寫法是 `cd 資料夾 || exit 1`，或在 bash 腳本開頭 `set -e`（遇到失敗就停，但在 `if`、`&&` 裡的失敗例外）。PowerShell 7 的 `&&` 看的是 `$?`：外部程式看結束代碼，cmdlet 看有沒有出錯。',
       ],
-      tryit: {
-        q: ['用一行完成：建立 `demo` 資料夾、進去、建立 `README.md`。前一步失敗就停。寫 zsh 版和 PowerShell 7 版。'],
-        code: true,
-        draft: 'zsh：____\nPowerShell 7：____',
-        answer: ['zsh：`mkdir demo && cd demo && touch README.md`', 'PowerShell 7：`mkdir demo && cd demo && New-Item README.md`（5.1 要拆成三行）。'],
-      },
     },
     mistakes: [
       { wrong: '從 Linux 教學複製 `npm install && npm start`，在 Windows PowerShell 5.1 出現「&& 不是有效的陳述式分隔符號」。', why: '5.1 不支援 `&&`，PowerShell 7 才支援。', right: '安裝並改用 PowerShell 7（`pwsh`），或拆成兩行執行。' },
@@ -469,35 +388,9 @@ defineLessons({
       { wrong: '在 cmd 用 `;` 分隔兩個指令。', why: 'cmd 不把 `;` 當分隔符號。', right: 'cmd 用 `&`（依序）、`&&`（成功才）、`||`（失敗才）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`A || B` 什麼時候會執行 B？', options: [
-        { text: 'A 成功時', why: '那是 `&&`。' },
-        { text: 'A 失敗時', correct: true, why: '`||` 是「否則」：A 失敗（非 0）才執行 B。' },
-        { text: '一定會執行', why: '一定執行的是 `;`。' },
-        { text: 'A 和 B 同時執行', why: '同時執行並接上資料的是管線 `|`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 PowerShell 7 中，要「`git pull` 成功才跑 `npm install`」，哪一行正確？', options: [
-        { text: '`git pull; npm install`', why: '`;` 不管成敗都會執行 npm install。' },
-        { text: '`git pull && npm install`', correct: true, why: 'PowerShell 7 支援 `&&`，行為和 bash 一樣。' },
-        { text: '`git pull | npm install`', why: '管線會把 git 的輸出接給 npm，不是「成功才執行」。' },
-        { text: '`git pull -and npm install`', why: '`-and` 是 PowerShell 在條件判斷裡用的邏輯運算子，不能拿來串接兩個指令。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['AI 建議你執行 `rm -rf build ; npm run build`。如果 `rm` 因為權限失敗了，會發生什麼？改成 `&&` 有什麼不同？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['AI 建議你執行 `rm -rf build ; npm run build`。如果 `rm` 因為權限失敗了，會發生什麼？改成 `&&` 有什麼不同？'], answer: [
         '參考：用 `;`，即使刪除失敗，build 照樣執行，可能混到舊檔案。改成 `&&`，刪除失敗就停下，你會看到錯誤並先處理。',
         '一般原則：後一步依賴前一步的結果時，用 `&&`。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-4）`&&` 是依據什麼判斷「成功」？', options: [
-        { text: '結束代碼是 0', correct: true, why: '所有串接運算子都只看結束代碼。' },
-        { text: '畫面上沒有紅字', why: '顏色不可靠，shell 不看顏色。' },
-        { text: '指令有輸出內容', why: '有沒有輸出和成功無關。' },
-        { text: '指令在 5 秒內完成', why: '時間無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-1）你在 `~/projects`，`cd ../Downloads` 會到哪裡？', options: [
-        { text: '`~/Downloads`', correct: true, why: '`..` 回到 `~`，再往下到 Downloads。' },
-        { text: '`~/projects/Downloads`', why: '那是不加 `..` 的 `cd Downloads`。' },
-        { text: '`/Downloads`', why: '那是從根目錄開始的絕對路徑。' },
-        { text: '會失敗，因為 `..` 只能單獨使用', why: '`..` 可以和其他路徑組合。' },
       ] },
     ],
     keypoints: [

@@ -12,6 +12,7 @@ defineTerms({
   '事件處理函式': { en: 'event handler', def: '傳給 onClick、onChange 等屬性的函式，使用者操作時被呼叫。', example: '`<button onClick={handleClick}>`' },
   '合成事件': { en: 'SyntheticEvent', def: 'React 包裝過的跨瀏覽器事件物件，API 和原生事件幾乎相同。', example: '`e.preventDefault()`' },
   '事件冒泡': { en: 'event propagation', def: '事件從被點的元素往外層一路傳遞；`e.stopPropagation()` 可以停止。', example: '點卡片裡的按鈕，卡片的 onClick 也會被觸發。' },
+  '事件委派': { en: 'event delegation', def: '不在每個元素上綁監聽器，而是在共同的祖先節點統一監聽，再依事件來源分派。React 17 起綁在根容器。', example: '一萬個按鈕也只有少數幾個原生監聽器。' },
   'children': { en: 'children', def: '寫在元件開關標籤之間的內容，會以 props.children 傳入。', example: '`<Card><p>內容</p></Card>`' },
   '組合': { en: 'composition', def: '用元件包住元件、透過 children 或 props 傳入 JSX 來建構畫面，取代繼承。', example: '`<Layout sidebar={<Menu />}>`' },
 });
@@ -22,14 +23,6 @@ defineLessons({
       '用 props 把資料傳給子元件',
       '用解構與預設值接收 props',
       '說出為什麼子元件不能修改 props',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-3）JSX 大括號裡可以放什麼？', options: [
-        { text: '運算式，例如 `{price * 2}`', correct: true, why: '要能算出一個值。' },
-        { text: 'if 陳述式，例如 `{if (ok) "是"}`', why: '不行，if 是陳述式；用三元運算子。' },
-        { text: 'for 迴圈', why: '不行，用 map。' },
-        { text: '只能放字串', why: '任何運算式都可以。' },
-      ] },
     ],
     analogy: {
       text: ['props 像點餐單：廚房（子元件）照單做菜，但不能改點餐單上的內容。想改點菜，要請客人（父元件）重新點一次。'],
@@ -67,49 +60,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Greeting({ name = "朋友", times = 1 }) {\n  return <p>{"嗨，" + name + "！".repeat(times)}</p>;\n}\n\nexport default function App() {\n  return (\n    <>\n      <Greeting />\n      <Greeting name="阿明" times={3} />\n      <Greeting name="小華" times="2" />\n    </>\n  );\n}',
-          predict: { q: '第三個 `times="2"`（字串）會顯示什麼？', options: ['嗨，小華！！', '嗨，小華！', '錯誤'], answer: 0 },
           output: '嗨，朋友！\n嗨，阿明！！！\n嗨，小華！！\n（"！".repeat("2") 會把 "2" 轉成 2；用 TypeScript 時這行會先報型別錯誤）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'string', label: '傳入字串' }, { id: 'expr', label: '傳入運算式的值' }],
-          items: [
-            { text: '`<Img src="a.png" />`', answer: 'string', why: '引號是字串字面值。' },
-            { text: '`<Img width={200} />`', answer: 'expr', why: '大括號：number 200。' },
-            { text: '`<Img width="200" />`', answer: 'string', why: '是字串 "200"，不是數字。' },
-            { text: '`<Btn disabled />`', answer: 'expr', why: '簡寫等於 `{true}`。' },
-            { text: '`<User data={user} />`', answer: 'expr', why: '傳入物件。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`<Img src="a.png" />`', '傳入字串', '引號是字串字面值。'],
+          ['`<Img width={200} />`', '傳入運算式的值', '大括號：number 200。'],
+          ['`<Img width="200" />`', '傳入字串', '是字串 "200"，不是數字。'],
+          ['`<Btn disabled />`', '傳入運算式的值', '簡寫等於 `{true}`。'],
+          ['`<User data={user} />`', '傳入運算式的值', '傳入物件。']
+        ] },
         { type: 'svg', svg: Fig.vs('props 與 state：props 由父元件給，子元件唯讀；state 由元件自己擁有，可以透過 set 函式更新', { title: 'props', lines: ['父元件給的', '唯讀'], tone: 3 }, { title: 'state', lines: ['自己擁有', '用 set 函式更新'], tone: 4 }), caption: '模組 2 會詳細講 state。' },
+        { type: 'heading', id: 'deep-props-identity', text: '深入：props 是凍結的快照，但只凍結一層' },
+        '開發模式下 React 會用 Object.freeze 凍結 JSX 元素的 props，而模組預設是嚴格模式，所以 `props.title = "x"` 會直接拋出 TypeError。',
+        '凍結是淺層的：`props.user.name = "x"` 不會報錯，卻改到父元件持有的資料，這就是比喻裡「物件 props 改得到」的原因。每次渲染傳下來的物件或箭頭函式都是新參考，平常沒差，只有子元件用了 memo（4-4）時才會讓記憶化失效。',
+        { type: 'table', head: ['傳法', '什麼時候用', '代價'], rows: [
+          ['個別列出 `name={…} price={…}`', '大多數情況', '多寫幾個字，但介面清楚'],
+          ['傳整個物件 `product={p}`', '子元件需要很多欄位', '子元件和資料形狀綁在一起'],
+          ['展開 `{...rest}`', '包裝原生元素（6-1）', '看不出傳了什麼，可能把不該給 DOM 的屬性傳下去'],
+        ] },
       ],
-      tryit: {
-        q: ['讓 Avatar 接收 size（預設 40）與 name，並用 size 設定圖片寬高：'],
-        draft: 'function Avatar({ name, size = ____ }: { name: string; size?: number }) {\n  return <img src={`/a/${name}.png`} width={____} height={size} alt={name} />;\n}',
-        answer: ['`size = 40`、`width={size}`。', '可選 props 加 `?`，再用解構的預設值處理沒傳的情況。'],
-      },
     },
     mistakes: [
       { wrong: '`<Img width="200" />` 以為傳的是數字。', why: '引號一律是字串。', right: '`width={200}`。' },
       { wrong: '在子元件裡修改 props 物件的屬性。', why: '父元件與其他使用同一物件的地方會被影響，React 也不會重新渲染。', right: '呼叫父元件傳下來的回呼函式。' },
       { wrong: '把 props 複製到 state：`useState(props.value)`。', why: 'props 之後改變時，state 不會跟著更新。', right: '直接使用 props；真的需要「初始值」才用 initialValue 這種命名。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '子元件要讓父元件的資料改變，正確做法是？', options: [
-        { text: '呼叫父元件透過 props 傳下來的函式', correct: true, why: '事件往上通知。' },
-        { text: '直接修改 props，React 會偵測到變化', why: 'props 唯讀，修改也不會觸發更新。' },
-        { text: '用全域變數', why: 'React 不會知道它改變了。' },
-        { text: '重新整理頁面', why: '不是 React 的方式。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`<Button primary />` 中 primary 的值是？', options: [
-        { text: '`true`', correct: true, why: '布林簡寫。' },
-        { text: '`"primary"`', why: '只寫名稱時是 true。' },
-        { text: '`undefined`', why: '有寫就是 true。' },
-        { text: '`""`', why: '不是空字串。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 堅持單向資料流？如果子元件可以直接改父元件的資料，大型應用會出現什麼問題？'], answer: [
-        '單向資料流讓「資料在哪裡被改」只有一個地方：擁有 state 的元件。出 bug 時只要找那個元件與它傳下去的函式。',
-        '如果任何子元件都能改，資料可能被畫面上十個地方修改，很難追蹤誰改的、什麼時候改的，畫面也可能不同步。',
-      ] },
     ],
     keypoints: [
       'props 是元件的參數，從父傳到子，而且唯讀。',
@@ -124,14 +98,6 @@ defineLessons({
       '用 &&、三元運算子、提早 return 做條件渲染',
       '用 map 渲染清單',
       '選對 key，並說出為什麼不能用索引',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-1）`<Img width="200" />` 中 width 的型別是？', options: [
-        { text: '字串', correct: true, why: '引號一律是字串。' },
-        { text: '數字', why: '要 `{200}` 才是數字。' },
-        { text: '布林', why: '不是。' },
-        { text: '自動判斷', why: 'JSX 不會自動轉型。' },
-      ] },
     ],
     analogy: {
       text: ['key 像學生的學號：老師重新排座位時，靠學號知道誰是誰，作業本（元件狀態）跟著對的人走。用「座號」（陣列索引）當 key，換座位後座號跟著位置走，作業本就發錯人。'],
@@ -170,26 +136,27 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const items = ["蘋果", "香蕉"];\n\nexport default function List() {\n  return (\n    <ul>\n      {items.map((name) => <li>{name}</li>)}\n    </ul>\n  );\n}',
-          predict: { q: '主控台會出現什麼？', options: ['key 的警告', '沒有任何訊息', '錯誤，畫面不顯示'], answer: 0 },
           output: '畫面：• 蘋果　• 香蕉\n!Warning: Each child in a list should have a unique "key" prop.',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'good', label: '好的 key' }, { id: 'bad', label: '不好的 key' }],
-          items: [
-            { text: '資料庫的 id', answer: 'good', why: '穩定且唯一。' },
-            { text: '陣列索引 i（清單會排序或刪除）', answer: 'bad', why: '位置改變時 key 跟著改，狀態錯位。' },
-            { text: '`Math.random()`', answer: 'bad', why: '每次渲染都不同，元件每次都被重建。' },
-            { text: '`crypto.randomUUID()` 在建立資料時產生並存起來', answer: 'good', why: '建立時產生一次並保存就是穩定的 id。' },
-            { text: '使用者名稱（可能重複）', answer: 'bad', why: '不保證唯一。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['資料庫的 id', '好的 key', '穩定且唯一。'],
+          ['陣列索引 i（清單會排序或刪除）', '不好的 key', '位置改變時 key 跟著改，狀態錯位。'],
+          ['`Math.random()`', '不好的 key', '每次渲染都不同，元件每次都被重建。'],
+          ['`crypto.randomUUID()` 在建立資料時產生並存起來', '好的 key', '建立時產生一次並保存就是穩定的 id。'],
+          ['使用者名稱（可能重複）', '不好的 key', '不保證唯一。']
+        ] },
         { type: 'svg', svg: Fig.vs('用索引當 key 時刪除第一項：原本 key 0 是蘋果、key 1 是香蕉，刪掉蘋果後香蕉變成 key 0，React 以為是蘋果被修改、香蕉被刪除，輸入框等狀態錯位；用 id 當 key 時 React 正確知道是蘋果被刪除', { title: 'key = 索引', lines: ['刪掉第一項後', '後面全部錯位'], tone: 5 }, { title: 'key = id', lines: ['正確知道', '哪一項被刪除'], tone: 4 }), caption: '清單只顯示、永遠不排序也不增刪時，索引才勉強可以。' },
+        { type: 'heading', id: 'deep-key-identity', text: '深入：key 是元件的身分證' },
+        'React 用「型別 ＋ 在父元件中的位置 ＋ key」判斷是不是同一個元件。三者相同就保留 state，任何一個不同就卸載舊的、建立新的。',
+        '所以 key 不只用在清單：`<ProfileForm key={userId} />` 換人時整個表單重置。反過來，`{isA ? <Counter /> : <Counter />}` 兩邊位置與型別相同，切換時 state 會被保留，常被誤以為是 bug。',
+        { type: 'table', head: ['情況', 'state 會保留嗎', '原因'], rows: [
+          ['同位置、同型別、同 key', '保留', '視為同一個元件'],
+          ['同位置，`<div>` 換成 `<section>`', '整棵子樹重置', '型別不同'],
+          ['同位置、同型別，key 改變', '重置', 'key 不同就是不同元件'],
+          ['索引當 key，刪除第一項', '保留但錯位', 'key 0 現在指向原本的第二項'],
+        ] },
+        '索引當 key 也有合理的場合：清單只在尾端新增、從不排序、項目沒有自己的 state（純顯示文字）。',
       ],
-      tryit: {
-        q: ['渲染使用者清單，並在沒有人時顯示「尚無使用者」：'],
-        draft: 'function Users({ users }: { users: { id: number; name: string }[] }) {\n  if (users.length === 0) return <p>尚無使用者</p>;\n  return (\n    <ul>\n      {users.____((u) => <li ____={u.id}>{u.name}</li>)}\n    </ul>\n  );\n}',
-        answer: ['`users.map(...)`、`key={u.id}`。', 'key 放在 map 回傳的最外層元素上；如果最外層是 Fragment，要用 `<Fragment key={…}>`。'],
-      },
     },
     mistakes: [
       { wrong: '`{count && <X />}`，count 可能是 0。', why: '畫面會顯示 0。', right: '`{count > 0 && <X />}`。' },
@@ -197,19 +164,7 @@ defineLessons({
       { wrong: '在 JSX 裡寫 if。', why: 'JSX 只接受運算式。', right: '三元運算子、&&，或在 return 前先算好。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'key 的主要作用是？', options: [
-        { text: '讓 React 在重新渲染時辨認每個項目', correct: true, why: '正確對應狀態與 DOM。' },
-        { text: '輸出成 DOM 屬性，給 CSS 選擇器使用', why: 'key 不會出現在 DOM。' },
-        { text: '傳給子元件當 props', why: 'key 不會傳進 props。' },
-        { text: '決定項目在畫面上的顯示順序', why: '順序由陣列決定。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`{items.length && <List />}`，items 是空陣列時畫面顯示？', options: [
-        { text: '`0`', correct: true, why: '&& 左邊是 0 時渲染 0。' },
-        { text: '什麼都不顯示', why: '0 會被渲染出來。' },
-        { text: '空的 List', why: '不會渲染 List。' },
-        { text: '錯誤', why: '不會報錯。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你想讓某個表單元件「切換使用者時完全重置」（清空所有欄位）。可以怎麼利用 key？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你想讓某個表單元件「切換使用者時完全重置」（清空所有欄位）。可以怎麼利用 key？'], answer: [
         '`<ProfileForm key={userId} user={user} />`：userId 改變時 key 不同，React 視為不同的元件，卸載舊的、建立新的，所有內部 state 都重置。',
         '這比在 effect 裡手動重置每個欄位簡單而且不會漏。',
       ] },
@@ -227,14 +182,6 @@ defineLessons({
       '為元素加上事件處理函式',
       '分辨「傳函式」與「呼叫函式」',
       '用 preventDefault 與 stopPropagation 控制事件',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）`{count && <X />}` 的陷阱是？', options: [
-        { text: 'count 為 0 時畫面出現 0', correct: true, why: '&& 左邊放布林。' },
-        { text: 'count 是 0 時 X 仍會渲染出來', why: '不會渲染 X，而是渲染出 0。' },
-        { text: '語法錯誤', why: '合法。' },
-        { text: 'count 會被改掉', why: '不會。' },
-      ] },
     ],
     analogy: {
       text: ['事件處理函式像門鈴的接線：你把「響鈴時要做什麼」接上去（傳函式），而不是現在就按一下（呼叫函式）。寫成 `onClick={handle()}` 等於裝門鈴時就自己按了一次。'],
@@ -269,52 +216,34 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'export default function Card() {\n  return (\n    <div onClick={() => console.log("開啟卡片")}>\n      <h3>商品</h3>\n      <button onClick={() => console.log("加入購物車")}>加入</button>\n    </div>\n  );\n}\n// 使用者點了「加入」按鈕',
-          predict: { q: '主控台會印出什麼？', options: ['加入購物車、開啟卡片', '只有加入購物車', '只有開啟卡片'], answer: 0 },
           output: '加入購物車\n開啟卡片\n（事件冒泡到外層 div；按鈕的處理函式加 e.stopPropagation() 可以阻止）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '正確傳入函式' }, { id: 'bad', label: '渲染時就呼叫了' }],
-          items: [
-            { text: '`onClick={handleClick}`', answer: 'ok', why: '傳函式本身。' },
-            { text: '`onClick={handleClick()}`', answer: 'bad', why: '渲染時呼叫，傳入的是回傳值。' },
-            { text: '`onClick={() => setOpen(true)}`', answer: 'ok', why: '箭頭函式，點擊時才執行。' },
-            { text: '`onClick={setOpen(true)}`', answer: 'bad', why: '渲染時就 setState，造成無限重新渲染。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`onClick={handleClick}`', '正確傳入函式', '傳函式本身。'],
+          ['`onClick={handleClick()}`', '渲染時就呼叫了', '渲染時呼叫，傳入的是回傳值。'],
+          ['`onClick={() => setOpen(true)}`', '正確傳入函式', '箭頭函式，點擊時才執行。'],
+          ['`onClick={setOpen(true)}`', '渲染時就呼叫了', '渲染時就 setState，造成無限重新渲染。']
+        ] },
         { type: 'svg', svg: Fig.stack('點擊卡片內按鈕時事件的路徑：先觸發按鈕的 onClick；接著冒泡到卡片 div 的 onClick；再往上到更外層；在按鈕處理函式呼叫 stopPropagation 可以在第一步就停住', [
           { title: '1. button 的 onClick', tone: 4 },
           { title: '2. 冒泡到 div 的 onClick', tone: 3 },
           { title: '3. 再往外層冒泡…', tone: 1 },
         ]), caption: '`e.stopPropagation()` 讓事件停在按鈕這一層。' },
+        { type: 'heading', id: 'deep-event-delegation', text: '深入：React 事件其實綁在根節點' },
+        'React 17 起，監聽器不綁在每個元素上，而是統一綁在 React 根容器（#root），事件冒泡到根時再分派給對應元件，這叫[[事件委派]]。畫面上有一萬個按鈕，也只有少數幾個原生監聽器。',
+        '邊界情況：在 React 裡呼叫 `e.stopPropagation()`，也會擋住綁在 document 上的原生監聽器。React 17 起 `onScroll` 不再冒泡（原生 scroll 本來就不冒泡）；需要在捕獲階段處理時，用 `onClickCapture` 這類 Capture 版本。',
+        { type: 'table', head: ['需求', '寫法'], rows: [
+          ['阻止表單重新載入、連結跳轉', '`e.preventDefault()`'],
+          ['內層按鈕不要觸發外層卡片', '`e.stopPropagation()`'],
+          ['外層要比內層先收到事件', '`onClickCapture`'],
+          ['點擊元件外部時關閉選單', 'Effect 裡對 document 加監聽並在清理時移除（3-2）'],
+        ] },
       ],
-      tryit: {
-        q: ['讓連結點擊時不跳轉，而是呼叫 openModal：'],
-        draft: '<a href="/detail" onClick={(e) => {\n  e.____();\n  ____();\n}}>看詳情</a>',
-        answer: ['`e.preventDefault(); openModal();`。', '保留 href 讓使用者可以用新分頁開啟或複製連結（無障礙與可用性），一般點擊才由 JS 處理。'],
-      },
     },
     mistakes: [
       { wrong: '`onClick={handleClick()}`。', why: '渲染時就執行；若裡面 setState 會無限重新渲染。', right: '`onClick={handleClick}` 或 `() => handleClick(x)`。' },
       { wrong: '表單送出沒有 preventDefault。', why: '瀏覽器重新載入頁面，state 全部消失。', right: 'onSubmit 裡 `e.preventDefault()`，或用 5-2 的 form action。' },
       { wrong: '用 `<div onClick>` 做按鈕。', why: '鍵盤無法操作、螢幕閱讀器不知道是按鈕。', right: '用 `<button type="button">`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '要讓點擊時才呼叫 `remove(id)`，正確寫法是？', options: [
-        { text: '`onClick={() => remove(id)}`', correct: true, why: '傳入之後才呼叫的函式。' },
-        { text: '`onClick={remove(id)}`', why: '渲染時就呼叫。' },
-        { text: '`onClick="remove(id)"`', why: 'React 不接受字串形式的處理函式。' },
-        { text: '`onClick={remove.bind(null)}`', why: '沒有帶入 id，點擊時 remove 收到的是事件物件。' },
-      ] },
-      { level: '應用', type: 'mc', q: '表單送出後整頁重新載入、輸入的資料不見了。最可能缺少？', options: [
-        { text: '`e.preventDefault()`', correct: true, why: '取消瀏覽器的預設送出行為。' },
-        { text: '`e.stopPropagation()`', why: '那是停止冒泡，不會阻止送出。' },
-        { text: 'key', why: '和表單送出無關。' },
-        { text: 'useEffect', why: '無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 建議子元件的事件 prop 命名成 onXxx，而父元件的處理函式命名成 handleXxx？'], answer: [
-        'onXxx 表示「事件發生時會呼叫你給的函式」，和原生 onClick 一致；handleXxx 表示「這是處理那個事件的實作」。',
-        '讀 `<SearchBox onSearch={handleSearch} />` 一眼就知道：SearchBox 會在搜尋時通知，父元件用 handleSearch 處理。命名一致讓資料流向更清楚。',
-      ] },
     ],
     keypoints: [
       '傳函式 `onClick={fn}`，不是呼叫 `onClick={fn()}`。',
@@ -329,14 +258,6 @@ defineLessons({
       '用 children 讓元件可以包住任意內容',
       '用 props 傳入 JSX 做出「插槽」',
       '用組合取代複雜的條件與繼承',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-3）點擊卡片內的按鈕，卡片的 onClick 也被觸發，原因是？', options: [
-        { text: '事件冒泡', correct: true, why: '用 stopPropagation 停止。' },
-        { text: 'key 重複', why: '無關。' },
-        { text: '元件渲染兩次', why: '無關。' },
-        { text: 'preventDefault 沒寫', why: 'preventDefault 不會停止冒泡。' },
-      ] },
     ],
     analogy: {
       text: ['children 像相框：相框（Card 元件）負責邊框、陰影、圓角，中間放什麼照片由使用的人決定。多個 props 插槽像有好幾格的展示框：標題一格、內容一格、按鈕一格。'],
@@ -375,25 +296,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Box({ children }: { children: React.ReactNode }) {\n  return <div className="box">[{children}]</div>;\n}\n\nexport default function App() {\n  return (\n    <Box>\n      <b>A</b>\n      <i>B</i>\n    </Box>\n  );\n}',
-          predict: { q: '畫面上方括號裡會有什麼？', options: ['粗體 A 和斜體 B', '空的', '只有 A'], answer: 0 },
           output: '[AB]（A 粗體、B 斜體；children 是包含兩個元素的陣列）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'children', label: '用 children' }, { id: 'slot', label: '用具名的 JSX props' }, { id: 'data', label: '用資料 props' }],
-          items: [
-            { text: 'Card 中間的任意內容', answer: 'children', why: '單一主要內容區。' },
-            { text: 'Layout 的側欄與主內容兩個區域', answer: 'slot', why: '兩個位置，各自命名。' },
-            { text: '商品卡片的價格數字', answer: 'data', why: '資料，元件自己決定怎麼顯示。' },
-            { text: 'Dialog 底部的按鈕區', answer: 'slot', why: '`footer={…}`。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['Card 中間的任意內容', '用 children', '單一主要內容區。'],
+          ['Layout 的側欄與主內容兩個區域', '用具名的 JSX props', '兩個位置，各自命名。'],
+          ['商品卡片的價格數字', '用資料 props', '資料，元件自己決定怎麼顯示。'],
+          ['Dialog 底部的按鈕區', '用具名的 JSX props', '`footer={…}`。']
+        ] },
         { type: 'svg', svg: Fig.vs('繼承與組合：其他框架常用子類別繼承基底元件；React 用組合，外框元件透過 children 或 props 接收內容', { title: '繼承（React 不用）', lines: ['FancyButton', 'extends Button'], tone: 5 }, { title: '組合（React 的方式）', lines: ['`<Button>`', '  `<Icon />`', '`</Button>`'], tone: 4 }), caption: 'React 官方：沒有發現需要元件繼承的情況。' },
+        { type: 'heading', id: 'deep-composition-patterns', text: '深入：組合不夠用時的三種延伸' },
+        'children 是不透明的：外層元件拿到的是一團 ReactNode，不該拆解或改寫它。外層需要知道每一項的資料時（例如 Tabs 要知道分頁標題），改傳資料陣列 `items={[{ id, label, content }]}`。',
+        'compound components（`<Tabs><Tabs.List /><Tabs.Panel /></Tabs>`）用 Context（4-1）在外層與內層之間共享狀態，是無樣式元件庫的常見做法。render prop 則是傳一個回傳 JSX 的函式，讓外層給資料、呼叫端決定每一項怎麼畫，例如 `renderItem={(item) => <Row {...item} />}`。',
+        { type: 'table', head: ['需求', '做法'], rows: [
+          ['一個主要內容區', 'children'],
+          ['幾個固定位置', '具名 JSX props（header、footer）'],
+          ['外層要知道每一項的資料', '傳資料陣列'],
+          ['外層給資料、呼叫端決定畫法', 'render prop'],
+          ['一組元件共享狀態', 'compound components ＋ Context'],
+        ] },
       ],
-      tryit: {
-        q: ['做一個 Alert 元件：type 決定顏色，內容用 children：'],
-        draft: 'function Alert({ type, ____ }: { type: "info" | "error"; children: React.____ }) {\n  return <div className={`alert alert-${type}`} role="alert">{children}</div>;\n}\n\n<Alert type="error">儲存失敗，請再試一次</Alert>',
-        answer: ['`children`、`React.ReactNode`。', 'role="alert" 讓螢幕閱讀器在內容出現時主動朗讀。'],
-      },
     },
     mistakes: [
       { wrong: '為了多一種樣式就加一個布林 prop（isLarge、isRed、hasIcon…）。', why: '組合數爆炸，元件內部充滿判斷。', right: '用 variant 字面型別，或讓使用者傳入 JSX。' },
@@ -401,19 +323,7 @@ defineLessons({
       { wrong: 'children 型別寫 `JSX.Element`。', why: '傳入文字或多個元素時型別不符。', right: '`React.ReactNode`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`<Card><p>內容</p></Card>` 中 `<p>內容</p>` 以什麼傳給 Card？', options: [
-        { text: '`props.children`', correct: true, why: '開關標籤之間的內容。' },
-        { text: '`props.content`', why: '要自己這樣命名才會有。' },
-        { text: '`props.body`', why: '同上。' },
-        { text: '不會傳入', why: '會以 children 傳入。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'Layout 需要「側欄」與「主內容」兩個區域，最清楚的寫法是？', options: [
-        { text: '`<Layout sidebar={<Nav />}>{main}</Layout>`', correct: true, why: '具名 props 加 children。' },
-        { text: '在 Layout 內部判斷 children 的第幾個是側欄', why: '依順序判斷很脆弱。' },
-        { text: '`<Layout>{[<Nav />, main]}</Layout>` 依位置判斷', why: '依順序判斷很脆弱，讀的人也看不出哪個是側欄。' },
-        { text: '用全域變數傳', why: '不是 React 的方式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['組合也能減少「props 一層層往下傳」（prop drilling）。怎麼做？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['組合也能減少「props 一層層往下傳」（prop drilling）。怎麼做？'], answer: [
         '如果中間的元件只是把 user 傳給更深的 Avatar，可以讓最外層直接建立 `<Avatar user={user} />`，以 children 或 slot 傳進中間的版面元件。',
         '中間層不需要知道 user，props 不用一層層傳。這是 Context（4-1）之前應該先考慮的做法。',
       ] },

@@ -520,3 +520,31 @@ Widgets.promptgen = {
     fill();
   },
 };
+
+/* ---------- knobs：改參數，看試算結果（移植自 finance-psychology-course） ---------- */
+// props: { title, sliders: [{ id, label, min, max, step, value, unit, ends? }], compute: (v) => ({ rows: [{ label, value, ratio }], note }) }
+Widgets.knobs = {
+  render(props, id) {
+    return `<div class="jw kn">
+      <div class="jw-head"><span class="label" style="--chip:var(--m7)">拉桿</span><span class="grow">${esc(props.title || '改參數，看結果')}</span></div>
+      <div class="lv-sliders">${props.sliders.map((s) => `<div class="lv-row">
+        <label for="${id}-${s.id}">${esc(s.label)}：<output data-kn-out="${s.id}"></output>${s.unit ? ` ${esc(s.unit)}` : ''}</label>
+        <input type="range" id="${id}-${s.id}" data-kn="${s.id}" min="${s.min}" max="${s.max}" step="${s.step || 1}" value="${s.value}">
+        ${s.ends ? `<div class="lv-ends"><span>${esc(s.ends[0])}</span><span>${esc(s.ends[1])}</span></div>` : ''}
+      </div>`).join('')}</div>
+      <div class="kn-rows" aria-live="polite"></div>
+      <p class="jw-note kn-note"></p>
+    </div>`;
+  },
+  hydrate(el, props) {
+    const v = Object.fromEntries(props.sliders.map((s) => [s.id, s.value]));
+    function draw() {
+      const r = props.compute(v);
+      $('.kn-rows', el).innerHTML = r.rows.map((row) => `<div class="kn-row"><span>${esc(row.label)}</span><span class="lv-meter"><span class="lv-fill" style="transform:scaleX(${Math.max(0, Math.min(1, row.ratio))})"></span></span><strong>${esc(row.value)}</strong></div>`).join('');
+      $('.kn-note', el).innerHTML = r.note ? md(r.note) : '';
+      props.sliders.forEach((s) => { $(`[data-kn-out="${s.id}"]`, el).textContent = s.format ? s.format(v[s.id]) : v[s.id]; });
+    }
+    el.addEventListener('input', (e) => { const s = e.target.closest('[data-kn]'); if (s) { v[s.dataset.kn] = Number(s.value); draw(); } });
+    draw();
+  },
+};

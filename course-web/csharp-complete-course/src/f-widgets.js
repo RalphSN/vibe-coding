@@ -67,22 +67,22 @@ function makeStepper(el, count, draw, { interval = STEP_MS, start = 0 } = {}) {
   return { go, stop };
 }
 
-/* ---------- csrun：先預測，再看輸出 ---------- */
+/* ---------- csrun：可執行範例的輸出（predict 是舊版選用欄位） ---------- */
 // props: { code, title?, file?, predict?: { q?, options: [文字], answer: index }, output: 字串（\n 分行，! 開頭的行顯示成錯誤） }
 // 瀏覽器不能執行 C#，所以輸出是事先寫好的；推導依據記在 research-notes.md。
 Widgets.csrun = {
   render(props, id) {
     const p = props.predict;
     return `<div class="jw runner">
-      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '先預測，再看輸出')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m0)">${p ? '試試看' : '執行'}</span><span class="grow">${esc(props.title || '執行結果')}</span></div>
       <div class="code"><div class="code-head"><span class="lang">C#</span><span class="ttl">${esc(props.file || 'Program.cs')}</span></div>
         <pre tabindex="0" aria-label="程式碼"><code class="language-csharp">${esc(props.code)}</code></pre></div>
       ${p ? `<div class="run-predict" role="group" aria-label="預測">
         <span class="jw-note"><strong>先預測：</strong>${md(p.q || '執行後會印出什麼？')}</span>
         <div class="opts">${p.options.map((o, i) => `<button type="button" class="btn small nb-press" data-pick="${i}" aria-pressed="false">${esc(o)}</button>`).join('')}</div>
       </div>` : ''}
-      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 看輸出</button></div>
-      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（先預測，再按「看輸出」）</span></pre>
+      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ ${p ? '看輸出' : '執行'}</button></div>
+      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">${p ? '（先預測，再按「看輸出」）' : '（按「▶ 執行」看輸出）'}</span></pre>
       <div class="run-verdict" aria-live="polite"></div>
     </div>`;
   },
@@ -219,11 +219,10 @@ Widgets.classify = {
 };
 
 
-/* ---------- herodemo：首頁的第一個預測 ---------- */
+/* ---------- herodemo：首頁的第一個範例 ---------- */
 const HERO_RUNNER = {
-  title: '這門課的第一個問題',
+  title: '這門課的第一個例子：7 / 2 為什麼是 3（1-2 會解釋）',
   code: 'int a = 7;\nint b = 2;\nConsole.WriteLine(a / b);\nConsole.WriteLine(7.0 / 2);',
-  predict: { q: '第一行會印出什麼？', options: ['3.5', '3', '4'], answer: 1 },
   output: '3\n3.5',
 };
 Widgets.herodemo = {

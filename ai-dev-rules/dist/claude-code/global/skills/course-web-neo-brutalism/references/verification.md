@@ -11,7 +11,7 @@ python -m http.server 8765 --bind 127.0.0.1
 ## 0. 腳本檢查（Playwright，先跑這個）
 
 ```bash
-node scripts/audit.mjs course-web/<slug>/index.html         # 選擇題、最長答案比例、缺段落、圖數、互動數、缺漏術語、360px 溢出、JS 錯誤
+node scripts/audit.mjs course-web/<slug>/index.html         # 殘留測驗、深入段落、缺段落、圖數、互動數、缺漏術語、360px 溢出、JS 錯誤
 node scripts/svg-text.mjs course-web/<slug>/index.html      # SVG 文字超出邊界或壓框
 node scripts/lesson-table.mjs course-web/<slug>/index.html  # 逐課總表：版型、圖數、元件、分鐘
 node scripts/longest-answer.mjs course-web/<slug>/index.html # 超過 35% 時，列出領先最多的題目優先改寫
@@ -41,32 +41,10 @@ for (const lesson of LESSONS.filter((l) => l.content)) {
 ({ done: LESSONS.filter((l) => l.content).length, total: LESSONS.length, report, errors });
 ```
 
-選擇題的結構檢查：
-
-```js
-const quizIssues = [];
-let mcCount = 0;
-let correctIsLongest = 0;
-for (const lesson of LESSONS.filter((l) => l.content)) {
-  // 範本庫、總複習這類 reference 頁的題目放在 blocks 的 quiz 區塊裡，一起收進來
-  const fromBlocks = (lesson.content.blocks || []).filter((b) => b.type === 'quiz').flatMap((b) => b.items);
-  const items = [...(lesson.content.practice || []), ...(lesson.content.review || []), ...fromBlocks].filter((q) => q.type === 'mc');
-  for (const q of items) {
-    mcCount += 1;
-    if (q.options.find((o) => o.correct)?.text.length === Math.max(...q.options.map((o) => o.text.length))) correctIsLongest += 1;
-    const correct = q.options.filter((o) => o.correct);
-    const lengths = q.options.map((o) => o.text.length);
-    if (correct.length !== 1) quizIssues.push([lesson.id, q.q, '正確答案不是剛好 1 個']);
-    if (q.options.some((o) => !o.why)) quizIssues.push([lesson.id, q.q, '有選項沒有解析']);
-    if (correct[0] && correct[0].text.length === Math.max(...lengths) && Math.max(...lengths) > Math.min(...lengths) * 1.5) {
-      quizIssues.push([lesson.id, q.q, '正確答案明顯最長']);
-    }
-    if (q.options.some((o) => /以上皆/.test(o.text))) quizIssues.push([lesson.id, q.q, '用了「以上皆…」']);
-  }
-}
-// 正確答案是最長選項的比例：4 個選項隨機約 25%，超過 35% 代表看長度就猜得到
-({ quizIssues, mcCount, correctIsLongestRatio: `${correctIsLongest} / ${mcCount}` });
-```
+測驗殘留與深入段落的檢查由 `scripts/audit.mjs` 負責：
+- 任何 `type: 'mc'`、`review`、`tryit`、`predict`、`classify`、`quiz` 區塊都算違規（2026-10-29 起不出測驗）。
+- 每課 `examples.blocks` 至少一個以「深入」開頭的 `heading`。
+- `practice` 只能放 `type: 'reveal'` 的深入思考題，每課最多 2 題。
 
 ## 1.1 幾何與對齊
 
@@ -112,15 +90,15 @@ for (const lesson of LESSONS.filter((l) => l.content)) {
 - [ ] 視窗邊緣的術語，popup 會翻轉方向且不超出畫面
 
 ### 內容
-- [ ] 自動檢查：0 個 console 錯誤、0 個缺漏術語、0 個溢出、0 個選擇題問題；正確答案是最長選項的比例 ≤ 35%
+- [ ] 自動檢查：0 個 console 錯誤、0 個缺漏術語、0 個溢出、0 個殘留測驗；每課都有「深入」段落
 - [ ] 每課至少 2 張圖；抽 3 課檢查 SVG 在 375px 的字是否看得清楚
-- [ ] 抽 3 課，逐題做 content-rules.md 2.4 的自我檢查
+- [ ] 抽 3 課，檢查深入段落有寫到原理、邊界或取捨（content-rules.md 2.1），深入思考題真的需要多步推理
 - [ ] 每個指令、版本、數據都對得到 `research-notes.md` 的來源；未確認的都有標註
 - [ ] 頁尾有「內容更新至 YYYY 年 MM 月」
 
 ### 功能
 - [ ] 所有單元都能切換，沒有死連結
-- [ ] 測驗作答、重做、進度儲存正常
+- [ ] 深入思考題的答案能展開與收合；進度儲存正常
 - [ ] 複製按鈕用真實點擊（不是腳本 `click()`）測過；腳本點擊沒有使用者手勢，會走到備援訊息
 - [ ] `/` 搜尋、`←` `→` 換課、Tab 走過一個完整單元
 - [ ] 「回書櫃」按鈕在桌面與手機都看得到，連到書櫃首頁

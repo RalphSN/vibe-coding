@@ -217,3 +217,58 @@
 ## 10. 下次重新查證
 
 **2027-01-22**：Claude 模型與價格、API 版本、MCP 規格、OpenAI 與 Gemini 的主推 API。
+
+---
+
+## 2026-10-29 改版審查
+
+> 改版：不出測驗、每課補「深入」段落、總複習改一頁地圖。查證日期 2026-10-29～30。標記同上（✅ 官方／🟡 第三方或摘要／⚠️ 未查證）。
+
+### 修正的錯誤
+
+| 課 | 原本 | 修正後 | 出處 |
+|---|---|---|---|
+| 1-1 | 常見錯誤寫「把金鑰放在 `Authorization: Bearer` 是錯的，要放 `x-api-key`」 | API 兩種標頭都接受；`@anthropic-ai/sdk` 1.0.0 起 SDK 改送 `Authorization: Bearer`。錯誤改成「閘道只認 `x-api-key`，升級 SDK 後被擋」 | https://platform.claude.com/docs/en/api/migration-2026-10-21 ✅ |
+| 0-2 | 術語「Claude 的金鑰放在 `x-api-key` 標頭」 | 「放在 `x-api-key` 或 `Authorization: Bearer`；SDK 1.0 起用後者」 | 同上 ✅ |
+| 1-2 | 「Claude 4.6 之後的模型不支援預填」 | 「Opus 5.5 等新模型不支援預填」（官方只寫 on models that don't support prefill，未列 4.6 這條界線） | https://platform.claude.com/docs/en/api/messages ✅ |
+| 1-2 | 「messages 的第一則要是 user」（說明 system 不能放 messages） | 開頭規則放頂層 `system`；messages 中途的 `role: "system"` 訊息有位置規則（要接在 user 後） | https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages ✅ |
+| 7-5 | MCP connector 只寫 beta `mcp-client-2025-11-20` | 補上較新的 `mcp-client-2026-09-15`（可固定工具清單），舊的 `2025-04-04` 已棄用；只能連公開 HTTP server | https://platform.claude.com/docs/en/agents-and-tools/mcp-connector ✅ |
+| 4-4（CSS） | 工具迴圈元件在 360px 寬度溢出 | `.tl-lanes`／`.tl-row` 改為可縮欄寬 | audit.mjs 360px 檢查 |
+
+### 重新確認無誤（2026-10-29～30）
+
+| 事實 | 來源 | 可信度 |
+|---|---|---|
+| 價格：Opus 5.5 $4／$20、Sonnet 5.5 $2／$10、Haiku 5.5 $0.10／$0.50（>10 萬 token $0.50／$2.50）、Fable 5.1 $10／$50；Opus 5.5／Sonnet 5.5 快取讀取 0.05 倍；Batch 5 折；`inference_geo: "us"` ×1.1；Fast mode $8／$40 且不能和 Batch 併用；工具系統提示 286 token | https://platform.claude.com/docs/en/about-claude/pricing | ✅ |
+| API 版本 `2026-10-21`：移除 temperature／top_p／top_k；document 不能放 assistant；user text 不能帶 citations；TS SDK 1.0.0 起預設此版本；Tool Runner 移除用戶端 compaction，改用伺服器端 compaction | migration-2026-10-21 | ✅ |
+| 中途 system 訊息：支援 Fable 5.1、Opus 5.5、Sonnet 5.5、Haiku 5.5 等；Sonnet 5 不支援；要接在 user 之後；只設 `output_config.effort` 的空訊息可放任何位置 | mid-conversation-system-messages | ✅ |
+| 伺服器端工具 `web_search_20260209`；工具三類（自訂、Anthropic 定義的用戶端工具、伺服器端工具）；`disable_parallel_tool_use`；Opus 5.5／Sonnet 5.5 沒有 any／tool 的系統提示數字（不支援強制呼叫） | https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview | ✅ |
+| 結構化輸出靠受限解碼；新 schema 首次有編譯延遲；編譯結果自最後使用起快取 24 小時；只改 name／description 不失效 | https://platform.claude.com/docs/en/build-with-claude/structured-outputs | ✅ |
+| MCP 目前版本 2026-07-28；每個請求在 `_meta` 的 `io.modelcontextprotocol/protocolVersion` 帶版本，HTTP 另帶 `MCP-Protocol-Version`；`server/discover`；`UnsupportedProtocolVersionError`；握手版為 2025-11-25 及更早 | https://modelcontextprotocol.io/docs/learn/versioning | ✅ |
+| pgvector：HNSW `m` 16、`ef_construction` 64、`hnsw.ef_search` 40；近似索引先掃再過濾；0.8.0 起 `hnsw.iterative_scan`；目前 0.8.7 | https://github.com/pgvector/pgvector | ✅ |
+| 多 agent 經驗：agent 約 4 倍、多 agent 約 15 倍於聊天的 token（2025-06-13） | https://www.anthropic.com/engineering/multi-agent-research-system | ✅ |
+
+### 補進深入段落的子題（摘要）
+
+- 0-1 API 代做的工作（伺服器端工具、compaction、Managed Agents）；0-2 金鑰從開發到上線的存放、BYOK 與 `dangerouslyAllowBrowser`。
+- 1-1 API 版本與升級清單；1-2 長對話三種處理法、同角色合併、中途 system 訊息；1-3 effort 取捨與 `stop_sequence`／`pause_turn`；1-4 tokenizer 差異與 context 上限；1-5 token bucket 與價格乘數。
+- 2-1 串流的代價（審查、JSON、引用）；2-2 SSE 解析規則、`input_json_delta`、`signature_delta`；2-3 代理緩衝、Serverless、HTTP/1.1 連線數；2-4 中止後的用量與續寫。
+- 3-1 長資料放前面、舊 prompt 習慣；3-2 範例數量、標籤偽造；3-3 思考簽章、effort 救不了的情況；3-4 受限解碼、欄位順序、schema 快取；3-5 三種重試、案件包。
+- 4-1 三類工具與伺服器端工具計費；4-2 工具數量、tool search、追問行為；4-3 關閉平行呼叫、tool_result 排列；4-4 確認閘門失效、冪等鍵、復原代替確認。
+- 5-1 embedding 的盲點；5-2 高維空間的基準分數、何時不正規化；5-3 HNSW 參數與過濾；5-4 檢索不對稱、voyage-context-4、雙寫遷移。
+- 6-1 RAG 五段排查、問題改寫；6-2 父子切塊等策略與重疊成本；6-3 RRF 合併；6-4 引用位置類型與 2026-10-21 規則；6-5 lost in the middle、快取存活時間。
+- 7-1 錯誤累積與回饋；7-2 context 管理四法、繞圈偵測；7-3 多 agent 代價；7-4 何時不需要 MCP；7-5 MCP connector 限制與固定工具清單。
+- 8-1 評估集大小與信賴區間、裁判偏誤；8-2 快取失效來源；8-3 延遲分位數；8-4 Markdown 圖片外洩等對外管道；8-5 一頁地圖與會過時的內容。
+
+### 未查證或僅第三方
+
+| 項目 | 狀態 |
+|---|---|
+| OWASP Top 10 for LLM Applications 2026 版：多家資安媒體報導 2026-08 發布；但 genai.owasp.org 與 owasp.org 專案頁截至 2026-10-30 仍列 2025 版 | 🟡 僅第三方，課程照此標示 |
+| Contextual Retrieval 入庫成本約每百萬 token 1.02 美元（2024，Claude 3 Haiku 價格） | 🟡 二手轉述，未重讀原文 |
+| TS SDK 1.x 是否仍保留 `dangerouslyAllowBrowser` 選項（0.x 確定有） | ⚠️ 未查證 |
+| `node --env-file`（Node 20.6 起） | 🟡 依 Node 文件常識，未重讀 |
+| 「lost in the middle」（Liu 等人 2023）為學術研究，未附連結 | 🟡 |
+| 中途停止後已產生 token 仍計費 | ⚠️ 同 2026-10-22 第 9 節第 4 項，仍未找到逐字出處 |
+
+下次重新查證：**2027-01-29**。

@@ -24,14 +24,6 @@ defineLessons({
       '用 FormData 讀取非受控表單',
       '判斷什麼時候用受控、什麼時候用非受控',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-3）表單送出時要避免整頁重新載入，傳統做法是？', options: [
-        { text: 'onSubmit 裡呼叫 e.preventDefault()', correct: true, why: '下一課的 form action 會幫你處理。' },
-        { text: '在按鈕的 onClick 裡呼叫 stopPropagation()', why: '那是停止冒泡，不會阻止送出。' },
-        { text: '把 form 改成 div', why: '失去表單語意與鍵盤送出。' },
-        { text: '用 useEffect', why: '無關。' },
-      ] },
-    ],
     analogy: {
       text: ['受控輸入像同步翻譯：使用者每說一個字，翻譯員（state）就記一個字，畫面顯示的是翻譯員的版本。非受控像收問卷：使用者自己填，交卷（送出）時才一次收回來看。'],
       limit: ['同步翻譯可以即時糾正（即時驗證、格式化）；收問卷比較省事，但填寫過程中你看不到內容。'],
@@ -65,29 +57,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Upper() {\n  const [text, setText] = useState("");\n  return (\n    <input\n      value={text}\n      onChange={(e) => setText(e.target.value.toUpperCase())}\n    />\n  );\n}\n// 使用者輸入 abc',
-          predict: { q: '輸入框顯示什麼？', options: ['ABC', 'abc', '空白'], answer: 0 },
           output: 'ABC\n（受控輸入可以在輸入當下轉換、格式化）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'controlled', label: '受控' }, { id: 'uncontrolled', label: '非受控就好' }],
-          items: [
-            { text: '輸入時即時顯示「還剩幾個字」', answer: 'controlled', why: '需要每次輸入都知道值。' },
-            { text: '單純的聯絡表單，送出時才讀取', answer: 'uncontrolled', why: '不需要即時反應。' },
-            { text: '選了國家後，城市選項跟著變', answer: 'controlled', why: '欄位彼此連動。' },
-            { text: '信用卡號輸入時自動每 4 碼加空格', answer: 'controlled', why: '輸入當下格式化。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['輸入時即時顯示「還剩幾個字」', '受控', '需要每次輸入都知道值。'],
+          ['單純的聯絡表單，送出時才讀取', '非受控就好', '不需要即時反應。'],
+          ['選了國家後，城市選項跟著變', '受控', '欄位彼此連動。'],
+          ['信用卡號輸入時自動每 4 碼加空格', '受控', '輸入當下格式化。']
+        ] },
         { type: 'svg', svg: Fig.row('受控輸入的資料流：使用者輸入觸發 onChange；setState 更新 state；重新渲染時 input 的 value 等於新的 state', [
           { title: '使用者輸入', lines: ['觸發 onChange'], tone: 1 },
           { title: 'setState', lines: ['更新 state'], tone: 3 },
           { title: '重新渲染', lines: ['value = state'], tone: 4 },
         ]), caption: '畫面上的值永遠等於 state，這就是「受控」。' },
+        { type: 'heading', id: 'deep-form-edge', text: '深入：表單的自動重置與邊界情況' },
+        'React 19 用 `<form action>` 送出成功後，會自動重置表單裡的非受控欄位；受控欄位的值來自 state，不會被重置。需要手動重置時，可以呼叫 react-dom 的 `requestFormReset(form)`。',
+        '受控輸入的更新一定要同步：在 onChange 裡 `await` 之後才 setState，React 來不及把值寫回，游標會跳到最後。`<input type="file">` 一律是非受控（瀏覽器不允許程式設定它的值）；數字欄位的 `e.target.value` 是字串，要轉型並處理空字串。',
+        { type: 'table', head: ['欄位', '建議'], rows: [
+          ['文字、需要即時驗證或格式化', '受控'],
+          ['檔案', '非受控（只能讀）'],
+          ['欄位很多的大表單', '非受控 ＋ 送出時驗證，或 React Hook Form'],
+          ['依其他欄位連動', '受控'],
+        ] },
       ],
-      tryit: {
-        q: ['用 FormData 讀取「訂閱電子報」核取方塊：'],
-        draft: '<input type="checkbox" name="newsletter" />\n…\nconst subscribed = formData.____("newsletter") === "on";',
-        answer: ['`formData.get("newsletter") === "on"`。', '沒勾選時 get 回傳 null；有勾選時預設值是 "on"（可以用 value 屬性改）。'],
-      },
     },
     mistakes: [
       { wrong: '`<input value={x} />` 沒有 onChange。', why: '變成唯讀，打不了字。', right: '加 onChange，或改用 defaultValue。' },
@@ -95,19 +87,7 @@ defineLessons({
       { wrong: '只在前端驗證就相信資料。', why: '前端驗證可以被繞過。', right: '伺服器端一定再驗證（TypeScript 課程 6-2 的 schema 可以共用）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '受控輸入一定要有哪兩個屬性？', options: [
-        { text: 'value 與 onChange', correct: true, why: '成對出現。' },
-        { text: 'name 與 id', why: '那是表單與無障礙用的。' },
-        { text: 'defaultValue 與 onChange', why: 'defaultValue 是非受控。' },
-        { text: 'ref 與 key', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要在送出時一次讀取 10 個欄位、平常不需要即時反應，最簡單的方式是？', options: [
-        { text: '非受控欄位加 name，送出時用 FormData', correct: true, why: '不用 10 個 state。' },
-        { text: '寫 10 個 useState，每個欄位都受控', why: '可以但冗長，也會每打一字就重新渲染。' },
-        { text: '10 個 ref', why: '比 FormData 麻煩。' },
-        { text: '用 Context', why: '不需要。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['大型表單（30 個欄位、即時驗證、動態新增欄位）用受控寫法時，每打一個字整個表單都重新渲染。有什麼對策？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['大型表單（30 個欄位、即時驗證、動態新增欄位）用受控寫法時，每打一個字整個表單都重新渲染。有什麼對策？'], answer: [
         '把表單拆成小元件，讓 state 留在各自欄位；或用 React Hook Form 這類以非受控為主、只在需要時讀值的函式庫。',
         '驗證規則用 Zod schema 描述，前端顯示錯誤、後端再驗一次。開啟 React Compiler 也能減少不必要的重新渲染。',
       ] },
@@ -126,14 +106,6 @@ defineLessons({
       '用 useActionState 取得結果與處理中狀態',
       '用 useOptimistic 做樂觀更新',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-1）用 FormData 讀取欄位，欄位需要有什麼屬性？', options: [
-        { text: 'name', correct: true, why: 'FormData 依 name 收集。' },
-        { text: 'key', why: 'key 是清單用的。' },
-        { text: 'ref', why: '不需要。' },
-        { text: 'value', why: '非受控不需要 value。' },
-      ] },
-    ],
     analogy: {
       text: ['form action 像餐廳的取號機：你按下送出（取號），系統自動顯示「處理中」（isPending），處理完叫號給結果（state）。以前要自己寫「顯示處理中、防止重複點、清空表單、顯示錯誤」，現在取號機幫你做了大半。'],
       limit: ['取號機不知道你的業務規則；驗證、錯誤訊息內容、成功後要去哪一頁，仍然由你的 Action 函式決定。'],
@@ -147,7 +119,8 @@ defineLessons({
       ]),
       caption: 'Action 可以是 async 函式；不需要自己 preventDefault。',
       blocks: [
-        'React 19 起，`<form action={函式}>` 接受 [[Action]]。[[useActionState]] 包裝 Action，提供上次結果與處理中狀態。表單內的子元件可以用 [[useFormStatus]] 讀取送出狀態。[[useOptimistic]] 讓畫面在請求完成前先顯示預期結果。',
+        'React 19 起，`<form action={函式}>` 接受 [[Action]]。[[useActionState]] 包裝 Action，提供上次結果與處理中狀態。',
+        '表單內的子元件可以用 [[useFormStatus]] 讀取送出狀態。[[useOptimistic]] 讓畫面在請求完成前先顯示預期結果。',
         { type: 'code', lang: 'tsx', title: 'NewsletterForm.tsx', code: 'import { useActionState } from "react";\n\ntype Result = { ok: boolean; message: string } | null;\n\nasync function subscribe(_prev: Result, formData: FormData): Promise<Result> {\n  const email = formData.get("email");\n  if (typeof email !== "string" || !email.includes("@")) {\n    return { ok: false, message: "Email 格式不正確" };\n  }\n  const res = await fetch("/api/v1/subscriptions", { method: "POST", body: formData });\n  return res.ok ? { ok: true, message: "訂閱成功" } : { ok: false, message: "伺服器忙碌，請稍後再試" };\n}\n\nexport function NewsletterForm() {\n  const [result, formAction, isPending] = useActionState(subscribe, null);\n  return (\n    <form action={formAction}>\n      <input name="email" type="email" required />\n      <button disabled={isPending}>{isPending ? "送出中…" : "訂閱"}</button>\n      {result && <p role="status">{result.message}</p>}\n    </form>\n  );\n}' },
       ],
     },
@@ -171,30 +144,28 @@ defineLessons({
       }],
       blocks: [
         { type: 'widget', name: 'csrun', props: {
-          code: 'function LikeButton({ likes, onLike }: { likes: number; onLike: () => Promise<void> }) {\n  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (n, delta: number) => n + delta);\n  return (\n    <form action={async () => {\n      addOptimistic(1);\n      await onLike();      // 伺服器要 1 秒\n    }}>\n      <button>❤ {optimisticLikes}</button>\n    </form>\n  );\n}\n// likes = 10，使用者點一下，伺服器回傳失敗',
-          predict: { q: '畫面上的數字會怎麼變？', options: ['立刻 11，失敗後回到 10', '等 1 秒才變 11', '一直是 10'], answer: 0 },
-          output: '點擊當下：❤ 11\n請求失敗、Action 結束後：❤ 10\n（樂觀值只在 Action 進行中有效，結束後顯示真實的 likes）',
+          code: 'function LikeButton({ likes, onLike }: { likes: number; onLike: () => Promise<void> }) {\n  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (n, delta: number) => n + delta);\n  return (\n    <form action={async () => {\n      addOptimistic(1);\n      await onLike();      // 伺服器要 1 秒\n    }}>\n      <button>❤ {optimisticLikes}</button>\n    </form>\n  );\n}\n// likes = 10，使用者點一下；伺服器回應「沒成功」（onLike 正常結束，父元件的 likes 沒變）',
+          output: '點擊當下：❤ 11\nAction 結束後：❤ 10\n（樂觀值只在 Action 進行中有效，結束後顯示真實的 likes；若 onLike 拋出錯誤，會交給 Error Boundary）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'actionstate', label: 'useActionState' }, { id: 'formstatus', label: 'useFormStatus' }, { id: 'optimistic', label: 'useOptimistic' }],
-          items: [
-            { text: '顯示伺服器回傳的驗證錯誤訊息', answer: 'actionstate', why: 'Action 的回傳結果。' },
-            { text: '共用的 SubmitButton 元件要知道所屬表單是否送出中', answer: 'formstatus', why: '在表單子元件讀取狀態。' },
-            { text: '聊天訊息送出後立刻出現在清單', answer: 'optimistic', why: '先顯示預期結果。' },
-            { text: '送出成功後顯示「已儲存」', answer: 'actionstate', why: '結果 state。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['顯示伺服器回傳的驗證錯誤訊息', 'useActionState', 'Action 的回傳結果。'],
+          ['共用的 SubmitButton 元件要知道所屬表單是否送出中', 'useFormStatus', '在表單子元件讀取狀態。'],
+          ['聊天訊息送出後立刻出現在清單', 'useOptimistic', '先顯示預期結果。'],
+          ['送出成功後顯示「已儲存」', 'useActionState', '結果 state。']
+        ] },
         { type: 'svg', svg: Fig.row('樂觀更新的時間線：點擊時立刻顯示預期結果；請求進行中維持樂觀值；請求結束後改為真實結果，成功則一致，失敗則退回', [
           { title: '點擊', lines: ['立刻顯示', '預期結果'], tone: 4 },
           { title: '請求中', lines: ['維持樂觀值'], tone: 3 },
           { title: '完成', lines: ['換成真實結果', '失敗就退回'], tone: 2 },
         ]), caption: '適合成功率高、可以退回的操作；付款這類不適合。' },
+        { type: 'heading', id: 'deep-actions-transitions', text: '深入：Action 其實是 Transition' },
+        'Action 是在 Transition 裡執行的函式：`<form action>`、useActionState、手動的 `startTransition(async () => …)` 都是。等待期間 isPending 為 true，期間的更新被視為非緊急，不會讓正在輸入的欄位卡住。',
+        'useActionState 會把多次送出排成佇列依序執行，每次都收到上一次的結果。Action 裡拋出的錯誤會交給最近的 Error Boundary，所以預期內的失敗要用回傳值表達；useOptimistic 的樂觀值在 Action 結束時消失，成功時要記得更新真實 state，否則畫面會跳回舊值。',
+        { type: 'table', head: ['失敗類型', '例子', '怎麼處理'], rows: [
+          ['預期內', 'Email 格式錯、名額已滿', '回傳 `{ ok: false, message }`，畫面顯示'],
+          ['例外', '網路斷線、程式 bug', 'throw，交給 Error Boundary 顯示替代畫面'],
+        ] },
       ],
-      tryit: {
-        q: ['做一個共用的送出按鈕，自己讀取表單是否送出中：'],
-        draft: 'import { ____ } from "react-dom";\n\nfunction SubmitButton({ label }: { label: string }) {\n  const { ____ } = useFormStatus();\n  return <button disabled={pending}>{pending ? "處理中…" : label}</button>;\n}',
-        answer: ['`import { useFormStatus } from "react-dom";`、`const { pending } = useFormStatus();`。', 'useFormStatus 只能在 `<form>` 的子元件裡使用，讀的是最近的上層表單。'],
-      },
     },
     mistakes: [
       { wrong: '用了 `<form action>` 還在 onSubmit 裡 preventDefault 並手動 fetch。', why: '兩套機制混用，處理中狀態不同步。', right: '統一用 Action。' },
@@ -202,19 +173,7 @@ defineLessons({
       { wrong: '付款、刪除帳號這類操作也用樂觀更新。', why: '失敗時退回會讓使用者誤以為已完成。', right: '只用在可以安全退回、成功率高的操作。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`useActionState` 回傳的第三個值是？', options: [
-        { text: 'isPending：是否處理中', correct: true, why: '可以用來停用按鈕。' },
-        { text: '最後一次的錯誤訊息（字串）', why: '錯誤是你放在 state 裡的。' },
-        { text: 'FormData', why: 'FormData 是傳給你的函式的。' },
-        { text: '重新整理函式', why: '沒有。' },
-      ] },
-      { level: '應用', type: 'mc', q: '使用 `<form action={fn}>` 時，需要自己呼叫 preventDefault 嗎？', options: [
-        { text: '不需要，React 會處理', correct: true, why: '不會整頁重新載入。' },
-        { text: '需要，否則頁面重新載入', why: 'Action 已處理。' },
-        { text: '只有 async 函式需要', why: '都不需要。' },
-        { text: '要在 Effect 裡呼叫', why: '無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 Next.js 等支援 Server Functions 的框架裡，表單 Action 可以直接是一個 `"use server"` 函式。這帶來什麼好處？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 Next.js 等支援 Server Functions 的框架裡，表單 Action 可以直接是一個 `"use server"` 函式。這帶來什麼好處？'], answer: [
         '不用另外寫 API 路由與 fetch：表單送出時直接在伺服器執行函式（寫資料庫），React 處理序列化與處理中狀態。',
         '在 JavaScript 還沒載入時表單也能送出（漸進增強）。但伺服器函式是公開端點，仍要驗證輸入與檢查權限（5-4）。',
       ] },
@@ -232,14 +191,6 @@ defineLessons({
       '用 Suspense 宣告等待時的畫面',
       '用 use 讀取 Promise',
       '說出為什麼不要在元件裡自己建立 Promise',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-2）在 Effect 裡 fetch，快速切換時可能出現什麼問題？', options: [
-        { text: '競態條件：舊的回應覆蓋新的', correct: true, why: '這課的 Suspense 與資料函式庫能處理。' },
-        { text: '無限迴圈', why: '不是這個問題。' },
-        { text: '不會有問題', why: '有。' },
-        { text: 'CORS 錯誤', why: '無關。' },
-      ] },
     ],
     analogy: {
       text: ['Suspense 像餐廳的「餐點準備中」立牌：桌上某道菜還沒好時，服務生放一個立牌（fallback），好了就換成菜。你不用在每道菜的程式裡寫「如果還沒好就顯示立牌」。'],
@@ -277,25 +228,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: '<Suspense fallback={<p>整頁載入中…</p>}>\n  <Header />          {/* 0.2 秒 */}\n  <Suspense fallback={<p>文章載入中…</p>}>\n    <Posts />         {/* 2 秒 */}\n  </Suspense>\n</Suspense>',
-          predict: { q: '0.5 秒時畫面顯示？', options: ['Header 與「文章載入中…」', '「整頁載入中…」', '什麼都沒有'], answer: 0 },
           output: '0 秒：整頁載入中…\n0.2 秒：Header ＋ 文章載入中…\n2 秒：Header ＋ Posts\n（巢狀 Suspense 讓快的部分先出現）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'suspense', label: 'Suspense 處理' }, { id: 'error', label: 'Error Boundary 處理' }],
-          items: [
-            { text: '資料還在載入', answer: 'suspense', why: '等待中。' },
-            { text: 'API 回傳 500，Promise 被 reject', answer: 'error', why: '錯誤由錯誤邊界處理。' },
-            { text: 'lazy 載入的元件程式碼還在下載', answer: 'suspense', why: '等待中。' },
-            { text: '元件渲染時拋出例外', answer: 'error', why: '錯誤。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['資料還在載入', 'Suspense 處理', '等待中。'],
+          ['API 回傳 500，Promise 被 reject', 'Error Boundary 處理', '錯誤由錯誤邊界處理。'],
+          ['lazy 載入的元件程式碼還在下載', 'Suspense 處理', '等待中。'],
+          ['元件渲染時拋出例外', 'Error Boundary 處理', '錯誤。']
+        ] },
         { type: 'svg', svg: Fig.vs('兩種載入畫面的寫法：自己在每個元件寫 if loading return spinner，載入狀態散落各處；用 Suspense 在外層宣告一次，元件裡只寫資料準備好之後的樣子', { title: '各自 if (loading)', lines: ['每個元件都寫', '散落各處'], tone: 5 }, { title: 'Suspense 邊界', lines: ['外層宣告一次', '元件只寫成功畫面'], tone: 4 }), caption: 'Suspense 讓「等待」變成版面設計的一部分。' },
+        { type: 'heading', id: 'deep-suspense-transition', text: '深入：Suspense 與 Transition 怎麼搭配' },
+        '已經顯示內容的區塊再次暫停時（例如換頁抓新資料），React 會改回顯示 fallback，畫面閃回「載入中」。把造成暫停的更新包在 startTransition 裡，React 會保留舊畫面，直到新內容準備好。',
+        'React 本身沒有內建資料快取：`use(promise)` 需要框架的 loader、Server Component 傳下來的 Promise，或有快取的函式庫提供穩定的 Promise。`cache()` 只在 Server Components 裡用來讓同一次請求不重複抓取。',
+        { type: 'table', head: ['你想要', '用'], rows: [
+          ['第一次載入時顯示骨架畫面', 'Suspense 的 fallback'],
+          ['切換時保留舊畫面，不閃回載入中', 'startTransition'],
+          ['輸入不卡，結果稍後更新', 'useDeferredValue'],
+          ['只在瀏覽器渲染某個元件（伺服器顯示 fallback）', '`use(browser())`（React 19.3，react-dom）'],
+        ] },
       ],
-      tryit: {
-        q: ['讓圖表元件按需載入，下載期間顯示「圖表載入中」：'],
-        draft: 'const Chart = ____(() => import("./Chart"));\n\n<____ fallback={<p>圖表載入中…</p>}>\n  <Chart />\n</Suspense>',
-        answer: ['`lazy(() => import("./Chart"))`、`<Suspense fallback={…}>`。', '圖表的程式碼會拆成另一個檔案，只有用到時才下載，首頁載入更快。'],
-      },
     },
     mistakes: [
       { wrong: '在元件渲染時 `use(fetch(…))`。', why: '每次渲染新的 Promise，無限暫停。', right: 'Promise 從外部傳入或使用有快取的函式庫。' },
@@ -303,19 +254,7 @@ defineLessons({
       { wrong: '整個 App 只包一個 Suspense。', why: '任何一小塊在等，整頁都變成載入畫面。', right: '依「希望一起出現」的區塊放置多個邊界。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`use(promise)` 在 Promise 未完成時會？', options: [
-        { text: '暫停元件，讓最近的 Suspense 顯示 fallback', correct: true, why: '完成後再繼續渲染。' },
-        { text: '回傳 undefined，完成後再自動重新渲染', why: '不會回傳半成品，而是暫停。' },
-        { text: '拋出錯誤', why: '未完成不是錯誤。' },
-        { text: '同步等待，直到 Promise 完成前阻塞整個頁面', why: '不會阻塞，而是暫停這個元件。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪個 Hook／API「可以」寫在 if 裡？', options: [
-        { text: '`use`', correct: true, why: 'use 是例外。' },
-        { text: '`useState`', why: '不行。' },
-        { text: '`useEffect`', why: '不行。' },
-        { text: '`useContext`', why: '不行（但 use(Context) 可以）。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['「在 Effect 裡 fetch」與「框架提供資料再用 Suspense 顯示」相比，使用者體驗有什麼差別？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['「在 Effect 裡 fetch」與「框架提供資料再用 Suspense 顯示」相比，使用者體驗有什麼差別？'], answer: [
         'Effect 方式要等元件渲染、JavaScript 執行後才開始請求，資料一層層「瀑布式」載入；每個元件都要自己處理 loading 與競態。',
         '框架在路由切換或伺服器端就開始抓資料，Suspense 決定等待時的版面；資料更早到、載入狀態一致，也能搭配串流讓快的部分先出現。',
       ] },
@@ -334,14 +273,6 @@ defineLessons({
       '判斷哪些元件該加 "use client"',
       '知道 Server Functions 的安全注意事項',
     ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-3）use(promise) 的 Promise 最好從哪裡來？', options: [
-        { text: '外部傳入（框架、快取、Server Component）', correct: true, why: '這課的 Server Component 正是常見來源。' },
-        { text: '在元件渲染時直接 fetch 一個新的 Promise', why: '每次渲染都是新的 Promise，會無限重新請求。' },
-        { text: 'useState 的初始值', why: '不是建議做法。' },
-        { text: 'Effect 裡建立', why: '不需要。' },
-      ] },
-    ],
     analogy: {
       text: ['Server Components 像餐廳的中央廚房：在後場（伺服器）把菜做好，只把成品送到桌上，食譜和廚具（程式碼、資料庫連線）不會送到客人手上。Client Components 像桌邊料理：需要和客人互動（點擊、輸入）的部分，才在桌邊（瀏覽器）處理。'],
       limit: ['中央廚房不能即時回應客人的手勢；Server Component 不能用 state、Effect、事件處理。需要互動的地方一定要是 Client Component。'],
@@ -350,7 +281,8 @@ defineLessons({
       svg: Fig.vs('Server Component 與 Client Component：Server Component 在伺服器執行，可以直接讀資料庫，不送程式碼到瀏覽器，不能用 state 與事件；Client Component 在瀏覽器執行，可以用 state、Effect、事件，程式碼會送到瀏覽器', { title: 'Server Component', lines: ['伺服器執行', '可直接讀資料庫', '不能用 state、事件'], tone: 3 }, { title: 'Client Component', lines: ['"use client"', '瀏覽器執行', 'state、Effect、事件'], tone: 4 }),
       caption: '預設是 Server Component；只有需要互動的葉子加 "use client"。',
       blocks: [
-        '[[Server Components]] 需要框架支援（例如 Next.js App Router、React Router 的 RSC 支援（2026-10 仍是實驗性））。它們可以是 async 函式，直接查資料庫，產生的結果傳到瀏覽器。需要互動的部分寫成 [[Client Components]]，在檔案最上面加 `"use client"`。[[Server Functions]] 用 `"use server"` 標記，能從客戶端呼叫；它們是公開的網路端點，一定要驗證輸入與檢查權限。',
+        '[[Server Components]] 需要框架支援（例如 Next.js App Router、React Router 的 RSC 支援（2026-10 仍是實驗性））。它們可以是 async 函式，直接查資料庫，產生的結果傳到瀏覽器。',
+        '需要互動的部分寫成 [[Client Components]]，在檔案最上面加 `"use client"`。[[Server Functions]] 用 `"use server"` 標記，能從客戶端呼叫；它們是公開的網路端點，一定要驗證輸入與檢查權限。',
         { type: 'code', lang: 'tsx', title: 'app/products/page.tsx（Server Component）', code: 'import { db } from "@/lib/db";\nimport { AddToCart } from "./AddToCart";\n\nexport default async function ProductsPage() {\n  const products = await db.product.findMany({ take: 20 });   // 直接查資料庫\n  return (\n    <ul>\n      {products.map((p) => (\n        <li key={p.id}>\n          {p.name}：{p.price} 元\n          <AddToCart productId={p.id} />   {/* Client Component */}\n        </li>\n      ))}\n    </ul>\n  );\n}' },
         { type: 'code', lang: 'tsx', title: 'app/products/AddToCart.tsx（Client Component）', code: '"use client";\nimport { useState } from "react";\n\nexport function AddToCart({ productId }: { productId: number }) {\n  const [added, setAdded] = useState(false);\n  return <button onClick={() => setAdded(true)}>{added ? "已加入" : "加入購物車"}</button>;\n}' },
       ],
@@ -374,33 +306,34 @@ defineLessons({
         why: ['"use client" 放在越下層（越接近葉子）越好'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'server', label: 'Server Component 就好' }, { id: 'client', label: '要 "use client"' }],
-          items: [
-            { text: '從資料庫讀出文章並顯示', answer: 'server', why: '不需要互動，直接讀資料。' },
-            { text: '有 onClick 的按讚按鈕', answer: 'client', why: '事件處理。' },
-            { text: '使用 useState 的分頁切換', answer: 'client', why: 'state。' },
-            { text: '把 Markdown 轉成 HTML 的靜態內容', answer: 'server', why: '轉換用的套件不必送到瀏覽器。' },
-            { text: '讀取 window.innerWidth', answer: 'client', why: '瀏覽器 API。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['從資料庫讀出文章並顯示', 'Server Component 就好', '不需要互動，直接讀資料。'],
+          ['有 onClick 的按讚按鈕', '要 "use client"', '事件處理。'],
+          ['使用 useState 的分頁切換', '要 "use client"', 'state。'],
+          ['把 Markdown 轉成 HTML 的靜態內容', 'Server Component 就好', '轉換用的套件不必送到瀏覽器。'],
+          ['讀取 window.innerWidth', '要 "use client"', '瀏覽器 API。']
+        ] },
         { type: 'widget', name: 'csrun', props: {
           file: 'app/actions.ts',
+          title: '只有作者看得到按鈕，別人能刪嗎',
           code: '"use server";\n\nexport async function deletePost(id: number) {\n  await db.post.delete({ where: { id } });\n}\n// 頁面上只有文章作者看得到刪除按鈕',
-          predict: { q: '其他使用者能刪除別人的文章嗎？', options: ['能，Server Function 是公開端點，要檢查權限', '不能，按鈕被隱藏了', '不能，"use server" 會自動檢查'], answer: 0 },
-          output: '能。\n（任何人都能直接呼叫這個端點；函式內必須確認目前登入者有權刪除這篇文章，並驗證 id）',
+          output: '!能：任何人都能對這個端點送出請求，帶入任意 id\n（按鈕藏起來不等於有權限；函式內必須確認目前登入者有權刪除這篇文章，並驗證 id）',
         } },
         { type: 'svg', svg: Fig.stack('一次請求的流程：伺服器執行 Server Components，查資料並產生結果；把結果與 Client Components 的參照串流到瀏覽器；瀏覽器顯示畫面並為 Client Components 加上互動（hydration）', [
           { title: '1. 伺服器執行 Server Components（查資料）', tone: 3 },
           { title: '2. 串流結果到瀏覽器', tone: 2 },
           { title: '3. 瀏覽器顯示並啟用 Client Components', tone: 4 },
         ]), caption: 'Server Component 的 props 傳給 Client Component 時必須可以序列化（不能傳函式，Server Function 除外）。' },
+        { type: 'heading', id: 'deep-rsc-security', text: '深入：Server Components 的安全事件與序列化邊界' },
+        '2025-12-03 React 公布 Server Components 的嚴重漏洞 CVE-2025-55182：未登入就能遠端執行程式碼。之後又公布了阻斷服務與原始碼外洩漏洞（CVE-2025-55184、CVE-2025-67779、CVE-2026-23864、CVE-2025-55183），前幾次修補不完整。',
+        { type: 'table', caption: 'react-server-dom-* 的修補版本（2026-10-30 查證；19.0.3、19.1.4、19.2.3 修補不完整）', head: ['版本線', '至少升到'], rows: [
+          ['19.0.x', '19.0.4'],
+          ['19.1.x', '19.1.5'],
+          ['19.2.x', '19.2.4'],
+        ] },
+        '受影響的是 `react-server-dom-*` 套件與用它們的框架（next、React Router 的 RSC 模式等）；沒有伺服器的 Vite SPA 不受影響。用了 RSC，就要像維護後端一樣追蹤安全公告。',
+        'Server Component 傳給 Client Component 的 props 會被序列化：可以傳字串、數字、純物件、陣列、Date、Map、Set、Promise、JSX 與 Server Function；不能傳一般函式或 class 實例。',
       ],
-      tryit: {
-        q: ['補上權限檢查，讓 deletePost 只允許作者刪除：'],
-        draft: '"use server";\nexport async function deletePost(id: number) {\n  const user = await getCurrentUser();\n  const post = await db.post.findUnique({ where: { id } });\n  if (!post || post.authorId !== ____?.id) {\n    throw new Error("____");\n  }\n  await db.post.delete({ where: { id } });\n}',
-        answer: ['`user?.id`、例如「沒有權限刪除這篇文章」。', '隱藏按鈕只是介面；授權一定在伺服器端檢查。也要驗證 id 的型別（用 Zod 等）。'],
-      },
     },
     mistakes: [
       { wrong: '在 Server Component 裡用 useState 或 onClick。', why: 'Server Component 不在瀏覽器執行。', right: '把互動部分拆成 Client Component。' },
@@ -408,19 +341,7 @@ defineLessons({
       { wrong: '以為 Server Function 只有自己的頁面會呼叫。', why: '它是公開的 HTTP 端點。', right: '驗證輸入、檢查身分與權限。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Server Component「不能」做哪一件事？', options: [
-        { text: '使用 useState', correct: true, why: '沒有瀏覽器端的狀態。' },
-        { text: '直接查資料庫', why: '這正是它的能力。' },
-        { text: '寫成 async 函式', why: '可以。' },
-        { text: '渲染 Client Component', why: '可以。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一頁大部分是靜態文章，只有一個留言表單要互動。"use client" 放哪裡？', options: [
-        { text: '只放在留言表單元件的檔案', correct: true, why: '越接近葉子越好。' },
-        { text: '頁面最上層的 page.tsx', why: '整頁都進瀏覽器 bundle。' },
-        { text: '每個檔案都放', why: '失去 Server Component 的好處。' },
-        { text: '不需要放', why: '有互動就需要。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用 Vite 建立的單頁應用（SPA）可以用 Server Components 嗎？什麼情況下 SPA 仍然是好選擇？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['用 Vite 建立的單頁應用（SPA）可以用 Server Components 嗎？什麼情況下 SPA 仍然是好選擇？'], answer: [
         'Server Components 需要伺服器（或建置時）執行環境與框架整合，單純的 Vite SPA 不支援；要用就選擇支援 RSC 的框架（6-4）。',
         '登入後才使用的內部系統、儀表板、不需要 SEO 與首屏極速的工具類應用，SPA 部署簡單（靜態檔案即可），仍是好選擇。',
       ] },
@@ -430,7 +351,7 @@ defineLessons({
       '"use client" 放在需要互動的葉子元件，越下層越好。',
       'Server Function 是公開端點，一定要驗證輸入與檢查權限。',
     ],
-    sources: ['react-rsc'],
+    sources: ['react-rsc', 'react-rsc-cve', 'react-rsc-dos', 'react-router-rsc'],
   },
 });
 </script>

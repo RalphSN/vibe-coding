@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>卡帕西的 4 種 AI 輸出格式</title>
-<meta name="description" content="改編自《數位時代》2026-10-02 報導：卡帕西推薦的 4 種讓 AI 把複雜概念講清楚的輸出格式（ASD-STE100、一張圖、HTML 互動網頁、Manim 影片），附原文連結、提示詞產生器與互動練習。">
+<meta name="description" content="改編自《數位時代》2026-10-02 報導：卡帕西推薦的 4 種讓 AI 把複雜概念講清楚的輸出格式（ASD-STE100、一張圖、HTML 互動網頁、Manim 影片），附原文連結、提示詞產生器與互動試算。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap">
@@ -1218,6 +1218,27 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 .ladder-bar { transform: none !important; opacity: 1 !important; transition: none; }
 .ladder-notes { margin: 0; padding-left: 1.4em; display: grid; gap: var(--sp-2); }
 .ladder-notes li { margin: 0; line-height: 1.7; }
+
+/* knobs 試算拉桿（移植自 finance-psychology-course） */
+.jw { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-4); border: var(--bw-lg) solid var(--ink); background: var(--surface); box-shadow: var(--shadow-off) var(--shadow-off) 0 var(--ink); min-width: 0; }
+.jw > * { min-width: 0; }
+.jw-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-family: var(--font-ui); font-weight: 700; font-size: var(--fs-small); }
+.jw-head .grow { flex: 1; min-width: 0; }
+.jw-note { margin: 0; font-size: var(--fs-small); line-height: 1.7; color: var(--ink-muted); }
+.jw-note:empty { display: none; }
+.jw label { font-weight: 700; font-size: var(--fs-small); }
+.lv-sliders { display: grid; gap: var(--sp-3); }
+.lv-row { display: grid; gap: var(--sp-1); }
+.lv-row input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--ink); }
+.lv-row output { font-family: var(--font-ui); }
+.lv-ends { display: flex; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-label); color: var(--ink-muted); font-weight: 500; }
+.lv-meter { display: block; height: 20px; border: var(--bw-sm) solid var(--ink); background: var(--bg); overflow: hidden; }
+.lv-fill { display: block; height: 100%; background: var(--m7); transform-origin: left center; transition: transform var(--dur-comp) var(--ease-mech); }
+.kn-rows { display: grid; gap: var(--sp-2); }
+.kn-row { display: grid; grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; font-size: var(--fs-small); }
+.kn-row strong { font-family: var(--font-ui); min-width: 5em; text-align: right; }
+@media (max-width: 480px) { .kn-row { grid-template-columns: minmax(0, 1fr) auto; } .kn-row .lv-meter { grid-column: 1 / -1; grid-row: 2; } }
+@media (prefers-reduced-motion: reduce) { .lv-fill { transition: none; } }
 /* 來源 */
 .sources { margin-top: var(--sp-7); padding: var(--sp-4); border: var(--bw-sm) dashed var(--ink); font-size: var(--fs-small); }
 .sources ol { margin: var(--sp-2) 0 0; }
@@ -1351,7 +1372,7 @@ details.reveal > .reveal-body > :last-child { margin-bottom: 0; }
 const SITE = {
   name: '卡帕西的 4 種 AI 輸出格式',
   updated: '2026 年 10 月',
-  verifiedOn: '2026-10-07',
+  verifiedOn: '2026-10-29',
   version: 'v1',
   article: 'https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100',
 };
@@ -1370,9 +1391,9 @@ const COURSES = [
     ['2-3', '方法 3：|HTML 互動解說網頁'],
     ['2-4', '方法 4：|Manim 解說影片'],
   ]},
-  { id: 3, title: '動手用', short: '動手', desc: '新手從哪裡開始、怎麼核對，以及可以直接帶走的提示詞產生器。', lessons: [
+  { id: 3, title: '動手用', short: '動手', desc: '新手從哪裡開始、怎麼核對，以及可以直接帶走的提示詞產生器與全書一頁地圖。', lessons: [
     ['3-1', '新手路線|與核對習慣'],
-    ['3-2', '提示詞產生器|與總複習'],
+    ['3-2', '提示詞產生器|與一頁地圖'],
   ]},
 ];
 
@@ -1440,6 +1461,20 @@ defineSources({
   'claude-code': { title: 'Claude Code', url: 'https://www.claude.com/product/claude-code' },
   'codex': { title: 'OpenAI Codex', url: 'https://openai.com/codex/' },
   'elevenlabs': { title: 'ElevenLabs', url: 'https://elevenlabs.io/' },
+  'larkin-simon': { title: 'Larkin & Simon（1987）Why a diagram is (sometimes) worth ten thousand words，Cognitive Science', url: 'https://doi.org/10.1111/j.1551-6708.1987.tb00863.x' },
+  'cowan': { title: 'Cowan（2001）The magical number 4 in short-term memory，Behavioral and Brain Sciences', url: 'https://doi.org/10.1017/S0140525X01003922' },
+  'tversky': { title: 'Tversky、Morrison & Bétrancourt（2002）Animation: can it facilitate?，International Journal of Human-Computer Studies', url: 'https://doi.org/10.1006/ijhc.2002.1017' },
+  'ste-wiki': { title: 'Wikipedia：Simplified Technical English（歷史、Issue 9、句長上限；2026-10-29 查證）', url: 'https://en.wikipedia.org/wiki/Simplified_Technical_English' },
+  'ste-tcworld': { title: 'tcworld｜ASD-STE100 Issue 9: Setting a standard for technical documentation', url: 'https://www.tcworld.info/news/asd-ste100-issue-9-setting-a-standard-for-technical-documentation' },
+  'iso-24495': { title: 'ISO 24495-1:2023 Plain language — Part 1: Governing principles and guidelines', url: 'https://www.iso.org/standard/78907.html' },
+  'mermaid-docs': { title: 'Mermaid 官方文件（支援的圖表類型）', url: 'https://mermaid.js.org/intro/' },
+  'github-mermaid': { title: 'GitHub Docs：Creating diagrams（Markdown 裡的 Mermaid）', url: 'https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams' },
+  'victor-ee': { title: 'Bret Victor（2011）Explorable Explanations', url: 'https://worrydream.com/ExplorableExplanations/' },
+  'vllm': { title: 'Kwon 等（2023）Efficient Memory Management for Large Language Model Serving with PagedAttention（vLLM）', url: 'https://arxiv.org/abs/2309.06180' },
+  'manim-ce': { title: 'Manim Community 文件：安裝（v0.22.1，2026-10-29 查證）', url: 'https://docs.manim.community/en/stable/installation.html' },
+  'manim-config': { title: 'Manim Community 文件：Configuration（-ql／-qm／-qh 畫質旗標）', url: 'https://docs.manim.community/en/stable/guides/configuration.html' },
+  'manim-voiceover': { title: 'manim-voiceover 文件：Speech services', url: 'https://voiceover.manim.community/en/stable/services.html' },
+  'elevenlabs-qs': { title: 'ElevenLabs 開發者文件：Quickstart', url: 'https://elevenlabs.io/docs/eleven-api/quickstart' },
   'bnext-lotr': { title: '數位時代｜延伸閱讀：Karpathy如何讓Claude用5,500行程式碼刻出《魔戒》世界？', url: 'https://www.bnext.com.tw/article/91711/karpathy-claude-opus-lord-of-the-rings' },
 });
 </script>
@@ -1464,7 +1499,7 @@ defineLessons({
       { type: 'callout', variant: 'tip', title: '先讀原文', body: [
         '這本書改編自《數位時代》2026-10-02 的報導（李先泰）。這一課是**導讀與重點摘要**，完整內容請讀原文：',
         '[→ 前往《數位時代》原文：如何讓AI變身「科普大師」？大神卡帕西推4種輸出技巧，提示詞範例一次看](https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100)',
-        '原文著作權屬原作者與數位時代。本書的摘要、圖解、互動與練習為改寫與延伸；引用的短句與提示詞範本都標示出處。',
+        '原文著作權屬原作者與數位時代。本書的摘要、圖解、互動與深入段落為改寫與延伸；引用的短句與提示詞範本都標示出處。',
       ] },
       { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="原文結構地圖：導言與為什麼換格式有效，接著 4 種格式：1 ASD-STE100、2 一張圖、3 HTML 互動網頁、4 Manim 影片，最後是新手怎麼開始；每段標出本書對應單元">
         <g font-size="17">
@@ -1531,6 +1566,8 @@ defineLessons({
 defineTerms({
   '輸出格式': { en: 'output format', def: 'AI 回答的呈現形式：一段文字、一張圖、一個網頁或一支影片。內容可以一樣，格式決定讀者要花多少力氣理解。' },
   '工作記憶': { en: 'working memory', def: '腦袋暫時記住、同時處理資訊的空間，容量很小。讀長文時，要一邊讀一邊把前面的內容記在這裡拼成全貌。' },
+  '組塊': { en: 'chunk', def: '工作記憶裡的一個單位：可以是一個字、一個詞，或一整組已經熟悉的資訊。熟悉的東西能打包成一塊，所以專家記得比較多。', example: 'Cowan（2001）估計成人一次大約 4 個組塊。' },
+  '攤提': { en: 'amortization', def: '把一次性的製作成本，分攤到之後每一次使用上。用的次數越多，每次分到的成本越低。' },
 });
 
 defineLessons({
@@ -1570,13 +1607,13 @@ defineLessons({
       blocks: [
         '原文的關鍵句：**文字是線性的，讀者必須一邊閱讀，一邊在腦中拼出完整架構。** 主題裡只要有流程、層級或元件之間的關係，這個拼圖的工作就落在讀者身上。',
         '換輸出格式，等於把拼圖的工作交回給 AI：讓它把結構直接畫出來、做成可以操作的網頁，或拍成一步一步播放的影片。',
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'text', label: '文字就夠' }, { id: 'visual', label: '換成圖或互動更好' }], items: [
-          { text: '「Python 的 `print` 是什麼意思？」', answer: 'text', why: '單一、簡單的概念，一兩句就講完。' },
-          { text: '「網頁從輸入網址到顯示出來，中間經過哪些步驟？」', answer: 'visual', why: '有流程方向、多個元件，畫成流程圖一眼看完。' },
-          { text: '「公司的組織架構是怎麼分的？」', answer: 'visual', why: '有層級關係，樹狀圖比文字清楚。' },
-          { text: '「這個英文單字怎麼翻譯？」', answer: 'text', why: '沒有結構可言。' },
-          { text: '「利率變動對房貸月付金的影響」', answer: 'visual', why: '有可以調整的參數，互動網頁拉一拉就懂（2-3）。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['「Python 的 `print` 是什麼意思？」', '文字就夠', '單一、簡單的概念，一兩句就講完。'],
+          ['「網頁從輸入網址到顯示出來，中間經過哪些步驟？」', '換成圖或互動更好', '有流程方向、多個元件，畫成流程圖一眼看完。'],
+          ['「公司的組織架構是怎麼分的？」', '換成圖或互動更好', '有層級關係，樹狀圖比文字清楚。'],
+          ['「這個英文單字怎麼翻譯？」', '文字就夠', '沒有結構可言。'],
+          ['「利率變動對房貸月付金的影響」', '換成圖或互動更好', '有可以調整的參數，互動網頁拉一拉就懂（2-3）。']
+        ] },
       ],
     },
     define: [
@@ -1609,12 +1646,30 @@ defineLessons({
             <text x="305" y="162" font-weight="900" class="on-color">也值得</text>
           </g>
         </svg>`, caption: '原文：當 AI 生成內容和程式碼的成本持續降低，只用一次的互動網頁或解說影片，也開始值得交給 AI 製作。' },
+        { type: 'heading', id: 'deep-why-diagram', text: '深入：圖為什麼「有時」比較好' },
+        '認知科學有一篇經典論文，標題就叫〈Why a diagram is (sometimes) worth ten thousand words〉（Larkin 與 Simon，1987）。他們的解釋是：圖把相關的資訊放在相鄰的位置，讀者用眼睛找就好，不必在腦中搜尋。重點在標題裡的 sometimes：兩種表示法資訊量一樣時，圖省的是「找」與「拼」的力氣，不是資訊本身。',
+        '拼圖為什麼吃力？[[工作記憶]]一次大約只能抓住 4 個[[組塊]]（Cowan，2001）。主題的元件一多，元件之間「可能的關係」會比元件數長得更快；下面的拉桿可以看到這個成長。',
+        { type: 'widget', name: 'knobs', props: { title: '元件變多時，讀文字要同時記住幾件事（實際計算）', sliders: [
+          { id: 'n', label: '主題裡的元件數', min: 2, max: 12, step: 1, value: 5, unit: '個' },
+          { id: 'p', label: '其中真的有關係的比例', min: 10, max: 100, step: 10, value: 40, unit: '%' },
+        ], compute: (v) => {
+          const pairs = v.n * (v.n - 1) / 2;
+          const rel = Math.round(pairs * v.p / 100);
+          const load = v.n + rel;
+          return { rows: [
+            { label: '可能的兩兩關係', value: `${pairs} 條`, ratio: pairs / 66 },
+            { label: '實際要描述的關係', value: `${rel} 條`, ratio: rel / 66 },
+            { label: '讀文字時要記住的事', value: `${load} 件（工作記憶約 4 個組塊）`, ratio: load / 78 },
+          ], note: `${v.n} 個元件、${v.p}% 有關係：可能的關係 ${pairs} 條，實際 ${rel} 條。讀文字時要同時記住 ${v.n} 個元件加 ${rel} 條關係，共 ${load} 件事${load > 4 ? '，超過工作記憶的容量，讀者只好回頭重讀' : '，還在工作記憶的容量內，文字就夠'}。圖把這些事攤在紙上，讀者不用全記在腦中。` };
+        } } },
+        { type: 'table', caption: '文字和圖各自擅長的事', head: ['內容', '文字比較好', '圖比較好'], rows: [
+          ['條件與例外（「除非」「如果不」）', '✓ 一句話就講清楚', '要另外畫分支，容易變亂'],
+          ['論證、因果推理', '✓ 線性順序剛好是推理順序', '箭頭只說「有關」，說不出「為什麼」'],
+          ['流程、層級、空間位置', '要讀者自己拼', '✓ 一眼看到全貌'],
+          ['精確定義、可搜尋、可複製', '✓', '圖片裡的字不能搜尋'],
+        ] },
+        '所以線性不全是缺點。主題本身是一條推理鏈時，文字的順序就是讀者該走的路；主題是一張網時，才換成圖。',
       ],
-      tryit: {
-        q: ['把你最近問過 AI、但看完還是一頭霧水的一個問題寫下來，判斷它有沒有「流程、層級或元件關係」。'],
-        draft: '我的問題：____\n有流程嗎？____\n有層級嗎？____\n有元件之間的關係嗎？____',
-        answer: ['只要有一個「有」，就值得試試 2-2 的「一張圖」或 2-3 的互動網頁。三個都沒有，先用 2-1 的規範文字讓回答變短就好。'],
-      },
     },
     mistakes: [
       { wrong: '回答看不懂，就一直要求 AI「再解釋清楚一點」。', why: '格式沒變，AI 通常只是換句話說，或寫得更長。', right: '直接指定格式：「用一張圖」「用 HTML 互動網頁」。' },
@@ -1622,28 +1677,10 @@ defineLessons({
       { wrong: '以為 AI 做得出來，自己就不用懂。', why: '原文說人的角色是「監督與理解」：判斷 AI 做得對不對，還是你的工作。', right: '拿到圖、網頁、影片後，挑重點對照文字版確認（3-1）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '原文說，為什麼改變輸出格式能讓複雜概念更好懂？', options: [
-        { text: '文字是線性的，結構要讀者自己拼', correct: true, why: '圖表、網頁、影片能直接呈現全貌，省下自行整理的力氣。' },
-        { text: '因為 AI 用圖表回答時，內容會比較正確', why: '格式不保證正確；原文反而提醒，格式越豐富越要核對。' },
-        { text: '因為文字回答一定比較長', why: '長短不是重點，重點是讀者要自己拼出結構。' },
-        { text: '因為現在的人都不喜歡讀字', why: '原文沒有這樣說；它講的是理解的成本。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你想了解「信用卡刷卡後，錢經過哪些單位才到店家手上」。最合適的要求是？', options: [
-        { text: '「請詳細說明，越完整越好」', why: '越完整通常越長，結構還是要你自己拼。' },
-        { text: '「請用一張圖說明，標出每個單位和錢的流向」', correct: true, why: '有多個單位和流程方向，最適合畫成圖。' },
-        { text: '「請用 ASD-STE100 的原則寫，越短越好」', why: '能讓文字變短，但流程結構仍要你自己想像。' },
-        { text: '「請用條列式回答」', why: '條列還是一條線，看不出誰流到誰。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['卡帕西說人的角色會往「監督與理解」移動。用你自己的工作或課業，舉一個例子說明這是什麼意思。'], answer: [
-        '參考：例如寫報告時，AI 可以幫你畫圖、做互動網頁、整理資料，但你要判斷圖上的數字對不對、結論合不合理，並且自己真正理解內容，才能回答別人的問題。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-1 原文）卡帕西提出的是哪一類方法？', options: [
-        { text: '改變 AI 的輸出格式', correct: true, why: '原文：他的簡單解法是直接改變 AI 的輸出格式。' },
-        { text: '換一個更大的模型', why: '原文沒有提到換模型。' },
-        { text: '把提示詞寫得更客氣、更有禮貌', why: '重點是格式，不是語氣。' },
-        { text: '只用英文提問', why: '原文也示範了中文用法。' },
+      { level: '深入思考', type: 'reveal', q: ['你要向新同事解釋公司的請假流程：員工申請 → 找代理人 → 主管核准 → 人資登記；請超過 3 天要多一關部門經理，病假則可以事後補單。這個主題該用文字還是圖？如果用圖，哪一部分圖反而畫不好？'], answer: [
+        '推理：主流程有方向、有 4 個角色，屬於「流程」，適合流程圖（1-2 的第 2 級）。「超過 3 天」是一個分支，畫成菱形判斷框還算清楚。',
+        '畫不好的是「病假可以事後補單」：它改變的是時間順序，不是多一個步驟，硬畫進去會讓箭頭交錯。比較好的做法是圖畫主流程，例外用一兩句文字寫在圖下方。',
+        '常見的錯誤想法：以為「有結構就全部畫成圖」。條件與例外正是文字擅長的部分，圖文搭配比純圖清楚。',
       ] },
     ],
     keypoints: [
@@ -1651,7 +1688,7 @@ defineLessons({
       '主題有流程、層級或元件關係時，就值得換格式。',
       'AI 讓「只用一次的客製化解說」變得划算；人負責監督與理解。',
     ],
-    sources: ['bnext', 'x-post'],
+    sources: ['bnext', 'x-post', 'larkin-simon', 'cowan'],
   },
 
   '1-2': {
@@ -1713,12 +1750,34 @@ defineLessons({
           </g>
           <g class="stroke-ink" stroke-width="3"><path d="M230 35 H330 M120 60 V100 M230 125 H330 M120 150 V190 M230 220 H330"/></g>
         </svg>`, caption: '不一定要爬到最高。依主題和你願意花的時間停在合適的那一級。' },
+        { type: 'heading', id: 'deep-amortize', text: '深入：哪一級划算，看「會被看幾次」' },
+        '每往上一級，製作和核對的時間變多，但每次觀看省下的理解時間也變多。這是[[攤提]]問題：只看一次，最便宜的那級通常最划算；看的人越多，上面幾級的製作成本被分得越薄。',
+        { type: 'widget', name: 'knobs', props: { title: '四級的總時間＝製作與核對＋每次觀看的理解時間 × 次數（示意假設）', sliders: [
+          { id: 'views', label: '會被看幾次（人次）', min: 1, max: 100, step: 1, value: 1, unit: '次' },
+          { id: 'base', label: '讀純文字版要花', min: 5, max: 60, step: 5, value: 20, unit: '分鐘' },
+        ], compute: (v) => {
+          const cost = [2, 10, 30, 120];
+          const frac = [0.8, 0.5, 0.4, 0.3];
+          const names = ['1 規範文字', '2 一張圖', '3 互動網頁', '4 解說影片'];
+          const totals = cost.map((c, i) => c + v.views * frac[i] * v.base);
+          const plain = v.views * v.base;
+          const max = Math.max(plain, ...totals);
+          const best = totals.indexOf(Math.min(...totals));
+          return { rows: [
+            ...names.map((n, i) => ({ label: n, value: `${Math.round(totals[i])} 分鐘`, ratio: totals[i] / max })),
+            { label: '一般長文回答', value: `${Math.round(plain)} 分鐘`, ratio: plain / max },
+          ], note: `看 ${v.views} 次、純文字要讀 ${v.base} 分鐘時，總時間最少的是「${names[best]}」（${Math.round(totals[best])} 分鐘）。假設：製作與核對依序 2、10、30、120 分鐘，理解時間依序是純文字的 80%、50%、40%、30%；數字是示意，不是實測。` };
+        } } },
+        '預設只看 1 次時，第 1 級最省時間；把次數拉到 40，第 3 級勝出；拉到 100，影片才划算。這也解釋原文為什麼說影片要「留給值得反覆看的主題」。',
+        { type: 'heading', id: 'deep-not-monotonic', text: '深入：越高級不保證越好懂' },
+        'Tversky 等人（2002）回顧了大量「動畫 vs 靜態圖」的研究，發現許多實驗裡動畫並沒有比資訊量相同的靜態圖更好懂。原因之一是動畫的畫面一閃就過，讀者來不及比較前後；靜態圖可以停下來、來回看。',
+        { type: 'table', caption: '每一級的限制', head: ['級', '什麼時候不適用'], rows: [
+          ['1 規範文字', '主題本身是一張網（很多元件互相連）時，再短的句子也要讀者自己拼。'],
+          ['2 一張圖', '要表達條件、例外、因果推理時，箭頭說不清楚（見 1-1 的深入段落）。'],
+          ['3 互動網頁', '沒有真正可調的參數時，互動只是裝飾；讀者會一直拉卻沒學到東西。'],
+          ['4 解說影片', '讀者需要停下來比較、查數字時；影片的節奏由作者決定，不由讀者決定。'],
+        ] },
       ],
-      tryit: {
-        q: ['為下面三個主題各選一級，寫一句理由。'],
-        draft: 'A. 「什麼是 API？」：____\nB. 「房貸利率升 1%，月付金差多少？」：____\nC. 「傅立葉轉換的直覺」（你想反覆複習）：____',
-        answer: ['A：第 1 或 2 級，概念單純，短文字或一張圖就夠。B：第 3 級，有參數可以調。C：第 4 級，數學直覺最適合動畫，而且值得反覆看；也可以先用第 3 級。'],
-      },
     },
     mistakes: [
       { wrong: '每個問題都直接跳到第 4 級做影片。', why: '影片要準備執行環境、花時間渲染，錯誤也最難發現。', right: '從第 1 級開始；真的值得反覆看的主題才做影片。' },
@@ -1726,28 +1785,11 @@ defineLessons({
       { wrong: '用一般的聊天介面要求「做一支影片」，結果只拿到程式碼。', why: '影片要實際執行程式並渲染，一般聊天介面不一定做得到。', right: '在 Claude Code、Codex 這類 AI agent 工具裡做（2-4）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '卡帕西的 4 級格式，由低到高的順序是？', options: [
-        { text: '規範文字 → 一張圖 → 互動網頁 → 解說影片', correct: true, why: '每一級都比前一級更容易理解、也更有互動性。' },
-        { text: '一張圖 → 規範文字 → 解說影片 → 互動網頁', why: '順序錯了：第 1 級是規範文字，最高是影片。' },
-        { text: '互動網頁 → 一張圖 → 規範文字 → 解說影片', why: '互動網頁是第 3 級。' },
-        { text: '規範文字 → 互動網頁 → 一張圖 → 解說影片', why: '一張圖是第 2 級，在網頁之前。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你只有 5 分鐘，想快速看懂一個新名詞。最先試哪一級？', options: [
-        { text: '第 4 級解說影片', why: '要準備環境和渲染，5 分鐘不夠。' },
-        { text: '第 1 級：點名 ASD-STE100', correct: true, why: '不用換工具，同一個問題改一下問法，立刻看得到差別。原文也建議新手從這裡開始。' },
-        { text: '第 3 級：做一個互動網頁來看', why: '做得到，但一個名詞通常不需要可調參數。' },
-        { text: '不用指定格式，讓 AI 自由發揮', why: '那就是會得到落落長回答的原因。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼越往上的格式越好懂，卻也越要「多核對一次」？'], answer: [
-        '參考：越豐富的格式越像成品，看起來越可信，你越不容易停下來檢查；錯誤藏在圖的箭頭、網頁的計算或影片的某一幀裡，比寫在文字裡更難發現。所以原文建議重要的數字和結論對照文字版確認。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）什麼樣的主題最值得換成圖或互動格式？', options: [
-        { text: '有流程、層級或元件關係的主題', correct: true, why: '這些結構用文字表達，讀者要自己在腦中拼起來。' },
-        { text: '越短越簡單、一句話就能講完的主題', why: '簡單的主題文字就夠。' },
-        { text: '只有一個名詞的定義', why: '一個定義通常沒有結構可畫。' },
-        { text: '任何主題都一樣', why: '原文強調的是有結構的主題。' },
+      { level: '深入思考', type: 'reveal', q: ['公司每年有 40 位新人要學「報帳流程」：申請 → 主管簽核 → 會計審單 → 出納付款，金額超過 5 萬要多一關財務長。你只有一個下午可以準備。你會停在哪一級？理由要同時考慮觀看次數、主題結構和核對成本。'], answer: [
+        '推理一（次數）：每年 40 人、還會年年重複用，屬於「反覆看」。用上面的拉桿把次數拉到 40，第 3 級的總時間最少，影片也接近。',
+        '推理二（結構）：報帳是流程加一個金額分支，沒有可以連續調整的參數（金額只決定走不走那一關），互動網頁的拉桿派不上用場。',
+        '推理三（核對與時間）：一個下午做影片還要核對每一幕，風險高；流程圖可以在半小時內核對完每條箭頭。',
+        '結論：做第 2 級的流程圖，加一句文字說明 5 萬元的例外；之後有空再升級。常見的錯誤想法是「看的人多就直接做影片」，忽略了主題結構和準備時間。',
       ] },
     ],
     keypoints: [
@@ -1755,7 +1797,7 @@ defineLessons({
       '每往上一級：更好懂、更有互動，也更費工、更難核對。',
       '從第 1 級開始；依主題和時間決定要不要往上爬。',
     ],
-    sources: ['bnext', 'x-post'],
+    sources: ['bnext', 'x-post', 'tversky'],
   },
 });
 </script>
@@ -1770,6 +1812,9 @@ defineTerms({
   'Manim': { en: 'Manim', def: '3Blue1Brown 創作者開發的開源動畫工具，用 Python 程式描述畫面，再渲染成影片。' },
   '渲染': { en: 'render', def: '把程式描述的畫面，實際算成一張張影像、輸出成影片檔的過程，通常要花一些時間。' },
   'API key': { en: 'API key', def: '程式呼叫雲端服務時證明身分的一串密碼，外流等於別人可以用你的額度。' },
+  '受控語言': { en: 'controlled language', def: '限制詞彙與句型的寫作規範，讓文字只有一種讀法。ASD-STE100 是最有名的一種。' },
+  '白話寫作': { en: 'plain language', def: '讓目標讀者第一次讀就能找到、看懂、用上資訊的寫作方式。2023 年有國際標準 ISO 24495-1。' },
+  '環境變數': { en: 'environment variable', def: '作業系統替程式保存的設定值，程式執行時去讀。金鑰放這裡，就不用寫進程式碼或貼進對話。' },
 });
 
 defineLessons({
@@ -1842,12 +1887,21 @@ defineLessons({
             <rect x="10" y="210" width="540" height="42" class="fill-surface stroke-ink" stroke-width="3"/><text x="26" y="238" font-weight="900">5 名詞片語最多三個詞</text>
           </g>
         </svg>`, caption: '黃色兩條，上面的檢查器能自動抓；白色三條要靠你讀。' },
+        { type: 'heading', id: 'deep-ste-now', text: '深入：規範的現況，以及為什麼 AI 照得出來' },
+        { type: 'table', caption: 'ASD-STE100 的版本與數字（2026-10-29 查證）', head: ['項目', '現況', '備註'], rows: [
+          ['最新版', 'Issue 9，2025 年 1 月發布', '下一版 Issue 10 預定 2028 年 1 月（僅第三方來源）'],
+          ['核准詞', '約 875 個（另一常見說法約 900 個）', '不同版本與統計方式數字略有出入；原文與本書用 875'],
+          ['句長上限', '流程類 20 個英文單字、描述類 25 個', '中文沒有官方換算；五條規則的「30 個字」是原文的改寫'],
+          ['起源', '1980 年代由歐洲航太業制定，1986 年起列入美國航空運輸協會的手冊規範', '目的：讓非英文母語的維修人員不誤讀'],
+        ] },
+        'ASD-STE100 屬於[[受控語言]]：它不是「寫得好」的建議，而是一份有字典、有句型規則的規格。[[LLM]] 在訓練資料裡看過大量技術手冊和這份規範的說明，所以點名它，模型就知道要切短句、固定用詞。卡帕西另外提的「80% of the way」，等於告訴模型「借用精神、不必逐條照做」。',
+        '邊界有兩個。第一，規範管的是寫法，不管內容對錯：句子再短，事實錯了仍然是錯的。第二，給一般讀者看的文件，更合適的參考是[[白話寫作]]的國際標準 ISO 24495-1（2023），它以「讀者找得到、看得懂、用得上」為準，不限制詞彙。',
+        { type: 'table', caption: '三種「讓文字好讀」的工具怎麼選', head: ['工具', '管什麼', '適合'], rows: [
+          ['ASD-STE100', '核准詞彙、句長、句型', '操作步驟、維修手冊、英文技術文件'],
+          ['五條中文規則（原文改寫）', '句長、一句一事、用詞一致、主動語態、名詞堆疊', '要 AI 用中文解釋一個概念'],
+          ['白話寫作（ISO 24495-1）', '讀者能否找到、看懂、用上', '給一般民眾的公告、表單、說明'],
+        ] },
       ],
-      tryit: {
-        q: ['把這段改寫成符合五條規則的版本：'],
-        draft: '原文：透過在推論階段導入鍵值快取記憶體管理最佳化機制，系統得以在避免重複運算的情況下，大幅降低生成延遲並提升整體吞吐量。\n\n改寫：____',
-        answer: ['參考：模型會把算過的 K 和 V 存起來。下一次直接拿來用。這樣就不用重算。所以模型回答得更快。', '改了什麼：拆成 4 句（規則 1、2）；拿掉「鍵值快取記憶體管理最佳化機制」這種名詞堆疊（規則 5）；每句都有清楚的主詞（規則 4）。'],
-      },
     },
     mistakes: [
       { wrong: '以為用中文下指令，AI 的輸出就「符合 ASD-STE100」。', why: '它是英文規範，原文提醒：中文只是借用原則。', right: '把它當成「讓回答變簡潔的開關」，不要當成認證。' },
@@ -1855,28 +1909,10 @@ defineLessons({
       { wrong: '看完簡潔版就以為學完了。', why: '原文的實測中，簡潔版省略了一般版提到的多種優化技術。', right: '先用簡潔版抓大方向，再追問省略的細節（3-1）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'ASD-STE100 最初是為了什麼制定的？', options: [
-        { text: '飛機維修手冊，照顧英文非母語的讀者', correct: true, why: '應航空公司客戶要求制定，這些客戶 80% 不以英文為母語。' },
-        { text: '讓 AI 的回答變短、讓聊天機器人更好用', why: '那是卡帕西的新用法；規範本身早在 AI 之前就存在。' },
-        { text: '學術論文的寫作格式', why: '它是航太維修文件的規範。' },
-        { text: '中文技術文件的標準', why: '它是英文規範。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你點名 ASD-STE100 後，AI 回答變成一長串編號清單，你想要比較像文章。最好的下一步是？', options: [
-        { text: '改用原文的五條中文規則', correct: true, why: '原文實測，五條規則寫出來最接近一般文章。' },
-        { text: '要求「不要用清單」，其他不變', why: '只說不要，AI 不知道該用什麼取代。' },
-        { text: '放棄，回到一般提問', why: '一般提問又會變回落落長。' },
-        { text: '改成第 4 級做影片', why: '問題只是文字風格，不需要換到最費工的格式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['五條規則除了拿來要求 AI，也可以用在哪裡？舉一個你自己的例子。'], answer: [
-        '參考：寫給主管的 email、操作說明、報告摘要、給長輩的使用教學。只要讀者可能很忙、不熟這個領域，或不是用母語閱讀，這五條都能讓文字更好懂。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）卡帕西的第 1 級是什麼？', options: [
-        { text: '照 ASD-STE100 規範寫文字', correct: true, why: '第 1 級還是文字，但照規範寫。' },
-        { text: '畫一張圖', why: '那是第 2 級。' },
-        { text: '做互動網頁', why: '那是第 3 級。' },
-        { text: '做一支 3Blue1Brown 風格的解說影片', why: '那是第 4 級。' },
+      { level: '深入思考', type: 'reveal', q: ['系統跳出這句通知：「資料庫連線逾時錯誤處理重試機制已被系統自動啟動，請使用者稍後再行確認交易處理結果。」用五條規則改寫，並說出每一處改動對應哪一條。'], answer: [
+        '推理：先找主詞與動作。原句的主詞藏在被動語態「已被系統自動啟動」裡（規則 4）；「資料庫連線逾時錯誤處理重試機制」是六個名詞黏在一起（規則 5）；一句塞了「發生逾時」「系統重試」「請你確認」三件事（規則 2）。',
+        '改寫示範：「資料庫連線逾時。系統正在自動重試。請 5 分鐘後查看交易結果。」三句各講一件事，主詞清楚，每句都在 30 字內（規則 1）。',
+        '常見的錯誤：只刪字、不拆句，例如「系統已自動啟動逾時重試機制，請稍後確認」，名詞堆疊還在；另一個錯誤是把「交易處理結果」後面改叫「訂單狀態」，違反規則 3。',
       ] },
     ],
     keypoints: [
@@ -1884,7 +1920,7 @@ defineLessons({
       '英文直接點名；中文借用原則，或用五條規則（最像一般文章）。',
       '簡潔會省略細節：先抓大方向，再追問。',
     ],
-    sources: ['bnext', 'ste-home', 'ste-issue9', 'ste-about'],
+    sources: ['bnext', 'x-post', 'ste-home', 'ste-issue9', 'ste-about', 'ste-wiki', 'ste-tcworld', 'iso-24495'],
   },
 
   '2-2': {
@@ -1944,12 +1980,12 @@ defineLessons({
         why: ['貼到 Mermaid 線上編輯器，左邊程式碼、右邊立刻出現圖'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'good', label: '好的解說圖' }, { id: 'bad', label: '文字搬進方框' }], items: [
-          { text: '每個方框裡都是一整句話，方框之間沒有箭頭', answer: 'bad', why: '只是把段落切開，結構還是要你自己拼。' },
-          { text: '6 個短標籤的方框，箭頭上寫著「傳送」「回傳」', answer: 'good', why: '元件、關係、方向都有。' },
-          { text: '一張圖有 25 個方框，標籤平均 20 個字', answer: 'bad', why: '太多、太長，等於另一篇文章。' },
-          { text: '用顏色區分「使用者端」和「伺服器端」，箭頭標出順序 1、2、3', answer: 'good', why: '層級和流程都一眼看得出來。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['每個方框裡都是一整句話，方框之間沒有箭頭', '文字搬進方框', '只是把段落切開，結構還是要你自己拼。'],
+          ['6 個短標籤的方框，箭頭上寫著「傳送」「回傳」', '好的解說圖', '元件、關係、方向都有。'],
+          ['一張圖有 25 個方框，標籤平均 20 個字', '文字搬進方框', '太多、太長，等於另一篇文章。'],
+          ['用顏色區分「使用者端」和「伺服器端」，箭頭標出順序 1、2、3', '好的解說圖', '層級和流程都一眼看得出來。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="拿到結果的兩種情況：如果是圖片，直接看並核對；如果是 Mermaid 程式碼，貼到 mermaid.live 線上編輯器看成圖">
           <g font-size="17">
             <rect x="10" y="10" width="200" height="60" class="f2 stroke-ink" stroke-width="3"/><text x="110" y="47" text-anchor="middle" class="on-color" font-weight="900">AI 的回答</text>
@@ -1958,49 +1994,44 @@ defineLessons({
           </g>
           <g class="stroke-ink" stroke-width="3" fill="none"><path d="M210 40 H290 M110 70 V158 H290"/></g>
         </svg>`, caption: '原文：拿到的可能是圖片，也可能是 Mermaid 這類畫圖程式碼。' },
+        { type: 'heading', id: 'deep-label-limit', text: '深入：標籤字數上限在擋什麼' },
+        '一張圖上的字，大約是「（方框數＋箭頭數）× 每個標籤的字數」。標籤一放寬，圖上的字很快就比一段文字還多，這就是「文字搬進方框」的數學。拉拉看：',
+        { type: 'widget', name: 'knobs', props: { title: '圖上的字 vs 同樣內容寫成文字（實際計算，文字版以每條關係一句約 25 字估）', sliders: [
+          { id: 'n', label: '方框（元件）數', min: 3, max: 20, step: 1, value: 6, unit: '個' },
+          { id: 'e', label: '箭頭（關係）數', min: 2, max: 30, step: 1, value: 7, unit: '條' },
+          { id: 'len', label: '每個標籤的字數上限', min: 4, max: 40, step: 2, value: 10, unit: '字' },
+        ], compute: (v) => {
+          const onFig = (v.n + v.e) * v.len;
+          const asText = v.e * 25;
+          const max = Math.max(onFig, asText);
+          return { rows: [
+            { label: '圖上最多的字', value: `${onFig} 字`, ratio: onFig / max },
+            { label: '寫成文字約', value: `${asText} 字`, ratio: asText / max },
+          ], note: `${v.n} 個方框、${v.e} 條箭頭、標籤上限 ${v.len} 字：圖上最多 ${onFig} 字，同樣的關係寫成文字約 ${asText} 字。${onFig > asText ? '圖上的字已經比文字版多，這張圖等於另一篇文章。' : '圖上的字比文字版少，讀者省下的是閱讀量，結構又一眼看得到。'}` };
+        } } },
+        '預設的 6 個方框、7 條箭頭、10 字上限，圖上最多 130 字，比文字版的 175 字少。把上限拉到 30 字，圖上會到 390 字，反而比文字多一倍以上。',
+        { type: 'heading', id: 'deep-code-vs-image', text: '深入：要圖片，還是要畫圖的程式碼' },
+        { type: 'table', caption: '兩種「一張圖」的取捨', head: ['', '影像生成的圖片', '程式碼畫的圖（Mermaid、SVG）'], rows: [
+          ['中文標籤', '常出現錯字或亂碼', '字就是你看到的文字，不會拼錯'],
+          ['修改', '只能重新生成，每次構圖都不同', '改一行文字，其他不動'],
+          ['核對', '要用眼睛看', '可以逐行讀：`A --> B` 就是 A 指向 B'],
+          ['風格與美感', '自由，適合插畫', '受限於語法，偏向示意圖'],
+        ] },
+        '[[Mermaid]] 不只畫流程圖。主題的結構決定該要哪一種：先後順序用 `flowchart`，誰跟誰對話用 `sequenceDiagram`，狀態切換用 `stateDiagram`，時間演進用 `timeline`，概念發散用 `mindmap`。提示詞裡直接點名圖的類型，比只說「畫一張圖」準。',
+        'Mermaid 程式碼也能直接放進 GitHub 的 Markdown：把程式碼放進標記為 `mermaid` 的程式碼區塊，GitHub 會自動畫成圖。各家 AI 聊天介面會不會直接顯示成圖，依產品而定（本書未逐一查證），看到程式碼就貼到 mermaid.live。',
       ],
-      tryit: {
-        q: ['用原文的公式，為「颱風假怎麼決定」寫一句畫圖指令，並列出你希望圖上出現的元件。'],
-        draft: '指令：____\n希望出現的元件：____',
-        answer: ['參考：「請用一張圖解釋颱風假怎麼決定，不要用長篇文字。圖上要標出氣象署、縣市政府、判斷標準和公布時間這幾個關鍵元件、彼此的關係和流程方向，每個標籤不超過10個字。」', '把你想要的元件直接寫進指令，比讓 AI 自己猜準得多。'],
-      },
     },
     mistakes: [
       { wrong: '只說「畫一張圖」。', why: 'AI 很容易把原本的文字切段塞進方框。', right: '照原文公式：不要長篇文字＋元件＋關係＋方向＋標籤字數上限。' },
       { wrong: '拿到一堆看不懂的程式碼，以為 AI 失敗了。', why: '那多半是 Mermaid 語法，本身就是「文字版的圖」。', right: '貼到 [Mermaid 線上編輯器](https://mermaid.live/) 看成圖。' },
       { wrong: '圖看起來很專業，就直接拿去簡報。', why: '箭頭方向、元件名稱都可能是推論出來的，錯了也很難發現。', right: '對照文字版或原始資料，逐條確認箭頭（3-1）。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '原文的畫圖指令，要求圖上標出哪三樣東西？', options: [
-        { text: '關鍵元件、元件之間的關係、流程方向', correct: true, why: '再加上「每個標籤不超過 10 個字」的限制。' },
-        { text: '標題、作者、日期', why: '那是文件資訊，不是解說圖的內容。' },
-        { text: '顏色、字型、尺寸', why: '原文沒有要求外觀，而是要求結構。' },
-        { text: '定義、生活化的例子、常見錯誤與修正方式', why: '那是教學文章的結構。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'AI 回你一段以 `flowchart TD` 開頭的程式碼。你該怎麼做？', options: [
-        { text: '貼到 Mermaid 線上編輯器看成圖', correct: true, why: '那是 Mermaid 語法，貼上去就能看到圖。' },
-        { text: '存成 .html 用瀏覽器打開', why: '那是第 3 級 HTML 的看法；Mermaid 程式碼要用 Mermaid 編輯器。' },
-        { text: '重新問一次，要求它直接給一張圖片檔', why: '可以，但貼到編輯器更快。' },
-        { text: '放棄，因為看不懂程式碼', why: '不需要看懂，貼上去就有圖。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼「每個標籤不超過 10 個字」這個限制很重要？'], answer: [
-        '參考：字數上限逼 AI 把每個元件提煉成關鍵詞；沒有上限，它很容易把整句話塞進方框，圖就變回一篇被切開的文章。限制越清楚，結構越乾淨。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-1）五條中文規則中，「一個名詞片語最多三個詞」是在避免什麼？', options: [
-        { text: '名詞堆疊', correct: true, why: '例如「快取記憶體管理最佳化機制」。' },
-        { text: '句子太短', why: '規則是希望句子短。' },
-        { text: '用到英文', why: '和語言無關。' },
-        { text: '主動語態', why: '主動語態是規則 4 鼓勵的。' },
-      ] },
-    ],
     keypoints: [
       '畫圖指令＝不要長篇文字＋元件＋關係＋方向＋標籤 ≤ 10 字。',
       '可能拿到圖片或 Mermaid 程式碼；程式碼貼到 mermaid.live。',
       '好圖畫的是結構，不是把文字搬進方框；箭頭要核對。',
     ],
-    sources: ['bnext', 'mermaid'],
+    sources: ['bnext', 'mermaid', 'mermaid-docs', 'github-mermaid'],
   },
 
   '2-3': {
@@ -2065,12 +2096,22 @@ defineLessons({
             <text x="305" y="88">只有定義</text><text x="305" y="122">歷史事件的經過</text><text x="305" y="156">沒有變數可調</text>
           </g>
         </svg>`, caption: '關鍵在「參數」：有東西可以調，互動才有意義。' },
+        { type: 'heading', id: 'deep-kv-tradeoff', text: '深入：KV cache 本身也有代價' },
+        '上面的拉桿只算「計算次數」，省下的是運算。代價是記憶體：每個 token 的 K 和 V 都要一直存著，對話越長，佔的記憶體越多。一個序列要存的量是「2（K 和 V）× 層數 × 注意力頭數 × 每頭維度 × token 數 × 每個數字的位元組」。',
+        { type: 'table', caption: '以 Llama 2 7B 的公開設定試算（32 層、32 頭、每頭 128 維、16 位元浮點數）', head: ['token 數', 'KV cache 大小', '說明'], rows: [
+          ['1', '0.5 MB', '2 × 32 × 32 × 128 × 2 位元組 = 524,288 位元組'],
+          ['4,096', '2 GB', '一段 4K token 的對話'],
+          ['32,768', '16 GB', '假設同樣設定撐到 32K（Llama 2 原本上限 4K）：比模型權重本身（約 13 GB）還大'],
+        ] },
+        '所以 KV cache 是「用記憶體換時間」。vLLM 等推論系統的研究重點，就是怎麼更省地存放這些 K 和 V；有些新模型也讓多個注意力頭共用 K、V，把這筆記憶體縮小。原文的實測只談計算量，這一層取捨是延伸補充。',
+        { type: 'heading', id: 'deep-single-file', text: '深入：「單一檔案」的邊界' },
+        { type: 'table', caption: '雙擊打開的 HTML 會在哪裡卡住', head: ['情況', '會發生什麼', '怎麼處理'], rows: [
+          ['網頁從 CDN 載入圖表函式庫', '沒網路時整個互動不見', '要離線用，請 AI「不使用外部函式庫」'],
+          ['網頁要讀同資料夾的 .json 或 .csv', '多數瀏覽器在 file:// 下擋掉讀取', '請 AI 把資料直接寫進同一個檔案'],
+          ['公式寫錯', '畫面照樣漂亮', '用極端值試算：0、1、最大值，結果要合理'],
+        ] },
+        '這種「讀者自己調參數、看結果」的寫法，Bret Victor 在 2011 年稱為 Explorable Explanations（可探索的解說）。以前要工程師花幾天做，現在 AI 幾分鐘就能做出草稿，這正是原文說「只用一次也值得」的原因。',
       ],
-      tryit: {
-        q: ['為「房貸月付金」寫一句互動網頁的指令，並說出你想要的參數。'],
-        draft: '指令：____\n參數：____',
-        answer: ['參考：「請用HTML做一個單頁互動網頁解釋房貸月付金怎麼算。要有可以點開的段落說明，以及一個可以調整貸款金額、利率、年限，即時看到月付金和總利息變化的互動元件。所有程式碼放在同一個檔案裡。」', '把參數名稱寫進指令，AI 就知道要做哪幾個拉桿。'],
-      },
     },
     mistakes: [
       { wrong: '忘了寫「所有程式碼放在同一個檔案裡」。', why: 'AI 可能分成好幾個檔案，你要自己組合才打得開。', right: '照原文加上這句，存一個檔就能用。' },
@@ -2078,28 +2119,11 @@ defineLessons({
       { wrong: '把檔案存成 .txt。', why: '瀏覽器會把它當純文字顯示。', right: '副檔名改成 .html；Windows 要先在檔案總管開啟「副檔名」顯示。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '原文的互動網頁指令要求哪兩種內容？', options: [
-        { text: '可點開的說明＋可調參數的互動元件', correct: true, why: '再加上「所有程式碼放在同一個檔案」。' },
-        { text: '一張圖和一段影片', why: '那是第 2 級和第 4 級。' },
-        { text: '登入功能和資料庫', why: '解說網頁不需要這些。' },
-        { text: '多個頁面、導覽列和一個可以搜尋的首頁', why: '原文要的是「單頁」。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在上面的 KV cache 示範裡，把 token 數從 8 拉到 16，沒有快取的計算次數會？', options: [
-        { text: '從 36 次變成 136 次，大約 3.8 倍', correct: true, why: '1+2+…+n，n 加倍，總數大約變 4 倍。這就是「計算量隨長度不斷堆高」。' },
-        { text: '從 8 次變成 16 次，剛好 2 倍', why: '那是有快取的情況。' },
-        { text: '不變', why: '每多一個 token，就要重算前面所有的。' },
-        { text: '從 36 次變成 72 次，剛好變成 2 倍', why: '不是線性成長，是越來越快地堆高。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['操作完上面的拉桿，再讀一次原文的「一般提問版」那段文字。哪一個讓你更快理解「非常浪費」？為什麼？'], answer: [
-        '參考：多半是拉桿。文字告訴你「會堆高」，拉桿讓你**看到**紅格像三角形一樣長大、而綠格只是一條線。這就是卡帕西把互動網頁放在第 3 級的原因。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）AI 回給你 Mermaid 程式碼時，要貼到哪裡看成圖？', options: [
-        { text: 'Mermaid 線上編輯器', correct: true, why: '貼上就會出現圖。' },
-        { text: '存成 .html 檔，再用瀏覽器打開來看看', why: '那是看 HTML 的方法。' },
-        { text: 'Word', why: 'Word 不會把 Mermaid 畫成圖。' },
-        { text: '直接讀程式碼就好', why: '可以，但看圖快得多。' },
+      { level: '深入思考', type: 'reveal', q: ['你請 AI 做了一個房貸試算網頁：輸入貸款金額、年利率、年數，顯示每月本息平均攤還的月付金。你不會看程式碼。怎麼用三組輸入值，判斷公式有沒有寫錯？'], answer: [
+        '推理：挑「答案不用公式也算得出來」的輸入值。第一組，利率設 0%：月付金應該剛好是「金額 ÷ 月數」，例如 120 萬、10 年 → 每月 1 萬。',
+        '第二組，只改年數：年數加倍，月付金應該變少，但不會剛好減半（利息變多）。如果剛好減半，代表利息沒算進去。',
+        '第三組，對照外部來源：用銀行官網的房貸試算器輸入同一組數字，月付金應該一致到元。',
+        '常見的錯誤：只試一組「看起來合理」的數字。公式把年利率當月利率用，結果也會是一個像樣的數字，只有極端值和外部對照抓得到。',
       ] },
     ],
     keypoints: [
@@ -2107,7 +2131,7 @@ defineLessons({
       '沒有預覽：存成 .html，用瀏覽器打開。',
       '有參數可調的主題最適合；用已知答案試算核對。',
     ],
-    sources: ['bnext'],
+    sources: ['bnext', 'vllm', 'victor-ee'],
   },
 
   '2-4': {
@@ -2144,7 +2168,7 @@ defineLessons({
           { cmd: '執行與渲染', out: ['渲染第 1 幕…', '渲染第 2 幕…', 'kv_cache.mp4'], note: 'AI agent 在你的電腦上執行程式，把畫面算成影片檔，要花一些時間。' },
           { cmd: '配音與合成', out: ['旁白音軌', 'kv_cache_final.mp4'], note: '用 ElevenLabs 的 API key 產生旁白；沒有的話，請 AI 找能用自己電腦運算的免費替代方案。' },
         ] } },
-        { type: 'callout', variant: 'danger', title: 'API key 的處理', body: ['「用我的 ElevenLabs API key」不代表要把金鑰貼進對話。比較安全的做法是先設成環境變數（例如 `ELEVENLABS_API_KEY`），再告訴 AI 去讀那個變數。金鑰外流，別人就能用你的額度。'] },
+        { type: 'callout', variant: 'danger', title: 'API key 的處理', body: ['「用我的 ElevenLabs API key」不代表要把金鑰貼進對話。比較安全的做法是先設成[[環境變數]]，再告訴 AI 去讀那個變數。變數名稱看工具而定：ElevenLabs 官方範例用 `ELEVENLABS_API_KEY`，Manim 的配音外掛 manim-voiceover 讀的是 `ELEVEN_API_KEY`。金鑰外流，別人就能用你的額度。'] },
       ],
     },
     define: [
@@ -2164,12 +2188,12 @@ defineLessons({
         why: ['agent 會在你的電腦上實際執行', '成品是一個真正的影片檔'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'worth', label: '值得做影片' }, { id: 'not', label: '用前三級就好' }], items: [
-          { text: '你要反覆複習、還想分享給全班的「傅立葉轉換」', answer: 'worth', why: '值得反覆看，數學直覺最適合動畫。' },
-          { text: '明天開會前要搞懂的一個名詞', answer: 'not', why: '時間緊，第 1 級最快。' },
-          { text: '公司新人訓練要用的「訂單處理流程」', answer: 'worth', why: '會被很多人反覆看。' },
-          { text: '只想確認一個數字算得對不對', answer: 'not', why: '影片最難核對數字。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['你要反覆複習、還想分享給全班的「傅立葉轉換」', '值得做影片', '值得反覆看，數學直覺最適合動畫。'],
+          ['明天開會前要搞懂的一個名詞', '用前三級就好', '時間緊，第 1 級最快。'],
+          ['公司新人訓練要用的「訂單處理流程」', '值得做影片', '會被很多人反覆看。'],
+          ['只想確認一個數字算得對不對', '用前三級就好', '影片最難核對數字。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="影片的代價：要準備能執行程式的環境、要花時間渲染、錯誤最難發現；所以留給值得反覆看的主題">
           <g font-size="17">
             <rect x="10" y="10" width="170" height="130" class="fill-surface stroke-ink" stroke-width="3"/><text x="95" y="62" text-anchor="middle" font-weight="900">要準備環境</text><text x="95" y="96" text-anchor="middle" font-size="14">AI agent 工具</text>
@@ -2178,49 +2202,46 @@ defineLessons({
             <rect x="10" y="156" width="540" height="44" class="f4 stroke-ink" stroke-width="3"/><text x="280" y="184" text-anchor="middle" class="on-color" font-weight="900">留給值得反覆看的主題</text>
           </g>
         </svg>`, caption: '原文：影片還得準備能執行程式的環境、花時間渲染，留給值得反覆看的主題再做。' },
+        { type: 'heading', id: 'deep-two-manims', text: '深入：Manim 有兩個版本，AI 常混用' },
+        '原文連結的是 3Blue1Brown 本人維護的版本（ManimGL）。另一個是社群接手維護的 Manim Community，文件較完整，網路上的範例也多半是它。兩者的程式碼不互通，AI 混著寫就會一執行就報錯。',
+        { type: 'table', caption: '兩個 Manim（2026-10-29 查證；Community 版文件為 v0.22.1）', head: ['', 'Manim Community', 'ManimGL（3b1b）'], rows: [
+          ['安裝', '`pip install manim`（官方建議用 uv 管環境）', '`pip install manimgl`'],
+          ['程式開頭', '`from manim import *`', '`from manimlib import *`'],
+          ['執行指令', '`manim`', '`manimgl`'],
+          ['LaTeX 數學式', '只用一般文字時可以不裝', '要排數學式才需要'],
+        ] },
+        '實務做法：在指令裡直接寫「用 Manim Community 版」。渲染時間由影格數決定，草稿先用低畫質預覽，定稿才出高畫質：',
+        { type: 'widget', name: 'knobs', props: { title: '要渲染多少影格（實際計算；Manim Community 的 -ql 是 480p 每秒 15 格，-qh 是 1080p 每秒 60 格）', sliders: [
+          { id: 'sec', label: '影片長度', min: 10, max: 600, step: 10, value: 60, unit: '秒' },
+          { id: 'rev', label: '改稿次數', min: 0, max: 10, step: 1, value: 3, unit: '次' },
+        ], compute: (v) => {
+          const runs = v.rev + 1;
+          const allHigh = v.sec * 60 * runs;
+          const draftLow = v.sec * 15 * v.rev + v.sec * 60;
+          return { rows: [
+            { label: '每次都用 -qh', value: `${allHigh.toLocaleString()} 格`, ratio: 1 },
+            { label: '改稿用 -ql、定稿用 -qh', value: `${draftLow.toLocaleString()} 格`, ratio: draftLow / allHigh },
+          ], note: `${v.sec} 秒的影片改 ${v.rev} 次：每次都出高畫質要算 ${allHigh.toLocaleString()} 格；改稿用低畫質、最後一次才出高畫質，只要 ${draftLow.toLocaleString()} 格，約是前者的 ${Math.round(draftLow / allHigh * 100)}%。` };
+        } } },
+        { type: 'table', caption: '配音的選擇（manim-voiceover 支援的服務）', head: ['服務', '費用', '要不要網路'], rows: [
+          ['ElevenLabs', '付費，有免費額度', '要'],
+          ['gTTS（Google 翻譯語音）', '免費，文件提醒未來可能失效', '要'],
+          ['Coqui', '免費', '不用，但要裝 PyTorch'],
+          ['錄自己的聲音', '免費', '不用'],
+        ] },
       ],
-      tryit: {
-        q: ['你沒有 ElevenLabs 的帳號。依原文，怎麼改卡帕西的指令？'],
-        draft: '改寫：____',
-        answer: ['參考：「製作一支主題為[主題]、3b1b（3Blue1Brown）風格的解說影片。我沒有 ElevenLabs，請找找看有沒有能用我自己電腦運算資源的免費配音替代方案。」', '這正是原文轉述卡帕西的建議。也可以先做沒有配音的版本。'],
-      },
     },
     mistakes: [
       { wrong: '在聊天網頁要求做影片，拿到程式碼後覺得 AI 不會做。', why: '影片要實際執行程式並渲染，聊天介面通常做不到。', right: '在 Claude Code、Codex 這類 AI agent 工具裡下指令。' },
       { wrong: '把 API key 直接貼進對話。', why: '金鑰會留在對話紀錄裡，可能外流。', right: '設成環境變數，告訴 AI 變數名稱就好。' },
       { wrong: '影片做完直接分享，沒有核對。', why: '影片裡的錯誤最難發現。', right: '對照文字版確認重要的數字和結論（3-1）。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '為什麼做解說影片要用 Claude Code、Codex 這類工具？', options: [
-        { text: 'AI 要實際執行程式，再把畫面渲染成影片檔', correct: true, why: '這需要能在電腦上執行程式的 AI agent。' },
-        { text: '因為只有這兩個工具會寫 Python 程式碼', why: '一般聊天介面也會寫程式，差在能不能執行。' },
-        { text: '因為影片需要付費帳號', why: '原文講的是執行環境，不是付費。' },
-        { text: '因為 Manim 只能在手機上用', why: 'Manim 是在電腦上執行的工具。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你想做影片但沒有 ElevenLabs API key。依原文，卡帕西建議？', options: [
-        { text: '請 AI 找能用自己電腦運算資源的免費替代方案', correct: true, why: '原文轉述的正是這個建議。' },
-        { text: '一定要先付費註冊 ElevenLabs 帳號才能配音', why: '原文提供了替代方案。' },
-        { text: '放棄做影片', why: '可以用替代方案。' },
-        { text: '向別人借 API key', why: '金鑰不應該共用。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['卡帕西對這一步的評語是「這真的開始行得通了！」。為什麼他說「開始」？這對你代表什麼？'], answer: [
-        '參考：「開始」表示這件事最近才變得可行，而且還不完美：要準備環境、要渲染、結果要核對。對你來說，它值得試，但不是每個問題的預設選項；先熟練前三級，真的值得的主題再做影片。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-3）互動網頁指令裡的「所有程式碼放在同一個檔案裡」有什麼用？', options: [
-        { text: '存一個 .html 檔就能直接打開', correct: true, why: '不用自己組合多個檔案。' },
-        { text: '讓網頁跑得比較快', why: '重點是方便打開，不是速度。' },
-        { text: '讓 AI 比較便宜', why: '和費用無關。' },
-        { text: '可以上傳到 App Store', why: '和 App Store 無關。' },
-      ] },
-    ],
     keypoints: [
       '影片要在 AI agent 工具（Claude Code、Codex）裡做：要執行程式並渲染。',
       '指令範例：主題＋3b1b 風格＋ElevenLabs 配音；沒有 key 就請 AI 找免費替代。',
       '最費工、最難核對：留給值得反覆看的主題；金鑰用環境變數。',
     ],
-    sources: ['bnext', '3b1b', 'manim', 'claude-code', 'codex', 'elevenlabs'],
+    sources: ['bnext', '3b1b', 'manim', 'manim-ce', 'manim-config', 'manim-voiceover', 'claude-code', 'codex', 'elevenlabs', 'elevenlabs-qs'],
   },
 });
 </script>
@@ -2280,12 +2301,12 @@ defineLessons({
         why: ['明確指出要補什麼', '維持同樣好讀的寫法'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'check', label: '一定要核對' }, { id: 'ok', label: '可以先相信' }], items: [
-          { text: '圖上的箭頭方向（誰傳資料給誰）', answer: 'check', why: '方向錯了，整個理解都錯。' },
-          { text: '互動網頁算出來的金額', answer: 'check', why: '公式可能寫錯，用已知答案試算。' },
-          { text: '影片裡出現的年份和數字', answer: 'check', why: '影片最難逐幀檢查。' },
-          { text: '文字版裡一句「這是一種快取機制」的描述', answer: 'ok', why: '概念性的描述可以先接受，之後在別的資料裡會再遇到。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['圖上的箭頭方向（誰傳資料給誰）', '一定要核對', '方向錯了，整個理解都錯。'],
+          ['互動網頁算出來的金額', '一定要核對', '公式可能寫錯，用已知答案試算。'],
+          ['影片裡出現的年份和數字', '一定要核對', '影片最難逐幀檢查。'],
+          ['文字版裡一句「這是一種快取機制」的描述', '可以先相信', '概念性的描述可以先接受，之後在別的資料裡會再遇到。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="核對難度：規範文字最容易核對，一張圖中等，互動網頁中等，解說影片最難；格式越豐富越要多核對">
           <g font-size="16">
             <text x="10" y="28" font-weight="900">越往右，錯誤越不容易被發現</text>
@@ -2295,42 +2316,36 @@ defineLessons({
             <rect x="415" y="50" width="135" height="160" class="f4 stroke-ink" stroke-width="3"/><text x="482" y="76" text-anchor="middle" class="on-color" font-weight="900">4 影片</text>
           </g>
         </svg>`, caption: '長條越高，越需要花心思核對。' },
+        { type: 'heading', id: 'deep-verify-math', text: '深入：為什麼要挑重點核對，而不是隨便看看' },
+        '一張圖、一個網頁裡有很多「事實」：每條箭頭、每個數字都算一個。就算每個事實出錯的機率很小，事實一多，整份成品「至少有一個錯」的機率就很高。拉拉看：',
+        { type: 'widget', name: 'knobs', props: { title: '成品裡藏著幾個錯（實際計算；假設每個事實出錯的機率相同、彼此獨立）', sliders: [
+          { id: 'n', label: '成品裡的事實數（箭頭、數字、標籤）', min: 5, max: 100, step: 5, value: 20, unit: '個' },
+          { id: 'p', label: '每個事實出錯的機率', min: 1, max: 20, step: 1, value: 5, unit: '%' },
+          { id: 'k', label: '你隨機抽查幾個', min: 0, max: 100, step: 5, value: 5, unit: '個' },
+        ], compute: (v) => {
+          const k = Math.min(v.k, v.n);
+          const expected = v.n * v.p / 100;
+          const atLeastOne = 1 - (1 - v.p / 100) ** v.n;
+          const left = expected * (1 - k / v.n);
+          return { rows: [
+            { label: '預期的錯誤數', value: `${expected.toFixed(2)} 個`, ratio: expected / 20 },
+            { label: '至少有一個錯的機率', value: `${Math.round(atLeastOne * 100)}%`, ratio: atLeastOne },
+            { label: `抽查 ${k} 個後，預期還剩`, value: `${left.toFixed(2)} 個`, ratio: left / 20 },
+          ], note: `${v.n} 個事實、每個 ${v.p}% 會錯：預期 ${expected.toFixed(2)} 個錯，至少一個錯的機率 ${Math.round(atLeastOne * 100)}%。隨機抽查 ${k} 個，平均只抓到 ${Math.round(k / v.n * 100)}% 的錯。所以要先核對「錯了會改變結論」的那幾個，不是隨機看幾個。` };
+        } } },
+        { type: 'table', caption: '每一級怎麼核對最省力', head: ['格式', '核對方法', '為什麼有效'], rows: [
+          ['1 規範文字', '請 AI 列出它省略了什麼', '簡潔版的風險是漏，不是錯'],
+          ['2 一張圖', '把每條箭頭念成一句話：「A 把什麼傳給 B」，再對照原始資料', '把圖還原成文字，錯誤就看得見'],
+          ['3 互動網頁', '用極端值和外部試算器對照（見 2-3 的深入思考題）', '公式錯了，極端值最先露餡'],
+          ['4 解說影片', '先請 AI 交出分鏡與旁白的文字稿，核對文字稿，再渲染', '核對文字比逐幀看影片快得多'],
+        ] },
+        '請同一個 AI「檢查自己的答案」有用但有限：它常重複同樣的錯誤假設。換一個模型交叉比對，或回到原始資料，抓錯的效果比較好；兩個模型都同意，也不等於正確。',
       ],
-      tryit: {
-        q: ['挑一個你最近想搞懂的概念，實際做一次 A/B 對照，記下差別。'],
-        draft: '概念：____\n問法 A 的回答有幾段？____\n問法 B 的回答有幾段？哪個比較好懂？____\n我要追問的細節：____',
-        answer: ['沒有標準答案。重點是親眼看到差別：多數人會發現 B 版短很多，但也會少一些細節，這正是第 2 步要追問的地方。'],
-      },
     },
     mistakes: [
       { wrong: '一開始就做互動網頁或影片。', why: '最費工、最難核對；還沒確定問題問得對，就花了最多時間。', right: '先從第 1 級開始，看懂大方向再決定要不要往上。' },
       { wrong: '簡潔版看完就結束，以為什麼都懂了。', why: '原文實測，簡潔版省略了多種優化技術。', right: '在簡潔版的基礎上追問省略的部分。' },
       { wrong: '圖或網頁看起來很專業，就不核對。', why: '原文：圖表、網頁和影片裡的錯誤，比寫在文字裡更不容易發現。', right: '重要的數字和結論，對照文字版確認。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '原文建議新手從哪裡開始？', options: [
-        { text: '第 1 級：點名 ASD-STE100', correct: true, why: '不用換工具，差別馬上看得出來。' },
-        { text: '直接做互動網頁，最有成就感', why: '原文建議先從第 1 級開始。' },
-        { text: '先安裝 Manim', why: '那是第 4 級才需要的準備。' },
-        { text: '先學會 Mermaid 語法，之後畫圖比較方便', why: '不需要先學語法，AI 會寫，貼到編輯器就能看。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你用互動網頁看懂了房貸計算，接下來最該做的是？', options: [
-        { text: '用已知答案的數字試算核對', correct: true, why: '格式越豐富越要核對，公式可能寫錯。' },
-        { text: '直接分享給朋友', why: '還沒核對就分享，錯誤會跟著傳出去。' },
-        { text: '要求 AI 做成影片', why: '先確認內容正確，再考慮更費工的格式。' },
-        { text: '刪掉網頁，改回去讀一般的文字說明', why: '它還有用，只是要先核對。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用自己的話，把原文的三個建議濃縮成一句你會貼在螢幕旁的提醒。'], answer: [
-        '參考：「先短，再深，最後對一下。」或「從第 1 級開始，懂了再追問，漂亮的更要核對。」',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-4）解說影片為什麼最難核對？', options: [
-        { text: '錯誤藏在某一幀裡，我們很少逐幀檢查', correct: true, why: '所以影片留給值得反覆看的主題，並對照文字版。' },
-        { text: '影片一定比較不準確，因為是 AI 自動產生的', why: '不一定不準，而是錯了很難發現。' },
-        { text: '影片沒有文字', why: '影片可能有字幕和旁白，問題是不易逐一確認。' },
-        { text: '影片都是英文', why: '和語言無關。' },
-      ] },
     ],
     keypoints: [
       '新手路線：先第 1 級 A/B 對照 → 再追問細節 → 最後核對。',
@@ -2343,9 +2358,16 @@ defineLessons({
   '3-2': {
     layout: 'reference',
     minutes: 10,
-    sources: ['bnext', 'x-post', 'ste-home', 'mermaid', 'manim'],
+    sources: ['bnext', 'x-post', 'ste-home', 'ste-tcworld', 'mermaid', 'manim', 'manim-ce', 'manim-voiceover', 'elevenlabs-qs'],
     blocks: [
-      '這一頁是可以直接帶走的工具。輸入你想搞懂的主題，挑一級，複製提示詞貼到 ChatGPT、Claude 或 Gemini。下面還有 10 題總複習。',
+      '這一頁是全書的一頁地圖，也是可以直接帶走的工具。先看全書架構和每個模組最重要的一件事，再用提示詞產生器挑一級，複製貼到 ChatGPT、Claude 或 Gemini。',
+      { type: 'heading', id: 'map', text: '全書架構' },
+      { type: 'table', caption: '4 個模組、每個模組最重要的一件事', head: ['模組', '單元', '最重要的行動或觀念'], rows: [
+        ['0 原文', '0-1', '先讀原文：本書是導讀與延伸，不是全文轉載'],
+        ['1 為什麼換格式有效', '1-1、1-2', '先問「主題有沒有結構、會被看幾次」，再決定停在哪一級'],
+        ['2 四種輸出格式', '2-1 到 2-4', '指令裡同時寫格式、內容、限制；影片要在 AI agent 裡做，金鑰放環境變數'],
+        ['3 動手用', '3-1、3-2', '先第 1 級問兩次，懂了再追問，最後挑「錯了會改變結論」的地方核對'],
+      ] },
       { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="使用流程：輸入主題，選一級格式，複製提示詞，貼到 AI，最後核對">
         <g font-size="16" font-weight="900">
           <rect x="10" y="60" width="96" height="70" class="fill-surface stroke-ink" stroke-width="3"/><text x="58" y="100" text-anchor="middle">輸入主題</text>
@@ -2374,69 +2396,15 @@ defineLessons({
         </g>
         <g class="stroke-ink" stroke-width="3"><path d="M170 70 H200 M360 70 H390"/></g>
       </svg>`, caption: '不管用哪一級，都照這三步走。' },
-      { type: 'heading', id: 'quiz', text: '總複習測驗' },
-      { type: 'quiz', key: '3-2:final', items: [
-        { level: '原文', type: 'mc', q: '卡帕西的核心主張是？', options: [
-          { text: '想讓複雜概念好懂，直接改變 AI 的輸出格式', correct: true, why: '這是原文開頭說的「簡單解法」。' },
-          { text: '提示詞要寫得越長越好', why: '原文沒有這樣說。' },
-          { text: '一定要用最新的模型', why: '重點是格式，不是模型。' },
-          { text: '不要讓 AI 解釋新概念', why: '正好相反。' },
-        ] },
-        { level: '1-1', type: 'mc', q: '為什麼文字比較難懂複雜概念？', options: [
-          { text: '文字是線性的，讀者要自己在腦中拼出架構', correct: true, why: '圖、網頁、影片直接呈現全貌。' },
-          { text: '文字一定有錯字', why: '和錯字無關。' },
-          { text: '文字不能表達流程', why: '可以，但讀者要自己拼。' },
-          { text: '文字比較慢產生', why: '產生速度不是重點。' },
-        ] },
-        { level: '1-2', type: 'mc', q: '「But even better」在原文裡的作用是？', options: [
-          { text: '卡帕西用它帶出下一級更好懂、更有互動性的格式', correct: true, why: '介紹完前三級都會補上這句。' },
-          { text: '表示前一級沒有用', why: '是更好，不是沒用。' },
-          { text: '是一個提示詞範本', why: '它是貼文裡的轉折句。' },
-          { text: '是 ASD-STE100 的規則', why: '和規範無關。' },
-        ] },
-        { level: '2-1', type: 'mc', q: '用中文點名 ASD-STE100，代表什麼？', options: [
-          { text: '借用它的清晰寫作原則，輸出不代表符合規範', correct: true, why: '它是英文規範，原文特別提醒。' },
-          { text: '輸出會自動符合國際標準', why: '只是借用原則。' },
-          { text: 'AI 會改用英文回答', why: '你指定中文，它就用中文。' },
-          { text: '只有航太業可以這樣用', why: '任何人都可以借用。' },
-        ] },
-        { level: '2-1', type: 'mc', q: '原文五條規則中，每句建議不超過幾個字？', options: [
-          { text: '30 個字', correct: true, why: '「句子要短，每句盡量不超過30個字」。' },
-          { text: '10 個字', why: '10 字是畫圖時「每個標籤」的上限。' },
-          { text: '20 個字', why: '20 是 ASD-STE100 流程類英文句子的單字上限。' },
-          { text: '沒有限制', why: '有，是規則 1。' },
-        ] },
-        { level: '2-2', type: 'mc', q: '畫圖指令裡為什麼要寫「不要用長篇文字」？', options: [
-          { text: '避免 AI 只是把文字搬進方框', correct: true, why: '要的是結構，不是切段的文章。' },
-          { text: '因為圖片不能有字', why: '可以有字，只是要短。' },
-          { text: '為了省錢', why: '和費用無關。' },
-          { text: '因為 Mermaid 不支援中文', why: '和語言無關。' },
-        ] },
-        { level: '2-3', type: 'mc', q: 'AI 給你一段 HTML，聊天介面沒有預覽。怎麼看？', options: [
-          { text: '存成 .html 檔，用瀏覽器打開', correct: true, why: '原文的做法。' },
-          { text: '貼到 Mermaid 編輯器', why: '那是看 Mermaid 圖的方法。' },
-          { text: '存成 .txt 用記事本打開', why: '只會看到程式碼。' },
-          { text: '一定要架網站', why: '單一 HTML 檔不需要架站。' },
-        ] },
-        { level: '2-4', type: 'mc', q: '做解說影片為什麼要在 AI agent 工具裡進行？', options: [
-          { text: '要實際執行程式並渲染成影片檔', correct: true, why: '一般聊天介面不一定做得到。' },
-          { text: 'agent 工具的模型比較聰明', why: '差別在能不能執行程式。' },
-          { text: '因為影片太大，聊天介面放不下', why: '重點是執行與渲染。' },
-          { text: '因為只有 agent 能配音', why: '配音靠 ElevenLabs 或替代方案。' },
-        ] },
-        { level: '3-1', type: 'mc', q: '看懂簡潔版之後，原文建議的下一步是？', options: [
-          { text: '再請 AI 補上省略的細節', correct: true, why: '先抓重點再追問，比一開始就啃長文省力。' },
-          { text: '直接做影片', why: '先把內容弄清楚。' },
-          { text: '換一個 AI 重問', why: '原文建議的是追問。' },
-          { text: '停止，已經夠了', why: '簡潔版會省略細節。' },
-        ] },
-        { level: '3-1', type: 'mc', q: '哪一個最需要對照文字版核對？', options: [
-          { text: '解說影片裡出現的關鍵數字', correct: true, why: '格式越豐富，錯誤越不容易發現。' },
-          { text: '文字版裡的一句概念描述', why: '文字最容易核對。' },
-          { text: '提示詞範本本身的每一個字', why: '範本來自原文，不需要核對數字。' },
-          { text: '你自己輸入的主題', why: '那是你寫的。' },
-        ] },
+      { type: 'heading', id: 'stale', text: '會過時的內容與更新方式' },
+      { type: 'table', caption: '這本書哪些地方會隨時間改變（最後查證：2026-10-29）', head: ['內容', '目前寫的', '怎麼更新'], rows: [
+        ['ASD-STE100 版本', 'Issue 9（2025-01）', '看 ASD-STE100 官網的下載頁；Issue 10 預定 2028 年'],
+        ['Manim 版本與安裝方式', 'Community v0.22.1，建議用 uv', '看 docs.manim.community 的安裝頁與 changelog'],
+        ['配音服務與環境變數名稱', 'ElevenLabs、gTTS、Coqui；`ELEVENLABS_API_KEY`／`ELEVEN_API_KEY`', '看 ElevenLabs 與 manim-voiceover 的官方文件'],
+        ['能執行程式的 AI agent', 'Claude Code、Codex', '工具名稱與能力變化快，以各家官網為準'],
+        ['聊天介面能不能直接顯示 Mermaid 或 HTML 預覽', '依產品而定', '直接試：貼一段 Mermaid 程式碼，看會不會變成圖'],
       ] },
+      '不太會過時的是方法本身：文字是線性的、格式決定理解成本、越豐富越要核對。工具換了，這三件事照樣適用。',
       { type: 'callout', variant: 'tip', title: '原文', body: ['[《數位時代》：如何讓AI變身「科普大師」？大神卡帕西推4種輸出技巧，提示詞範例一次看](https://www.bnext.com.tw/article/92477/karpathy-llm-output-formats-asd-ste100)'] },
     ],
   },
@@ -2926,10 +2894,10 @@ Views.home = () => {
     <h2 class="section-title"><span class="label" style="--chip:var(--m2)">怎麼用</span><span class="phrase">本站的使用方式</span></h2>
     <div class="content" style="margin:0">
       <ul>
-        <li>每個單元的結構都一樣：3 件事 → 暖身回顧 → 比喻 → 心智模型 → 定義 → 範例 → 常見錯誤 → 練習 → 三個重點。</li>
+        <li>每個單元的結構都一樣：3 件事 → 比喻 → 心智模型 → 定義 → 範例與深入段落 → 常見錯誤 → 深入思考（部分單元）→ 三個重點。沒有考題。</li>
         <li>0-1 是原文導讀與重點摘要（附原文連結），之後每一課拆解原文的一段。</li>
         <li>全站用同一組顏色代表 4 種格式：<strong>黃＝規範文字、藍＝一張圖、綠＝互動網頁、粉紅＝解說影片</strong>。</li>
-        <li>練習的答案預設隱藏；選擇題送出後，每個選項都有解析。</li>
+        <li>深入思考題的參考解析預設隱藏，先自己想過再展開。</li>
         <li>鍵盤：<kbd>←</kbd> <kbd>→</kbd> 切換上一課與下一課，<kbd>/</kbd> 搜尋。頂部列可以調整字級，寬螢幕可以拖曳目錄的右緣調整寬度。</li>
         <li>進度存在這台電腦的瀏覽器裡${Store.persistent() ? '' : '（目前瀏覽器不允許儲存，關閉分頁後進度會消失）'}。</li>
       </ul>
@@ -2977,7 +2945,7 @@ const SECTION_DEFS = [
   ['define', '正式定義'],
   ['examples', '範例'],
   ['mistakes', '常見錯誤'],
-  ['practice', '練習'],
+  ['practice', '深入思考'],
   ['keypoints', '三個重點'],
 ];
 
@@ -3052,7 +3020,7 @@ Views.lesson = ({ id }) => {
     ${c ? `<div class="done-row" id="done-row">
       ${isDone
         ? `<span class="stamp">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`}
+        : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`}
     </div>` : ''}
     <nav class="lesson-nav" aria-label="上一課與下一課">
       ${prev ? `<a class="prev nb-press" href="#/l/${prev.id}" rel="prev"><span class="dir">← 上一課</span><span class="ttl">${renderPhrases(`${prev.id} ${prev.title}`)}</span></a>` : ''}
@@ -3121,7 +3089,7 @@ function onClick(e) {
   const { action: name, id } = action.dataset;
   if (name === 'done') markDone(id, true);
   if (name === 'undone') markDone(id, false);
-  if (name === 'reset' && window.confirm('確定要清除所有學習進度與測驗紀錄嗎？字級與目錄寬度不會被清除。')) {
+  if (name === 'reset' && window.confirm('確定要清除所有學習進度嗎？字級與目錄寬度不會被清除。')) {
     Store.reset();
     render();
     announce('學習進度已清除');
@@ -3134,7 +3102,7 @@ function markDone(id, isDone) {
   if (row) {
     row.innerHTML = isDone
       ? `<span class="stamp animate">已完成 ✓</span><button class="btn small nb-press" type="button" data-action="undone" data-id="${id}">改回未完成</button>`
-      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完、做完練習後按一下。</span>`;
+      : `<button class="btn big success nb-press" type="button" data-action="done" data-id="${id}">標記為已完成</button><span style="color:var(--ink-muted)">讀完後按一下。</span>`;
     const focusTarget = $('button', row);
     if (focusTarget) focusTarget.focus();
   }
@@ -4317,6 +4285,34 @@ Widgets.promptgen = {
     });
     input.addEventListener('input', fill);
     fill();
+  },
+};
+
+/* ---------- knobs：改參數，看試算結果（移植自 finance-psychology-course） ---------- */
+// props: { title, sliders: [{ id, label, min, max, step, value, unit, ends? }], compute: (v) => ({ rows: [{ label, value, ratio }], note }) }
+Widgets.knobs = {
+  render(props, id) {
+    return `<div class="jw kn">
+      <div class="jw-head"><span class="label" style="--chip:var(--m7)">拉桿</span><span class="grow">${esc(props.title || '改參數，看結果')}</span></div>
+      <div class="lv-sliders">${props.sliders.map((s) => `<div class="lv-row">
+        <label for="${id}-${s.id}">${esc(s.label)}：<output data-kn-out="${s.id}"></output>${s.unit ? ` ${esc(s.unit)}` : ''}</label>
+        <input type="range" id="${id}-${s.id}" data-kn="${s.id}" min="${s.min}" max="${s.max}" step="${s.step || 1}" value="${s.value}">
+        ${s.ends ? `<div class="lv-ends"><span>${esc(s.ends[0])}</span><span>${esc(s.ends[1])}</span></div>` : ''}
+      </div>`).join('')}</div>
+      <div class="kn-rows" aria-live="polite"></div>
+      <p class="jw-note kn-note"></p>
+    </div>`;
+  },
+  hydrate(el, props) {
+    const v = Object.fromEntries(props.sliders.map((s) => [s.id, s.value]));
+    function draw() {
+      const r = props.compute(v);
+      $('.kn-rows', el).innerHTML = r.rows.map((row) => `<div class="kn-row"><span>${esc(row.label)}</span><span class="lv-meter"><span class="lv-fill" style="transform:scaleX(${Math.max(0, Math.min(1, row.ratio))})"></span></span><strong>${esc(row.value)}</strong></div>`).join('');
+      $('.kn-note', el).innerHTML = r.note ? md(r.note) : '';
+      props.sliders.forEach((s) => { $(`[data-kn-out="${s.id}"]`, el).textContent = s.format ? s.format(v[s.id]) : v[s.id]; });
+    }
+    el.addEventListener('input', (e) => { const s = e.target.closest('[data-kn]'); if (s) { v[s.dataset.kn] = Number(s.value); draw(); } });
+    draw();
   },
 };
 /* ---------- 單元各段 ---------- */

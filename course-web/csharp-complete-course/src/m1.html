@@ -27,14 +27,6 @@ defineLessons({
       '知道 `var` 是「讓編譯器推斷」，不是「沒有型別」',
       '分辨靜態型別語言和動態型別語言的差別',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 0-3）`int n = "5";` 會在什麼時候出錯？', options: [
-        { text: '編譯時，產生 CS0029 錯誤', correct: true, why: 'string 不能隱含轉成 int，編譯器直接拒絕。' },
-        { text: '執行時拋出 FormatException', why: '這行根本不會被編譯出來，沒有機會執行。' },
-        { text: '不會出錯，n 會是 5', why: 'C# 不會自動把字串轉成數字。' },
-        { text: '執行時 n 會變成 0', why: 'C# 不會默默給預設值，直接編譯錯誤。' },
-      ] },
-    ],
     analogy: {
       text: ['變數像貼了標籤的收納盒：標籤寫「雞蛋」的盒子是雞蛋專用的形狀，放不進牛奶瓶。C# 在你把東西放進去之前（編譯時）就會檢查形狀合不合。'],
       limit: ['真的盒子可以撕掉標籤重貼；C# 變數的型別一旦宣告就不能改。另外 `var` 不是「沒貼標籤」，而是「讓店員看你第一次放什麼，就幫你貼上那個標籤」。'],
@@ -89,7 +81,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var a = 10;\nvar b = 10.0;\nvar c = 10m;\nConsole.WriteLine(a.GetType().Name);\nConsole.WriteLine(b.GetType().Name);\nConsole.WriteLine(c.GetType().Name);',
-          predict: { q: '`var b = 10.0;` 的型別名稱是？', options: ['Int32', 'Double', 'Decimal'], answer: 1 },
           output: 'Int32\nDouble\nDecimal',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="字面值決定推斷的型別：10 推斷為 int，10.0 推斷為 double，10m 推斷為 decimal，10L 推斷為 long">
@@ -103,35 +94,20 @@ defineLessons({
           <rect x="286" y="120" width="125" height="60" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/><text x="348" y="157" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">decimal</text>
           <rect x="424" y="120" width="125" height="60" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/><text x="486" y="157" text-anchor="middle" font-size="20" font-weight="900" class="on-color mono">long</text>
         </svg>`, caption: '用 var 時，字面值的寫法決定型別：有小數點是 double，加 m 是 decimal，加 L 是 long。' },
+        { type: 'heading', id: 'deep-var', text: '深入：var、object 與 dynamic 不是同一件事' },
+        { type: 'table', head: ['寫法', '型別何時決定', '打錯成員名稱時'], rows: [
+          ['`var x = 1;`', '編譯時推斷為 int，之後固定', '編譯錯誤'],
+          ['`object x = 1;`', '宣告就是 object，int 被包裝（boxing，見 4-1）', '編譯錯誤；只能用 object 的成員'],
+          ['`dynamic x = 1;`', '執行時才決定', '執行到那行才拋 RuntimeBinderException'],
+        ] },
+        '目標型別 new（C# 9）是 var 的反方向：`List<string> names = new();`，型別寫在左邊、右邊省略。兩種只能選一種，`var x = new();` 是編譯錯誤，因為兩邊都沒有型別可以推斷。',
+        'var 不適用的情況：右邊是方法呼叫、看不出型別（`var x = Load();`），或推斷結果不是你要的（想要 long，`var n = 0;` 卻得到 int）。多數團隊用 .editorconfig 的 `csharp_style_var_*` 規則統一，不靠個人習慣。',
       ],
-      tryit: {
-        q: ['填入適當的型別或字尾，讓每一行都能編譯：'],
-        draft: '____ isAdult = age >= 18;\ndecimal fee = 120.5__;\n____ initial = \'R\';',
-        answer: ['`bool isAdult`、`120.5m`、`char initial`。', '比較運算的結果是 bool；decimal 的字面值要加 m，不然 120.5 是 double，不能隱含轉成 decimal；單引號是 char。'],
-      },
     },
     mistakes: [
       { wrong: '`decimal price = 19.99;`', why: '19.99 是 double 字面值，double 轉 decimal 不能隱含轉換，CS0664。', right: '`decimal price = 19.99m;`' },
       { wrong: '`var x;` 之後再給值。', why: 'var 要從初始值推斷型別，沒有初始值就推斷不了（CS0818）。', right: '`var x = 0;`，或明確寫 `int x;`。' },
       { wrong: '把 `var` 當成 JavaScript 的 `let`，後面換成別的型別的值。', why: '推斷出來的型別是固定的。', right: '需要「可能是多種型別」的值時，要用 object、介面或聯合的設計（模組 4）。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`var price = 9.9;` 的型別是？', options: [
-        { text: 'double', correct: true, why: '有小數點、沒有字尾的字面值是 double。' },
-        { text: 'decimal', why: 'decimal 要加 m：`9.9m`。' },
-        { text: 'float', why: 'float 要加 f：`9.9f`。' },
-        { text: '沒有型別，執行時才決定', why: 'var 在編譯時就推斷出型別。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪一行可以編譯？', options: [
-        { text: '`var n; n = 5;`', why: 'var 必須在宣告時給初始值。' },
-        { text: '`var s = "a"; s = 1;`', why: 's 被推斷為 string，不能放 int。' },
-        { text: '`var d = 1.5m; d = 2;`', correct: true, why: 'int 可以隱含轉成 decimal，所以 2 放得進去。' },
-        { text: '`int i = 1.5;`', why: 'double 轉 int 會遺失小數，需要明確轉換。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['團隊有人主張「全部用 var」，有人主張「全部寫型別」。你怎麼建議？'], answer: [
-        '型別從右邊一眼就看得出來時（`new List<string>()`、`"文字"`）用 var，少寫重複的資訊。',
-        '右邊是方法呼叫、看不出型別時（`var x = Load();`）寫出型別比較好讀。多數團隊用 .editorconfig 的規則統一，不靠個人習慣。',
-      ] },
     ],
     keypoints: [
       'C# 每個變數在編譯時就有固定的型別。',
@@ -146,14 +122,6 @@ defineLessons({
       '說出 int、long、double、decimal 的差別與用途',
       '解釋整數除法與溢位',
       '金額一律用 decimal',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-1）`var total = 0;` 之後執行 `total = total + 0.5;`，結果是？', options: [
-        { text: '編譯錯誤：double 不能隱含轉成 int', correct: true, why: 'total 被推斷為 int，int + double 的結果是 double，放不回 int。' },
-        { text: 'total 自動變成 double，值是 0.5', why: 'total 的型別已經固定是 int。' },
-        { text: 'total 變成 0，小數被捨去', why: 'C# 不會自動捨去，而是要求你明確轉換。' },
-        { text: '執行時拋出例外', why: '型別問題在編譯時就會被抓到。' },
-      ] },
     ],
     analogy: {
       text: ['數字型別像不同大小的里程表：機車的里程表 5 位數，跑到 99999 再加 1 就變回 00000。int 就是一個 32 位元的里程表，到最大值再加就會繞回負數。'],
@@ -202,7 +170,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'Console.WriteLine(7 / 2);\nConsole.WriteLine(7 / 2.0);\nConsole.WriteLine(7 % 2);\nConsole.WriteLine(0.1 + 0.2 == 0.3);\nConsole.WriteLine(0.1m + 0.2m == 0.3m);',
-          predict: { q: '第一行 `7 / 2` 會印出什麼？', options: ['3.5', '3', '4'], answer: 1 },
           output: '3\n3.5\n1\nFalse\nTrue',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="除法看兩邊的型別：int 除以 int 得到 int，小數直接捨去；只要有一邊是 double，結果就是 double">
@@ -216,12 +183,15 @@ defineLessons({
           <text x="425" y="152" text-anchor="middle" font-size="20" font-weight="900">double，有小數</text>
           <g class="stroke-ink" stroke-width="4"><path d="M260 55 H300"/><path d="M260 145 H300"/></g>
         </svg>`, caption: '除法的結果型別由兩邊運算元決定，不是由你要存進去的變數決定。' },
+        { type: 'heading', id: 'deep-float', text: '深入：0.1 為什麼存不準，decimal 的代價' },
+        '0.1 在二進位是無限循環小數（0.000110011…），double 只有 52 位元的尾數，只能存最接近的近似值。兩個近似值相加，誤差剛好讓結果和 0.3 的近似值不同，所以 `==` 是 False。比較 double 要用容許誤差：`Math.Abs(a - b) < 1e-9`。',
+        { type: 'table', head: ['型別', '大小', '有效位數', '速度', '適合'], rows: [
+          ['`float`', '4 位元組', '約 6–9 位', '最快', '遊戲座標、圖形'],
+          ['`double`', '8 位元組', '約 15–17 位', '快（CPU 硬體支援）', '科學計算、統計'],
+          ['`decimal`', '16 位元組', '28–29 位', '慢很多（軟體運算）', '金額、稅率、利率'],
+        ] },
+        'decimal 也不是萬能：`1m / 3m` 一樣除不盡，會在第 28 位左右捨入；它解決的是「十進位小數能精確表示」，不是「所有除法都精確」。整數超過 long 的範圍時，.NET 7 起有 `Int128`，再大就用 `BigInteger`；整個專案都想在溢位時拋例外，可以在專案檔設 `<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>`。',
       ],
-      tryit: {
-        q: ['平均分數算錯了。改哪裡才會得到 85.5？'],
-        draft: 'int sum = 171;\nint count = 2;\ndouble avg = sum / count;   // 得到 85',
-        answer: ['把其中一邊轉成 double：`double avg = (double)sum / count;` 或 `sum / 2.0`。', '原本 `sum / count` 是 int / int，先算出 85 才放進 double，小數早就不見了。'],
-      },
     },
     mistakes: [
       { wrong: '`double avg = sum / count;` 以為會有小數。', why: '右邊先以 int 計算完才指定給 double。', right: '`(double)sum / count`。' },
@@ -229,19 +199,7 @@ defineLessons({
       { wrong: '以為 int 加超過範圍會報錯。', why: 'C# 預設 unchecked，會默默繞回負數。', right: '可能超出時用 long，或包在 `checked(...)` 裡讓它拋例外。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`int.MaxValue + 1` 在預設設定下的結果是？', options: [
-        { text: '拋出 OverflowException', why: '只有在 checked 區塊裡才會拋例外，預設不檢查。' },
-        { text: '-2147483648（int.MinValue）', correct: true, why: '預設 unchecked，二補數繞回最小值。' },
-        { text: '2147483648，自動升級成 long', why: 'C# 不會自動升級型別。' },
-        { text: '編譯錯誤', why: '常數運算會被編譯器抓到（CS0220），但寫成變數相加就會在執行時繞回；題目指的是執行時。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要存「商品單價 × 數量」的總價，最適合哪個型別？', options: [
-        { text: 'double，範圍最大', why: '範圍大但 0.1 這種金額無法精確表示。' },
-        { text: 'decimal，十進位精確', correct: true, why: '金額以十進位計算，decimal 不會有 0.1 + 0.2 的誤差。' },
-        { text: 'int，用「元」為單位就好', why: '可行但遇到小數金額或折扣就要另外處理；decimal 更直接。' },
-        { text: 'float，比 double 省記憶體', why: 'float 精度更低，誤差更大。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['遊戲角色的座標用 float 或 double 合理嗎？和金額的判斷有什麼不同？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['遊戲角色的座標用 float 或 double 合理嗎？和金額的判斷有什麼不同？'], answer: [
         '合理。座標是連續的物理量，微小誤差看不出來，速度比精確更重要；Unity 就用 float。',
         '金額是「人會逐分核對」的十進位數字，任何誤差都會被發現，所以用 decimal。判斷依據是：誤差能不能被接受、數字是不是十進位定義的。',
       ] },
@@ -259,14 +217,6 @@ defineLessons({
       '用字串插值組合文字',
       '知道 string 不可變，以及這對效能的影響',
       '用原始字串常值寫 JSON、路徑等含特殊字元的文字',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-2）`Console.WriteLine(10 / 4 * 2.0);` 會印出什麼？', options: [
-        { text: '`4`', correct: true, why: '先算 10 / 4 = 2（整數除法），再乘 2.0 得到 4（double，印出 4）。' },
-        { text: '`5`', why: '要 10 / 4 先變成 2.5 才會是 5，但 int / int 是整數除法。' },
-        { text: '`4.0`', why: 'double 的 4 預設印成 `4`，不會加 .0。' },
-        { text: '`2.5`', why: '還有後面的 * 2.0 沒算。' },
-      ] },
     ],
     analogy: {
       text: ['字串像印好的名片：想改一個字，只能整張重印，舊名片不會變。`$"…{name}…"` 就像名片模板，把名字填進空格後印出新的一張。'],
@@ -317,7 +267,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'string name = "阿明";\nint score = 92;\nConsole.WriteLine($"{name} 考了 {score} 分");\nConsole.WriteLine($"及格嗎？{score >= 60}");\nConsole.WriteLine("abc".Length);\nConsole.WriteLine("abc"[0]);',
-          predict: { q: '第二行輸出的後半段是？', options: ['及格嗎？true', '及格嗎？True', '及格嗎？1'], answer: 1 },
           output: '阿明 考了 92 分\n及格嗎？True\n3\na',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="三種字串寫法的比較：一般字串要用反斜線跳脫引號；逐字字串以 @ 開頭，反斜線照字面；原始字串用三個引號，引號與反斜線都照字面">
@@ -328,12 +277,16 @@ defineLessons({
           <rect x="10" y="141" width="540" height="50" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
           <text x="25" y="173" font-size="17" class="on-color mono">"""{"id": 1}"""　原始：" 也照字面</text>
         </svg>`, caption: '有反斜線用 `@""`；有雙引號（JSON、HTML）用 `"""`。' },
+        { type: 'heading', id: 'deep-compare', text: '深入：字串比較的兩個維度' },
+        '比較字串要決定兩件事：分不分大小寫、要不要套用文化規則。給程式判斷的（檔名、網址、設定鍵、權限名稱）用 `StringComparison.Ordinal` 或 `OrdinalIgnoreCase`；給人排序顯示的才用目前文化。經典的坑是土耳其語：在 tr-TR 文化下 `"i".ToUpper()` 是帶點的「İ」，讓 `name.ToUpper() == "ID"` 這種判斷失效。',
+        { type: 'table', head: ['情境', '建議寫法', '為什麼'], rows: [
+          ['少量組合文字', '`$"…{x}…"`', 'C# 10 起插值會直接寫進緩衝區，通常比 string.Format 快'],
+          ['迴圈裡累加上千次', '`StringBuilder`', '避免每次都複製整個字串'],
+          ['把集合用分隔符串起來', '`string.Join(", ", items)`', '一次算好長度、只配置一次'],
+          ['比較檔名或鍵', '`string.Equals(a, b, StringComparison.OrdinalIgnoreCase)`', '不受文化影響，也不會產生 ToLower 的暫時字串'],
+        ] },
+        'string 的 `Length` 算的是 UTF-16 的單位，不是「看到的字數」：表情符號 😀 的 Length 是 2。要算使用者看到的字元數，用 `StringInfo.LengthInTextElements`。',
       ],
-      tryit: {
-        q: ['把下面的串接改寫成字串插值，並讓價格顯示千分位、不要小數：'],
-        draft: 'decimal price = 12800m;\nstring msg = "價格：" + price + " 元";\n// 改成：string msg = $"____";',
-        answer: ['`string msg = $"價格：{price:N0} 元";` → `價格：12,800 元`。', 'N0 表示數字格式、0 位小數，千分位符號依目前的文化設定（zh-TW、en-US 都是逗號）。'],
-      },
     },
     mistakes: [
       { wrong: '`name.Trim();` 以為空白已經去掉了。', why: 'string 不可變，Trim 回傳新字串。', right: '`name = name.Trim();`' },
@@ -341,19 +294,7 @@ defineLessons({
       { wrong: '`"C:\new\file.txt"`', why: '`\n` 被解讀成換行、`\f` 是換頁字元，路徑就壞了。', right: '`@"C:\new\file.txt"`，或用 `Path.Combine`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`string s = "hi"; s.ToUpper(); Console.WriteLine(s);` 印出？', options: [
-        { text: '`HI`', why: 'ToUpper 的結果沒有被存回 s。' },
-        { text: '`hi`', correct: true, why: 'string 不可變，s 仍指向原本的 "hi"。' },
-        { text: '編譯錯誤：沒有使用回傳值', why: '不使用回傳值是合法的，最多只有分析器警告。' },
-        { text: '`Hi`', why: 'ToUpper 是全部大寫，而且這裡結果根本沒被使用。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要在程式裡寫一段含雙引號的 JSON，哪個寫法最不容易出錯？', options: [
-        { text: '`"{\\"id\\": 1}"`', why: '可以，但每個引號都要跳脫，JSON 一長就很難讀。' },
-        { text: '`@"{"id": 1}"`', why: '逐字字串裡的引號要寫成兩個 `""`，這樣寫會編譯錯誤。' },
-        { text: '`"""{"id": 1}"""`', correct: true, why: '原始字串常值裡引號照字面，不用跳脫。' },
-        { text: "`'{\"id\": 1}'`", why: 'C# 的單引號只能放一個字元（char）。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['`$"{price:N0}"` 在台灣的電腦印出 12,800，在德國的電腦可能印出 12.800。為什麼？寫要存進檔案或傳給 API 的數字時該怎麼辦？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['`$"{price:N0}"` 在台灣的電腦印出 12,800，在德國的電腦可能印出 12.800。為什麼？寫要存進檔案或傳給 API 的數字時該怎麼辦？'], answer: [
         '格式化預設使用目前執行緒的文化設定（CultureInfo.CurrentCulture），德文用句點當千分位。',
         '給機器讀的資料要固定格式：`price.ToString(CultureInfo.InvariantCulture)`，或在插值時用 `string.Create(CultureInfo.InvariantCulture, $"…")`。給人看的才用目前文化。',
       ] },
@@ -371,14 +312,6 @@ defineLessons({
       '分辨隱含轉換與明確轉換',
       '用 TryParse 安全地把使用者輸入轉成數字',
       '知道 `(int)` 轉型是捨去而不是四捨五入',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-3）`string s = " a "; s.Trim();` 執行後 s 的內容是？', options: [
-        { text: '`" a "`，沒有改變', correct: true, why: 'Trim 回傳新字串，沒有存回 s。' },
-        { text: '`"a"`', why: '要寫 `s = s.Trim();` 才會變。' },
-        { text: '`" a"`，只去掉右邊的空白', why: 'Trim 會去兩邊，但這裡根本沒存回去。' },
-        { text: '`null`', why: '沒有任何操作會讓 s 變成 null。' },
-      ] },
     ],
     analogy: {
       text: ['換鈔：把一張千元換成十張百元（int → long）不會少錢，櫃員直接換。把 1,234 元換成只收百元鈔的信封（double → int），零頭會掉，櫃員要你簽名確認「我知道會少」，那個簽名就是 `(int)`。'],
@@ -421,20 +354,16 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'Console.WriteLine((int)3.9);\nConsole.WriteLine((int)-3.9);\nConsole.WriteLine(Math.Round(2.5));\nConsole.WriteLine(Math.Round(3.5));\nConsole.WriteLine(int.TryParse("12a", out int n));\nConsole.WriteLine(n);',
-          predict: { q: '`Math.Round(2.5)` 會印出什麼？', options: ['3', '2', '2.5'], answer: 1 },
           output: '3\n-3\n2\n4\nFalse\n0',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'imp', label: '隱含（自動）' }, { id: 'exp', label: '要寫 (型別)' }, { id: 'parse', label: '要用 Parse' }],
-          items: [
-            { text: '`int` → `long`', answer: 'imp', why: 'long 範圍比 int 大，不會遺失。' },
-            { text: '`double` → `int`', answer: 'exp', why: '小數會不見，要明確轉換。' },
-            { text: '`"42"` → `int`', answer: 'parse', why: '字串和數字之間沒有轉型，要解析。' },
-            { text: '`int` → `decimal`', answer: 'imp', why: '所有 int 都能精確放進 decimal。' },
-            { text: '`double` → `decimal`', answer: 'exp', why: '兩者表示方式不同，可能遺失或超出範圍，要明確轉換。' },
-            { text: '`long` → `int`', answer: 'exp', why: 'long 的值可能超過 int 範圍。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`int` → `long`', '隱含（自動）', 'long 範圍比 int 大，不會遺失。'],
+          ['`double` → `int`', '要寫 (型別)', '小數會不見，要明確轉換。'],
+          ['`"42"` → `int`', '要用 Parse', '字串和數字之間沒有轉型，要解析。'],
+          ['`int` → `decimal`', '隱含（自動）', '所有 int 都能精確放進 decimal。'],
+          ['`double` → `decimal`', '要寫 (型別)', '兩者表示方式不同，可能遺失或超出範圍，要明確轉換。'],
+          ['`long` → `int`', '要寫 (型別)', 'long 的值可能超過 int 範圍。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="Math.Round 預設使用銀行家捨入：0.5 時取最接近的偶數，所以 2.5 變 2、3.5 變 4；要一般的四捨五入需傳入 MidpointRounding.AwayFromZero">
           <rect x="10" y="20" width="160" height="60" class="fill-surface stroke-ink" stroke-width="4"/><text x="90" y="58" text-anchor="middle" font-size="20" class="mono">2.5 → 2</text>
           <rect x="200" y="20" width="160" height="60" class="fill-surface stroke-ink" stroke-width="4"/><text x="280" y="58" text-anchor="middle" font-size="20" class="mono">3.5 → 4</text>
@@ -443,12 +372,15 @@ defineLessons({
           <text x="280" y="130" text-anchor="middle" font-size="16" class="mono">Math.Round(2.5, MidpointRounding.AwayFromZero)</text>
           <text x="280" y="158" text-anchor="middle" font-size="16">→ 3（一般的四捨五入）</text>
         </svg>`, caption: 'Math.Round 預設是銀行家捨入（往偶數靠），開發票、算成績前先確認規則。' },
+        { type: 'heading', id: 'deep-convert', text: '深入：轉型、Convert 與 Parse 的細節' },
+        '`(int)` 把浮點數轉成整數是往 0 捨去，但 `Convert.ToInt32(3.5)` 會用銀行家捨入得到 4，兩者結果不同。超出範圍時，`(int)1e10` 在預設的 unchecked 下沒有意義（.NET 9 起在 x86／x64 上統一成飽和到 int.MaxValue）；包在 `checked(...)` 裡才會拋 OverflowException。',
+        { type: 'table', head: ['方法', '輸入 null', '輸入 "abc"', '用在'], rows: [
+          ['`int.Parse(s)`', 'ArgumentNullException', 'FormatException', '確定格式一定正確的資料'],
+          ['`int.TryParse(s, out n)`', '回傳 false', '回傳 false', '使用者輸入、外部檔案'],
+          ['`Convert.ToInt32(s)`', '回傳 0', 'FormatException', '舊程式常見；null 變 0 容易掩蓋問題'],
+        ] },
+        '解析也受文化影響：`double.Parse("3.14")` 在用逗號當小數點、句點當千分位的文化（例如 de-DE）會得到 314。讀檔案或 API 的數字一律傳 `CultureInfo.InvariantCulture`，只有解析使用者在畫面上輸入的值才用目前文化。',
       ],
-      tryit: {
-        q: ['讓程式在輸入不是數字時印出「格式錯誤」，填空：'],
-        draft: 'string text = "3.5";\nif (double.____(text, out ____ value))\n    Console.WriteLine(value * 2);\nelse\n    Console.WriteLine("格式錯誤");',
-        answer: ['`double.TryParse(text, out double value)`（也可以寫 `out var value`）。', '注意：解析小數也受文化設定影響，給機器讀的資料可以傳 `CultureInfo.InvariantCulture`。'],
-      },
     },
     mistakes: [
       { wrong: '`int n = (int)"42";`', why: 'string 和 int 之間沒有轉型關係，CS0030。', right: '`int.Parse("42")` 或 `int.TryParse`。' },
@@ -456,19 +388,7 @@ defineLessons({
       { wrong: '用 try/catch 包住 int.Parse 來判斷輸入是否為數字。', why: '例外成本高、程式也難讀；這是預期中的錯誤，不是例外狀況。', right: '用 TryParse。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`(int)-7.8` 的結果是？', options: [
-        { text: '`-8`', why: '那是往負無限大取整（Math.Floor）；轉型是往 0 捨去。' },
-        { text: '`-7`', correct: true, why: '轉型直接截掉小數，往 0 的方向。' },
-        { text: '`-7.8`', why: 'int 不能有小數。' },
-        { text: '編譯錯誤', why: 'double 轉 int 寫了 (int) 就合法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`int.TryParse("abc", out int n)` 執行後，n 是多少？', options: [
-        { text: '保持原本的值', why: 'out 參數一定會被方法指定，失敗時設成 0。' },
-        { text: '`0`', correct: true, why: '失敗時回傳 false，並把 n 設成 0。' },
-        { text: '`-1`', why: '.NET 沒有用 -1 表示失敗的慣例，靠回傳的 bool 判斷。' },
-        { text: '拋出 FormatException', why: 'TryParse 就是為了不拋例外而設計的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['讀 CSV 檔時，某一欄有時是空字串、有時是「N/A」、有時是數字。你會怎麼寫才不會讓整個匯入因為一行壞資料而中止？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['讀 CSV 檔時，某一欄有時是空字串、有時是「N/A」、有時是數字。你會怎麼寫才不會讓整個匯入因為一行壞資料而中止？'], answer: [
         '每一欄用 `TryParse`，失敗時記錄行號與原始內容（寫進錯誤清單或日誌），然後跳過或給預設值，繼續下一行。',
         '最後回報「成功 N 筆、失敗 M 筆」，讓使用者知道哪幾行要修。不要用 Parse 搭配一個大 try/catch，那樣一出錯就整批停止。',
       ] },
@@ -486,14 +406,6 @@ defineLessons({
       '用 if／else 與 switch 運算式做判斷',
       '選對 for、foreach、while 三種迴圈',
       '用關係模式寫出清楚的範圍判斷',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-4）`int.TryParse("", out var n)` 回傳？', options: [
-        { text: '`false`，n 是 0', correct: true, why: '空字串不是數字，TryParse 失敗。' },
-        { text: '`true`，n 是 0', why: '空字串不會被當成 0。' },
-        { text: '拋出 ArgumentException', why: 'TryParse 不拋例外。' },
-        { text: '編譯錯誤：out var 不能這樣用', why: '`out var n` 是合法的寫法，型別推斷為 int。' },
-      ] },
     ],
     analogy: {
       text: ['流程控制像捷運的路線圖：`if` 是轉乘站，看條件換線；`switch` 是售票機的按鈕，按哪個就出哪張票；迴圈是環狀線，條件成立就一直繞。'],
@@ -544,7 +456,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'for (int i = 0; i < 3; i++)\n{\n    Console.Write(i);\n}\nConsole.WriteLine();\n\nint n = 10;\nwhile (n > 1)\n{\n    n /= 2;\n    Console.Write($"{n} ");\n}',
-          predict: { q: 'while 迴圈會印出哪些數字？', options: ['5 2 1', '5 2', '10 5 2 1'], answer: 0 },
           output: '012\n5 2 1 ',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="for 迴圈的三個部分：初始化 int i = 0 只執行一次；條件 i 小於 3 每圈開始前檢查；更新 i++ 每圈結束後執行">
@@ -561,35 +472,21 @@ defineLessons({
           <text x="385" y="145" text-anchor="middle" font-size="16" font-weight="900" class="on-color">更新</text>
           <text x="385" y="170" text-anchor="middle" font-size="14" class="on-color">每圈後</text>
         </svg>`, caption: 'for 的三段各有執行時機；條件第一次就不成立時，迴圈一次都不跑。' },
+        { type: 'heading', id: 'deep-flow', text: '深入：窮舉檢查、do-while 與跳出迴圈' },
+        'switch 運算式的編譯器會檢查是否涵蓋所有輸入：對 bool 少寫一個值會給 CS8509 警告。對 enum 就算列滿所有成員，編譯器仍會給 CS8524，因為 enum 可以裝沒有名字的整數（4-4），所以還是要 `_`。',
+        { type: 'table', head: ['迴圈', '條件何時檢查', '最少執行幾次', '典型用途'], rows: [
+          ['`for`', '每圈開始前', '0', '固定次數、需要索引'],
+          ['`foreach`', '每次取下一個元素', '0', '走過集合'],
+          ['`while`', '每圈開始前', '0', '看條件，例如讀到檔案結尾'],
+          ['`do … while`', '每圈結束後', '1', '至少要做一次，例如先問使用者再檢查答案'],
+        ] },
+        '`break` 跳出整個迴圈、`continue` 跳到下一圈。巢狀迴圈想一次跳出兩層，目前只能用旗標變數、把內層抽成方法再 return，或 goto；C# 15 預計加入有標籤的 break 與 continue。foreach 不要求型別實作 IEnumerable，只要有 `GetEnumerator()` 方法就能用，編譯器看的是形狀。',
       ],
-      tryit: {
-        q: ['用 switch 運算式把溫度分類：低於 15 是「冷」，15 到 27 是「舒適」，28 以上是「熱」。'],
-        draft: 'int t = 30;\nstring feel = t switch\n{\n    ____ => "冷",\n    ____ => "舒適",\n    _ => "熱",\n};',
-        answer: ['`< 15 => "冷"`、`<= 27 => "舒適"`（或 `>= 15 and <= 27`）。', '由上往下比對：走到第二行時已經確定 t ≥ 15，所以只要寫 `<= 27`。'],
-      },
     },
     mistakes: [
       { wrong: '`if (x = 5)`', why: '`=` 是指定；C# 的 if 只收 bool，所以這是編譯錯誤 CS0029（這點比 C 安全）。', right: '`if (x == 5)`。' },
       { wrong: 'switch 運算式沒有 `_` 分支。', why: '沒涵蓋到的值會在執行時拋 SwitchExpressionException，編譯器也會給 CS8509 警告。', right: '最後加 `_ => …`，或確定已涵蓋所有情況。' },
       { wrong: '在 foreach 裡對同一個 List 做 Add 或 Remove。', why: '集合在列舉時被修改，拋 InvalidOperationException。', right: '用 for 倒著跑，或先收集要刪的項目，迴圈結束後再刪（也可用 `RemoveAll`）。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '要依序處理一個 `List<string>` 裡的每個名字，最適合哪種迴圈？', options: [
-        { text: '`foreach`', correct: true, why: '走過集合的每個元素，不用管索引。' },
-        { text: '`while (true)`', why: '要自己管索引和結束條件，容易寫錯。' },
-        { text: '`do … while`', why: '至少會跑一次，空清單時會出錯。' },
-        { text: '`for` 一定比較快，所以用 for', why: 'List 的 foreach 效能和 for 差不多，可讀性更好。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`int x = 0; string r = x switch { > 0 => "正", < 0 => "負" };` 執行時會怎樣？', options: [
-        { text: 'r 是空字串，switch 沒符合時給預設值', why: 'switch 運算式不會默默給預設值。' },
-        { text: 'r 是 null，表示沒有任何分支符合', why: '沒有符合的模式時不是 null。' },
-        { text: '拋出 SwitchExpressionException', correct: true, why: '0 不符合任何模式，執行時拋例外；編譯時也會有 CS8509 警告。' },
-        { text: '編譯錯誤，不能執行', why: '沒有涵蓋全部情況只是警告，不是錯誤。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['要寫一個猜數字遊戲：一直讓玩家猜，猜中才結束。該用哪種迴圈？為什麼不用 for？'], answer: [
-        '用 while（或 do-while，因為至少要猜一次）：不知道玩家要猜幾次，結束條件是「猜中」。',
-        'for 適合事先知道次數的情況；硬用 for 會變成 `for (;;)` 加 break，意圖不清楚。',
-      ] },
     ],
     keypoints: [
       '多個分支比對同一個值時，用 switch 運算式加 `_`。',

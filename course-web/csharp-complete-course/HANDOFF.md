@@ -22,9 +22,12 @@
 - [ ] 10 種寬度、深色模式、Safari 檢查
 
 ## 互動元件（src/f-widgets.js）
-- `csrun`：C# 程式 + 預測 + 事先寫好的輸出（`!` 開頭的行顯示成錯誤）
+- `csrun`：C# 程式 + 事先寫好的輸出（`!` 開頭的行顯示成錯誤）；2026-10-29 起不再用 `predict`
 - `intrange`：整數型別範圍與溢位拉桿
-- `classify`：分類練習
+- `classify`：分類練習（2026-10-29 起不再使用，已改成表格）
+
+## 下次重新查證
+- 2027-01：.NET 11 正式版後，更新 0-1 版本表、4-4 的 union／closed、9-4 一頁地圖的「會過時的內容」
 
 ## 驗證
 audit 需要 Playwright：本機沒有全域安裝，用暫存資料夾 `npm i playwright`，設 `PW_ROOT=<暫存>/node_modules` 與 `CHROMIUM_PATH=~/Library/Caches/ms-playwright/chromium-1243/.../Google Chrome for Testing`。

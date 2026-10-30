@@ -13,26 +13,16 @@ defineTerms({
   '私有欄位': { en: 'private field', def: 'class 裡用 `#` 開頭的欄位，class 外面讀不到也改不到。', example: '`#points = 0`' },
 });
 
+defineTerms({
+  '原型污染': { en: 'prototype pollution', def: '攻擊者讓程式把屬性寫到 `Object.prototype` 上，使所有物件都「多出」那個屬性。', example: '不安全的深層合併處理 `{"__proto__": {"isAdmin": true}}`。' },
+});
+
 defineLessons({
   '5-1': {
     goals: [
       '寫出函式宣告、函式運算式、箭頭函式三種寫法',
       '用預設參數與剩餘參數處理「沒傳」與「傳很多」',
       '說出回呼函式是「誰」在呼叫',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-3）`[1, 2, 3].map((n) => n * 10)` 裡，是誰呼叫了 `(n) => n * 10`？', options: [
-        { text: 'map 方法，對每個元素各呼叫一次', correct: true, why: '你把函式交給 map，由 map 決定何時、用什麼引數呼叫。' },
-        { text: '你自己，在寫下它的那一刻', why: '寫下箭頭函式只是建立它，沒有呼叫。' },
-        { text: '瀏覽器的事件迴圈，等同步程式跑完才呼叫', why: 'map 是同步的，當下就呼叫完了。' },
-        { text: '只會呼叫一次，引數是整個陣列', why: '每個元素各呼叫一次。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-2）在 `const early = () => 1;` 這行之前呼叫 `early()` 會？', options: [
-        { text: '拋出 ReferenceError（暫時性死區）', correct: true, why: 'const 有提升，但在宣告那行之前不能存取。' },
-        { text: '回傳 1，因為箭頭函式和函式宣告一樣會整個提升到最上面', why: '那是函式宣告 `function early() {}` 的行為。' },
-        { text: '回傳 undefined', why: 'var 才會先是 undefined；而且 undefined 不能被呼叫。' },
-        { text: '拋出 SyntaxError', why: '語法沒有錯，是執行期才發生的錯。' },
-      ] },
     ],
     analogy: {
       text: ['函式像一張食譜卡。你可以把卡片抄給別人、夾進另一本食譜（「做完主菜後照這張做醬汁」），也可以收在抽屜等以後用。卡片本身不是菜；真正「煮」是在有人照著做的那一刻（呼叫）。'],
@@ -83,7 +73,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "function greet(name = '球員', ...tags) {\n  return `${name}:${tags.length}`;\n}\nconsole.log(greet(), greet('阿明', 'a', 'b'));\nconsole.log(greet(undefined), greet(null));\nconst mk1 = () => { ok: 1 };\nconst mk2 = () => ({ ok: 1 });\nconsole.log(mk1(), mk2());",
-          predict: { q: '`greet(null)` 的結果是？', options: ["'球員:0'", "'null:0'", '拋出 TypeError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="回呼的呼叫關係：你的程式把函式 fn 交給 map；map 對每個元素各呼叫一次 fn，收集回傳值成為新陣列">
           <rect x="10" y="10" width="160" height="200" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -101,12 +90,15 @@ defineLessons({
           <text x="470" y="140" text-anchor="middle" font-size="15" class="on-color">回傳值</text>
           <g class="stroke-ink" stroke-width="4"><path d="M170 110 H200 M360 110 H390"/></g>
         </svg>`, caption: 'map 呼叫回呼時會傳三個引數：元素、索引、整個陣列。' },
+        { type: 'heading', id: 'deep-params', text: '深入：預設參數何時求值、函式也是物件' },
+        '預設參數**每次呼叫都重新求值**：`function add(item, list = [])` 每次沒傳 list 都會拿到一個新的空陣列。這和 Python 的預設參數只建立一次剛好相反，從 Python 轉過來的人常以為要特別處理。預設值也可以用到前面的參數：`function range(start, end = start + 10)`。',
+        '`.map(parseInt)` 的結果是 `[1, NaN, NaN]`：map 呼叫 `parseInt("2", 1)`、`parseInt("3", 2)`，第二個參數被當成進位制。1 進位不存在，2 進位裡沒有 3，所以是 NaN。這就是「把現成函式直接交出去」的風險：你控制不了對方傳幾個引數。',
+        { type: 'table', head: ['函式身上的東西', '意思'], rows: [
+          ['`fn.name`', '函式名稱；箭頭函式存進變數時會自動取變數名'],
+          ['`fn.length`', '第一個預設參數或剩餘參數之前的參數個數'],
+          ['`arguments`', '舊式的引數清單，只有一般函式有，箭頭函式沒有；新程式用剩餘參數'],
+        ] },
       ],
-      tryit: {
-        q: ["`['1', '2', '3'].map(parseInt)` 會得到什麼？先預測，再想為什麼。提示：看上圖 map 傳了幾個引數，再查 `parseInt(字串, 基數)`。"],
-        draft: "['1', '2', '3'].map(parseInt); // ____",
-        answer: ['`[1, NaN, NaN]`（Node.js 22.13 實測）。', "map 把索引當第二個引數傳進去：`parseInt('2', 1)` 基數 1 不合法、`parseInt('3', 2)` 二進位沒有 3，都是 NaN。修正：`.map((s) => parseInt(s, 10))` 或 `.map(Number)`。"],
-      },
     },
     mistakes: [
       { wrong: '箭頭函式要回傳物件，寫 `() => { ok: 1 }`。', why: '大括號被當成函式本體，結果是 undefined。', right: '`() => ({ ok: 1 })`。' },
@@ -114,19 +106,7 @@ defineLessons({
       { wrong: '把現成函式直接交給 map：`.map(parseInt)`。', why: 'map 會多傳索引與陣列，函式可能拿它們當別的參數用。', right: '包一層箭頭函式，只傳你要的引數。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`function sum(...nums) { return nums.length; }`，`sum(1, 2, 3)` 是？', options: [
-        { text: '`3`', correct: true, why: 'nums 是 `[1, 2, 3]`。' },
-        { text: '`1`', why: '剩餘參數會收集全部剩下的引數。' },
-        { text: '`6`', why: '函式回傳的是長度，不是總和。' },
-        { text: '`undefined`', why: 'nums 一定是陣列，有 length。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下面哪一個能在宣告之前呼叫？', options: [
-        { text: '`function load() {}`', correct: true, why: '函式宣告整個提升。' },
-        { text: '`const load = function () {};`', why: 'const 在宣告前處於暫時性死區。' },
-        { text: '`const load = () => {};`', why: '同上，是存在 const 裡的值。' },
-        { text: '`let load = () => {};`', why: 'let 一樣有暫時性死區。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你寫了 `button.addEventListener(\'click\', save())`，結果頁面一載入就存檔了一次，之後點按鈕都沒反應。用「函式是值」解釋原因並修正。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你寫了 `button.addEventListener(\'click\', save())`，結果頁面一載入就存檔了一次，之後點按鈕都沒反應。用「函式是值」解釋原因並修正。'], answer: [
         '`save()` 有括號，是「立刻呼叫 save，把回傳值交出去」。載入時就存檔一次，交給 addEventListener 的是 save 的回傳值（大概是 undefined），所以點擊沒反應。',
         '修正：交出函式本身 `addEventListener(\'click\', save)`；需要傳引數時包一層 `() => save(id)`。',
       ] },
@@ -144,20 +124,6 @@ defineLessons({
       '解釋閉包「記住的是變數本身」',
       '用閉包做出外面改不到的私有狀態',
       '說出 var 迴圈印出 3 3 3 的原因與修法',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: "（回顧 5-1）`button.addEventListener('click', save())` 錯在哪？", options: [
-        { text: '`save()` 立刻呼叫了，交出去的是回傳值', correct: true, why: '應該交出函式本身 `save`。' },
-        { text: "'click' 要寫成 'onclick'", why: 'addEventListener 用的是不含 on 的事件名稱。' },
-        { text: 'save 必須是箭頭函式', why: '一般函式也可以當回呼。' },
-        { text: '沒有錯，addEventListener 會自己判斷要不要呼叫', why: '載入時就會存檔一次，點擊反而沒反應。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-3）`let` 宣告的變數，作用範圍是？', options: [
-        { text: '它所在的那一對大括號（區塊）', correct: true, why: 'let 和 const 是區塊作用域。' },
-        { text: '整個函式', why: '那是 var。' },
-        { text: '整個檔案', why: '只有寫在最外層時才是。' },
-        { text: '整個檔案，和寫在最外層的 var 一樣', why: '整個區塊都看得到。' },
-      ] },
     ],
     analogy: {
       text: ['小孩去夏令營時帶著一個背包，裡面是家裡給的東西。不管人走到哪，他都能從背包拿東西、也能把東西放回去。函式離開它被建立的地方去別處執行時，也帶著一個「背包」：建立時看得到的那些變數。'],
@@ -202,13 +168,11 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "function makeCounter() {\n  let count = 0;\n  return () => ++count;\n}\nconst c1 = makeCounter();\nconst c2 = makeCounter();\nc1();\nc1();\nconsole.log(c1(), c2());",
-          predict: { q: '印出的兩個數字是？', options: ['3 4', '3 1', '1 1'], answer: 1 },
         } },
         { type: 'widget', name: 'runner', props: {
           title: '迴圈與計時器',
           wait: 100,
           code: "for (var i = 0; i < 3; i++) {\n  setTimeout(() => console.log('var', i));\n}\nfor (let j = 0; j < 3; j++) {\n  setTimeout(() => console.log('let', j));\n}",
-          predict: { q: "var 那三行印出的數字是？", options: ['0 1 2', '3 3 3', '2 2 2'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="共用與各自一份：var 時三個回呼都連到同一個 i，值是 3；let 時每個回呼連到自己那一輪的 i，分別是 0、1、2">
           <rect x="10" y="10" width="265" height="200" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
@@ -220,12 +184,15 @@ defineLessons({
           <text x="417" y="100" text-anchor="middle" font-size="16" class="on-color">每個回呼 → 自己的 i</text>
           <text x="417" y="150" text-anchor="middle" font-size="16" class="mono on-color">0　1　2</text>
         </svg>`, caption: '計時器的回呼在迴圈跑完之後才執行（模組 6）；它們讀到的是那時候變數裡的值。' },
+        { type: 'heading', id: 'deep-closure-memory', text: '深入：閉包與記憶體、私有狀態的兩種做法' },
+        '閉包會讓它記住的變數一直活著。一個掛在 window 上、永遠不移除的事件監聽，如果記住了一個很大的陣列，那個陣列就永遠不會被回收。元件或頁面區塊被移除時，記得一併移除監聽；`addEventListener(type, fn, { signal })` 搭配 AbortController，一次 `abort()` 就能移除一整組監聽（8-2、6-4）。',
+        { type: 'table', head: ['做法', '寫法', '適合'], rows: [
+          ['閉包', '`function makeCounter() { let count = 0; return { inc: () => ++count }; }`', '小工具、一兩個函式；不用 class'],
+          ['class 的 `#` 私有欄位', '`class Counter { #count = 0; inc() { return ++this.#count; } }`', '要建很多實例、有繼承、需要 instanceof（5-4）'],
+          ['模組最外層變數', '模組裡 `let count = 0`，只 export 操作函式', '整個應用程式只需要一份的狀態'],
+        ] },
+        '三種做法外面都改不到內部狀態。差別在記憶體：閉包每建一個實例就有一份新的函式，class 的方法放在原型上共用一份；只建少量實例時這個差別可以忽略。',
       ],
-      tryit: {
-        q: ['補完 `once(fn)`：回傳一個新函式，第一次呼叫時執行 fn 並記住結果，之後再呼叫都直接回傳那個結果。'],
-        draft: 'function once(fn) {\n  let isDone = false;\n  let result;\n  return (...args) => {\n    if (!isDone) {\n      result = ____;\n      isDone = true;\n    }\n    return result;\n  };\n}',
-        answer: ['`fn(...args)`。', 'isDone 與 result 是閉包裡的私有狀態：回傳的函式每次被呼叫都讀寫同一份，外面改不到。這就是「只初始化一次」的常見寫法。'],
-      },
     },
     mistakes: [
       { wrong: '以為閉包會把變數的「當下的值」拍照存起來。', why: '閉包連到的是變數本身，之後變數改了，閉包讀到的也是新的。', right: '要固定某一刻的值，就讓那一刻有一個新的變數（例如 let 迴圈、或用參數傳進去）。' },
@@ -233,19 +200,7 @@ defineLessons({
       { wrong: '把要保護的狀態放在全域變數，再寫函式去改它。', why: '任何程式都能直接改全域變數，出錯時很難找是誰改的。', right: '包進函式（或模組）裡，只交出操作它的函式。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`const c = makeCounter(); c(); c();` 之後，能不能從外面讀到 count？', options: [
-        { text: '不能，count 只在閉包裡', correct: true, why: '只有回傳的函式碰得到它。' },
-        { text: '可以，用 `c.count`', why: 'count 不是函式的屬性，是閉包裡的變數。' },
-        { text: '可以，它變成全域變數', why: 'let 宣告在函式裡，不會跑到全域。' },
-        { text: '可以，用 `makeCounter.count`', why: 'count 每次呼叫都是新的，也不是 makeCounter 的屬性。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`let x = 1; const show = () => x; x = 2;` 之後 `show()` 是？', options: [
-        { text: '`2`', correct: true, why: '閉包讀的是變數 x 本身，現在是 2。' },
-        { text: '`1`', why: '閉包不會在建立時把值拍照存起來。' },
-        { text: '`undefined`', why: 'x 一直存在。' },
-        { text: '拋出 ReferenceError', why: 'x 已經宣告，show 讀得到。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['搜尋框：每打一個字就打 API 太浪費，你想要「停止打字 300 毫秒後才查」（debounce）。說出你會用閉包記住什麼，並寫出大概的結構。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['搜尋框：每打一個字就打 API 太浪費，你想要「停止打字 300 毫秒後才查」（debounce）。說出你會用閉包記住什麼，並寫出大概的結構。'], answer: [
         '用閉包記住「上一次排的計時器 id」，每次輸入就取消上一個、再排一個新的。',
         '`function debounce(fn, ms) { let timerId; return (...args) => { clearTimeout(timerId); timerId = setTimeout(() => fn(...args), ms); }; }`；timerId 是每個 debounce 出來的函式各自的私有狀態。',
       ] },
@@ -263,20 +218,6 @@ defineLessons({
       '用判定順序找出任何一次呼叫的 this',
       '解釋方法「拿出來」單獨呼叫為什麼 this 會不見',
       '選擇用箭頭函式或 bind 修正',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-2）閉包記住的是？', options: [
-        { text: '變數本身，之後改了也看得到', correct: true, why: '閉包連到變數，不是拍照存值。' },
-        { text: '建立當下的值，像拍照一樣存起來', why: '這是最常見的誤解。' },
-        { text: '只有全域變數', why: '任何外層的變數都會被記住。' },
-        { text: '函式的原始碼', why: '原始碼本來就在，閉包多的是變數環境。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 0-2）ES 模組（`.mjs`）裡的程式，預設是什麼模式？', options: [
-        { text: '嚴格模式', correct: true, why: 'ES 模組自動是嚴格模式（class 本體也是）。' },
-        { text: '寬鬆模式', why: '只有傳統 script 預設是寬鬆模式。' },
-        { text: '看瀏覽器決定', why: '這是語言規格，所有環境一樣。' },
-        { text: '沒有模式之分', why: '嚴格模式會改變 this 等行為。' },
-      ] },
     ],
     analogy: {
       text: ['「我」這個字指的是誰？要看是誰在說話。同一句「我要請假」寫在紙條上，阿明唸就是阿明請假，小華唸就是小華請假。一般函式裡的 [[this]] 就是「我」：不看寫在哪裡，看是誰呼叫。'],
@@ -328,7 +269,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const team = {\n  name: '雷霆',\n  describe() { return this?.name; },\n};\nconsole.log(team.describe());\nconst f = team.describe;\nconsole.log(f());\nconsole.log(f.call({ name: '閃電' }), f.bind({ name: '颶風' })());",
-          predict: { q: '`f()` 印出什麼？', options: ["'雷霆'", 'undefined', '拋出 ReferenceError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="方法脫鉤：team.describe() 呼叫時點的左邊是 team；把 team.describe 存進 f 之後，f() 呼叫時點的左邊沒有東西">
           <rect x="10" y="10" width="265" height="200" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
@@ -340,12 +280,17 @@ defineLessons({
           <text x="417" y="130" text-anchor="middle" font-size="16" class="on-color">點的左邊：沒有</text>
           <text x="417" y="170" text-anchor="middle" font-size="16" class="on-color">this = undefined</text>
         </svg>`, caption: 'f 和 team.describe 是同一個函式（4-1 的參考）；差別只在呼叫的寫法。' },
+        { type: 'heading', id: 'deep-this-places', text: '深入：最外層與事件裡的 this，以及 bind 的代價' },
+        { type: 'table', head: ['位置', 'this 是什麼'], rows: [
+          ['ES 模組最外層', '`undefined`'],
+          ['一般 `script` 標籤 最外層', '`window`'],
+          ['Node.js 的 CommonJS 最外層', '`module.exports`'],
+          ['`addEventListener` 的一般函式', '掛監聽的元素（`e.currentTarget`）'],
+          ['class 的箭頭函式欄位 `handle = () => {}`', '建立時的實例，永遠固定'],
+        ] },
+        '`bind` 每呼叫一次就產生一個**新的函式**。所以 `el.addEventListener("click", this.save.bind(this))` 之後，`removeEventListener("click", this.save.bind(this))` 移除不掉：兩次 bind 得到的是不同函式（4-1 的同一性）。要移除就先把綁好的函式存起來，或改用 `{ signal }` 選項。',
+        '什麼時候不用煩惱 this：寫函式風格的程式（純函式、閉包）時幾乎用不到 this。this 的規則主要在 class、物件方法、DOM 事件這三個地方出現；其他地方能不用就不用，讀程式的人少記一條規則。',
       ],
-      tryit: {
-        q: ['下面這行 1 秒後執行 describe，但拿不到「雷霆」。用兩種方法修好：'],
-        draft: 'setTimeout(team.describe, 1000);',
-        answer: ['方法一：`setTimeout(() => team.describe(), 1000)`，呼叫時仍然是「team 點 describe」。', '方法二：`setTimeout(team.describe.bind(team), 1000)`，先做出 this 固定為 team 的新函式。'],
-      },
     },
     mistakes: [
       { wrong: '物件的方法寫成箭頭函式：`{ name: \'x\', hi: () => this.name }`。', why: '箭頭函式用外層的 this；物件字面值不會建立 this，外層在模組裡是 undefined。', right: '物件方法用簡寫 `hi() { … }`。' },
@@ -353,19 +298,7 @@ defineLessons({
       { wrong: '以為 this 是「函式寫在哪個物件裡」。', why: '一般函式的 this 只看呼叫方式；同一個函式換個呼叫方式就不同。', right: '看呼叫那一行，套用判定順序。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`obj.fn()` 呼叫時（fn 是一般函式），this 是？', options: [
-        { text: 'obj', correct: true, why: '規則 3：點的左邊。' },
-        { text: 'fn 自己', why: 'this 不會指向函式本身。' },
-        { text: '全域物件', why: '有點的左邊時不會是全域。' },
-        { text: 'undefined', why: '那是直接 `fn()` 的情況。' },
-      ] },
-      { level: '應用', type: 'mc', q: "`const g = { n: 1, get() { return this.n; } }; const h = { n: 2, get: g.get };` 之後 `h.get()` 是？", options: [
-        { text: '`2`', correct: true, why: '呼叫時點的左邊是 h，h.n 是 2。' },
-        { text: '`1`', why: '函式寫在 g 裡面不代表 this 是 g。' },
-        { text: '`undefined`', why: '有點的左邊，this 是 h。' },
-        { text: '拋出 TypeError', why: 'this 是 h，讀 n 沒問題。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你在 class 裡寫了 `handleClick() { this.count++; }`，然後 `button.addEventListener(\'click\', this.handleClick)`。點擊時 this 是什麼（提示：瀏覽器呼叫事件處理函式時，會把 this 設成觸發的元素）？怎麼修？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你在 class 裡寫了 `handleClick() { this.count++; }`，然後 `button.addEventListener(\'click\', this.handleClick)`。點擊時 this 是什麼（提示：瀏覽器呼叫事件處理函式時，會把 this 設成觸發的元素）？怎麼修？'], answer: [
         'this 是 button 元素，不是 class 實例。瀏覽器用類似 `handleClick.call(button, event)` 的方式呼叫（規則 2）；button 沒有 count，`this.count++` 會變成 NaN。',
         '修法：`addEventListener(\'click\', () => this.handleClick())`，或在 class 裡把它寫成箭頭函式欄位 `handleClick = () => { this.count++; }`。',
       ] },
@@ -383,20 +316,6 @@ defineLessons({
       '說出讀取屬性時沿原型鏈往上找的過程',
       '用 class、extends、super 寫出繼承',
       '用 `#` 私有欄位保護內部狀態',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-3）`new Player()` 裡的 this 是？', options: [
-        { text: '剛建立的新物件', correct: true, why: '規則 1：new 先建物件，再讓 this 指向它。' },
-        { text: 'Player 函式本身', why: 'this 不會指向函式本身。' },
-        { text: 'undefined', why: '用 new 呼叫時一定有新物件。' },
-        { text: '全域物件', why: 'new 的規則優先。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-1）`typeof []` 是？', options: [
-        { text: "`'object'`", correct: true, why: '陣列是物件的一種。' },
-        { text: "`'array'`", why: 'typeof 沒有這個結果。' },
-        { text: "`'list'`", why: 'typeof 沒有這個結果。' },
-        { text: "`'undefined'`", why: '空陣列也是存在的值。' },
-      ] },
     ],
     analogy: {
       text: ['你問公司前台一個問題，前台不知道就轉給部門主管，主管不知道再轉給總經理，總經理也不知道才回答「沒有這回事」。物件找屬性也是這樣：自己沒有就問它的[[原型]]，原型沒有再往上問，一路問到 null。'],
@@ -449,7 +368,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "class Player {\n  #points = 0;\n  constructor(name) { this.name = name; }\n  score(n = 1) { this.#points += n; return this.#points; }\n  get points() { return this.#points; }\n}\nclass Captain extends Player {\n  constructor(name) { super(name); this.isCaptain = true; }\n  score(n = 1) { return super.score(n * 2); }\n}\nconst p = new Captain('阿明');\np.score();\nconsole.log(p.score(), p.points, Object.keys(p));\nconsole.log(Object.hasOwn(p, 'score'), 'score' in p, p.fly);",
-          predict: { q: '`p.score()` 第二次呼叫的結果是？', options: ['2', '4', '1'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="class 與原型的對應：constructor 裡設定的放在實例自己身上；方法與 getter 放在 prototype 上共用；井字號私有欄位存在實例裡但外面看不到">
           <rect x="10" y="10" width="170" height="210" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
@@ -465,12 +383,15 @@ defineLessons({
           <text x="465" y="110" text-anchor="middle" font-size="15" class="on-color">每個實例一份</text>
           <text x="465" y="140" text-anchor="middle" font-size="15" class="on-color">外面完全看不到</text>
         </svg>`, caption: '所以 `Object.keys(p)` 只有 name 與 isCaptain；`Object.hasOwn(p, \'score\')` 是 false，但 `\'score\' in p` 是 true（in 會往原型鏈找）。' },
+        { type: 'heading', id: 'deep-pollution', text: '深入：原型鏈帶來的安全問題與 class 的進階語法' },
+        '原型鏈的「找不到就往上找」也是一個攻擊面，叫[[原型污染]]。如果你寫了一個深層合併函式，把外部 JSON 的每個鍵直接 `target[key] = …` 遞迴寫進去，遇到 `__proto__` 這個鍵時就會寫到 `Object.prototype`，之後所有物件讀 `isAdmin` 都得到 true。防法：合併前跳過 `__proto__`、`constructor`、`prototype`；用 `Object.hasOwn` 檢查；存「鍵來自外部」的資料時用 Map 或 `Object.create(null)`。',
+        { type: 'table', caption: 'class 的其他語法（ES2022 起）', head: ['語法', '用途'], rows: [
+          ['`static count = 0`、`static create() {}`', '放在類別本身，不在實例上'],
+          ['`static { … }`', '靜態初始化區塊：類別建立時跑一次'],
+          ['`#secret in obj`', '檢查 obj 是不是這個 class 建立的（有沒有這個私有欄位），不會拋錯'],
+        ] },
+        '繼承不是預設選項。兩個 class 只是「有幾個共同方法」時，用組合（把共同的部分做成另一個物件或函式，傳進去用）通常比 extends 好改：繼承鏈越長，改父類別就越容易牽動一堆子類別。',
       ],
-      tryit: {
-        q: ['寫一個 `Libero extends Player`：建構時多一個 `this.position = \'自由\'`，而且 `score()` 一律回傳 0（自由球員不能攻擊得分）。'],
-        draft: 'class Libero extends Player {\n  constructor(name) {\n    ____;\n    this.position = \'自由\';\n  }\n  score() {\n    return ____;\n  }\n}',
-        answer: ['第一格 `super(name)`，第二格 `0`。', '子類別的 constructor 在用 this 之前一定要先呼叫 super，否則拋出 ReferenceError。score 同名會遮住 Player 的版本，所以 #points 永遠不會增加。'],
-      },
     },
     mistakes: [
       { wrong: '子類別 constructor 先寫 `this.x = 1` 再 `super()`。', why: 'super 之前 this 還不存在，拋出 ReferenceError。', right: '第一行就呼叫 `super(...)`。' },
@@ -478,19 +399,7 @@ defineLessons({
       { wrong: '忘了 new：`const p = Player(\'阿明\')`。', why: 'class 一定要用 new 呼叫，否則拋出 TypeError（Class constructor Player cannot be invoked without \'new\'）。', right: '`new Player(\'阿明\')`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '讀取 `p.toString` 時，在哪裡找到？', options: [
-        { text: 'Object.prototype', correct: true, why: 'p、Captain.prototype、Player.prototype 都沒有，往上到 Object.prototype 才找到。' },
-        { text: 'p 自己', why: '你沒有在 p 上設定 toString。' },
-        { text: 'Player.prototype', why: 'class 裡沒有寫 toString。' },
-        { text: '找不到，class 沒有寫 toString 就是 undefined', why: '幾乎所有物件都從 Object.prototype 繼承 toString。' },
-      ] },
-      { level: '應用', type: 'mc', q: "`Object.hasOwn(p, 'score')` 與 `'score' in p` 分別是？", options: [
-        { text: 'false 與 true', correct: true, why: 'score 在原型上：hasOwn 只看自己，in 會往上找。' },
-        { text: 'true 與 true', why: 'score 不是 p 自己的屬性。' },
-        { text: 'false 與 false', why: 'in 會沿原型鏈找到 score。' },
-        { text: 'true 與 false', why: '兩者的範圍剛好相反。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你用 `for (const key in p)` 列出物件屬性，結果出現一些「不是你設定的」鍵（在別人的程式碼或舊函式庫裡很常見）。為什麼？該改用什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你用 `for (const key in p)` 列出物件屬性，結果出現一些「不是你設定的」鍵（在別人的程式碼或舊函式庫裡很常見）。為什麼？該改用什麼？'], answer: [
         '`for…in` 會列出原型鏈上所有「可列舉」的屬性，有人在原型上加了可列舉的屬性時就會跑出來（class 的方法本身不可列舉，所以不會）。',
         '改用 `Object.keys(p)`、`Object.entries(p)`，只列出物件自己的可列舉屬性；需要判斷單一屬性就用 `Object.hasOwn`。',
       ] },

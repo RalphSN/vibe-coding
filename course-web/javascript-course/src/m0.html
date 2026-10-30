@@ -8,10 +8,15 @@ defineTerms({
   '執行環境': { en: 'runtime', def: '把引擎包起來、再加上各種設備（API）的整個平台。', example: '瀏覽器、Node.js 都是執行環境。' },
   'API': { en: 'application programming interface', def: '別人寫好、提供給你呼叫的功能。', example: '`document.querySelector`、`fs.readFile`、`fetch`。' },
   'Node.js': { en: 'Node.js', def: '在瀏覽器以外執行 JavaScript 的執行環境，用 V8 引擎，另外提供讀檔、網路、行程等設備。', example: '`node 檔名.mjs` 執行一支程式。' },
-  'LTS': { en: 'long-term support', def: '長期支援版：會持續收到安全性修正好幾年，正式工作建議用這種版本。', example: '截至 2026-10-14，Node.js 24 是 Active LTS；26 預定 10-28 接手。' },
+  'LTS': { en: 'long-term support', def: '長期支援版：會持續收到安全性修正好幾年，正式工作建議用這種版本。', example: '截至 2026-10-29，Node.js 26 是 Active LTS（2026-10-28 起），24 已轉為 Maintenance LTS。' },
   'Console': { en: 'console', def: '開發者工具裡的「主控台」分頁，可以看 `console.log` 的輸出、錯誤，也能直接輸入程式執行。', example: 'Chrome 按 F12（macOS 是 ⌥⌘I）打開開發者工具，點 Console。' },
   'ES 模組': { en: 'ES module, ESM', def: '用 `import`／`export` 組織的 JavaScript 檔案；預設是嚴格模式。', example: 'Node.js 把副檔名 `.mjs` 的檔案當成 ES 模組。' },
   '呼叫堆疊': { en: 'call stack', def: '目前正在執行、還沒結束的函式，一層一層疊起來的清單。錯誤訊息下面那幾行 `at …` 就是它。', example: '`a()` 呼叫 `b()`，`b()` 裡出錯，堆疊會列出 `at b`、`at a`。' },
+});
+
+defineTerms({
+  'source map': { en: 'source map', def: '記錄「壓縮或編譯後的位置」對應到「原始碼哪一行」的檔案；開發者工具與 Node.js 靠它把錯誤位置翻回原始碼。', example: '`app.min.js:1:48213` 透過 source map 顯示成 `cart.ts:42:7`。' },
+  'WinterTC': { en: 'WinterTC (Ecma TC55)', def: 'Ecma 的第 55 號技術委員會，協調 Node.js、Deno、Cloudflare Workers 等非瀏覽器執行環境要共同提供哪些 Web API。', example: '2025-12 發布 ECMA-429「Minimum Common Web API」。' },
 });
 
 defineLessons({
@@ -77,7 +82,6 @@ defineLessons({
         { type: 'widget', name: 'runner', props: {
           title: '這個小框是瀏覽器環境',
           code: "console.log(typeof document);\nconsole.log(typeof process);\nconsole.log(Math.max(3, 9, 4));",
-          predict: { q: '在瀏覽器裡執行，前兩行各印出什麼？', options: ["'object' 和 'object'", "object 和 undefined", "undefined 和 object"], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 250" role="img" aria-label="同一段程式在兩個環境的結果：typeof document 在瀏覽器是 object、在 Node.js 是 undefined；typeof process 在瀏覽器是 undefined、在 Node.js 是 object；Math.max 兩邊都是 9">
           <rect x="10" y="10" width="200" height="50" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -96,23 +100,25 @@ defineLessons({
           <text x="297" y="202" text-anchor="middle" font-size="17" class="mono">9</text>
           <text x="467" y="202" text-anchor="middle" font-size="17" class="mono">9</text>
         </svg>`, caption: '語言本身的功能（Math.max）兩邊一樣；環境的設備（document、process）各有各的。Node.js 的結果是 2026-10-14 在 Node.js 22.13 實測。' },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'lang', label: '語言本身' }, { id: 'web', label: '只有瀏覽器' }, { id: 'node', label: '只有 Node.js' }, { id: 'both', label: '兩個環境都有' }],
-          items: [
-            { text: '`Array.prototype.map`', answer: 'lang', why: '處理陣列只靠引擎就做得到，寫在 ECMAScript 規格裡。' },
-            { text: '`document.querySelector`', answer: 'web', why: '找網頁上的元素，需要有網頁，只有瀏覽器有。' },
-            { text: '`fs.readFile`', answer: 'node', why: '讀硬碟上的檔案，瀏覽器為了安全不允許，只有 Node.js 提供。' },
-            { text: '`JSON.parse`', answer: 'lang', why: '把文字解析成物件，是語言本身的功能。' },
-            { text: '`fetch`', answer: 'both', why: '發網路請求是環境的設備，不是語言本身；瀏覽器一直有，Node.js 18 起也內建。' },
-            { text: '`setTimeout`', answer: 'both', why: 'ECMAScript 裡沒有計時器；瀏覽器和 Node.js 各自實作了一個。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`Array.prototype.map`', '語言本身', '處理陣列只靠引擎就做得到，寫在 ECMAScript 規格裡。'],
+          ['`document.querySelector`', '只有瀏覽器', '找網頁上的元素，需要有網頁，只有瀏覽器有。'],
+          ['`fs.readFile`', '只有 Node.js', '讀硬碟上的檔案，瀏覽器為了安全不允許，只有 Node.js 提供。'],
+          ['`JSON.parse`', '語言本身', '把文字解析成物件，是語言本身的功能。'],
+          ['`fetch`', '兩個環境都有', '發網路請求是環境的設備，不是語言本身；瀏覽器一直有，Node.js 18 起也內建。'],
+          ['`setTimeout`', '兩個環境都有', 'ECMAScript 裡沒有計時器；瀏覽器和 Node.js 各自實作了一個。']
+        ] },
+        { type: 'heading', id: 'deep-runtimes', text: '深入：「兩邊都有」的 API 是誰規定的' },
+        '`fetch`、`setTimeout`、`URL`、`TextEncoder` 不在 ECMAScript 裡，它們的規格來自 WHATWG 與 W3C 的 Web 標準。瀏覽器照這些規格做；Node.js、Deno、Bun 這些伺服器端執行環境則是「挑一部分來做」，所以同名 API 的細節可能不同（例如 0-1 比喻提到的 `setTimeout` 回傳值）。',
+        '為了讓同一段程式能在更多環境跑，Ecma 在 2025 年成立 [[WinterTC]]（TC55），並在 2025-12 發布 ECMA-429「Minimum Common Web API」，列出伺服器端環境應該共同提供的 Web API 子集。截至 2026-10，各環境的符合程度仍在補測試，不能假設「清單上有就一定一樣」。',
+        { type: 'table', caption: '常見執行環境與引擎（截至 2026-10）', head: ['執行環境', '引擎', '適合什麼'], rows: [
+          ['Node.js', 'V8', '伺服器、命令列工具、建置工具；生態系最大'],
+          ['Deno', 'V8', '預設沙盒權限、內建 TypeScript'],
+          ['Bun', 'JavaScriptCore', '啟動快、內建打包與測試'],
+          ['Cloudflare Workers 等邊緣平台', 'V8', '在 CDN 節點跑短小的請求處理；沒有 `fs`'],
+        ] },
+        '判斷環境時，問「這個功能在不在」而不是「這是哪個環境」：`typeof fetch === "function"` 比判斷瀏覽器名稱可靠。所有環境共通的全域物件寫 `globalThis`（ES2020），不要寫 `window` 或 `global`。',
       ],
-      tryit: {
-        q: ['填空：下面三樣東西各屬於哪一層？'],
-        draft: 'A. V8：____\nB. Node.js：____\nC. ECMAScript 2026：____',
-        answer: ['A 是引擎；B 是執行環境；C 是語言規格。', '判斷方法：會「執行程式」的是引擎；提供讀檔、畫面等設備的整個平台是執行環境；只是一份文件、規定語言長什麼樣子的是規格。'],
-      },
     },
     mistakes: [
       { wrong: '以為瀏覽器能跑的程式，Node.js 一定也能跑。', why: '語法一樣，但只要用到 `document`、`window`、`localStorage`，在 Node.js 就會得到 `ReferenceError`。', right: '看到 `is not defined` 而名字沒打錯時，先問「這個環境有沒有這個設備」。' },
@@ -120,19 +126,7 @@ defineLessons({
       { wrong: '以為規格一通過，新功能就能直接用。', why: '要等引擎實作、等使用者更新瀏覽器或 Node.js。例如 ES2026 的 `Math.sumPrecise`，截至 2026-10 Node.js 還沒有。', right: '用新功能前查支援表（9-2 新功能地圖）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一個負責「照規格執行 JavaScript」？', options: [
-        { text: 'V8 這類引擎', correct: true, why: '引擎解析、編譯、執行程式碼，只懂 ECMAScript。' },
-        { text: 'ECMAScript 規格本身', why: '規格是一份文件，描述語言應該怎麼運作，它自己不會執行任何東西。' },
-        { text: '瀏覽器提供的 document', why: 'document 是環境提供的 API，用來操作網頁，不負責執行程式。' },
-        { text: '你電腦上的作業系統', why: '作業系統執行的是引擎這個程式，JavaScript 程式碼則是由引擎解讀。' },
-      ] },
-      { level: '應用', type: 'mc', q: '一段程式在瀏覽器正常，搬到 Node.js 後出現 `ReferenceError: localStorage is not defined`。最可能的原因是？', options: [
-        { text: 'Node.js 的 JavaScript 版本比較舊', why: '這個錯誤跟語言版本無關；localStorage 從來就不是 ECMAScript 的一部分。' },
-        { text: 'localStorage 是瀏覽器的設備，Node.js 沒有', correct: true, why: '它是瀏覽器提供的儲存 API，Node.js 這個環境沒有提供。' },
-        { text: '變數名稱打錯了，應該寫成 LocalStorage', why: '名字沒打錯；換成大寫反而一定找不到。' },
-        { text: '要先 import localStorage 才能用', why: 'Node.js 沒有可以匯入的 localStorage 模組；需要的話要改用讀寫檔案。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要寫一個函式 `detectRuntime()`，在瀏覽器回傳 `"browser"`、在 Node.js 回傳 `"node"`，而且在任何環境呼叫都不能拋出錯誤。為什麼不能直接寫 `if (window)`？要怎麼寫？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要寫一個函式 `detectRuntime()`，在瀏覽器回傳 `"browser"`、在 Node.js 回傳 `"node"`，而且在任何環境呼叫都不能拋出錯誤。為什麼不能直接寫 `if (window)`？要怎麼寫？'], answer: [
         '在 Node.js 直接讀 `window` 會拋出 `ReferenceError`，整支程式就停了。',
         '改用 `typeof`：`typeof window !== "undefined"` 對不存在的名字只會得到字串 `"undefined"`，不會報錯。Node.js 可以用 `typeof process !== "undefined" && typeof process.versions.node === "string"` 判斷。',
       ] },
@@ -142,7 +136,7 @@ defineLessons({
       'document、localStorage 只有瀏覽器有；fs、process 只有 Node.js 有；setTimeout、fetch 兩邊都有但各自實作。',
       '新功能要等引擎實作與使用者更新，用之前先查支援表。',
     ],
-    sources: ['ecma-2026', 'tc39-finished', 'mdn-js'],
+    sources: ['ecma-2026', 'tc39-finished', 'mdn-js', 'wintertc'],
   },
 
   '0-2': {
@@ -177,7 +171,7 @@ defineLessons({
       </svg>`,
       caption: '左邊適合試一兩行；右邊適合寫成檔案、重複執行。這門課的「試試看」小框，就是放在網頁裡的左邊那條路。',
       blocks: [
-        '安裝 [[Node.js]] 時選 **[[LTS]]** 版本。截至 2026-10-14，Active LTS 是 Node.js 24；Node.js 26 預定 2026-10-28 成為新的 LTS。兩個都可以用來上這門課。',
+        '安裝 [[Node.js]] 時選 **[[LTS]]** 版本。截至 2026-10-29，Active LTS 是 Node.js 26（2026-10-28 起）；Node.js 24 從 2026-10-20 起轉為 Maintenance LTS，仍有安全性修正。兩個都可以用來上這門課，新安裝選 26。',
         { type: 'widget', name: 'checklist', props: { key: 'setup', items: [
           '到 nodejs.org 下載 LTS 安裝程式並安裝',
           '打開終端機，輸入 `node --version`，看到 `v24` 或 `v26` 開頭的版本號',
@@ -188,7 +182,7 @@ defineLessons({
     },
     define: [
       { term: 'Node.js', en: 'Node.js', def: '在瀏覽器以外執行 JavaScript 的環境。', example: '`node l02.mjs` 執行一個檔案。' },
-      { term: 'LTS', en: 'long-term support', def: '長期支援版，會持續收到安全性修正，正式工作與學習都建議用它。', example: 'Node.js 24（Active LTS，至 2026-10-20 轉為 Maintenance）。' },
+      { term: 'LTS', en: 'long-term support', def: '長期支援版，會持續收到安全性修正，正式工作與學習都建議用它。', example: 'Node.js 26（2026-10-28 起為 Active LTS）。' },
       { term: 'ES 模組', en: 'ES module', def: '用 import／export 組織的檔案。Node.js 看到 `.mjs` 副檔名就當成 ES 模組，而且是嚴格模式。', example: '這門課的範例都存成 `.mjs`。' },
     ],
     examples: {
@@ -211,49 +205,36 @@ defineLessons({
           title: '也可以直接在這裡跑',
           code: "console.log('Hello, JavaScript');\nconsole.log(Math.max(3, 9, 4));\nconsole.log(`現在是 ${new Date().getFullYear()} 年`);",
         } },
-        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="Node.js 版本時間軸：22 是 Maintenance LTS 到 2027-04；24 是 Active LTS，2026-10-20 轉 Maintenance；26 是 Current，2026-10-28 成為 Active LTS">
+        { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="Node.js 版本狀態：22 是 Maintenance LTS，維護到 2027-04；24 從 2026-10-20 起是 Maintenance LTS；26 從 2026-10-28 起是 Active LTS">
           <rect x="10" y="20" width="170" height="70" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
           <text x="95" y="50" text-anchor="middle" font-size="22" font-weight="900" class="on-color">Node 22</text>
           <text x="95" y="76" text-anchor="middle" font-size="16" class="on-color">維護到 2027-04</text>
           <rect x="195" y="20" width="170" height="70" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
           <text x="280" y="50" text-anchor="middle" font-size="22" font-weight="900" class="on-color">Node 24</text>
-          <text x="280" y="76" text-anchor="middle" font-size="16" class="on-color">目前的 LTS</text>
+          <text x="280" y="76" text-anchor="middle" font-size="16" class="on-color">維護中的 LTS</text>
           <rect x="380" y="20" width="170" height="70" style="fill:var(--m0)" class="stroke-ink" stroke-width="4"/>
           <text x="465" y="50" text-anchor="middle" font-size="22" font-weight="900" class="on-color">Node 26</text>
-          <text x="465" y="76" text-anchor="middle" font-size="16" class="on-color">10-28 成為 LTS</text>
+          <text x="465" y="76" text-anchor="middle" font-size="16" class="on-color">目前的 LTS</text>
           <rect x="10" y="130" width="540" height="70" class="fill-surface stroke-ink" stroke-width="4"/>
           <text x="280" y="160" text-anchor="middle" font-size="18" font-weight="900">學這門課：24 或 26 都可以</text>
           <text x="280" y="186" text-anchor="middle" font-size="16">本站範例在 Node.js 22.13 實測</text>
-        </svg>`, caption: '截至 2026-10-14 的 Node.js 版本狀態（來源：Node.js 官方版本頁）。' },
+        </svg>`, caption: '截至 2026-10-29 的 Node.js 版本狀態（來源：Node.js 官方版本頁）。' },
+        { type: 'heading', id: 'deep-release', text: '深入：Node.js 的版本節奏與切換版本' },
+        '到 Node.js 26 為止，偶數版是 LTS、奇數版只活 6 個月。官方版本頁寫明：**Node.js 27 起改成一年一版**，每個大版本先當 6 個月 Current、再 6 個月 Alpha，然後進入 LTS。所以「偶數才是 LTS」這個口訣之後不再成立，選版本一律看官方版本頁標的狀態。',
+        { type: 'table', caption: 'Node.js 版本狀態（2026-10-29 查證，來源：Node.js 官方版本頁）', head: ['版本', '狀態', '要注意'], rows: [
+          ['20', '已停止支援（2026-04）', '不再有安全性修正，應升級'],
+          ['22', 'Maintenance LTS', '只收重大修正，支援到 2027-04'],
+          ['24', 'Maintenance LTS（2026-10-20 起）', '可以繼續用，新專案改選 26'],
+          ['26', 'Active LTS（2026-10-28 起）', '目前建議的版本；內建 Temporal'],
+        ] },
+        '同時維護好幾個專案時，用版本管理工具切換：macOS 常用 `nvm` 或 `fnm`，Windows 用 `fnm` 或 `nvm-windows`。在專案根目錄放一個 `.nvmrc`（內容例如 `26`），團隊每個人切到同一版，避免「我電腦上可以跑」。',
+        '寫練習檔時可以用 `node --watch l02.mjs`：存檔就自動重跑，省掉一直按上鍵。它在 Node.js 22 起是穩定功能。',
       ],
-      tryit: {
-        q: ['在終端機輸入下面這行，____ 的地方應該填什麼，才會看到 Node.js 的版本號？'],
-        draft: 'node ____',
-        answer: ['`node --version`（也可以寫 `node -v`）。', '看到 `v24.x.x` 或 `v26.x.x` 就代表安裝成功。'],
-      },
     },
     mistakes: [
       { wrong: '在 Node.js 的程式裡寫 `alert("嗨")`，結果報錯。', why: '`alert` 是瀏覽器的設備（彈出視窗），Node.js 沒有畫面。', right: '在 Node.js 用 `console.log` 輸出到終端機。' },
       { wrong: '在終端機直接輸入 `console.log("嗨")`。', why: '終端機看的是 shell 指令，不是 JavaScript；它會說找不到這個指令。', right: '把程式存成檔案再用 `node 檔名.mjs` 執行，或輸入 `node` 進入互動模式再打。' },
       { wrong: '安裝了 Node.js 的 Current 版本（奇數或剛發布的版本）來做正式專案。', why: 'Current 版本更新快，支援期短，適合嘗鮮。', right: '學習與正式專案都選 LTS。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'Node.js 用什麼判斷一個檔案「一定是 ES 模組」？', options: [
-        { text: '副檔名是 `.mjs`', correct: true, why: '`.mjs` 一律被當成 ES 模組，不受其他設定影響。' },
-        { text: '檔案第一行寫了 `import`', why: 'Node.js 不會先看內容再決定；是先決定規則才讀內容。' },
-        { text: '檔案放在 `modules` 資料夾裡', why: '資料夾名稱沒有特別意義。' },
-        { text: '檔名裡有 module 這個字', why: '檔名不影響規則，只有副檔名與 package.json 設定會。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你想快速確認 `[1, 2, 3].at(-1)` 的結果，最省事的地方是？', options: [
-        { text: '建專案、裝套件，再寫測試', why: '只是確認一行的結果，不需要這麼多準備。' },
-        { text: '瀏覽器 Console 或本站的「試試看」小框', correct: true, why: '打一行就有結果，最適合試一兩個動作。' },
-        { text: '直接在終端機輸入 `[1, 2, 3].at(-1)`', why: '終端機看的是 shell 指令，不懂 JavaScript；要先輸入 `node` 進入互動模式。' },
-        { text: '寫成網頁再部署到網路上', why: '部署是最慢的路，跟「快速確認」相反。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的同事在 Node.js 20 寫好一支程式，你用 Node.js 24 執行時一切正常；他說「那我也不用升級」。現在是 2026-10，你會怎麼建議？'], answer: [
-        '建議升級。Node.js 20 已經過了支援期，不再有安全性修正；目前的 LTS 是 24，26 會在 2026-10-28 接手。',
-        '「能跑」不代表「安全」：舊版的漏洞不會再被修。'],
-      },
     ],
     keypoints: [
       '學習與正式專案都安裝 Node.js 的 LTS 版本，用 `node --version` 確認。',
@@ -322,7 +303,6 @@ defineLessons({
         { type: 'widget', name: 'runner', props: {
           title: '找出錯在哪裡',
           code: "console.log('開始');\nconst scores = [80, 92, 75];\nconsole.log(Math.max(...scores));\nconsole.log(scores.lenght.toFixed(0));\nconsole.log('結束');",
-          predict: { q: '會印出幾行正常的輸出？錯誤是哪一種？', options: ['2 行，然後 TypeError', '3 行，然後 ReferenceError', '0 行，SyntaxError'], answer: 0 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="三種 console 輸出：console.log 一般文字；console.error 紅色錯誤；console.table 把陣列印成有欄位的表格">
           <rect x="10" y="10" width="170" height="200" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -338,12 +318,15 @@ defineLessons({
           <text x="465" y="96" text-anchor="middle" font-size="16" class="on-color">陣列變表格</text>
           <text x="465" y="130" text-anchor="middle" font-size="16" class="on-color">一眼比較欄位</text>
         </svg>`, caption: '三個最常用的 console 方法。本站的小框把 table 簡化成一般輸出；要看表格，請在瀏覽器 Console 或 Node.js 試。' },
+        { type: 'heading', id: 'deep-stack', text: '深入：堆疊追蹤什麼時候不可靠' },
+        '堆疊追蹤是引擎「盡量」提供的資訊，不是語言規格的一部分。實務上有三種情況會讓它看起來怪怪的：',
+        { type: 'table', head: ['情況', '你會看到', '怎麼辦'], rows: [
+          ['呼叫太深', 'V8 預設只保留 10 層 `at …`', 'Node.js 加 `--stack-trace-limit=50`，或在程式開頭設 `Error.stackTraceLimit = 50`'],
+          ['非同步', '`await` 之後的錯誤會有 `at async 函式名`；但 `setTimeout`、事件的回呼看不到「是誰排的」', '在排程的地方加 log，或用開發者工具的 async 呼叫堆疊'],
+          ['程式被壓縮或編譯過', '位置變成 `app.min.js:1:48213`、TypeScript 的行號對不上', '產生 [[source map]]；Node.js 執行時加 `--enable-source-maps`'],
+        ] },
+        '還有一個原則：錯誤訊息指的是「問題被發現的地方」。像 `Cannot read properties of undefined (reading \'name\')`，真正的原因通常在更早的地方：某個值本來就不該是 undefined。從錯誤那一行往回追「這個值從哪裡來」，比在錯誤那一行加 `?.` 掩蓋問題更有用。',
       ],
-      tryit: {
-        q: ['下面的錯誤訊息，錯在哪個檔案、第幾行、什麼種類？'],
-        draft: "TypeError: Cannot read properties of undefined (reading 'name')\n    at showPlayer (file:///…/team.mjs:12:24)\n\n檔案：____　行：____　種類：____",
-        answer: ['檔案 `team.mjs`、第 12 行（第 24 個字元）、`TypeError`。', '說明告訴你：程式對一個 `undefined` 讀了 `name` 屬性。去第 12 行找 `.name`，再往前追那個值為什麼是 undefined。'],
-      },
     },
     mistakes: [
       { wrong: '看到紅字就從最下面那行開始讀。', why: '最下面通常是執行環境內部的程式（例如 `node:internal/…`），跟你的程式無關。', right: '從第一行的種類與說明開始，再找第一個指向你自己檔案的 `at`。' },
@@ -351,19 +334,7 @@ defineLessons({
       { wrong: '除錯時到處加 `console.log`，修好後忘了刪。', why: '留下的除錯輸出會干擾正式環境的紀錄，也會洩漏資料。', right: '修好就刪；需要更深入時改用斷點（7-4）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '錯誤訊息裡的 `l03.mjs:2:1` 代表什麼？', options: [
-        { text: '第 2 行、第 1 個字元', correct: true, why: '格式是「檔名:行:字元」。' },
-        { text: '第 2 個錯誤、共 1 個', why: '冒號後面是位置，不是錯誤的編號。' },
-        { text: '第 1 行、第 2 個字元', why: '順序是先行再字元。' },
-        { text: '執行了 2 秒、發生 1 次', why: '錯誤訊息不記錄時間。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`console.log(user.name)` 出現 `TypeError: Cannot read properties of undefined (reading \'name\')`。問題出在哪？', options: [
-        { text: '`name` 這個屬性名稱打錯了', why: '屬性名稱打錯只會讀到 `undefined`，不會拋出 TypeError。' },
-        { text: '`user` 本身是 `undefined`', correct: true, why: '對 undefined 讀任何屬性都會拋出 TypeError；括號裡的 name 是「想讀的屬性」。' },
-        { text: '`console.log` 不能印物件', why: 'console.log 可以印任何值。' },
-        { text: '`name` 這個屬性在 user 物件裡拼錯了', why: '少分號頂多是 SyntaxError 或行為不同，訊息不會長這樣。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一支程式只印出「開始」，接著出現 `RangeError: Invalid array length`。你會怎麼一步一步找到原因？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['一支程式只印出「開始」，接著出現 `RangeError: Invalid array length`。你會怎麼一步一步找到原因？'], answer: [
         '1. 種類是 RangeError：某個數值超出允許範圍。說明提到 array length：有地方建立了長度不合法的陣列（例如負數或非整數）。',
         '2. 看位置找到那一行，通常是 `new Array(n)` 或設定 `arr.length = n`。',
         '3. 在那一行之前 `console.log(n)` 看 n 實際是多少，再往前追它怎麼算出來的。',

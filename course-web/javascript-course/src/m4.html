@@ -15,26 +15,16 @@ defineTerms({
   'Set': { en: 'Set', def: '不重複值的集合；ES2025 起有 `union`、`intersection`、`difference` 等方法。', example: '`new Set([1, 1, 2]).size` 是 2。' },
 });
 
+defineTerms({
+  'WeakMap': { en: 'WeakMap', def: '鍵只能是物件的 Map；它不會讓鍵「活著」，鍵物件沒有其他地方用到時會連同資料一起被回收。', example: '替 DOM 元素存額外資料，元素被移除後資料自動消失。' },
+});
+
 defineLessons({
   '4-1': {
     goals: [
       '說出「指定」與「傳參數」複製的是值還是參考',
       '預測修改一個變數後，其他變數會不會跟著變',
       '解釋 `{ a: 1 } === { a: 1 }` 為什麼是 false',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-3）`input.value` 是 "17"，`input.value + 1` 得到？', options: [
-        { text: "`'171'`", correct: true, why: '`+` 有一邊是字串就相接。' },
-        { text: '`18`', why: '要先 `Number(input.value)` 才會是加法。' },
-        { text: '`NaN`（字串不能和數字相加）', why: '`+` 遇到字串會相接，不會產生 NaN。' },
-        { text: "`'18'`", why: '不會先算 17 + 1；"17" 是字串，直接相接。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-1）`const team = {}` 之後 `team.wins = 1` 會怎樣？', options: [
-        { text: '正常執行', correct: true, why: 'const 只禁止重新指定，不保護物件內容。' },
-        { text: '拋出 TypeError', why: '`team.wins = 1` 是修改內容，不是重新指定。' },
-        { text: '靜默失敗', why: '沒有任何規則阻止它，真的會改到。' },
-        { text: '拋出 ReferenceError', why: 'team 已經宣告過了。' },
-      ] },
     ],
     analogy: {
       text: ['你把一份雲端文件的「共用連結」傳給同事，他改了幾個字，你打開也看到改過的版本，因為你們開的是同一份。如果你印一份紙本給他，他在紙上怎麼塗改都不會影響你。'],
@@ -97,7 +87,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "function addBonus(p) { p.score += 10; }\nfunction replace(p) { p = { name: '替補', score: 0 }; }\nconst ace = { name: '阿明', score: 20 };\naddBonus(ace);\nreplace(ace);\nconsole.log(ace);\nconsole.log({ a: 1 } === { a: 1 });",
-          predict: { q: '最後印出的 ace 是？', options: ["{ name: '阿明', score: 20 }", "{ name: '阿明', score: 30 }", "{ name: '替補', score: 0 }"], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="函式參數：addBonus 的 p 和外面的 ace 指向同一個物件，改內容兩邊都看到；replace 的 p 改指向新物件，ace 仍指向原物件">
           <rect x="10" y="10" width="265" height="210" style="fill:var(--success)" class="stroke-ink" stroke-width="4"/>
@@ -111,12 +100,15 @@ defineLessons({
           <text x="417" y="140" text-anchor="middle" font-size="16" class="on-color">ace → 原本的物件</text>
           <text x="417" y="184" text-anchor="middle" font-size="16" class="on-color">ace 不受影響</text>
         </svg>`, caption: '參數 p 一開始和 ace 指向同一個物件；差別在你改的是「物件內容」還是「p 自己」。' },
+        { type: 'heading', id: 'deep-sharing', text: '深入：參考、記憶體與框架怎麼偵測變化' },
+        'JavaScript 的參數傳遞正式說法是「傳共享」（call by sharing）：一律複製變數裡的東西，物件的情況下複製的是參考。所以它既不是「傳參考」（函式不能讓外面的變數改指向別的物件），也不只是「傳值」（函式改得到外面的物件內容）。',
+        '參考也決定了物件什麼時候被回收。只要還有任何一條路（變數、陣列、Map、閉包、事件監聽）連得到某個物件，垃圾回收就不會釋放它。快取用一般 Map 存「以物件為鍵」的資料，就算物件早就沒用了也會一直留著；這種情況用 [[WeakMap]]。',
+        { type: 'table', caption: '直接修改陣列，框架看得到嗎', head: ['框架', '`list.push(x)`', '原因'], rows: [
+          ['React', '看不到，畫面不更新', '`setList` 用 `Object.is` 比參考；參考沒變就當作沒變'],
+          ['Vue 3', '看得到', '`reactive`／`ref` 的陣列被 Proxy 包住，push 會被攔截'],
+        ] },
+        '所以「改內容」還是「換新的」要看你用的工具；但在 React 一律換新的，在 Vue 兩種都可以。不管哪個框架，換新參考的寫法都比較容易追蹤「是誰在什麼時候改的」。',
       ],
-      tryit: {
-        q: ['不執行，預測最後印出什麼：'],
-        draft: "const list = [1, 2];\nconst copy = list;\ncopy.push(3);\nconsole.log(list.length); // ____",
-        answer: ['`3`。', '`copy = list` 只複製參考，兩個名字指向同一個陣列，從 copy push 進去的，從 list 也看得到。要真的複製要寫 `[...list]`（4-2）。'],
-      },
     },
     mistakes: [
       { wrong: '以為 `const b = a` 就把物件複製了一份。', why: '複製的只是參考，兩個名字共用一個物件。', right: '需要獨立的一份，用展開或 structuredClone（4-2）。' },
@@ -124,21 +116,9 @@ defineLessons({
       { wrong: '在函式裡寫 `p = {...}`，以為能換掉外面的物件。', why: '這只改了函式自己的變數 p。', right: '回傳新物件，讓呼叫者自己接：`ace = replace(ace)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`const a = { n: 1 }; const b = a; b.n = 2;` 之後 `a.n` 是？', options: [
-        { text: '`2`', correct: true, why: 'a 和 b 指向同一個物件。' },
-        { text: '`1`', why: 'b 不是複製品，是同一個物件的另一個名字。' },
-        { text: '拋出 TypeError，因為 a 是 const', why: 'const 不保護物件內容。' },
-        { text: '`undefined`', why: 'n 一直存在，只是值被改了。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下面哪一個比較結果是 true？', options: [
-        { text: '`const x = [1]; const y = x; x === y`', correct: true, why: 'x 與 y 指向同一個陣列。' },
-        { text: '`[1] === [1]`', why: '兩個各自建立的陣列，內容一樣但不是同一個。' },
-        { text: '`{} === {}`', why: '每寫一次 `{}` 就建立一個新物件。' },
-        { text: '`[1] === [1].slice()`（slice 回傳的是同一個陣列物件）', why: '左邊是字串，右邊是陣列，型別不同。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['Vue 或 React 裡，你寫了 `state.list.push(item)`，畫面卻沒有更新（或更新得很奇怪）。用這一課的觀念解釋可能的原因，並寫出替代寫法。'], answer: [
-        '框架常用「參考有沒有變」判斷資料有沒有變。`push` 改的是同一個陣列，參考沒變，框架可能以為沒有變化（React 尤其如此）。',
-        '替代寫法：產生新陣列再指定回去，`state.list = [...state.list, item]`（React 用 `setList([...list, item])`）。參考變了，框架就知道要更新。',
+      { level: '深入思考', type: 'reveal', q: ['React 裡你寫了 `list.push(item); setList(list);`，畫面沒有更新；同樣的 push 搬到 Vue 3 的 `reactive` 陣列卻會更新。用這一課的觀念解釋兩者為什麼不同，並寫出 React 的正確寫法。'], answer: [
+        'React 用 `Object.is` 比較新舊 state 的參考。push 改的是同一個陣列，`setList(list)` 傳回去的還是同一個參考，React 判斷「沒變」就不重畫。Vue 3 把陣列包在 Proxy 裡，push 這個動作本身就被攔截到，所以不需要換參考。',
+        'React 的寫法：產生新陣列再交出去，`setList([...list, item])`。參考變了，React 才知道要更新；這種寫法在 Vue 也一樣能用。',
       ] },
     ],
     keypoints: [
@@ -146,7 +126,7 @@ defineLessons({
       '透過任何一個參考修改物件，其他參考都看得到；讓參數改指向新物件則不影響外面。',
       '`===` 比較物件時比的是「是不是同一個」，不是內容。',
     ],
-    sources: ['mdn-types'],
+    sources: ['mdn-types', 'react-arrays', 'vue-reactivity'],
   },
 
   '4-2': {
@@ -154,20 +134,6 @@ defineLessons({
       '分辨「共用」「淺複製」「深複製」三種情況',
       '用解構一次取出巢狀資料、改名、給預設值',
       '寫出不改動原物件、回傳新物件的更新',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-1）`function f(p) { p.x = 1; }`，呼叫 `f(obj)` 後 obj 會怎樣？', options: [
-        { text: 'obj.x 變成 1', correct: true, why: 'p 和 obj 指向同一個物件，改內容兩邊都看得到。' },
-        { text: '沒變，函式拿到的是複製品', why: '傳進函式的是參考，不是複製品。' },
-        { text: 'obj 變成 undefined', why: '函式沒有改 obj 這個變數本身。' },
-        { text: '拋出 TypeError', why: '對物件加屬性是合法的。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-1）哪一個是「重新指定」？', options: [
-        { text: '`state = newState`', correct: true, why: '名字本身改指向別的值。' },
-        { text: '`state.count = 1`', why: '這是修改物件內容。' },
-        { text: '`state.list.push(1)`', why: '這是修改陣列內容。' },
-        { text: '`delete state.count`', why: '這是修改物件內容（刪掉屬性）。' },
-      ] },
     ],
     analogy: {
       text: ['複製一個專案資料夾給同事：資料夾本身是新的，他在裡面改檔名不影響你（淺複製的外層）；但資料夾裡有一個「捷徑」指向共用的預算表，他打開捷徑改預算，你那邊也會變（淺複製的內層）。要完全不互相影響，得把預算表也一起複製一份（深複製）。'],
@@ -227,7 +193,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const match = { home: '雷霆', score: { away: 21 }, sets: [25, 23, 15] };\nconst { home, score: { away: awayPoints }, venue = '主場館' } = match;\nconst [first, ...rest] = match.sets;\nconsole.log(home, awayPoints, venue);\nconsole.log(first, rest);",
-          predict: { q: '`venue` 會是什麼？', options: ['undefined', "'主場館'", '拋出 ReferenceError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="解構對應：左邊的資料形狀與右邊的解構寫法一一對應：home 取出 home，score 裡的 away 取出並改名為 awayPoints，不存在的 venue 使用預設值">
           <rect x="10" y="10" width="250" height="210" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -242,12 +207,20 @@ defineLessons({
           <text x="320" y="170" font-size="16" class="mono on-color">venue = '主場館'</text>
           <g class="stroke-ink" stroke-width="4"><path d="M260 85 H300 M260 125 H300 M260 165 H300"/></g>
         </svg>`, caption: '解構就是「照資料的形狀寫一個模子」：同名取出、冒號改名、等號給預設值。' },
+        { type: 'heading', id: 'deep-immutable', text: '深入：不改動舊狀態的更新，與 structuredClone 的限制' },
+        '「不改動舊狀態」的更新：從外往內，路徑上每一層都建新的，沒變的部分直接共用。下面的 `scorePoint` 讓最後一局的主隊加 1 分：',
+        { type: 'widget', name: 'runner', props: {
+          title: '只重建有變的那幾層',
+          code: "function scorePoint(state) {\n  const last = state.sets.length - 1;\n  const sets = [...state.sets];\n  sets[last] = { ...sets[last], home: sets[last].home + 1 };\n  return { ...state, sets };\n}\nconst before = { team: '雷霆', sets: [{ home: 25, away: 20 }, { home: 3, away: 5 }] };\nconst after = scorePoint(before);\nconsole.log(before.sets[1].home, after.sets[1].home);\nconsole.log(before.sets[0] === after.sets[0], before.sets[1] === after.sets[1]);",
+        } },
+        '第一局沒變，新舊狀態共用同一個物件（true）；第二局有變，所以是新的（false）。這也是撤銷、比對變化便宜的原因：沒變的部分連複製都不用。',
+        { type: 'table', caption: 'structuredClone 複製不了或會變形的東西', head: ['值', '結果'], rows: [
+          ['函式、DOM 元素', '拋出 `DataCloneError`'],
+          ['class 的實例', '變成一般物件，原型與方法都沒了'],
+          ['getter', '被讀一次，存成一般的值'],
+          ['Map、Set、Date、正規表示式、循環參考', '都能正確複製'],
+        ] },
       ],
-      tryit: {
-        q: ['寫出 `scorePoint(state)`：讓 `state.sets` 最後一局的 home 加 1，回傳新狀態，**不改動傳進來的 state**。'],
-        draft: "function scorePoint(state) {\n  const last = state.sets.length - 1;\n  const sets = [...state.sets];\n  sets[last] = ____;\n  return { ...state, sets };\n}",
-        answer: ['`{ ...sets[last], home: sets[last].home + 1 }`。', '每一層「有變的」都建新的（那一局、sets 陣列、state），沒變的直接共用。這樣舊的 state 完全不受影響，可以留著做「復原」（9-1 期末實作會用到）。'],
-      },
     },
     mistakes: [
       { wrong: '以為 `{ ...obj }` 就是完整複製。', why: '只複製最外層，裡面的物件與陣列仍共用。', right: '巢狀的也展開，或用 structuredClone。' },
@@ -255,21 +228,9 @@ defineLessons({
       { wrong: '用 `JSON.parse(JSON.stringify(obj))` 做深複製。', why: '日期會變成字串、undefined 的屬性會消失（1-4）、函式會不見。', right: '用 structuredClone；它能保留日期與 Map。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`const b = [...a]` 之後 `b.push(4)`，a 會變嗎？', options: [
-        { text: '不會，b 是新的陣列', correct: true, why: '展開建立了新陣列，push 只改 b。' },
-        { text: '會，兩者共用', why: '那是 `b = a` 的情況。' },
-        { text: '只有在 a 是 const 時不會', why: '和 a 的宣告方式無關。' },
-        { text: '拋出 TypeError', why: '對新陣列 push 完全合法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`a = [{ n: 1 }]; b = [...a]; b[0].n = 2;` 之後 `a[0].n` 是？', options: [
-        { text: '`2`', correct: true, why: '淺複製：陣列是新的，但裡面的物件是同一個。' },
-        { text: '`1`', why: '只有外層的陣列被複製，元素物件仍共用。' },
-        { text: '`undefined`', why: '元素一直存在。' },
-        { text: '拋出 TypeError', why: '修改物件屬性是合法的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要寫「撤銷」功能：每次修改前先把目前狀態存進歷史陣列。同事說「每次都 structuredClone 整個狀態最保險」。這樣做有什麼代價？有沒有更好的做法？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要寫「撤銷」功能：每次修改前先把目前狀態存進歷史陣列。同事說「每次都 structuredClone 整個狀態最保險」。這樣做有什麼代價？有沒有更好的做法？'], answer: [
         '代價：狀態很大時，每次都完整深複製很耗時間和記憶體。',
-        '更好的做法：更新時一律用「不改動舊狀態、只把有變的那幾層建成新的」的寫法（本課的 scorePoint）。這樣舊狀態本來就不會被改，直接把舊的參考存進歷史就好，沒變的部分新舊共用，幾乎不花額外記憶體。',
+        '更好的做法：更新時一律用「不改動舊狀態、只把有變的那幾層建成新的」的寫法（本課深入段落的 scorePoint）。這樣舊狀態本來就不會被改，直接把舊的參考存進歷史就好，沒變的部分新舊共用，幾乎不花額外記憶體。',
       ] },
     ],
     keypoints: [
@@ -285,20 +246,6 @@ defineLessons({
       '用 map、filter、reduce 寫出常見的資料處理',
       '用 find、some、every 回答「有沒有」「是不是全部」',
       '讀懂 reduce 每一輪的累加器',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-2）`{ ...obj }` 對巢狀陣列做了什麼？', options: [
-        { text: '沒有複製，新舊物件共用同一個陣列', correct: true, why: '展開只複製一層。' },
-        { text: '也複製了一份新的陣列', why: '那是 structuredClone 的行為。' },
-        { text: '把陣列轉成字串', why: '展開不會轉型。' },
-        { text: '把巢狀陣列也展開，變成新物件的好幾個屬性', why: '展開不會刪任何東西。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 3-2）`players.find(…)` 找不到時回傳 undefined，下面哪個寫法安全地讀它的 name？', options: [
-        { text: '`players.find(…)?.name`', correct: true, why: '找不到時直接得到 undefined，不拋錯。' },
-        { text: '`players.find(…).name`', why: '找不到時會對 undefined 讀屬性，拋出 TypeError。' },
-        { text: '`players.find(…) || .name`', why: '這是語法錯誤。' },
-        { text: '`players.find(…)!.name`', why: '`!` 是 TypeScript 的寫法，執行時不會檢查，找不到仍然拋錯。' },
-      ] },
     ],
     analogy: {
       text: ['中央廚房的生產線：第一台把每一顆番茄切成丁（一顆進、一份出：map）；第二台挑掉撞傷的（有的留下、有的丟掉：filter）；第三台把全部倒進一鍋煮成湯（很多顆進、一鍋出：reduce）。'],
@@ -346,7 +293,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const players = [\n  { name: '阿明', pos: '主攻', points: 18 },\n  { name: '小華', pos: '副攻', points: 9 },\n  { name: '小美', pos: '主攻', points: 21 },\n  { name: '阿凱', pos: '舉球', points: 3 },\n];\nconsole.log(players.map((p) => p.name));\nconsole.log(players.filter((p) => p.pos === '主攻').length);\nconsole.log(players.reduce((sum, p) => sum + p.points, 0));\nconsole.log(players.find((p) => p.points > 10).name, players.some((p) => p.points === 0));",
-          predict: { q: '`reduce` 那一行印出多少？', options: ['18', '51', "'0189213'"], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="四個問句方法：find 回傳第一個符合的元素；findIndex 回傳它的位置，找不到是負一；some 問有沒有至少一個；every 問是不是全部">
           <rect x="10" y="10" width="125" height="200" style="fill:var(--m6)" class="stroke-ink" stroke-width="4"/>
@@ -366,42 +312,29 @@ defineLessons({
           <text x="482" y="100" text-anchor="middle" font-size="15" class="on-color">是不是</text>
           <text x="482" y="130" text-anchor="middle" font-size="15" class="on-color">全部</text>
         </svg>`, caption: '找到答案就停的「問句方法」：不用跑完整個陣列。' },
+        { type: 'heading', id: 'deep-pipeline', text: '深入：方法串接的成本與迭代器 helpers' },
+        '`filter().map()` 每一步都會建立一個完整的新陣列。幾百、幾千筆時這個成本可以忽略，可讀性比較重要；資料到幾十萬筆、或只需要「前 10 筆符合的」時，中間陣列就會浪費。',
+        'ES2025 的 Iterator helpers 提供「一次只處理一個元素」的版本：`players.values().filter(isAttacker).map(toName).take(10).toArray()`。它是惰性的，找到 10 筆就停，不會先把整個陣列篩一遍。支援版本見 9-2（Chrome 122、Firefox 131、Safari 18.4、Node.js 22 起）。',
+        { type: 'table', head: ['情況', '建議'], rows: [
+          ['一般資料處理（幾千筆以內）', '陣列方法串接，可讀性優先'],
+          ['只要前幾筆、或資料很大', 'Iterator helpers 或 `for…of` 搭配 `break`'],
+          ['同時要算好幾個統計值', '一個 `for…of` 跑一次，比串好幾次 `reduce` 好讀'],
+          ['依條件分組', '`Object.groupBy`（4-5），不要用 reduce 手刻'],
+        ] },
+        'reduce 什麼時候不適用：累加器是物件、而且每一輪都 `{ ...acc, … }` 複製一次時，時間會變成平方級，資料一多就很慢。這種情況改用迴圈直接修改一個區域變數，反正它不會外流。',
       ],
-      tryit: {
-        q: ['用 `reduce` 算出每個位置有幾個人，結果要是 `{ 主攻: 2, 副攻: 1, 舉球: 1 }`：'],
-        draft: 'const countByPos = players.reduce((acc, p) => {\n  acc[p.pos] = ____;\n  return acc;\n}, ____);',
-        answer: ['第一格 `(acc[p.pos] ?? 0) + 1`，第二格 `{}`。', '起始值是空物件；第一次遇到某個位置時 `acc[p.pos]` 是 undefined，用 `??` 當成 0。別忘了每一輪都要 `return acc`。'],
-      },
     },
     mistakes: [
       { wrong: 'reduce 不給起始值。', why: '會拿第一個元素當起始值；元素是物件時，`物件 + 數字` 變成字串相接（Node.js 22.13 實測得到 `[object Object]9213`）。', right: '起始值一律寫清楚。' },
       { wrong: '用 map 只是為了跑過每個元素，回傳值不用。', why: 'map 會建立一個用不到的新陣列，讀程式的人也會以為你要那個結果。', right: '只做事不要結果就用 `for…of` 或 `forEach`。' },
       { wrong: '對 `find` 的結果直接讀屬性。', why: '找不到時是 undefined，讀屬性拋出 TypeError。', right: '用 `?.` 或先判斷。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`[1, 2, 3].forEach((n) => n * 2)` 回傳什麼？', options: [
-        { text: '`undefined`', correct: true, why: 'forEach 只負責「對每個做事」，永遠回傳 undefined。' },
-        { text: '`[2, 4, 6]`', why: '那是 map 的結果。' },
-        { text: '`[1, 2, 3]`', why: 'forEach 不回傳原陣列。' },
-        { text: '`6`（最後一次回呼的結果）', why: '那是最後一次回呼的結果，但 forEach 不會回傳它。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要找出「第一個得分超過 20 的球員的名字」，哪個最合適？', options: [
-        { text: '`players.find((p) => p.points > 20)?.name`', correct: true, why: 'find 找到第一個就停，?. 處理找不到的情況。' },
-        { text: '`players.filter((p) => p.points > 20)[0].name`', why: '能用但會跑完整個陣列，而且找不到時 `[0]` 是 undefined，讀 name 會拋錯。' },
-        { text: '`players.some((p) => p.points > 20).name`', why: 'some 回傳布林值，沒有 name。' },
-        { text: '`players.map((p) => p.points > 20).name`', why: 'map 回傳的是布林值陣列。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你有一份訂單陣列 `orders`（每筆有 `status`、`amount`）。用方法串接寫出「已付款訂單的總金額」，並說出每一步的輸入與輸出長度。'], answer: [
-        "`orders.filter((o) => o.status === 'paid').reduce((sum, o) => sum + o.amount, 0)`",
-        'filter：N 筆進、只剩已付款的 K 筆出；reduce：K 筆進、1 個數字出。金額如果是小數，記得 1-2：用整數的分存、最後才換算。',
-      ] },
-    ],
     keypoints: [
       'map 變形（N 進 N 出）、filter 篩選（N 進 0～N 出）、reduce 合併（N 進 1 個值）。',
       'find、findIndex、some、every 找到答案就停；find 找不到是 undefined。',
       'reduce 一定要給起始值；只做事不要結果就不要用 map。',
     ],
-    sources: ['mdn-array'],
+    sources: ['mdn-array', 'tc39-finished'],
   },
 
   '4-4': {
@@ -409,20 +342,6 @@ defineLessons({
       '分辨哪些陣列方法會改到原陣列',
       '寫出正確的數字排序',
       '用 toSorted、with 等方法保留原陣列',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-3）`players.filter(…)` 會改到 players 嗎？', options: [
-        { text: '不會，它回傳新陣列', correct: true, why: 'filter 不改原陣列。' },
-        { text: '會，不符合的元素會被刪掉', why: 'filter 只是在新陣列裡不放它們。' },
-        { text: '只有在回呼回傳 false 時會', why: '回呼的結果只決定新陣列放不放，不碰原陣列。' },
-        { text: '會把 players 清空', why: '原陣列完全不變。' },
-      ] },
-      { level: '回想', type: 'mc', q: "（回顧 3-3）`'10' > '9'` 為什麼是 false？", options: [
-        { text: '兩邊都是字串時比字典順序，"1" 在 "9" 前面', correct: true, why: '字串比較從第一個字元開始。' },
-        { text: '字串不能比大小', why: '可以比，只是比的是字典順序。' },
-        { text: '10 被轉成 1', why: '沒有這種轉換。' },
-        { text: '數字字串會先轉成數字再比，但 "10" 轉換失敗變成 NaN', why: '"10" 比 "9" 長，長短不是比較依據。' },
-      ] },
     ],
     analogy: {
       text: ['排列機有兩種型號：舊型的直接在原本的箱子裡重新排（別人的箱子也被打亂了）；新型的拿一個新箱子放排好的結果，原本的箱子不動。'],
@@ -471,7 +390,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const nums = [10, 9, 1, 100];\nconst result = nums.sort();\nconsole.log(result, result === nums);\nconsole.log([10, 9, 1, 100].sort((a, b) => a - b));\nconst sets = [25, 23, 15];\nconsole.log(sets.at(-1), sets.push(18), sets);",
-          predict: { q: '`[10, 9, 1, 100].sort()` 的結果是？', options: ['[ 1, 9, 10, 100 ]', '[ 1, 10, 100, 9 ]', '[ 100, 10, 9, 1 ]'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="預設排序把數字轉成字串逐字比較：1、10、100 都以字元 1 開頭排在前面，9 以字元 9 開頭排在最後">
           <rect x="10" y="10" width="540" height="200" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -480,35 +398,21 @@ defineLessons({
           <text x="30" y="140" font-size="16">第一個字元：1、1、1 都比 9 小，所以 9 排最後</text>
           <text x="30" y="180" font-size="16">"1" 是 "10" 的開頭，較短的排前面</text>
         </svg>`, caption: '這就是 `sort()` 得到 `[1, 10, 100, 9]` 的原因；數字要給 `(a, b) => a - b`。' },
+        { type: 'heading', id: 'deep-sort', text: '深入：比較函式的規則、穩定排序與中文排序' },
+        '比較函式必須「一致」：同樣的 a、b 每次都回傳同號的結果。常見的錯是回傳布林值 `(a, b) => a > b`：它只會回傳 true／false（轉成 1／0），永遠不會是負數，排序結果會因引擎與資料而異。',
+        'ES2019 起規格保證 `sort` 是穩定排序：比較結果相等的元素，保持原本的先後順序。所以多條件排序可以寫成一個比較函式 `(a, b) => b.points - a.points || a.number - b.number`：得分高的在前，同分時背號小的在前。',
+        { type: 'table', head: ['要排的東西', '寫法'], rows: [
+          ['數字', '`(a, b) => a - b`'],
+          ['英文字串，不分大小寫', '`(a, b) => a.localeCompare(b, "en", { sensitivity: "base" })`'],
+          ['中文字串', '`new Intl.Collator("zh-Hant-TW").compare`，排序依語系規則，不是依 UTF-16 編碼'],
+          ['日期', '`(a, b) => a - b`（Date 會轉成毫秒數）'],
+        ] },
       ],
-      tryit: {
-        q: ['補完比較函式：分數高的在前，同分時依名字（用 `localeCompare`）排：'],
-        draft: "players.toSorted((a, b) => ____)",
-        answer: ["`b.points - a.points || a.name.localeCompare(b.name, 'zh-Hant')`", '分數差是 0 時，`||` 會改看右邊的名字比較（3-2：0 是 falsy）。這裡用 `||` 剛好正確，因為「差是 0」正是要改用下一個條件的時候。'],
-      },
     },
     mistakes: [
       { wrong: '以為 `const sorted = list.sort()` 會得到新陣列。', why: 'sort 就地排序並回傳原陣列，list 也被改了。', right: '用 `toSorted`。' },
       { wrong: '數字陣列直接 `sort()`。', why: '預設用字串比較，100 會排在 9 前面。', right: '`sort((a, b) => a - b)`。' },
-      { wrong: '在 Vue、React 的 state 上直接 push 或 sort。', why: '改的是同一個陣列，框架可能偵測不到變化（4-1）。', right: '用回傳新陣列的方法，再指定回 state。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '下列哪一個「不會」改到原陣列？', options: [
-        { text: '`arr.with(0, 99)`', correct: true, why: 'with 回傳一個第 0 格換成 99 的新陣列。' },
-        { text: '`arr.reverse()`', why: 'reverse 就地反轉。' },
-        { text: '`arr.splice(0, 1)`', why: 'splice 直接刪掉原陣列的元素。' },
-        { text: '`arr[0] = 99`', why: '這是直接修改那一格。' },
-      ] },
-      { level: '應用', type: 'mc', q: "`const words = ['banana', 'Apple', 'cherry']; words.toSorted()` 的結果是？", options: [
-        { text: "`['Apple', 'banana', 'cherry']`", correct: true, why: '預設依字元編碼比較，大寫字母排在小寫前面。' },
-        { text: "`['banana', 'Apple', 'cherry']`", why: 'toSorted 有排序，只是不改原陣列。' },
-        { text: "`['Apple', 'cherry', 'banana']`", why: 'b 排在 c 前面。' },
-        { text: "`['apple', 'banana', 'cherry']`", why: '排序不會改字的大小寫。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同一份球員陣列，要同時顯示「依背號」與「依得分」兩個表格。原本的程式在第二個表格用了 sort，結果第一個表格也亂了。用這一課的觀念解釋，並修正。'], answer: [
-        '兩個表格用的是同一個陣列（同一個參考）。sort 就地排序，第一個表格讀到的順序也跟著變了。',
-        '修正：第二個表格改用 `players.toSorted((a, b) => b.points - a.points)`，原陣列保持依背號的順序。',
-      ] },
+      { wrong: '在 React 的 state 陣列上直接 push 或 sort，再把同一個陣列交給 setState。', why: '參考沒變，React 用 Object.is 比較後判斷沒有變化，不會重畫（4-1）；Vue 3 的 reactive 陣列則偵測得到。', right: '用回傳新陣列的方法（toSorted、展開），再交給 setState。' },
     ],
     keypoints: [
       'push、pop、shift、unshift、sort、reverse、splice、`arr[i] =` 會改原陣列；toSorted、toReversed、toSpliced、with、slice、map、filter 不會。',
@@ -523,20 +427,6 @@ defineLessons({
       '判斷什麼時候用 Map、Set，而不是一般物件與陣列',
       '用 Set 去除重複、算交集與聯集',
       '用 Object.groupBy 依條件分組',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-4）`[3, 1, 2].toSorted()` 之後原陣列是？', options: [
-        { text: '`[3, 1, 2]`', correct: true, why: 'toSorted 回傳新陣列，不改原陣列。' },
-        { text: '`[1, 2, 3]`', why: '那是 sort 的效果。' },
-        { text: '`[]`（排好的元素被搬到新陣列）', why: '原陣列不會被清空。' },
-        { text: '`undefined`', why: '原陣列完全不變。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 4-1）兩個內容一樣的物件用 `===` 比較，結果是？', options: [
-        { text: 'false，除非它們是同一個物件', correct: true, why: '物件比較的是「是不是同一個」。' },
-        { text: 'true，因為內容一樣', why: '`===` 不比內容。' },
-        { text: '拋出 TypeError', why: '物件可以用 `===` 比較。' },
-        { text: '屬性數量和每個值都相同時就是 true', why: '屬性數量也不在比較範圍內。' },
-      ] },
     ],
     analogy: {
       text: ['一般物件像一本只能用「中文名字」當索引的通訊錄；[[Map]] 像一本什麼都能當索引的資料夾，連「一張照片」都可以當標籤。[[Set]] 則像簽到表：同一個人簽兩次，名單上還是只有一個名字。'],
@@ -587,7 +477,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const a = new Set(['阿明', '小華', '小美']);\nconst b = new Set(['小華', '小美', '阿凱']);\nconsole.log(a.intersection(b), a.union(b).size);\nconsole.log([...new Set(['a', 'b', 'a'])]);\nconst scores = new Map([['阿明', 18]]);\nscores.set('小華', 9);\nconsole.log(scores.get('阿明'), scores.has('阿凱'), scores.size);\nconst obj = { b: 1 };\nobj[2] = 'x';\nconsole.log(Object.keys(obj));",
-          predict: { q: '最後一行 `Object.keys(obj)` 的結果是？', options: ["[ 'b', 2 ]", "[ '2', 'b' ]", "[ 'b', '2' ]"], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="集合運算：A 是阿明小華小美，B 是小華小美阿凱；交集是小華小美；聯集是四個人；A 減 B 的差集是阿明">
           <rect x="10" y="10" width="170" height="210" style="fill:var(--m3)" class="stroke-ink" stroke-width="4"/>
@@ -603,12 +492,19 @@ defineLessons({
           <text x="465" y="100" text-anchor="middle" font-size="16" class="on-color">A 有、B 沒有</text>
           <text x="465" y="140" text-anchor="middle" font-size="16" class="on-color">阿明</text>
         </svg>`, caption: 'A 是阿明、小華、小美；B 是小華、小美、阿凱。' },
+        { type: 'heading', id: 'deep-map-object', text: '深入：Map 和物件的取捨細節' },
+        { type: 'table', head: ['比較', '一般物件', 'Map'], rows: [
+          ['鍵的順序', '整數樣子的鍵先由小到大，其他字串再照加入順序', '完全照加入順序'],
+          ['繼承來的鍵', '`"toString" in {}` 是 true；用 `Object.create(null)` 才乾淨', '沒有'],
+          ['JSON', '直接 stringify', '`JSON.stringify(map)` 得到 `"{}"`，要先 `Object.fromEntries(map)`'],
+          ['大小', '`Object.keys(o).length`', '`map.size`'],
+        ] },
+        { type: 'widget', name: 'runner', props: {
+          title: '鍵的順序與 JSON',
+          code: "const o = { b: 1, 2: 'x', a: 2, 1: 'y' };\nconsole.log(Object.keys(o));\nconst m = new Map([['b', 1], [2, 'x']]);\nconsole.log(JSON.stringify(m), JSON.stringify(Object.fromEntries(m)));\nconst groups = Object.groupBy([1, 2, 3], (n) => (n % 2 ? 'odd' : 'even'));\nconsole.log(Object.getPrototypeOf(groups));",
+        } },
+        '最後一行印出 null：`Object.groupBy` 回傳沒有原型的物件，所以分組名稱叫 `toString` 也不會撞到內建方法。ES2027 預定加入的 `map.getOrInsert(key, 預設值)` 可以把「沒有就先放一個」寫成一行，Node.js 26 已經支援（9-2）。',
       ],
-      tryit: {
-        q: ['用一行把有重複的報名名單 `signups` 變成不重複的陣列：'],
-        draft: 'const unique = ____;',
-        answer: ['`[...new Set(signups)]`。', 'Set 自動去除重複，再用展開轉回陣列；順序會保留第一次出現的位置。'],
-      },
     },
     mistakes: [
       { wrong: '用一般物件當「以使用者 id 為鍵」的快取，id 是數字。', why: '物件的鍵會被轉成字串；拿物件當鍵更會變成 "[object Object]"，全部撞在一起。', right: '鍵不是固定的字串時用 Map。' },
@@ -616,19 +512,7 @@ defineLessons({
       { wrong: '以為 `Object.groupBy` 回傳的是 Map。', why: '它回傳一般物件（而且沒有原型）；要 Map 用 `Map.groupBy`。', right: '依需要選 `Object.groupBy` 或 `Map.groupBy`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`new Set([1, 1, 2, 2, 3]).size` 是？', options: [
-        { text: '`3`', correct: true, why: 'Set 只保留不重複的值：1、2、3。' },
-        { text: '`5`', why: 'Set 會去除重複。' },
-        { text: '`2`', why: '有三個不同的值。' },
-        { text: '`undefined`', why: 'Set 有 size 屬性。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要記錄「每個 DOM 元素被點了幾次」（元素本身當鍵），該用？', options: [
-        { text: '`new Map()`', correct: true, why: 'Map 的鍵可以是物件，而且不會被轉成字串。' },
-        { text: '一般物件 `{}`', why: '元素當鍵會被轉成 "[object HTMLButtonElement]" 這類字串，不同元素撞在一起。' },
-        { text: '`new Set()`', why: 'Set 只記得「有沒有」，不能存次數。' },
-        { text: '陣列，用元素在頁面上的順序當索引', why: '要用位置對應元素，查找很麻煩。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要做「本週出席統計」：輸入是一串 `{ name, date }` 的打卡紀錄（同一人同一天可能重複打卡）。說出你會用哪些資料結構、各自做什麼。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要做「本週出席統計」：輸入是一串 `{ name, date }` 的打卡紀錄（同一人同一天可能重複打卡）。說出你會用哪些資料結構、各自做什麼。'], answer: [
         '先用 Set 去除重複：把每筆變成 `` `${name}|${date}` `` 這種字串放進 Set，同人同日只會留一筆。',
         '再分組或計數：用 `Object.groupBy` 依 name 分組看每個人出席了哪幾天，或用 Map 計數 `map.set(name, (map.get(name) ?? 0) + 1)`。',
       ] },

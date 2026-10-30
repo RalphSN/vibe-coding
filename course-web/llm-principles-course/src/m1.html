@@ -13,14 +13,6 @@ defineTerms({
   '對話格式': { en: 'chat template', def: '把多輪對話（system、user、assistant）攤平成一條 token 序列的固定格式，中間用特殊 token 分隔。', example: 'API 的 messages 會先變成這種序列才進模型。', lesson: '1-4' },
 });
 
-const REVIEW_M0 = [
-  { level: '回想', type: 'mc', q: '（回顧 0-1）模型拿到文字後，第一件事是什麼？', options: [
-    { text: '切成 token 並換成編號', correct: true, why: '模型只處理數字。' },
-    { text: '直接把整句話送進 Transformer', why: 'Transformer 處理的是向量，不是文字。' },
-    { text: '先在資料庫裡找出最像的一句話', why: '模型裡沒有句子資料庫。' },
-    { text: '先算出下一個字的機率', why: '機率是最後一站。' },
-  ] },
-];
 
 const SPLIT_SVG = `<svg viewBox="0 0 560 250" role="img" aria-label="三種切法對照：用字母切太長，用整個詞切會遇到沒看過的詞，用子詞切兩邊折衷">
   <text x="20" y="28" font-size="15" font-weight="900">同一個詞「unhappiness」</text>
@@ -38,6 +30,11 @@ const SPLIT_SVG = `<svg viewBox="0 0 560 250" role="img" aria-label="三種切�
   <text x="20" y="236" font-size="13">子詞的切點是示意；真正怎麼切由各模型的 tokenizer 決定</text>
 </svg>`;
 
+defineTerms({
+  '預先切段': { en: 'pre-tokenization', def: 'BPE 訓練前先用規則把文字切成詞、數字、標點、空白，合併只在每一段內部發生。', example: '「dog.」先切成 dog 和 .。', lesson: '1-2' },
+  '共用向量表': { en: 'weight tying', def: '讓輸入的向量表和輸出層使用同一份 V × d 數字，參數少一半。', example: 'Press、Wolf 2016。', lesson: '1-3' },
+});
+
 defineLessons({
   '1-1': {
     goals: [
@@ -45,7 +42,6 @@ defineLessons({
       '解釋子詞為什麼是折衷',
       '知道為什麼現代 tokenizer 不會遇到「不認得的字」',
     ],
-    review: REVIEW_M0,
     analogy: {
       text: ['寄東西用的箱子：全部用小盒子裝（字母），一台卡車要裝幾千盒，搬很久；全部用訂製大箱（整個詞），遇到形狀沒看過的東西就沒有箱子可裝。', '物流公司的做法是準備幾種常用尺寸：常寄的東西剛好一箱，奇怪的東西拆成幾箱。這就是[[子詞]]切法。'],
       limit: ['箱子尺寸是人設計的，子詞是從資料統計出來的（1-2）。而且箱子只影響運費，token 切法還會影響模型「看到」的東西：切得怪，模型就比較難處理（1-3 的數字例子）。'],
@@ -81,12 +77,15 @@ defineLessons({
           <text x="20" y="170" font-size="14">任何文字最差也能拆成位元組，所以不會有「不認得的字」。</text>
           <text x="20" y="192" font-size="13">常見的字會被合併成一整塊（1-2），罕見的字才會拆到位元組。</text>
         </svg>`, caption: '在位元組上做子詞切分是許多現代 tokenizer 的通用做法；各家細節不同。' },
+        { type: 'heading', id: 'deep-space-case', text: '深入：空格、大小寫也會改變 token' },
+        '很多 tokenizer 把空格當成 token 的一部分：「 hello」（前面有空格）和「hello」常常是兩個不同的 token，大寫的「Hello」又是另一個。SentencePiece 甚至把空格換成一個看得見的符號（▁）再切，所以中文、日文這種不用空格分詞的語言也能用同一套做法。',
+        { type: 'table', head: ['你以為一樣的', '在 tokenizer 眼裡', '實務影響'], rows: [
+          ['hello、 hello、Hello', '常常是三個不同編號', 'prompt 裡多一個空格，模型看到的序列就不同'],
+          ['全形「，」與半形「,」', '不同的 token', '中英混排時標點不一致會多花 token'],
+          ['同一個詞在句首或句中', '可能切法不同', '計數要用實際內容量，不要用單字數換算'],
+        ], caption: '原理見 Kudo、Richardson 2018（SentencePiece）。各模型的實際切法不同，用該模型的 token 計數確認。' },
+        '子詞切法不是唯一選擇。也有直接在位元組上訓練、完全不用 tokenizer 的研究模型，好處是沒有切法的怪現象，代價是序列長好幾倍；目前主流的大型模型仍用子詞（未查證各家最新內部做法）。',
       ],
-      tryit: {
-        q: ['在上面的示意器切到「罕見英文」與「常見英文」，比較兩者每個字元平均分到幾段，寫下你的觀察：'],
-        draft: '常見英文：＿ 字元 → ＿ 段\n罕見英文：＿ 字元 → ＿ 段\n觀察：＿',
-        answer: ['示意器是固定每 4 個字母切一段，所以兩者比例差不多；真正的 tokenizer 不是這樣。真正的 tokenizer 會把常見詞（The、weather）整個當一個 token，罕見長詞拆成很多塊，所以罕見詞「每字元花的 token」比較多。', '要看真實切法，用模型自己的 token 計數功能（第一部 1-4）。'],
-      },
     },
     mistakes: [
       { wrong: '以為 token 就是一個字或一個單字。', why: 'token 是子詞：可能比一個詞小，也可能是一整個常見詞。', right: '把 token 想成「tokenizer 認得的片段」。' },
@@ -94,19 +93,7 @@ defineLessons({
       { wrong: '以為 tokenizer 會隨著使用慢慢學新詞。', why: 'tokenizer 和模型一起定好，之後固定。', right: '新名詞會被拆成舊的片段組合。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '用「整個詞」當 token，最大的問題是？', options: [
-        { text: '遇到詞彙表沒有的詞就無法表示', correct: true, why: '新詞、拼錯的詞、專有名詞都會卡住。' },
-        { text: '每個句子會切出太多段，運算太慢', why: '那是字母切法的問題。' },
-        { text: '中文和英文的字數不同', why: '這不是整詞切法特有的問題。' },
-        { text: '模型會因此不懂文法', why: '和文法無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '為什麼許多現代 tokenizer 不會出現「不認得的字」？', options: [
-        { text: '任何文字最差都能拆成位元組', correct: true, why: '最差情況就是一個位元組一個 token。' },
-        { text: '詞彙表收錄了世界上所有的文字與符號', why: '詞彙表只有幾萬到幾十萬個，收不完。' },
-        { text: '遇到不認得的字，模型會自動上網查詢', why: '模型推論時不會上網。' },
-        { text: '不認得的字會被直接刪掉', why: '不會刪掉；會拆成位元組。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的產品名稱是自創字「Zyntrova」。推測它會被怎麼切，以及這對模型有什麼影響。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的產品名稱是自創字「Zyntrova」。推測它會被怎麼切，以及這對模型有什麼影響。'], answer: [
         '詞彙表裡不會有它，會被拆成幾個常見片段（例如 Z、yn、tro、va，切點是示意）。',
         '影響：多花幾個 token；模型對這個詞沒有現成的「意思」，要靠上下文推斷。所以在 prompt 裡第一次出現時，最好說明它是什麼。',
       ] },
@@ -116,7 +103,7 @@ defineLessons({
       '位元組是最後防線：任何文字都切得出來。',
       'tokenizer 和模型一起定好，之後不變。',
     ],
-    sources: ['bpe'],
+    sources: ['bpe', 'sentencepiece'],
   },
 
   '1-2': {
@@ -124,14 +111,6 @@ defineLessons({
       '手算 BPE 的一次合併',
       '說出「合併規則」怎麼用來切新的文字',
       '解釋為什麼常見的詞最後會變成一整塊',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）子詞切法折衷了哪兩種切法？', options: [
-        { text: '字母切法與整詞切法', correct: true, why: '子詞介於兩者之間。' },
-        { text: '中文切法與英文切法', why: '子詞不是依語言分。' },
-        { text: '大寫字母切法與小寫字母切法', why: '和大小寫無關。' },
-        { text: '句子切法與段落切法', why: 'token 比詞還小或差不多大。' },
-      ] },
     ],
     analogy: {
       text: ['打字常用縮寫：你發現自己老是打「謝謝你」，就設一個快捷鍵；之後又發現「謝謝你的幫忙」也很常出現，再設一個更長的。', '[[BPE]] 就是這樣自動找快捷鍵：一開始每個字元一塊，每一步把資料裡最常相鄰出現的兩塊黏成一塊新 token，記下這條[[合併規則]]，重複幾萬次。'],
@@ -172,12 +151,16 @@ defineLessons({
         { type: 'widget', name: 'bpe', props: { title: '小語料：low×5、lower×2、newest×6、widest×3', words: [{ w: 'low', n: 5 }, { w: 'lower', n: 2 }, { w: 'newest', n: 6 }, { w: 'widest', n: 3 }], steps: 8 } },
         { type: 'callout', variant: 'tip', title: '看互動時注意三件事', body: ['一、最先合併的是 `e`＋`s`、`es`＋`t` 這種在很多詞裡都出現的片段，不是某一個詞。', '二、每合併一次，詞彙表多一個 token，整份資料切出來的段數變少。', '三、`_` 是詞尾標記：讓 `est_`（詞尾的 est）和詞中間的 est 分開，原論文的做法也類似。'] },
         { type: 'code', lang: 'python', title: '用學到的規則切一個新詞（示意）', code: 'merges = [("e","s"), ("es","t"), ("est","_"), ("l","o"), ("lo","w")]\n\ndef tokenize(word):\n    parts = list(word) + ["_"]\n    for a, b in merges:          # 依學到的順序套用\n        i = 0\n        while i < len(parts) - 1:\n            if parts[i] == a and parts[i + 1] == b:\n                parts[i:i + 2] = [a + b]\n            else:\n                i += 1\n    return parts\n\nprint(tokenize("lowest"))   # [\'low\', \'est_\']' },
+        { type: 'heading', id: 'deep-bpe-limits', text: '深入：實際的 BPE 比互動多兩道手續' },
+        '第一道是[[預先切段]]（pre-tokenization）：訓練前先用規則把文字切成詞、數字、標點、空白幾類，BPE 只在每段內部合併。這樣「dog.」和「dog!」不會各自長出一個 token，數字也不會和字母黏在一起。',
+        '第二道是在位元組上做 BPE：起點不是字元，而是 256 種位元組（1-1 的最後防線）。中文字的 3 個位元組會先被合併成一整個字，常見的詞再往上合併。',
+        { type: 'table', head: ['做法', '怎麼長出詞彙表', '代表'], rows: [
+          ['BPE', '從小塊開始，反覆合併最常見的一對', 'Sennrich 等 2015；GPT 系列的位元組版'],
+          ['WordPiece', '也是合併，但挑「合併後讓資料機率提升最多」的一對', 'BERT'],
+          ['Unigram', '從很大的候選表開始，反覆刪掉最不重要的 token', 'SentencePiece 的選項之一'],
+        ], caption: '三種做法的結果都是一張子詞詞彙表；差別在怎麼挑。' },
+        'BPE 只看次數，所以會留下一種怪 token：在 tokenizer 的語料裡常見、在模型的訓練資料裡卻幾乎沒出現。它在詞彙表裡有一個向量，但這個向量幾乎沒被訓練過，模型讀到它時可能出現奇怪的行為。這是 tokenizer 和模型分開訓練時要對齊語料的原因之一。',
       ],
-      tryit: {
-        q: ['語料只有「aaab ×4」與「ab ×3」。不看答案，手算第一次合併會合併哪一對、出現幾次？'],
-        draft: '相鄰配對與次數：＿\n第一次合併：＿',
-        answer: ['把每個詞拆成字元（先不管詞尾標記）：aaab 有 a+a 兩次、a+b 一次；乘上 ×4 → a+a 8 次、a+b 4 次。ab 有 a+b 一次，×3 → 3 次。', '合計 a+a 8 次、a+b 7 次，所以第一次合併 a+a → aa。注意要乘上每個詞出現的次數。'],
-      },
     },
     mistakes: [
       { wrong: '數配對時忘了乘上詞出現的次數。', why: '一個詞出現 6 次，它裡面的配對也算 6 次。', right: '配對次數 ＝ 在詞裡出現幾次 × 詞出現幾次。' },
@@ -185,19 +168,7 @@ defineLessons({
       { wrong: '以為切新文字時是「找最長的 token 去配」。', why: 'BPE 是依學到的合併順序一條一條套用。', right: '照規則順序合併（上面的程式碼）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'BPE 每一步合併的是哪一對？', options: [
-        { text: '出現最多次的相鄰配對', correct: true, why: '只看次數。' },
-        { text: '意思最完整的那兩個字元', why: 'BPE 不看意思。' },
-        { text: '字母順序最前面的那一對', why: '字母順序只用在同分時。' },
-        { text: '最長那個詞的最後兩個字元', why: '和詞長無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'BPE 合併越多次，會發生什麼事？', options: [
-        { text: '詞彙表變大，同一段文字切出的 token 變少', correct: true, why: '每合併一次就多一個 token，序列變短。' },
-        { text: '詞彙表變小，同一段文字切出的 token 變多', why: '方向反了。' },
-        { text: '詞彙表大小不變，只有編號改變', why: '每次合併都會新增一個 token。' },
-        { text: '模型的參數會跟著重新訓練一次', why: '這裡在訓練 tokenizer，不是模型。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['如果訓練 tokenizer 的語料幾乎都是英文，用它切中文會怎樣？對使用者有什麼實際影響？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['如果訓練 tokenizer 的語料幾乎都是英文，用它切中文會怎樣？對使用者有什麼實際影響？'], answer: [
         '中文的常見組合沒機會被合併，很多字會停在位元組或很小的片段，同樣意思要花更多 token。',
         '影響：中文使用者同樣內容付更多錢、更快碰到 context 上限，而且模型處理起來也比較吃力。這就是為什麼 tokenizer 的訓練語料要涵蓋多種語言（1-3）。',
       ] },
@@ -207,7 +178,7 @@ defineLessons({
       '只看次數，不看意思；同分依固定順序。',
       '切新文字時，照規則順序一條一條套用。',
     ],
-    sources: ['bpe'],
+    sources: ['bpe', 'sentencepiece'],
   },
 
   '1-3': {
@@ -215,20 +186,6 @@ defineLessons({
       '說出詞彙表變大的好處與代價',
       '用數字算出詞彙表大小對參數量的影響',
       '解釋數字、程式碼、不同語言為什麼被切得不一樣',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-2）BPE 合併的依據是什麼？', options: [
-        { text: '相鄰配對在語料裡出現的次數', correct: true, why: '每次合併最多的那一對。' },
-        { text: '人工整理好的字根清單', why: 'BPE 不用字根清單。' },
-        { text: '每個詞的意思相近程度', why: 'BPE 不看意思。' },
-        { text: '字元在鍵盤上的位置', why: '無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 0-1）一次前向計算的結果是什麼？', options: [
-        { text: '下一個 token 的機率', correct: true, why: '每次只算下一個。' },
-        { text: '整段回答', why: '回答是很多次接出來的。' },
-        { text: '更新後的參數', why: '推論不更新參數。' },
-        { text: 'tokenizer 的合併規則', why: '那是訓練 tokenizer 的產物。' },
-      ] },
     ],
     analogy: {
       text: ['字典越厚，查到整個詞的機會越高，句子拆得越少；但字典越厚越重，而且很少用到的詞條，你也不太記得意思。', '[[詞彙表]]也一樣：越大，序列越短；但每個 token 都要一個向量（2-1），輸出時也要對每個 token 打分，參數和計算都跟著變多，罕見 token 也練不熟。'],
@@ -289,12 +246,15 @@ defineLessons({
           { label: '程式碼縮排', text: '        if (x) {\n            return y;\n        }' },
           { label: '中英混合', text: '請把 README 翻成中文' },
         ] } },
+        { type: 'heading', id: 'deep-vocab-trend', text: '深入：詞彙表越來越大，以及兩個省參數的做法' },
+        { type: 'table', head: ['模型', '詞彙表大小', '出處'], rows: [
+          ['GPT-2、GPT-3', '50,257', 'Brown 等 2020 沿用 GPT-2 的 tokenizer'],
+          ['Llama 3（2024）', '約 128K', 'Llama Team 2024'],
+          ['Claude', '未公開', '—'],
+        ], caption: '公開模型的趨勢是詞彙表變大：模型夠大時，向量表佔比很小（上面的拉桿），換來多語言與程式碼的序列變短。' },
+        '第一個省參數的做法是[[共用向量表]]與輸出層（weight tying）：輸入查表用的 V × d 矩陣，同時拿來當輸出層，參數直接少一半（Press、Wolf 2016）。小模型常用；大模型因為佔比小，不一定這樣做。',
+        '第二個是處理數字。有些 tokenizer 把數字強制切成一位一位（Llama 系列的做法），讓「1234」永遠是 1、2、3、4，直式計算時每一位對得齊；代價是長數字要花更多 token。這也說明 tokenizer 的設計會直接影響模型擅長什麼。',
       ],
-      tryit: {
-        q: ['把拉桿設成 V＝256 千、d＝4096、整個模型 1 十億。向量表＋輸出層佔多少？這個設計合理嗎？'],
-        draft: '佔比：＿\n合理嗎：＿',
-        answer: ['256,000 × 4,096 × 2 ≈ 21 億，超過整個模型的 10 億，拉桿會頂到 100%。代表這個組合不合理：參數幾乎全花在詞彙上，沒有剩給中間的 Transformer 層。', '小模型要用比較小的詞彙表或比較小的 d，或讓向量表和輸出層共用同一份數字。'],
-      },
     },
     mistakes: [
       { wrong: '以為詞彙表越大越好。', why: '向量表和輸出層會跟著變大，罕見 token 也練不熟。', right: '依語言、模型大小選一個划算的大小。' },
@@ -302,19 +262,7 @@ defineLessons({
       { wrong: '以為模型算錯數學只是因為「不會算」。', why: '數字被切成不規則的片段，也是原因之一。', right: '需要精確計算時，讓模型呼叫工具（第一部 4-1）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '詞彙表變大，下面哪一項會跟著變大？', options: [
-        { text: '向量表與輸出層的參數', correct: true, why: '兩者都是 V × d。' },
-        { text: '同一段文字切出的 token 數', why: '詞彙表大，序列反而變短。' },
-        { text: 'Transformer 中間層的層數', why: '層數和詞彙表無關。' },
-        { text: '每個 token 的位元組數', why: '位元組是文字本身決定的。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'V＝100,000、d＝2,048，向量表有多少個數字？', options: [
-        { text: '約 2.05 億', correct: true, why: '100,000 × 2,048 ＝ 204,800,000。' },
-        { text: '約 2,050 萬', why: '少乘了一個 10。' },
-        { text: '約 20.5 億', why: '多乘了一個 10。' },
-        { text: '102,048 個', why: '要相乘，不是相加。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要做一個只處理繁體中文客服對話的小模型。詞彙表要怎麼設計？說出兩個考量。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要做一個只處理繁體中文客服對話的小模型。詞彙表要怎麼設計？說出兩個考量。'], answer: [
         '一、用大量繁體中文語料訓練 tokenizer，讓常見的中文詞被合併成一塊，序列才不會太長。',
         '二、模型小，詞彙表不能太大，否則參數都花在向量表上；可以讓向量表與輸出層共用，或選中等大小的 V。',
       ] },
@@ -324,7 +272,7 @@ defineLessons({
       '向量表＝V × d 個數字；小模型裡佔比很高。',
       '數字、程式碼、不同語言的切法差很多，要實際量。',
     ],
-    sources: ['bpe', 'claude-token-counting'],
+    sources: ['bpe', 'claude-token-counting', 'gpt3', 'llama3', 'tied-emb'],
   },
 
   '1-4': {
@@ -332,20 +280,6 @@ defineLessons({
       '說出特殊 token 的用途',
       '解釋 API 的 messages 怎麼變成一條 token 序列',
       '知道模型為什麼會「自己停下來」',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-3）V＝50,000、d＝1,000，向量表有幾個數字？', options: [
-        { text: '5,000 萬', correct: true, why: '50,000 × 1,000。' },
-        { text: '500 萬', why: '少乘一個 10。' },
-        { text: '51,000', why: '要相乘。' },
-        { text: '5 億', why: '多乘一個 10。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 1-1）模型遇到從沒看過的自創字，會怎樣？', options: [
-        { text: '拆成幾個認得的小片段', correct: true, why: '最差拆到位元組。' },
-        { text: '整個字被刪掉不處理', why: '不會刪。' },
-        { text: '回傳錯誤訊息', why: '不會報錯。' },
-        { text: '自動把這個新字加進詞彙表裡', why: '詞彙表是固定的。' },
-      ] },
     ],
     analogy: {
       text: ['劇本不只有台詞，還有「（小明）」「（燈暗）」「（第一幕完）」這種標記。演員看到標記，就知道誰在說話、什麼時候結束。', '[[特殊 token]] 就是模型的劇本標記：標出對話從哪裡開始、這段是誰說的、這一輪什麼時候結束。多輪對話照固定的[[對話格式]]攤平成一條序列。'],
@@ -381,13 +315,13 @@ defineLessons({
   <text x="420" y="124" text-anchor="middle" font-size="13" class="on-color">被截斷，要提示或調高</text>
   <text x="280" y="186" text-anchor="middle" font-size="13">stop_reason 的完整清單見第一部 1-3</text>
 </svg>`, caption: '程式要分開處理這兩種情況。' },
-        { type: 'widget', name: 'classify', props: { buckets: [{ id: 'sp', label: '特殊 token 的工作' }, { id: 'tx', label: '一般文字 token 的工作' }], items: [
-          { text: '標出「接下來是使用者說的話」', answer: 'sp', why: '角色標記是結構，不是內容。' },
-          { text: '表示「台北」這個地名', answer: 'tx', why: '這是內容。' },
-          { text: '讓模型知道回答可以停了', answer: 'sp', why: '結束 token。' },
-          { text: '表示程式碼裡的 `return`', answer: 'tx', why: '程式碼也是一般文字。' },
-          { text: '分隔 system 指示和對話內容', answer: 'sp', why: '格式標記。' },
-        ] } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['標出「接下來是使用者說的話」', '特殊 token 的工作', '角色標記是結構，不是內容。'],
+          ['表示「台北」這個地名', '一般文字 token 的工作', '這是內容。'],
+          ['讓模型知道回答可以停了', '特殊 token 的工作', '結束 token。'],
+          ['表示程式碼裡的 `return`', '一般文字 token 的工作', '程式碼也是一般文字。'],
+          ['分隔 system 指示和對話內容', '特殊 token 的工作', '格式標記。']
+        ] },
         { type: 'table', head: ['你在 API 裡寫的', '進模型前大概變成'], rows: [
           ['`system: "你是客服"`', '〈開始〉你是客服'],
           ['`{ role: "user", content: "退貨要幾天？" }`', '〈使用者〉退貨要幾天？'],
@@ -395,42 +329,36 @@ defineLessons({
           ['模型產生', '退貨約 7 天…〈結束〉'],
         ], caption: '示意。重點是：API 的結構化欄位，最後都會變成同一條 token 序列。' },
         { type: 'callout', variant: 'tip', title: '這和 prompt injection 有什麼關係？', body: ['一般的做法是：使用者輸入的文字只會被切成一般 token，就算有人打出「〈系統〉」這幾個字，也只是普通文字，不會變成真正的角色標記。', '但模型讀到這些字，仍可能被內容本身影響。所以第一部 8-4 的防護不能只靠格式，還要靠程式端的檢查。'] },
+        { type: 'widget', name: 'knobs', props: { title: '多輪對話：每一輪都要把歷史重送一次（實際計算）', sliders: [
+          { id: 'sys', label: 'system prompt', min: 0, max: 5000, step: 100, value: 1000, unit: 'token' },
+          { id: 'turn', label: '每一輪（問＋答）', min: 100, max: 2000, step: 100, value: 300, unit: 'token' },
+          { id: 'n', label: '對話輪數', min: 1, max: 50, step: 1, value: 10 },
+        ], compute: (v) => {
+          const last = v.sys + v.n * v.turn;
+          const total = v.n * v.sys + (v.turn * v.n * (v.n + 1)) / 2;
+          const fmt = (x) => Math.round(x).toLocaleString('en-US');
+          return { rows: [
+            { label: '最後一次請求的輸入', value: `${fmt(last)} token`, ratio: Math.min(1, last / total) },
+            { label: '整段對話累計送出的輸入', value: `${fmt(total)} token`, ratio: 1 },
+            { label: '累計是「最後一次」的幾倍', value: `${(total / last).toFixed(1)} 倍`, ratio: Math.min(1, total / last / 30) },
+          ], note: `模型沒有記憶，每一輪都要把 system＋全部歷史重新攤平成一條序列送進去。${v.n} 輪下來累計送了 ${fmt(total)} 個輸入 token，約是最後一次請求的 ${(total / last).toFixed(1)} 倍；輪數越多，差距越大。prompt caching（第一部 8-2）讓重複的前綴便宜很多，但它們仍佔 context。` };
+        } } },
+        { type: 'heading', id: 'deep-template', text: '深入：格式錯了，模型會變笨' },
+        '對話格式是訓練時就定好的。開放模型如果用錯格式（少了角色標記、結束標記放錯位置），模型面對的是它幾乎沒看過的序列，常見的症狀是不停下來、自問自答，或回答品質明顯變差。',
+        '所以開放模型的 tokenizer 通常附一份官方的格式範本，推論框架照著套用；用 API 時這一步由服務端代勞，你只需要寫 messages。另一個實務細節：很多 tokenizer 函式庫預設會拒絕或跳脫使用者文字裡長得像特殊 token 的字串，避免它被當成真正的標記。',
       ],
-      tryit: {
-        q: ['如果訓練資料裡，助理的回答後面從來沒有〈結束〉，模型推論時會怎樣？'],
-        draft: '我的推測：＿',
-        answer: ['模型學不會「什麼時候該停」，會一直接下去，直到碰到 `max_tokens` 上限被截斷，甚至開始自己扮演使用者繼續對話。', '這也是為什麼後訓練（模組 6）的資料都要照對話格式排好、每一輪都有結束標記。'],
-      },
     },
     mistakes: [
       { wrong: '以為 system prompt 是另外一個通道，模型「分開」處理。', why: '最後都會被攤平成同一條序列，只是用特殊 token 標出位置。', right: '把 system 想成序列開頭、有特別標記的一段文字。' },
       { wrong: '以為在訊息裡打出「〈結束〉」就能讓模型停。', why: '使用者打的字通常只會切成一般 token。', right: '要控制長度，用 `max_tokens` 或 stop sequences。' },
       { wrong: '以為模型停下來是因為「想說的說完了」這種意圖。', why: '它只是在某一步選到了結束 token。', right: '停止也是一次取樣的結果。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '模型為什麼會在回答完自己停下來？', options: [
-        { text: '它在某一步選到了結束 token', correct: true, why: '程式看到結束 token 就停止生成。' },
-        { text: 'API 會依照字數幫它自動截斷', why: '那是 max_tokens 的情況，不是正常結束。' },
-        { text: '模型會判斷使用者是否滿意', why: '模型沒有這種回饋。' },
-        { text: 'GPU 算完事先設定的固定次數就會自動停下', why: '次數不是固定的。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'API 回應的 `stop_reason` 是 `max_tokens`，代表什麼？', options: [
-        { text: '還沒產生結束 token，就碰到長度上限', correct: true, why: '回答被截斷了。' },
-        { text: '模型自然地說完了', why: '那是 end_turn。' },
-        { text: '輸入超過了 context window', why: '那會是請求錯誤。' },
-        { text: 'tokenizer 切不出這段文字', why: 'tokenizer 一定切得出來。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你把同一段對話分別送到兩家公司的模型，兩邊都用了 1,000 個輸入 token 嗎？為什麼？'], answer: [
-        '不一定。兩家的 tokenizer 不同，內容切出的 token 數不同；對話格式不同，加進去的特殊 token 數也不同。',
-        '要算成本，用各家自己的 token 計數功能。',
-      ] },
-    ],
     keypoints: [
       '特殊 token 標記結構：開始、角色、結束。',
       'messages 最後都會攤平成同一條 token 序列。',
       '模型選到結束 token 才會正常停；沒選到就會碰到長度上限。',
     ],
-    sources: ['claude-token-counting'],
+    sources: ['claude-token-counting', 'claude-context'],
   },
 });
 </script>

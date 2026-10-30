@@ -14,26 +14,16 @@ defineTerms({
 
 const SCORE_DOM = '<h1 id="title">雷霆 vs 閃電</h1><p id="score">0 : 0</p><ul id="log"></ul>';
 
+defineTerms({
+  'CSP': { en: 'Content Security Policy', def: '伺服器用回應標頭告訴瀏覽器「這個頁面只准執行哪些來源的程式」，即使 XSS 塞進了程式碼也可能被擋下。', example: "`Content-Security-Policy: script-src 'self'`" },
+});
+
 defineLessons({
   '8-1': {
     goals: [
       '說出 HTML 與 DOM 樹的對應',
       '用 querySelector 找到元素並改內容',
       '用 createElement 與 append 新增元素',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-1）`const el = document.querySelector(\'h1\'); el.textContent = \'X\';` 畫面上的 h1 會變嗎？', options: [
-        { text: '會，el 是指向那個節點的參考', correct: true, why: '改的是同一個物件，畫面跟著更新。' },
-        { text: '不會，el 只是一份複製品', why: 'querySelector 回傳的是參考，不是複製品。' },
-        { text: '要再呼叫 render() 才會變', why: '直接改 DOM 就會反映到畫面。' },
-        { text: '拋出 TypeError，因為 el 是 const', why: 'const 不保護物件內容。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 0-2）`document` 在 Node.js 裡存在嗎？', options: [
-        { text: '不存在，它是瀏覽器提供的', correct: true, why: 'DOM 是瀏覽器這個執行環境的 API，不是語言本身。' },
-        { text: '存在，所有環境都有', why: 'Node.js 沒有網頁，所以沒有 document。' },
-        { text: '只有在 .mjs 檔裡存在', why: '和副檔名無關。' },
-        { text: '要先 npm install document', why: '它不是 npm 套件。' },
-      ] },
     ],
     analogy: {
       text: ['HTML 原始碼像建築藍圖，[[DOM]] 像照藍圖蓋好的房子。房子蓋好之後，你搬家具、換燈泡改的是房子，不是藍圖；重新整理頁面就是「照藍圖重蓋一次」，你做的改動都不見了。'],
@@ -88,7 +78,6 @@ defineLessons({
           title: '沙盒裡的小頁面（下方程式可以直接改 DOM）',
           dom: SCORE_DOM,
           code: "const score = document.querySelector('#score');\nscore.textContent = '1 : 0';\nconst li = document.createElement('li');\nli.textContent = '雷霆 發球得分';\ndocument.querySelector('#log').append(li);\nconsole.log(score.textContent, document.querySelectorAll('li').length);\nconsole.log(document.querySelector('#nope'));",
-          predict: { q: '找不到 `#nope` 時印出什麼？', options: ['undefined', 'null', '拋出 TypeError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="DOM 的三個動作：找用 querySelector，改用 textContent 和 classList，加用 createElement 和 append">
           <rect x="10" y="10" width="170" height="180" style="fill:var(--m8)" class="stroke-ink" stroke-width="4"/>
@@ -104,12 +93,15 @@ defineLessons({
           <text x="465" y="110" text-anchor="middle" font-size="14" class="mono on-color">createElement</text>
           <text x="465" y="140" text-anchor="middle" font-size="14" class="mono on-color">append</text>
         </svg>`, caption: '大部分 DOM 程式都是這三個動作的組合。' },
+        { type: 'heading', id: 'deep-layout', text: '深入：真正慢的是「強制同步排版」' },
+        '現代瀏覽器會把連續的 DOM 修改先記下來，等到這個任務結束、要更新畫面時才一起排版。所以「迴圈裡 append 50 次」本身通常不慢。真正慢的是**一邊改、一邊讀版面**：讀 `offsetHeight`、`getBoundingClientRect()` 這類值時，瀏覽器必須立刻把前面的修改排版完才能回答，迴圈裡交錯讀寫就會排版好幾百次。',
+        { type: 'code', lang: 'javascript', title: '先全部讀，再全部寫', code: "// 慢：每一圈都強制排版\nfor (const box of boxes) box.style.height = box.offsetWidth / 2 + 'px';\n\n// 快：先讀完，再一起寫\nconst widths = boxes.map((box) => box.offsetWidth);\nboxes.forEach((box, i) => { box.style.height = widths[i] / 2 + 'px'; });" },
+        { type: 'table', head: ['工具', '用途'], rows: [
+          ['`el.replaceChildren(...nodes)`', '清空並換成新內容，一行完成'],
+          ['`<template>` ＋ `cloneNode(true)`', '重複產生同樣結構的區塊'],
+          ['`querySelectorAll` 與 `children`', '前者是「當下的快照」；後者是「活的」清單，會跟著 DOM 改變'],
+        ] },
       ],
-      tryit: {
-        q: ['讓計分板「比分改變時閃一下」：替 `#score` 加上 `flash` 這個 class，已經有就拿掉。'],
-        draft: "document.querySelector('#score').____;",
-        answer: ["`classList.toggle('flash')`。", '用 class 切換樣式，把樣式本身寫在 CSS 裡；不要在 JavaScript 裡直接改一堆 `style.xxx`。'],
-      },
     },
     mistakes: [
       { wrong: '在 `<head>` 的一般 script 裡直接 querySelector 頁面元素，得到 null。', why: '那時候 body 還沒被讀進來，元素不存在。', right: '用 `<script type="module">`（自動延後）或 `defer`，或把 script 放在 body 最後。' },
@@ -117,19 +109,7 @@ defineLessons({
       { wrong: '找不到元素時直接讀屬性。', why: '找不到是 null，讀屬性拋出 TypeError。', right: '先檢查，或用 `?.`；選擇器打錯是最常見的原因。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`querySelector(\'.player\')` 有三個符合時，回傳？', options: [
-        { text: '第一個符合的元素', correct: true, why: '要全部用 querySelectorAll。' },
-        { text: '三個元素組成的陣列', why: '那是 querySelectorAll（而且是 NodeList）。' },
-        { text: '最後一個符合的元素', why: '它從文件開頭找，回傳第一個。' },
-        { text: 'null，因為不只一個', why: '有符合就回傳第一個。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要把清單裡每個 li 的文字收集成陣列，哪個寫法可以？', options: [
-        { text: "`[...document.querySelectorAll('li')].map((li) => li.textContent)`", correct: true, why: '先展開成真正的陣列，才有 map。' },
-        { text: "`document.querySelectorAll('li').map((li) => li.textContent)`", why: 'NodeList 沒有 map。' },
-        { text: "`document.querySelector('li').map((li) => li.textContent)`", why: 'querySelector 只回傳一個元素。' },
-        { text: "`document.getElementsByTagName('li').textContent`", why: '集合本身沒有 textContent。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你用 Vue 寫專案，同事在元件裡寫了 `document.querySelector(\'#total\').textContent = sum`。為什麼這在 Vue 裡不是好做法？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你用 Vue 寫專案，同事在元件裡寫了 `document.querySelector(\'#total\').textContent = sum`。為什麼這在 Vue 裡不是好做法？'], answer: [
         'Vue 依資料重畫 DOM。你直接改的 DOM，下次 Vue 重畫時會被蓋掉；而且畫面與資料不一致，很難追蹤。',
         '改成把 sum 放在響應式資料裡，模板寫 `{{ sum }}`。真的需要拿到元素（例如聚焦輸入框）時用 template ref，不用 querySelector。',
       ] },
@@ -147,20 +127,6 @@ defineLessons({
       '說出事件冒泡的方向與順序',
       '分辨 target 與 currentTarget',
       '用事件委派處理動態新增的元素',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-3）`btn.addEventListener(\'click\', app.save)`，點擊時 save 裡的 this 是？', options: [
-        { text: 'btn 元素，不是 app', correct: true, why: '瀏覽器呼叫事件處理函式時，this 設成掛監聽的元素。' },
-        { text: 'app，因為 save 是寫在 app 裡的方法', why: '交出去的只是函式，呼叫時沒有「app 點」。' },
-        { text: 'window', why: '瀏覽器會把 this 設成元素。' },
-        { text: '事件物件', why: '事件物件是第一個參數，不是 this。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 8-1）`querySelectorAll` 回傳的 NodeList 有 map 嗎？', options: [
-        { text: '沒有，要先展開成陣列', correct: true, why: '它只有 forEach。' },
-        { text: '有，NodeList 就是陣列的一種', why: 'NodeList 不是陣列。' },
-        { text: '有，但只能用一次', why: '它根本沒有 map。' },
-        { text: '看瀏覽器', why: '所有瀏覽器都沒有。' },
-      ] },
     ],
     analogy: {
       text: ['在大樓裡喊「失火了」：你所在的房間先聽到，接著整層樓、整棟大樓的廣播系統都會收到。[[事件冒泡]]也是這樣：事件從被點的元素開始，一層一層往外傳。所以大樓的管理室（外層元素）只要裝一台接收器，就知道哪一間房間出事了。'],
@@ -207,7 +173,6 @@ defineLessons({
         { type: 'widget', name: 'runner', props: {
           dom: '<ul id="list"><li>阿明 <button class="del" data-id="1">刪除</button></li></ul>',
           code: "const list = document.querySelector('#list');\nlist.addEventListener('click', (e) => {\n  const btn = e.target.closest('.del');\n  if (!btn) return;\n  console.log('刪除', btn.dataset.id, e.currentTarget.id);\n});\nlist.insertAdjacentHTML('beforeend', '<li>小華 <button class=\"del\" data-id=\"2\">刪除</button></li>');\ndocument.querySelector('[data-id=\"2\"]').click();",
-          predict: { q: '點了「後來才加的」第二個按鈕，會印出？', options: ['什麼都不印', '刪除 2 list', '刪除 2 undefined'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="委派前後對照：委派前每個按鈕各有一個監聽，新項目沒有；委派後只有 ul 有一個監聽，所有按鈕包括新的都由它處理">
           <rect x="10" y="10" width="265" height="180" style="fill:var(--danger-soft)" class="stroke-ink" stroke-width="4"/>
@@ -219,12 +184,16 @@ defineLessons({
           <text x="417" y="100" text-anchor="middle" font-size="15" class="on-color">1 個監聽</text>
           <text x="417" y="140" text-anchor="middle" font-size="15" class="on-color">新項目：自動處理</text>
         </svg>`, caption: '委派靠的就是冒泡：所有按鈕的點擊最後都會傳到 ul。' },
+        { type: 'heading', id: 'deep-event-options', text: '深入：捕獲階段、不冒泡的事件與監聽選項' },
+        '事件其實分三段：先從 document 往下傳到目標（捕獲階段），在目標觸發，再往上冒泡。`addEventListener` 預設只聽冒泡階段；第三個參數寫 `{ capture: true }` 會在往下傳的路上就收到，適合「在任何子元素處理之前先攔下」的需求。',
+        { type: 'table', head: ['事件', '會冒泡嗎', '委派時改用'], rows: [
+          ['`focus`、`blur`', '不會', '`focusin`、`focusout`'],
+          ['`mouseenter`、`mouseleave`', '不會', '`mouseover`、`mouseout`'],
+          ['元素自己的 `scroll`', '不會', '直接掛在那個元素上'],
+          ['`click`、`input`、`keydown`、`submit`', '會', '照常委派'],
+        ] },
+        '`addEventListener` 的選項物件：`{ once: true }` 觸發一次就自動移除；`{ passive: true }` 承諾不呼叫 preventDefault，讓瀏覽器不用等你就能捲動（觸控、滾輪事件用）；`{ signal }` 讓 `ac.abort()` 一次移除一整組監聽。',
       ],
-      tryit: {
-        q: ['點按鈕裡的 `<span>` 圖示時，`e.target` 是 span 而不是 button，所以 `e.target.dataset.id` 是 undefined。補完修正：'],
-        draft: "list.addEventListener('click', (e) => {\n  const btn = ____;\n  if (!btn) return;\n  remove(btn.dataset.id);\n});",
-        answer: ["`e.target.closest('button[data-id]')`。", 'closest 從被點的元素開始往外找，點到按鈕裡的任何東西都能找到按鈕本身；點在按鈕外面就是 null，直接 return。'],
-      },
     },
     mistakes: [
       { wrong: '委派時直接用 `e.target.dataset.id`。', why: '點到按鈕裡面的圖示或文字時，target 是那個子元素。', right: '用 `e.target.closest(選擇器)` 找到真正的按鈕。' },
@@ -232,19 +201,7 @@ defineLessons({
       { wrong: '把表單送出寫在按鈕的 click 上。', why: '按 Enter 送出不會經過按鈕的 click 處理，邏輯會漏掉。', right: '監聽 form 的 submit 事件（8-3）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '冒泡的方向是？', options: [
-        { text: '從被點的元素往外層傳', correct: true, why: '先觸發最內層，再一層層往外。' },
-        { text: '從 document 往內傳', why: '那是捕獲階段，預設的監聽不在那個階段。' },
-        { text: '只在被點的元素觸發', why: '外層的監聽也會收到。' },
-        { text: '隨機順序', why: '順序是固定的。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'ul 上的 click 監聽，使用者點了 li 裡的 button，`e.currentTarget` 是？', options: [
-        { text: 'ul', correct: true, why: 'currentTarget 是掛監聽的元素。' },
-        { text: 'button', why: '那是 target。' },
-        { text: 'li', why: 'li 只是中間經過的一層。' },
-        { text: 'document', why: '監聽掛在 ul 上。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你做了一個下拉選單：點按鈕打開，點頁面其他地方要關閉。說出你會怎麼用冒泡做到「點外面關閉」。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你做了一個下拉選單：點按鈕打開，點頁面其他地方要關閉。說出你會怎麼用冒泡做到「點外面關閉」。'], answer: [
         '在 document 上監聽 click；事件處理裡判斷 `menu.contains(e.target)` 或 `e.target.closest(\'.menu\')`，點在選單裡就不處理，點在外面就關閉。',
         '不要在選單上 stopPropagation 來「保護」它：用 target 判斷就好，其他依賴冒泡的功能才不會壞掉。',
       ] },
@@ -262,20 +219,6 @@ defineLessons({
       '用 submit 事件與 preventDefault 處理表單',
       '說出把使用者輸入放進 innerHTML 的風險',
       '用 textContent 或建立元素安全地顯示資料',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 8-2）表單送出的邏輯該掛在哪？', options: [
-        { text: 'form 的 submit 事件', correct: true, why: '點按鈕和按 Enter 都會觸發 submit。' },
-        { text: '送出按鈕的 click', why: '按 Enter 送出時邏輯可能被漏掉。' },
-        { text: '每個 input 的 change', why: 'change 是欄位改變，不是送出。' },
-        { text: 'window 的 load', why: 'load 是頁面載入完成。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 3-3）`input.value` 永遠是什麼型別？', options: [
-        { text: '字串', correct: true, why: '就算 type="number" 也是字串，要自己轉。' },
-        { text: '看 input 的 type', why: 'value 一律是字串；數字型的另有 valueAsNumber。' },
-        { text: '數字', why: '要自己 Number() 轉換。' },
-        { text: '物件', why: '它是原始值字串。' },
-      ] },
     ],
     analogy: {
       text: ['留言板讓訪客貼紙條。安全的做法是「把紙條內容抄成文字貼上去」；危險的做法是「把訪客交來的東西原封不動貼上去」：如果那不是紙條，而是一個會自己動的機關（程式碼），每個來看留言板的人都會觸發它。'],
@@ -328,7 +271,6 @@ defineLessons({
           dom: '<ul><li id="unsafe"></li><li id="safe"></li></ul>',
           wait: 300,
           code: "window.hacked = false;\nconst comment = '好球！<img src=x onerror=\"window.hacked = true\">';\ndocument.querySelector('#safe').textContent = comment;\nconsole.log('textContent 之後：', window.hacked);\ndocument.querySelector('#unsafe').innerHTML = comment;\nsetTimeout(() => console.log('innerHTML 之後：', window.hacked), 100);",
-          predict: { q: 'innerHTML 之後 `window.hacked` 變成？', options: ['false，只是一張壞掉的圖', 'true，onerror 被執行了', '拋出錯誤，瀏覽器擋下來'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 220" role="img" aria-label="安全與不安全寫法對照：innerHTML、outerHTML、insertAdjacentHTML、v-html 會解析 HTML，不安全；textContent、append 字串、框架的一般插值只當文字，安全">
           <rect x="10" y="10" width="265" height="200" style="fill:var(--danger)" class="stroke-ink" stroke-width="4"/>
@@ -346,14 +288,17 @@ defineLessons({
           title: '表單：攔下送出，讀出欄位',
           dom: '<form id="f"><input name="player" value="阿明"><input name="points" type="number" value="18"><button>送出</button></form>',
           code: "const form = document.querySelector('#f');\nform.addEventListener('submit', (e) => {\n  e.preventDefault();\n  const data = Object.fromEntries(new FormData(form));\n  console.log(data, typeof data.points);\n});\n// 這個沙盒不允許真的送出表單，所以直接觸發 submit 事件，效果等同按下送出\nform.dispatchEvent(new Event('submit', { cancelable: true }));",
-          predict: { q: '`typeof data.points` 是？', options: ["'number'", "'string'", "'undefined'"], answer: 1 },
         } },
+        { type: 'heading', id: 'deep-xss-layers', text: '深入：textContent 擋不住的 XSS 與第二道防線' },
+        '用 textContent 只解決「插入 HTML」這一種。把使用者給的網址放進 `a.href` 或 `iframe.src` 時，`javascript:alert(1)` 這種網址被點下去就會執行程式碼。檢查網址要先 `new URL(input, location.href)`，再確認 `protocol` 是 `https:` 或 `http:`。',
+        { type: 'table', head: ['防線', '做什麼', '擋得住什麼'], rows: [
+          ['輸出時跳脫', 'textContent、框架的一般插值', '最常見的留言、暱稱注入'],
+          ['網址白名單', '只允許 http(s) 協定', '`javascript:` 網址'],
+          ['[[CSP]]', '伺服器回應標頭限制可執行的程式來源，不准行內 script', '就算注入成功，程式也可能不被執行'],
+          ['HttpOnly cookie', '登入憑證不讓 JavaScript 讀', 'XSS 偷不走 session cookie（8-4）'],
+        ] },
+        '這些防線要一起用，不能只靠其中一道：CSP 設定錯一個字就形同虛設，跳脫漏掉一個地方也一樣。前端能做的是第一道；CSP 與 cookie 設定要和後端一起決定。',
       ],
-      tryit: {
-        q: ['用「建立元素」的方式安全地顯示一則留言：名字粗體、後面接留言內容。'],
-        draft: "const li = document.createElement('li');\nconst name = document.createElement('strong');\nname.textContent = c.name;\nli.append(name, '：', ____);\nlist.append(li);",
-        answer: ['`c.text`。', 'append 收到字串時會建立文字節點，和 textContent 一樣不會被當成 HTML；這樣就能組出有結構的內容，又不會有 XSS。'],
-      },
     },
     mistakes: [
       { wrong: '以為「只有 script 標籤危險」，過濾掉它就安全了。', why: 'innerHTML 插入的 script 標籤本來就不會執行；真正常見的是 onerror、onclick 這類事件屬性。', right: '不要用 innerHTML 插入外部資料；需要時用 DOMPurify 清洗。' },
@@ -361,19 +306,7 @@ defineLessons({
       { wrong: '只在前端驗證欄位就相信資料。', why: '使用者可以繞過前端直接送請求。', right: '前端驗證是為了體驗；伺服器端一定要再驗證一次。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`el.textContent = \'<b>hi</b>\'` 畫面上顯示？', options: [
-        { text: '`<b>hi</b>` 這串文字', correct: true, why: 'textContent 不解析 HTML。' },
-        { text: '粗體顯示的 hi 兩個字', why: '那是 innerHTML 的效果。' },
-        { text: 'hi（標籤被瀏覽器拿掉，只剩下文字）', why: '標籤會原樣顯示出來。' },
-        { text: '什麼都不顯示', why: '文字會正常顯示。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下列哪一個用來顯示「從 API 拿到的使用者暱稱」是安全的？', options: [
-        { text: '`el.textContent = user.nickname`', correct: true, why: '當成純文字，什麼都不會執行。' },
-        { text: '`el.innerHTML = user.nickname`', why: '暱稱裡如果有 HTML，會被解析執行。' },
-        { text: '用樣板字串把暱稱包進 `<b>` 再指定給 innerHTML', why: '樣板字串不會跳脫 HTML，一樣危險。' },
-        { text: "`el.outerHTML = user.nickname`", why: '一樣會被當成 HTML 解析。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['Vue 有 `v-html`，React 有 `dangerouslySetInnerHTML`。用這一課的觀念說明：什麼情況下用它們會有 XSS？要怎麼安全地用？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['Vue 有 `v-html`，React 有 `dangerouslySetInnerHTML`。用這一課的觀念說明：什麼情況下用它們會有 XSS？要怎麼安全地用？'], answer: [
         '兩者都等於 innerHTML。內容只要有一部分來自使用者或外部（留言、暱稱、從 API 拿到的文章），就可能被塞進帶事件屬性的標籤。',
         '安全的用法：預設用一般的插值（Vue 的 `{{ }}`、React 的 `{}`，框架會自動跳脫）；真的需要 HTML 時，先用 DOMPurify 清洗再交給 v-html。',
       ] },
@@ -383,7 +316,7 @@ defineLessons({
       'innerHTML 會解析 HTML，用在外部資料就是 XSS；textContent 與 append 字串是安全的。',
       '需要插入 HTML 時先用 DOMPurify 清洗；前端驗證之外，伺服器還要再驗證。',
     ],
-    sources: ['owasp-xss'],
+    sources: ['owasp-xss', 'mdn-csp'],
   },
 
   '8-4': {
@@ -391,20 +324,6 @@ defineLessons({
       '用 localStorage 搭配 JSON 存讀物件',
       '讀取時處理「沒有資料」「格式壞掉」「資料不合法」',
       '用版本號 key 讓資料結構可以升級',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 7-2）`JSON.parse` 遇到壞掉的字串會？', options: [
-        { text: '拋出 SyntaxError', correct: true, why: '要用 try／catch 接住。' },
-        { text: '回傳 null', why: 'parse 失敗不會回傳 null。' },
-        { text: '回傳空物件 `{}` 當作預設值', why: '不會自動給預設值。' },
-        { text: '回傳原本的字串', why: '它會拋錯。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-4）`JSON.stringify({ a: undefined })` 是？', options: [
-        { text: "`'{}'`", correct: true, why: 'undefined 的屬性在 JSON 裡會消失。' },
-        { text: `\`'{"a":undefined}'\``, why: 'JSON 沒有 undefined。' },
-        { text: `\`'{"a":null}'\``, why: '物件屬性的 undefined 直接被省略，不會變成 null。' },
-        { text: '拋出 TypeError', why: '不會拋錯，只是省略。' },
-      ] },
     ],
     analogy: {
       text: ['[[localStorage]] 像飯店房間的保險箱：退房前放進去的東西，下次入住還在。但它只收「信封」（字串），所以物件要先寫成一封信（JSON.stringify），拿出來再拆信讀（JSON.parse）。'],
@@ -453,7 +372,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const DEFAULTS = { work: 30, rest: 15, sets: 8 };\nfunction parseSettings(raw) {\n  if (raw === null) return DEFAULTS;\n  let data;\n  try { data = JSON.parse(raw); } catch { return DEFAULTS; }\n  const isValid = (n, min, max) => Number.isInteger(n) && n >= min && n <= max;\n  if (!isValid(data?.work, 5, 600) || !isValid(data?.rest, 1, 600) || !isValid(data?.sets, 1, 50)) return DEFAULTS;\n  return { work: data.work, rest: data.rest, sets: data.sets };\n}\nconsole.log(parseSettings('{\"work\":40,\"rest\":20,\"sets\":5}'));\nconsole.log(parseSettings('{\"work\":\"40\"}'));\nconsole.log(parseSettings('{bad'));\nconsole.log(JSON.stringify({ d: new Date(0), u: undefined, n: NaN }));",
-          predict: { q: "`parseSettings('{\"work\":\"40\"}')` 回傳？", options: ["{ work: '40' }", '預設值 { work: 30, rest: 15, sets: 8 }', '拋出 TypeError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="驗證失敗的退路：沒有資料、JSON 壞掉、欄位不合法三種情況，都回到預設值，頁面照常開啟">
           <rect x="10" y="10" width="170" height="120" style="fill:var(--warning)" class="stroke-ink" stroke-width="4"/>
@@ -469,12 +387,16 @@ defineLessons({
           <text x="280" y="182" text-anchor="middle" font-size="16" class="on-color">全部 → 預設值，頁面照常開啟</text>
           <g class="stroke-ink" stroke-width="4"><path d="M95 130 V150 M280 130 V150 M465 130 V150"/></g>
         </svg>`, caption: '「讀不到」永遠不該讓頁面壞掉。' },
+        { type: 'heading', id: 'deep-storage', text: '深入：localStorage 的限制與其他儲存方式' },
+        'localStorage 是**同步**的：每次讀寫都在主執行緒上等磁碟，資料大時會卡畫面（6-1）。容量大約每個來源 5 MB（各瀏覽器不同），寫滿時 `setItem` 會拋出 `QuotaExceededError`，所以寫入也要包 try／catch。同一個網站開了兩個分頁時，一邊寫入，另一邊會收到 `storage` 事件，可以用來同步設定。',
+        { type: 'table', head: ['儲存方式', '特性', '適合'], rows: [
+          ['localStorage', '同步、只存字串、約 5 MB', '少量設定、偏好'],
+          ['sessionStorage', '同上，但分頁關掉就消失', '一次操作流程裡的暫存'],
+          ['IndexedDB', '非同步、可存物件與檔案、容量大', '離線資料、大量快取'],
+          ['Cookie（HttpOnly）', '每個請求自動帶給伺服器，JavaScript 讀不到', '登入狀態'],
+        ] },
+        '什麼時候不能把 localStorage 當成「一定在」：使用者清除網站資料、無痕模式關閉視窗、Safari 對一段時間沒有互動的網站會清掉程式寫入的儲存（WebKit 的追蹤防護政策）。重要資料要存在伺服器；localStorage 只放「不見了也能用預設值重來」的東西。',
       ],
-      tryit: {
-        q: ['設定的結構要從 `{ work, rest, sets }` 改成多了 `sound: true`。照「版本號 key」的做法，你會怎麼改？'],
-        draft: "const KEY = '____';\n// 舊的 v1 資料要怎麼處理？____",
-        answer: ["`'interval-timer.settings.v2'`。", '讀 v2；沒有的話試著讀 v1 並補上 `sound: true` 轉換成 v2 存回去，再 `removeItem` 舊的 key。這樣舊使用者的設定不會遺失，也不會被新程式誤讀。'],
-      },
     },
     mistakes: [
       { wrong: '`localStorage.setItem(\'s\', settings)` 直接存物件。', why: '會被轉成字串 "[object Object]"，資料全沒了。', right: '`setItem(key, JSON.stringify(settings))`。' },
@@ -482,19 +404,7 @@ defineLessons({
       { wrong: '讀取時沒有 try／catch。', why: '資料被手動改壞或被舊版程式寫成別的格式時，整頁掛掉。', right: '包成 load 函式：沒有、壞掉、不合法都回傳預設值。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`localStorage.getItem(\'沒有的key\')` 回傳？', options: [
-        { text: '`null`', correct: true, why: '沒有就是 null，不是 undefined。' },
-        { text: '`undefined`', why: 'getItem 找不到時回傳 null。' },
-        { text: "`''`", why: '不會回傳空字串。' },
-        { text: '拋出錯誤', why: '找不到不會拋錯。' },
-      ] },
-      { level: '應用', type: 'mc', q: '存進去的 `{ when: new Date() }`，parse 回來後 `when` 是？', options: [
-        { text: 'ISO 格式的字串，要自己 `new Date()` 轉回來', correct: true, why: 'JSON 沒有日期型別，stringify 時會變成字串。' },
-        { text: '原本的 Date 物件，可以直接呼叫 getTime() 和 toLocaleString()', why: 'JSON.parse 不會自動轉回 Date。' },
-        { text: '從 1970 年起算的毫秒數字，可以直接比較大小', why: 'stringify 輸出的是 ISO 字串。' },
-        { text: 'undefined', why: '屬性還在，只是變成字串。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的網站把購物車存在 localStorage。改版後商品的 `price` 從「元」改成「分」（整數）。舊使用者打開網站可能發生什麼？怎麼避免？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的網站把購物車存在 localStorage。改版後商品的 `price` 從「元」改成「分」（整數）。舊使用者打開網站可能發生什麼？怎麼避免？'], answer: [
         '舊資料的 price 會被當成「分」，金額少了 100 倍；或驗證規則不同導致整個購物車被當成不合法而清空。',
         '把 key 從 `cart.v1` 換成 `cart.v2`：讀不到 v2 時讀 v1、把 price 乘 100 轉成新格式存成 v2，再刪掉 v1。資料結構改變一律換版本號。',
       ] },

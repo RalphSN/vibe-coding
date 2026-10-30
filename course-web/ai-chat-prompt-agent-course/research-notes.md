@@ -303,3 +303,51 @@
 | Agent SDK quickstart 程式碼 | ✅ 逐字取得 TypeScript 與 Python 範例（`query`、`allowedTools`、`permissionMode: "acceptEdits"`、`message.type === "result"` 時印出 `message.subtype`）；SDK 內含 Claude Code 執行檔；不會自動讀 `.env` | https://code.claude.com/docs/en/agent-sdk/quickstart |
 
 下次重新查證：**2027-01-05**。
+
+## 2026-10-29 改版審查
+
+改版內容：不出測驗（0-2 能力評估改成自評清單、11-4 總複習測驗改成「一頁地圖」）、46 課補「深入」段落、深入思考題從 45 題刪到 31 題、22 課補互動元件（新增 `toggle` 切換對照與 `knobs` 試算）。查證日期 2026-10-30。
+
+### 修正的錯誤
+
+| 課號 | 原本 | 修正後 | 出處 | 可信度 |
+|---|---|---|---|---|
+| 1-2 | 現行模型為 Opus 5.5、Sonnet 5.5、Fable 5.1（1M）＋ Haiku 4.5（200K），Haiku 4.5 退役日「不早於 2026-10-15」 | 現行四個模型 Fable 5.1、Opus 5.5、Sonnet 5.5、Haiku 5.5 皆 1M context、128K 輸出；Haiku 4.5 改列 legacy | https://platform.claude.com/docs/en/about-claude/models/overview | ✅ 官方 |
+| 1-3 | 可靠知識截止只列三個模型 | 四個現行模型皆為 2026 年 6 月 | 同上 | ✅ 官方 |
+| 1-4 | 思考設定表列 Haiku 4.5（extended，不支援 effort） | Haiku 5.5：Adaptive、預設 effort `medium` | 同上 | ✅ 官方 |
+| 4-4 | 快取讀取：一般 10%、Opus 5.5 5%、Fable 5.1 2.5% | Opus 5.5 與 Sonnet 5.5 都是 5% | 同上 | ✅ 官方 |
+| 7-1 | auto mode 預設「v2.1.289」 | v2.1.283 起，互動式終端機與 VS Code | https://code.claude.com/docs/en/permission-modes | ✅ 官方 |
+| 7-3 | auto mode 預設「v2.1.287 起」 | v2.1.283 起（第 11 節依 changelog 記為 2.1.287；以目前 Permission modes 文件為準） | 同上 | ✅ 官方 |
+| 5-3 | 「新增擴充：Tasks、MCP Apps」 | Tasks 從實驗性核心移到擴充；擴充另含 MCP Apps、企業管理授權 | https://blog.modelcontextprotocol.io/posts/2026-07-28/ | ✅ 官方 |
+
+### 新查證、寫進深入段落的事實
+
+| 事實 | 課號 | 來源 | 可信度 |
+|---|---|---|---|
+| Opus 4.7 起的新分詞器：1M tokens ≈ 2.5M Unicode 字元 ≈ 555k 英文單字；舊模型約 750k 字 | 1-1 | Models overview | ✅ |
+| 四個現行模型輸出上限 128K；Batch 5 折 | 1-2、4-4 | Models overview | ✅ |
+| Fable 5.1、Opus 5.5 adaptive 永遠開啟；Sonnet 5.5 不接受 `disabled`、接受 `between_tools`；用 Models API `capabilities` 判斷 | 1-4 | Models overview | ✅ |
+| 評測只看答對率會獎勵猜測（Kalai et al., 2025-09-04） | 1-3 | https://arxiv.org/abs/2509.04664（OpenAI 頁面 403，以 arXiv 與搜尋摘要確認） | 🟡 |
+| Lost in the Middle（Liu et al., 2023） | 1-2 | https://arxiv.org/abs/2307.03172 | 🟡 依既有知識，未重新開啟 |
+| Calibrate Before Use 的三種偏誤（Zhao et al., 2021） | 3-1 | https://arxiv.org/abs/2102.09690 | 🟡 依既有知識，未重新開啟 |
+| CoT 忠實度：Claude 3.7 Sonnet 提到提示 25%、DeepSeek R1 39%（2025-04-03） | 3-2 | https://www.anthropic.com/research/reasoning-models-dont-say-think | ✅ |
+| 多代理研究系統：agent 約為聊天 4 倍 token、多代理約 15 倍；不適合的情境 | 5-4 | https://www.anthropic.com/engineering/multi-agent-research-system | ✅ |
+| MCP 2026-07-28：移除 session、MRTR、`Mcp-Method`／`Mcp-Name` 標頭、清單快取提示、`iss` 驗證、DCR 棄用改 CIMD；Sampling／Roots／Logging／HTTP+SSE 棄用，至少 12 個月 | 5-3 | MCP 官方部落格 | ✅ |
+| auto memory 依 repo 存放、worktree 共用；MEMORY.md 前 200 行或 25KB | 4-2 | https://code.claude.com/docs/en/memory | ✅ |
+| `@path` 最多 4 層、超過 4 MiB 略過、CLAUDE.md 以 user message 送出、`/doctor prompt-audit` 檢查範圍、`claudeMdExcludes` | 4-3、7-2 | 同上 | ✅ |
+| AGENTS.md：v2.1.277 起可直接讀；預設規則與 `CLAUDE.local.md` 陷阱；Project instructions 四個值 | 6-2 | 同上 | ✅ |
+| 預設模式：`-p`／SDK 為 Manual，v2.1.302 起需核准的動作直接拒絕；HIPAA（v2.1.285）；專案設定裡的 `defaultMode: "auto"` 會被忽略；bypass 拒絕以 root 執行 | 6-3、7-3、7-7 | Permission modes | ✅ |
+| Codex CLI 安裝指令 `curl -fsSL https://chatgpt.com/codex/install.sh \| sh`、`codex exec`、`AGENTS.md` | 6-2（原文，確認無誤） | https://learn.chatgpt.com/docs/codex/cli | ✅ |
+| 致命三要素（Simon Willison, 2025-06-16） | 10-1 | https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/ | 🟡 依既有知識，未重新開啟 |
+| LLM-as-judge 的位置、長度、自我偏好偏誤（Zheng et al., 2023） | 9-2 | https://arxiv.org/abs/2306.05685 | 🟡 依既有知識，未重新開啟 |
+| 套件幻覺研究（Spracklen et al., 2024） | 10-4 | https://arxiv.org/abs/2406.10279 | ⚠️ 未查證（搜尋額度用完，arXiv 編號依記憶） |
+
+### 補的子題（深入段落）
+
+分詞器與跨世代 token 差異（1-1）、輸出上限與中間遺失（1-2）、幻覺的評測誘因與四種類型（1-3）、思考 token 計費與能否關閉（1-4）、寫太細的代價（2-1）、原因推廣過頭（2-2）、角色的能與不能、輸出去處決定格式（2-3）、範例庫與快取（2-4）、標籤被資料提早關閉（2-5）、範本過期（2-6）、少樣本的三種偏誤（3-1）、CoT 忠實度（3-2）、五種 workflow 模式（3-3）、超長文件策略（3-4）、結構化輸出的保證範圍（3-5）、隱藏的 context（4-1）、記憶過時（4-2）、CLAUDE.md 的層級（4-3）、快取失效條件（4-4）、`stop_reason` 與迴圈失敗模式（5-1）、工具呼叫 id、錯誤回傳、server 工具（5-2）、MCP 2026-07-28 變更表（5-3）、多代理成本（5-4）、harness 設計取捨（6-1）、AGENTS.md 讀取規則（6-2）、自建三個漏洞（6-3）、第一週設定順序（7-1）、CLAUDE.md 送出方式（7-2）、各執行方式的預設模式（7-3）、skill／CLAUDE.md／subagent／hook 選擇（7-4）、hook exit code（7-5）、MCP scope（7-6）、CI 檢查表（7-7）、探索與規劃分開（8-1）、防止改測試（8-2）、驗證關卡成本（8-3）、fan-out 的失敗數學（8-4）、五層根本原因（9-1）、eval 雜訊與 judge 偏誤（9-2）、eval 過度貼合（9-3）、致命三要素（10-1）、確認疲勞（10-2）、機密外洩路徑（10-3）、幻覺套件攻擊（10-4）。
+
+### 未查證或未做
+
+- MCP scope（local／project／user 與 `--scope`）、hook exit code 語意、`/doctor` 指令：依既有知識撰寫，本次未重新開官方頁面。
+- 7-6 原文「Explore 會略過 CLAUDE.md」：本次未重新查證。
+- Safari 實機檢視：未做（只用 Playwright Chromium 檢查 360px 與 1280px、淺色與深色）。

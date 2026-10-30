@@ -96,13 +96,15 @@ defineLessons({
             <text x="26" y="222" class="t-dim">exit 0</text><text x="300" y="222" class="t-dim">← 結束代碼（1-4）</text>
           </g>
         </svg>`, caption: '腳本裡的每一行，都是你在終端機可以直接打的指令。' },
+        { type: 'heading', id: 'deep-sh', text: '深入：sh 不等於 bash，以及什麼時候不要寫 bash' },
+        { type: 'table', caption: 'shebang 的三種寫法', head: ['第一行', '用誰執行', '注意'], rows: [
+          ['`#!/bin/sh`', '系統的 POSIX sh；Ubuntu 上是 dash', '`[[ ]]`、陣列這些 bash 專屬寫法會失敗'],
+          ['`#!/bin/bash`', '固定路徑的 bash', 'macOS 上是 3.2 舊版，沒有關聯陣列（bash 4 才有）'],
+          ['`#!/usr/bin/env bash`', 'PATH 裡找到的第一個 bash', '在 macOS 會用到 brew 裝的新版 bash'],
+        ] },
+        '很多腳本開頭會寫 `set -euo pipefail`：`-e` 遇到失敗就停、`-u` 用到沒設定的變數就報錯、`pipefail` 讓管線任何一段失敗都算失敗。它能擋掉很多意外，但 `-e` 有例外（在 `if` 條件、`&&` 左邊的失敗不會停），不能取代自己檢查結果。',
+        'bash 適合把幾行指令串起來；超過一兩百行、需要處理 JSON 或複雜資料時，改用 Python 或 Node.js 通常更好讀、更好測。',
       ],
-      tryit: {
-        q: ['補完這個 bash 腳本：建立一個以今天日期命名的資料夾（例如 `2026-10-07`），並印出「已建立 2026-10-07」。'],
-        code: true,
-        draft: '#!/bin/bash\ntoday=$(date +%Y-%m-%d)\n____\n____',
-        answer: ['`mkdir -p "$today"`、`echo "已建立 $today"`。', '變數加引號是好習慣（1-2），即使值裡沒有空白。'],
-      },
     },
     mistakes: [
       { wrong: '在 bash 裡寫 `name = "Amy"`。', why: '空白會把它切成三塊：執行叫 name 的程式，參數是 = 和 Amy（4-1 同樣的陷阱）。', right: '`name="Amy"`，等號兩邊不留空白。' },
@@ -110,35 +112,9 @@ defineLessons({
       { wrong: '照教學在 PowerShell 裡執行 `./script.sh`。', why: 'PowerShell 不是 bash，它不會讀 shebang，會試著用 Windows 的檔案關聯打開它。', right: '在 WSL 或 Git Bash 裡執行 bash 腳本。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '腳本第一行 `#!/bin/bash` 的用途是？', options: [
-        { text: '註解，說明作者是誰', why: '它用 `#` 開頭，但 `#!` 在第一行有特殊意義。' },
-        { text: '告訴系統用哪個程式執行這個檔案', correct: true, why: '這就是 shebang：系統依它找到 `/bin/bash` 來執行腳本。' },
-        { text: '讓腳本自動取得管理員權限', why: '權限和 shebang 無關，需要的是 sudo（4-3）。' },
-        { text: '宣告這個檔案只能在 Linux 執行', why: '只要那台電腦有 `/bin/bash`，macOS 也能執行。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你在 Windows 想照著一份 Ubuntu 伺服器的教學練習，最接近真實環境的選擇是？', options: [
-        { text: '在 PowerShell 裡照打', why: '簡單指令可以，但管線、引號、腳本的寫法會有差異。' },
-        { text: '安裝 WSL，在 Ubuntu 分頁裡做', correct: true, why: 'WSL 是真正的 Linux，行為和伺服器最接近。' },
-        { text: '用 cmd，它最接近 Linux', why: 'cmd 和 Linux 的 shell 差異最大。' },
-        { text: '把教學裡的 `/` 都改成 `\\`', why: '路徑分隔符號只是差異之一，指令和語法還有很多不同。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你每天上班都要打 `cd ~/work/api && git pull && npm install && npm run dev`。怎麼用這課學到的東西省下力氣？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你每天上班都要打 `cd ~/work/api && git pull && npm install && npm run dev`。怎麼用這課學到的東西省下力氣？'], answer: [
         '參考：寫成腳本 `start.sh`：第一行 `#!/bin/bash`，第二行放那串指令，`chmod +x start.sh`，之後只打 `./start.sh`。',
         '更進一步：在 `~/.zshrc` 加 `alias work="~/work/api/start.sh"`（4-4）。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-3）`./hello.sh` 回 `permission denied`，最先試什麼？', options: [
-        { text: '`chmod +x hello.sh`', correct: true, why: '新建的腳本沒有執行權限。' },
-        { text: '`sudo ./hello.sh`', why: '問題不是身分，是檔案缺少 x 權限。' },
-        { text: '把檔名改成 hello.exe', why: '副檔名不會給它執行權限。' },
-        { text: '重新開機', why: '和開機無關。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-1）`./hello.sh` 的 `./` 是什麼意思？', options: [
-        { text: '目前資料夾', correct: true, why: '`.` 是目前資料夾，`./hello.sh` 就是「這裡的 hello.sh」。' },
-        { text: '根目錄', why: '根目錄是 `/`。' },
-        { text: '上一層', why: '上一層是 `..`。' },
-        { text: '家目錄', why: '家目錄是 `~`。' },
       ] },
     ],
     keypoints: [
@@ -212,13 +188,15 @@ defineLessons({
             <text x="305" y="196" class="on-color" font-size="16">ls 根本沒執行</text>
           </g>
         </svg>`, caption: '兩種都會失敗，但**報錯的人不一樣**。看錯誤訊息開頭是 `zsh:` 還是程式名，就知道是誰擋下來的（1-4）。' },
+        { type: 'heading', id: 'deep-zsh', text: '深入：zsh 和 bash 真正不同的三個地方' },
+        { type: 'table', caption: '照抄 bash 寫法時要注意', head: ['項目', 'bash', 'zsh（預設設定）'], rows: [
+          ['沒加引號的變數', '`$f` 有空白就被切開（1-2 深入段）', '不切開，整個當一塊'],
+          ['陣列的第一個元素', '`${arr[0]}`', '`${arr[1]}`（從 1 開始）'],
+          ['萬用字元找不到', '原樣交給程式', '報 `no matches found`，不執行'],
+        ] },
+        '萬用字元這一條可以改：在 `~/.zshrc` 加 `setopt nonomatch`，zsh 就會像 bash 一樣原樣交給程式。不過建議先別改，直接養成「網址和含 `[ ]` 的參數加引號」的習慣，換到哪個 shell 都不會錯。',
+        '要執行別人寫的 bash 腳本，不要用 zsh 硬跑，直接 `bash script.sh`；macOS 內建 bash 3.2，大部分腳本都能跑。',
       ],
-      tryit: {
-        q: ['這行在 zsh 失敗了。改成能執行的版本：'],
-        code: true,
-        draft: 'npm install eslint@^9\n# zsh: no matches found: eslint@^9\n\n修正：____',
-        answer: ['`npm install "eslint@^9"`。`^` 在 zsh 的延伸萬用字元裡有特殊意義，加引號最保險。'],
-      },
     },
     mistakes: [
       { wrong: '看到 `zsh: no matches found` 以為是 npm 或 pip 壞了。', why: '錯誤開頭是 `zsh:`，代表是 shell 自己擋下來，程式根本沒執行。', right: '把含 `[ ] ? * ^` 的參數加引號。' },
@@ -226,34 +204,8 @@ defineLessons({
       { wrong: '把 bash 的設定寫進 `~/.bash_profile`，在 macOS 上沒效果。', why: 'macOS 預設是 zsh，它不讀 bash 的設定檔。', right: '寫進 `~/.zshrc`（4-4）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下列哪個描述 zsh 和 bash 的關係最準確？', options: [
-        { text: '完全不同的語言，bash 教學不能用在 zsh', why: '兩者大部分語法相同，bash 教學多半可以直接用。' },
-        { text: '大部分相同，少數規則不同（例如萬用字元）', correct: true, why: '這就是為什麼 macOS 使用者可以照 Linux 教學做。' },
-        { text: 'zsh 只是 bash 換了名字', why: 'zsh 是獨立開發的 shell，有自己的功能和規則。' },
-        { text: 'zsh 是 PowerShell 的 macOS 版', why: 'PowerShell 是微軟的另一個 shell，和 zsh 無關。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 zsh 執行 `pip install pandas[excel]` 出現 `no matches found`。正確修法是？', options: [
-        { text: '改用 `sudo pip install pandas[excel]`', why: '問題不是權限；sudo 後面一樣會被 zsh 展開失敗。' },
-        { text: '`pip install "pandas[excel]"`', correct: true, why: '引號讓 zsh 不把 `[ ]` 當萬用字元。' },
-        { text: '重新安裝 pip', why: 'pip 根本沒有被執行，跟它無關。' },
-        { text: '改成 `pip install pandas excel`', why: '這會安裝兩個不同的套件，意思變了。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['AI 給你一段在 Linux 測試過的 bash 指令，你在 macOS 的 zsh 執行時失敗了。你會先檢查哪兩件事？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['AI 給你一段在 Linux 測試過的 bash 指令，你在 macOS 的 zsh 執行時失敗了。你會先檢查哪兩件事？'], answer: [
         '參考：① 錯誤訊息開頭是不是 `zsh:`（shell 擋下的），常見是萬用字元或方括號，加引號解決。② 指令用到的工具在 macOS 是不是 BSD 版本，選項不同（例如 `sed -i`、`ls --help`），查 `man`。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-4）zsh 的設定檔是？', options: [
-        { text: '`~/.zshrc`', correct: true, why: '互動式 zsh 啟動時讀這個檔案。' },
-        { text: '`~/.bashrc`', why: '那是 bash 的。' },
-        { text: '`$PROFILE`', why: '那是 PowerShell 的。' },
-        { text: '`/etc/zsh.conf`', why: '一般使用者的設定放在家目錄的 `.zshrc`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-3）`rm *.log` 在 zsh 裡、目前資料夾沒有任何 .log 檔時，會怎樣？', options: [
-        { text: 'zsh 報 `no matches found`，rm 不執行', correct: true, why: 'zsh 在展開萬用字元時就停下了。' },
-        { text: '刪除所有檔案', why: '`*.log` 只對應 .log 結尾的檔案。' },
-        { text: '刪除一個叫 *.log 的檔案', why: '那是 bash 把原文交給 rm 後的情況（而且通常也不存在）。' },
-        { text: '進入互動模式詢問', why: '要加 `-i` 才會詢問。' },
       ] },
     ],
     keypoints: [
@@ -336,50 +288,20 @@ defineLessons({
             <text x="305" y="146" class="on-color">另外安裝</text><text x="305" y="178" class="on-color">持續更新、跨平台</text><text x="305" y="210" class="on-color">支援 &amp;&amp;、||</text>
           </g>
         </svg>`, caption: '安裝 PowerShell 7：`winget install Microsoft.PowerShell`。之後在 Windows Terminal 把它設成預設設定檔。' },
+        { type: 'heading', id: 'deep-pwsh', text: '深入：物件管線的代價與預設行為' },
+        { type: 'table', caption: '初學最常遇到的四個 PowerShell 特性', head: ['特性', '結果', '做法'], rows: [
+          ['畫面上的表格只是「顯示格式」', '物件其實有更多欄位沒顯示', '`| Select-Object *` 看全部欄位'],
+          ['`Format-Table` 之後的東西不再是原本的物件', '`... | Format-Table | Sort-Object` 會出錯或結果奇怪', '`Format-*` 一律放在管線最後'],
+          ['字串比較預設不分大小寫', '`"ABC" -eq "abc"` 是 True', '要分大小寫用 `-ceq`'],
+          ['外部程式（git、npm）輸出的是文字', '進到 PowerShell 後是一行一行的字串，不是物件', 'JSON 輸出用 `ConvertFrom-Json` 轉成物件'],
+        ] },
+        '版本現況（2026-10）：PowerShell 7.6 是 2026-03 發布的長期支援版（LTS），建在 .NET 10 上。Windows 內建的 5.1 仍會隨 Windows 提供安全更新，但不再加新功能，所以兩個版本會長期並存。',
       ],
-      tryit: {
-        q: ['不查資料，猜這些 cmdlet 在做什麼：'],
-        code: true,
-        draft: 'Get-Process     ____\nStop-Process    ____\nGet-Service     ____\nTest-Path       ____\nGet-History     ____',
-        answer: ['取得執行中的程式、停止程式、取得系統服務、測試路徑是否存在（回傳 True／False）、取得指令歷史。', '這就是動詞-名詞的好處：沒學過也猜得到。不確定時用 `Get-Help 名稱 -Examples`。'],
-      },
     },
     mistakes: [
       { wrong: '在 PowerShell 寫 `if ($size > 100)`。', why: '`>` 在 PowerShell 是重新導向，這行會建立一個叫 100 的檔案。', right: '比較用 `-gt`：`if ($size -gt 100)`。' },
       { wrong: '以為 PowerShell 的 `curl` 就是真正的 curl。', why: '在 Windows PowerShell 5.1，`curl` 是 `Invoke-WebRequest` 的別名，選項完全不同。PowerShell 7 已移除這個別名。', right: '在 5.1 要用真正的 curl 就打 `curl.exe`（Windows 10 起內建）。' },
       { wrong: '想從 `ls` 的輸出裡「切出第 5 欄」來排序，像 bash 那樣。', why: 'PowerShell 的輸出是物件，畫面上的表格只是顯示格式。', right: '用欄位名稱：`Sort-Object Length`；不知道欄位名就 `| Get-Member`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`Remove-Item` 最可能在做什麼？', options: [
-        { text: '從清單中移除重複的項目', why: '那是 `Select-Object -Unique` 或 `Sort-Object -Unique`。' },
-        { text: '刪除檔案或資料夾', correct: true, why: 'Remove（移除）＋Item（項目，例如檔案）＝刪除，它也是 `rm`、`del` 的實體。' },
-        { text: '把項目移到資源回收筒', why: 'Remove-Item 直接刪除，不經過資源回收筒。' },
-        { text: '取消安裝程式', why: '解除安裝程式用的是其他工具（例如 winget uninstall）。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 PowerShell 找出大於 100MB 的檔案，哪一行正確？', options: [
-        { text: '`Get-ChildItem | Where-Object { Length > 100MB }`', why: '`>` 是重新導向，會建立叫 100MB 的檔案。' },
-        { text: '`Get-ChildItem | Where-Object Length -gt 100MB`', correct: true, why: '用 `-gt` 比較 Length 欄位；PowerShell 認得 MB 單位。' },
-        { text: '`ls -l | sort -k5`', why: '這是 bash 的文字處理寫法，PowerShell 的 ls 不認得 `-l`。' },
-        { text: '`Get-ChildItem -Size 100MB`', why: 'Get-ChildItem 沒有 `-Size` 參數。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['同事說「PowerShell 指令好長，不如 bash 簡潔」。用這課的概念，說出 PowerShell 設計的一個優點，和一個讓它不那麼長的方法。'], answer: [
-        '參考：優點是好猜、好讀（動詞-名詞），而且物件管線不用切文字欄位，比較不會切錯。',
-        '縮短方法：互動時用別名（`ls`、`cd`、`where`、`sort`、`select`）和參數的前綴（`-Rec` 代替 `-Recurse`）；寫腳本時再用完整名稱方便別人讀。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-1）PowerShell 讀取環境變數 `Path` 的寫法是？', options: [
-        { text: '`$env:Path`', correct: true, why: '`env:` 前綴讀環境變數。' },
-        { text: '`$PATH`', why: 'bash 寫法，PowerShell 裡是不同的一般變數。' },
-        { text: '`%PATH%`', why: 'cmd 寫法。' },
-        { text: '`Get-EnvironmentPath`', why: '沒有這個 cmdlet。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-2）PowerShell 的 `ls -Force` 顯示了什麼？', options: [
-        { text: '包含隱藏檔的清單', correct: true, why: '`-Force` 顯示隱藏項目，相當於 bash 的 `-a`。' },
-        { text: '強制刪除', why: 'ls 只列出，不刪除。' },
-        { text: '以管理員權限列出', why: '和權限無關。' },
-        { text: '子資料夾的內容', why: '那是 `-Recurse`。' },
-      ] },
     ],
     keypoints: [
       'cmdlet 是「動詞-名詞」：Get、Set、New、Remove…看名詞就能猜意思。',
@@ -464,13 +386,14 @@ defineLessons({
             <text x="30" y="220" font-size="16">真的要照原樣跑，就交給 cmd 執行</text>
           </g>
         </svg>`, caption: '最常見的混亂：在 PowerShell 打 `dir /s`，名稱對了但選項是 cmd 的。' },
+        { type: 'heading', id: 'deep-cmd', text: '深入：cmd 讀批次檔時的三個怪規則' },
+        { type: 'table', caption: '看舊 .bat 時會遇到', head: ['規則', '例子', '為什麼'], rows: [
+          ['變數在「整段讀進來時」就展開', '`( )` 區塊裡改了 `%X%`，同一個區塊讀到的還是舊值', 'cmd 先展開整段再執行；要用 `setlocal enabledelayedexpansion` 搭配 `!X!`'],
+          ['迴圈變數在檔案裡要寫兩個 %', '互動時 `for %f in (*)`，.bat 裡寫 `for %%f in (*)`', '單一個 % 在批次檔有別的意思'],
+          ['中文輸出變亂碼', '繁體中文 Windows 的 cmd 預設字碼頁是 950（Big5）', '`chcp 65001` 切成 UTF-8'],
+        ] },
+        '`cmd /c 指令` 執行完就結束，`cmd /k 指令` 執行完留在 cmd 裡。很多安裝程式和捷徑用 `cmd /c` 包住一行指令，看到時就知道它只是「借 cmd 跑一下」。',
       ],
-      tryit: {
-        q: ['把這行 cmd 翻成 PowerShell：'],
-        code: true,
-        draft: 'cmd：        del /s /q *.tmp\nPowerShell：____',
-        answer: ['`Get-ChildItem -Recurse -Filter *.tmp | Remove-Item -Force`', '`/s` 遞迴 → `-Recurse`；`/q` 不詢問 → `-Force`（並且 Remove-Item 預設就不問）。執行前先拿掉 `| Remove-Item ...` 預覽清單（2-3）。'],
-      },
     },
     mistakes: [
       { wrong: '在 cmd 打 `ls`、`cat`、`pwd`。', why: '這些是 Unix／PowerShell 的名稱，cmd 不認得。', right: '開 PowerShell；或在 cmd 用 `dir`、`type`、`cd`。' },
@@ -478,35 +401,9 @@ defineLessons({
       { wrong: '雙擊一個來路不明的 `.bat` 檔看看會發生什麼。', why: '雙擊就會執行裡面所有指令，包括 `del /s /q`、`rd /s /q` 這種不詢問的刪除。', right: '先用記事本打開看內容，看得懂、確定安全再執行。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪一個最能確定是 cmd 的寫法？', options: [
-        { text: '`echo %PATH%`', correct: true, why: '`%變數%` 是 cmd 特有的寫法。' },
-        { text: '`echo $PATH`', why: '這是 bash／zsh 的寫法。' },
-        { text: '`echo $env:Path`', why: '這是 PowerShell 的寫法。' },
-        { text: '`ls -la`', why: '這是 bash／zsh 的寫法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 PowerShell 打 `dir /s` 出現錯誤。為什麼？', options: [
-        { text: 'PowerShell 沒有 dir 指令', why: '有，`dir` 是 `Get-ChildItem` 的別名。' },
-        { text: '`/s` 是 cmd 的選項，Get-ChildItem 不認得', correct: true, why: '名稱借到了，選項沒有；PowerShell 要寫 `dir -Recurse`。' },
-        { text: '要用系統管理員身分', why: '和權限無關。' },
-        { text: '要先切換到 C:\\', why: '和位置無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['公司的部署說明是一個 `deploy.bat`。你想改成 PowerShell 腳本。翻譯時要特別注意哪三種差異？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['公司的部署說明是一個 `deploy.bat`。你想改成 PowerShell 腳本。翻譯時要特別注意哪三種差異？'], answer: [
         '參考：① 變數：`%X%` → `$env:X` 或 `$X`。② 選項：`/s /q` → `-Recurse -Force` 等。③ 流程：`if exist`、`goto`、`%ERRORLEVEL%` → `Test-Path`、函式、`$LASTEXITCODE`。',
         '翻完先在測試環境跑一次，並加上 `-WhatIf`（很多 cmdlet 支援的「只預覽不執行」選項）。',
-      ] },
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 4-2）cmd 裡查 `git` 在哪個資料夾，用哪個指令？', options: [
-        { text: '`where git`', correct: true, why: 'cmd 的 where 會列出 PATH 中符合的程式。' },
-        { text: '`which git`', why: '那是 bash／zsh。' },
-        { text: '`Get-Command git`', why: '那是 PowerShell。' },
-        { text: '`find git`', why: 'cmd 的 find 是找文字。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 2-4）cmd 的 `type notes.txt` 等於 zsh 的哪個指令？', options: [
-        { text: '`cat notes.txt`', correct: true, why: '兩者都是印出檔案內容。' },
-        { text: '`file notes.txt`', why: 'file 是判斷檔案類型。' },
-        { text: '`touch notes.txt`', why: 'touch 是建立空檔案。' },
-        { text: '`grep notes.txt`', why: 'grep 是搜尋。' },
       ] },
     ],
     keypoints: [
@@ -583,13 +480,16 @@ defineLessons({
             <rect x="10" y="190" width="540" height="50" style="fill:var(--warning)" class="stroke-ink" stroke-width="3"/><text x="26" y="222" class="on-color" font-weight="900">④ 只翻 shell 的部分：變數、選項、導向</text>
           </g>
         </svg>`, caption: '好消息：跨平台工具（模組 6、7）在每種 shell 的寫法幾乎一樣，要翻的通常只有 shell 本身的語法。' },
+        { type: 'heading', id: 'deep-untranslatable', text: '深入：沒有直接對應、不該硬翻的寫法' },
+        { type: 'table', caption: '翻譯時要換做法的地方', head: ['bash／zsh', 'PowerShell', '差別'], rows: [
+          ['`source 檔案`', '`. 檔案`', '寫法不同，意思相同'],
+          ['`cat <<EOF … EOF`（here-doc）', `\`@' … '@\`（here-string）`, '結尾符號必須單獨一行、放在行首'],
+          ['`diff <(指令A) <(指令B)`', '沒有對應', '先存成暫存檔再比較'],
+          ['`chmod +x`', '不需要；Windows 用 ACL（`icacls`）', '權限模型不同（4-3）'],
+          ['`sudo 指令`', '5.1 沒有；Windows 11 24H2 起可開啟 `sudo`', '預設會開新視窗（4-3 深入段）'],
+        ] },
+        '翻譯的成本超過幾行時，換個方法通常更快：在 Windows 開 WSL 或 Git Bash 直接跑原本的 bash 版本，或找原本就用 PowerShell 寫的版本。翻譯最適合的是一兩行的指令。',
       ],
-      tryit: {
-        q: ['判斷每一行是哪種方言：'],
-        code: true,
-        draft: 'A. if exist build rd /s /q build          ____\nB. Remove-Item build -Recurse -Force      ____\nC. [ -d build ] && rm -rf build           ____\nD. $env:NODE_ENV = "production"           ____',
-        answer: ['A：cmd（`if exist`、`/s /q`）。B：PowerShell（動詞-名詞、`-Recurse`）。C：bash／zsh（`[ -d ]`、`&&`、`rm -rf`）。D：PowerShell（`$env:`）。', 'A、B、C 做的是同一件事：刪除 build 資料夾。'],
-      },
     },
     mistakes: [
       { wrong: '把多行的 bash 指令（行尾有 `\\`）直接貼進 PowerShell。', why: 'PowerShell 不認得 `\\` 是續行符號，每一行會被當成獨立的指令，結果亂掉。', right: '把行尾的 `\\` 換成反引號 `` ` ``，或乾脆合併成一行。' },
@@ -597,34 +497,8 @@ defineLessons({
       { wrong: '用 AI 翻譯後不看就執行。', why: 'AI 可能翻錯選項的意思，例如把 `rm -r`（遞迴）翻成不同行為的參數。', right: '用拆解器（1-1）看懂每一塊，對照這課的表格確認，再執行。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '看到一行指令結尾是反引號 `` ` ``，下一行繼續。這是哪種 shell？', options: [
-        { text: 'bash', why: 'bash 用 `\\` 續行。' },
-        { text: 'PowerShell', correct: true, why: '反引號是 PowerShell 的跳脫與續行字元。' },
-        { text: 'cmd', why: 'cmd 用 `^` 續行。' },
-        { text: 'zsh', why: 'zsh 和 bash 一樣用 `\\`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '教學寫 `export PORT=3000 && npm start`，你在 PowerShell 7。怎麼改？', options: [
-        { text: '`$env:PORT = 3000; npm start`', correct: true, why: '設環境變數用 `$env:`；這裡用 `;` 或 `&&` 都可以（PowerShell 7）。' },
-        { text: '`set PORT=3000 && npm start`', why: '`set` 是 cmd 的寫法；在 PowerShell 是 Set-Variable，不會設環境變數。' },
-        { text: '照抄就好，PowerShell 7 也支援 export 指令', why: 'PowerShell 沒有 export 指令。' },
-        { text: '`npm start --PORT=3000`', why: '這是把參數傳給 npm，不是設環境變數，程式不一定讀得到。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你常在 Windows（PowerShell）和 Mac（zsh）之間切換。寫一個讓你少翻譯的策略。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你常在 Windows（PowerShell）和 Mac（zsh）之間切換。寫一個讓你少翻譯的策略。'], answer: [
         '參考：① 兩邊都盡量用跨平台的工具（git、npm、python）和 npm scripts，把指令藏在 `npm run xxx` 後面。② 兩邊都裝 PowerShell 7 或兩邊都用 bash（WSL），讓 shell 一致。③ 常用的對照（像這課的表格）收藏起來。',
-      ] },
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-1）`set MODE=dev` 最可能出現在哪？', options: [
-        { text: 'cmd 或 .bat 檔', correct: true, why: 'cmd 用 set 設變數。' },
-        { text: 'zsh 的 .zshrc', why: 'zsh 用 `export MODE=dev`。' },
-        { text: 'PowerShell 的 $PROFILE', why: 'PowerShell 用 `$env:MODE = "dev"`。' },
-        { text: 'Python 程式碼', why: 'Python 有自己的語法。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 2-3）三種 shell 的「刪除資料夾」有什麼共同點？', options: [
-        { text: '都不經過資源回收筒', correct: true, why: '`rm -rf`、`Remove-Item -Recurse -Force`、`rd /s /q` 都直接刪除。' },
-        { text: '都會先詢問', why: '加了 `-f`、`-Force`、`/q` 就不會問。' },
-        { text: '都需要以系統管理員身分執行', why: '刪自己的檔案不需要。' },
-        { text: '都只能刪空資料夾', why: '加了遞迴選項就能刪整個資料夾。' },
       ] },
     ],
     keypoints: [

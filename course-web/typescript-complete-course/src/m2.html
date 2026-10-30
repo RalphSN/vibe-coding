@@ -25,17 +25,9 @@ defineLessons({
       '用 typeof、in、instanceof 收斂型別',
       '寫一個自訂型別守衛',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-4）callback 型別寫成 `Function` 的問題是？', options: [
-        { text: '參數與回傳都變成 any，失去檢查', correct: true, why: '要寫具體的函式型別。' },
-        { text: '執行比較慢，因為要在執行時檢查函式型別', why: '型別不影響執行速度。' },
-        { text: '不能傳箭頭函式', why: '可以傳，只是沒檢查。' },
-        { text: '語法錯誤', why: '合法但不安全。' },
-      ] },
-    ],
     analogy: {
       text: ['聯合型別像寄來的包裹「可能是書或衣服」：你不能直接翻頁（書的操作），也不能直接穿（衣服的操作）。先打開看是哪一種（收斂），確定是書才翻頁。'],
-      limit: ['你打開一次就記住了；TypeScript 的收斂只在那個 if 區塊裡有效，而且如果中間呼叫了可能改變它的函式，收斂結果可能被重置。'],
+      limit: ['你打開一次就記住了；TypeScript 的收斂只在那段控制流程裡有效。變數被重新指定、或在之後才執行的 callback 裡讀取 let 變數時，收斂可能失效（見本課「深入」）。'],
     },
     model: {
       svg: Fig.tree('收斂流程：x 的型別是 string 或 number；在 typeof x === "string" 的分支裡 x 是 string，可以用 toUpperCase；在 else 分支裡 x 是 number，可以用 toFixed', { title: 'x: string | number', lines: ['只能用兩者共有的操作'] }, [
@@ -69,55 +61,36 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function len(x: string | null) {\n  if (typeof x === "object") {\n    return 0;          // 這裡 x 是什麼型別？\n  }\n  return x.length;\n}\n\nconsole.log(len(null), len("hi"));',
-          predict: { q: '`typeof x === "object"` 分支裡 x 的型別是？', options: ['null', 'string | null', 'object'], answer: 0 },
           output: '0 2\n（typeof null 是 "object"，所以這個分支收斂成 null）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'typeof', label: 'typeof' }, { id: 'in', label: 'in' }, { id: 'inst', label: 'instanceof' }, { id: 'arr', label: 'Array.isArray' }],
-          items: [
-            { text: '區分 string 與 number', answer: 'typeof', why: '原始型別用 typeof。' },
-            { text: '區分 Date 與 string', answer: 'inst', why: 'Date 是類別，用 instanceof（或先 typeof 判斷 string）。' },
-            { text: '區分「有 meow 方法的物件」與「有 bark 方法的物件」', answer: 'in', why: '依屬性存在與否。' },
-            { text: '區分 string 與 string[]', answer: 'arr', why: '`typeof` 對陣列是 "object"。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['區分 string 與 number', 'typeof', '原始型別用 typeof。'],
+          ['區分 Date 與 string', 'instanceof', 'Date 是類別，用 instanceof（或先 typeof 判斷 string）。'],
+          ['區分「有 meow 方法的物件」與「有 bark 方法的物件」', 'in', '依屬性存在與否。'],
+          ['區分 string 與 string[]', 'Array.isArray', '`typeof` 對陣列是 "object"。']
+        ] },
         { type: 'svg', svg: Fig.vs('filter 搭配型別守衛：一般 filter(x => x !== null) 結果仍是 (User | null)[]；寫成 filter((x): x is User => x !== null) 結果收斂成 User[]（TS 5.5 起簡單情況可自動推斷）', { title: '一般 callback', lines: ['`(User | null)[]`', '舊版不會收斂'], tone: 5 }, { title: '型別守衛 callback', lines: ['`User[]`', '明確收斂'], tone: 4 }), caption: 'TypeScript 5.5 起會自動推斷簡單的型別守衛；複雜條件仍要自己寫 `x is T`。' },
+        { type: 'heading', id: 'deep-narrow-limits', text: '深入：收斂在哪裡會失效' },
+        { type: 'table', head: ['情況', '收斂還在嗎', '說明'], rows: [
+          ['if 之後呼叫一個可能修改物件的函式', '還在', '刻意的取捨：每次呼叫都重置會讓收斂幾乎沒用，代價是少數情況不安全'],
+          ['let 變數在 callback 裡讀取', '最後一次指定之後才保留', 'TS 5.4 起，callback 建立在最後一次指定之後時會保留收斂；之前的版本一律失效'],
+          ['把條件存成 const：`const isStr = typeof x === "string"`', '還在', 'TS 4.4 起支援「別名條件」，x 也要是 const 或沒被重新指定的參數'],
+          ['`arr.filter(x => !!x)` 用在 `(number | undefined)[]`', '不會自動收斂', '5.5 的自動型別守衛要求 false 時「一定不是」該型別；0 也會被濾掉，所以不成立'],
+        ] },
+        '第一列是最容易被誤解的地方：TypeScript 不追蹤函式的副作用。收斂完立刻使用，不要中間夾著會改狀態的呼叫，是最實際的防法。',
       ],
-      tryit: {
-        q: ['寫一個型別守衛，判斷 unknown 值是不是有 id（number）的物件：'],
-        draft: 'function hasId(x: unknown): x ____ { id: number } {\n  return typeof x === "object" && x !== null && "id" in x && typeof x.id === ____;\n}',
-        answer: ['`x is { id: number }`、`"number"`。', '要先排除 null（typeof null 是 "object"），再用 in 確認屬性存在，最後檢查屬性型別。'],
-      },
     },
     mistakes: [
       { wrong: '用 `typeof x === "object"` 判斷是物件，忘了 null。', why: '`typeof null` 也是 "object"。', right: '`x !== null && typeof x === "object"`。' },
       { wrong: '用 `as string` 直接斷言聯合型別。', why: '沒有真的檢查，執行時可能是 number。', right: '用 typeof 收斂。' },
       { wrong: '自訂型別守衛寫錯邏輯（回傳 true 但其實不是）。', why: 'TypeScript 完全相信 `x is T`，不檢查守衛本身。', right: '型別守衛要有測試。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`x: string | number`，收斂前能直接呼叫哪個？', options: [
-        { text: '`x.toString()`', correct: true, why: '兩種型別都有 toString。' },
-        { text: '`x.toUpperCase()`', why: '只有 string 有。' },
-        { text: '`x.toFixed()`', why: '只有 number 有。' },
-        { text: '`x.length`', why: '只有 string 有。' },
-      ] },
-      { level: '應用', type: 'mc', q: '區分 `Date | string`，最直接的寫法是？', options: [
-        { text: '`if (x instanceof Date)`', correct: true, why: 'Date 是類別。' },
-        { text: '`if (typeof x === "date")`', why: 'typeof 沒有 "date" 這個結果。' },
-        { text: '`if (x as Date)`', why: '斷言不是檢查。' },
-        { text: '`if ("getTime" === x)`', why: '這是字串比較。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼說「收斂」是 TypeScript 最核心的能力？舉一個 JavaScript 本來就會寫、加了 TypeScript 後變更安全的例子。'], answer: [
-        'TypeScript 不需要新語法來判斷型別，它直接理解你本來就會寫的 JavaScript 檢查（typeof、in、if (!x) return）。',
-        '例如 `if (!user) return; user.name` ——JavaScript 裡你本來就會這樣寫；TypeScript 讀懂這個 return，在後面把 user 收斂成非 null，忘了寫這個檢查時就報錯。',
-      ] },
-    ],
     keypoints: [
       '聯合型別 `A | B`，收斂前只能用共有的成員。',
       '用 typeof、in、instanceof、Array.isArray 收斂。',
       '自訂型別守衛 `x is T` 要寫對，TypeScript 會完全相信它。',
     ],
-    sources: ['ts-narrowing'],
+    sources: ['ts-narrowing', 'ts-44', 'ts-54', 'ts-55'],
   },
 
   '2-2': {
@@ -125,14 +98,6 @@ defineLessons({
       '用字面型別限制值的範圍',
       '用可辨識聯合描述「幾種狀態，每種帶不同資料」',
       '用 never 做窮舉檢查',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-1）`typeof null` 的結果是？', options: [
-        { text: '`"object"`', correct: true, why: '歷史遺留，收斂時要另外排除 null。' },
-        { text: '`"null"`', why: '沒有這個結果。' },
-        { text: '`"undefined"`', why: '那是 undefined 的結果。' },
-        { text: '拋出例外', why: 'typeof 不會拋例外。' },
-      ] },
     ],
     analogy: {
       text: ['可辨識聯合像外送訂單的狀態欄：「準備中」只有預計時間、「外送中」有外送員與位置、「已送達」有簽收時間。看狀態欄（kind）就知道其他欄位有哪些。'],
@@ -171,29 +136,28 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'type Shape =\n  | { kind: "circle"; r: number }\n  | { kind: "square"; size: number }\n  | { kind: "triangle"; base: number; h: number };\n\nfunction area(s: Shape): number {\n  switch (s.kind) {\n    case "circle": return Math.PI * s.r ** 2;\n    case "square": return s.size ** 2;\n    default: {\n      const _x: never = s;\n      return _x;\n    }\n  }\n}',
-          predict: { q: 'tsc 會在哪裡報錯？', options: ['`const _x: never = s` 那行', '沒有錯誤', 'case "circle" 那行'], answer: 0 },
           output: "!app.ts:11:13 - error TS2322: Type '{ kind: \"triangle\"; base: number; h: number; }' is not assignable to type 'never'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'lit', label: '字面型別聯合就夠' }, { id: 'du', label: '用可辨識聯合' }],
-          items: [
-            { text: '排序方向：升冪或降冪', answer: 'lit', why: '`"asc" | "desc"`，不帶額外資料。' },
-            { text: '付款方式：信用卡要末四碼、轉帳要帳號、現金不用', answer: 'du', why: '每種帶不同資料。' },
-            { text: '按鈕尺寸 S、M、L', answer: 'lit', why: '單純的選項。' },
-            { text: 'WebSocket 訊息：聊天、加入、離開，各有不同欄位', answer: 'du', why: '用 type 欄位區分。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['排序方向：升冪或降冪', '字面型別聯合就夠', '`"asc" | "desc"`，不帶額外資料。'],
+          ['付款方式：信用卡要末四碼、轉帳要帳號、現金不用', '用可辨識聯合', '每種帶不同資料。'],
+          ['按鈕尺寸 S、M、L', '字面型別聯合就夠', '單純的選項。'],
+          ['WebSocket 訊息：聊天、加入、離開，各有不同欄位', '用可辨識聯合', '用 type 欄位區分。']
+        ] },
         { type: 'svg', svg: Fig.row('窮舉檢查的效果：新增 triangle 到聯合型別；所有沒處理 triangle 的 switch 的 never 那行都報錯；逐一補上後全部通過', [
           { title: '新增 triangle', lines: ['改型別定義'], tone: 2 },
           { title: '漏處理的地方', lines: ['never 那行報錯'], tone: 5 },
           { title: '補上 case', lines: ['全部通過'], tone: 4 },
         ]), caption: '編譯器幫你找出所有要改的地方。' },
+        { type: 'heading', id: 'deep-discriminant', text: '深入：判別屬性的細節與窮舉的其他寫法' },
+        '判別屬性不一定要是字串：`{ ok: true; data: T } | { ok: false; error: string }` 用 boolean 字面型別也能收斂。TS 4.6 起，先用 const 解構 `const { kind, ... } = shape` 再判斷 kind，也能收斂其他解構出來的變數。',
+        { type: 'table', head: ['窮舉寫法', '優點', '缺點'], rows: [
+          ['`const _x: never = s`', '不用額外工具', '每個 switch 都要寫'],
+          ['`default: throw new Error(String(s satisfies never))`', '一行，執行時也會拋錯', '要 TS 4.9 以上'],
+          ['typescript-eslint 的 switch-exhaustiveness-check', '不改程式碼', '需要型別感知的 lint 設定'],
+        ] },
+        '不適用的情況：資料來自 API 時，判別屬性的值可能是新版後端才有的狀態，型別上「窮舉」不代表執行時窮舉。用 `z.discriminatedUnion` 驗證（6-2），未知狀態走明確的錯誤處理。',
       ],
-      tryit: {
-        q: ['補完型別：Toast 有 success（只有 text）與 error（有 text 與 retry 函式）兩種：'],
-        draft: 'type Toast =\n  | { type: ____; text: string }\n  | { type: "error"; text: string; retry: ____ };',
-        answer: ['`type: "success"`、`retry: () => void`。', '確認 `t.type === "error"` 之後才能呼叫 `t.retry()`。'],
-      },
     },
     mistakes: [
       { wrong: '判別屬性用 string 而不是字面型別：`{ kind: string; r: number }`。', why: 'string 無法收斂到特定成員。', right: '`kind: "circle"`。' },
@@ -201,21 +165,9 @@ defineLessons({
       { wrong: '用一堆 boolean 旗標描述狀態。', why: '組合爆炸，容易出現不可能的狀態。', right: '可辨識聯合。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '可辨識聯合的「判別屬性」要是什麼型別？', options: [
-        { text: '字面型別，例如 `"circle"`', correct: true, why: '才能透過比較收斂。' },
-        { text: '`string`', why: 'string 無法區分成員。' },
-        { text: '`boolean` 一定不行', why: 'true／false 也是字面型別，兩種狀態時其實可以。' },
-        { text: '`any`', why: '無法收斂。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`type Dir = "up" | "down"; let d: Dir = "left";` 會？', options: [
-        { text: 'TS2322：\'"left"\' 不能指定給 Dir', correct: true, why: '只能是列出的值。' },
-        { text: '可以編譯，因為 "left" 和 Dir 的成員都是字串', why: '字面型別比 string 嚴格。' },
-        { text: 'd 變成 string', why: '型別是 Dir。' },
-        { text: '執行時錯誤', why: '是編譯時錯誤。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['C# 15（.NET 11）新增了 union 型別與 closed 類別，目的是讓 switch 可以窮舉。TypeScript 的可辨識聯合在解決同一個問題嗎？差在哪？'], answer: [
-        '是同一個問題：讓編譯器知道「所有可能」，漏處理時報錯。',
-        'TypeScript 用結構型別加判別屬性，在 JavaScript 物件上就做得到，不需要新語法；代價是要自己寫 never 檢查，而且判別屬性需要真的存在於執行時的物件裡。',
+      { level: '深入思考', type: 'reveal', q: ['Kotlin 的 sealed class 與 Rust 的 enum 都能讓 when／match 窮舉所有情況。TypeScript 的可辨識聯合在解決同一個問題嗎？少了什麼、多了什麼？'], answer: [
+        '同一個問題：讓編譯器知道「所有可能」，漏處理時報錯。Kotlin、Rust 的窮舉檢查是語言內建；TypeScript 要靠 never 指定、satisfies never 或 lint 規則（switch-exhaustiveness-check）自己補。',
+        'TypeScript 多的是彈性：判別屬性就是一般的 JavaScript 屬性，API 回傳的 JSON 不用轉成類別就能收斂。代價是判別屬性必須真的存在於執行時的物件，外部資料要先驗證（6-2）。',
       ] },
     ],
     keypoints: [
@@ -223,7 +175,7 @@ defineLessons({
       '每種狀態帶不同資料時用可辨識聯合。',
       'switch 的 default 指定給 never，漏處理時會報錯。',
     ],
-    sources: ['ts-narrowing'],
+    sources: ['ts-narrowing', 'ts-46'],
   },
 
   '2-3': {
@@ -231,14 +183,6 @@ defineLessons({
       '說出 any 為什麼危險',
       '用 unknown 安全地接收不明資料',
       '認識 never 的兩種用途',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-2）窮舉檢查用哪個型別？', options: [
-        { text: '`never`', correct: true, why: '處理完所有情況後剩下的就是 never。' },
-        { text: '`unknown`', why: '任何值都能指定給 unknown，抓不到漏處理。' },
-        { text: '`any`', why: '關掉檢查。' },
-        { text: '`void`', why: 'void 用於函式回傳。' },
-      ] },
     ],
     analogy: {
       text: ['any 像機場的「免檢通道」：什麼都放行，危險品也一起進來，而且它經手的行李也都變成免檢。unknown 像「待檢查區」：什麼都收，但要開箱檢查後才能帶走。'],
@@ -277,30 +221,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'let a: any = "hello";\nlet n: number = a;     // ?\nlet u: unknown = "hello";\nlet m: number = u;     // ?',
-          predict: { q: '哪一行會報錯？', options: ['只有 `let m: number = u`', '只有 `let n: number = a`', '兩行都會'], answer: 0 },
           output: "!app.ts:4:5 - error TS2322: Type 'unknown' is not assignable to type 'number'.\n（any 可以默默放進 number，這正是它危險的地方）",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'unknown', label: '用 unknown' }, { id: 'never', label: '用 never' }, { id: 'specific', label: '寫具體型別' }],
-          items: [
-            { text: 'JSON.parse 的結果', answer: 'unknown', why: '執行前不知道內容。' },
-            { text: '一定會拋例外、不會正常回傳的函式', answer: 'never', why: '回傳型別 never。' },
-            { text: '函式參數：使用者名稱', answer: 'specific', why: '你知道它是 string。' },
-            { text: 'catch (e) 裡的 e', answer: 'unknown', why: '任何東西都可能被 throw。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['JSON.parse 的結果', '用 unknown', '執行前不知道內容。'],
+          ['一定會拋例外、不會正常回傳的函式', '用 never', '回傳型別 never。'],
+          ['函式參數：使用者名稱', '寫具體型別', '你知道它是 string。'],
+          ['catch (e) 裡的 e', '用 unknown', '任何東西都可能被 throw。']
+        ] },
         { type: 'svg', svg: Fig.stack('any 的擴散：data 是 any，data.user 也是 any，data.user.name 也是 any，傳給要 number 的函式也不報錯，錯誤在很遠的地方才在執行時出現', [
           { title: 'data: any', tone: 5 },
           { title: 'data.user: any', tone: 5 },
           { title: 'data.user.name: any', tone: 5 },
           { title: 'add(data.user.name, 1) ← 不報錯', tone: 1 },
         ]), caption: '一個 any 可以讓整條資料流都失去檢查。' },
+        { type: 'heading', id: 'deep-top-types', text: '深入：unknown、{}、object 的差別與雙重斷言' },
+        { type: 'table', head: ['型別', '接受', '不接受'], rows: [
+          ['`unknown`', '所有值', '—（使用前要收斂）'],
+          ['`{}`', '所有非 null／undefined 的值，包括 42、"a"', 'null、undefined'],
+          ['`object`', '物件、陣列、函式', '原始值'],
+        ] },
+        '`{}` 常被誤以為是「空物件」，其實它接受字串和數字；要表示「任何物件」用 object，要表示「什麼都可能」用 unknown。',
+        'as 只允許「可能相容」的型別，`"a" as number` 會報 TS2352。`x as unknown as T` 的雙重斷言可以繞過，它是最強的關閉檢查手段，只該出現在測試替身或已經驗證過的資料上，並附註解說明原因。',
       ],
-      tryit: {
-        q: ['在 catch 裡安全地印出錯誤訊息：'],
-        draft: 'try {\n  risky();\n} catch (e) {\n  const msg = e ____ Error ? e.message : String(e);\n  console.error(msg);\n}',
-        answer: ['`e instanceof Error`。', 'JavaScript 可以 throw 任何東西（字串、數字），所以 e 是 unknown；先確認是 Error 才讀 message。'],
-      },
     },
     mistakes: [
       { wrong: '遇到型別錯誤就加 `: any`。', why: '錯誤被藏起來並擴散。', right: '找出正確型別；真的不知道就 unknown 加收斂。' },
@@ -308,19 +251,7 @@ defineLessons({
       { wrong: '`catch (e) { console.log(e.message) }`。', why: 'e 是 unknown，TS18046；而且被 throw 的可能不是 Error。', right: '`e instanceof Error`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '哪個型別「什麼都能接受，但使用前必須收斂」？', options: [
-        { text: '`unknown`', correct: true, why: '安全版的 any。' },
-        { text: '`any`', why: 'any 不需要收斂就能用。' },
-        { text: '`never`', why: 'never 什麼都不能接受。' },
-        { text: '`object`', why: 'object 不接受原始值。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`function fail(msg: string): never { throw new Error(msg); }` 為什麼回傳 never？', options: [
-        { text: '它永遠不會正常回傳', correct: true, why: '一定拋例外。' },
-        { text: '它回傳 undefined', why: '那是 void。' },
-        { text: '它可以回傳任何型別', why: '那是 any。' },
-        { text: '語法要求', why: '回傳 void 也能編譯，never 更精確。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['接手一個充滿 any 的舊專案，要怎麼漸進地清除？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['接手一個充滿 any 的舊專案，要怎麼漸進地清除？'], answer: [
         '先開 noImplicitAny（strict），擋住新的隱含 any；用 ESLint 的 no-explicit-any 規則列出明確的 any。',
         '從資料進入點（API、JSON、localStorage）開始改成 unknown 加驗證，型別會一路往內傳遞；內部的 any 很多會自然消失。',
       ] },
@@ -338,14 +269,6 @@ defineLessons({
       '說出 strictNullChecks 帶來的保護',
       '用 ?. 與 ?? 處理可能是 null 的值',
       '分辨 `??` 與 `||`，避免把 0 和空字串換掉',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-3）catch 的參數 e 在 strict 下是什麼型別？', options: [
-        { text: '`unknown`', correct: true, why: '任何東西都可能被 throw。' },
-        { text: '`Error`', why: '不一定是 Error。' },
-        { text: '`any`', why: 'strict 起改為 unknown。' },
-        { text: '`never`', why: '不是。' },
-      ] },
     ],
     analogy: {
       text: ['strictNullChecks 像要求每個可能空著的座位都插上「可能空位」的牌子。沒有牌子的座位保證有人；有牌子的座位，你要先看一眼才能跟對方說話。'],
@@ -390,48 +313,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'const el = document.querySelector("#price");\nel.textContent = "100";\n\n// tsc 會說什麼？',
-          predict: { q: 'el 的型別與 tsc 的結果？', options: ['Element | null，報錯 TS18047', 'Element，通過', 'any，通過'], answer: 0 },
           output: "!app.ts:2:1 - error TS18047: 'el' is possibly 'null'.",
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'q', label: '用 ??' }, { id: 'or', label: '用 || 也沒問題' }],
-          items: [
-            { text: '分頁大小：使用者可能傳 0（代表不分頁）', answer: 'q', why: '0 是有效值。' },
-            { text: '顯示名稱：空字串也想換成「匿名」', answer: 'or', why: '這時正是要把空字串也換掉。' },
-            { text: '是否開啟通知：false 是有效值', answer: 'q', why: '|| 會把 false 換掉。' },
-            { text: '價格：0 元是免費商品', answer: 'q', why: '0 是有效值。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['分頁大小：使用者可能傳 0（代表不分頁）', '用 ??', '0 是有效值。'],
+          ['顯示名稱：空字串也想換成「匿名」', '用 || 也沒問題', '這時正是要把空字串也換掉。'],
+          ['是否開啟通知：false 是有效值', '用 ??', '|| 會把 false 換掉。'],
+          ['價格：0 元是免費商品', '用 ??', '0 是有效值。']
+        ] },
         { type: 'svg', svg: Fig.vs('處理 querySelector 回傳 null：用 ! 斷言時找不到元素執行期才出錯；用 if 檢查時找不到元素可以給出清楚的錯誤訊息', { title: 'el!.textContent', lines: ['找不到時', '執行期 TypeError'], tone: 5 }, { title: 'if (!el) throw …', lines: ['清楚的錯誤訊息', '之後 el 非空'], tone: 4 }), caption: '`!` 只在你百分之百確定時使用，例如頁面一定有的根元素。' },
+        { type: 'heading', id: 'deep-null-undefined', text: '深入：缺少、undefined 與 null 是三件事' },
+        { type: 'table', head: ['寫法', '`{}`（沒有這個鍵）', '`{ email: undefined }`', '`{ email: null }`'], rows: [
+          ['`email?: string`', '可以', '可以（預設）', '不行'],
+          ['`email?: string` + exactOptionalPropertyTypes', '可以', '不行', '不行'],
+          ['`email: string | undefined`', '不行', '可以', '不行'],
+          ['`email: string | null`', '不行', '不行', '可以'],
+        ] },
+        '差別在 JSON：`JSON.stringify` 會丟掉值是 undefined 的鍵，但保留 null。很多 PATCH API 因此約定「缺欄位 = 不改、null = 清空」，型別就該分開寫。',
+        '`x == null` 同時檢查 null 與 undefined，TypeScript 也能據此收斂，是少數建議用 == 的地方。類別屬性或變數確定會在別處指定時，可以寫 `let ready!: boolean`（明確指定斷言），但它和非空斷言一樣不做檢查。',
       ],
-      tryit: {
-        q: ['安全地取得使用者所在城市，沒有就顯示「未填寫」：'],
-        draft: 'type User = { address?: { city?: string } };\nfunction city(u: User | null) {\n  return u____address____city ____ "未填寫";\n}',
-        answer: ['`u?.address?.city ?? "未填寫"`。', '任何一層是 null 或 undefined，`?.` 都會停下得到 undefined，再由 ?? 換成預設值。'],
-      },
     },
     mistakes: [
       { wrong: '關掉 strictNullChecks 讓錯誤消失。', why: '最常見的執行時錯誤（Cannot read properties of null）就沒有保護了。', right: '保持 strict，用 ?. ?? 與收斂處理。' },
       { wrong: '到處寫 `!`。', why: '等於關掉 null 檢查。', right: '用 if 檢查並給出清楚錯誤，或 ?. 與 ??。' },
       { wrong: '`count || 0` 處理可能為 0 的數字。', why: '0 也會被換掉（剛好結果相同時看不出 bug，換成其他預設值就錯）。', right: '`count ?? 0`。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`0 ?? 5` 的結果是？', options: [
-        { text: '`0`', correct: true, why: '0 不是 null 或 undefined。' },
-        { text: '`5`', why: '那是 `0 || 5`。' },
-        { text: '`null`', why: '不是。' },
-        { text: '型別錯誤', why: '合法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`user?.profile.name`，當 user 存在但 profile 是 undefined 時會？', options: [
-        { text: '執行時 TypeError（TypeScript 也會先報錯）', correct: true, why: '`?.` 只保護 user，profile 之後要再加 `?.`。' },
-        { text: '得到 undefined，因為 `?.` 會一路保護到最後', why: '要寫 `user?.profile?.name`。' },
-        { text: '得到空字串', why: '不會自動給空字串。' },
-        { text: '得到 null', why: '不會。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['API 的型別寫著 `name: string`，但實際上某些舊資料是 null。為什麼 TypeScript 沒提醒你？要怎麼防？'], answer: [
-        '型別是你自己宣告的，TypeScript 相信它；執行時 API 回傳什麼它看不到。',
-        '在資料進來的地方驗證（6-2），驗證失敗時記錄並處理；或把型別誠實地改成 `name: string | null`，讓所有使用的地方都被要求處理 null。',
-      ] },
     ],
     keypoints: [
       'strict 下 null 與 undefined 必須寫進型別，使用前要處理。',

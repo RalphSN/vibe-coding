@@ -1,6 +1,6 @@
 ---
 name: course-web-neo-brutalism
-description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：單一 HTML、資料驅動的模組與單元、高對比色塊與硬陰影、可拖曳寬度的側欄與字級調整、術語 hover 解釋、有鑑別度且每個選項都附解析的選擇題、大量 SVG 圖解，內容查證到當下日期。使用者說「X 的著作」，或要做線上課程網站、教學網站、互動講義站、「像 ai-chat-prompt-agent-course 那樣的課程」、或新野獸派風格的教材網頁時使用。
+description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：單一 HTML、資料驅動的模組與單元、高對比色塊與硬陰影、可拖曳寬度的側欄與字級調整、術語 hover 解釋、每課的深入段落與試算互動（不出測驗）、大量 SVG 圖解，內容查證到當下日期。使用者說「X 的著作」，或要做線上課程網站、教學網站、互動講義站、「像 ai-chat-prompt-agent-course 那樣的課程」、或新野獸派風格的教材網頁時使用。
 ---
 
 <!-- 由 scripts/build.ps1 產生，請改 ai-dev-rules 的來源（core/、skills/、workflows/、agents/、enforcement/），不要改這裡 -->
@@ -11,7 +11,7 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 教學方向：零基礎與 ADHD 友善，一個單元只教一件事，先具體後抽象，答案先藏起來。
 
 這個 skill 疊加在下列規範之上，衝突時以這份為準：
-- `domain-education-content`：每課結構、練習題、學習科學
+- `domain-education-content`：每課結構、不出測驗、學習科學
 - `course-lesson`：單課模板與檢查清單
 - `domain-web-frontend`：RWD、無障礙、設計品質
 - `web-animation`：動畫工具與 reduced-motion
@@ -27,7 +27,7 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
    1. 寫 `design-system.md`，token 照 [design-tokens.md](references/design-tokens.md)，先跑對比度檢查。
    2. 做骨架：token、版面、側欄（含拖曳與字級）、路由、進度儲存、標題的詞組斷行。
    3. 做元件與元件樣式表頁（`#/styleguide`），照 [components.md](references/components.md)。互動元件從共用元件庫搬，見 [build-and-widgets.md](references/build-and-widgets.md)。
-   4. 逐模組填內容，超過 5 個模組時用分段檔加 `scripts/build.sh` 組合（build-and-widgets.md 第 1 節）。每 2–3 個模組跑一次 `scripts/audit.mjs` 並自我檢查：console、缺漏術語、360px 溢出、選擇題長度、SVG 線段端點與文字（[layout-geometry.md](references/layout-geometry.md) 6.5 節）。圖畫完當下就檢查，不要留到最後。
+   4. 逐模組填內容，超過 5 個模組時用分段檔加 `scripts/build.sh` 組合（build-and-widgets.md 第 1 節）。每 2–3 個模組跑一次 `scripts/audit.mjs` 並自我檢查：console、缺漏術語、360px 溢出、深入段落、SVG 線段端點與文字（[layout-geometry.md](references/layout-geometry.md) 6.5 節）。圖畫完當下就檢查，不要留到最後。
 4. 驗證：照 [verification.md](references/verification.md) 全部走一次，再回報。
 5. 加入書櫃：用 `bookshelf-portal` skill 把網站加進書櫃（3D 與 2D 兩個入口都要加），這一步沒做不算完成。
 
@@ -55,7 +55,7 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 3. Hover 只用一個訊號通道：已經換底色或文字色，就不再改底線；要改底線，就不換底色。詳見 components.md 第 3 節。
 4. 每個狀態變化都有進場和退場轉場：下拉選單、側欄模組、摺疊區、tooltip、抽屜、分頁都要滑動或淡入淡出，關閉時也一樣。詳見 components.md 第 4 節。
 5. 術語：每課第一次出現的術語包成 `[[術語]]`，hover、focus、點擊都能看到詳細解釋的 popup，滑鼠能移進 popup 而不消失。詳見 components.md 第 5 節。
-6. 選擇題：錯誤選項來自真實的誤解，長度與具體程度和正確答案相當；每個選項（含正確答案）都附解析。全站正確答案是最長選項的比例不超過 35%（4 個選項隨機約 25%）。詳見 content-rules.md 第 2 節。
+6. 不出測驗：不放選擇題、暖身回顧、補完題、預測題、分類練習、總複習測驗（2026-10-29 使用者決定）。每課的詳細說明最後至少一段「深入：」；深入思考題選用，每課最多 2 題、只收要多步推理的開放題。詳見 content-rules.md 第 2 節。
 7. 視覺化：每個單元至少 2 張圖（心智模型 SVG ＋ 範例或比較的圖表）；每 300–400 字至少一個非文字元素。詳見 content-rules.md 第 3 節。
 8. 時效：所有事實查證到今天，記錄查證日期與來源；查不到的標「⚠️ 截至 YYYY-MM 查證狀態：未確認」。詳見 content-rules.md 第 4 節。
 9. 動畫只動 `transform`、`opacity`、顏色類屬性；例外只有摺疊區的高度（components.md 第 4 節）與 SVG 的 `stroke-dashoffset`。所有動畫都有 reduced-motion 版本。
@@ -74,7 +74,7 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 
 分段建置與互動元件最完整的是 `terminal-commands-course/`（2026-10-07 版，37 課、8 種元件）；改編外部文章看 `karpathy-output-formats-course/`。
 
-版面與引擎優先參考 `claude-code-secure-dev-course/`（2026-10-02 版）：它照本 skill 實作，已修正下表的差異，並通過 layout-geometry.md 的全部檢查。引擎（路由、側欄、字級、術語 popup、測驗、詞組斷行）可以直接沿用，再換掉 `COURSES` 與各模組的資料區塊。
+版面與引擎優先參考 `claude-code-secure-dev-course/`（2026-10-02 版）：它照本 skill 實作，已修正下表的差異，並通過 layout-geometry.md 的全部檢查。引擎（路由、側欄、字級、術語 popup、深入思考題的展開、詞組斷行）可以直接沿用，再換掉 `COURSES` 與各模組的資料區塊。
 
 `ai-chat-prompt-agent-course/`（2026-10 版）是這套風格的第一個實作，資料格式相同。下列地方它還不符合本 skill，複製時要改：
 
@@ -86,7 +86,6 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 | tooltip、`details` 關閉 | 沒有退場動畫 | 關閉也要轉場（規則 4） |
 | 側欄寬度 | 固定 `18rem` | 可拖曳（規則 2） |
 | 字級 | 不能調 | 頂部列字級控制（規則 2） |
-| 選擇題 `whyWrong` | 選填 | 每個錯誤選項都必填（規則 6） |
 | 標題、上一課／下一課 | 瀏覽器預設換行，出現「平行開」／「發」 | 詞組斷行（規則 11） |
 | 上一課／下一課（深色模式，2026-10-02 截圖） | 黃底上是白字 | 彩色底一律 `--on-color` 黑字（規則 1） |
 | 側欄位置 | `top` 寫死頂部列高度 | 量測後寫回 `--topbar-h`（規則 12） |
@@ -94,11 +93,11 @@ description: 製作新野獸派（Neo-Brutalism）風格的互動課程網站：
 ## 回報
 
 照個人回報範本，另外寫出：
-- 單元數、每單元閱讀時間範圍、圖解總數、選擇題總數
+- 單元數、每單元閱讀時間範圍、圖解總數、深入段落數
 - `scripts/audit.mjs`、`scripts/svg-text.mjs` 的輸出摘要（JS 錯誤數、結構問題數、SVG 問題數）
 - 用了哪些互動元件、哪些是動畫、哪些是靜態（規則 13）
 - 對比度檢查結果（最低的一組是多少）
-- 選擇題：正確答案是最長選項的比例
+- 深入段落：每課是否都有、沒有的課號
 - 標為「未確認」的項目清單
 - 10 種裝置寬度（layout-geometry.md 6.1 節）與深色模式是否都看過；頁面最上方與捲到最底的對齊量測結果
 - SVG 檢查：圖數、懸空端點數、文字問題數

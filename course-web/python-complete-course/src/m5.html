@@ -26,14 +26,6 @@ defineLessons({
       '加入、移除相依套件並產生鎖定檔',
       '說出為什麼不要把套件裝到全域的 Python',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-3）`import requests` 時 Python 依序在哪裡找？', options: [
-        { text: '快取 → 目前資料夾 → 標準函式庫 → 已安裝套件', correct: true, why: '所以虛擬環境決定了「已安裝套件」是哪一批。' },
-        { text: '只找標準函式庫', why: '也會找已安裝的套件。' },
-        { text: '直接上網下載', why: 'import 不會下載任何東西。' },
-        { text: '只找目前資料夾', why: '還會找其他路徑。' },
-      ] },
-    ],
     analogy: {
       text: ['虛擬環境像每個專案各自的工具箱：A 專案要 2 號螺絲起子、B 專案要 3 號，各放各的箱子就不會吵架。鎖定檔像工具箱的清單照片，別人照著照片就能配出一模一樣的箱子。'],
       limit: ['實體工具箱很佔空間；uv 會共用快取、用連結的方式安裝，很多專案用同一版套件時不會重複佔用磁碟。'],
@@ -69,23 +61,19 @@ defineLessons({
         why: ['每個專案一個環境，是 Python 開發最基本的衛生習慣'],
       }],
       blocks: [
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'commit', label: '要 commit' }, { id: 'ignore', label: '加進 .gitignore' }],
-          items: [
-            { text: '`pyproject.toml`', answer: 'commit', why: '專案需求。' },
-            { text: '`uv.lock`', answer: 'commit', why: '讓別人裝出相同版本。' },
-            { text: '`.venv/`', answer: 'ignore', why: '可以由 uv sync 重建，而且和作業系統有關。' },
-            { text: '`__pycache__/`', answer: 'ignore', why: '位元組碼快取。' },
-            { text: '`.env`（含 API 金鑰）', answer: 'ignore', why: '秘密資訊不能進版本控制。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`pyproject.toml`', '要 commit', '專案需求。'],
+          ['`uv.lock`', '要 commit', '讓別人裝出相同版本。'],
+          ['`.venv/`', '加進 .gitignore', '可以由 uv sync 重建，而且和作業系統有關。'],
+          ['`__pycache__/`', '加進 .gitignore', '位元組碼快取。'],
+          ['`.env`（含 API 金鑰）', '加進 .gitignore', '秘密資訊不能進版本控制。']
+        ] },
         { type: 'widget', name: 'csrun', props: {
           file: '終端機',
-          title: '先預測，再看結果',
+          title: '執行結果',
           lang: 'BASH',
           hl: 'bash',
           code: '# 專案 A 需要 httpx 0.27，專案 B 需要 0.28\n# 兩個專案都用 uv 管理\ncd project-a && uv run python -c "import httpx; print(httpx.__version__)"\ncd ../project-b && uv run python -c "import httpx; print(httpx.__version__)"',
-          predict: { q: '兩次印出的版本會一樣嗎？', options: ['不一樣：各自 0.27 與 0.28', '一樣，後裝的蓋掉前面', '第二個會報錯'], answer: 0 },
           output: '0.27.2\n0.28.1\n（版本號為示意）',
         } },
         { type: 'svg', svg: Fig.row('uv 常用指令：uv init 建立專案；uv add 加入套件；uv run 執行；uv sync 依鎖定檔安裝', [
@@ -94,35 +82,20 @@ defineLessons({
           { title: 'uv run', lines: ['在環境裡執行'], tone: 4 },
           { title: 'uv sync', lines: ['依鎖定檔安裝'], tone: 2 },
         ]), caption: '日常幾乎只用這四個。' },
+        { type: 'heading', id: 'deep-uv', text: '深入：版本範圍、鎖定檔與 Python 版本本身' },
+        { type: 'table', caption: '三個層次的「版本」', head: ['檔案', '寫什麼', '例子'], rows: [
+          ['`pyproject.toml` 的 dependencies', '允許的範圍', '`httpx>=0.28`'],
+          ['`uv.lock`', '實際解出來的精確版本與雜湊值，跨平台一份', '`httpx 0.28.1` 加上各平台的檔案雜湊'],
+          ['`.python-version`', '這個專案用哪個 Python', '`uv python pin 3.15` 產生'],
+        ] },
+        '函式庫和應用程式的鎖定方式不同：應用程式（網站、CLI）要 commit 鎖定檔，部署才可重現；發布到 PyPI 的函式庫只寫範圍、範圍要寬，否則使用者的其他套件很容易版本衝突。升級時用 `uv lock --upgrade-package 套件名` 一次只升一個，出問題比較好追。',
+        'uv 不是唯一選擇：標準工具 `python -m venv` 加 pip 隨 Python 附帶，不用另外安裝，適合不能裝第三方工具的環境；Poetry、PDM 也做類似的事。uv 的優勢是速度與「一個工具管 Python 版本、虛擬環境、套件、全域工具」。',
       ],
-      tryit: {
-        q: ['同事 clone 了你的專案，要怎麼裝出和你一樣的環境並執行測試？'],
-        draft: 'git clone …\ncd my-project\nuv ____\nuv run ____',
-        answer: ['`uv sync`、`uv run pytest`。', 'uv sync 會依 uv.lock 建立 .venv；uv run 不用手動啟動虛擬環境。'],
-      },
     },
     mistakes: [
       { wrong: '把 .venv 資料夾 commit 進 git。', why: '很大、而且綁定作業系統與路徑，別台電腦用不了。', right: '加進 .gitignore，commit pyproject.toml 和 uv.lock。' },
       { wrong: '只寫 `dependencies = ["httpx"]`，沒有鎖定檔。', why: '每次安裝可能拿到不同版本，今天能跑明天不行。', right: '用 uv.lock（或 pip-tools 產生的 requirements.txt）鎖定。' },
       { wrong: '從部落格複製套件名稱直接 `uv add`。', why: '有仿冒名稱的惡意套件（typosquatting）。', right: '在 pypi.org 確認作者、下載量、最後更新日期。' },
-    ],
-    practice: [
-      { level: '回想', type: 'mc', q: '哪個檔案記錄「實際安裝的精確版本」？', options: [
-        { text: '`uv.lock`', correct: true, why: '鎖定檔包含所有間接相依的精確版本。' },
-        { text: '`pyproject.toml`', why: '它寫的是需求範圍，例如 >=0.28。' },
-        { text: '`.venv/pyvenv.cfg`', why: '那是虛擬環境的設定，不是版本清單。' },
-        { text: '`__init__.py`', why: '那是套件的入口。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`uv run main.py` 和直接 `python main.py` 最大的差別是？', options: [
-        { text: 'uv run 會自動使用並同步專案的虛擬環境', correct: true, why: '不用手動 activate。' },
-        { text: 'uv run 會把程式編譯成執行檔', why: '不會。' },
-        { text: '沒有差別', why: '直接 python 可能用到系統的 Python 與套件。' },
-        { text: 'uv run 只能執行測試', why: '可以執行任何指令。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的公司電腦（Windows）和家裡的 Mac 都要開發同一個 Python 專案。用這課的工具，怎麼讓兩台環境一致？'], answer: [
-        '兩台都裝 uv；專案 commit pyproject.toml、uv.lock、.python-version（`uv python pin 3.15`），不 commit .venv。',
-        '每次 git pull 後 `uv sync`；uv.lock 是跨平台的，會為 Windows 與 macOS 各自選對的套件檔案。',
-      ] },
     ],
     keypoints: [
       '每個專案一個虛擬環境，不要裝到全域 Python。',
@@ -137,14 +110,6 @@ defineLessons({
       '用 pathlib 組合跨平台路徑',
       '讀寫文字檔，知道 3.15 預設 UTF-8',
       '用 json 讀寫設定與資料',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 3-4）開檔一律用 with 的原因是？', options: [
-        { text: '離開區塊時一定會關檔，即使中途出錯', correct: true, why: 'with 保證清理。' },
-        { text: '讀檔比較快', why: '速度一樣。' },
-        { text: '可以同時讀寫', why: '和讀寫模式無關。' },
-        { text: '不用 with 會 SyntaxError', why: '語法上可以不用，只是容易漏關。' },
-      ] },
     ],
     analogy: {
       text: ['pathlib 像導航 App：你只要說「從家裡到公司」，它自己處理左轉右轉。手寫路徑字串像自己畫地圖：Windows 用 `\\`、macOS 用 `/`，畫錯一筆就迷路。'],
@@ -183,55 +148,36 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'import json\nfrom pathlib import Path\n\np = Path("reports") / "2026-10.json"\nprint(p.name, p.suffix, p.stem)\nprint(p.parent)\n\ndata = {"城市": "台北", "溫度": 23.5}\nprint(json.dumps(data))\nprint(json.dumps(data, ensure_ascii=False))',
-          predict: { q: '第一個 `json.dumps(data)` 的中文會怎麼顯示？', options: ['直接顯示中文', '變成 \\u 跳脫碼', '亂碼'], answer: 1 },
           output: '2026-10.json .json 2026-10\nreports\n{"\\u57ce\\u5e02": "\\u53f0\\u5317", "\\u6eab\\u5ea6": 23.5}\n{"城市": "台北", "溫度": 23.5}',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'str', label: '處理字串' }, { id: 'file', label: '處理檔案物件' }],
-          items: [
-            { text: '`json.loads`', answer: 'str', why: 'load + s（string）。' },
-            { text: '`json.dump`', answer: 'file', why: '直接寫進開啟的檔案。' },
-            { text: '`json.dumps`', answer: 'str', why: '回傳字串。' },
-            { text: '`json.load`', answer: 'file', why: '從檔案物件讀。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`json.loads`', '處理字串', 'load + s（string）。'],
+          ['`json.dump`', '處理檔案物件', '直接寫進開啟的檔案。'],
+          ['`json.dumps`', '處理字串', '回傳字串。'],
+          ['`json.load`', '處理檔案物件', '從檔案物件讀。']
+        ] },
         { type: 'svg', svg: Fig.vs('Python 3.15 的預設編碼改變：3.14 以前未指定 encoding 時依作業系統，Windows 常是 cp950；3.15 起一律 UTF-8', { title: '3.14 以前', lines: ['依作業系統', 'Windows：cp950', '中文檔可能亂碼'], tone: 5 }, { title: '3.15 起', lines: ['一律 UTF-8', '跨平台一致'], tone: 4 }), caption: '程式要支援 3.14 以前時，一定寫 `encoding="utf-8"`。' },
+        { type: 'heading', id: 'deep-files', text: '深入：編碼、換行與安全寫檔' },
+        '3.15 的 UTF-8 預設（PEP 686）只影響「沒寫 encoding」的情況；要暫時退回舊行為可以設 `PYTHONUTF8=0` 或 `-X utf8=0`。在 3.14 以前找漏寫的地方，用 `python -X warn_default_encoding app.py`，每個沒指定 encoding 的 open 都會出 EncodingWarning。',
+        { type: 'table', caption: '讀檔時常遇到的編碼', head: ['來源', '常見編碼', '讀法'], rows: [
+          ['Excel 在 Windows 存的 CSV', 'UTF-8 加 BOM，或 cp950', '`encoding="utf-8-sig"`（會去掉 BOM）'],
+          ['舊的台灣政府或銀行資料', 'cp950（Big5 的微軟版）', '`encoding="cp950"`'],
+          ['不確定、只想先讀進來', '—', '`errors="replace"` 把無法解碼的字換成 �，先看再說'],
+        ] },
+        '寫入重要檔案時，程式中途當掉會留下寫一半的檔案。安全做法是先寫到同資料夾的暫存檔，完成後用 `Path.replace()` 換過去（macOS、Linux 在同一個磁碟上是原子操作，Windows 不保證，但仍比直接覆寫安全）。3.14 起 Path 也有 `copy()`、`move()`，搬檔不必再匯入 shutil。',
       ],
-      tryit: {
-        q: ['讀取 `todo.json`（內容是清單），加入一項後寫回，保持中文可讀：'],
-        draft: 'import json\nfrom pathlib import Path\n\np = Path("todo.json")\nitems = json.loads(p.____(encoding="utf-8"))\nitems.append("買牛奶")\np.write_text(json.dumps(items, ____=False, indent=2), encoding="utf-8")',
-        answer: ['`p.read_text(...)`、`ensure_ascii=False`。', '寫回前可以先寫到暫存檔再改名（`tmp.replace(p)`），避免寫到一半斷電把檔案弄壞。'],
-      },
     },
     mistakes: [
       { wrong: '路徑寫死 `C:\\Users\\ralph\\data`。', why: '換一台電腦或作業系統就壞。', right: '`Path.home() / "data"` 或相對於 `Path(__file__).parent`。' },
       { wrong: 'Windows 上讀 UTF-8 檔案沒指定編碼，出現 UnicodeDecodeError（3.14 以前）。', why: '預設用系統編碼 cp950。', right: '一律 `encoding="utf-8"`，或升級到 3.15。' },
       { wrong: '用 `"a" in open(p).read()` 讀大檔。', why: '整個檔案讀進記憶體，而且沒關檔。', right: '`with open(p, encoding="utf-8") as f: for line in f:` 逐行處理。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '`Path("a/b/report.csv").suffix` 是？', options: [
-        { text: '`".csv"`', correct: true, why: 'suffix 包含點。' },
-        { text: '`"csv"`', why: '有包含點。' },
-        { text: '`"report"`', why: '那是 stem。' },
-        { text: '`"report.csv"`', why: '那是 name。' },
-      ] },
-      { level: '應用', type: 'mc', q: '在 Python 3.15 執行 `open("a.txt").read()`（沒寫 encoding），用的是？', options: [
-        { text: 'UTF-8', correct: true, why: 'PEP 686：3.15 起預設 UTF-8。' },
-        { text: '作業系統的預設編碼', why: '那是 3.14 以前的行為。' },
-        { text: 'ASCII', why: '不是。' },
-        { text: '自動偵測', why: 'Python 不會自動偵測編碼。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的程式要在 Windows 的公司電腦（Python 3.12）與家裡的 Mac（3.15）都能正確讀寫中文檔案。怎麼寫最保險？'], answer: [
-        '所有 open、read_text、write_text 都明確寫 `encoding="utf-8"`；路徑一律用 pathlib。',
-        '這樣在 3.12 不受 cp950 影響，在 3.15 也行為一致。可以開啟 `python -X warn_default_encoding` 找出漏寫 encoding 的地方。',
-      ] },
-    ],
     keypoints: [
       '路徑用 pathlib 的 `/` 組合，不手寫分隔符號。',
       '3.15 起預設 UTF-8，但仍寫 `encoding="utf-8"` 以相容舊版。',
       'json 的 s 結尾處理字串；中文加 `ensure_ascii=False`。',
     ],
-    sources: ['py-pathlib', 'py-json', 'py-315'],
+    sources: ['py-pathlib', 'py-json', 'py-315', 'py-314'],
   },
 
   '5-3': {
@@ -239,14 +185,6 @@ defineLessons({
       '用 pytest 寫測試並執行',
       '用 parametrize 測試多組輸入',
       '用 pytest.raises 與 tmp_path 測試例外和檔案',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-1）開發用的 pytest 應該怎麼加入專案？', options: [
-        { text: '`uv add --dev pytest`', correct: true, why: '放在開發相依，正式安裝時不需要。' },
-        { text: '`sudo pip install pytest`', why: '不要裝到全域。' },
-        { text: '把 pytest 的原始碼複製進專案', why: '用套件管理即可。' },
-        { text: '`uv add pytest` 放進正式相依', why: '可以，但會讓使用者也裝到測試工具。' },
-      ] },
     ],
     analogy: {
       text: ['測試像烘焙時的溫度計：每次改配方（程式），插一下就知道裡面熟了沒（結果對不對），不用每次都切開來吃（手動試）。'],
@@ -285,31 +223,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           file: 'uv run pytest 的輸出',
-          title: '先預測，再看測試結果',
+          title: '執行 pytest 的結果',
           code: '# shop/price.py\ndef average(prices):\n    return sum(prices) / len(prices)\n\n# tests/test_price.py\ndef test_average_of_two():\n    assert average([100, 200]) == 150\n\ndef test_average_of_empty_is_zero():\n    assert average([]) == 0',
-          predict: { q: '第二個測試會怎樣？', options: ['通過', '失敗：ZeroDivisionError', '被略過'], answer: 1 },
           output: 'tests/test_price.py .F\n!FAILED tests/test_price.py::test_average_of_empty_is_zero - ZeroDivisionError: division by zero\n1 failed, 1 passed in 0.02s',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'raises', label: 'pytest.raises' }, { id: 'tmp', label: 'tmp_path' }, { id: 'param', label: 'parametrize' }],
-          items: [
-            { text: '確認負數價格會拋 ValueError', answer: 'raises', why: '測試例外。' },
-            { text: '測試「存檔再讀回來」不碰真的資料夾', answer: 'tmp', why: '每個測試一個乾淨的暫存資料夾。' },
-            { text: '同一個函式要測 8 組輸入輸出', answer: 'param', why: '一組資料一個案例。' },
-            { text: '確認讀不存在的設定檔會拋 FileNotFoundError', answer: 'raises', why: '測試例外。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['確認負數價格會拋 ValueError', 'pytest.raises', '測試例外。'],
+          ['測試「存檔再讀回來」不碰真的資料夾', 'tmp_path', '每個測試一個乾淨的暫存資料夾。'],
+          ['同一個函式要測 8 組輸入輸出', 'parametrize', '一組資料一個案例。'],
+          ['確認讀不存在的設定檔會拋 FileNotFoundError', 'pytest.raises', '測試例外。']
+        ] },
         { type: 'svg', svg: Fig.row('修 bug 的流程：先寫一個能重現 bug 的失敗測試，確認是紅燈；修改程式讓它變綠燈；之後這個測試防止同樣的 bug 再出現', [
           { title: '1. 寫失敗測試', lines: ['紅燈'], tone: 5 },
           { title: '2. 修程式', lines: ['讓它通過'], tone: 2 },
           { title: '3. 綠燈', lines: ['bug 不會回來'], tone: 4 },
         ]), caption: '先看到紅燈，才能確定測試真的抓得到這個 bug。' },
+        { type: 'heading', id: 'deep-pytest', text: '深入：fixture 的範圍、測試替身與測什麼' },
+        { type: 'table', caption: 'fixture 的 scope', head: ['scope', '建立幾次', '適合'], rows: [
+          ['`function`（預設）', '每個測試一次', '會被修改的資料'],
+          ['`module`', '每個測試檔一次', '建立成本高、但測試只讀不寫'],
+          ['`session`', '整次測試一次', '啟動資料庫容器、載入大型模型'],
+        ] },
+        '範圍越大越快，但測試之間開始共用狀態，順序一換就壞。原則是先用預設的 function，真的慢了再放大，並確認放大的 fixture 是唯讀的。',
+        '測什麼比測多少重要：覆蓋率 100% 也可能每個 assert 都在檢查不重要的事。優先測邊界（空清單、0、負數、超長字串）、錯誤路徑、以及曾經出過 bug 的地方；`pytest --lf` 只重跑上次失敗的測試，修 bug 時省很多時間。',
       ],
-      tryit: {
-        q: ['為 `average` 修好空清單的情況後，寫一個確認它會拋 ValueError 的測試：'],
-        draft: 'import pytest\n\ndef test_average_rejects_empty_list():\n    with pytest.____(ValueError):\n        ____([])',
-        answer: ['`with pytest.raises(ValueError):`、`average([])`。', '先決定規格：空清單要回傳 0 還是拋例外？寫測試就是把規格寫下來。'],
-      },
     },
     mistakes: [
       { wrong: '為了讓測試通過去改測試的預期值。', why: '測試是規格，改它等於改需求。', right: '先確認測試本身對不對；錯了先回報再改。' },
@@ -317,19 +254,7 @@ defineLessons({
       { wrong: '測試互相依賴執行順序。', why: '單獨執行或平行執行時就壞。', right: '每個測試自己準備資料（fixture），不共用可變狀態。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'pytest 預設會執行哪個函式？', options: [
-        { text: '`tests/test_cart.py` 裡的 `test_add_item`', correct: true, why: '檔名與函式名都以 test_ 開頭。' },
-        { text: '`tests/cart.py` 裡的 `add_item`', why: '檔名與函式名都不符合。' },
-        { text: '`tests/test_cart.py` 裡的 `check_add`', why: '函式名要以 test 開頭。' },
-        { text: '所有 .py 裡的所有函式', why: '只找符合命名規則的。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`@pytest.mark.parametrize("x", [1, 2, 3])` 加在一個測試上，報告會算成幾個測試？', options: [
-        { text: '3 個', correct: true, why: '每組參數一個案例。' },
-        { text: '1 個', why: 'parametrize 會展開。' },
-        { text: '0 個', why: '會正常執行。' },
-        { text: '6 個', why: '只有 3 組參數。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的函式會呼叫天氣 API。怎麼在測試裡不真的連網？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的函式會呼叫天氣 API。怎麼在測試裡不真的連網？'], answer: [
         '設計時把「取得資料」與「處理資料」分開：處理資料的函式接收 dict，直接用固定資料測試。',
         '真的要測整合時，用 `monkeypatch.setattr(module, "fetch_weather", lambda city: {"temp": 25})` 替換，或用 respx 這類套件模擬 httpx 的回應。',
       ] },
@@ -347,14 +272,6 @@ defineLessons({
       '用 httpx 發出 GET 與 POST 請求',
       '檢查狀態碼並處理逾時',
       '從環境變數讀取 API 金鑰',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-3）測試會呼叫 API 的函式，最好的做法是？', options: [
-        { text: '把資料處理和網路呼叫分開，用固定資料測處理邏輯', correct: true, why: '測試快又穩定。' },
-        { text: '每次測試都真的呼叫 API', why: '慢、不穩定，還可能被收費或限流。' },
-        { text: '不要測', why: '邏輯錯誤就沒人發現。' },
-        { text: '只在正式環境測', why: '太晚發現問題。' },
-      ] },
     ],
     analogy: {
       text: ['呼叫 API 像打電話到餐廳訂位：你說「我要訂 4 人、晚上 7 點」（請求），對方回「好的」或「客滿」（狀態碼與內容）。電話沒人接時，你不會永遠等下去，響 10 聲就掛（逾時）。'],
@@ -394,30 +311,29 @@ defineLessons({
         { type: 'widget', name: 'csrun', props: {
           file: 'app.py（伺服器回應 404）',
           code: 'import httpx\n\nr = httpx.get("https://api.example.com/v1/users/999", timeout=10)\nprint(r.status_code)\nprint(r.is_success)\nr.raise_for_status()\nprint("這行會執行嗎？")',
-          predict: { q: '最後一行「這行會執行嗎？」會印出嗎？', options: ['會', '不會，raise_for_status 拋出例外', '不會，httpx.get 就拋出例外'], answer: 1 },
           output: '404\nFalse\n!httpx.HTTPStatusError: Client error \'404 Not Found\' for url \'https://api.example.com/v1/users/999\'',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'client', label: '4xx：請求端的問題' }, { id: 'server', label: '5xx：伺服器的問題' }, { id: 'ok', label: '2xx：成功' }],
-          items: [
-            { text: '401 Unauthorized', answer: 'client', why: '金鑰錯誤或沒帶。' },
-            { text: '503 Service Unavailable', answer: 'server', why: '伺服器暫時無法服務，可以稍後重試。' },
-            { text: '201 Created', answer: 'ok', why: '建立成功。' },
-            { text: '429 Too Many Requests', answer: 'client', why: '請求太頻繁，要放慢（看 Retry-After 標頭）。' },
-            { text: '404 Not Found', answer: 'client', why: '網址或資源不存在。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['401 Unauthorized', '4xx：請求端的問題', '金鑰錯誤或沒帶。'],
+          ['503 Service Unavailable', '5xx：伺服器的問題', '伺服器暫時無法服務，可以稍後重試。'],
+          ['201 Created', '2xx：成功', '建立成功。'],
+          ['429 Too Many Requests', '4xx：請求端的問題', '請求太頻繁，要放慢（看 Retry-After 標頭）。'],
+          ['404 Not Found', '4xx：請求端的問題', '網址或資源不存在。']
+        ] },
         { type: 'svg', svg: Fig.stack('處理 API 失敗的決策：逾時或 5xx 可以等一下重試；429 依 Retry-After 等待後重試；其他 4xx 不要重試，要修正請求', [
           { title: '逾時、5xx → 等一下重試（最多幾次）', tone: 3 },
           { title: '429 → 依 Retry-After 等待再試', tone: 2 },
           { title: '其他 4xx → 不重試，修正請求', tone: 5 },
         ], { arrows: false }), caption: '重試只對「暫時性」的錯誤有意義。' },
+        { type: 'heading', id: 'deep-http', text: '深入：連線重用、重試與冪等' },
+        '每次 `httpx.get()` 都重新建立 TCP 與 TLS 連線；同一個主機要發很多請求時，用 `with httpx.Client(base_url=..., timeout=10) as client:`，連線會被重用，速度差很多。httpx 的 timeout 可以分開設定連線、讀取、寫入、等待連線池（`httpx.Timeout(10, connect=3)`）。',
+        { type: 'table', caption: '哪些請求可以安全重試', head: ['方法', '冪等（重送結果相同）', '重試'], rows: [
+          ['GET、HEAD', '是', '可以'],
+          ['PUT、DELETE', '是（設計正確時）', '可以'],
+          ['POST', '否', '要有 idempotency key 之類的機制，否則可能重複下單、重複扣款'],
+        ] },
+        '重試要「指數退避加隨機抖動」：等 1、2、4 秒再各加一點亂數，避免一千個客戶端在同一秒一起重試把伺服器再打掛。requests 仍然常見、只支援同步；新專案需要 async 或 HTTP/2 時選 httpx。',
       ],
-      tryit: {
-        q: ['用 POST 送出 JSON，建立一筆待辦事項：'],
-        draft: 'r = httpx.____(\n    "https://api.example.com/v1/todos",\n    ____={"title": "買牛奶"},\n    timeout=10,\n)\nr.raise_for_status()\nprint(r.json()["id"])',
-        answer: ['`httpx.post(...)`、`json={"title": "買牛奶"}`。', '用 `json=` 參數時 httpx 自動序列化並設定 Content-Type: application/json；用 `data=` 則是表單格式。'],
-      },
     },
     mistakes: [
       { wrong: 'API 金鑰寫在程式碼裡並 commit。', why: '一旦推上 GitHub 就外洩，機器人幾分鐘內就會掃到。', right: '環境變數或 .env（加進 .gitignore），立刻撤銷已外洩的金鑰。' },
@@ -425,19 +341,7 @@ defineLessons({
       { wrong: '沒檢查狀態碼就 `r.json()["data"]`。', why: '錯誤時的回應格式不同，出現 KeyError 或 JSONDecodeError，看不出真正原因。', right: '先 `raise_for_status()`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`r.raise_for_status()` 的作用是？', options: [
-        { text: '狀態碼是 4xx 或 5xx 時拋出 HTTPStatusError', correct: true, why: '把錯誤狀態轉成例外。' },
-        { text: '把狀態碼印出來', why: '它不印任何東西。' },
-        { text: '自動重試失敗的請求', why: '不會重試。' },
-        { text: '把回應轉成 JSON', why: '那是 r.json()。' },
-      ] },
-      { level: '應用', type: 'mc', q: '收到 503 時最合理的處理是？', options: [
-        { text: '等一下重試，設定最多次數', correct: true, why: '503 通常是暫時性的。' },
-        { text: '立刻無限重試', why: '可能把伺服器壓得更慘。' },
-        { text: '修改請求內容', why: '問題在伺服器端。' },
-        { text: '當成成功處理', why: '5xx 是失敗。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你要寫一個每 10 分鐘抓一次匯率的排程程式。把這課與前面學到的東西組合起來，會注意哪些事？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你要寫一個每 10 分鐘抓一次匯率的排程程式。把這課與前面學到的東西組合起來，會注意哪些事？'], answer: [
         '金鑰從環境變數讀；每次請求 timeout=10；raise_for_status；逾時與 5xx 重試最多 3 次並逐次拉長間隔。',
         '把「抓資料」與「解析與存檔」分開以便測試；寫日誌記錄開始、結束、成功與失敗；失敗時以非 0 結束代碼退出，讓排程系統知道要通知。',
       ] },
@@ -455,14 +359,6 @@ defineLessons({
       '用 argparse 寫出有 --help 的命令列工具',
       '用結束代碼回報成功或失敗',
       '把錯誤訊息寫到 stderr',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 5-4）API 金鑰應該放在哪裡？', options: [
-        { text: '環境變數', correct: true, why: '不進版本控制。' },
-        { text: '程式碼裡的常數', why: '會被 commit。' },
-        { text: '寫在 README', why: '會被公開。' },
-        { text: '網址的查詢字串', why: '會出現在日誌與瀏覽紀錄。' },
-      ] },
     ],
     analogy: {
       text: ['命令列工具像自動販賣機：按鈕（參數）上有清楚標示，`--help` 是機器上的使用說明。成功就掉出飲料（結束代碼 0），卡住就亮紅燈（非 0），旁邊的監控系統看燈號就知道要不要派人。'],
@@ -501,63 +397,40 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           file: '終端機',
-          title: '先預測，再看結果',
+          title: '執行結果',
           lang: 'BASH',
           hl: 'bash',
           code: 'uv run wordcount.py\n# 沒有給 path 參數',
-          predict: { q: '會發生什麼事？', options: ['argparse 印出用法與錯誤，結束代碼 2', '程式當掉並顯示 Traceback', '統計目前資料夾的所有檔案'], answer: 0 },
           output: '!usage: wordcount.py [-h] [-n TOP] path\n!wordcount.py: error: the following arguments are required: path',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'out', label: 'stdout' }, { id: 'err', label: 'stderr' }],
-          items: [
-            { text: '統計結果「apple\\t12」', answer: 'out', why: '正常結果，可能被導向檔案。' },
-            { text: '「找不到檔案：a.txt」', answer: 'err', why: '錯誤訊息。' },
-            { text: '「處理中 37/100…」進度', answer: 'err', why: '給人看的狀態，不應混入結果。' },
-            { text: '轉換後的 JSON 內容', answer: 'out', why: '工具的產出。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['統計結果「apple\\t12」', 'stdout', '正常結果，可能被導向檔案。'],
+          ['「找不到檔案：a.txt」', 'stderr', '錯誤訊息。'],
+          ['「處理中 37/100…」進度', 'stderr', '給人看的狀態，不應混入結果。'],
+          ['轉換後的 JSON 內容', 'stdout', '工具的產出。']
+        ] },
         { type: 'svg', svg: Fig.stack('把 main 寫成接收 argv 並回傳結束代碼的函式：正式執行時 sys.exit(main())；測試時直接呼叫 main(["a.txt", "-n", "3"]) 並檢查回傳值', [
           { title: 'def main(argv=None) -> int', tone: 2 },
           { title: '正式：sys.exit(main())', tone: 3 },
           { title: '測試：assert main(["a.txt"]) == 0', tone: 4 },
         ], { arrows: false }), caption: 'main 接收參數清單、回傳代碼，就能直接用 pytest 測試整個工具。' },
+        { type: 'heading', id: 'deep-cli', text: '深入：安裝成指令、子命令與 3.14、3.15 的 argparse' },
+        { type: 'code', lang: 'toml', title: 'pyproject.toml：讓 wordcount 變成全域指令', code: '[project.scripts]\nwordcount = "wordcount:main"\n\n# 安裝：uv tool install .\n# 之後任何資料夾都能直接輸入 wordcount' },
+        '進入點會把 main 的回傳值交給 `sys.exit`，所以 main 回傳 int 的設計在這裡也成立。功能變多時用 `parser.add_subparsers()` 做出 `tool add`、`tool list` 這種子命令；參數更複雜的工具，社群常用第三方的 Typer 或 Click。',
+        'argparse 近兩版的變化：3.14 起 `--help` 預設有顏色（設 `NO_COLOR` 環境變數可關掉）；3.15 起 `suggest_on_error` 預設開啟，打錯選項名稱時會提示最接近的正確名稱。顏色只在輸出是終端機時出現，導向檔案或管線時會自動關掉，不會污染被其他程式解析的結果。',
       ],
-      tryit: {
-        q: ['加一個 `--lower` 開關：有加時先把文字轉小寫再統計。'],
-        draft: 'parser.add_argument("--lower", action="____", help="統計前轉成小寫")\n...\nif args.____:\n    text = text.lower()',
-        answer: ['`action="store_true"`、`args.lower`。', 'store_true 的選項沒給時是 False，給了是 True，不需要值。'],
-      },
     },
     mistakes: [
       { wrong: '自己解析 `sys.argv[1]`，沒有 --help，參數少了就 IndexError。', why: '使用者看不懂怎麼用，錯誤訊息也不友善。', right: '用 argparse，自動產生說明與錯誤提示。' },
       { wrong: '錯誤時 `print` 後正常結束（代碼 0）。', why: '排程、CI 以為成功。', right: '錯誤寫到 stderr，`return 1`／`sys.exit(1)`。' },
       { wrong: '會修改檔案的工具沒有預覽模式。', why: '使用者不敢執行，或一執行就改壞。', right: '提供 `--dry-run` 只列出會做什麼；覆寫前備份或要求 `--force`。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: '程式成功結束時的結束代碼慣例是？', options: [
-        { text: '0', correct: true, why: '0 表示成功。' },
-        { text: '1', why: '1 通常表示一般錯誤。' },
-        { text: '-1', why: '不是慣例。' },
-        { text: '200', why: '那是 HTTP 狀態碼。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`add_argument("-n", "--top", type=int, default=5)`，使用者沒給 -n 時 args.top 是？', options: [
-        { text: '`5`', correct: true, why: '用預設值。' },
-        { text: '`None`', why: '有設 default=5。' },
-        { text: '`"5"`', why: 'default 直接用你給的值（int 5）。' },
-        { text: '報錯', why: '選項不是必填。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你想讓這個工具在 Windows 與 macOS 的任何資料夾都能直接輸入 `wordcount` 執行。有哪些做法？'], answer: [
-        '在 pyproject.toml 加 `[project.scripts] wordcount = "wordcount:main"`，用 `uv tool install .` 安裝成全域指令（uv 會處理兩個平台的捷徑）。',
-        '注意 main 要回傳結束代碼；scripts 進入點會把回傳值交給 sys.exit。',
-      ] },
-    ],
     keypoints: [
       '用 argparse 定義參數，自動有 --help 與錯誤提示。',
       '結果寫 stdout、錯誤寫 stderr；失敗以非 0 結束代碼退出。',
       'main(argv) 回傳代碼，正式與測試都好用。',
     ],
-    sources: ['py-argparse'],
+    sources: ['py-argparse', 'py-314', 'py-315'],
   },
 });
 </script>

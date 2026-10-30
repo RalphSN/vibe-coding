@@ -18,14 +18,6 @@ defineLessons({
       '分清「重新指定」與「修改物件內容」',
       '照實務規則選擇宣告方式：預設 const、需要時 let、不用 var',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）下列哪一個是物件，而不是原始值？', options: [
-        { text: '`[80, 90]`', correct: true, why: '陣列是物件，可以被修改。' },
-        { text: '`"80, 90"`', why: '這是字串，原始值。' },
-        { text: '`Number("80")` 的結果', why: '這是 number，原始值。' },
-        { text: '`null`', why: 'typeof null 雖然是 object，但 null 是原始值。' },
-      ] },
-    ],
     analogy: {
       text: ['置物櫃上的名牌：用 `const` 掛的名牌是用螺絲鎖死的，這個名牌永遠指向同一格；但那一格「裡面放什麼」可以換。用 `let` 掛的名牌是磁鐵，可以撕下來貼到別格。`var` 是舊式的公告欄便條，貼在整層樓的入口，誰都看得到。'],
       limit: ['如果那一格放的是原始值（數字、字串），它本來就不能被改，所以 const 加上原始值，看起來就像「完全不能動」；這也是很多人誤會 const 是「常數」的原因。'],
@@ -78,7 +70,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "const team = { wins: 3 };\nteam.wins += 1;\nconsole.log(team);\ntry {\n  team = { wins: 0 };\n} catch (e) {\n  console.log(`${e.name}: ${e.message}`);\n}",
-          predict: { q: '`team.wins += 1` 這一行會報錯嗎？', options: ['會，const 不能改', '不會，印出 { wins: 4 }'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="const 鎖住的是名字到物件的箭頭：team 指向物件；改物件內容時箭頭不變，所以合法；讓 team 指向新物件會換箭頭，所以不合法">
           <rect x="10" y="70" width="120" height="60" class="fill-surface stroke-ink" stroke-width="4"/>
@@ -93,12 +84,16 @@ defineLessons({
           <text x="495" y="108" text-anchor="middle" font-size="18" font-weight="900" class="on-color">const</text>
           <g class="stroke-ink" stroke-width="4"><path d="M130 100 H230 M325 54 V70 M325 130 V150 M420 100 H440"/></g>
         </svg>`, caption: 'const 鎖住的是「這個名字指向哪裡」的箭頭；被指向的物件內容不受保護。4-1 會完整介紹這個箭頭。' },
+        { type: 'heading', id: 'deep-freeze', text: '深入：要「內容也不能改」時，有哪些工具' },
+        { type: 'table', head: ['工具', '擋住什麼', '什麼時候檢查'], rows: [
+          ['`const`', '重新指定名字', '執行時（拋 TypeError）'],
+          ['`Object.freeze(obj)`', '新增、刪除、修改第一層屬性', '執行時；嚴格模式拋 TypeError，非嚴格模式安靜失敗'],
+          ['`Object.seal(obj)`', '新增與刪除；既有屬性仍可改值', '執行時'],
+          ['TypeScript `readonly`、`as const`', '修改內容', '只在編譯時；編譯後不存在'],
+        ] },
+        '`Object.freeze` 只凍結一層：`Object.freeze({ list: [] }).list.push(1)` 照樣成功。要整棵凍結得自己遞迴，但成本不低，實務上更常見的做法是「大家約定不改，更新一律產生新物件」（4-2），只在設定檔、常數表這種真的不該動的地方用 freeze。',
+        '另一個常見誤會是「const 比較快」。引擎自己就能分析出哪些變數從來沒被重新指定，選 const 的理由是給讀程式的人看：看到 const，就不用往下追它會不會變。',
       ],
-      tryit: {
-        q: ['把下面的 `var` 改成 `const` 或 `let`（各選一個最合適的）：'],
-        draft: 'var names = ["阿明", "小華"];\nvar total = 0;\nfor (var i = 0; i < names.length; i++) total += 1;',
-        answer: ['`const names`（陣列不會被重新指定）、`let total`（會 +1）、`for (let i …)`（每圈要更新）。', '判斷方法只有一個問題：這個名字之後會被 `=` 重新指定嗎？會就 let，不會就 const。'],
-      },
     },
     mistakes: [
       { wrong: '以為 `const` 宣告的陣列不能 push。', why: 'push 改的是陣列內容，不是讓名字改指向別的陣列。', right: '要內容也不能改，用 `Object.freeze`（只凍結第一層）或不可變的寫法（4-2）。' },
@@ -106,19 +101,7 @@ defineLessons({
       { wrong: '在新程式裡繼續用 var。', why: 'var 會漏出區塊，也能在宣告前讀到 undefined，兩者都會藏 bug。', right: '新程式只用 const 和 let。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`const scores = [80]; scores.push(90);` 會發生什麼？', options: [
-        { text: '正常執行，scores 變成 [80, 90]', correct: true, why: 'push 修改陣列內容，scores 仍指向同一個陣列。' },
-        { text: '拋出 TypeError，因為 const 不能修改', why: 'const 只禁止重新指定，不保護內容。' },
-        { text: 'scores 被複製成新陣列再 push', why: 'push 直接改原陣列，不會複製。' },
-        { text: '靜默失敗，scores 還是 [80]', why: '沒有任何規則阻止 push，它真的會改到。' },
-      ] },
-      { level: '應用', type: 'mc', q: '哪一個宣告最適合「迴圈裡累加的總分」？', options: [
-        { text: '`let total = 0`', correct: true, why: '每一圈都要 `total += …`，需要重新指定。' },
-        { text: '`const total = 0`', why: '`total += 1` 就是重新指定，會拋出 TypeError。' },
-        { text: '`var total = 0`', why: '能用，但 var 會漏出區塊，新程式不建議。' },
-        { text: '不用宣告，直接寫 `total = 0`', why: '模組（嚴格模式）裡會拋出 ReferenceError：total is not defined。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['TypeScript 有 `readonly` 和 `as const`。它們和 JavaScript 的 `const` 有什麼不同？為什麼用了 `as const`，執行時還是改得動？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['TypeScript 有 `readonly` 和 `as const`。它們和 JavaScript 的 `const` 有什麼不同？為什麼用了 `as const`，執行時還是改得動？'], answer: [
         'JavaScript 的 const 只管「名字能不能重新指定」，在執行時真的會擋（拋 TypeError）。',
         'TypeScript 的 readonly、as const 管的是「內容能不能改」，但只在編譯時檢查；編譯後型別消失，執行時物件照樣改得動。要執行時也擋，得用 `Object.freeze`。',
       ] },
@@ -136,20 +119,6 @@ defineLessons({
       '解釋「提升」：名字為什麼在宣告那一行之前就存在',
       '預測在宣告前讀取 var、let、函式宣告分別會怎樣',
       '看懂 `Cannot access … before initialization` 的意思',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-1）`const list = []; list = [1];` 會怎樣？', options: [
-        { text: '拋出 TypeError：Assignment to constant variable.', correct: true, why: '`list = [1]` 是重新指定，const 不允許。' },
-        { text: '正常執行，list 變成 [1]', why: '這不是修改內容，而是換掉整個陣列。' },
-        { text: '拋出 ReferenceError：Cannot access list before initialization', why: 'list 已經宣告過，名字存在。' },
-        { text: '只有在嚴格模式才會報錯，一般 script 會靜靜忽略這次指定', why: '對 const 重新指定，任何模式都會拋錯。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-4）`let x;` 之後讀 x，得到什麼？', options: [
-        { text: '`undefined`', correct: true, why: '宣告了但沒給值，就是 undefined。' },
-        { text: '`null`', why: 'null 只有在你主動放進去時才會出現。' },
-        { text: '拋出 ReferenceError', why: '宣告那一行已經執行過了，可以讀。' },
-        { text: '`0`', why: 'JavaScript 不會自動給 0。' },
-      ] },
     ],
     analogy: {
       text: ['尾牙的圓桌：主辦人一開始就把名牌全部擺好了。你坐下就知道這桌有阿明，但他還沒到，你對著空位講話沒人回（let、const 的暫時性死區）。有一張老式的桌子規則不同：名牌擺好的同時，座位上先放一個「空氣人」，你跟他講話會得到「（沒有）」（var 的 undefined）。'],
@@ -199,7 +168,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "console.log(typeof a);\nvar a = 1;\ntry {\n  console.log(b);\n} catch (e) {\n  console.log(`${e.name}: ${e.message}`);\n}\nlet b = 2;\nconsole.log(f());\nfunction f() { return 'ok'; }",
-          predict: { q: '第 4 行讀 b 會怎樣？', options: ['印出 undefined', '拋出 ReferenceError', '印出 2'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 230" role="img" aria-label="兩種錯誤訊息對照：not defined 代表名字根本不存在，通常是打錯字或沒宣告；before initialization 代表名字存在但還在暫時性死區，通常是順序寫錯">
           <rect x="10" y="10" width="260" height="210" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
@@ -213,12 +181,14 @@ defineLessons({
           <text x="420" y="140" text-anchor="middle" font-size="16" class="on-color">但還在死區</text>
           <text x="420" y="182" text-anchor="middle" font-size="16" class="on-color">順序寫錯了</text>
         </svg>`, caption: '同樣是 ReferenceError，說明不同，修法也不同：一個要找拼字，一個要調整順序。' },
+        { type: 'heading', id: 'deep-tdz', text: '深入：死區還會出現在哪裡' },
+        '死區不只出現在 let、const。`class` 宣告也有：`new Player(); class Player {}` 會拋出 `Cannot access \'Player\' before initialization`。而且在死區裡，連 0-1 用來「安全偵測」的 `typeof` 也會報錯；只有「完全沒宣告的名字」才會安靜地得到 `"undefined"`。',
+        { type: 'widget', name: 'runner', props: {
+          title: 'typeof 在死區裡也不安全',
+          code: "console.log(typeof neverDeclared);\ntry {\n  console.log(typeof later);\n} catch (e) {\n  console.log(`${e.name}: ${e.message}`);\n}\nlet later = 1;",
+        } },
+        '實務上最常在**模組互相匯入**時遇到死區：a.mjs 匯入 b.mjs、b.mjs 又匯入 a.mjs，其中一邊在模組最外層就讀了對方還沒初始化的 const，錯誤訊息就是 before initialization（7-1）。解法是打破循環：把兩邊共用的東西抽到第三個模組，或把讀取延後到函式被呼叫時。',
       ],
-      tryit: {
-        q: ['下面的程式哪一行會出錯？把它改好（只能調整順序）：'],
-        draft: "const price = applyTax(100);\nconst TAX = 0.05;\nfunction applyTax(n) { return n * (1 + TAX); }",
-        answer: ['第 1 行呼叫 applyTax 時，函式本身已經提升可以用，但它裡面讀的 TAX 還在死區，拋出 ReferenceError。', '把 `const TAX = 0.05;` 移到第 1 行之前。'],
-      },
     },
     mistakes: [
       { wrong: '以為提升就是「把宣告搬到檔案最上面」。', why: '只有名字被登記；let／const 的值要等那一行執行才有。', right: '記成「名字先登記，值後到」。' },
@@ -226,19 +196,7 @@ defineLessons({
       { wrong: '依賴 var 在宣告前是 undefined 的行為寫程式。', why: '讀程式的人很難發現這種隱性依賴，改順序就壞。', right: '用 let／const，讓順序錯誤直接報錯。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`console.log(x); var x = 5;` 印出什麼？', options: [
-        { text: '`undefined`', correct: true, why: 'var 提升時值先設成 undefined。' },
-        { text: '`5`', why: '值要等 `x = 5` 那一行執行才有。' },
-        { text: '拋出 ReferenceError', why: '那是 let／const 的行為。' },
-        { text: '`null`', why: '提升不會放 null。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`run(); const run = () => 1;` 的錯誤訊息最可能是？', options: [
-        { text: "`Cannot access 'run' before initialization`", correct: true, why: 'run 是 const，呼叫時名字存在但在死區。' },
-        { text: '`run is not defined`', why: '名字已經登記，所以不是 not defined。' },
-        { text: '`TypeError: Assignment to constant variable.`', why: '還沒走到「拿到值再呼叫」那一步，讀取就先失敗了。' },
-        { text: '不會出錯，const 宣告的箭頭函式也會整個提升', why: '只有函式宣告會整個提升，箭頭函式不會。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼語言設計者要讓 let／const 在宣告前「報錯」，而不是像 var 一樣給 undefined？從除錯的角度說說看。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼語言設計者要讓 let／const 在宣告前「報錯」，而不是像 var 一樣給 undefined？從除錯的角度說說看。'], answer: [
         '給 undefined 的話，錯誤會「安靜地」往下傳：程式拿著 undefined 繼續跑，可能很多行之後才在別的地方爆掉，離真正的原因很遠。',
         '直接報錯會讓問題停在發生的那一行，錯誤訊息還會說出變數名稱，一眼就知道是順序問題。這和嚴格模式「讓錯誤大聲說出來」是同一種設計理念。',
       ] },
@@ -256,20 +214,6 @@ defineLessons({
       '畫出巢狀作用域，說出變數是「由內往外」找的',
       '預測遮蔽發生時，內外層各讀到哪個值',
       '找出 var 漏出區塊造成的 bug',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-2）`console.log(n); let n = 1;` 的錯誤種類是？', options: [
-        { text: 'ReferenceError（before initialization）', correct: true, why: 'n 已經登記但還在暫時性死區。' },
-        { text: 'TypeError', why: 'TypeError 是對錯的型別做事；這裡是名字還不能用。' },
-        { text: "SyntaxError: Identifier 'n' has already been declared", why: '語法完全正確。' },
-        { text: '沒有錯，let 和 var 一樣會先印出 undefined 再指定為 1', why: '那是 var 的行為。' },
-      ] },
-      { level: '回想', type: 'mc', q: '（回顧 1-3）`"Hi".toUpperCase()` 之後，原本的 "Hi" 變成什麼？', options: [
-        { text: '還是 "Hi"', correct: true, why: '字串不能被修改，方法回傳的是新字串。' },
-        { text: '變成 "HI"', why: '原本的字串不會被改。' },
-        { text: '被刪除', why: '原值不會因為呼叫方法而消失。' },
-        { text: '變成 undefined', why: '原本的值完全沒受影響。' },
-      ] },
     ],
     analogy: {
       text: ['一棟公司大樓：你在會議室裡找「釘書機」，先找會議室桌上；沒有就去樓層的公用區找；再沒有就去一樓總務處。你只會往「外面」找，不會跑去別的會議室翻。'],
@@ -313,7 +257,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'runner', props: {
           code: "let level = 1;\n{\n  let level = 2;\n  console.log('內', level);\n}\nconsole.log('外', level);\nif (true) {\n  var leak = 'var 跑出來了';\n  let stay = 'let 留在裡面';\n}\nconsole.log(leak, typeof stay);",
-          predict: { q: '最後一行的 `typeof stay` 是？', options: ['string', 'undefined', '拋出 ReferenceError'], answer: 1 },
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 210" role="img" aria-label="遮蔽示意：外層 level 等於 1；內層區塊宣告 level 等於 2，擋住外層；離開區塊後，外層 level 仍然是 1">
           <rect x="10" y="10" width="540" height="190" style="fill:var(--neutral)" class="stroke-ink" stroke-width="4"/>
@@ -325,12 +268,17 @@ defineLessons({
           <text x="450" y="114" text-anchor="middle" font-size="16">外層仍是 1</text>
           <text x="450" y="146" text-anchor="middle" font-size="16">沒被改到</text>
         </svg>`, caption: '內層宣告同名變數，只是擋住，不是修改；離開區塊，外層的值原封不動。' },
+        { type: 'heading', id: 'deep-global', text: '深入：最外層的變數到底放在哪裡' },
+        '「全域」其實有好幾種。同樣寫在檔案最外層，放在一般 script 和放在模組裡，結果不一樣：',
+        { type: 'table', head: ['最外層寫', '一般 `script` 標籤', '模組（`.mjs`、`type="module"`）'], rows: [
+          ['`var x = 1`', '全域變數，而且變成 `window.x`', '只在這個模組裡'],
+          ['`let y = 1`', '全域變數，但不在 `window` 上；其他 script 也看得到', '只在這個模組裡'],
+          ['`z = 1`（沒宣告）', '偷偷建立 `window.z`', '拋出 ReferenceError（嚴格模式）'],
+          ['`this`', '`window`', '`undefined`'],
+        ] },
+        '這就是模組比舊式 script 安全的原因之一：每個模組自己是一層作用域，兩個模組都宣告 `count` 也不會互相覆蓋。真的需要跨環境存取全域物件時，寫 `globalThis`。',
+        '遮蔽本身不是錯，小範圍的回呼裡重用 `item`、`i` 很常見。容易出事的是「離很遠的同名變數」：讀程式的人以為用到外層那一個。很多團隊用 ESLint 的 `no-shadow` 規則提醒這種情況。',
       ],
-      tryit: {
-        q: ['在下面的程式補一個字，讓內層的 `level = 2` 改到外層的 level（最後印出 2）：'],
-        draft: 'let level = 1;\n{\n  ____ level = 2;\n}\nconsole.log(level);',
-        answer: ['什麼都不寫，直接 `level = 2;`。', '加了 let 就是在內層宣告一個新的變數（遮蔽）；不加才是對外層那個變數重新指定。所以空格要留白：答案是「不要寫宣告關鍵字」。'],
-      },
     },
     mistakes: [
       { wrong: '在區塊裡想改外層變數，卻寫成 `let x = …`。', why: '加了 let 就是宣告一個新的內層變數，外層的完全沒變。', right: '要改外層就直接 `x = …`；要新變數就換個名字，避免混淆。' },
@@ -338,19 +286,7 @@ defineLessons({
       { wrong: '以為外層可以讀到內層函式裡的變數。', why: '查找只會由內往外，不會往內。', right: '需要外面用到的值，用 return 傳出來。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '在函式內讀一個變數，引擎找的順序是？', options: [
-        { text: '目前的區塊 → 外層函式 → 模組', correct: true, why: '由內往外，找到第一個就停。' },
-        { text: '模組 → 外層函式 → 目前的區塊', why: '方向反了；從最近的那一層開始找。' },
-        { text: '呼叫這個函式的那段程式', why: '查找由程式碼寫的位置決定，與呼叫的位置無關。' },
-        { text: '全部作用域同時找，取最後一個被宣告的同名變數', why: '是依序找、找到就停。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`var total = 100; function d(v) { if (v) { var total = 80; } return total; }`，`d(false)` 的結果是？', options: [
-        { text: '`undefined`', correct: true, why: '函式內的 var total 被提升到整個函式，遮蔽外面的 total，沒進 if 就還是 undefined。（Node.js 22.13 實測）' },
-        { text: '`100`', why: '外面的 total 被函式內提升的 var total 遮蔽了。' },
-        { text: '`80`', why: '沒有進入 if，所以沒被設成 80。' },
-        { text: '拋出 ReferenceError', why: 'var 宣告前讀取不會報錯，只會得到 undefined。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['用作用域鏈解釋：為什麼在函式裡不小心少寫 let，寫成 `count = 0`，在模組裡會報錯，但在舊式的非模組 script 裡卻「安靜地」成功？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['用作用域鏈解釋：為什麼在函式裡不小心少寫 let，寫成 `count = 0`，在模組裡會報錯，但在舊式的非模組 script 裡卻「安靜地」成功？'], answer: [
         '`count = 0` 會沿著作用域鏈往外找名字 count。都找不到時：嚴格模式（模組）直接拋出 `ReferenceError: count is not defined`。',
         '非嚴格模式則會偷偷在全域物件（window）上建立一個 count，看起來成功了，其實製造了一個全域變數，可能和別的程式衝突。這又是嚴格模式讓錯誤大聲說出來的例子。',
       ] },

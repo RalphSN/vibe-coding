@@ -67,29 +67,22 @@ function makeStepper(el, count, draw, { interval = STEP_MS, start = 0 } = {}) {
   return { go, stop };
 }
 
-/* ---------- csrun：先預測，再看輸出 ---------- */
-// props: { code, title?, file?, predict?: { q?, options: [文字], answer: index }, output: 字串（\n 分行，! 開頭的行顯示成錯誤） }
-// 頁面不執行 Python，輸出是事先寫好的；推導依據記在 research-notes.md。
+/* ---------- csrun：可執行的範例與輸出 ---------- */
+// props: { code, title?, file?, lang?, hl?, output: 字串（\n 分行，! 開頭的行顯示成錯誤） }
+// 頁面不執行 Python，輸出是事先在 CPython 實際跑過的結果；版本與差異記在 research-notes.md。
 Widgets.csrun = {
   render(props, id) {
-    const p = props.predict;
     return `<div class="jw runner">
-      <div class="jw-head"><span class="label" style="--chip:var(--m0)">試試看</span><span class="grow">${esc(props.title || '先預測，再看輸出')}</span></div>
+      <div class="jw-head"><span class="label" style="--chip:var(--m0)">執行</span><span class="grow">${esc(props.title || '範例與執行結果')}</span></div>
       <div class="code"><div class="code-head"><span class="lang">${esc(props.lang || 'Python')}</span><span class="ttl">${esc(props.file || 'app.py')}</span></div>
         <pre tabindex="0" aria-label="程式碼"><code class="language-${esc(props.hl || 'python')}">${esc(props.code)}</code></pre></div>
-      ${p ? `<div class="run-predict" role="group" aria-label="預測">
-        <span class="jw-note"><strong>先預測：</strong>${md(p.q || '執行後會印出什麼？')}</span>
-        <div class="opts">${p.options.map((o, i) => `<button type="button" class="btn small nb-press" data-pick="${i}" aria-pressed="false">${esc(o)}</button>`).join('')}</div>
-      </div>` : ''}
-      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out">▶ 看輸出</button></div>
-      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（先預測，再按「看輸出」）</span></pre>
-      <div class="run-verdict" aria-live="polite"></div>
+      <div class="jw-row"><button type="button" class="btn small primary nb-press" data-run aria-controls="${id}-out" aria-expanded="false">▶ 執行</button></div>
+      <pre class="run-out" id="${id}-out" aria-live="polite" aria-label="輸出"><span class="ln dim">（按「執行」顯示輸出）</span></pre>
     </div>`;
   },
   hydrate(el, props) {
     const out = $('.run-out', el);
-    const verdict = $('.run-verdict', el);
-    let picked = null;
+    const runBtn = $('[data-run]', el);
     function show() {
       out.textContent = '';
       String(props.output).split('\n').forEach((line) => {
@@ -99,21 +92,9 @@ Widgets.csrun = {
         span.textContent = isErr ? line.slice(1) : line;
         out.appendChild(span);
       });
-      const p = props.predict;
-      if (!p || picked == null) { verdict.className = 'run-verdict'; verdict.textContent = ''; return; }
-      const ok = picked === p.answer;
-      verdict.className = `run-verdict ${ok ? 'ok' : 'no'}`;
-      verdict.textContent = ok ? `✓ 預測正確：${p.options[p.answer]}` : `✗ 你預測「${p.options[picked]}」，正確是「${p.options[p.answer]}」`;
+      runBtn.setAttribute('aria-expanded', 'true');
     }
-    el.addEventListener('click', (e) => {
-      const pick = e.target.closest('[data-pick]');
-      if (pick) {
-        picked = Number(pick.dataset.pick);
-        $$('[data-pick]', el).forEach((b) => b.setAttribute('aria-pressed', String(b === pick)));
-        return;
-      }
-      if (e.target.closest('[data-run]')) show();
-    });
+    runBtn.addEventListener('click', show);
   },
 };
 
@@ -163,22 +144,41 @@ Widgets.classify = {
 };
 
 
-/* ---------- herodemo：首頁的第一個預測 ---------- */
+/* ---------- knobs：試算拉桿（從 finance-psychology-course 複製） ---------- */
+// props: { title, sliders: [{ id, label, min, max, step, value, unit?, ends?, format? }], compute: (v) => ({ rows: [{ label, value, ratio }], note }) }
+Widgets.knobs = {
+  render(props, id) {
+    return `<div class="jw kn">
+      <div class="jw-head"><span class="label" style="--chip:var(--m7)">拉桿</span><span class="grow">${esc(props.title || '改參數，看結果')}</span></div>
+      <div class="lv-sliders">${props.sliders.map((s) => `<div class="lv-row">
+        <label for="${id}-${s.id}">${esc(s.label)}：<output data-kn-out="${s.id}"></output>${s.unit ? ` ${esc(s.unit)}` : ''}</label>
+        <input type="range" id="${id}-${s.id}" data-kn="${s.id}" min="${s.min}" max="${s.max}" step="${s.step || 1}" value="${s.value}">
+        ${s.ends ? `<div class="lv-ends"><span>${esc(s.ends[0])}</span><span>${esc(s.ends[1])}</span></div>` : ''}
+      </div>`).join('')}</div>
+      <div class="kn-rows" aria-live="polite"></div>
+      <p class="jw-note kn-note"></p>
+    </div>`;
+  },
+  hydrate(el, props) {
+    const v = Object.fromEntries(props.sliders.map((s) => [s.id, s.value]));
+    function draw() {
+      const r = props.compute(v);
+      $('.kn-rows', el).innerHTML = r.rows.map((row) => `<div class="kn-row"><span>${esc(row.label)}</span><span class="lv-meter"><span class="lv-fill" style="transform:scaleX(${Math.max(0, Math.min(1, row.ratio))})"></span></span><strong>${esc(row.value)}</strong></div>`).join('');
+      $('.kn-note', el).innerHTML = r.note ? md(r.note) : '';
+      props.sliders.forEach((s) => { $(`[data-kn-out="${s.id}"]`, el).textContent = s.format ? s.format(v[s.id]) : v[s.id]; });
+    }
+    el.addEventListener('input', (e) => { const s = e.target.closest('[data-kn]'); if (s) { v[s.dataset.kn] = Number(s.value); draw(); } });
+    draw();
+  },
+};
+
+/* ---------- herodemo：首頁的第一個範例 ---------- */
 const HERO_RUNNER = {
-  "title": "這門課的第一個問題",
+  "title": "這門課的第一個觀念：名字與物件",
   "lang": "Python",
   "hl": "python",
   "file": "app.py",
   "code": "a = [1, 2]\nb = a\nb.append(3)\nprint(a)",
-  "predict": {
-    "q": "會印出什麼？",
-    "options": [
-      "[1, 2]",
-      "[1, 2, 3]",
-      "錯誤"
-    ],
-    "answer": 1
-  },
   "output": "[1, 2, 3]"
 };
 Widgets.herodemo = {

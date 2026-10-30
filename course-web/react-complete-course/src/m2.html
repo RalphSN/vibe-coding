@@ -12,6 +12,7 @@ defineTerms({
   '批次更新': { en: 'batching', def: '同一個事件裡的多次 set 會合併成一次重新渲染。', example: '同時 setName、setAge 只渲染一次。' },
   '不可變更新': { en: 'immutable update', def: '更新物件或陣列 state 時建立新的物件或陣列，而不是修改原本的。', example: '`setUser({ ...user, name: "小華" })`' },
   '展開運算子': { en: 'spread syntax', def: '`...` 複製物件或陣列的內容到新的物件或陣列。', example: '`[...items, newItem]`' },
+  '結構共享': { en: 'structural sharing', def: '不可變更新時只複製被改到的路徑，沒改的部分沿用原本的參考。', example: '`{ ...user, address: newAddress }` 裡的 orders 仍是同一個陣列。' },
   '狀態提升': { en: 'lifting state up', def: '兩個元件需要共用同一份 state 時，把 state 移到它們最近的共同父元件，再用 props 傳下去。', example: '兩個面板只能同時展開一個。' },
   '單一事實來源': { en: 'single source of truth', def: '每份資料只存在一個地方，其他地方都從它推導。', example: '總價從購物車清單計算，不另存 state。' },
   '受控元件': { en: 'controlled component', def: '值由父元件的 props 決定、變更透過回呼通知的元件。', example: '`<Tabs active={tab} onChange={setTab} />`' },
@@ -23,14 +24,6 @@ defineLessons({
       '用 useState 讓元件記住資料',
       '說出為什麼一般變數無法讓畫面更新',
       '遵守 Hook 只能在最上層呼叫的規則',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-1）子元件能修改 props 嗎？', options: [
-        { text: '不能，props 唯讀', correct: true, why: '這課的 state 才是元件可以改的資料。' },
-        { text: '可以，直接指定', why: '不會觸發更新，也違反規則。' },
-        { text: '只有物件型別的 props 可以', why: '都不應該修改。' },
-        { text: '只能改一次', why: '不能改。' },
-      ] },
     ],
     analogy: {
       text: ['一般變數像寫在便利貼上的數字：每次重新渲染，元件函式從頭執行，便利貼就重新寫一張，之前的數字不見了。state 像存在 React 保險箱裡的數字：函式每次執行時都去保險箱拿最新的，而且只有用指定的鑰匙（set 函式）改，React 才知道要重新渲染。'],
@@ -70,29 +63,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Profile({ showEmail }: { showEmail: boolean }) {\n  const [name, setName] = useState("阿明");\n  if (showEmail) {\n    const [email, setEmail] = useState("a@x.tw");\n  }\n  const [age, setAge] = useState(30);\n  return <p>{name} {age}</p>;\n}',
-          predict: { q: '這段程式有什麼問題？', options: ['在 if 裡呼叫 Hook，違反規則', '沒有問題', 'useState 不能用字串'], answer: 0 },
           output: '!React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.（eslint）\n（showEmail 改變時 Hook 數量不同，React 會拋錯或拿錯 state）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'state', label: '放 state' }, { id: 'not', label: '不用 state' }],
-          items: [
-            { text: '輸入框目前的文字', answer: 'state', why: '會變，而且要顯示。' },
-            { text: '從 props 的價格與數量算出的總價', answer: 'not', why: '每次渲染算出來就好（2-4、3-1）。' },
-            { text: '選單是否展開', answer: 'state', why: '使用者操作會改變，畫面要跟著變。' },
-            { text: '固定的常數，例如稅率 0.05', answer: 'not', why: '不會變，放在元件外面的常數。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['輸入框目前的文字', '放 state', '會變，而且要顯示。'],
+          ['從 props 的價格與數量算出的總價', '不用 state', '每次渲染算出來就好（2-4、3-1）。'],
+          ['選單是否展開', '放 state', '使用者操作會改變，畫面要跟著變。'],
+          ['固定的常數，例如稅率 0.05', '不用 state', '不會變，放在元件外面的常數。']
+        ] },
         { type: 'svg', svg: Fig.stack('React 依呼叫順序對應 state：第一個 useState 對應第一格 name；第二個對應第二格 age；如果中間的 Hook 被 if 跳過，之後全部錯位', [
           { title: '第 1 格：useState("阿明") → name', tone: 1 },
           { title: '第 2 格：useState(30) → age', tone: 3 },
           { title: '中間用 if 跳過一個 → 之後全部拿錯', tone: 5 },
         ], { arrows: false }), caption: '這就是 Hook 不能放在條件裡的原因。' },
+        { type: 'heading', id: 'deep-state-storage', text: '深入：state 存在哪裡、什麼時候被丟掉' },
+        'state 不存在元件函式裡，而是存在 React 為畫面上每個元件建立的內部節點上，依 Hook 呼叫順序排成一串。元件從畫面移除（卸載）時，這串 state 一起丟掉；再出現時從初始值重新開始。',
+        '`useState(expensive())` 每次渲染都會執行 expensive，只是結果被忽略；改成 `useState(() => expensive())`（惰性初始化）只在第一次執行。set 函式的參考是穩定的，不必列進 Effect 的相依陣列；傳入和目前相同的值（Object.is）時，React 通常會略過這次重新渲染。',
+        { type: 'table', caption: 'state 不是唯一的存放位置', head: ['你想存的東西', '放哪裡'], rows: [
+          ['畫面要顯示、會變', 'useState'],
+          ['不顯示、要跨渲染保留（計時器 id）', 'useRef（3-3）'],
+          ['重新整理頁面後還要在', 'localStorage 或伺服器；state 只在記憶體'],
+          ['應該出現在網址上（篩選條件、分頁）', 'URL 查詢參數，由路由管理'],
+        ] },
       ],
-      tryit: {
-        q: ['做一個開關：點按鈕在「開」與「關」之間切換：'],
-        draft: 'function Toggle() {\n  const [on, setOn] = useState(____);\n  return <button onClick={() => setOn(____)}>{on ? "開" : "關"}</button>;\n}',
-        answer: ['`useState(false)`、`setOn(!on)`（或 `setOn((v) => !v)`）。', '下一課會說明為什麼更新函式 `(v) => !v` 在某些情況更安全。'],
-      },
     },
     mistakes: [
       { wrong: '直接改 state 變數：`count = 5`。', why: 'React 不知道它變了，不會重新渲染。', right: '`setCount(5)`。' },
@@ -100,19 +93,7 @@ defineLessons({
       { wrong: '可以算出來的值也放 state。', why: '要手動保持同步，容易不一致。', right: '渲染時直接計算。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`useState(0)` 回傳的是？', options: [
-        { text: '`[目前值, 設定函式]`', correct: true, why: '用陣列解構接住。' },
-        { text: '目前值', why: '還有設定函式。' },
-        { text: '一個物件 `{ value, set }`', why: '是陣列。' },
-        { text: 'Promise', why: '不是非同步。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`const [items] = useState(loadFromStorage())`，有什麼問題？', options: [
-        { text: 'loadFromStorage 每次渲染都會被呼叫', correct: true, why: '初始值雖只用一次，但運算式每次都會執行；改成 `useState(() => loadFromStorage())`。' },
-        { text: '語法錯誤', why: '合法。' },
-        { text: 'items 不能是陣列，useState 只接受原始值', why: 'useState 可以存任何值。' },
-        { text: '沒有問題，初始值本來就只計算一次', why: '初始值只「使用」一次，但運算式每次渲染都會執行。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 React 選擇「呼叫 set 函式」而不是「直接改變數就自動偵測」（像 Vue 的響應式）？各有什麼取捨？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 React 選擇「呼叫 set 函式」而不是「直接改變數就自動偵測」（像 Vue 的響應式）？各有什麼取捨？'], answer: [
         'React 的做法讓「何時更新」很明確：只有呼叫 set 才會渲染，資料流好追蹤，也方便做批次更新與並行渲染。',
         '代價是要記得不可變更新（2-3），而且寫法比直接指定冗長。Vue 的響應式寫起來直覺，但更新時機與依賴追蹤比較隱含。',
       ] },
@@ -130,14 +111,6 @@ defineLessons({
       '說出「state 是這次渲染的快照」',
       '用更新函式依序累加 state',
       '理解批次更新與重新渲染的時機',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-1）`count = 5` 為什麼不會更新畫面？', options: [
-        { text: 'React 只在呼叫 set 函式時重新渲染', correct: true, why: '要 setCount(5)。' },
-        { text: 'count 是 const，改成 let 就會更新', why: '就算用 let 也不會更新畫面。' },
-        { text: '5 不是合法值', why: '值本身沒問題。' },
-        { text: '要等 1 秒', why: '和時間無關。' },
-      ] },
     ],
     analogy: {
       text: ['每次渲染像拍一張照片：照片裡的 count 是 0，你在照片上寫「把它改成 count + 1」三次，三次看到的都是照片裡的 0，結果都是 1。更新函式像寫「在最新的值上加 1」，React 會一張張依序套用。'],
@@ -172,30 +145,29 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Demo() {\n  const [n, setN] = useState(0);\n  function handle() {\n    setN(n + 1);\n    setN((x) => x + 10);\n    console.log("handle 裡的 n：", n);\n  }\n  return <button onClick={handle}>{n}</button>;\n}\n// 點一下按鈕',
-          predict: { q: '點一下後按鈕顯示多少？', options: ['11', '10', '1'], answer: 0 },
           output: 'handle 裡的 n： 0\n按鈕顯示：11\n（先替換成 0 + 1 = 1，再由更新函式 1 + 10 = 11）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'updater', label: '建議用更新函式' }, { id: 'direct', label: '直接給值就好' }],
-          items: [
-            { text: '計數器加 1', answer: 'updater', why: '新值依賴舊值。' },
-            { text: '把輸入框的值設成使用者輸入的文字', answer: 'direct', why: '新值不依賴舊值。' },
-            { text: '在清單尾端加一筆', answer: 'updater', why: '依賴舊清單。' },
-            { text: '關閉對話框（設成 false）', answer: 'direct', why: '固定的新值。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['計數器加 1', '建議用更新函式', '新值依賴舊值。'],
+          ['把輸入框的值設成使用者輸入的文字', '直接給值就好', '新值不依賴舊值。'],
+          ['在清單尾端加一筆', '建議用更新函式', '依賴舊清單。'],
+          ['關閉對話框（設成 false）', '直接給值就好', '固定的新值。']
+        ] },
         { type: 'svg', svg: Fig.stack('一次事件裡多個更新的處理：React 把 setN(n + 1) 與 setN(x => x + 10) 依序放入佇列；事件結束後依序計算 0 → 1 → 11；只重新渲染一次', [
           { title: '佇列 1：替換成 0 + 1', tone: 1 },
           { title: '佇列 2：x => x + 10', tone: 3 },
           { title: '依序計算：0 → 1 → 11', tone: 2 },
           { title: '只重新渲染一次，顯示 11', tone: 4 },
         ]), caption: '批次更新讓多次 set 只觸發一次渲染。' },
+        { type: 'heading', id: 'deep-batching-flushsync', text: '深入：批次更新的歷史與 flushSync' },
+        'React 18 以前，只有 React 事件處理函式裡的更新會批次；setTimeout、Promise 裡的每次 set 都各自渲染一次。React 18 的 createRoot 之後，所有地方都自動批次。',
+        '少數情況必須「set 完立刻更新 DOM」，例如新增訊息後馬上捲到最底：用 react-dom 的 `flushSync(() => setMessages(next))`，下一行就能讀到新的 DOM。它會打斷批次、拖慢效能，只在必要時用。',
+        { type: 'table', head: ['寫法', '適合', '注意'], rows: [
+          ['`setX(5)`', '新值和舊值無關', '—'],
+          ['`setX((x) => x + 1)`', '新值依賴舊值', '更新函式要純：StrictMode 會呼叫兩次檢查'],
+          ['`flushSync(() => setX(…))`', '下一行必須讀到新 DOM', '打斷批次，少用'],
+        ] },
       ],
-      tryit: {
-        q: ['讓按一下按鈕就把分數加 3（呼叫三次也要正確）：'],
-        draft: 'function addPoint() {\n  setScore(____ => ____ + 1);\n}\n<button onClick={() => { addPoint(); addPoint(); addPoint(); }}>+3</button>',
-        answer: ['`setScore((s) => s + 1)`。', '直接寫 `setScore(score + 1)` 時三次都會是同一個快照值加 1，結果只加 1。'],
-      },
     },
     mistakes: [
       { wrong: 'set 之後立刻讀 state，以為已經是新值。', why: '目前這次渲染的 state 不會改變。', right: '要用新值就自己先算好：`const next = count + 1; setCount(next); use(next);`。' },
@@ -203,19 +175,7 @@ defineLessons({
       { wrong: '在 setTimeout 或非同步回呼裡讀 state 想拿到最新值。', why: '閉包抓到的是建立時的快照。', right: '用更新函式，或用 ref 存最新值（3-3）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`setCount(count + 1); console.log(count);` 印出的是？', options: [
-        { text: '更新前的值', correct: true, why: '這次渲染的快照不會變。' },
-        { text: '更新後的值', why: '要等下一次渲染。' },
-        { text: 'undefined', why: '仍是原本的值。' },
-        { text: '一個 Promise', why: 'set 不回傳任何東西。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`setN(5); setN((x) => x * 2);`，n 原本是 1，結果是？', options: [
-        { text: '`10`', correct: true, why: '先替換成 5，再 5 × 2。' },
-        { text: '`2`', why: '更新函式拿到的是佇列中的最新值 5，不是 1。' },
-        { text: '`5`', why: '還有第二個更新。' },
-        { text: '`6`', why: '是乘以 2。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['聊天室：使用者送出訊息後 3 秒，要顯示「已送出給 {收件人}」。如果使用者在這 3 秒內切換了收件人，應該顯示哪一位？React 預設會顯示哪一位？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['聊天室：使用者送出訊息後 3 秒，要顯示「已送出給 {收件人}」。如果使用者在這 3 秒內切換了收件人，應該顯示哪一位？React 預設會顯示哪一位？'], answer: [
         '多半應該顯示「送出時」的收件人，React 預設也正是如此：setTimeout 的回呼抓住的是送出那次渲染的快照。',
         '這正是快照模型的好處：非同步行為依「事件發生時」的資料進行，不會被之後的狀態改變影響。真的需要最新值時才用 ref。',
       ] },
@@ -233,14 +193,6 @@ defineLessons({
       '用展開運算子更新物件 state',
       '用 map、filter、展開更新陣列 state',
       '說出為什麼不能直接修改 state 物件',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-2）在清單尾端加一筆，建議寫法是？', options: [
-        { text: '`setItems((list) => [...list, item])`', correct: true, why: '依賴舊值時用更新函式。' },
-        { text: '`items.push(item)`', why: '直接修改，React 不會更新（這課的重點）。' },
-        { text: '`setItems(items.concat(item).sort())`', why: 'concat 回傳新陣列沒問題，但多了不需要的 sort，順序也被改變。' },
-        { text: '`items = [...items, item]`', why: '沒有呼叫 set。' },
-      ] },
     ],
     analogy: {
       text: ['React 比較 state 像比對兩份文件的「檔案編號」：編號一樣就認定沒改。你在原文件上塗改（直接修改物件），編號沒變，React 就不會重新渲染。要改就影印一份新的（建立新物件），新編號才會被注意到。'],
@@ -280,29 +232,28 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Tags() {\n  const [tags, setTags] = useState(["react"]);\n  function add() {\n    tags.push("hooks");\n    setTags(tags);\n  }\n  return (\n    <>\n      <p>{tags.join(", ")}</p>\n      <button onClick={add}>新增</button>\n    </>\n  );\n}\n// 點一下按鈕',
-          predict: { q: '點一下後畫面會更新嗎？', options: ['不會，參考沒變', '會，顯示 react, hooks', '會報錯'], answer: 0 },
           output: '畫面仍是：react\n（tags 陣列被改了，但 setTags 收到同一個參考，React 略過渲染）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'ok', label: '正確（新陣列或新物件）' }, { id: 'bad', label: '錯誤（修改原本的）' }],
-          items: [
-            { text: '`setList([...list, item])`', answer: 'ok', why: '新陣列。' },
-            { text: '`list.splice(i, 1); setList(list)`', answer: 'bad', why: 'splice 修改原陣列。' },
-            { text: '`setList(list.filter((x) => x.id !== id))`', answer: 'ok', why: 'filter 回傳新陣列。' },
-            { text: '`setUser({ ...user, age: 31 })`', answer: 'ok', why: '新物件。' },
-            { text: '`user.age = 31; setUser({ ...user })`', answer: 'bad', why: '雖然最後是新物件，但已經修改了原本的 state（可能被其他地方共用）。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`setList([...list, item])`', '正確（新陣列或新物件）', '新陣列。'],
+          ['`list.splice(i, 1); setList(list)`', '錯誤（修改原本的）', 'splice 修改原陣列。'],
+          ['`setList(list.filter((x) => x.id !== id))`', '正確（新陣列或新物件）', 'filter 回傳新陣列。'],
+          ['`setUser({ ...user, age: 31 })`', '正確（新陣列或新物件）', '新物件。'],
+          ['`user.age = 31; setUser({ ...user })`', '錯誤（修改原本的）', '雖然最後是新物件，但已經修改了原本的 state（可能被其他地方共用）。']
+        ] },
         { type: 'svg', svg: Fig.tree('巢狀物件的更新：只複製被修改的路徑；user 是新物件，address 是新物件，但沒改到的 orders 陣列繼續共用原本的', { title: '新的 user', lines: ['`{ ...user, address: … }`'], tone: 4 }, [
           { title: '新的 address', lines: ['city 改成台中'], tone: 3 },
           { title: '原本的 orders', lines: ['沒改，共用'], tone: 1 },
         ]), caption: '巢狀很深時，可以用 Immer（useImmer）以「看似直接修改」的寫法產生不可變更新。' },
+        { type: 'heading', id: 'deep-structural-sharing', text: '深入：淺複製為什麼不慢' },
+        '不可變更新只複製「被改到的路徑」，其他部分沿用舊參考，這叫[[結構共享]]。一千筆的陣列改一項，map 會建立一個新陣列，但沒改的 999 個物件都不複製，成本通常遠小於一次 DOM 更新。',
+        '結構共享也是 memo（4-4）能運作的前提：沒改的物件參考相同，用它的子元件就能略過渲染。反過來，`structuredClone` 深複製會讓每個參考都變新，等於放棄結構共享，不適合拿來更新 state。',
+        { type: 'table', head: ['做法', '適合', '代價'], rows: [
+          ['展開運算子與 map、filter', '一到兩層的資料', '巢狀深時很冗長'],
+          ['Immer（useImmer）', '巢狀很深的資料', '多一個套件；只有草稿可以「直接改」'],
+          ['把資料攤平（以 id 為鍵的物件）', '關聯多、常依 id 更新', '要另外維護排序'],
+        ] },
       ],
-      tryit: {
-        q: ['刪除指定 id 的商品：'],
-        draft: 'function remove(id: number) {\n  setCart((items) => items.____((it) => it.id ____ id));\n}',
-        answer: ['`items.filter((it) => it.id !== id)`。', 'filter 保留「不是要刪的」項目，回傳新陣列。'],
-      },
     },
     mistakes: [
       { wrong: '`state.push(x); setState(state)`。', why: '參考相同，React 不重新渲染。', right: '`setState([...state, x])`。' },
@@ -310,19 +261,7 @@ defineLessons({
       { wrong: '`list.sort()` 後 setList(list)。', why: 'sort 原地排序。', right: '`list.toSorted(…)` 或 `[...list].sort(…)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'React 怎麼判斷物件 state 有沒有改變？', options: [
-        { text: '比較新舊參考（Object.is）', correct: true, why: '所以要建立新物件。' },
-        { text: '深度比較新舊物件的每一個屬性', why: '不會深度比較，只比參考。' },
-        { text: '比較 JSON 字串', why: '不會。' },
-        { text: '每次都重新渲染', why: '參考相同時會略過。' },
-      ] },
-      { level: '應用', type: 'mc', q: '把第 2 項（索引 1）的數量改成 5，哪個寫法正確？', options: [
-        { text: '`setItems(items.map((it, i) => i === 1 ? { ...it, qty: 5 } : it))`', correct: true, why: '新陣列、新物件。' },
-        { text: '`items[1].qty = 5; setItems([...items])`', why: '修改了原本的物件。' },
-        { text: '`setItems(items.map((it, i) => { if (i === 1) it.qty = 5; return it; }))`', why: 'map 回傳新陣列，但裡面直接修改了原本的物件。' },
-        { text: '`items.splice(1, 1, {...items[1], qty: 5})`', why: 'splice 修改原陣列，也沒呼叫 set。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼不可變更新能讓「上一步／復原」功能變得簡單？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼不可變更新能讓「上一步／復原」功能變得簡單？'], answer: [
         '每次更新都產生新的 state 物件，舊的 state 完整保留、不會被修改。只要把每一版存進陣列，復原就是回到上一個索引。',
         '如果直接修改，所有「歷史版本」其實指向同一個物件，早就被改掉了，無法復原。',
       ] },
@@ -340,14 +279,6 @@ defineLessons({
       '判斷 state 該放在哪個元件',
       '把兩個元件共用的 state 提升到共同父元件',
       '避免重複與可以計算出來的 state',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 2-3）刪除陣列 state 的一項，建議用？', options: [
-        { text: '`filter`', correct: true, why: '回傳新陣列。' },
-        { text: '`splice`', why: '修改原陣列。' },
-        { text: '`pop`', why: '修改原陣列，而且只能刪最後一個。' },
-        { text: '`delete arr[i]`', why: '留下空洞而且修改原陣列。' },
-      ] },
     ],
     analogy: {
       text: ['兩個房間要共用一台電視遙控器，與其各買一支（兩份 state 不同步），不如把遙控器放在客廳（共同父元件），誰要用就從客廳拿（props），按了也是通知客廳（回呼）。'],
@@ -385,30 +316,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'function Filter() {\n  const [query, setQuery] = useState("");\n  return <input value={query} onChange={(e) => setQuery(e.target.value)} />;\n}\nfunction List() {\n  const [query] = useState("");\n  return <ul>{products.filter((p) => p.name.includes(query)).map(/* … */)}</ul>;\n}\nexport default function Page() {\n  return <><Filter /><List /></>;\n}\n// 在輸入框輸入「耳機」',
-          predict: { q: '清單會依輸入篩選嗎？', options: ['不會，兩個 query 是不同的 state', '會', '輸入框打不了字'], answer: 0 },
           output: '清單沒有變化。\n（Filter 與 List 各有一份 query；要把 query 提升到 Page，傳給兩者）',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'state', label: '存 state' }, { id: 'derived', label: '渲染時計算' }],
-          items: [
-            { text: '購物車的商品清單', answer: 'state', why: '原始資料。' },
-            { text: '購物車的商品總數', answer: 'derived', why: '從清單算。' },
-            { text: '搜尋框的文字', answer: 'state', why: '使用者輸入。' },
-            { text: '符合搜尋文字的商品', answer: 'derived', why: '從清單與搜尋文字算。' },
-            { text: '目前選中的商品（只存 id）', answer: 'state', why: '存 id，不要存整個物件。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['購物車的商品清單', '存 state', '原始資料。'],
+          ['購物車的商品總數', '渲染時計算', '從清單算。'],
+          ['搜尋框的文字', '存 state', '使用者輸入。'],
+          ['符合搜尋文字的商品', '渲染時計算', '從清單與搜尋文字算。'],
+          ['目前選中的商品（只存 id）', '存 state', '存 id，不要存整個物件。']
+        ] },
         { type: 'svg', svg: Fig.stack('state 該放哪裡的判斷：找出所有用到這份 state 的元件；找出它們最近的共同父元件；把 state 放在那裡，用 props 往下傳', [
           { title: '1. 誰需要這份資料？', tone: 1 },
           { title: '2. 它們最近的共同父元件是誰？', tone: 3 },
           { title: '3. state 放那裡，props 往下傳', tone: 4 },
         ]), caption: '共同父元件離太遠、傳太多層時，考慮組合（1-4）或 Context（4-1）。' },
+        { type: 'heading', id: 'deep-state-placement', text: '深入：state 放太高或太低的代價' },
+        '放太低：兄弟元件拿不到，只好各存一份，兩份不同步。放太高：每次更新都讓整棵子樹重新渲染，還要把大量 props 往下傳。',
+        '把 state 往下移到真正用到它的元件，是最常被忽略的效能手段：只有搜尋框用到的 query 留在搜尋框裡，打字時就不會讓整頁重新渲染。元件也可以同時支援受控與非受控：提供 `value`／`onChange`，也接受 `defaultValue`，原生 `<input>` 就是這樣設計的。',
+        { type: 'table', head: ['症狀', '可能原因', '調整'], rows: [
+          ['兩個地方顯示的值不一致', '同一份資料存了兩份', '提升到共同父元件'],
+          ['打一個字整頁都變慢', 'state 放太高', '移到真正用到的元件'],
+          ['中間元件只為了轉傳而接 props', '層數太多', '組合（1-4）或 Context（4-1）'],
+          ['伺服器資料散在很多元件的 state', '把快取當成 state 管', '交給 TanStack Query 或框架（5-3）'],
+        ] },
       ],
-      tryit: {
-        q: ['讓 Filter 與 List 共用 query：把 state 放到 Page：'],
-        draft: 'export default function Page() {\n  const [query, setQuery] = useState("");\n  return (\n    <>\n      <Filter value={____} onChange={____} />\n      <List query={query} />\n    </>\n  );\n}',
-        answer: ['`value={query}`、`onChange={setQuery}`。', 'Filter 變成受控元件：顯示父元件給的值，變更時通知父元件。'],
-      },
     },
     mistakes: [
       { wrong: '兩個兄弟元件各自 useState 同一份資料。', why: '兩份會不同步。', right: '提升到共同父元件。' },
@@ -416,19 +347,7 @@ defineLessons({
       { wrong: 'selectedItem 存整個物件。', why: '清單裡的物件更新後，selectedItem 還是舊的那份。', right: '存 selectedId，渲染時 `items.find(i => i.id === selectedId)`。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '兩個元件需要同步同一份資料，應該？', options: [
-        { text: '把 state 提升到最近的共同父元件', correct: true, why: '單一事實來源。' },
-        { text: '兩邊各存一份再用 effect 同步', why: '容易不一致又多一次渲染。' },
-        { text: '用全域變數', why: 'React 不會知道它改變。' },
-        { text: '一律放在 App', why: '不一定需要那麼高。' },
-      ] },
-      { level: '應用', type: 'mc', q: '下列哪一個「不應該」存成 state？', options: [
-        { text: '`fullName`（姓加名）', correct: true, why: '可以算出來。' },
-        { text: '`firstName`（使用者在輸入框打的名字）', why: '使用者輸入，要存。' },
-        { text: '`isMenuOpen`', why: '使用者操作狀態。' },
-        { text: '`selectedId`', why: '使用者選擇。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['表單有「國家」與「城市」兩個下拉選單，換國家時城市要清空。有人用 useEffect 監聽國家變化再 setCity("")。有沒有更好的寫法？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['表單有「國家」與「城市」兩個下拉選單，換國家時城市要清空。有人用 useEffect 監聽國家變化再 setCity("")。有沒有更好的寫法？'], answer: [
         '在國家的 onChange 處理函式裡同時 `setCountry(v); setCity("")`：兩個更新在同一事件裡批次處理，只渲染一次，而且意圖清楚。',
         '用 effect 會先渲染一次「新國家 + 舊城市」的錯誤組合，再渲染一次修正，還多一層間接。3-1 會專門談「你可能不需要 Effect」。',
       ] },

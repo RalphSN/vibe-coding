@@ -31,10 +31,6 @@ Sections.reference = (c, lesson) => `<div class="blocks" style="--chip:var(--m${
 
 /* ---------- 元件樣式表 ---------- */
 Views.styleguide = () => {
-  const sampleQuiz = { type: 'mc', level: '應用', q: '`let x = 5; x = "5";` 會怎樣？', options: [
-    { text: '可以編譯', why: 'x 被推斷為 number。' },
-    { text: '型別錯誤 TS2322', correct: true, why: 'string 不能指定給 number。' },
-  ] };
   return `<div class="content">
     <header class="lesson-head" style="--chip:var(--neutral)"><span class="lid-big">SG</span><h1>元件樣式表</h1></header>
     <p>這頁列出全站共用元件與它們的狀態。改樣式後先看這頁，深淺色各看一次。</p>
@@ -99,10 +95,9 @@ Views.styleguide = () => {
       ${tabsBlock({ label: '作業系統', tabs: [{ label: 'Windows', blocks: ['`winget install OpenJS.NodeJS.LTS`'] }, { label: 'macOS', blocks: ['`brew install node`'] }] })}
     </section>
 
-    <section class="sg-block"><h2>摺疊與測驗</h2>
+    <section class="sg-block"><h2>摺疊（深入思考）</h2>
       <div class="quiz-list">
-        ${quizItem(sampleQuiz, 'styleguide:q:0')}
-        ${quizItem({ type: 'reveal', level: '遷移', q: '先想一想：為什麼答案要先藏起來？', answer: ['先嘗試提取記憶，再看答案，記得比較牢（提取練習）。'] }, 'styleguide:r:0')}
+        ${quizItem({ type: 'reveal', level: '深入思考', q: '先想一想：為什麼解析要先藏起來？', answer: ['先自己推一次，再看推理過程，比較容易發現自己卡在哪一步。'] }, 'styleguide:r:0')}
       </div>
     </section>
 
@@ -114,11 +109,8 @@ Views.styleguide = () => {
       ${renderWidget({ name: 'checklist', props: { key: 'sg', items: ['第一項', '第二項', '第三項'] } })}
     </section>
 
-    <section class="sg-block"><h2>csrun：預測再看結果</h2>
-      ${renderWidget({ name: 'csrun', props: { code: 'let n: number = "1";', predict: { options: ['可以編譯', '型別錯誤'], answer: 1 }, output: '!error TS2322' } })}
-    </section>
-    <section class="sg-block"><h2>classify</h2>
-      ${renderWidget({ name: 'classify', props: { buckets: [{ id: 'c', label: '編譯時' }, { id: 'r', label: '執行時' }], items: [{ text: '型別註記', answer: 'c', why: '編譯後被擦掉。' }, { text: '`typeof x === "string"`', answer: 'r', why: 'JavaScript 本身的檢查。' }] } })}
+    <section class="sg-block"><h2>csrun：執行看結果</h2>
+      ${renderWidget({ name: 'csrun', props: { code: 'let n: number = "1";', output: '!error TS2322' } })}
     </section>
 
     <section class="sg-block"><h2>鍵盤提示</h2>

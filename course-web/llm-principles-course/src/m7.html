@@ -12,96 +12,13 @@ defineTerms({
   '幻覺': { en: 'hallucination', def: '模型產生看起來合理、語氣篤定，但與事實不符的內容。', example: '編出一個不存在的論文標題。', lesson: '7-4' },
 });
 
-const REVIEW_M6 = [
-  { level: '回想', type: 'mc', q: '（回顧 6-4）推理模型的思考 token 會？', options: [
-    { text: '增加費用與等待時間', correct: true, why: '也是輸出 token。' },
-    { text: '完全免費', why: '一樣要算力。' },
-    { text: '保證答案正確', why: '思考也可能出錯。' },
-    { text: '讓 context window 變大', why: '反而會佔用 context。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（回顧 5-1）預訓練學到的是？', options: [
-    { text: '文字通常怎麼接的規律', correct: true, why: '不保證是事實。' },
-    { text: '經過查證的事實清單', why: '沒有逐條查證。' },
-    { text: '每篇文章的原文', why: '學的是規律。' },
-    { text: '使用者的偏好', why: '那是後訓練。' },
-  ] },
-];
 
-/* 7-5 總複習：模組 1–7 */
-const REVIEW_12 = [
-  { level: '回想', type: 'mc', q: '（1-1）為什麼現代 tokenizer 不會遇到「不認得的字」？', options: [
-    { text: '最差可以拆成位元組', correct: true, why: '詞彙表包含全部 256 種位元組。' },
-    { text: '詞彙表收錄了所有文字', why: '收不完。' },
-    { text: '不認得的字會被刪掉', why: '不會刪。' },
-    { text: '會自動上網查', why: '推論不上網。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（1-2）語料 aab×3、ab×2，第一次 BPE 合併哪一對？', options: [
-    { text: 'a＋b（5 次）', correct: true, why: 'a+a 3 次、a+b 3＋2＝5 次。' },
-    { text: 'a＋a（6 次）', why: 'aab 裡 a+a 只出現一次，×3 是 3 次。' },
-    { text: 'b＋a（2 次）', why: '沒有 b 在 a 前面的配對。' },
-    { text: '同分，無法決定', why: '5 比 3 多。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（2-1）向量表的數字從哪來？', options: [
-    { text: '亂數開始、訓練時調整', correct: true, why: '它是參數。' },
-    { text: '人工依詞性填寫', why: '不是人工。' },
-    { text: 'tokenizer 算出來', why: 'tokenizer 只給編號。' },
-    { text: '每次推論重新產生', why: '推論時固定。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（2-3）沒有位置編碼時，「狗咬人」和「人咬狗」在 attention 看來？', options: [
-    { text: '一樣，分不出順序', correct: true, why: 'attention 只比內容。' },
-    { text: '完全不同', why: '沒有位置資訊就分不出。' },
-    { text: 'tokenizer 會幫忙區分', why: 'tokenizer 只切字。' },
-    { text: '因果遮罩會區分', why: '遮罩只限制看的範圍，不提供位置向量。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（3-3）softmax(1, 2, 3) 最大的那一項大約是？', options: [
-    { text: '67%', correct: true, why: 'e³ ÷（e＋e²＋e³）≈ 0.665。' },
-    { text: '50%', why: '那是 3÷6 的直接比例。' },
-    { text: '33%', why: '那是平均。' },
-    { text: '100%', why: '其他兩項不是 0。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（3-4）d_model＝2,048、16 個頭，每個頭的 d_k？', options: [
-    { text: '128', correct: true, why: '2,048 ÷ 16。' },
-    { text: '32,768', why: '是除不是乘。' },
-    { text: '16', why: '那是頭數。' },
-    { text: '2,048', why: '那是全部。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（4-4）d_model 加倍、層數不變，Transformer 層參數變？', options: [
-    { text: '4 倍', correct: true, why: '和 d² 成正比。' },
-    { text: '2 倍', why: '那是層數加倍。' },
-    { text: '8 倍', why: '是平方不是立方。' },
-    { text: '不變', why: '一定變多。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（5-1）模型給正確答案 1% 機率，損失約？', options: [
-    { text: '4.6', correct: true, why: '−ln 0.01 ≈ 4.61。' },
-    { text: '0.01', why: '那是機率本身。' },
-    { text: '99', why: '損失不是百分比。' },
-    { text: '0', why: '機率 1 才是 0。' },
-  ] },
-  { level: '回想', type: 'mc', q: '（5-3）訓練算力的常用估算？', options: [
-    { text: '6 × 參數 × token', correct: true, why: 'Kaplan 等的通則。' },
-    { text: '參數 ＋ token', why: '是相乘。' },
-    { text: '參數²', why: '和資料量也有關。' },
-    { text: 'token ÷ 參數', why: '不是相除。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（6-1、6-2）讓模型「學會用公司的語氣回答」，哪個方法最直接？', options: [
-    { text: '用公司語氣的示範資料做 SFT', correct: true, why: '語氣是行為。' },
-    { text: '增加預訓練資料', why: '成本高又不直接。' },
-    { text: '加大詞彙表', why: '無關。' },
-    { text: '提高 temperature', why: '只影響變化程度。' },
-  ] },
-  { level: '應用', type: 'mc', q: '（7-2、7-3）把輸入從 2 千加到 20 千 token，最先感受到的是？', options: [
-    { text: '第一個字等更久、也更貴', correct: true, why: 'prefill 變長、輸入 token 變多。' },
-    { text: '之後每個字明顯變快', why: '不會變快。' },
-    { text: '回答必定更正確', why: 'context rot 可能更差。' },
-    { text: '沒有任何差別', why: '差很多。' },
-  ] },
-  { level: '遷移', type: 'mc', q: '（7-4）哪一種評估設計比較不會鼓勵幻覺？', options: [
-    { text: '答錯扣分、資料不足時答「不知道」算對', correct: true, why: '讓不確定時不猜比較划算。' },
-    { text: '只看有沒有回答', why: '鼓勵什麼都答。' },
-    { text: '只看使用者滿意度', why: '自信的錯答也可能很滿意。' },
-    { text: '只看回答長度', why: '鼓勵囉嗦。' },
-  ] },
-];
+
+
+defineTerms({
+  '推測解碼': { en: 'speculative decoding', def: '小模型先猜幾個 token，大模型一次檢查要不要接受；產生的分布和大模型自己取樣相同，但比較快。', example: 'Leviathan 等 2022。', lesson: '7-1' },
+  'PagedAttention': { en: 'PagedAttention', def: '把 KV cache 切成固定大小的塊來管理，像作業系統的分頁，減少記憶體浪費。', example: 'Kwon 等 2023（vLLM）。', lesson: '7-3' },
+});
 
 defineLessons({
   '7-1': {
@@ -110,7 +27,6 @@ defineLessons({
       '解釋 top-p 解決了什麼問題',
       '知道 Claude 最新 API 對這些參數的變化',
     ],
-    review: REVIEW_M6,
     analogy: {
       text: ['點餐時，每道菜都有一個「你可能會點」的機率。永遠點最常點的那道（貪婪）很安全但無聊；完全照機率抽（[[取樣]]），偶爾會抽到奇怪的東西。', '[[temperature]] 調整機率的集中程度；[[top-p]] 先把菜單上排在很後面的菜劃掉，只在前幾名裡抽。Holtzman 等（2019）發現：只挑最高機率常常產生無聊又重複的文字，而從整個尾巴抽又容易失控，top-p 是兩者之間的折衷。'],
       limit: ['點餐抽到奇怪的菜只是一餐，生成文字時抽到一個怪字，後面每一步都會以它為前提繼續接，錯誤會累積。'],
@@ -138,42 +54,34 @@ defineLessons({
           { candidates: [{ t: '，', logit: 2.5 }, { t: '。', logit: 2.0 }, { t: '散心', logit: 1.0 }] },
           { candidates: [{ t: '你呢', logit: 2.0 }, { t: '順便', logit: 1.6 }, { t: '可是', logit: 1.4 }] },
         ], note: '把 temperature 拉到 2、top-p 留在 1：「火星」被抽到的機會明顯變大。再把 top-p 拉到 0.8：火星直接出局。機率是**示意**。' } },
-        { type: 'table', head: ['Claude API 版本', '可調的取樣參數'], rows: [
-          ['2026-10-21 以前的版本', '`temperature`、`top_p`、`top_k`'],
-          ['2026-10-21 版', '移除；送出這些參數會回 400，改用 prompt 與 `effort` 等設定控制'],
-        ], caption: '查證於 2026-10-22（第一部 1-1 的研究筆記）。參數拿掉了，模型內部仍然在依機率選 token。' },
+        { type: 'table', head: ['Claude API', '取樣參數'], rows: [
+          ['`2023-06-01` 版＋較舊的模型（例如 Sonnet 4.6）', '`temperature`、`top_p`、`top_k` 可以調'],
+          ['Claude 4.7 之後的模型', '本來就只接受預設值'],
+          ['`2026-10-21` 版', '移除：送出這三個參數就回 400，連預設值也不行；一律用預設（temperature 1.0）取樣'],
+        ], caption: '查證於 2026-10-29（Claude Docs｜Migrating to API version 2026-10-21）。官方明說沒有其他設定能取代 temperature；參數拿掉了，模型內部仍然在依機率選 token。' },
         { type: 'svg', svg: `<svg viewBox="0 0 560 200" role="img" aria-label="錯誤累積：第三步抽到一個怪字，後面每一步都以它為前提，整段越走越偏">
           ${['週末', '想去', '火星', '因為', '那裡', '…'].map((t, i) => `<rect x="${10 + i * 92}" y="60" width="84" height="44" ${i >= 2 ? 'style="fill:var(--m7)"' : 'class="fill-surface"'} class="stroke-ink" stroke-width="3"/><text x="${52 + i * 92}" y="88" text-anchor="middle" font-size="14" font-weight="900"${i >= 2 ? ' class="on-color"' : ''}>${t}</text>`).join('')}
           <text x="198" y="44" text-anchor="middle" font-size="13" font-weight="900">抽到低機率的字</text>
           <text x="280" y="140" text-anchor="middle" font-size="14">之後每一步都把「火星」當成既成事實繼續接</text>
           <text x="280" y="168" text-anchor="middle" font-size="13">這是剪掉尾巴（top-p）的主要理由</text>
         </svg>`, caption: '自迴歸的特性：前面選了什麼，後面就只能順著接。' },
+        { type: 'heading', id: 'deep-sampling-more', text: '深入：其他剪尾巴的方法，與「猜幾個再驗證」' },
+        { type: 'table', head: ['方法', '怎麼剪', '弱點'], rows: [
+          ['top-k', '只留機率最高的 k 個', 'k 固定：有時前 2 名就夠，有時前 50 名都合理'],
+          ['top-p（nucleus）', '留到累積機率達 p', '分布很平時會留下很多候選'],
+          ['min-p', '只留「至少是第一名機率的某個比例」的候選', '較新的做法（Nguyen 等 2024），各推論框架支援程度不同'],
+        ], caption: '開放模型的推論框架多半三種都有；用 Claude API 時這些都不能調（上表）。' },
+        '另一個和取樣有關的技巧是[[推測解碼]]（speculative decoding）：先讓一個小模型快速猜接下來的幾個 token，再讓大模型一次檢查這幾個要不要接受。Leviathan 等（2022）證明，只要接受規則設計得對，最後產生的文字分布和大模型自己一個一個取樣完全相同，只是比較快。',
+        '它能變快的原因和 0-1 的深入段落一樣：大模型「檢查一整段已知的 token」可以平行算（像 prefill），比一個一個產生有效率得多。',
       ],
-      tryit: {
-        q: ['把 temperature 拉到 0.1，連按幾次「抽一個」；再拉到 2 試試。兩者的句子差在哪？'],
-        draft: 'T＝0.1：＿\nT＝2：＿',
-        answer: ['T＝0.1 時幾乎每次都是「週末想去爬山，你呢」，和「挑最高的」一樣。', 'T＝2 時每次都不一樣，偶爾出現「火星」或不通順的接法。低溫穩定、高溫多變，各有用途。'],
-      },
     },
     mistakes: [
       { wrong: '以為 temperature 0 代表模型「最誠實」。', why: '它只是永遠挑最高機率，最高機率的答案也可能是錯的。', right: 'temperature 控制變化程度，不控制正確性。' },
       { wrong: '以為 top-p 和 temperature 只能擇一。', why: '兩者可以一起用：先調形狀，再剪尾巴。', right: '先 temperature，再 top-p。' },
-      { wrong: '在 Claude 最新 API 照舊送 temperature。', why: '2026-10-21 版已移除，會回 400。', right: '改用 prompt 與 API 提供的其他設定。' },
+      { wrong: '在 Claude 最新 API 照舊送 temperature。', why: '2026-10-21 版已移除，連送預設值都會回 400。', right: '不送這些參數；要穩定輸出，靠結構化輸出、清楚的 prompt 與程式端驗證。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'top-p 取樣在做什麼？', options: [
-        { text: '只保留累積機率達到 p 的前幾名再抽', correct: true, why: '剪掉不可靠的尾巴。' },
-        { text: '把每個候選的機率都乘以 p 再重新抽籤', why: '不是乘法。' },
-        { text: '永遠選第 p 名的候選', why: '不是選固定名次。' },
-        { text: '把 logit 除以 p', why: '那是 temperature 的做法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '你要模型產生多樣的廣告標語，又不要太離譜。比較合適的組合是？', options: [
-        { text: '稍高的 temperature 加上 top-p 剪尾巴', correct: true, why: '多樣又避開極低機率的怪字。' },
-        { text: '貪婪解碼', why: '每次都一樣，不多樣。' },
-        { text: 'temperature 調到很高、而且完全不剪尾巴', why: '容易離譜。' },
-        { text: '只要把 max_tokens 調大', why: '長度和多樣性無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['API 拿掉了 temperature，你要讓分類任務的輸出更穩定，可以怎麼做？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['API 拿掉了 temperature，你要讓分類任務的輸出更穩定，可以怎麼做？'], answer: [
         '用結構化輸出（第一部 3-3）限制只能回固定選項；在 prompt 給清楚的判斷規則與範例。',
         '程式端驗證輸出；重要的分類可以多問幾次取多數，或對不確定的情況請模型回「無法判斷」。',
       ] },
@@ -183,7 +91,7 @@ defineLessons({
       '低機率的字一旦被選上，後面會順著接，錯誤累積。',
       'Claude 2026-10-21 版 API 移除了這些參數，但取樣仍在發生。',
     ],
-    sources: ['nucleus'],
+    sources: ['nucleus', 'claude-migration', 'minp', 'speculative'],
   },
 
   '7-2': {
@@ -191,20 +99,6 @@ defineLessons({
       '說出 context window 包含哪些東西',
       '解釋為什麼 context 越長越貴、越慢',
       '知道「放更多不一定更好」的原因',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-1）temperature 小於 1 時？', options: [
-        { text: '機率更集中在高分的候選', correct: true, why: 'logit 除以小數，差距被放大。' },
-        { text: '機率更平均', why: '那是大於 1。' },
-        { text: '不影響機率', why: '一定會影響。' },
-        { text: '剪掉尾巴', why: '那是 top-p。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 3-3）attention 權重表的大小？', options: [
-        { text: 'n × n（n 是 token 數）', correct: true, why: '每個 token 對每個 token。' },
-        { text: 'n × d', why: '那是向量矩陣。' },
-        { text: 'V × d', why: '那是向量表。' },
-        { text: 'd × d', why: '那是參數矩陣。' },
-      ] },
     ],
     analogy: {
       text: ['辦公桌的大小：桌子越大，能同時攤開的文件越多。但文件堆滿整張桌子時，你要找某一張也會變慢、容易漏看。', '[[context window]] 就是模型的桌面：system prompt、對話歷史、附件、工具定義、這次的輸出都要擺上去。Claude 官方文件提醒，token 越多，找出與記住正確資訊的準確度會下降（[[context rot]]）。'],
@@ -255,12 +149,17 @@ defineLessons({
           ['附件太大', '先檢索相關段落再放（第一部模組 5）'],
           ['重複的長前綴', 'prompt caching 省錢，但仍佔 context'],
         ], caption: '出處：Claude Docs｜Context windows。' },
+        { type: 'heading', id: 'deep-context-now', text: '深入：Claude 的 context 規則（2026-10）' },
+        { type: 'table', head: ['項目', '現況'], rows: [
+          ['context window', 'Opus 5.5、Sonnet 5.5、Haiku 5.5 等目前的模型都是 1M token，不需要 beta header'],
+          ['單次輸出上限', '最多 128k token（`max_tokens`）'],
+          ['輸入就超過上限', '回 400（prompt is too long）'],
+          ['輸入＋max_tokens 超過、但輸入沒超過', 'Claude 4.5 之後的模型會接受；生成時碰到上限就以 `model_context_window_exceeded` 停止'],
+          ['前幾輪的思考內容', 'Opus 5.5 等新模型預設保留在對話裡，照樣佔 context、以輸入價計'],
+          ['快取的前綴', '仍然佔 context；快取只改變價錢'],
+        ], caption: '查證於 2026-10-29（Claude Docs｜Context windows）。' },
+        '為什麼 context window 不能無限加大？除了 attention 的平方成長，還有兩筆帳：KV cache 隨長度線性增加，很快比模型參數還佔記憶體（7-3）；模型也要在長文本上訓練過，長位置才用得好（2-3 的深入）。「放得下」和「用得好」是兩件事，這也是官方提醒 context rot 的原因。',
       ],
-      tryit: {
-        q: ['把拉桿從 10 千拉到 100 千 token。配對數變幾倍？這對「把整本手冊都塞進 prompt」的做法有什麼啟示？'],
-        draft: '倍數：＿\n啟示：＿',
-        answer: ['約 100 倍（長度 10 倍 → 配對約 100 倍）。', '能塞不代表該塞：成本、延遲、準確度（context rot）都會受影響。先用檢索挑出相關段落，通常更便宜也更準。'],
-      },
     },
     mistakes: [
       { wrong: '以為 context window 只算輸入。', why: '這次的輸出、思考也算在內。', right: '輸入＋輸出都要放得下。' },
@@ -268,19 +167,7 @@ defineLessons({
       { wrong: '以為模型會記得上一次對話。', why: '每次請求都要重新放入需要的內容。', right: '記憶是應用程式的工作（第一部 1-1）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '下面哪一項不算在 context window 裡？', options: [
-        { text: '模型訓練時讀過的資料', correct: true, why: '那是參數裡的知識，不是 context。' },
-        { text: '工具定義', why: '算。' },
-        { text: '這次產生的思考內容', why: '算。' },
-        { text: 'system prompt', why: '算。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'context 長度從 50k 變 200k，attention 的配對數大約變成？', options: [
-        { text: '16 倍', correct: true, why: '4 倍長度 → 約 16 倍配對。' },
-        { text: '4 倍', why: '配對是平方成長。' },
-        { text: '2 倍', why: '低估了。' },
-        { text: '不變', why: '一定變多。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你把 300 頁的合約全部放進 prompt，問其中一條條款，模型答錯了。用這一課的概念說明可能原因與改善方式。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你把 300 頁的合約全部放進 prompt，問其中一條條款，模型答錯了。用這一課的概念說明可能原因與改善方式。'], answer: [
         '可能原因：context 很長造成準確度下降，相關條款剛好在中間（lost in the middle）。',
         '改善：先檢索出相關條款再問；把問題放在最後；要求模型引用原文並由程式比對（第一部 5-4）。',
       ] },
@@ -298,20 +185,6 @@ defineLessons({
       '說明 KV cache 存了什麼、為什麼能省計算',
       '解釋為什麼第一個 token 最慢',
       '估算 KV cache 佔用的記憶體',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-2）context 長度變 3 倍，attention 配對約？', options: [
-        { text: '9 倍', correct: true, why: '平方。' },
-        { text: '3 倍', why: '低估。' },
-        { text: '6 倍', why: '不是乘 2。' },
-        { text: '不變', why: '會變多。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 3-2）attention 加總的是？', options: [
-        { text: 'V', correct: true, why: '權重乘在 V 上。' },
-        { text: 'Q', why: 'Q 用來打分。' },
-        { text: 'K', why: 'K 用來被比對。' },
-        { text: 'logit', why: 'logit 在最後一站。' },
-      ] },
     ],
     analogy: {
       text: ['寫長篇連載時，每寫一段新的，不必把前面所有章節重讀一遍再做筆記：你早就有一本筆記本，記著每個角色的重點。新的一段只要查筆記、再把新的重點補上去。', '[[KV cache]] 就是那本筆記本：前面每個 token 在每一層的 K、V 算過一次就存起來。產生下一個 token 時，只要算新 token 自己的 Q、K、V，拿新的 Q 去和存好的所有 K 比對，加總存好的 V。'],
@@ -363,42 +236,29 @@ defineLessons({
           ['代價', '計算重複', '要記憶體存快取'],
         ], caption: '用記憶體換計算：推論系統最典型的取捨。' },
         { type: 'callout', variant: 'tip', title: '和 prompt caching 的關係', body: ['第一部 8-2 的 prompt caching：同樣的長前綴（system prompt、文件）在多次請求間重複使用，讀快取的價錢便宜很多。', '概念上和 KV cache 類似：前綴算過的結果不必每次重算。官方文件沒有寫內部實作細節，所以這裡只說「概念類似」。'] },
+        { type: 'heading', id: 'deep-kv-shrink', text: '深入：推論系統怎麼對付 KV cache' },
+        '上面的拉桿算的是「沒有任何技巧」的大小。實際系統從三個方向下手：存少一點、存小一點、存得比較整齊。',
+        { type: 'table', head: ['方向', '做法', '代價'], rows: [
+          ['存少一點', '多個頭共用 K、V（GQA、MQA，見 3-2 的深入）', '要在訓練時就這樣設計；品質可能略降'],
+          ['存少一點', '只保留最近一段 token 的 K、V（滑動視窗）', '太早的內容看不到了'],
+          ['存小一點', '把 K、V 從 16 位元壓到 8 位元或更少（量化）', '精度損失，要實測'],
+          ['存得整齊', '像作業系統分頁一樣，把快取切成固定大小的塊（[[PagedAttention]]）', '要專門的推論框架；Kwon 等 2023 報告大幅減少浪費、提高同時服務量'],
+          ['重複利用', '多個請求共用同一段前綴的快取', '只對完全相同的前綴有效'],
+        ], caption: '出處：Ainslie 等 2023、Kwon 等 2023。商業服務實際用哪些做法通常不公開。' },
+        '所以一台伺服器能同時服務幾個長對話，常常不是被計算量卡住，而是被 KV cache 的記憶體卡住。長 context 的價格與速度，很大一部分就是這筆記憶體帳。',
       ],
-      tryit: {
-        q: ['用拉桿：預設設定下，把 context 從 4 千拉到 100 千 token，KV cache 變多大？一張 80 GB 記憶體的 GPU 放得下嗎？'],
-        draft: '大小：＿\n放得下嗎：＿',
-        answer: ['每 token 約 4.72 MB，100 千 token 約 472 GB。', '一張 80 GB 放不下，而且模型本身的參數還要佔記憶體。這就是長 context 很貴、以及需要各種縮減技巧與多張 GPU 的原因。'],
-      },
     },
     mistakes: [
       { wrong: '以為 KV cache 讓模型「記得」上次對話。', why: '它只在同一次請求的生成過程中使用。', right: '跨請求的記憶要靠應用程式重新放入 context。' },
       { wrong: '以為 KV cache 也存 Q。', why: 'Q 只有當下產生的 token 需要。', right: '只存 K、V，所以叫 KV cache。' },
       { wrong: '以為輸出越長，第一個字越慢。', why: '第一個字的等待主要是 prefill，由輸入長度決定。', right: '輸入長 → 第一個字慢；輸出長 → 總時間長。' },
     ],
-    practice: [
-      { level: '回想', type: 'mc', q: 'KV cache 存的是？', options: [
-        { text: '前面每個 token 在每一層的 K 與 V', correct: true, why: '下一步直接拿來用。' },
-        { text: '前面每個 token 的 Q', why: 'Q 不用存。' },
-        { text: '最後的機率分布', why: '那每步都重算。' },
-        { text: '模型的參數', why: '參數本來就在記憶體裡。' },
-      ] },
-      { level: '應用', type: 'mc', q: '同一個模型，輸入從 1 千 token 加到 50 千 token，最明顯的變化是？', options: [
-        { text: '第一個字更慢、快取更大', correct: true, why: 'prefill 變長、快取變大。' },
-        { text: '之後每個 token 都變快', why: '每步要看的 K、V 變多，通常不會更快。' },
-        { text: '回答一定變長', why: '輸入長不代表輸出長。' },
-        { text: '完全沒有影響', why: '影響很大。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['一台伺服器同時服務 100 個長對話，最先遇到的瓶頸可能是什麼？為什麼？'], answer: [
-        '記憶體：每個對話都有自己的 KV cache，長度越長佔越多，100 個加起來很快就超過 GPU 記憶體。',
-        '所以推論系統要管理快取（例如分頁存放、縮減 K、V 的大小、限制同時服務數），這是第五部的主題。',
-      ] },
-    ],
     keypoints: [
       'KV cache：存前面 token 每層的 K、V，下一步只算新 token。',
       '第一個 token 慢（prefill），之後快（decode）。',
       '用記憶體換計算；長 context 的 KV cache 非常大。',
     ],
-    sources: ['transformer', 'claude-context'],
+    sources: ['transformer', 'claude-context', 'gqa', 'paged'],
   },
 
   '7-4': {
@@ -406,20 +266,6 @@ defineLessons({
       '從預訓練與評估兩個角度說明幻覺為什麼會發生',
       '說出幻覺最容易出現的情況',
       '列出應用端降低幻覺的做法',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-3）第一個 token 最慢的主要原因？', options: [
-        { text: '要先處理整段輸入、填好 KV cache', correct: true, why: 'prefill。' },
-        { text: '模型在思考要不要回答', why: '不是這樣運作。' },
-        { text: '網路比較慢', why: '主要是計算。' },
-        { text: '輸出比較長', why: '輸出長影響總時間。' },
-      ] },
-      { level: '應用', type: 'mc', q: '（回顧 6-2）reward hacking 是指？', options: [
-        { text: '模型討好評分方式而非真正目標', correct: true, why: '例如越寫越長。' },
-        { text: '駭客入侵獎勵模型', why: '不是資安事件。' },
-        { text: '獎勵太少導致不學習', why: '不是這個意思。' },
-        { text: '使用者給負評', why: '無關。' },
-      ] },
     ],
     analogy: {
       text: ['考選擇題時，答錯和沒作答都是 0 分，那最佳策略就是「不會也要猜」。猜的時候還要寫得很有自信，看起來才像會。', 'Kalai 等（2025）用這個角度解釋[[幻覺]]：預訓練時，有些事實（例如只在網路上出現一次的生日）本來就無法從統計規律可靠地學會；而很多評測只看答對率，說「我不知道」拿 0 分，猜一個還有機會得分，於是模型被訓練成「很會考試的考生」。'],
@@ -474,12 +320,17 @@ defineLessons({
           <text x="420" y="120" text-anchor="middle" font-size="14" font-weight="900" class="on-color">→ 沒把握時說不知道</text>
           <text x="280" y="190" text-anchor="middle" font-size="13">你自己的評估也一樣：計分方式決定你會選出什麼樣的模型或 prompt</text>
         </svg>`, caption: '同樣的道理適用在你的應用：如果只獎勵「有回答」，就會得到更多有自信的猜測。' },
+        { type: 'heading', id: 'deep-calibration', text: '深入：模型「知道自己不知道」嗎' },
+        '某種程度上知道。GPT-4 技術報告顯示，只做過預訓練的模型校準得相當好：它給答案的機率，和實際答對的比例很接近；做完後訓練之後，校準反而變差。也就是說，「篤定的語氣」有一部分是後訓練教出來的，不是模型內部真的更有把握（6-2）。',
+        { type: 'table', head: ['幻覺的來源', '發生在哪個階段', '對應的課'], rows: [
+          ['罕見事實學不牢', '預訓練', '5-1、5-2'],
+          ['硬教模型不知道的新事實', 'SFT', '6-1 的深入'],
+          ['評分獎勵猜測、偏好有自信的回答', '後訓練與評測', '6-2、本課'],
+          ['抽到低機率的字後順著接', '推論', '7-1'],
+          ['相關資訊在長 context 中間被忽略', '推論', '7-2'],
+        ] },
+        '這張表也說明為什麼沒有單一解法：每個來源的對策不同。應用端能控制的，主要是最後兩列與「給資料、要出處、允許不知道」；前三列要靠模型公司改訓練與評測方式（Kalai 等 2025 的建議）。',
       ],
-      tryit: {
-        q: ['答對 +1、答錯 −1、不知道 0。模型對某題只有 30% 把握，猜的期望分數是多少？該不該猜？'],
-        draft: '期望分數：＿\n該不該猜：＿',
-        answer: ['0.3 × 1 ＋ 0.7 ×（−1）＝ −0.4，比「不知道」的 0 分還低，所以不該猜。', '如果答錯不扣分，期望分數是 0.3，猜就比較划算。計分方式直接決定什麼行為會被獎勵。'],
-      },
     },
     mistakes: [
       { wrong: '以為在 prompt 裡寫「不要幻覺」就能解決。', why: '模型沒有一個「不要猜」的開關。', right: '給資料、要出處、允許不知道、用程式驗證。' },
@@ -487,19 +338,7 @@ defineLessons({
       { wrong: '以為模型語氣篤定代表它有把握。', why: '篤定的語氣也是學來的文字風格。', right: '用可驗證的證據判斷，不看語氣。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: 'Kalai 等 2025 認為幻覺持續存在的原因之一是？', options: [
-        { text: '評測給猜測比承認不確定更高的分數', correct: true, why: '模型被訓練成會考試的考生。' },
-        { text: '模型故意說謊', why: '沒有這種意圖。' },
-        { text: 'GPU 計算錯誤', why: '和硬體無關。' },
-        { text: 'tokenizer 切錯字', why: '不是主要原因。' },
-      ] },
-      { level: '應用', type: 'mc', q: '要做「回答公司內部政策」的機器人，最能降低幻覺的做法是？', options: [
-        { text: '放入政策原文並要求附出處', correct: true, why: '把答案來源放在眼前，並可驗證。' },
-        { text: '換一個參數更多的模型就好', why: '模型不知道你公司的政策。' },
-        { text: '在 prompt 裡寫十次「請不要說錯」', why: '不會改變機制。' },
-        { text: '把 max_tokens 調小', why: '長度和正確性無關。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你的評估表只記錄「有沒有回答」和「使用者滿意度」。這可能讓你選到什麼樣的 prompt？怎麼修改評估？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你的評估表只記錄「有沒有回答」和「使用者滿意度」。這可能讓你選到什麼樣的 prompt？怎麼修改評估？'], answer: [
         '可能選到「什麼都回答、語氣很有自信」的 prompt，因為使用者常常對有答案的回應比較滿意，即使答案是錯的。',
         '修改：加入正確性檢查（對照標準答案或來源），答錯扣分，「資料不足、無法回答」在該說的時候算對。',
       ] },
@@ -509,22 +348,14 @@ defineLessons({
       '語氣篤定不代表有把握。',
       '對策：給資料、要出處、允許不知道、工具計算、用正確的計分量。',
     ],
-    sources: ['hallucinate', 'nucleus'],
+    sources: ['hallucinate', 'nucleus', 'gpt4', 'new-knowledge'],
   },
 
   '7-5': {
     goals: [
       '從頭到尾講一遍一個 token 怎麼產生',
-      '把每一站和訓練、推論的取捨連起來',
-      '用 12 題總複習找出自己要回頭讀的單元',
-    ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 7-4）降低幻覺最可靠的做法是？', options: [
-        { text: '給資料、要出處、允許說不知道，再由程式驗證', correct: true, why: '把答案來源放在眼前並可檢查。' },
-        { text: '在 prompt 寫「不要幻覺」', why: '不會改變機制。' },
-        { text: '把 temperature 調到 0', why: '最高機率的答案也可能錯。' },
-        { text: '換一個更大的模型', why: '問題依然存在。' },
-      ] },
+      '用一張表看完全卷的架構與每個模組最重要的一個觀念',
+      '知道哪些內容會過時，以及去哪裡更新',
     ],
     analogy: {
       text: ['學完一台車的每個零件，最後要開上路跑一圈，才知道它們怎麼一起運作。', '這一課把前面七個模組串成一條路：從你打的字，到螢幕上冒出下一個字，每一站各做什麼、花多少、在哪裡可能出錯。'],
@@ -534,7 +365,7 @@ defineLessons({
     define: [
       { term: 'prefill', en: 'prefill', def: '處理整段輸入的階段。', example: '7-3。' },
       { term: 'decode', en: 'decode', def: '一個一個產生 token 的階段。', example: '7-3。' },
-      { term: '總複習', en: 'review', def: '涵蓋模組 1 到 7 的 12 題。', example: '每題標出來源單元。' },
+      { term: '一頁地圖', en: 'one-page map', def: '把全卷的架構、每個模組的重點與會過時的內容放在同一頁。', example: '下面的三張表。' },
     ],
     examples: {
       blocks: [
@@ -562,34 +393,35 @@ defineLessons({
           ['輸出', '預訓練＋後訓練讓機率更準、更像助理（模組 5、6）', '取樣方式、思考多寡（7-1、6-4）'],
           ['快取', '—', 'KV cache 用記憶體換速度（7-3）'],
         ] },
-        { type: 'heading', id: 'final-review', text: '總複習：12 題' },
-        { type: 'quiz', key: '7-5:final', items: REVIEW_12 },
+        { type: 'heading', id: 'map', text: '一頁地圖：每個模組最重要的一件事' },
+        { type: 'table', head: ['模組', '這一站在做什麼', '最重要的一個觀念或行動'], rows: [
+          ['0 起點', '六站總覽', '每產生一個 token，就把整條線跑一次；訓練調參數，推論時參數固定'],
+          ['1 切字', '文字 → token 編號', '成本與 context 用 token 算：用該模型的 token 計數量你的實際內容'],
+          ['2 向量', '編號 → 向量＋位置', '向量相近代表「用法相近」，不等於同義、也不等於事實'],
+          ['3 attention', 'token 之間交流', '每個 token 直接看前面全部：資訊不流失，代價是長度的平方'],
+          ['4 結構', 'block、殘差、layer norm', '參數 ≈ 12Ld²＋Vd；看到參數量先問是總參數還是活躍參數'],
+          ['5 預訓練', '學會預測下一個 token', '學的是文字的規律，不是事實；知識主要在這一步'],
+          ['6 後訓練', '學會當助理、偏好、推理', '改的是行為多於知識；新知識用 RAG 給，不要靠微調塞'],
+          ['7 推論', '取樣、context、快取、幻覺', '放相關的而不是全部；給資料、要出處、允許不知道'],
+        ] },
+        { type: 'heading', id: 'deep-outdated', text: '深入：哪些內容會過時、怎麼更新' },
+        { type: 'table', head: ['內容', '目前（查證於 2026-10-29）', '會怎麼變', '去哪裡查'], rows: [
+          ['Claude 的 context window 與輸出上限（7-2）', '1M token；單次輸出 128k', '新模型可能再加大', 'Claude Docs｜Context windows'],
+          ['取樣參數（7-1）', '`2026-10-21` 版 API 移除 temperature 等', '舊版 API 會逐步淘汰', 'Claude Docs｜API 版本遷移指南'],
+          ['思考的設定與計費（6-4）', 'Opus 5.5 一律思考，用 effort 調；以輸出價計', '模型換代時預設值常改', 'Claude Docs｜Thinking、Pricing'],
+          ['價格（0-1、6-4）', 'Opus 5.5：輸入 $4、輸出 $20／百萬 token', '新模型通常重新定價', 'Claude Docs｜Pricing'],
+          ['架構細節（模組 2～4）', 'RoPE、pre-LN／RMSNorm、GQA、MoE 是公開模型常見選擇', '新論文持續出現，但六站骨架變動慢', '開放模型的技術報告'],
+          ['訓練方法（模組 5、6）', 'SFT、RLHF／DPO、推理 RL', '組合與比例常變，細節多半不公開', '模型公司的技術報告與官方部落格'],
+        ], caption: '原理（模組 1～5 的公式與機制）幾年內都不太會變；變得快的是 API 參數、數字與價格。建議每 3 個月重新查一次上表。' },
       ],
-      tryit: {
-        q: ['不看上面的追蹤，用 6 句話向朋友解釋「LLM 怎麼接出下一個字」，每句對應一站：'],
-        draft: '1. ＿\n2. ＿\n3. ＿\n4. ＿\n5. ＿\n6. ＿',
-        answer: ['範例：1. 文字先切成 token 並換成編號。2. 每個編號查出一串數字（向量），加上位置。3. 經過很多層，每層先讓每個字參考前面的字（attention），再各自加工。4. 最後算出詞彙表裡每個字的分數，變成機率。5. 依機率選一個字。6. 把它接回去，用快取省掉重算，再產生下一個。'],
-      },
     },
     mistakes: [
       { wrong: '把「訓練」和「推論」的步驟混在一起講。', why: '推論不更新參數，訓練才會。', right: '先講推論的六站，再說參數是怎麼訓練出來的。' },
       { wrong: '以為某一站壞了就只影響那一站。', why: '自迴歸讓前面的選擇影響後面每一步。', right: '從整條路看問題。' },
-      { wrong: '總複習錯了就重讀整本。', why: '每題都標了單元。', right: '只回去讀答錯的單元。' },
+      { wrong: '把課文裡的數字（context 長度、價格）當成永久不變。', why: 'API 與模型每幾個月就會改。', right: '原理記在腦裡，數字每次用之前查官方文件（上面的表）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '產生第二個 token 時，哪一站可以大幅省掉重算？', options: [
-        { text: '④ 的 K、V：用 KV cache', correct: true, why: '前面算過的 K、V 直接拿。' },
-        { text: '② tokenizer：不用再切', why: '新 token 本來就不用切，省下的主要是 attention 的 K、V。' },
-        { text: '⑤ 機率：用上一次的機率', why: '每步都要重算新機率。' },
-        { text: '⑥ 取樣：沿用上次的選擇', why: '每步都要重新選。' },
-      ] },
-      { level: '應用', type: 'mc', q: '使用者抱怨「中文問題比英文問題貴」。最可能和哪一站有關？', options: [
-        { text: 'tokenizer：中文切出的 token 數不同', correct: true, why: '費用按 token 計。' },
-        { text: 'attention 的頭數', why: '和語言無關。' },
-        { text: 'layer norm', why: '無關。' },
-        { text: '取樣方式', why: '不影響輸入費用。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['挑一個你在使用 AI 時遇過的問題（慢、貴、答錯、太囉嗦），用這一卷的六站找出最可能的原因。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['挑一個你在使用 AI 時遇過的問題（慢、貴、答錯、太囉嗦），用這一卷的六站找出最可能的原因。'], answer: [
         '慢 → 輸入太長（prefill）或思考太多（6-4、7-3）。貴 → token 多（1-3、7-2）。',
         '答錯 → 罕見事實、沒給資料、取樣後順著接（7-4）。太囉嗦 → 偏好學習的副作用（6-2），可以在 prompt 要求簡潔。',
       ] },
@@ -597,9 +429,9 @@ defineLessons({
     keypoints: [
       '推論：切 token → 向量 → 很多層 block → 機率 → 取樣 → 接回去。',
       '訓練決定所有參數；推論時的取捨在 context、取樣、思考與快取。',
-      '總複習錯的題目，只回頭讀標示的單元。',
+      '原理變得慢、數字變得快：數字每次用之前都重新查證。',
     ],
-    sources: ['transformer', 'hallucinate'],
+    sources: ['transformer', 'hallucinate', 'claude-context', 'claude-migration', 'claude-thinking', 'claude-pricing'],
   },
 });
 </script>

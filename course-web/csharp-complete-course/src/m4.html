@@ -26,14 +26,6 @@ defineLessons({
       '寫一個泛型方法',
       '用 where 條件約束讓泛型方法能比較大小',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 3-5）`record P(int X)`，`new P(1) == new P(1)` 的結果是？', options: [
-        { text: '`True`，record 比較內容', correct: true, why: 'record 預設是值相等。' },
-        { text: '`False`，兩個是不同物件', why: '一般 class 才會比參考。' },
-        { text: '編譯錯誤：record 不能用 ==', why: 'record 自動產生了 == 運算子。' },
-        { text: '執行時拋出例外', why: '比較是合法操作。' },
-      ] },
-    ],
     analogy: {
       text: ['泛型像有標籤欄的收納箱：箱子的設計只有一種，但貼上「襪子」的箱子就只能放襪子。`List<T>` 是箱子設計，`List<int>` 是貼了 int 標籤的那一個。'],
       limit: ['真的箱子標籤寫錯還是塞得進去；C# 的 `List<int>` 放字串會直接編譯錯誤。而且 .NET 會為每種實值型別產生專門的機器碼，不只是貼標籤。'],
@@ -81,7 +73,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var box = new Box<int>(5);\nvar label = new Box<string>("hi");\nConsole.WriteLine(box.Value + 1);\nConsole.WriteLine(label.Value + 1);\nConsole.WriteLine(box.GetType().Name);\n\nclass Box<T>(T value)\n{\n    public T Value => value;\n}',
-          predict: { q: '`label.Value + 1` 會印出什麼？', options: ['hi1', '編譯錯誤', 'hi + 1'], answer: 0 },
           output: '6\nhi1\nBox`1',
         } },
         { type: 'svg', svg: `<svg viewBox="0 0 560 180" role="img" aria-label="條件約束讓編譯器知道 T 的能力：沒有約束時 T 只能當 object 用，不能呼叫 CompareTo；加上 where T : IComparable of T 後就能呼叫">
@@ -95,12 +86,17 @@ defineLessons({
           <text x="310" y="132" font-size="16" class="on-color">✓ 可以呼叫</text>
           <path d="M270 90 H290" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: '約束是對呼叫端的要求，也是給方法內部的保證。' },
+        { type: 'heading', id: 'deep-generics', text: '深入：泛型在執行時還在，以及共變與反變' },
+        'C# 的泛型在執行時仍然存在：`List<int>` 和 `List<string>` 是不同的型別，可以用 `typeof(T)` 取得 T。JIT 替每種實值型別產生專用的機器碼（所以不 boxing），所有參考型別則共用一份；Java 的泛型在編譯後被擦除，這是兩者最大的差別。',
+        '共變（`out T`）讓 `IEnumerable<string>` 可以當成 `IEnumerable<object>` 用，因為它只「產出」T；反變（`in T`）讓 `Action<object>` 可以當成 `Action<string>` 用。`List<T>` 兩者都不是：如果 `List<string>` 能當 `List<object>`，別人就能往裡面放 int。',
+        { type: 'table', head: ['約束', '意思', '版本'], rows: [
+          ['`where T : class` ／ `struct`', '參考型別／實值型別', 'C# 2'],
+          ['`where T : new()`', '有無參數建構子，可以 `new T()`', 'C# 2'],
+          ['`where T : notnull`', '不可為 null 的型別', 'C# 8'],
+          ['`where T : INumber<T>`', '泛型數學：`T.Zero`、`+` 都能用', '.NET 7'],
+          ['`where T : allows ref struct`', '讓 Span 這類 ref struct 也能當 T', 'C# 13'],
+        ] },
       ],
-      tryit: {
-        q: ['寫一個泛型方法 `FirstOrFallback`：陣列有元素就回傳第一個，否則回傳 fallback。'],
-        draft: 'T FirstOrFallback____(T[] items, T fallback)\n    => items.Length > 0 ? ____ : fallback;',
-        answer: ['`T FirstOrFallback<T>(T[] items, T fallback) => items.Length > 0 ? items[0] : fallback;`', '方法名稱後面的 `<T>` 宣告型別參數；呼叫時通常不用寫，編譯器會從引數推斷：`FirstOrFallback(names, "無")`。'],
-      },
     },
     mistakes: [
       { wrong: '用 `List<object>` 裝各種東西，取出時再判斷型別。', why: '失去型別安全，錯誤延到執行時。', right: '找出共同的介面或基底類別，用 `List<IShape>`。' },
@@ -108,19 +104,7 @@ defineLessons({
       { wrong: '每個方法都加 `<T>`，即使只會用到一種型別。', why: '徒增閱讀負擔。', right: '真的有兩種以上型別要共用同一邏輯時才泛型化。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`List<int>` 比 `ArrayList` 好的地方「不包括」哪一項？', options: [
-        { text: '可以同時放 int 和 string', correct: true, why: '這是 ArrayList 的「特性」，正是泛型要避免的。' },
-        { text: '放錯型別時編譯錯誤', why: '這是泛型的優點。' },
-        { text: '存 int 不會 boxing', why: '這是泛型的優點。' },
-        { text: '取出時不用轉型', why: '這是泛型的優點。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`T Max<T>(T a, T b) where T : IComparable<T>`，哪個呼叫「不能」編譯？', options: [
-        { text: '`Max(new object(), new object())`', correct: true, why: 'object 沒有實作 IComparable<object>，不符合約束。' },
-        { text: '`Max(1, 2)`', why: 'int 實作了 IComparable<int>。' },
-        { text: '`Max("a", "b")`', why: 'string 實作了 IComparable<string>。' },
-        { text: '`Max(1.5, 2.5)`', why: 'double 實作了 IComparable<double>。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你寫了三個幾乎一樣的方法：`SaveUser(User u)`、`SaveOrder(Order o)`、`SaveProduct(Product p)`，都是轉成 JSON 寫進檔案。怎麼用泛型合併？需要約束嗎？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你寫了三個幾乎一樣的方法：`SaveUser(User u)`、`SaveOrder(Order o)`、`SaveProduct(Product p)`，都是轉成 JSON 寫進檔案。怎麼用泛型合併？需要約束嗎？'], answer: [
         '`void Save<T>(T item, string path) => File.WriteAllText(path, JsonSerializer.Serialize(item));`',
         '序列化對任何型別都能做，不一定需要約束。如果還要用 `item.Id` 當檔名，就定義 `interface IEntity { int Id { get; } }`，加 `where T : IEntity`。',
       ] },
@@ -138,14 +122,6 @@ defineLessons({
       '讀懂 `string` 與 `string?` 的差別',
       '用 `?.`、`??`、`??=` 處理可能是 null 的值',
       '用 C# 14 的 null 條件指定 `?.=` 簡化程式',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-1）`where T : IComparable<T>` 的作用是？', options: [
-        { text: '只接受能比較的型別，方法內才能呼叫 CompareTo', correct: true, why: '約束同時限制呼叫端、保證方法內部能用。' },
-        { text: '讓 T 自動實作 IComparable', why: '約束不會幫型別加功能。' },
-        { text: '執行時檢查 T，不符合就拋例外', why: '約束在編譯時檢查。' },
-        { text: '讓方法回傳排序後的結果', why: '約束只限制型別，不改行為。' },
-      ] },
     ],
     analogy: {
       text: ['`string?` 像貼了「可能是空盒」的包裹：拆之前要先搖一搖。`string` 是保證有東西的包裹。編譯器像物流人員，看到你想直接拆「可能是空盒」的包裹，就提醒你：先檢查。'],
@@ -196,19 +172,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'string? a = null;\nstring? b = "hi";\nConsole.WriteLine(a?.Length);\nConsole.WriteLine(b?.Length);\nConsole.WriteLine(a?.Length ?? -1);\na ??= "預設";\nConsole.WriteLine(a);',
-          predict: { q: '`Console.WriteLine(a?.Length);` 印出什麼？', options: ['0', '空白的一行', '拋出 NullReferenceException'], answer: 1 },
           output: '\n2\n-1\n預設',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'warn', label: '編譯器會警告' }, { id: 'ok', label: '不會警告' }],
-          items: [
-            { text: '`string? s = Find(); Console.WriteLine(s.Length);`', answer: 'warn', why: 's 可能是 null，CS8602。' },
-            { text: '`string? s = Find(); if (s is null) return; Console.WriteLine(s.Length);`', answer: 'ok', why: '檢查過後編譯器知道 s 不是 null（流程分析）。' },
-            { text: '`string s = null;`', answer: 'warn', why: '把 null 放進不可為 null 的型別，CS8600。' },
-            { text: '`string? s = Find(); Console.WriteLine(s?.Length);`', answer: 'ok', why: '用了 `?.`，安全。' },
-            { text: '`string s = Find()!;`', answer: 'ok', why: '`!` 告訴編譯器「我保證不是 null」，警告消失，但你要負責。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`string? s = Find(); Console.WriteLine(s.Length);`', '編譯器會警告', 's 可能是 null，CS8602。'],
+          ['`string? s = Find(); if (s is null) return; Console.WriteLine(s.Length);`', '不會警告', '檢查過後編譯器知道 s 不是 null（流程分析）。'],
+          ['`string s = null;`', '編譯器會警告', '把 null 放進不可為 null 的型別，CS8600。'],
+          ['`string? s = Find(); Console.WriteLine(s?.Length);`', '不會警告', '用了 `?.`，安全。'],
+          ['`string s = Find()!;`', '不會警告', '`!` 告訴編譯器「我保證不是 null」，警告消失，但你要負責。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="編譯器的流程分析：s 一開始是可能 null，經過 if s is null return 之後，後面的程式碼中 s 被視為不是 null">
           <rect x="10" y="40" width="160" height="80" style="fill:var(--m5)" class="stroke-ink" stroke-width="4"/>
           <text x="90" y="75" text-anchor="middle" font-size="17" font-weight="900" class="on-color mono">s: string?</text>
@@ -222,12 +194,15 @@ defineLessons({
           <g class="stroke-ink" stroke-width="4"><path d="M170 80 H200"/><path d="M360 80 H390"/></g>
           <text x="280" y="155" text-anchor="middle" font-size="15">提早 return 是最清楚的 null 檢查</text>
         </svg>`, caption: '編譯器會跟著 if、return 追蹤 null 狀態，檢查過一次後面就不再警告。' },
+        { type: 'heading', id: 'deep-nullable', text: '深入：int? 與 string? 不一樣，以及編譯器看不到的破口' },
+        '`int?` 和 `string?` 長得一樣，本質不同：`int?` 是 `Nullable<int>` 這個真的型別，執行時有 `HasValue`；`string?` 只是給編譯器看的標註，執行時和 string 完全一樣。所以沒有約束的泛型方法裡，`T?` 對 int 不會變成 `int?`。',
+        { type: 'table', head: ['屬性標註', '告訴編譯器', '例子'], rows: [
+          ['`[NotNullWhen(true)]`', '回傳 true 時 out 參數不是 null', '`bool TryFind(int id, [NotNullWhen(true)] out User? user)`'],
+          ['`[NotNullWhen(false)]`', '回傳 false 時參數不是 null', '`string.IsNullOrEmpty` 就有標'],
+          ['`[MemberNotNull(nameof(_x))]`', '這個方法執行後欄位已經設好', '建構子呼叫的初始化方法'],
+        ] },
+        '編譯器看不到的破口：`new string[3]` 的元素型別是 string，實際全是 null，不會有警告；struct 的 `default` 裡的字串欄位也是。nullable 是在資料進來的邊界之內才可靠的工具。',
       ],
-      tryit: {
-        q: ['用一行處理：settings 可能是 null、Theme 可能是 null，都 null 時用 "light"。'],
-        draft: 'string theme = settings____Theme ____ "light";',
-        answer: ['`string theme = settings?.Theme ?? "light";`', '`?.` 讓 settings 是 null 時不拋例外；`??` 把 null 換成預設值。'],
-      },
     },
     mistakes: [
       { wrong: '警告太多，到處加 `!` 讓它閉嘴。', why: '`!` 只是消除警告，執行時遇到 null 一樣拋例外。', right: '在資料進來的地方檢查一次（提早 return 或拋 ArgumentNullException），之後用不可為 null 的型別。' },
@@ -235,19 +210,7 @@ defineLessons({
       { wrong: '用 `?.` 呼叫回傳 int 的成員，再指定給 int。', why: '`a?.Length` 的型別是 `int?`，不能直接放進 int。', right: '`int len = a?.Length ?? 0;`' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`string? s = null; var n = s?.Length;` 中 n 的型別是？', options: [
-        { text: '`int?`', correct: true, why: '`?.` 可能得到 null，所以結果是可為 null 的 int。' },
-        { text: '`int`', why: 'int 不能表示 null。' },
-        { text: '`string?`', why: 'Length 是 int，不是 string。' },
-        { text: '`object`', why: '編譯器推斷得出精確的 int?。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`customer?.Points += 10;`（C# 14）在 customer 是 null 時會？', options: [
-        { text: '什麼都不做，不拋例外', correct: true, why: '左邊是 null 時整個指定略過，右邊也不會計算。' },
-        { text: '拋出 NullReferenceException', why: '`?.` 就是為了避免這個。' },
-        { text: '建立一個新的 customer 再加 10', why: 'C# 不會自動建立物件。' },
-        { text: '編譯錯誤：?. 不能放在等號左邊', why: '那是 C# 13 以前；C# 14 起可以。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你接手一個舊專案，開啟 Nullable 後出現 800 個警告。怎麼循序漸進處理，而不是一次全加 `!`？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你接手一個舊專案，開啟 Nullable 後出現 800 個警告。怎麼循序漸進處理，而不是一次全加 `!`？'], answer: [
         '先在專案層級設成 `<Nullable>warnings</Nullable>` 或逐檔用 `#nullable enable`，從新寫的檔案與核心模型開始開啟。',
         '優先修「邊界」：讀檔、API 輸入、資料庫查詢，在那裡檢查 null 並轉成不可為 null 的型別；內部程式的警告會跟著大量消失。剩下真正可能為 null 的地方改成 `?` 並處理。',
       ] },
@@ -265,14 +228,6 @@ defineLessons({
       '用型別模式取代 `as` 加 null 檢查',
       '用屬性模式一次檢查多個屬性',
       '用清單模式比對陣列的形狀',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-2）`string? s = Get(); if (s is null) return;` 之後的 `s.Length` 會警告嗎？', options: [
-        { text: '不會，編譯器知道這裡 s 不是 null', correct: true, why: '流程分析：null 的情況已經 return 了。' },
-        { text: '會，因為 s 宣告成 string?', why: '編譯器會追蹤檢查後的狀態。' },
-        { text: '會，要寫成 s!.Length', why: '不需要 `!`，檢查已經足夠。' },
-        { text: '編譯錯誤', why: '這段完全合法。' },
-      ] },
     ],
     analogy: {
       text: ['模式比對像機場安檢：先看「這是行李箱還是背包」（型別），再看「重量是否超過 7 公斤、有沒有液體」（屬性），符合某個規則就分到對應的通道。'],
@@ -324,19 +279,15 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'Console.WriteLine(Describe([]));\nConsole.WriteLine(Describe([7]));\nConsole.WriteLine(Describe([1, 2, 3, 4]));\n\nstring Describe(int[] a) => a switch\n{\n    [] => "空的",\n    [var only] => $"只有 {only}",\n    [var first, .., var last] => $"{first} 到 {last}",\n};',
-          predict: { q: '`Describe([1, 2, 3, 4])` 回傳什麼？', options: ['1 到 4', '只有 1', '空的'], answer: 0 },
           output: '空的\n只有 7\n1 到 4',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'type', label: '型別模式' }, { id: 'prop', label: '屬性模式' }, { id: 'list', label: '清單模式' }],
-          items: [
-            { text: '`shape is Circle c`', answer: 'type', why: '檢查型別並宣告 c。' },
-            { text: '`user is { IsAdmin: true }`', answer: 'prop', why: '檢查屬性值。' },
-            { text: '`args is ["--version"]`', answer: 'list', why: '陣列剛好一個元素且等於 "--version"。' },
-            { text: '`order is { Items.Count: 0 }`', answer: 'prop', why: '延伸屬性模式，檢查巢狀屬性。' },
-            { text: '`path is [.., "bin", _]`', answer: 'list', why: '倒數第二個元素是 "bin"。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`shape is Circle c`', '型別模式', '檢查型別並宣告 c。'],
+          ['`user is { IsAdmin: true }`', '屬性模式', '檢查屬性值。'],
+          ['`args is ["--version"]`', '清單模式', '陣列剛好一個元素且等於 "--version"。'],
+          ['`order is { Items.Count: 0 }`', '屬性模式', '延伸屬性模式，檢查巢狀屬性。'],
+          ['`path is [.., "bin", _]`', '清單模式', '倒數第二個元素是 "bin"。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 190" role="img" aria-label="switch 分支的順序：範圍小、條件具體的放前面；如果把 Total 大於 0 放在 Total 大於等於 1000 前面，後者永遠不會被比對到，編譯器報 CS8510">
           <rect x="10" y="20" width="260" height="150" style="fill:var(--m4)" class="stroke-ink" stroke-width="4"/>
           <text x="140" y="52" text-anchor="middle" font-size="17" font-weight="900" class="on-color">✓ 具體的在前</text>
@@ -349,12 +300,18 @@ defineLessons({
           <text x="420" y="155" text-anchor="middle" font-size="14" class="on-color">CS8510</text>
           <path d="M270 95 H290" class="stroke-ink" stroke-width="4"/>
         </svg>`, caption: 'switch 由上往下比對，第一個符合就停；把具體條件放前面。' },
+        { type: 'heading', id: 'deep-patterns', text: '深入：編譯器怎麼處理模式' },
+        'switch 運算式不是一串 if：編譯器把所有分支組成決策樹，同一個屬性只讀一次，並在編譯時找出永遠到不了的分支（CS8510）與沒涵蓋的輸入（CS8509）。所以分支多的 switch 通常不比手寫 if 慢，而且更早發現錯誤。',
+        { type: 'table', head: ['模式', '例子', '意思'], rows: [
+          ['常數', '`null`、`"TW"`、`0`', '等於這個常數'],
+          ['關係', '`> 0`、`<= 100`', '比大小'],
+          ['邏輯', '`not null`、`>= 1 and <= 5`、`"JP" or "KR"`', '組合其他模式'],
+          ['var', '`var x`', '永遠成立，只是取值'],
+          ['位置', '`(0, 0)`', '用 Deconstruct 拆開後逐一比對'],
+          ['清單＋切片', '`[_, .. var rest]`', '略過第一個，其餘放進 rest'],
+        ] },
+        '邊界：`when` 子句的條件編譯器無法分析，有 when 的分支不算涵蓋任何情況，所以後面仍需要 `_`。模式只能比對常數，不能比對變數：`x is limit` 會被當成型別或常數名稱，要比變數就寫 `x == limit` 或 `when x == limit`。',
       ],
-      tryit: {
-        q: ['用清單模式判斷命令列參數：第一個是 "add" 且後面至少還有一個參數。'],
-        draft: 'if (args is [____, ____ rest])\n    Console.WriteLine($"要新增 {rest.Length} 個項目");',
-        answer: ['`args is ["add", .. var rest]` 會符合 0 個以上；要「至少一個」寫 `["add", _, ..]`，或先比對再檢查 `rest.Length > 0`。', '`.. var rest` 把剩下的部分取成一個新陣列（切片）。'],
-      },
     },
     mistakes: [
       { wrong: '`if (x is Circle) { var c = (Circle)x; … }`', why: '檢查一次、轉型又檢查一次，寫兩遍型別。', right: '`if (x is Circle c) { … }`' },
@@ -362,19 +319,7 @@ defineLessons({
       { wrong: '用 `obj is { }` 卻不知道它的意思。', why: '空的屬性模式代表「不是 null」，讀者容易看不懂。', right: '團隊不熟時寫 `obj is not null`，意思更直接。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`p is { Age: >= 18 }` 在 p 是 null 時的結果是？', options: [
-        { text: '`false`', correct: true, why: '屬性模式隱含不是 null 的檢查。' },
-        { text: '拋出 NullReferenceException', why: '模式比對不會對 null 存取屬性。' },
-        { text: '`true`', why: 'null 沒有 Age 屬性，不會符合。' },
-        { text: '編譯錯誤', why: '語法合法。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`int[] a = [5]; a is [_, ..]` 的結果是？', options: [
-        { text: '`true`', correct: true, why: '`_` 符合一個元素，`..` 可以是 0 個，所以至少一個元素就成立。' },
-        { text: '`false`，因為 `..` 至少要一個元素', why: '`..` 可以符合 0 個元素。' },
-        { text: '`false`，因為 `_` 只符合 null', why: '`_` 是捨棄模式，符合任何值。' },
-        { text: '編譯錯誤', why: '這是合法的清單模式。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你在寫一個簡單的指令列工具，支援 `app add 名稱`、`app list`、`app remove 編號`。用清單模式設計一個 switch。'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你在寫一個簡單的指令列工具，支援 `app add 名稱`、`app list`、`app remove 編號`。用清單模式設計一個 switch。'], answer: [
         '`args switch { ["add", var name] => Add(name), ["list"] => List(), ["remove", var id] when int.TryParse(id, out var n) => Remove(n), _ => ShowHelp() }`',
         '`when` 子句讓你在模式之外再加條件；最後的 `_` 處理所有錯誤用法，不會讓程式拋 SwitchExpressionException。',
       ] },
@@ -392,14 +337,6 @@ defineLessons({
       '用 enum 表示固定的選項',
       '知道 enum 的陷阱：可以裝不在清單上的數字',
       '了解 C# 15 的 closed 與 union 要解決什麼問題',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 4-3）switch 運算式沒有 `_`，而值沒有符合任何分支時會？', options: [
-        { text: '執行時拋出 SwitchExpressionException', correct: true, why: '1-5 學過；編譯器也會給 CS8509 警告。' },
-        { text: '回傳 default 值', why: 'switch 運算式不會默默回傳預設值。' },
-        { text: '編譯錯誤', why: '沒涵蓋全部情況只是警告。' },
-        { text: '回傳 null', why: '同樣不會默默回傳。' },
-      ] },
     ],
     analogy: {
       text: ['enum 像飲料店的甜度按鈕：全糖、半糖、微糖、無糖，每個按鈕背後是一個數字（3、2、1、0）。union 則像「餐點」這個欄位：它可能是一杯飲料、一份炸雞或一碗麵，每種的內容完全不同。'],
@@ -427,7 +364,7 @@ defineLessons({
       caption: '虛線框是 2026-10 還在 .NET 11 RC 的功能；正式專案先用 enum 與一般類別階層。',
       blocks: [
         '[[列舉]]適合固定選項。它的兩個陷阱：可以轉型出不在清單上的值；switch 時編譯器無法保證你處理了全部。C# 15 的 [[closed]] 與 [[union 型別]]讓編譯器知道「全部可能」，switch 可以不寫 `_`，新增一種情況時所有沒處理的地方都會被抓出來。',
-        { type: 'code', lang: 'csharp', title: 'C# 15 預覽（.NET 11 RC1，語法以正式版為準）', code: 'public record class Cat(string Name);\npublic record class Dog(string Name);\npublic union Pet(Cat, Dog);\n\nPet pet = new Dog("Rex");\nstring name = pet switch\n{\n    Dog d => d.Name,\n    Cat c => c.Name,\n    // 不需要 _：編譯器知道只有這兩種\n};' },
+        { type: 'code', lang: 'csharp', title: 'C# 15 預覽（.NET 11 RC2，語法以正式版為準）', code: 'public record class Cat(string Name);\npublic record class Dog(string Name);\npublic union Pet(Cat, Dog);\n\nPet pet = new Dog("Rex");\nstring name = pet switch\n{\n    Dog d => d.Name,\n    Cat c => c.Name,\n    // 不需要 _：編譯器知道只有這兩種\n};' },
       ],
     },
     define: [
@@ -451,18 +388,14 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'var s = (Status)7;\nConsole.WriteLine(s);\nConsole.WriteLine(Enum.IsDefined(s));\nConsole.WriteLine((int)Status.Shipped);\n\nenum Status { Pending, Paid, Shipped }',
-          predict: { q: '`(Status)7` 印出來是什麼？', options: ['Shipped', '7', '拋出例外'], answer: 1 },
           output: '7\nFalse\n2',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'enum', label: 'enum 就夠' }, { id: 'hier', label: '需要帶資料的型別' }],
-          items: [
-            { text: '星期一到星期日', answer: 'enum', why: '固定、不帶額外資料。' },
-            { text: '付款方式：信用卡要卡號末四碼、轉帳要帳號、現金什麼都不用', answer: 'hier', why: '每種情況帶的資料不同，用 record 階層（未來可用 union）。' },
-            { text: 'Log 等級：Debug、Info、Warning、Error', answer: 'enum', why: '單純的固定選項。' },
-            { text: 'API 結果：成功時有資料，失敗時有錯誤代碼與訊息', answer: 'hier', why: '成功與失敗帶不同資料，正是 union 想解決的問題。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['星期一到星期日', 'enum 就夠', '固定、不帶額外資料。'],
+          ['付款方式：信用卡要卡號末四碼、轉帳要帳號、現金什麼都不用', '需要帶資料的型別', '每種情況帶的資料不同，用 record 階層（未來可用 union）。'],
+          ['Log 等級：Debug、Info、Warning、Error', 'enum 就夠', '單純的固定選項。'],
+          ['API 結果：成功時有資料，失敗時有錯誤代碼與訊息', '需要帶資料的型別', '成功與失敗帶不同資料，正是 union 想解決的問題。']
+        ] },
         { type: 'svg', svg: `<svg viewBox="0 0 560 170" role="img" aria-label="enum 的值其實是整數：Pending 對應 0、Paid 對應 1、Shipped 對應 2；轉型成 7 也合法，但沒有名字">
           <g class="stroke-ink" stroke-width="4">
             <rect x="10" y="30" width="125" height="60" style="fill:var(--m1)"/><rect x="145" y="30" width="125" height="60" style="fill:var(--m3)"/><rect x="280" y="30" width="125" height="60" style="fill:var(--m4)"/><rect x="415" y="30" width="135" height="60" class="fill-surface" stroke-dasharray="8 6"/>
@@ -477,12 +410,17 @@ defineLessons({
           <text x="482" y="130" text-anchor="middle" font-size="20" class="mono">7</text>
           <g class="stroke-ink" stroke-width="3"><path d="M72 90 V108"/><path d="M207 90 V108"/><path d="M342 90 V108"/><path d="M482 90 V108"/></g>
         </svg>`, caption: '從資料庫或 API 讀進來的數字轉成 enum 前，用 `Enum.IsDefined` 檢查。' },
+        { type: 'heading', id: 'deep-enum', text: '深入：Flags、序列化與 closed 的邊界' },
+        '`[Flags]` 列舉把每個值設成 2 的次方，就能用位元 OR 組合：`Permission.Read | Permission.Write`，用 `HasFlag` 或 `(p & Permission.Write) != 0` 檢查。沒有標 Flags 的 enum 不要這樣組合，ToString 會印出數字而不是名稱。',
+        'enum 用 System.Text.Json 序列化預設是數字，加上 `JsonStringEnumConverter` 才輸出名稱。存名稱比較好讀、不怕中間插值造成錯位，代價是之後改名就破壞相容性；兩種都可以，重點是全專案一致。',
+        { type: 'table', head: ['表示法', '可以帶資料', '編譯器能窮舉', '可用版本'], rows: [
+          ['enum', '不行', '不行（可裝未定義的整數）', '一直都有'],
+          ['abstract record 階層', '可以', '不行，要 `_`', '.NET 5 起'],
+          ['closed 階層', '可以', '可以（只限直接子類別）', 'C# 15，2026-10 為 .NET 11 RC2'],
+          ['union', '可以，而且能組合不相關的型別', '可以', 'C# 15，2026-10 為 .NET 11 RC2'],
+        ] },
+        'closed 只管「直接」子類別，而且不會傳遞：closed 類別的子類別如果沒有再標 closed，任何組件都能繼承它。截至 2026-10，Microsoft Learn 的 What\'s new in C# 15 仍把這些功能標為預覽，正式語法以 2026-11 的正式版為準。',
       ],
-      tryit: {
-        q: ['用 enum 搭配 switch 運算式，把甜度轉成顯示文字：'],
-        draft: 'enum Sugar { None, Light, Half, Full }\n\nstring Label(Sugar s) => s switch\n{\n    Sugar.None => "無糖",\n    Sugar.____ => "微糖",\n    Sugar.Half => "半糖",\n    Sugar.Full => "全糖",\n    ____ => "未知",\n};',
-        answer: ['`Sugar.Light`、`_`。', '即使四個 enum 值都寫了，編譯器仍會警告沒涵蓋全部：因為 `(Sugar)99` 也是合法的值。所以 enum 的 switch 都要有 `_`。'],
-      },
     },
     mistakes: [
       { wrong: '從資料庫讀到 int 直接 `(Status)value`。', why: '不存在的數字也能轉，後面的 switch 會走到意料之外的分支。', right: '`Enum.IsDefined(typeof(Status), value)` 檢查，或用 `Enum.TryParse`。' },
@@ -490,19 +428,7 @@ defineLessons({
       { wrong: '2026-10 就在正式專案大量使用 union。', why: '.NET 11 還是 RC，部分功能規格尚未完全實作。', right: '先用 record 類別階層加 `_` 分支；.NET 11 正式發布並評估後再遷移。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`enum Color { Red, Green, Blue }` 中 `(int)Color.Blue` 是？', options: [
-        { text: '`2`', correct: true, why: '預設從 0 開始依序遞增。' },
-        { text: '`3`', why: '從 0 開始，不是 1。' },
-        { text: '`"Blue"`', why: '轉成 int 得到的是數字。' },
-        { text: '編譯錯誤', why: 'enum 可以明確轉成底層整數型別。' },
-      ] },
-      { level: '應用', type: 'mc', q: 'C# 15 的 union 與 closed 最主要解決什麼問題？', options: [
-        { text: '讓編譯器知道所有可能情況，switch 漏處理會被抓出來', correct: true, why: '這就是「窮舉檢查」（exhaustiveness）。' },
-        { text: '讓程式執行得比較快', why: '主要目的是正確性，不是效能。' },
-        { text: '取代所有的介面', why: '介面描述能力，用途不同。' },
-        { text: '讓 enum 可以帶字串值', why: 'enum 沒有改變；union 是另一種型別。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 .NET 10 上要表達「API 結果是成功（帶資料）或失敗（帶錯誤）」，不用 union 怎麼寫？之後升級 .NET 11 要怎麼改？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 .NET 10 上要表達「API 結果是成功（帶資料）或失敗（帶錯誤）」，不用 union 怎麼寫？之後升級 .NET 11 要怎麼改？'], answer: [
         '.NET 10：`abstract record Result; record Ok(Data Value) : Result; record Fail(string Code, string Message) : Result;` 用 switch 處理，最後加 `_ => throw new UnreachableException()`。',
         '.NET 11：把基底改成 `closed record Result`（或改成 union），移除 `_`；之後新增第三種結果時，所有沒處理的 switch 都會被編譯器指出來。',
       ] },
@@ -512,7 +438,7 @@ defineLessons({
       'enum 可以裝不在清單上的數字，外部資料要檢查，switch 要有 `_`。',
       'C# 15 的 closed 與 union（2026-11 正式）讓 switch 可以窮舉檢查；現在先用 record 階層。',
     ],
-    sources: ['cs-enum', 'cs-union', 'cs-whatsnew-15'],
+    sources: ['cs-enum', 'cs-union', 'cs-whatsnew-15', 'dotnet11-rc2'],
   },
 });
 </script>

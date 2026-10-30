@@ -14,7 +14,7 @@
 | 4 | `c-data.html` | `COURSES` 與資料 API（`defineLessons`、`defineTerms`、`defineSources`） |
 | 5 | `d-sources.html` | `defineSources()` 全部來源 |
 | 6 | `m0.html`…`mN.html` | 每個模組一個 `<script>`，只放資料 |
-| 7 | `e-engine1.js` | 引擎前半（`md()`、路由、側欄、術語、測驗） |
+| 7 | `e-engine1.js` | 引擎前半（`md()`、路由、側欄、術語、深入思考題） |
 | 8 | `f-widgets.js` | 互動元件 |
 | 9 | `e-engine2.js` | 引擎後半（render、hydrate、啟動） |
 
@@ -46,10 +46,9 @@ sh scripts/build.sh <分段資料夾> course-web/<slug>/index.html
 | `anatomy` | 指令拆解：點每一段看說明 | 靜態＋點擊 |
 | `fstree` | 資料夾樹：點資料夾看路徑變化 | 靜態＋點擊 |
 | `pipeflow` | 資料流經多個階段 | `static: true` 為靜態圖；不加才逐站播放 |
-| `pathfinder` | 絕對／相對路徑練習 | 互動練習 |
+| `pathfinder` | 絕對／相對路徑：輸入路徑看解析結果 | 互動示範 |
 | `rosetta` | 同一件事在不同 shell 的寫法對照 | 分頁切換 |
 | `herodemo` | 首頁示範 | 動態 |
-| `classify` | 拖放或點選分類練習 | 互動練習 |
 
 單一課程專用的元件（例如 karpathy 課的 `ladder`、`rulecheck`、`kvcache`、`promptgen`）寫在該課的 HANDOFF，不放進共用表，除非第二門課也要用。
 
@@ -62,7 +61,7 @@ sh scripts/build.sh <分段資料夾> course-web/<slug>/index.html
 
 `pipeflow` 用在概念步驟時一律加 `static: true`。逐站播放會讓讀者等動畫跑完才看得到全貌，對 ADHD 讀者反而是阻礙。
 
-每一課至少一個互動元素（分類練習、拉桿、可切換對照、檢查器），但要讓讀者「做」一件事，不是裝飾。
+每一課至少一個互動元素（試算拉桿 `knobs`、可切換對照、檢查器、可執行的程式碼），但要讓讀者「做」一件事，不是裝飾。不做有標準答案、要讀者作答的互動（`classify` 已停用，分類內容改用 `table` 區塊；`runner` 不再加 `predict`）。
 
 ## 3. 移植元件到既有課程
 

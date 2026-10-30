@@ -26,14 +26,6 @@ defineLessons({
       '用切片、負索引取出部分元素',
       '分辨 list 與 tuple 的用途',
     ],
-    review: [
-      { level: '回想', type: 'mc', q: '（回顧 1-4）為什麼不能寫 `def f(items=[]):`？', options: [
-        { text: '預設清單只建立一次，每次呼叫共用', correct: true, why: '資料會在呼叫之間累積。' },
-        { text: '語法錯誤，預設值不能是清單', why: '語法合法，所以才危險。' },
-        { text: '清單當參數會很慢', why: '問題不是效能。' },
-        { text: '每次呼叫會複製一份大清單', why: '剛好相反，它不會複製。' },
-      ] },
-    ],
     analogy: {
       text: ['list 像購物清單：可以隨時加一項、劃掉一項、改順序。tuple 像身分證上的生日：年、月、日三個值綁在一起，印好就不能改。'],
       limit: ['購物清單通常只寫同一類東西；Python 的 list 可以混放不同型別。不過實務上一個 list 最好只放同一種東西，tuple 才用來放「不同意義的一組值」。'],
@@ -79,26 +71,26 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'nums = [10, 20, 30, 40, 50]\nprint(nums[-1], nums[1:3], nums[::-1])\n\nfirst, *rest = nums\nprint(first, rest)\n\npoint = (3, 4)\nx, y = point\nprint(x + y)\nsingle = (5)\nprint(type(single).__name__)',
-          predict: { q: '`type((5)).__name__` 是？', options: ['tuple', 'int', 'list'], answer: 1 },
           output: '50 [20, 30] [50, 40, 30, 20, 10]\n10 [20, 30, 40, 50]\n7\nint',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'list', label: '用 list' }, { id: 'tuple', label: '用 tuple' }],
-          items: [
-            { text: '待辦事項，會一直新增刪除', answer: 'list', why: '需要修改。' },
-            { text: '地圖座標（緯度, 經度）', answer: 'tuple', why: '固定的一組值，還能當 dict 的鍵。' },
-            { text: '函式要回傳「最小值和最大值」', answer: 'tuple', why: '`return lo, hi` 自然就是 tuple。' },
-            { text: '讀進來的 1000 行檔案內容，之後要排序', answer: 'list', why: '需要排序（原地修改）。' },
-            { text: 'RGB 顏色 (255, 0, 0)', answer: 'tuple', why: '三個固定位置、不同意義。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['待辦事項，會一直新增刪除', '用 list', '需要修改。'],
+          ['地圖座標（緯度, 經度）', '用 tuple', '固定的一組值，還能當 dict 的鍵。'],
+          ['函式要回傳「最小值和最大值」', '用 tuple', '`return lo, hi` 自然就是 tuple。'],
+          ['讀進來的 1000 行檔案內容，之後要排序', '用 list', '需要排序（原地修改）。'],
+          ['RGB 顏色 (255, 0, 0)', '用 tuple', '三個固定位置、不同意義。']
+        ] },
         { type: 'svg', svg: Fig.vs('list 與 tuple 對照：list 可修改、通常放同類資料；tuple 不可修改、放一組不同意義的值、可以當 dict 的鍵', { title: 'list', lines: ['可修改', '同類的一串', '不能當鍵'], tone: 3 }, { title: 'tuple', lines: ['不可修改', '一組固定值', '可以當鍵'], tone: 4 }), caption: '選擇依據是「會不會變」和「每個位置的意義」。' },
+        { type: 'heading', id: 'deep-list-cost', text: '深入：list 每個操作的成本' },
+        'list 在記憶體裡是一整排連續的格子，存的是指向物件的參考。所以讀第 i 個、加到尾巴很快；在開頭插入或刪除，後面每一格都要往後或往前搬。',
+        { type: 'table', caption: '時間複雜度（n 是元素數量）', head: ['操作', '成本', '大量資料時的替代'], rows: [
+          ['`lst[i]`、`lst.append(x)`、`lst.pop()`', '固定時間', '—'],
+          ['`lst.insert(0, x)`、`lst.pop(0)`', '和 n 成正比', '`collections.deque` 兩端都固定時間'],
+          ['`x in lst`', '和 n 成正比', '轉成 set，見 2-2'],
+          ['`lst.sort()`', 'n log n；已部分排序時更快', '只要前幾名用 `heapq.nsmallest`'],
+        ] },
+        'tuple 也不一定「整個不可變」：`t = ([1], 2)` 裡的 list 還是可以 append，這時 `hash(t)` 會 TypeError。需要有欄位名稱的 tuple，用 `typing.NamedTuple`，或直接用 3-2 的 dataclass。',
       ],
-      tryit: {
-        q: ['不用暫存變數，交換 a 與 b：'],
-        draft: 'a, b = 1, 2\n____ = ____\nprint(a, b)  # 2 1',
-        answer: ['`a, b = b, a`。', '右邊先組成 tuple (2, 1)，再解包給左邊。'],
-      },
     },
     mistakes: [
       { wrong: '`result = lst.sort()`', why: 'sort 回傳 None。', right: '`lst.sort()` 後直接用 lst，或 `result = sorted(lst)`。' },
@@ -106,19 +98,7 @@ defineLessons({
       { wrong: '`nums[5]` 讀超過長度的索引。', why: 'IndexError。', right: '先檢查 `len(nums)`，或用切片 `nums[5:6]`（超出範圍得到空清單）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`[1, 2, 3, 4][1:3]` 是？', options: [
-        { text: '`[2, 3]`', correct: true, why: '索引 1 到 2（不含 3）。' },
-        { text: '`[1, 2, 3]`', why: '索引從 0 開始，1 是第二個元素。' },
-        { text: '`[2, 3, 4]`', why: '不含索引 3。' },
-        { text: '`[1, 2]`', why: '那是 `[0:2]`。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`a = [3, 1, 2]; b = sorted(a); a.append(0); print(b)` 印出？', options: [
-        { text: '`[1, 2, 3]`', correct: true, why: 'sorted 產生新清單，之後修改 a 不影響 b。' },
-        { text: '`[0, 1, 2, 3]`', why: 'b 是獨立的新清單。' },
-        { text: '`[3, 1, 2, 0]`', why: '那是 a。' },
-        { text: '`None`', why: 'sorted 會回傳新清單；回傳 None 的是 sort。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['為什麼 tuple 可以當 dict 的鍵，list 不行？如果可以用 list 當鍵會發生什麼事？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['為什麼 tuple 可以當 dict 的鍵，list 不行？如果可以用 list 當鍵會發生什麼事？'], answer: [
         'dict 依鍵的雜湊值決定存放位置；list 可修改，內容改了雜湊值也會變，就再也找不到原本的位置。',
         '所以 Python 規定 list 不可雜湊（TypeError: unhashable type: \'list\'）；不可變的 tuple 雜湊值固定，可以當鍵（前提是裡面的元素也不可變）。',
       ] },
@@ -136,14 +116,6 @@ defineLessons({
       '用 dict 依鍵查值，安全處理不存在的鍵',
       '用 set 去重複與判斷成員',
       '認識 3.15 新增的 frozendict',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-1）為什麼 list 不能當 dict 的鍵？', options: [
-        { text: 'list 可修改，雜湊值不固定', correct: true, why: '所以 list 不可雜湊。' },
-        { text: 'list 太大', why: '和大小無關。' },
-        { text: 'dict 的鍵只能是字串', why: '任何可雜湊的物件都能當鍵。' },
-        { text: '其實可以', why: '會拋 TypeError: unhashable type。' },
-      ] },
     ],
     analogy: {
       text: ['dict 像電話簿：用名字（鍵）直接找到號碼（值），不用從第一頁翻起。set 像活動的簽到名單：只在乎「有沒有來」，同一個人簽兩次也只算一次。'],
@@ -182,30 +154,30 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'stock = {"蘋果": 3}\nstock["香蕉"] = 5\nprint(stock.get("西瓜"))\nprint(len({1, 1, 2, 2, 3}))\nempty = {}\nprint(type(empty).__name__)\nprint(stock["西瓜"])',
-          predict: { q: '`type({}).__name__` 是？', options: ['set', 'dict', 'frozendict'], answer: 1 },
           output: 'None\n3\ndict\n!Traceback (most recent call last):\n!  File "app.py", line 7, in <module>\n!    print(stock["西瓜"])\n!KeyError: \'西瓜\'',
         } },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'dict', label: 'dict' }, { id: 'set', label: 'set' }, { id: 'list', label: 'list' }],
-          items: [
-            { text: '學號 → 學生姓名', answer: 'dict', why: '用鍵查值。' },
-            { text: '已經寄過信的 Email', answer: 'set', why: '只需要判斷有沒有寄過。' },
-            { text: '照時間順序的聊天訊息', answer: 'list', why: '順序重要、可能重複。' },
-            { text: '兩個班級都有選的課程', answer: 'set', why: '交集 `a & b`。' },
-            { text: '設定檔：鍵 → 值', answer: 'dict', why: '典型的鍵值對。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['學號 → 學生姓名', 'dict', '用鍵查值。'],
+          ['已經寄過信的 Email', 'set', '只需要判斷有沒有寄過。'],
+          ['照時間順序的聊天訊息', 'list', '順序重要、可能重複。'],
+          ['兩個班級都有選的課程', 'set', '交集 `a & b`。'],
+          ['設定檔：鍵 → 值', 'dict', '典型的鍵值對。']
+        ] },
         { type: 'svg', svg: Fig.row('set 的三種運算：交集 a & b 是兩邊都有的；聯集 a | b 是全部合起來；差集 a - b 是 a 有但 b 沒有的', [
           { title: 'a & b', lines: ['交集', '兩邊都有'], tone: 1 },
           { title: 'a | b', lines: ['聯集', '全部合起來'], tone: 3 },
           { title: 'a - b', lines: ['差集', 'a 有 b 沒有'], tone: 4 },
         ], { arrows: false }), caption: '比對兩份名單時，set 運算比雙層迴圈快很多。' },
+        { type: 'heading', id: 'deep-hash', text: '深入：dict 為什麼快、什麼時候會變慢' },
+        'dict 和 set 用雜湊表：先算鍵的 `hash()`，直接跳到對應的格子，所以查詢幾乎不受資料量影響。代價是記憶體用量比 list 大，而且鍵必須[[雜湊]]、且雜湊值不能變。',
+        { type: 'table', caption: '幾種「映射」怎麼選', head: ['型別', '可修改', '可雜湊', '用在'], rows: [
+          ['`dict`', '是', '否', '一般的鍵值資料'],
+          ['`frozendict`（3.15）', '否', '鍵值都可雜湊時是', '設定、快取鍵、常數表'],
+          ['`types.MappingProxyType(d)`', '透過它不能改', '否', '對外提供唯讀視圖，原本的 d 改了它也會變'],
+          ['`collections.defaultdict`', '是', '否', '分組、計數（見 6-3）'],
+        ] },
+        'frozendict 不是 dict 的子類別，所以 `isinstance(fd, dict)` 是 False；只接受 dict 的舊函式可能拒收它，型別提示改寫 `collections.abc.Mapping` 才能同時接受兩者。3.15 的 json、pickle、copy、pprint 已支援 frozendict。',
       ],
-      tryit: {
-        q: ['找出兩份名單都有的人（不管順序與重複）：'],
-        draft: 'team_a = ["阿明", "小華", "阿花", "小華"]\nteam_b = ["阿花", "阿明", "大雄"]\nboth = ____(team_a) ____ set(team_b)\nprint(both)',
-        answer: ['`set(team_a) & set(team_b)` → `{\'阿明\', \'阿花\'}`（順序不固定）。', '先轉成 set 去除重複，再用 & 取交集。'],
-      },
     },
     mistakes: [
       { wrong: '`s = {}` 想建立空集合。', why: '`{}` 是空 dict。', right: '`s = set()`。' },
@@ -213,19 +185,7 @@ defineLessons({
       { wrong: '走過 dict 時同時刪除元素。', why: 'RuntimeError: dictionary changed size during iteration。', right: '`for k in list(d):` 先複製鍵，或用推導式建立新 dict。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '建立空集合的正確寫法是？', options: [
-        { text: '`set()`', correct: true, why: '`{}` 已經被 dict 用掉了。' },
-        { text: '`{}`', why: '這是空 dict。' },
-        { text: '`[]`', why: '這是空 list。' },
-        { text: '`frozendict()`', why: '那是不可變的 dict，不是 set。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`d = {"a": 1}; print(d.get("b", 0) + d.get("a"))` 印出？', options: [
-        { text: '`1`', correct: true, why: 'get("b", 0) 得 0，get("a") 得 1。' },
-        { text: 'KeyError', why: 'get 不會拋 KeyError。' },
-        { text: '`None`', why: '"b" 有給預設值 0。' },
-        { text: 'TypeError', why: '0 + 1 是合法的。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在 3.15 以前，想把「一組設定」放進 set 去重複，或當快取的鍵，要怎麼做？frozendict 解決了什麼？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在 3.15 以前，想把「一組設定」放進 set 去重複，或當快取的鍵，要怎麼做？frozendict 解決了什麼？'], answer: [
         '以前常見做法是轉成 `tuple(sorted(d.items()))` 或 `frozenset(d.items())`，可讀性差，也失去鍵值查詢的能力。',
         'frozendict 讓「不可修改的字典」成為內建型別：可以直接 `frozendict(d)`，既能雜湊、又保留 `fd["key"]` 查詢；也適合當函式的預設值與快取鍵。',
       ] },
@@ -241,16 +201,8 @@ defineLessons({
   '2-3': {
     goals: [
       '判斷一個物件可變或不可變',
-      '預測「共用參考」造成的意外修改',
+      '看出「共用參考」造成的意外修改',
       '分辨淺複製與深複製',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 1-1）`b = a` 之後，a 和 b 的關係是？', options: [
-        { text: '兩個名字指向同一個物件', correct: true, why: '`=` 不複製物件。' },
-        { text: 'b 是 a 的複本', why: '沒有發生複製。' },
-        { text: 'b 是 a 的子類別', why: '和類別無關。' },
-        { text: '要看型別才知道會不會複製', why: '不管什麼型別，`=` 都不複製。' },
-      ] },
     ],
     analogy: {
       text: ['不可變物件像印好的書：想改內容只能印一本新的。可變物件像共用的白板：任何拿到白板位置的人都能改，大家看到的是同一塊白板。'],
@@ -284,7 +236,6 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'import copy\n\noriginal = {"name": "阿明", "tags": ["vip"]}\nshallow = original.copy()\ndeep = copy.deepcopy(original)\n\nshallow["name"] = "小華"\nshallow["tags"].append("new")\n\nprint(original)\nprint(deep)',
-          predict: { q: 'original 的 tags 會變成什麼？', options: ["['vip']", "['vip', 'new']", "['new']"], answer: 1 },
           output: "{'name': '阿明', 'tags': ['vip', 'new']}\n{'name': '阿明', 'tags': ['vip']}",
         } },
         { type: 'svg', svg: Fig.tree('淺複製：original 與 shallow 是兩個不同的 dict，但它們的 tags 指向同一個 list；deepcopy 連 tags 都複製一份', { title: 'tags list', lines: ['`["vip", "new"]`'], tone: 5 }, [
@@ -292,23 +243,23 @@ defineLessons({
           { title: 'shallow', lines: ['dict（新的）', 'tags 共用'], tone: 3 },
           { title: 'deep', lines: ['tags 是獨立', '的另一份'], dashed: true },
         ]), caption: '淺複製只換掉外層盒子，裡面的清單還是同一個。' },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'm', label: '可變' }, { id: 'i', label: '不可變' }],
-          items: [
-            { text: '`str`', answer: 'i', why: '方法都回傳新字串。' },
-            { text: '`list`', answer: 'm', why: 'append、sort 都原地修改。' },
-            { text: '`tuple`', answer: 'i', why: '不能改元素（但若元素本身可變，那個元素仍可被改）。' },
-            { text: '`dict`', answer: 'm', why: '可以新增、刪除鍵。' },
-            { text: '`frozendict`（3.15）', answer: 'i', why: '不可修改的 dict。' },
-            { text: '`set`', answer: 'm', why: 'add、remove 原地修改；不可變版本是 frozenset。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['`str`', '不可變', '方法都回傳新字串。'],
+          ['`list`', '可變', 'append、sort 都原地修改。'],
+          ['`tuple`', '不可變', '不能改元素（但若元素本身可變，那個元素仍可被改）。'],
+          ['`dict`', '可變', '可以新增、刪除鍵。'],
+          ['`frozendict`（3.15）', '不可變', '不可修改的 dict。'],
+          ['`set`', '可變', 'add、remove 原地修改；不可變版本是 frozenset。']
+        ] },
+        { type: 'heading', id: 'deep-mutation', text: '深入：`+=` 的雙重身分與參數傳遞' },
+        '`a += b` 會先找 `__iadd__`：list 有，所以原地修改；tuple、str、int 沒有，就退回 `a = a + b` 產生新物件。這也是 `t = ([1],); t[0] += [2]` 會「拋出 TypeError 但 list 還是被改了」的原因：原地加完之後，再把結果指定回 tuple 的位置時才失敗。',
+        { type: 'table', caption: '函式收到可變物件時的三種寫法', head: ['寫法', '呼叫端的資料', '適合'], rows: [
+          ['原地修改並回傳 None（像 `list.sort`）', '被改', '資料很大、呼叫端明確想要修改'],
+          ['回傳新物件（像 `sorted`）', '不變', '預設選擇，最好推理'],
+          ['先 `copy()` 再改並回傳', '不變', '要改的部分多，但不想影響呼叫端'],
+        ] },
+        'deepcopy 不是萬靈丹：它會遞迴複製整棵物件樹，大資料很慢；遇到檔案、鎖、資料庫連線這類物件會失敗或產生不合理的副本。資料結構設計成「不可變為主」，需要複製的地方自然就少。',
       ],
-      tryit: {
-        q: ['讓函式不要修改呼叫端傳進來的清單：'],
-        draft: 'def add_tax(prices):\n    result = ____\n    for i in range(len(result)):\n        result[i] = round(result[i] * 1.05)\n    return result',
-        answer: ['`result = prices.copy()`（或 `list(prices)`），更好的寫法是直接 `return [round(p * 1.05) for p in prices]`。', '函式修改傳入的可變物件，呼叫端常常不會預期；預設應該回傳新物件。'],
-      },
     },
     mistakes: [
       { wrong: '`[[0] * 3] * 3` 建立二維清單。', why: '外層的三個元素是同一個 list。', right: '`[[0] * 3 for _ in range(3)]`。' },
@@ -316,19 +267,7 @@ defineLessons({
       { wrong: '函式默默修改呼叫端傳入的 list 或 dict。', why: '呼叫端的資料在別處被改，很難追。', right: '回傳新物件；真的要原地修改時，在函式名稱與文件說清楚，並回傳 None（像 list.sort）。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`b = a.copy()` 對 `a = [[1], [2]]` 來說是？', options: [
-        { text: '淺複製：b 是新清單，但 b[0] 和 a[0] 是同一個物件', correct: true, why: 'copy 只複製外層。' },
-        { text: '深複製：完全獨立', why: '要 copy.deepcopy 才是。' },
-        { text: '沒有複製，b 和 a 是同一個物件', why: '外層確實是新物件，`a is b` 為 False。' },
-        { text: '錯誤：巢狀清單不能 copy', why: '可以 copy，只是只有一層。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`t = ([1], 2); t[0].append(3); print(t)` 會？', options: [
-        { text: '印出 `([1, 3], 2)`', correct: true, why: 'tuple 不能換元素，但裡面的 list 本身可變。' },
-        { text: 'TypeError：tuple 不可修改', why: '沒有修改 tuple 的元素指向，只是修改了那個 list 物件。' },
-        { text: '印出 `([1], 2)`', why: 'list 確實被 append 了。' },
-        { text: '印出 `([1], 2, 3)`', why: 'append 加在 list 裡，不是 tuple。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['在網頁伺服器裡，把一個「預設設定」dict 放在模組層級，每個請求 `cfg = DEFAULT` 再修改。會發生什麼事？怎麼改？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['在網頁伺服器裡，把一個「預設設定」dict 放在模組層級，每個請求 `cfg = DEFAULT` 再修改。會發生什麼事？怎麼改？'], answer: [
         '所有請求拿到的都是同一個 dict，A 請求改的設定會影響 B 請求，而且在多執行緒下行為不可預測。',
         '每個請求用 `cfg = copy.deepcopy(DEFAULT)` 或 `{**DEFAULT, **overrides}` 建立新的；更好的是讓 DEFAULT 本身不可變（3.15 可用 frozendict），誤改時直接報錯。',
       ] },
@@ -346,14 +285,6 @@ defineLessons({
       '用 list、dict、set 推導式取代簡單迴圈',
       '用產生器運算式處理大量資料',
       '認識 3.15 推導式中的解包',
-    ],
-    review: [
-      { level: '應用', type: 'mc', q: '（回顧 2-3）`[[0] * 2] * 2` 之後改 `grid[0][0] = 9`，grid 是？', options: [
-        { text: '`[[9, 0], [9, 0]]`', correct: true, why: '兩列是同一個 list。' },
-        { text: '`[[9, 0], [0, 0]]`', why: '要用推導式建立才會是這樣。' },
-        { text: '`[[9, 9], [0, 0]]`', why: '只改了索引 0。' },
-        { text: 'TypeError', why: '合法操作。' },
-      ] },
     ],
     analogy: {
       text: ['推導式像點餐時一句話說完：「把菜單上所有素食的品項，價格打九折列給我」。迴圈則像一項一項指著問、一項一項寫下來。'],
@@ -392,25 +323,25 @@ defineLessons({
       blocks: [
         { type: 'widget', name: 'csrun', props: {
           code: 'words = ["apple", "Banana", "cherry", "apple"]\nprint([w.upper() for w in words if len(w) > 5])\nprint(sorted({w.lower() for w in words}))\nprint({w: len(w) for w in words})\nprint(sum(len(w) for w in words))',
-          predict: { q: '第一行印出什麼？', options: ["['BANANA', 'CHERRY']", "['APPLE', 'BANANA', 'CHERRY', 'APPLE']", "['BANANA']"], answer: 0 },
           output: "['BANANA', 'CHERRY']\n['apple', 'banana', 'cherry']\n{'apple': 5, 'Banana': 6, 'cherry': 6}\n22",
         } },
         { type: 'svg', svg: Fig.vs('list 推導式立刻建好整個清單、佔用記憶體、可以走很多次；產生器運算式需要時才算、幾乎不佔記憶體、只能走一次', { title: '[ … ] list', lines: ['立刻全部算好', '佔記憶體', '可以走很多次'], tone: 3 }, { title: '( … ) 產生器', lines: ['需要時才算', '幾乎不佔記憶體', '只能走一次'], tone: 4 }), caption: '結果只是要交給 sum、max、any 時，用產生器。' },
-        { type: 'widget', name: 'classify', props: {
-          buckets: [{ id: 'comp', label: '適合推導式' }, { id: 'loop', label: '用一般迴圈' }],
-          items: [
-            { text: '把價格清單全部乘上 1.05', answer: 'comp', why: '單純轉換。' },
-            { text: '走過檔案，每行寫進資料庫並印出進度', answer: 'loop', why: '有副作用，不是建立集合。' },
-            { text: '篩出 Email 有 @ 的使用者', answer: 'comp', why: '單純篩選。' },
-            { text: '三層巢狀 for 加兩個 if 與 try/except', answer: 'loop', why: '太複雜，推導式會變得難讀。' },
-          ],
-        } },
+        { type: 'table', head: ['情境', '分類', '為什麼'], rows: [
+          ['把價格清單全部乘上 1.05', '適合推導式', '單純轉換。'],
+          ['走過檔案，每行寫進資料庫並印出進度', '用一般迴圈', '有副作用，不是建立集合。'],
+          ['篩出 Email 有 @ 的使用者', '適合推導式', '單純篩選。'],
+          ['三層巢狀 for 加兩個 if 與 try/except', '用一般迴圈', '太複雜，推導式會變得難讀。']
+        ] },
+        { type: 'heading', id: 'deep-comprehension', text: '深入：推導式的作用域與效能' },
+        '推導式的迴圈變數不會外洩：`[x for x in range(3)]` 之後 x 不存在（Python 2 會外洩）。3.12 起（PEP 709）CPython 把 list、dict、set 推導式「內聯」到所在的函式，不再另外建立函式物件，速度最多快一倍，行為不變。',
+        { type: 'table', caption: '同一件事的幾種寫法', head: ['寫法', '優點', '缺點'], rows: [
+          ['list 推導式', '最常見、好讀', '立刻建好全部結果'],
+          ['產生器運算式', '記憶體固定', '只能走一次，見 4-1'],
+          ['`map(f, xs)`、`filter(p, xs)`', 'f 已經是現成函式時很短', '要寫 lambda 時反而難讀'],
+          ['一般 for 迴圈', '能放副作用、try、多層邏輯', '比較長'],
+        ] },
+        '3.15 的推導式解包（PEP 798）也適用 dict：`{**d for d in configs}` 依序合併多個 dict，後面的鍵覆蓋前面的。要支援 3.14 以前的專案不能用，寫函式庫時通常要等最舊支援版本到 3.15 才會採用。',
       ],
-      tryit: {
-        q: ['用 dict 推導式，把價格超過 50 的商品打八折：'],
-        draft: 'menu = {"咖啡": 60, "茶": 40, "蛋糕": 90}\nsale = {____: ____ for name, p in menu.items() if p > 50}',
-        answer: ['`{name: p * 0.8 for name, p in menu.items() if p > 50}` → `{\'咖啡\': 48.0, \'蛋糕\': 72.0}`。', '注意：if 放在後面會「過濾掉」茶；要保留茶但不打折，改成 `{name: p * 0.8 if p > 50 else p for …}`。'],
-      },
     },
     mistakes: [
       { wrong: '用推導式做副作用：`[print(x) for x in items]`。', why: '建立了一個沒用的 None 清單，意圖也不清楚。', right: '一般 for 迴圈。' },
@@ -418,19 +349,7 @@ defineLessons({
       { wrong: '把篩選與條件運算式的位置搞混。', why: '`if` 放最後是篩選；`a if c else b` 放前面是選值。', right: '要保留全部元素但值不同時，用前面的條件運算式。' },
     ],
     practice: [
-      { level: '回想', type: 'mc', q: '`[n for n in range(5) if n % 2]` 是？', options: [
-        { text: '`[1, 3]`', correct: true, why: 'n % 2 為 1（真）時才保留，也就是奇數。' },
-        { text: '`[0, 2, 4]`', why: '偶數 n % 2 為 0（假），會被過濾掉。' },
-        { text: '`[0, 1, 2, 3, 4]`', why: '有篩選條件。' },
-        { text: '`[True, False, …]`', why: '結果運算式是 n，不是條件。' },
-      ] },
-      { level: '應用', type: 'mc', q: '`g = (x * 2 for x in [1, 2]); print(list(g)); print(list(g))` 印出？', options: [
-        { text: '`[2, 4]` 然後 `[]`', correct: true, why: '產生器第一次就走完了。' },
-        { text: '`[2, 4]` 兩次', why: '產生器不能重頭再走。' },
-        { text: '`[]` 兩次', why: '第一次會正常產生。' },
-        { text: '錯誤', why: '對走完的產生器再 list 只會得到空清單。' },
-      ] },
-      { level: '遷移', type: 'reveal', q: ['你有很多 API 回應，每個是 `{"items": [...]}`。要把全部 items 合成一個清單，3.15 以前與以後各怎麼寫？'], answer: [
+      { level: '深入思考', type: 'reveal', q: ['你有很多 API 回應，每個是 `{"items": [...]}`。要把全部 items 合成一個清單，3.15 以前與以後各怎麼寫？'], answer: [
         '3.15 以前：`[item for r in responses for item in r["items"]]`（兩層 for），或 `itertools.chain.from_iterable(r["items"] for r in responses)`。',
         '3.15 起：`[*r["items"] for r in responses]`，用解包表達「把每個清單攤開」，更直接。若專案還要支援 3.14 以前，就先用舊寫法。',
       ] },
