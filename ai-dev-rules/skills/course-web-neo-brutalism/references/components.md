@@ -88,7 +88,6 @@ applySidebarWidth(prefs.get('sidebarWidth') ?? SIDEBAR_WIDTH.fallback);
 | 本課目錄連結 | 無底線 | 左側 4px 色條或底色擇一 | 底色 ＋ 底線 |
 | 術語 | 2px 虛線底線 | 底色換 `--highlight`，虛線不變 | 改成實線 |
 | 按鈕、卡片 | 硬陰影 | 浮起（transform） | 再改底色或加底線 |
-| 選擇題選項 | `--bg` 底 | 底色換 `--highlight` | 加底線或改框線粗細 |
 
 規則：
 - 一個元素在 hover 時只選一種變化：底色／文字色，或底線，或位移。
@@ -110,7 +109,6 @@ applySidebarWidth(prefs.get('sidebarWidth') ?? SIDEBAR_WIDTH.fallback);
 | tooltip / popup | 往上 4px ＋ 淡入 | 淡出 |
 | 手機抽屜 | 從左滑入，背景遮罩淡入 | 反向 |
 | 分頁切換 | 新面板淡入 ＋ 水平滑入 8px | 舊面板淡出 |
-| 測驗回饋 | 解析區滑入；正確選項換色 | 重做時反向 |
 | 換課 | 舊內容淡出、新內容從右 16px 滑入 | — |
 | 深淺色切換 | 背景與文字色 240ms 漸變 | — |
 | 複製成功提示 | 按鈕文字與底色換成成功狀態 | 1.5 秒後換回 |

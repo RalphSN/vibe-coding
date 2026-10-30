@@ -10,6 +10,8 @@
 
 ### Changed
 
+- 課程不出測驗：`domain-education-content`、`course-lesson`、`course-web-neo-brutalism`、`/new-lesson` 拿掉選擇題、暖身回顧、補完題、預測題、分類練習與總複習測驗；每課改成「詳細說明＋深入段落＋出處」，深入思考題選用、每課最多 2 題。
+- `course-web-neo-brutalism` 的 `audit.mjs`：改成檢查殘留測驗與「深入」段落，不再檢查選擇題長度；互動數只算 `data-widget`。
 - `bookshelf-portal`：同一系列的書在書櫃上用同一高度；`titlePhrases` 每個詞組限制長度（中文 ≤ 7 字、英文 ≤ 14 字元）。
 
 ### Fixed
