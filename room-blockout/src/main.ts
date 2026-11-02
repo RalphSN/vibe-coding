@@ -16,7 +16,7 @@ type Vec3Tuple = [number, number, number];
 type SizeProp = 'width' | 'depth' | 'height';
 type ClearanceSide = 'front' | 'back' | 'right' | 'left';
 type StatusTone = 'ok' | 'warn' | 'bad';
-type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'run';
+type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'toggleWalk';
 type ViewModeName = 'orbit' | 'firstPerson';
 type ActionType = 'move' | 'rotate' | 'resize';
 type HandleKind = 'rotate' | 'size';
@@ -1265,7 +1265,7 @@ const AVATAR_VISIBLE_DISTANCE = 0.4;
 const KEY_ACTIONS: Record<string, KeyAction | undefined> = {
   KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
   KeyA: 'turnLeft', ArrowLeft: 'turnLeft', KeyD: 'turnRight', ArrowRight: 'turnRight',
-  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', ShiftLeft: 'run', ShiftRight: 'run',
+  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', ShiftLeft: 'toggleWalk', ShiftRight: 'toggleWalk',
 };
 
 // 臨界阻尼彈簧（和 Unity Mathf.SmoothDamp 同一套近似公式）：起步、停下都平順、不會過衝。
@@ -1992,6 +1992,7 @@ function createFirstPersonMode(): ViewMode {
   let mouseButtons = 0;
   let lastPointer: { x: number; y: number } | null = null;
   let savedPose: PlayerPose | null = null;   // 上次離開時站的位置與朝向，再進來時接著走
+  let isWalking = false;  // 預設跑步；按一下 Shift 切成走路，再按一下切回來
 
   const isHeld = (action: KeyAction): boolean => [...heldCodes].some((code) => KEY_ACTIONS[code] === action);
   const isGrounded = (): boolean => isOnGround;
@@ -2038,6 +2039,8 @@ function createFirstPersonMode(): ViewMode {
       return;
     }
     heldCodes.add(event.code);
+    // 按住不放時瀏覽器會連續送 keydown（repeat），只認第一下，不然會一直來回切換
+    if (action === 'toggleWalk' && !event.repeat) isWalking = !isWalking;
     if (action === 'jump' && isGrounded()) {
       velocityY = Math.sqrt(2 * config.character.gravity * config.character.jumpHeight);
       isOnGround = false;
@@ -2284,7 +2287,7 @@ function createFirstPersonMode(): ViewMode {
     dismissHint();
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
-    const speed = isHeld('run') ? config.character.runSpeed : config.character.walkSpeed;
+    const speed = isWalking ? config.character.walkSpeed : config.character.runSpeed;
     const step = (speed * dt) / length;
     const dx = (-sin * forward + cos * right) * step;
     const dz = (-cos * forward - sin * right) * step;

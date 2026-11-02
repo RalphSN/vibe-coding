@@ -101,7 +101,7 @@ export interface CharacterConfig {
   radius: number;
   /** 比腳高這麼多以內的表面直接走上去（m），更高要跳。 */
   stepHeight: number;
-  /** 走路／按住 Shift 跑步的移動速度（m/s）。 */
+  /** 走路／跑步的移動速度（m/s）；預設跑步，按 Shift 切換成走路。 */
   walkSpeed: number;
   runSpeed: number;
   /** A／D 轉身速度（度/秒）。 */
