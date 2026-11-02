@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 const USAGE = `用法：node tools/draw-plans.cjs [scene.config.json 路徑] [輸出資料夾]
-  每層畫一張 floor-plan-<n>f.svg：空間編號、名稱、尺寸、門窗、樓梯、家具輪廓、格線、比例尺。
+  每層畫一張 floor-plan-<n>f.svg（空間編號、名稱、尺寸、門窗、樓梯、家具輪廓、格線、比例尺），
+  另外畫一張 floor-plan-site.svg（街道、人行道、車道、各基地範圍）。
   沒給參數時讀 src/config/scene.config.json，輸出到 room-blockout/。
 範例：npm run plans`;
 const args = process.argv.slice(2);
@@ -174,3 +175,55 @@ house.levels.forEach((level, li) => {
   fs.writeFileSync(path.join(outDir, name), out.join('\n'));
   console.log(`${name}：${lines.length} 個空間、${openingNames.length} 個門窗`);
 });
+
+// ---------- 基地配置圖：街道、人行道、草帶、車道、各基地範圍與本宅外輪廓 ----------
+function drawSite() {
+  const site = cfg.scene.site ?? [];
+  if (site.length === 0) return;
+  const SPX = 3.2;   // 基地圖 1 m 幾像素
+  const pts = site.flatMap((a) => a.points);
+  const sx0 = Math.min(...pts.map((p) => p[0])) - 4;
+  const sx1 = Math.max(...pts.map((p) => p[0])) + 4;
+  const sz0 = Math.min(...pts.map((p) => p[1])) - 4;
+  const sz1 = Math.max(...pts.map((p) => p[1])) + 4;
+  const SX = (x) => 40 + (x - sx0) * SPX;
+  const SY = (z) => 90 + (z - sz0) * SPX;
+  const w = (sx1 - sx0) * SPX + 80;
+  const h = (sz1 - sz0) * SPX + 175;
+  const fills = { street: '#5b5f64', sidewalk: '#cbc7bf', parkway: '#86b673', driveway: '#b9b4aa' };
+  const poly = (points, attrs) => `<polygon points="${points.map(([x, z]) => `${SX(x)},${SY(z)}`).join(' ')}" ${attrs}/>`;
+  const out = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" font-family="${FONT}">`, `<rect width="100%" height="100%" fill="#9cc48a"/>`];
+  out.push(`<text x="40" y="40" font-size="26" font-weight="700" fill="#222">基地配置圖</text>`);
+  out.push(`<text x="40" y="66" font-size="13" fill="#333">街道與四塊鄰地（鄰地只畫基地範圍與車道）　北在上</text>`);
+  for (const area of site.filter((a) => a.kind !== 'lot')) out.push(poly(area.points, `fill="${fills[area.kind]}" stroke="none"`));
+  for (const area of site.filter((a) => a.kind === 'lot')) out.push(poly(area.points, `fill="none" stroke="#3f5f33" stroke-width="1.5" stroke-dasharray="8 4"`));
+  for (const floor of house.levels[0].floors) out.push(poly(floor.points, `fill="${floor.kind === 'deck' ? '#e7cfae' : '#f4f1ea'}" stroke="#555" stroke-width="0.6"`));
+  for (const area of site.filter((a) => a.kind === 'lot')) {
+    const [cx, cz] = centroid(area.points);
+    const { w: lw, d: ld } = bbox(area.points);
+    const isOwn = area.label.startsWith('本宅');
+    // 本宅標籤放在基地西南角的空地，不壓到房子
+    const lx = isOwn ? SX(cx - lw / 2 + 12) : SX(cx);
+    const y = isOwn ? SY(cz + ld / 2 - 8) : SY(cz);
+    out.push(`<text x="${lx}" y="${y}" font-size="15" font-weight="700" fill="#1f3b14" text-anchor="middle">${esc(area.label)}</text>`);
+    out.push(`<text x="${lx}" y="${y + 18}" font-size="12" fill="#2d4a22" text-anchor="middle">${fmt(lw)} × ${fmt(ld)} m</text>`);
+  }
+  const street = site.find((a) => a.kind === 'street');
+  if (street) {
+    const [cx, cz] = centroid(street.points);
+    out.push(`<text x="${SX(cx)}" y="${SY(cz) + 5}" font-size="15" font-weight="700" fill="#fff" text-anchor="middle">街道（道路用地 18 m：人行道 1.5＋草帶 2.5＋車道 10＋草帶 2.5＋人行道 1.5）</text>`);
+  }
+  const sb = SY(sz1) + 30;
+  out.push(`<line x1="40" y1="${sb}" x2="${40 + 20 * SPX}" y2="${sb}" stroke="#222" stroke-width="3"/><text x="${48 + 20 * SPX}" y="${sb + 4}" font-size="12" fill="#222">20 m</text>`);
+  out.push(`<text x="${w - 40}" y="40" font-size="16" font-weight="700" fill="#222" text-anchor="end">北 ↑</text>`);
+  const legend = [['#5b5f64', '路面'], ['#cbc7bf', '人行道'], ['#86b673', '行道樹草帶'], ['#b9b4aa', '車道'], ['#f4f1ea', '本宅（一樓）']];
+  legend.forEach(([color, text], i) => {
+    const lx = 40 + i * 108;
+    out.push(`<rect x="${lx}" y="${sb + 20}" width="26" height="14" fill="${color}" stroke="#555"/><text x="${lx + 34}" y="${sb + 32}" font-size="12.5" fill="#222">${text}</text>`);
+  });
+  out.push(`<line x1="40" y1="${sb + 51}" x2="66" y2="${sb + 51}" stroke="#3f5f33" stroke-width="1.5" stroke-dasharray="8 4"/><text x="74" y="${sb + 56}" font-size="12.5" fill="#222">地界線</text>`);
+  out.push('</svg>');
+  fs.writeFileSync(path.join(outDir, 'floor-plan-site.svg'), out.join('\n'));
+  console.log(`floor-plan-site.svg：${site.filter((a) => a.kind === 'lot').length} 塊基地、${site.length} 個地面區塊`);
+}
+drawSite();
