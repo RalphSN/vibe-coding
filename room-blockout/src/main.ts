@@ -7,7 +7,7 @@ import GUI, { type Controller } from 'lil-gui';
 import {
   CLIP_ROLES, FURNITURE_TYPES, SAVE_ENDPOINT, loadSceneConfig,
   type ClipRole, type FloorArea, type FurnitureItem, type FurnitureType, type HouseConfig, type Level, type Opening, type Point, type Ramp,
-  type SceneConfig, type Sizes, type Spot, type Wall,
+  type SceneConfig, type SiteArea, type Sizes, type Spot, type Wall,
 } from './config/scene.config';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
@@ -16,7 +16,7 @@ type Vec3Tuple = [number, number, number];
 type SizeProp = 'width' | 'depth' | 'height';
 type ClearanceSide = 'front' | 'back' | 'right' | 'left';
 type StatusTone = 'ok' | 'warn' | 'bad';
-type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'run';
+type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'toggleWalk';
 type ViewModeName = 'orbit' | 'firstPerson';
 type ActionType = 'move' | 'rotate' | 'resize';
 type HandleKind = 'rotate' | 'size';
@@ -260,6 +260,7 @@ const FURNITURE_SPECS: Record<FurnitureType, FurnitureSpec> = {
 
 // 椅子用書桌的深一階橘色，看得出是一組，又能和書桌分開。
 const COLORS = {
+  asphalt: 0x5b5f64, sidewalk: 0xcbc7bf, parkway: 0x86b673, driveway: 0xb9b4aa, lotLine: 0x5d7f4f,
   floor: 0xd8d8d8, wall: 0xc4c4c4, ceiling: 0xe9e9e6, deck: 0xb98a5e, garage: 0xa9a9a4, grass: 0x9cc48a, railing: 0x6b5a4a, step: 0xa98058,
   bed: 0x4f86e8, desk: 0xe8a33c, chair: 0xb8741c, bookcase: 0x47a65a, wardrobe: 0x9b62d1,
   counter: 0x8a96a3, island: 0x5f6b78, sofa: 0xd9607a, bath: 0xe6eef2, table: 0xc98b5a, car: 0x3f6fb5,
@@ -294,7 +295,8 @@ document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeef0f2);
 
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
+const CAMERA_FAR = 500;   // 整片基地約 200 m 寬，拉遠看整區時才不會被切掉
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, CAMERA_FAR);
 camera.position.set(28, 42, 38);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1.2));
@@ -616,10 +618,43 @@ function buildLevel(house: HouseConfig, level: Level, index: number): THREE.Grou
   return group;
 }
 
-function buildHouse(cfg: SceneConfig): THREE.Group {
-  const { house, groundMargin } = cfg.scene;
+// 基地地面的頂面高度（m）：路面比室內地板略低，人行道與行道樹草帶高一個路緣石（15 cm，走得上去）。
+const SITE_TOP: Record<Exclude<SiteArea['kind'], 'lot'>, number> = { street: -0.02, sidewalk: 0.13, parkway: 0.13, driveway: 0 };
+const SITE_MATERIAL: Record<Exclude<SiteArea['kind'], 'lot'>, string> = { street: 'asphalt', sidewalk: 'sidewalk', parkway: 'parkway', driveway: 'driveway' };
+const LOT_LINE_WIDTH = 0.3;
+const LOT_LINE_TOP = -GROUND_DROP + 0.01;
+const SOLID_SITE_HEIGHT = 0.05;   // 頂面高過這個值的地面才算碰撞（人行道、草帶），其餘踩在地面高度 0 就好
+
+// 地面範圍：房屋外擴 groundMargin，再涵蓋整片基地；草地與外圍圍欄都用它。
+function groundBounds(cfg: SceneConfig): Rect {
+  const houseArea = expandRect(houseBounds(cfg.scene.house), cfg.scene.groundMargin);
+  return cfg.scene.site.length === 0 ? houseArea : unionBounds([houseArea, ...cfg.scene.site.map((area) => polygonBounds(area.points))]);
+}
+
+// 街道、人行道、草帶、車道是貼地的多邊形板；基地範圍只沿邊畫一條地界線。
+function buildSite(site: SiteArea[]): THREE.Group {
   const group = new THREE.Group();
-  addRectBox(group, materials.grass, expandRect(houseBounds(house), groundMargin), -GROUND_DROP - FLOOR_THICKNESS, -GROUND_DROP);
+  const bottom = -GROUND_DROP - FLOOR_THICKNESS;
+  for (const area of site) {
+    if (area.kind === 'lot') {
+      area.points.forEach(([x1, z1], i) => {
+        const [x2, z2] = area.points[(i + 1) % area.points.length];
+        addOrientedBar(group, materials.lotLine, { x1, z1, x2, z2 }, LOT_LINE_WIDTH, bottom, LOT_LINE_TOP);
+      });
+      continue;
+    }
+    const top = SITE_TOP[area.kind];
+    const mesh = addFloorSlab(group, materials[SITE_MATERIAL[area.kind]], area.points, bottom, top);
+    if (top > SOLID_SITE_HEIGHT) stripColliders.set(mesh, stripBoxes(polygonStrips([area.points], [], 0), bottom, top));
+  }
+  return group;
+}
+
+function buildHouse(cfg: SceneConfig): THREE.Group {
+  const { house } = cfg.scene;
+  const group = new THREE.Group();
+  addRectBox(group, materials.grass, groundBounds(cfg), -GROUND_DROP - FLOOR_THICKNESS, -GROUND_DROP);
+  group.add(buildSite(cfg.scene.site));
   house.levels.forEach((level, index) => group.add(buildLevel(house, level, index)));
   return group;
 }
@@ -729,7 +764,7 @@ function disposeChildren(group: THREE.Object3D): void {
 
 // 草地四邊的隱形圍欄：只給第一人稱碰撞用，走到草地邊緣就停住，不會走進虛空。
 function groundFenceBoxes(cfg: SceneConfig): THREE.Box3[] {
-  const r = expandRect(houseBounds(cfg.scene.house), cfg.scene.groundMargin);
+  const r = groundBounds(cfg);
   const T = cfg.scene.house.wallThickness;
   const box = (minX: number, minZ: number, maxX: number, maxZ: number): THREE.Box3 =>
     new THREE.Box3(new THREE.Vector3(minX, 0, minZ), new THREE.Vector3(maxX, FENCE_HEIGHT, maxZ));
@@ -1195,7 +1230,7 @@ function createOrbitMode(): ViewMode {
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;
-  controls.maxDistance = 90;
+  controls.maxDistance = 220;
   let savedPosition: THREE.Vector3 | null = null;   // 切回來時回到離開前的鏡頭位置
   return {
     allowsEditing: true,
@@ -1230,7 +1265,7 @@ const AVATAR_VISIBLE_DISTANCE = 0.4;
 const KEY_ACTIONS: Record<string, KeyAction | undefined> = {
   KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
   KeyA: 'turnLeft', ArrowLeft: 'turnLeft', KeyD: 'turnRight', ArrowRight: 'turnRight',
-  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', ShiftLeft: 'run', ShiftRight: 'run',
+  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', ShiftLeft: 'toggleWalk', ShiftRight: 'toggleWalk',
 };
 
 // 臨界阻尼彈簧（和 Unity Mathf.SmoothDamp 同一套近似公式）：起步、停下都平順、不會過衝。
@@ -1957,6 +1992,7 @@ function createFirstPersonMode(): ViewMode {
   let mouseButtons = 0;
   let lastPointer: { x: number; y: number } | null = null;
   let savedPose: PlayerPose | null = null;   // 上次離開時站的位置與朝向，再進來時接著走
+  let isWalking = false;  // 預設跑步；按一下 Shift 切成走路，再按一下切回來
 
   const isHeld = (action: KeyAction): boolean => [...heldCodes].some((code) => KEY_ACTIONS[code] === action);
   const isGrounded = (): boolean => isOnGround;
@@ -2003,6 +2039,8 @@ function createFirstPersonMode(): ViewMode {
       return;
     }
     heldCodes.add(event.code);
+    // 按住不放時瀏覽器會連續送 keydown（repeat），只認第一下，不然會一直來回切換
+    if (action === 'toggleWalk' && !event.repeat) isWalking = !isWalking;
     if (action === 'jump' && isGrounded()) {
       velocityY = Math.sqrt(2 * config.character.gravity * config.character.jumpHeight);
       isOnGround = false;
@@ -2249,7 +2287,7 @@ function createFirstPersonMode(): ViewMode {
     dismissHint();
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
-    const speed = isHeld('run') ? config.character.runSpeed : config.character.walkSpeed;
+    const speed = isWalking ? config.character.walkSpeed : config.character.runSpeed;
     const step = (speed * dt) / length;
     const dx = (-sin * forward + cos * right) * step;
     const dz = (-cos * forward - sin * right) * step;

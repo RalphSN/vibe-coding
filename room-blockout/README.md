@@ -31,7 +31,7 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 | `npm run preview` | 在本機開啟打包好的 `dist/`，確認正式版能跑 |
 | `npx tsc --noEmit` | 只跑型別檢查 |
 | `npm run house` | 用 `tools/gen-house.cjs` 重新產生房屋與家具（寫入前備份；加 `-- --dry-run` 只看數量） |
-| `npm run plans` | 依目前設定畫一、二樓平面圖（`floor-plan-1f.svg`、`floor-plan-2f.svg`） |
+| `npm run plans` | 依目前設定畫一、二樓平面圖與基地配置圖（`floor-plan-1f.svg`、`floor-plan-2f.svg`、`floor-plan-site.svg`） |
 | `npm run check-floors` | 檢查有沒有懸空、沒接好的牆 |
 
 ## 專案結構
@@ -42,7 +42,7 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 - `src/config/scene.config.ts`：設定檔的型別、欄位說明與格式檢查
 - `vite.config.ts`：含「儲存」用的 dev 外掛
 - `tools/`：房屋產生器、平面圖繪製、樓板檢查（Node 腳本，`--help` 看用法）
-- `floor-plan-1f.svg`、`floor-plan-2f.svg`：由 `npm run plans` 產生的平面圖
+- `floor-plan-1f.svg`、`floor-plan-2f.svg`、`floor-plan-site.svg`：由 `npm run plans` 產生的平面圖與基地配置圖
 - `src/style.css`：樣式
 - `assets/raw/`：原始素材（例如動畫包 zip），只放本機、不進 git
 - `assets/models/`：整理好、要給程式載入的模型
@@ -58,7 +58,7 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 | 模式 | 按鍵 |
 |---|---|
 | 環繞檢視（可編輯） | 點家具選取、拖曳移動、拖角落鈕旋轉、`S` 尺寸、`Esc` 完成、`Tab` 切到第一人稱 |
-| 第一人稱／第三人稱 | `W`／`S` 前進後退、`A`／`D` 轉身、`Q`／`E` 平移、空白鍵跳、按住 `Shift` 跑、滾輪切第三人稱、`Tab` 回環繞檢視 |
+| 第一人稱／第三人稱 | `W`／`S` 前進後退、`A`／`D` 轉身、`Q`／`E` 平移、空白鍵跳、`Shift` 切換走路／跑步（預設跑步）、滾輪切第三人稱、`Tab` 回環繞檢視 |
 
 ## 房屋與實體
 
@@ -81,6 +81,20 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 - 家具約 120 件，依每個空間的用途與上面的準則擺放；有頂露台只留一組休息座位，烤肉露台放長桌與烤爐。
 - 走廊與門比原圖加寬：一樓主走廊與二樓走廊約 2.2 m、門至少 1.0 m，第三人稱鏡頭才不會太擠。
 - 還沒做：屋頂、電梯（只有井）、車庫上方儲藏室其實比二樓低（目前和二樓同高）、泳池與庭院。
+
+## 基地與街道
+
+`scene.site` 是房屋以外的地面：街道路面、人行道、行道樹草帶、車道，以及每塊基地的範圍（`lot`，只畫地界線）。配置參考比佛利山莊平地區（Flats）的大基地、深前院、寬行道樹草帶：
+
+| 項目 | 參考資料 | 本專案 |
+|---|---|---|
+| 基地 | 平地區一例 80 × 155 ft；聖塔莫尼卡大道以北最小 13,000 平方英尺 | 本宅與四塊鄰地各 69 × 62 m（大型宅邸），鄰地只畫範圍與車道 |
+| 前院 | 鋪面不超過退縮區一半，其餘植栽；停車不能放在前院 | 房屋離臨街線約 15 m，前院是草地，只有車道鋪面 |
+| 車道 | 每個臨街面一條，最寬 28 ft（第三方整理，未查證原文） | 每塊基地一條，寬 5.5 m |
+| 街道 | 未找到比佛利山莊標準；美國住宅道路用地常見 50–60 ft | 道路用地 18 m：人行道 1.5＋草帶 2.5＋車道 10＋草帶 2.5＋人行道 1.5；人行道與草帶高 15 cm（路緣石），走得上去 |
+| 車庫門 | 雙車門標準 16 × 7 ft，常見 16–18 ft 寬、7–8 ft 高 | 車庫南牆 5.5 × 2.4 m 大門，車道直通街道 |
+
+出處：[Nest Seekers：513 N Rexford Dr](https://www.nestseekers.com/5666944/513-n-rexford-dr-beverly-hills-ca-4br)、[Jade Mills：最小基地面積](https://jademillsestates.com/blog/choosing-your-ideal-beverly-hills-address)、[gocodebook：開發標準](https://gocodebook.com/us/california/beverly-hills/development-standards)、[gocodebook：景觀規定](https://gocodebook.com/us/california/beverly-hills/landscaping-and-screening)、[gocodebook：停車規定](https://gocodebook.com/us/california/beverly-hills/parking)、[Stormwater Center：住宅道路用地寬度](https://www.stormwatercenter.net/Slideshows-textonly/bsd%20for%20smrc-dsc/tsld018.htm)、[Home Depot：車庫門尺寸](https://www.homedepot.com/c/ab/what-are-the-standard-garage-door-sizes/9ba683603be9fa5395fab901c8f64dae)（查證日期 2026-11-01）。
 
 ## 室內設計準則（配置與家具參考）
 

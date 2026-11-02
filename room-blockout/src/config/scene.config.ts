@@ -74,8 +74,18 @@ export interface HouseConfig {
   levels: Level[];
 }
 
+export type SiteKind = 'street' | 'sidewalk' | 'parkway' | 'driveway' | 'lot';
+export const SITE_KINDS: SiteKind[] = ['street', 'sidewalk', 'parkway', 'driveway', 'lot'];
+
+/**
+ * 基地與街道的地面（多邊形）：street 路面、sidewalk 人行道、parkway 行道樹草帶、driveway 車道、
+ * lot 基地範圍（不畫地面，只沿邊畫地界線）。人行道與草帶比路面高一個路緣石。
+ */
+export interface SiteArea { label: string; kind: SiteKind; points: Point[] }
+
 export interface SceneSection {
   house: HouseConfig;
+  site: SiteArea[];
   /** 房屋外框往外多大一片草地可以走（m），邊緣有隱形圍欄。 */
   groundMargin: number;
   /** 第一次進入第一人稱時站的位置；facing 是面向（度，0 朝北、90 朝西，逆時針）。 */
@@ -91,7 +101,7 @@ export interface CharacterConfig {
   radius: number;
   /** 比腳高這麼多以內的表面直接走上去（m），更高要跳。 */
   stepHeight: number;
-  /** 走路／按住 Shift 跑步的移動速度（m/s）。 */
+  /** 走路／跑步的移動速度（m/s）；預設跑步，按 Shift 切換成走路。 */
   walkSpeed: number;
   runSpeed: number;
   /** A／D 轉身速度（度/秒）。 */
@@ -209,6 +219,12 @@ function collectSceneIssues(scene: unknown): string[] {
   const issues = missingNumbers(house, ['wallThickness', 'slabThickness']).map((key) => `scene.house.${key}`);
   issues.push(...collectListIssues(house.levels, 'scene.house.levels', ['elevation', 'wallHeight'], collectLevelIssues));
   if (Array.isArray(house.levels) && house.levels.length === 0) issues.push('scene.house.levels（至少一層）');
+  issues.push(...collectListIssues(scene.site, 'scene.site', [], (area, at) => {
+    const kindIssues = SITE_KINDS.some((kind) => kind === area.kind) ? [] : [`${at}.kind（要是 ${SITE_KINDS.join('／')}）`];
+    const points = area.points;
+    const isValid = Array.isArray(points) && points.length >= 3 && points.every(isPoint);
+    return isValid ? kindIssues : [...kindIssues, `${at}.points（至少 3 個 [x, z]）`];
+  }));
   issues.push(...missingNumbers(scene, ['groundMargin']).map((key) => `scene.${key}`));
   issues.push(...missingNumbers(scene.spawn, ['x', 'z', 'facing']).map((key) => `scene.spawn.${key}`));
   issues.push(...missingNumbers(scene.rules, ['gridSnap', 'edgeSnap', 'sizeSnap', 'windowClearance']).map((key) => `scene.rules.${key}`));

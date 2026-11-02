@@ -45,7 +45,7 @@ const F1 = {
     { label: '洗衣與儲藏', pts: rect(12, 2.2, 16, 9) },
     { label: '電梯', pts: rect(12, 9, 14, 11) },
     { label: '車庫', kind: 'garage', pts: rect(16, 2, 24, 23) },
-    { label: '車庫儲藏室', pts: rect(16, 23, 20, 25.5) },
+    { label: '車庫儲藏室', pts: rect(24, 17, 26.5, 22) },
     { label: '入口門廊', kind: 'deck', ceiling: true, pts: rect(-5.5, 6.2, -2.5, 9) },
     { label: '門廳旁露台', kind: 'deck', ceiling: true, pts: rect(-1, 2.2, 3, 5.5) },
     { label: '側門門廊', kind: 'deck', ceiling: true, pts: rect(9, 9, 12, 11.5) },
@@ -88,9 +88,9 @@ const F1 = {
     { label: '備餐間往洗衣間', kind: 'door', at: [12, 6.5], width: 1 },
     { label: '側門', kind: 'door', at: [10.5, 9], width: 1 },
     { label: '電梯門', kind: 'door', at: [13, 9], width: 1 },
-    { label: '車庫門 1', kind: 'slider', at: [16, 14], width: 3, height: 2.4 },
-    { label: '車庫門 2', kind: 'slider', at: [16, 19], width: 3, height: 2.4 },
-    { label: '車庫儲藏室門', kind: 'door', at: [18, 23], width: 1 },
+    // 車庫大門：雙車寬 18 × 8 ft（5.5 × 2.4 m），往上捲收，淨空用拉門的規則
+    { label: '車庫大門', kind: 'slider', at: [20, 23], width: 5.5, height: 2.4 },
+    { label: '車庫儲藏室門', kind: 'door', at: [24, 21.4], width: 1 },
     { label: '車庫東窗 1', kind: 'window', at: [24, 8], width: 1.2, sill: 1.2, height: 1 },
     { label: '車庫東窗 2', kind: 'window', at: [24, 16], width: 1.2, sill: 1.2, height: 1 },
   ],
@@ -332,10 +332,11 @@ wallPut(0, 'bookcase', '備餐間層架', '工作備餐間', 'W', 5.5, 1.2, 0.45
 wallPut(0, 'counter', '洗衣機與烘衣機', '洗衣與儲藏', 'E', 5.3, 1.6, 0.6, 0.9);
 wallPut(0, 'bookcase', '洗衣間層架', '洗衣與儲藏', 'W', 1.3, 1.2, 0.45, 2.0);
 // 車庫
-for (const [i, z] of [6.5, 9.5, 14, 19].entries()) put(0, 'car', `車 ${i + 1}`, 20.5, z, 90, i === 3 ? 1.95 : 1.85, i === 3 ? 5.0 : 4.8, i === 3 ? 1.8 : 1.45);
+// 車子南北向停，車頭朝南邊的大門：門口一排三台、後排一台
+for (const [i, [x, z]] of [[17.5, 18.5], [20, 18.5], [22.5, 18.5], [20, 11]].entries()) put(0, 'car', `車 ${i + 1}`, x, z, 180, i === 3 ? 1.95 : 1.85, i === 3 ? 5.0 : 4.8, i === 3 ? 1.8 : 1.45);
 wallPut(0, 'bookcase', '車庫層架 1', '車庫', 'E', 1.0, 1.2, 0.45, 2.0);
 wallPut(0, 'bookcase', '車庫層架 2', '車庫', 'E', 2.3, 1.2, 0.45, 2.0);
-wallPut(0, 'bookcase', '儲藏室層架', '車庫儲藏室', 'S', 2.6, 1.2, 0.45, 2.0);
+wallPut(0, 'bookcase', '儲藏室層架', '車庫儲藏室', 'E', 1.5, 1.2, 0.45, 2.0);
 // 露台：有頂露台只留一組休息沙發；烤肉露台放長桌與烤爐
 put(0, 'sofa', '北露台沙發', -8, -11.3, 0, 2.4, 0.85, 0.8);
 put(0, 'table', '北露台茶几', -8, -10.1, 0, 1.0, 0.5, 0.4);
@@ -392,8 +393,55 @@ sideChairs(1, '南陽台椅', -5.5, 4.2, 'x', 0.95, [0]);
 put(1, 'sofa', '東陽台躺椅 1', 16.5, -4.2, 90, 0.75, 1.9, 0.4);
 put(1, 'sofa', '東陽台躺椅 2', 16.5, -2.4, 90, 0.75, 1.9, 0.4);
 
+// ---------- 基地與街道（參考比佛利山莊平地區：大基地、深前院、寬行道樹草帶） ----------
+// 每塊基地 69 × 62 m；本宅與東西鄰地在街道北側，對街兩塊錯開半個基地寬。
+// 道路用地 18 m：人行道 1.5＋草帶 2.5＋車道 10＋草帶 2.5＋人行道 1.5。每塊基地一條 5.5 m 車道接到路面。
+const LOT = { w: 69, d: 62 };
+const STREET = { north: 40, walkN: 41.5, curbN: 44, curbS: 54, walkS: 56.5, south: 58 };
+const SITE_X = [-101, 106];
+const lots = [
+  { label: '本宅基地', x0: -32, z0: STREET.north - LOT.d, driveway: [17.25, 22.75], from: 23 },
+  { label: '西鄰基地', x0: -101, z0: STREET.north - LOT.d, driveway: [-88, -82.5], from: 15 },
+  { label: '東鄰基地', x0: 37, z0: STREET.north - LOT.d, driveway: [88, 93.5], from: 15 },
+  { label: '對街西鄰基地', x0: -66.5, z0: STREET.south, driveway: [-24, -18.5], to: 83 },
+  { label: '對街東鄰基地', x0: 2.5, z0: STREET.south, driveway: [40, 45.5], to: 83 },
+];
+// 把 [x0, x1] 扣掉車道經過的區段（人行道和草帶在車道處斷開，車道直接接到路面）
+const splitX = (x0, x1, cuts) => {
+  const spans = [];
+  let cursor = x0;
+  for (const [a, b] of [...cuts].sort((p, q) => p[0] - q[0])) {
+    if (a > cursor) spans.push([cursor, a]);
+    cursor = Math.max(cursor, b);
+  }
+  if (cursor < x1) spans.push([cursor, x1]);
+  return spans;
+};
+const northCuts = lots.filter((lot) => lot.from !== undefined).map((lot) => lot.driveway);
+const southCuts = lots.filter((lot) => lot.to !== undefined).map((lot) => lot.driveway);
+const site = [
+  { label: '街道路面', kind: 'street', points: rect(SITE_X[0], STREET.curbN, SITE_X[1], STREET.curbS) },
+  ...splitX(SITE_X[0], SITE_X[1], northCuts).flatMap(([a, b], i) => [
+    { label: `北側人行道 ${i + 1}`, kind: 'sidewalk', points: rect(a, STREET.north, b, STREET.walkN) },
+    { label: `北側行道樹草帶 ${i + 1}`, kind: 'parkway', points: rect(a, STREET.walkN, b, STREET.curbN) },
+  ]),
+  ...splitX(SITE_X[0], SITE_X[1], southCuts).flatMap(([a, b], i) => [
+    { label: `南側行道樹草帶 ${i + 1}`, kind: 'parkway', points: rect(a, STREET.curbS, b, STREET.walkS) },
+    { label: `南側人行道 ${i + 1}`, kind: 'sidewalk', points: rect(a, STREET.walkS, b, STREET.south) },
+  ]),
+  ...lots.map((lot) => ({ label: lot.label, kind: 'lot', points: rect(lot.x0, lot.z0, lot.x0 + LOT.w, lot.z0 + LOT.d) })),
+  ...lots.map((lot) => {
+    const [a, b] = lot.driveway;
+    const name = lot.label.replace('基地', '車道');
+    return lot.from !== undefined
+      ? { label: name, kind: 'driveway', points: rect(a, lot.from, b, STREET.curbN) }
+      : { label: name, kind: 'driveway', points: rect(a, STREET.curbS, b, lot.to) };
+  }),
+];
+
 cfg.scene = {
   house: { wallThickness: 0.15, slabThickness: SLAB, levels },
+  site,
   groundMargin: 6,
   spawn: { x: -3.5, z: 10.5, facing: 0 },
   rules: cfg.scene.rules,
