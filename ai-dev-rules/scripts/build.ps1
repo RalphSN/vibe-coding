@@ -183,6 +183,13 @@ function New-PwshHookCommand([string]$Exe, [string]$ScriptPath, [string]$Tool) {
     return "$Exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -Tool $Tool"
 }
 
+# Antigravity 不經過 shell 直接切空白執行，引號會原樣變成路徑的一部分，
+# powershell.exe 回報路徑不合法，Big5 的 stderr 再讓 Antigravity 的 protobuf 因非 UTF-8 而中斷。
+# 所以路徑不加引號；路徑含空白時這個寫法不適用。
+function New-AgHookCommand([string]$Exe, [string]$ScriptPath) {
+    return "$Exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath -Tool antigravity"
+}
+
 function New-PwshHookArgs([string]$ScriptPath, [string]$Tool) {
     return @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath, '-Tool', $Tool)
 }
@@ -339,7 +346,7 @@ Write-Json (Join-Path $ag 'config/hooks.json') ([ordered]@{
         'ai-dev-rules' = [ordered]@{
             PreToolUse = @([ordered]@{
                     matcher = $PreMatcherAg
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '{{PS}}' '{{HOME}}/.gemini/config/hooks/block-dangerous.ps1' 'antigravity'); timeout = 30 })
+                    hooks   = @([ordered]@{ type = 'command'; command = (New-AgHookCommand '{{PS}}' '{{HOME}}/.gemini/config/hooks/block-dangerous.ps1'); timeout = 30 })
                 })
         }
     })
@@ -363,11 +370,11 @@ Write-Json (Join-Path $ap '.agents/hooks.json') ([ordered]@{
         'ai-dev-rules' = [ordered]@{
             PreToolUse  = @([ordered]@{
                     matcher = $PreMatcherAg
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '{{PS}}' '.agents/hooks/block-dangerous.ps1' 'antigravity'); timeout = 30 })
+                    hooks   = @([ordered]@{ type = 'command'; command = (New-AgHookCommand '{{PS}}' '.agents/hooks/block-dangerous.ps1'); timeout = 30 })
                 })
             PostToolUse = @([ordered]@{
                     matcher = 'write_to_file|replace_file_content|multi_replace_file_content'
-                    hooks   = @([ordered]@{ type = 'command'; command = (New-PwshHookCommand '{{PS}}' '.agents/hooks/format-on-edit.ps1' 'antigravity'); timeout = 60 })
+                    hooks   = @([ordered]@{ type = 'command'; command = (New-AgHookCommand '{{PS}}' '.agents/hooks/format-on-edit.ps1'); timeout = 60 })
                 })
         }
     })
