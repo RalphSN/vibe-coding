@@ -194,19 +194,35 @@ function drawSite() {
   const poly = (points, attrs) => `<polygon points="${points.map(([x, z]) => `${SX(x)},${SY(z)}`).join(' ')}" ${attrs}/>`;
   const out = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" font-family="${FONT}">`, `<rect width="100%" height="100%" fill="#9cc48a"/>`];
   out.push(`<text x="40" y="40" font-size="26" font-weight="700" fill="#222">基地配置圖</text>`);
-  out.push(`<text x="40" y="66" font-size="13" fill="#333">街道與四塊鄰地（鄰地只畫基地範圍與車道）　北在上</text>`);
+  out.push(`<text x="40" y="66" font-size="13" fill="#333">街道與四塊鄰地（鄰宅只有外觀量體，標示建築風格）　北在上</text>`);
   for (const area of site.filter((a) => a.kind !== 'lot')) out.push(poly(area.points, `fill="${fills[area.kind]}" stroke="none"`));
   for (const area of site.filter((a) => a.kind === 'lot')) out.push(poly(area.points, `fill="none" stroke="#3f5f33" stroke-width="1.5" stroke-dasharray="8 4"`));
   for (const floor of house.levels[0].floors) out.push(poly(floor.points, `fill="${floor.kind === 'deck' ? '#e7cfae' : '#f4f1ea'}" stroke="#555" stroke-width="0.6"`));
+  const buildings = cfg.scene.buildings ?? [];
+  const rectPoints = ([x0, z0, x1, z1]) => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  for (const building of buildings) {
+    for (const m of building.masses) out.push(poly(rectPoints(m.rect), `fill="#d9d4c7" stroke="#555" stroke-width="0.8"`));
+  }
+  const streetArea = site.find((a) => a.kind === 'street');
+  const streetZ = streetArea ? centroid(streetArea.points)[1] : 0;
   for (const area of site.filter((a) => a.kind === 'lot')) {
     const [cx, cz] = centroid(area.points);
     const { w: lw, d: ld } = bbox(area.points);
     const isOwn = area.label.startsWith('本宅');
     // 本宅標籤放在基地西南角的空地，不壓到房子
+    // 鄰地標籤放在離街道較遠的那一側，不壓到鄰宅輪廓
+    const isNorthOfStreet = cz < streetZ;
     const lx = isOwn ? SX(cx - lw / 2 + 12) : SX(cx);
-    const y = isOwn ? SY(cz + ld / 2 - 8) : SY(cz);
+    const y = isOwn ? SY(cz + ld / 2 - 8) : SY(isNorthOfStreet ? cz - ld / 2 + 4.5 : cz + ld / 2 - 15);
     out.push(`<text x="${lx}" y="${y}" font-size="15" font-weight="700" fill="#1f3b14" text-anchor="middle">${esc(area.label)}</text>`);
-    out.push(`<text x="${lx}" y="${y + 18}" font-size="12" fill="#2d4a22" text-anchor="middle">${fmt(lw)} × ${fmt(ld)} m</text>`);
+    out.push(`<text x="${lx}" y="${y + 15}" font-size="12" fill="#2d4a22" text-anchor="middle">${fmt(lw)} × ${fmt(ld)} m</text>`);
+    const building = buildings.find((b) => b.label === area.label.replace('基地', '住宅'));
+    // 風格名稱拆成中文、英文兩行，長的英文名才不會壓到隔壁基地
+    const [styleZh, styleEn = ''] = building ? building.style.replace('）', '').split('（') : [];
+    if (building) {
+      out.push(`<text x="${lx}" y="${y + 29}" font-size="12" fill="#2d4a22" text-anchor="middle">${esc(styleZh)}</text>`);
+      out.push(`<text x="${lx}" y="${y + 42}" font-size="11" fill="#2d4a22" text-anchor="middle">${esc(styleEn)}</text>`);
+    }
   }
   const street = site.find((a) => a.kind === 'street');
   if (street) {
@@ -216,9 +232,9 @@ function drawSite() {
   const sb = SY(sz1) + 30;
   out.push(`<line x1="40" y1="${sb}" x2="${40 + 20 * SPX}" y2="${sb}" stroke="#222" stroke-width="3"/><text x="${48 + 20 * SPX}" y="${sb + 4}" font-size="12" fill="#222">20 m</text>`);
   out.push(`<text x="${w - 40}" y="40" font-size="16" font-weight="700" fill="#222" text-anchor="end">北 ↑</text>`);
-  const legend = [['#5b5f64', '路面'], ['#cbc7bf', '人行道'], ['#86b673', '行道樹草帶'], ['#b9b4aa', '車道'], ['#f4f1ea', '本宅（一樓）']];
+  const legend = [['#5b5f64', '路面'], ['#cbc7bf', '人行道'], ['#86b673', '行道樹草帶'], ['#b9b4aa', '車道'], ['#f4f1ea', '本宅（一樓）'], ['#d9d4c7', '鄰宅量體']];
   legend.forEach(([color, text], i) => {
-    const lx = 40 + i * 108;
+    const lx = 40 + i * 120;
     out.push(`<rect x="${lx}" y="${sb + 20}" width="26" height="14" fill="${color}" stroke="#555"/><text x="${lx + 34}" y="${sb + 32}" font-size="12.5" fill="#222">${text}</text>`);
   });
   out.push(`<line x1="40" y1="${sb + 51}" x2="66" y2="${sb + 51}" stroke="#3f5f33" stroke-width="1.5" stroke-dasharray="8 4"/><text x="74" y="${sb + 56}" font-size="12.5" fill="#222">地界線</text>`);

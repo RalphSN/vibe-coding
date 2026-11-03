@@ -7,7 +7,7 @@ import GUI, { type Controller } from 'lil-gui';
 import {
   CLIP_ROLES, FURNITURE_TYPES, SAVE_ENDPOINT, loadSceneConfig,
   type ClipRole, type FloorArea, type FurnitureItem, type FurnitureType, type HouseConfig, type Level, type Opening, type Point, type Ramp,
-  type SceneConfig, type SiteArea, type Sizes, type Spot, type Wall,
+  type Building, type BuildingMass, type SceneConfig, type SiteArea, type Sizes, type Spot, type Wall,
 } from './config/scene.config';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
@@ -650,11 +650,81 @@ function buildSite(site: SiteArea[]): THREE.Group {
   return group;
 }
 
+// ---------- 鄰宅外觀量體（進不去，只有外殼、屋頂與立面細節） ----------
+const PITCHED_OVERHANG = 0.5;   // 斜屋頂出簷（m）
+const FLAT_OVERHANG = 1.2;      // 現代平屋頂出挑多一點，做出水平的雨遮線條
+const FLAT_ROOF_THICKNESS = 0.3;
+const buildingMaterials = new Map<string, THREE.Material>();
+// 屋頂是自己組的三角面，雙面材質就不用管每片的繞行方向
+function buildingMaterial(color: string, isDoubleSided = false): THREE.Material {
+  const key = `${color}|${isDoubleSided}`;
+  let material = buildingMaterials.get(key);
+  if (!material) {
+    material = new THREE.MeshLambertMaterial({ color, side: isDoubleSided ? THREE.DoubleSide : THREE.FrontSide });
+    buildingMaterials.set(key, material);
+  }
+  return material;
+}
+
+// 斜屋頂：局部座標屋脊沿 X，length 沿 X、span 沿 Z。四坡的屋脊兩端各內縮半個跨距，山牆不內縮（兩端是垂直三角面）。
+function pitchedRoofGeometry(length: number, span: number, rise: number, isHip: boolean): THREE.BufferGeometry {
+  const inset = isHip ? Math.min(span / 2, length / 2) : 0;
+  const [hl, hs] = [length / 2, span / 2];
+  const a = [-hl, 0, -hs], b = [hl, 0, -hs], c = [hl, 0, hs], e = [-hl, 0, hs];
+  const r1 = [-hl + inset, rise, 0], r2 = [hl - inset, rise, 0];
+  const triangles = [[a, r1, r2], [a, r2, b], [c, r2, r1], [c, r1, e], [e, r1, a], [b, r2, c], [a, b, c], [a, c, e]];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(triangles.flat(2), 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addBuildingRoof(group: THREE.Group, mass: BuildingMass, material: THREE.Material): void {
+  const [x0, z0, x1, z1] = mass.rect;
+  const top = mass.base + mass.height;
+  const center: Vec3Tuple = [(x0 + x1) / 2, top, (z0 + z1) / 2];
+  if (mass.roof === 'flat') {
+    addBox(group, material, [x1 - x0 + 2 * FLAT_OVERHANG, FLAT_ROOF_THICKNESS, z1 - z0 + 2 * FLAT_OVERHANG], [center[0], top + FLAT_ROOF_THICKNESS / 2, center[2]]);
+    return;
+  }
+  const isAlongX = mass.ridge === 'x';
+  const length = (isAlongX ? x1 - x0 : z1 - z0) + 2 * PITCHED_OVERHANG;
+  const span = (isAlongX ? z1 - z0 : x1 - x0) + 2 * PITCHED_OVERHANG;
+  const rise = (span / 2) * Math.tan(DEG(mass.pitch));
+  const mesh = new THREE.Mesh(pitchedRoofGeometry(length, span, rise, mass.roof === 'hip'), material);
+  mesh.position.set(...center);
+  if (!isAlongX) mesh.rotation.y = Math.PI / 2;
+  group.add(mesh);
+}
+
+// 牆體和細節方塊標成 isSolid，角色會被擋住；屋頂在頭頂上，不需要碰撞。
+function buildBuildings(buildings: Building[]): THREE.Group {
+  const group = new THREE.Group();
+  for (const building of buildings) {
+    const wall = buildingMaterial(building.colors.wall);
+    const roof = buildingMaterial(building.colors.roof, true);
+    for (const mass of building.masses) {
+      const [x0, z0, x1, z1] = mass.rect;
+      const body = addRectBox(group, wall, { minX: x0, maxX: x1, minZ: z0, maxZ: z1 }, mass.base, mass.base + mass.height);
+      body.userData.isSolid = true;
+      addBuildingRoof(group, mass, roof);
+    }
+    for (const detail of building.details) {
+      const [ax, ay, az] = detail.min;
+      const [bx, by, bz] = detail.max;
+      const mesh = addBox(group, buildingMaterial(building.colors[detail.part]), [bx - ax, by - ay, bz - az], [(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2]);
+      mesh.userData.isSolid = true;
+    }
+  }
+  return group;
+}
+
 function buildHouse(cfg: SceneConfig): THREE.Group {
   const { house } = cfg.scene;
   const group = new THREE.Group();
   addRectBox(group, materials.grass, groundBounds(cfg), -GROUND_DROP - FLOOR_THICKNESS, -GROUND_DROP);
   group.add(buildSite(cfg.scene.site));
+  group.add(buildBuildings(cfg.scene.buildings));
   house.levels.forEach((level, index) => group.add(buildLevel(house, level, index)));
   return group;
 }
