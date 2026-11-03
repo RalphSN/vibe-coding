@@ -2,12 +2,13 @@ import './style.css';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 import GUI, { type Controller } from 'lil-gui';
 import {
   CLIP_ROLES, FURNITURE_TYPES, SAVE_ENDPOINT, loadSceneConfig,
   type ClipRole, type FloorArea, type FurnitureItem, type FurnitureType, type HouseConfig, type Level, type Opening, type Point, type Ramp,
-  type SceneConfig, type SiteArea, type Sizes, type Spot, type Wall,
+  type Building, type BuildingMass, type SceneConfig, type SiteArea, type Sizes, type Spot, type Wall,
 } from './config/scene.config';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
@@ -23,7 +24,7 @@ type HandleKind = 'rotate' | 'size';
 type GaitName = 'walk' | 'run';
 type Direction = 'forward' | 'backward' | 'side';
 type RigPose = Record<string, number>;
-type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land';
+type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land' | 'blocked';
 
 interface Preset extends Sizes { name: string }
 interface ClearanceRule { sides: ClearanceSide[]; need?: 'any'; depth: number; name: string; ignoreTypes?: FurnitureType[] }
@@ -54,8 +55,15 @@ interface GaitStyle {
   elbowSwing: number; armOut: number; lean: number; twist: number;
 }
 interface JumpKey { spinePitch: number; hipX: number; knee: number; foot: number; shoulderX: number; shoulderZ: number; elbow: number }
-interface RigMotion { forwardSpeed: number; sideSpeed: number; turnRate: number; isGrounded: boolean; riseRatio: number }
-interface AvatarRig { root: THREE.Group; build(eyeHeight: number): void; animate(motion: RigMotion, dt: number): void }
+// pushForward／pushSide：按著方向鍵、手的高度前方有牆時，想走的方向（角色座標的單位向量）；沒有是 0。
+// pushBack：手會穿進牆多少（m），角色畫面往後退這麼多，手剛好貼在牆面上（碰撞位置不變）。
+interface RigMotion {
+  forwardSpeed: number; sideSpeed: number; turnRate: number; isGrounded: boolean; riseRatio: number;
+  pushForward: number; pushSide: number; pushBack: number;
+}
+// 推牆時手掌在角色前方多遠、離腳底多高（m）。
+interface HandReach { forward: number; height: number }
+interface AvatarRig { root: THREE.Group; build(eyeHeight: number): void; animate(motion: RigMotion, dt: number): void; handReach(): HandReach }
 interface Character extends AvatarRig { load(): Promise<string[]>; syncSkeletonHelper(): void }
 interface PlayerPose { x: number; z: number; yaw: number; pitch: number; distance?: number; feetY?: number }
 interface ScreenPoint { x: number; y: number; isVisible: boolean }
@@ -650,11 +658,81 @@ function buildSite(site: SiteArea[]): THREE.Group {
   return group;
 }
 
+// ---------- 鄰宅外觀量體（進不去，只有外殼、屋頂與立面細節） ----------
+const PITCHED_OVERHANG = 0.5;   // 斜屋頂出簷（m）
+const FLAT_OVERHANG = 1.2;      // 現代平屋頂出挑多一點，做出水平的雨遮線條
+const FLAT_ROOF_THICKNESS = 0.3;
+const buildingMaterials = new Map<string, THREE.Material>();
+// 屋頂是自己組的三角面，雙面材質就不用管每片的繞行方向
+function buildingMaterial(color: string, isDoubleSided = false): THREE.Material {
+  const key = `${color}|${isDoubleSided}`;
+  let material = buildingMaterials.get(key);
+  if (!material) {
+    material = new THREE.MeshLambertMaterial({ color, side: isDoubleSided ? THREE.DoubleSide : THREE.FrontSide });
+    buildingMaterials.set(key, material);
+  }
+  return material;
+}
+
+// 斜屋頂：局部座標屋脊沿 X，length 沿 X、span 沿 Z。四坡的屋脊兩端各內縮半個跨距，山牆不內縮（兩端是垂直三角面）。
+function pitchedRoofGeometry(length: number, span: number, rise: number, isHip: boolean): THREE.BufferGeometry {
+  const inset = isHip ? Math.min(span / 2, length / 2) : 0;
+  const [hl, hs] = [length / 2, span / 2];
+  const a = [-hl, 0, -hs], b = [hl, 0, -hs], c = [hl, 0, hs], e = [-hl, 0, hs];
+  const r1 = [-hl + inset, rise, 0], r2 = [hl - inset, rise, 0];
+  const triangles = [[a, r1, r2], [a, r2, b], [c, r2, r1], [c, r1, e], [e, r1, a], [b, r2, c], [a, b, c], [a, c, e]];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(triangles.flat(2), 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addBuildingRoof(group: THREE.Group, mass: BuildingMass, material: THREE.Material): void {
+  const [x0, z0, x1, z1] = mass.rect;
+  const top = mass.base + mass.height;
+  const center: Vec3Tuple = [(x0 + x1) / 2, top, (z0 + z1) / 2];
+  if (mass.roof === 'flat') {
+    addBox(group, material, [x1 - x0 + 2 * FLAT_OVERHANG, FLAT_ROOF_THICKNESS, z1 - z0 + 2 * FLAT_OVERHANG], [center[0], top + FLAT_ROOF_THICKNESS / 2, center[2]]);
+    return;
+  }
+  const isAlongX = mass.ridge === 'x';
+  const length = (isAlongX ? x1 - x0 : z1 - z0) + 2 * PITCHED_OVERHANG;
+  const span = (isAlongX ? z1 - z0 : x1 - x0) + 2 * PITCHED_OVERHANG;
+  const rise = (span / 2) * Math.tan(DEG(mass.pitch));
+  const mesh = new THREE.Mesh(pitchedRoofGeometry(length, span, rise, mass.roof === 'hip'), material);
+  mesh.position.set(...center);
+  if (!isAlongX) mesh.rotation.y = Math.PI / 2;
+  group.add(mesh);
+}
+
+// 牆體和細節方塊標成 isSolid，角色會被擋住；屋頂在頭頂上，不需要碰撞。
+function buildBuildings(buildings: Building[]): THREE.Group {
+  const group = new THREE.Group();
+  for (const building of buildings) {
+    const wall = buildingMaterial(building.colors.wall);
+    const roof = buildingMaterial(building.colors.roof, true);
+    for (const mass of building.masses) {
+      const [x0, z0, x1, z1] = mass.rect;
+      const body = addRectBox(group, wall, { minX: x0, maxX: x1, minZ: z0, maxZ: z1 }, mass.base, mass.base + mass.height);
+      body.userData.isSolid = true;
+      addBuildingRoof(group, mass, roof);
+    }
+    for (const detail of building.details) {
+      const [ax, ay, az] = detail.min;
+      const [bx, by, bz] = detail.max;
+      const mesh = addBox(group, buildingMaterial(building.colors[detail.part]), [bx - ax, by - ay, bz - az], [(ax + bx) / 2, (ay + by) / 2, (az + bz) / 2]);
+      mesh.userData.isSolid = true;
+    }
+  }
+  return group;
+}
+
 function buildHouse(cfg: SceneConfig): THREE.Group {
   const { house } = cfg.scene;
   const group = new THREE.Group();
   addRectBox(group, materials.grass, groundBounds(cfg), -GROUND_DROP - FLOOR_THICKNESS, -GROUND_DROP);
   group.add(buildSite(cfg.scene.site));
+  group.add(buildBuildings(cfg.scene.buildings));
   house.levels.forEach((level, index) => group.add(buildLevel(house, level, index)));
   return group;
 }
@@ -1251,6 +1329,10 @@ const ORBIT_FOV = camera.fov;
 const HEAD_CLEARANCE = 0.1;      // 眼睛以上還有頭頂，門楣比這低就過不去
 const SURFACE_EPSILON = 1e-4;    // 判斷「站在表面上」的容差
 const MAX_SUBSTEP = 0.05;        // 每格移動切成小段，速度調高也不會穿過 0.1 m 的牆
+const BLOCKED_SPEED_RATIO = 0.2;  // 實際速度不到想走速度的這個比例，算被擋住
+const BLOCKED_DELAY = 0.1;        // 連續被擋這麼久（秒）才切到受阻，擦過牆角不會閃一下
+const HAND_PROBE_MARGIN = 0.3;    // 手伸到的距離再往前多探這麼遠找牆
+const HAND_GAP = 0.03;            // 手掌厚度：手骨停在牆面前這麼遠，看起來才是貼著不是穿進去
 
 const MOUSE_LEFT = 1;            // PointerEvent.buttons 的位元
 const MOUSE_RIGHT = 2;
@@ -1313,6 +1395,8 @@ const LAND_MIN = 0.35;            // 落地緩衝最小幅度；下落越快蹲�
 const LEAN_SMOOTH_TIME = 0.18;
 const ACCEL_LEAN_PER_MS2 = 1.5;   // 每 1 m/s² 加速度前傾幾度
 const MAX_ACCEL_LEAN = 8;
+const BRACE_SMOOTH_TIME = 0.15;   // 受阻姿勢淡入淡出
+const BRACE_HAND_REACH = { forward: 0.3, height: 0.74 };   // 撐牆姿勢的手掌位置，以身高為 1 的比例（依關節長度估計）
 const BANK_PER_TURN_SPEED = 1.2;   // 轉彎內傾：轉速（rad/s）× 速度（m/s）× 這個值 = 度
 const MAX_BANK = 10;
 
@@ -1383,6 +1467,20 @@ function blendPose(a: RigPose, b: RigPose, t: number): RigPose {
   const out: RigPose = {};
   for (const key of POSE_KEYS) out[key] = lerp(a[key], b[key], t);
   return out;
+}
+
+// 受阻：上身前傾、雙手往前撐牆，一腳在前一腳在後頂住。
+function bracePose(): RigPose {
+  const pose: RigPose = { hipsYaw: 0, spinePitch: -14, spineYaw: 0 };
+  for (const i of [0, 1]) {
+    const side = sideOf(i);
+    const isFront = i === 0;
+    Object.assign(pose, {
+      ['hipX' + i]: isFront ? 18 : -18, ['hipZ' + i]: side * 3, ['knee' + i]: isFront ? -22 : -4, ['foot' + i]: isFront ? 4 : -12,
+      ['shoulderX' + i]: 78, ['shoulderZ' + i]: side * 10, ['elbow' + i]: 35,
+    });
+  }
+  return pose;
 }
 
 function idlePose(time: number): RigPose {
@@ -1482,11 +1580,11 @@ function createAvatarRig(): AvatarRig {
   const markerPos = new THREE.Vector3();
   const motions = {
     fwd: { velocity: 0 }, side: { velocity: 0 }, gait: { velocity: 0 }, air: { velocity: 0 },
-    land: { velocity: 0 }, lean: { velocity: 0 }, bank: { velocity: 0 },
+    land: { velocity: 0 }, lean: { velocity: 0 }, bank: { velocity: 0 }, brace: { velocity: 0 },
   };
   const state = {
     height: REFERENCE_HEIGHT, phase: 0, time: 0, fwd: 0, side: 0, sag: 1, lat: 0, gait: 0,
-    air: 0, land: 0, landHold: 0, lastRise: 0, wasGrounded: true, lean: 0, bank: 0,
+    air: 0, land: 0, landHold: 0, lastRise: 0, wasGrounded: true, lean: 0, bank: 0, brace: 0,
   };
   const emptyTable = (): Record<Direction, number[]> => ({ forward: [], backward: [], side: [] });
   const ground = { rest: 0, idle: 0, crouch: 0, walk: emptyTable(), run: emptyTable() };   // 烘焙好的骨盆高度
@@ -1664,7 +1762,8 @@ function createAvatarRig(): AvatarRig {
     state.air = smoothDamp(state.air, motion.isGrounded ? 0 : 1, motions.air, AIR_SMOOTH_TIME, dt);
   }
 
-  // motion：forwardSpeed／sideSpeed 是實際位移換算的速度（m/s，角色座標），撞牆時是 0，腳就不會原地空踩。
+  // motion：forwardSpeed／sideSpeed 是實際位移換算的速度（m/s，角色座標），撞牆時是 0，腳就不會原地空踩；
+  // 撞牆時改由 pushForward／pushSide 切到撐牆姿勢。
   function animate(motion: RigMotion, dt: number): void {
     if (!isBuilt || dt <= 0) return;
     state.time += dt;
@@ -1675,7 +1774,10 @@ function createAvatarRig(): AvatarRig {
     for (const channel of GAIT_CHANNELS) keys[channel] = GAIT_KEYS.walk[channel].map((value, k) => lerp(value, GAIT_KEYS.run[channel][k], run));
     const style: GaitStyle = { ...GAIT_STYLE.walk };
     for (const key of STYLE_KEYS) style[key] = lerp(GAIT_STYLE.walk[key], GAIT_STYLE.run[key], run);
-    const grounded = blendPose(idlePose(state.time), gaitPose(state.phase, keys, style, state.sag, state.lat), state.gait);
+    const isPushing = motion.pushForward !== 0 || motion.pushSide !== 0;
+    state.brace = smoothDamp(state.brace, isPushing ? 1 : 0, motions.brace, BRACE_SMOOTH_TIME, dt);
+    const standing = blendPose(idlePose(state.time), bracePose(), state.brace);
+    const grounded = blendPose(standing, gaitPose(state.phase, keys, style, state.sag, state.lat), state.gait);
     addLandingCrouch(grounded, state.land);
     const pose = blendPose(grounded, airPose(motion.riseRatio), state.air);
     pose.spinePitch -= state.lean;
@@ -1684,7 +1786,9 @@ function createAvatarRig(): AvatarRig {
     tilt.rotation.z = DEG(state.bank);
   }
 
-  return { root, build, animate };
+  const handReach = (): HandReach => ({ forward: BRACE_HAND_REACH.forward * state.height, height: BRACE_HAND_REACH.height * state.height });
+
+  return { root, build, animate, handReach };
 }
 
 // ---------- glTF 角色（Quaternius UAL1 Standard，CC0） ----------
@@ -1694,6 +1798,9 @@ const ONCE_ROLES: ClipRole[] = ['jumpStart', 'jumpLand'];
 const LOCOMOTION_ROLES: ClipRole[] = ['walk', 'run'];
 const MODEL_FACING = Math.PI;      // 模型面向 +Z，遊戲裡角色面向 -Z
 const IDLE_SPEED = 0.1;            // 低於這個速度（m/s）算站著
+const BLOCKED_TIME_SCALE = 0.6;    // 推牆動畫放慢一點，看起來是頂著推不動，不是在走
+const HAND_BONES = ['hand_l', 'hand_r'];
+const PUSH_BACK_SMOOTH_TIME = 0.15;
 const CLIP_END_EPSILON = 1e-3;
 const PHASE_FOOT_BONE = 'ball_l';  // 用左腳尖找步伐週期的起點
 const PHASE_PROBE_SAMPLES = 48;
@@ -1701,11 +1808,13 @@ const PHASE_PROBE_SAMPLES = 48;
 const PELVIS_BONE = 'pelvis';
 const SPINE_COUNTER: [string, number][] = [['spine_01', 0.4], ['spine_02', 0.3], ['spine_03', 0.3]];
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
-type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand';
-const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand'];
-const SLOT_OF_PHASE: Record<CharacterPhase, AnimSlot> = { ground: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', land: 'jumpLand' };
+type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked';
+const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked'];
+const SLOT_OF_PHASE: Record<CharacterPhase, AnimSlot> = {
+  ground: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', land: 'jumpLand', blocked: 'blocked',
+};
 const SLOT_OF_ROLE: Record<ClipRole, AnimSlot> = {
-  idle: 'locomotion', walk: 'locomotion', run: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', jumpLand: 'jumpLand',
+  idle: 'locomotion', walk: 'locomotion', run: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', jumpLand: 'jumpLand', blocked: 'blocked',
 };
 
 // 找出「左腳踩到最前面」在動畫裡的位置（0–1），當成步伐週期的 0。
@@ -1733,10 +1842,39 @@ function measurePhaseOffset(model: THREE.Object3D, clip: THREE.AnimationClip): n
   return bestPhase;
 }
 
+// 推牆動畫裡兩手平均伸到最前面的那一格：手在模型前方多遠、多高（模型原始尺寸，還沒乘縮放）。
+// 用複製出來的骨架量，不動到畫面上那隻角色的骨頭（mixer 只在值改變時才寫回骨頭，量完會留下錯的姿勢）。
+function measureHandReach(model: THREE.Object3D, clip: THREE.AnimationClip): HandReach | null {
+  const copy = cloneSkinned(model);
+  copy.rotation.set(0, 0, 0);
+  copy.scale.setScalar(1);
+  const hands = HAND_BONES.map((name) => copy.getObjectByName(name));
+  if (hands.some((hand) => !hand)) return null;
+  const probe = new THREE.AnimationMixer(copy);
+  probe.clipAction(clip).play();
+  const point = new THREE.Vector3();
+  let best: HandReach | null = null;
+  for (let i = 0; i < PHASE_PROBE_SAMPLES; i++) {
+    probe.setTime((i / PHASE_PROBE_SAMPLES) * clip.duration);
+    copy.updateMatrixWorld(true);
+    let forward = 0;
+    let height = 0;
+    for (const hand of hands) {
+      hand?.getWorldPosition(point);
+      forward += point.z / hands.length;
+      height += point.y / hands.length;
+    }
+    if (!best || forward > best.forward) best = { forward, height };
+  }
+  probe.stopAllAction();
+  return best;
+}
+
 // 模型載入前（或載入失敗時）先用方塊人，介面和方塊人一樣，第一人稱模式不用知道是哪一個。
 // 架構照遊戲引擎的動畫狀態機：
 // - 地面：一維混合空間（blend space），依速度在走路、跑步兩個節點之間插值，兩段共用同一個步伐週期；
 // - 跳躍：起跳（播一次）→ 空中（循環，起跳播完還沒落地才會用到）→ 落地（播一次，蹲夠久就能被走路打斷）；
+// - 受阻：在地面按著方向鍵卻被擋住（例如撞牆）時播推牆循環，身體轉向想走的方向；放開或轉離牆面就回到地面；
 // - 狀態之間用權重淡入淡出，權重總和永遠是 1（three.js 不足 1 的部分會混進 T-pose）。
 // 平移沒有專用動畫：身體轉向移動方向（orient to movement），播一般的走跑。
 function createCharacter(): Character {
@@ -1749,7 +1887,11 @@ function createCharacter(): Character {
   let clips = new Map<string, THREE.AnimationClip>();
   const usedActions = new Set<THREE.AnimationAction>();
   const phaseOffsets = new Map<THREE.AnimationClip, number>();
-  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0 };
+  const handReaches = new Map<THREE.AnimationClip, HandReach | null>();
+  const pushBackMotion = { velocity: 0 };
+  const pushDir = { forward: 1, side: 0 };   // 最後一次推的方向，放開後沿原方向退回原位
+  let pushBack = 0;
+  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0 };
   const facingMotion = { velocity: 0 };
   let phase: CharacterPhase = 'ground';
   let phaseTime = 0;
@@ -1783,7 +1925,7 @@ function createCharacter(): Character {
       const isOnce = ONCE_ROLES.includes(role);
       action.setLoop(isOnce ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
       action.clampWhenFinished = isOnce;
-      action.timeScale = LOCOMOTION_ROLES.includes(role) ? 0 : 1;
+      action.timeScale = LOCOMOTION_ROLES.includes(role) ? 0 : role === 'blocked' ? BLOCKED_TIME_SCALE : 1;
       action.setEffectiveWeight(0);
       action.play();
       usedActions.add(action);
@@ -1853,12 +1995,13 @@ function createCharacter(): Character {
   // 轉的角度先給下半身（上限 legTurnLimit，上半身仍朝前），超過的部分才轉整個模型。
   function updateFacing(motion: RigMotion, speed: number, dt: number): void {
     const c = config.character;
-    let target = phase === 'ground' ? 0 : facing;
-    if (phase === 'ground' && speed >= IDLE_SPEED) {
-      const isBackward = motion.forwardSpeed < -IDLE_SPEED;
-      const angle = isBackward
-        ? Math.atan2(motion.sideSpeed, -motion.forwardSpeed)
-        : -Math.atan2(motion.sideSpeed, motion.forwardSpeed);
+    const isPushing = phase === 'blocked';
+    const fwd = isPushing ? motion.pushForward : motion.forwardSpeed;
+    const side = isPushing ? motion.pushSide : motion.sideSpeed;
+    let target = phase === 'ground' || isPushing ? 0 : facing;
+    if ((phase === 'ground' && speed >= IDLE_SPEED) || isPushing) {
+      const isBackward = fwd < -IDLE_SPEED;
+      const angle = isBackward ? Math.atan2(side, -fwd) : -Math.atan2(side, fwd);
       target = clamp(angle, -DEG(c.maxMoveTurn), DEG(c.maxMoveTurn));
     }
     facing = smoothDamp(facing, target, facingMotion, c.turnToMoveSeconds, dt);
@@ -1909,12 +2052,32 @@ function createCharacter(): Character {
     const speed = Math.hypot(motion.forwardSpeed, motion.sideSpeed);
     const canLeaveLanding = isFinished('jumpLand') || (phaseTime >= config.character.landLockSeconds && speed > IDLE_SPEED);
     if (phase === 'land' && canLeaveLanding) phase = 'ground';
+    const isPushing = motion.isGrounded && (motion.pushForward !== 0 || motion.pushSide !== 0);
+    if (phase === 'ground' && isPushing) enterPhase('blocked', 'blocked');
+    else if (phase === 'blocked' && !isPushing) phase = 'ground';
     fadeSlots(SLOT_OF_PHASE[phase], dt);
     applyWeights(updateLocomotion(motion, speed, dt));
     updateFacing(motion, speed, dt);
   }
 
+  // 角色座標裡往前是 -Z、往右是 +X，往後退就是反方向。
+  function applyPushBack(motion: RigMotion, dt: number): void {
+    if (motion.pushForward !== 0 || motion.pushSide !== 0) Object.assign(pushDir, { forward: motion.pushForward, side: motion.pushSide });
+    pushBack = smoothDamp(pushBack, motion.pushBack, pushBackMotion, PUSH_BACK_SMOOTH_TIME, dt);
+    (model ?? block.root).position.set(-pushDir.side * pushBack, 0, pushDir.forward * pushBack);
+  }
+
+  function handReach(): HandReach {
+    const clip = clips.get(config.character.clips.blocked);
+    if (!model || !clip) return block.handReach();
+    if (!handReaches.has(clip)) handReaches.set(clip, measureHandReach(model, clip));
+    const reach = handReaches.get(clip);
+    const scale = config.character.scale;
+    return reach ? { forward: reach.forward * scale, height: reach.height * scale } : block.handReach();
+  }
+
   function animate(motion: RigMotion, dt: number): void {
+    if (dt > 0) applyPushBack(motion, dt);
     if (!mixer) {
       block.animate(motion, dt);
       return;
@@ -1952,7 +2115,7 @@ function createCharacter(): Character {
     if (skeletonHelper) skeletonHelper.visible = config.character.showSkeleton && root.visible;
   }
 
-  return { root, build, animate, load, syncSkeletonHelper };
+  return { root, build, animate, handReach, load, syncSkeletonHelper };
 }
 
 // 第一人稱與第三人稱是同一個模式：鏡頭距離 0 是第一人稱，滾輪拉遠就從背後看到方塊角色。
@@ -1993,6 +2156,7 @@ function createFirstPersonMode(): ViewMode {
   let lastPointer: { x: number; y: number } | null = null;
   let savedPose: PlayerPose | null = null;   // 上次離開時站的位置與朝向，再進來時接著走
   let isWalking = false;  // 預設跑步；按一下 Shift 切成走路，再按一下切回來
+  let blockedSeconds = 0;  // 按著方向鍵卻幾乎沒移動，持續了多久
 
   const isHeld = (action: KeyAction): boolean => [...heldCodes].some((code) => KEY_ACTIONS[code] === action);
   const isGrounded = (): boolean => isOnGround;
@@ -2268,7 +2432,45 @@ function createFirstPersonMode(): ViewMode {
   }
 
   // 實際位移轉成角色座標的前後／左右速度，交給方塊人決定步伐。
-  function animateAvatar(dx: number, dz: number, turn: number, dt: number): void {
+  // 從 (x, z) 沿水平方向 (dirX, dirZ) 往前，在高度 y 最先碰到的碰撞方塊有多遠；maxDistance 內沒有就是 Infinity。
+  // 用 slab 法算射線和方塊的交點；起點已經在方塊裡的不算。
+  function distanceToSurface(x: number, z: number, dirX: number, dirZ: number, y: number, maxDistance: number): number {
+    let nearest = Infinity;
+    for (const box of world.colliders) {
+      if (y < box.min.y || y > box.max.y) continue;
+      let near = 0;
+      let far = maxDistance;
+      for (const [origin, dir, min, max] of [[x, dirX, box.min.x, box.max.x], [z, dirZ, box.min.z, box.max.z]]) {
+        if (Math.abs(dir) < EPSILON) {
+          if (origin < min || origin > max) far = -1;
+          continue;
+        }
+        const t1 = (min - origin) / dir;
+        const t2 = (max - origin) / dir;
+        near = Math.max(near, Math.min(t1, t2));
+        far = Math.min(far, Math.max(t1, t2));
+      }
+      if (near > 0 && near <= far) nearest = Math.min(nearest, near);
+    }
+    return nearest;
+  }
+
+  // 被擋住時，在推牆動畫手的高度往前探：有牆面才推，手往後退到剛好貼著；
+  // 手的高度是空的（窗洞、只到腰的欄杆或矮家具）就不推，維持站著。
+  function pushTarget(push: { forward: number; right: number } | null): { forward: number; right: number; back: number } | null {
+    if (!push) return null;
+    const sin = Math.sin(yaw);
+    const cos = Math.cos(yaw);
+    const dirX = -sin * push.forward + cos * push.right;
+    const dirZ = -cos * push.forward - sin * push.right;
+    const reach = rig.handReach();
+    const distance = distanceToSurface(body.x, body.z, dirX, dirZ, feetY + reach.height, reach.forward + HAND_PROBE_MARGIN);
+    if (distance === Infinity) return null;
+    return { ...push, back: Math.max(0, reach.forward + HAND_GAP - distance) };
+  }
+
+  // push 是被擋住時想走的方向（角色座標：forward 往前、right 往右）與畫面要往後退多少，沒被擋住是 null。
+  function animateAvatar(dx: number, dz: number, turn: number, push: { forward: number; right: number; back: number } | null, dt: number): void {
     if (dt <= 0) return;
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
@@ -2278,7 +2480,19 @@ function createFirstPersonMode(): ViewMode {
       turnRate: turn * DEG(config.character.turnSpeed),
       isGrounded: isGrounded(),
       riseRatio: velocityY / Math.sqrt(2 * config.character.gravity * config.character.jumpHeight),
+      pushForward: push?.forward ?? 0,
+      pushSide: push?.right ?? 0,
+      pushBack: push?.back ?? 0,
     }, dt);
+  }
+
+  // 有方向輸入、站在地上，實際速度卻遠低於想走的速度，連續 BLOCKED_DELAY 秒就回傳想走的方向。
+  function detectPush(forward: number, right: number, moved: number, dt: number): { forward: number; right: number } | null {
+    const length = Math.hypot(forward, right);
+    const intended = isWalking ? config.character.walkSpeed : config.character.runSpeed;
+    const isStuck = length > 0 && isOnGround && dt > 0 && moved / dt < intended * BLOCKED_SPEED_RATIO;
+    blockedSeconds = isStuck ? blockedSeconds + dt : 0;
+    return blockedSeconds >= BLOCKED_DELAY ? { forward: forward / length, right: right / length } : null;
   }
 
   function walk(forward: number, right: number, dt: number): void {
@@ -2348,7 +2562,8 @@ function createFirstPersonMode(): ViewMode {
       const startZ = body.z;
       walk(forward, right, dt);
       updateVertical(dt);
-      animateAvatar(body.x - startX, body.z - startZ, turn, dt);
+      const push = pushTarget(detectPush(forward, right, Math.hypot(body.x - startX, body.z - startZ), dt));
+      animateAvatar(body.x - startX, body.z - startZ, turn, push, dt);
       followCharacter(dt, turn !== 0 || forward !== 0 || right !== 0, forward > 0);
       placeCamera(dt);
     },
@@ -3388,7 +3603,7 @@ function updateOverlay(): void {
 // 「儲存」只在 vite dev 有（寫回 JSON 的外掛在 vite.config.ts），打包後整段被移除。
 const SAVE_FEEDBACK_MS = 1500;
 const CLIP_ROLE_NAMES: Record<ClipRole, string> = {
-  idle: '站立', walk: '走路', run: '跑步', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地',
+  idle: '站立', walk: '走路', run: '跑步', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地', blocked: '受阻',
 };
 const furnitureFolders = new Map<string, GUI>();
 let furnitureGroup: GUI | null = null;

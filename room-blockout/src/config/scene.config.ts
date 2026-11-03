@@ -2,14 +2,14 @@
 // 座標：原點在房屋外框中心的地面；+X 東、-Z 北、+Y 上。
 
 export type FurnitureType = 'bed' | 'desk' | 'chair' | 'bookcase' | 'wardrobe' | 'counter' | 'island' | 'sofa' | 'bath' | 'table' | 'car';
-export type ClipRole = 'idle' | 'walk' | 'run' | 'jumpStart' | 'jumpLoop' | 'jumpLand';
+export type ClipRole = 'idle' | 'walk' | 'run' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked';
 export type OpeningKind = 'door' | 'slider' | 'window';
 export type FloorKind = 'room' | 'deck' | 'garage';
 
 export const FURNITURE_TYPES: FurnitureType[] = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe', 'counter', 'island', 'sofa', 'bath', 'table', 'car'];
 export const OPENING_KINDS: OpeningKind[] = ['door', 'slider', 'window'];
 export const FLOOR_KINDS: FloorKind[] = ['room', 'deck', 'garage'];
-export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'jumpStart', 'jumpLoop', 'jumpLand'];
+export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked'];
 
 export interface Sizes { width: number; depth: number; height: number }
 export interface Spot { x: number; z: number }
@@ -83,9 +83,41 @@ export const SITE_KINDS: SiteKind[] = ['street', 'sidewalk', 'parkway', 'drivewa
  */
 export interface SiteArea { label: string; kind: SiteKind; points: Point[] }
 
+export type RoofKind = 'gable' | 'hip' | 'flat';
+export const ROOF_KINDS: RoofKind[] = ['gable', 'hip', 'flat'];
+export type BuildingPart = 'wall' | 'roof' | 'trim' | 'glass';
+export const BUILDING_PARTS: BuildingPart[] = ['wall', 'roof', 'trim', 'glass'];
+
+/**
+ * 只有外觀的量體（鄰宅用，進不去）：長方形底面 rect = [x0, z0, x1, z1]，從 base 往上蓋 height。
+ * roof：gable 山牆（屋脊沿 ridge 軸）、hip 四坡、flat 平頂；pitch 是屋面斜度（度）。
+ */
+export interface BuildingMass {
+  label: string;
+  rect: [number, number, number, number];
+  base: number;
+  height: number;
+  roof: RoofKind;
+  pitch: number;
+  ridge: 'x' | 'z';
+}
+
+/** 外觀細節的方塊（窗、車庫門、柱子、煙囪、雨遮），min／max 是世界座標 [x, y, z]，part 決定顏色。 */
+export interface BuildingDetail { label: string; part: BuildingPart; min: [number, number, number]; max: [number, number, number] }
+
+/** 一棟鄰宅：style 是建築風格名稱，colors 依部位給 CSS 色碼。 */
+export interface Building {
+  label: string;
+  style: string;
+  colors: Record<BuildingPart, string>;
+  masses: BuildingMass[];
+  details: BuildingDetail[];
+}
+
 export interface SceneSection {
   house: HouseConfig;
   site: SiteArea[];
+  buildings: Building[];
   /** 房屋外框往外多大一片草地可以走（m），邊緣有隱形圍欄。 */
   groundMargin: number;
   /** 第一次進入第一人稱時站的位置；facing 是面向（度，0 朝北、90 朝西，逆時針）。 */
@@ -114,7 +146,7 @@ export interface CharacterConfig {
   fadeSeconds: number;
   /** 落地後至少蹲這麼久才接回走路（秒）。 */
   landLockSeconds: number;
-  /** 各動作用哪段動畫（glb 裡的片段名稱）。 */
+  /** 各動作用哪段動畫（glb 裡的片段名稱）。blocked 是按著方向鍵卻被牆擋住時播的（例如推牆）。 */
   clips: Record<ClipRole, string>;
   /** 走路、跑步動畫原本的移動速度（m/s），也是混合空間的兩個節點：速度介於兩者之間時兩段按比例混合，腳才不會滑。 */
   clipSpeeds: { walk: number; run: number };
@@ -189,8 +221,9 @@ function collectOpeningIssues(wall: Record<string, unknown>, at: string): string
     (OPENING_KINDS.some((kind) => kind === opening.kind) ? [] : [`${path}.kind（要是 ${OPENING_KINDS.join('／')}）`]));
 }
 
-const isPoint = (value: unknown): boolean =>
-  Array.isArray(value) && value.length === 2 && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+const isNumberTuple = (value: unknown, length: number): boolean =>
+  Array.isArray(value) && value.length === length && value.every((n) => typeof n === 'number' && Number.isFinite(n));
+const isPoint = (value: unknown): boolean => isNumberTuple(value, 2);
 
 function collectFloorIssues(floor: Record<string, unknown>, at: string): string[] {
   const issues = FLOOR_KINDS.some((kind) => kind === floor.kind) ? [] : [`${at}.kind（要是 ${FLOOR_KINDS.join('／')}）`];
@@ -225,6 +258,19 @@ function collectSceneIssues(scene: unknown): string[] {
     const isValid = Array.isArray(points) && points.length >= 3 && points.every(isPoint);
     return isValid ? kindIssues : [...kindIssues, `${at}.points（至少 3 個 [x, z]）`];
   }));
+  issues.push(...collectListIssues(scene.buildings, 'scene.buildings', [], (building, at) => [
+    ...(typeof building.style === 'string' ? [] : [`${at}.style`]),
+    ...BUILDING_PARTS.filter((part) => !isObject(building.colors) || typeof building.colors[part] !== 'string').map((part) => `${at}.colors.${part}`),
+    ...collectListIssues(building.masses, `${at}.masses`, ['base', 'height', 'pitch'], (mass, path) => [
+      ...(isNumberTuple(mass.rect, 4) ? [] : [`${path}.rect（[x0, z0, x1, z1]）`]),
+      ...(ROOF_KINDS.some((kind) => kind === mass.roof) ? [] : [`${path}.roof（要是 ${ROOF_KINDS.join('／')}）`]),
+      ...(mass.ridge === 'x' || mass.ridge === 'z' ? [] : [`${path}.ridge（要是 x／z）`]),
+    ]),
+    ...collectListIssues(building.details, `${at}.details`, [], (detail, path) => [
+      ...(BUILDING_PARTS.some((part) => part === detail.part) ? [] : [`${path}.part（要是 ${BUILDING_PARTS.join('／')}）`]),
+      ...(isNumberTuple(detail.min, 3) && isNumberTuple(detail.max, 3) ? [] : [`${path}.min／max（[x, y, z]）`]),
+    ]),
+  ]));
   issues.push(...missingNumbers(scene, ['groundMargin']).map((key) => `scene.${key}`));
   issues.push(...missingNumbers(scene.spawn, ['x', 'z', 'facing']).map((key) => `scene.spawn.${key}`));
   issues.push(...missingNumbers(scene.rules, ['gridSnap', 'edgeSnap', 'sizeSnap', 'windowClearance']).map((key) => `scene.rules.${key}`));

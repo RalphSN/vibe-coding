@@ -88,13 +88,30 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 
 | 項目 | 參考資料 | 本專案 |
 |---|---|---|
-| 基地 | 平地區一例 80 × 155 ft；聖塔莫尼卡大道以北最小 13,000 平方英尺 | 本宅與四塊鄰地各 69 × 62 m（大型宅邸），鄰地只畫範圍與車道 |
+| 基地 | 平地區一例 80 × 155 ft；聖塔莫尼卡大道以北最小 13,000 平方英尺 | 本宅與四塊鄰地各 69 × 62 m（大型宅邸），鄰宅見下一節 |
 | 前院 | 鋪面不超過退縮區一半，其餘植栽；停車不能放在前院 | 房屋離臨街線約 15 m，前院是草地，只有車道鋪面 |
 | 車道 | 每個臨街面一條，最寬 28 ft（第三方整理，未查證原文） | 每塊基地一條，寬 5.5 m |
 | 街道 | 未找到比佛利山莊標準；美國住宅道路用地常見 50–60 ft | 道路用地 18 m：人行道 1.5＋草帶 2.5＋車道 10＋草帶 2.5＋人行道 1.5；人行道與草帶高 15 cm（路緣石），走得上去 |
 | 車庫門 | 雙車門標準 16 × 7 ft，常見 16–18 ft 寬、7–8 ft 高 | 車庫南牆 5.5 × 2.4 m 大門，車道直通街道 |
 
 出處：[Nest Seekers：513 N Rexford Dr](https://www.nestseekers.com/5666944/513-n-rexford-dr-beverly-hills-ca-4br)、[Jade Mills：最小基地面積](https://jademillsestates.com/blog/choosing-your-ideal-beverly-hills-address)、[gocodebook：開發標準](https://gocodebook.com/us/california/beverly-hills/development-standards)、[gocodebook：景觀規定](https://gocodebook.com/us/california/beverly-hills/landscaping-and-screening)、[gocodebook：停車規定](https://gocodebook.com/us/california/beverly-hills/parking)、[Stormwater Center：住宅道路用地寬度](https://www.stormwatercenter.net/Slideshows-textonly/bsd%20for%20smrc-dsc/tsld018.htm)、[Home Depot：車庫門尺寸](https://www.homedepot.com/c/ab/what-are-the-standard-garage-door-sizes/9ba683603be9fa5395fab901c8f64dae)（查證日期 2026-11-01）。
+
+## 鄰宅外觀量體
+
+`scene.buildings` 是四塊鄰地上的房子：只有外殼、屋頂與立面細節（窗、門、柱子、煙囪、車庫門），角色會被牆擋住但進不去。每個量體是長方形底面加屋頂（`gable` 山牆、`hip` 四坡、`flat` 平頂），細節是貼在牆上的方塊，依部位（`wall`／`roof`／`trim`／`glass`）上色。
+
+| 鄰地 | 風格 | 外觀重點 |
+|---|---|---|
+| 西鄰 | 西班牙殖民復興 | 白灰泥牆、紅瓦低斜四坡屋頂、側翼拱廊、樓梯塔 |
+| 東鄰 | 都鐸復興 | 陡斜山牆屋頂、正面山牆、二樓深色半木構、高煙囪 |
+| 對街西鄰 | 喬治亞／殖民復興 | 紅磚方正兩層樓、四坡屋頂、中央四柱門廊、左右對稱開窗、兩端煙囪 |
+| 對街東鄰 | 中世紀現代 | 平屋頂大出挑、一樓落地玻璃、二樓懸挑量體、入口雨遮與石材景牆 |
+
+- 風格：平地區以各種復古風格為主（西班牙殖民復興、都鐸、喬治亞／殖民復興、地中海等），另有中世紀現代與新建住宅。
+- 高度：每棟含屋頂約 10 m 內，參考中央區獨棟住宅上限 32 ft（第三方法規整理，未對照官方條文）。
+- 前牆退縮和本宅差不多；車庫門對齊各基地的車道盡頭。
+
+出處：[Hilton & Hyland：The Beverly Hills Flats](https://hiltonhyland.com/post/the-beverly-hills-flats/)、[Hilton & Hyland：比佛利山莊建築風格](https://www.hiltonhyland.com/post/quintessential-architectural-styles-to-recognize-in-beverly-hills)、[Steve Frankel：建築風格辭典](https://stevefrankel.com/blog/beverly-hills-architecture-a-buyers-style-glossary)、[gocodebook：中央區獨棟住宅標準](https://gocodebook.com/library/us/ca/beverly-hills-zoning/article-24-single-family-residential-development-standards-for-the-central-area-of-the-city)（查證日期 2026-11-02）。
 
 ## 室內設計準則（配置與家具參考）
 

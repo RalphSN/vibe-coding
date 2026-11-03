@@ -439,9 +439,109 @@ const site = [
   }),
 ];
 
+// ---------- 鄰宅外觀量體（參考比佛利山莊平地區常見的復古風格，只有外殼、進不去） ----------
+// 每棟高度含屋頂控制在約 10 m 內（中央區獨棟住宅上限 32 ft ≈ 9.75 m，第三方法規整理，未對照官方條文）。
+// 前牆退到和本宅差不多的位置；車庫門對齊每塊基地的車道盡頭。
+const mass = (label, rect, height, roof, pitch, ridge = 'x', base = 0) => ({ label, rect, base, height, roof, pitch, ridge });
+const box = (label, part, min, max) => ({ label, part, min, max });
+const FACE = 0.06;   // 貼在牆面上的細節凸出多少
+// side = +1 表示牆面朝 +z（南），-1 朝 -z（北）；細節往牆外凸出
+const onFace = (label, part, z, side, x0, x1, y0, y1) =>
+  box(label, part, [x0, y0, side > 0 ? z : z - FACE], [x1, y1, side > 0 ? z + FACE : z]);
+const windowRow = (label, z, side, xs, rows, width) =>
+  xs.flatMap((x, i) => rows.map(([y0, y1], j) => onFace(`${label} ${j + 1}-${i + 1}`, 'glass', z, side, x - width / 2, x + width / 2, y0, y1)));
+const GLASS = '#6f8fa6';
+
+const buildings = [
+  {
+    label: '西鄰住宅', style: '西班牙殖民復興（Spanish Colonial Revival）',
+    colors: { wall: '#efe6d6', roof: '#b4552f', trim: '#5a3d2b', glass: GLASS },
+    masses: [
+      mass('主樓', [-80, 4, -60, 22], 6.2, 'hip', 20),
+      mass('側翼', [-60, -4, -46, 16], 3.6, 'gable', 22, 'z'),
+      mass('樓梯塔', [-65, 20, -61, 24], 7.6, 'hip', 25),
+      mass('車庫', [-92, 3, -80, 15], 3.2, 'hip', 20),
+    ],
+    details: [
+      ...[-58, -55, -52, -49, -46.4].map((x, i) => box(`拱廊柱 ${i + 1}`, 'wall', [x - 0.2, 0, 18.1], [x + 0.2, 3, 18.5])),
+      box('拱廊瓦頂', 'roof', [-60, 3, 16], [-46, 3.3, 18.6]),
+      ...windowRow('主樓窗', 22, 1, [-78, -74.5, -71], [[1, 2.4], [4.2, 5.4]], 1.2),
+      onFace('大門', 'trim', 22, 1, -68.6, -67.2, 0, 2.6),
+      onFace('樓梯塔窗', 'glass', 24, 1, -63.4, -62.6, 4.5, 6),
+      onFace('車庫門', 'trim', 15, 1, -88, -82.5, 0, 2.4),
+      box('煙囪', 'wall', [-79, 0, 10], [-77.6, 10.2, 11.4]),
+    ],
+  },
+  {
+    label: '東鄰住宅', style: '都鐸復興（Tudor Revival）',
+    colors: { wall: '#ebe3d0', roof: '#4a4846', trim: '#3a2b20', glass: GLASS },
+    masses: [
+      mass('主樓', [52, 10, 80, 22], 5.4, 'gable', 35),
+      mass('正面山牆', [60, 22, 69, 26], 5.4, 'gable', 42, 'z'),
+      mass('後翼', [54, -4, 78, 10], 3.4, 'hip', 30),
+      mass('連廊', [80, 6, 84, 14], 3, 'gable', 35),
+      mass('車庫', [84, 3, 97, 15], 3.2, 'gable', 40),
+    ],
+    details: [
+      // 半木構：二樓外露的深色木框
+      onFace('山牆腰帶', 'trim', 26, 1, 60, 69, 2.9, 3.15),
+      ...[60.9, 63.1, 65.4, 67.6].map((x, i) => onFace(`山牆木框 ${i + 1}`, 'trim', 26, 1, x - 0.11, x + 0.11, 3.15, 5.4)),
+      onFace('主樓腰帶', 'trim', 22, 1, 52, 80, 2.9, 3.15),
+      ...[53.5, 57, 71, 74.5, 78].map((x, i) => onFace(`主樓木框 ${i + 1}`, 'trim', 22, 1, x - 0.11, x + 0.11, 3.15, 5.4)),
+      ...windowRow('主樓窗', 22, 1, [55.3, 72.8, 76.3], [[1, 2.3], [3.5, 4.8]], 1.6),
+      onFace('山牆凸窗', 'glass', 26, 1, 62.5, 66.5, 1, 2.3),
+      onFace('山牆上窗', 'glass', 26, 1, 63.6, 65.4, 3.4, 4.6),
+      onFace('大門', 'trim', 22, 1, 70, 71.3, 0, 2.4),
+      onFace('車庫門', 'trim', 15, 1, 88, 93.5, 0, 2.3),
+      box('煙囪', 'trim', [50.6, 0, 15], [52, 11.5, 17]),
+    ],
+  },
+  {
+    label: '對街西鄰住宅', style: '喬治亞／殖民復興（Georgian / Colonial Revival）',
+    colors: { wall: '#a65a44', roof: '#3f4347', trim: '#f3efe6', glass: GLASS },
+    masses: [
+      mass('主樓', [-52, 75, -28, 89], 6.4, 'hip', 25),
+      mass('西翼', [-61, 78, -52, 88], 3.6, 'hip', 25, 'z'),
+      mass('車庫翼', [-28, 83, -15.5, 95], 3.4, 'hip', 25, 'z'),
+    ],
+    details: [
+      // 正面左右對稱：中央門廊四根白柱、上方簷部，兩側各兩列窗
+      ...[-43, -41, -39, -37].map((x, i) => box(`門廊柱 ${i + 1}`, 'trim', [x - 0.25, 0, 73], [x + 0.25, 5.6, 73.5])),
+      box('門廊簷部', 'trim', [-44.2, 5.6, 72.6], [-35.8, 6.1, 75]),
+      onFace('大門', 'roof', 75, -1, -40.6, -39.4, 0, 2.6),
+      ...windowRow('主樓窗', 75, -1, [-50, -46.5, -33.5, -30], [[1, 2.6], [4, 5.6]], 1.2),
+      onFace('簷口飾帶', 'trim', 75, -1, -52.2, -27.8, 6.1, 6.4),
+      ...windowRow('西翼窗', 78, -1, [-58, -55], [[1, 2.4]], 1.2),
+      box('西煙囪', 'wall', [-51.5, 0, 81], [-50.3, 11, 83]),
+      box('東煙囪', 'wall', [-29.7, 0, 81], [-28.5, 11, 83]),
+      onFace('車庫門', 'trim', 83, -1, -24, -18.5, 0, 2.4),
+    ],
+  },
+  {
+    label: '對街東鄰住宅', style: '中世紀現代（Mid-century Modern）',
+    colors: { wall: '#f1f0ec', roof: '#cfcdc6', trim: '#2f2f2f', glass: '#7fa3b8' },
+    masses: [
+      mass('主量體', [12, 78, 37.5, 96], 3.8, 'flat', 0),
+      mass('車庫', [37.5, 83, 48.5, 95], 3.4, 'flat', 0),
+      mass('二樓懸挑', [16, 76, 32, 90], 3.2, 'flat', 0, 'x', 4.1),
+      mass('後側', [16, 96, 32, 100], 3.5, 'flat', 0),
+    ],
+    details: [
+      onFace('一樓落地玻璃', 'glass', 78, -1, 13, 30, 0.3, 3.4),
+      onFace('二樓帶狀窗', 'glass', 76, -1, 17, 31, 4.6, 6.8),
+      box('入口雨遮', 'trim', [30, 3, 75.5], [37, 3.2, 78]),
+      box('雨遮細柱', 'trim', [36.7, 0, 75.6], [36.9, 3, 75.8]),
+      box('石材景牆', 'roof', [30, 0, 74], [30.6, 3, 78]),
+      onFace('大門', 'trim', 78, -1, 33, 34.4, 0, 2.6),
+      onFace('車庫門', 'trim', 83, -1, 40, 45.5, 0, 2.4),
+    ],
+  },
+];
+
 cfg.scene = {
   house: { wallThickness: 0.15, slabThickness: SLAB, levels },
   site,
+  buildings,
   groundMargin: 6,
   spawn: { x: -3.5, z: 10.5, facing: 0 },
   rules: cfg.scene.rules,
