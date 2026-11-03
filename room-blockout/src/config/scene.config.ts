@@ -2,14 +2,14 @@
 // 座標：原點在房屋外框中心的地面；+X 東、-Z 北、+Y 上。
 
 export type FurnitureType = 'bed' | 'desk' | 'chair' | 'bookcase' | 'wardrobe' | 'counter' | 'island' | 'sofa' | 'bath' | 'table' | 'car';
-export type ClipRole = 'idle' | 'walk' | 'run' | 'jumpStart' | 'jumpLoop' | 'jumpLand';
+export type ClipRole = 'idle' | 'walk' | 'run' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked';
 export type OpeningKind = 'door' | 'slider' | 'window';
 export type FloorKind = 'room' | 'deck' | 'garage';
 
 export const FURNITURE_TYPES: FurnitureType[] = ['bed', 'desk', 'chair', 'bookcase', 'wardrobe', 'counter', 'island', 'sofa', 'bath', 'table', 'car'];
 export const OPENING_KINDS: OpeningKind[] = ['door', 'slider', 'window'];
 export const FLOOR_KINDS: FloorKind[] = ['room', 'deck', 'garage'];
-export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'jumpStart', 'jumpLoop', 'jumpLand'];
+export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked'];
 
 export interface Sizes { width: number; depth: number; height: number }
 export interface Spot { x: number; z: number }
@@ -146,7 +146,7 @@ export interface CharacterConfig {
   fadeSeconds: number;
   /** 落地後至少蹲這麼久才接回走路（秒）。 */
   landLockSeconds: number;
-  /** 各動作用哪段動畫（glb 裡的片段名稱）。 */
+  /** 各動作用哪段動畫（glb 裡的片段名稱）。blocked 是按著方向鍵卻被牆擋住時播的（例如推牆）。 */
   clips: Record<ClipRole, string>;
   /** 走路、跑步動畫原本的移動速度（m/s），也是混合空間的兩個節點：速度介於兩者之間時兩段按比例混合，腳才不會滑。 */
   clipSpeeds: { walk: number; run: number };
