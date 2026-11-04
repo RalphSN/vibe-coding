@@ -2189,14 +2189,15 @@ function createCharacter(): Character {
     for (const action of usedActions) action.setEffectiveWeight(weights.get(action) ?? 0);
   }
 
-  // 移動方向在角色座標裡偏離正前（或正後）多少，身體就轉多少（上限 maxMoveTurn）；停下來轉回正面，空中維持不動。
+  // 移動方向在角色座標裡偏離正前（或正後）多少，身體就轉多少（上限 maxMoveTurn）；停下來或跳起來都轉回正面，
+  // 側移時起跳，下半身不會維持扭向側邊的姿勢。
   // 轉的角度先給下半身（上限 legTurnLimit，上半身仍朝前），超過的部分才轉整個模型。
   function updateFacing(motion: RigMotion, speed: number, dt: number): void {
     const c = config.character;
     const isPushing = phase === 'blocked';
     const fwd = isPushing ? motion.pushForward : motion.forwardSpeed;
     const side = isPushing ? motion.pushSide : motion.sideSpeed;
-    let target = phase === 'ground' || isPushing ? 0 : facing;
+    let target = 0;
     if ((phase === 'ground' && speed >= IDLE_SPEED) || isPushing) {
       const isBackward = fwd < -IDLE_SPEED;
       const angle = isBackward ? Math.atan2(side, -fwd) : -Math.atan2(side, fwd);
