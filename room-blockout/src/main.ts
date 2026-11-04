@@ -61,6 +61,11 @@ interface RigMotion {
   forwardSpeed: number; sideSpeed: number; turnRate: number; isGrounded: boolean; riseRatio: number;
   pushForward: number; pushSide: number; pushBack: number;
 }
+// 水平碰撞用的有向方塊（OBB）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。
+// 斜牆、斜放的家具就是一整個轉了角度的方塊，不用切成小段。
+interface Solid { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
+// 掃掠碰到的時刻（位移的比例 0–1）與表面法線（世界座標，朝外）。
+interface SweepHit { t: number; nx: number; nz: number }
 // 推牆時手掌在角色前方多遠、離腳底多高（m）。
 interface HandReach { forward: number; height: number }
 interface AvatarRig { root: THREE.Group; build(eyeHeight: number): void; animate(motion: RigMotion, dt: number): void; handReach(): HandReach }
@@ -312,7 +317,7 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.8);
 sun.position.set(3, 6, 2);
 scene.add(sun);
 
-// world 是之後第一人稱模式也會用到的共用狀態：colliders 給玩家碰撞用。
+// world 是之後第一人稱模式也會用到的共用狀態：colliders 給垂直方向（站上去、撞頭），solids 給水平移動。
 const world: {
   room: THREE.Group;
   furniture: THREE.Group;
@@ -320,6 +325,7 @@ const world: {
   overlay: THREE.Group;
   editor: THREE.Group;
   colliders: THREE.Box3[];
+  solids: Solid[];
   ramps: Ramp[];
 } = {
   room: new THREE.Group(),
@@ -328,6 +334,7 @@ const world: {
   overlay: new THREE.Group(),   // 拖曳中才有：門窗淨空區
   editor: new THREE.Group(),    // 尺寸模式的控制點
   colliders: [],
+  solids: [],
   ramps: [],                    // 世界座標的碰撞斜面（高度已加上樓層高度）
 };
 scene.add(world.room, world.furniture, world.guides, world.overlay, world.editor);
@@ -885,18 +892,125 @@ function meshColliders(mesh: THREE.Mesh): THREE.Box3[] {
   return boxes;
 }
 
-function collectColliders(): THREE.Box3[] {
+const solidFromBox = (box: THREE.Box3): Solid => ({
+  cx: (box.min.x + box.max.x) / 2, cz: (box.min.z + box.max.z) / 2, ux: 1, uz: 0, vx: 0, vz: 1,
+  hu: (box.max.x - box.min.x) / 2, hv: (box.max.z - box.min.z) / 2, minY: box.min.y, maxY: box.max.y,
+});
+
+const solidCenter = new THREE.Vector3();
+const solidSize = new THREE.Vector3();
+
+// 網格自身座標的外框轉成世界座標的 OBB。只繞垂直軸轉的才行；有傾斜的退回軸對齊的小段。
+function meshSolids(mesh: THREE.Mesh): Solid[] {
+  const e = mesh.matrixWorld.elements;
+  const sx = Math.hypot(e[0], e[1], e[2]);
+  const sy = Math.hypot(e[4], e[5], e[6]);
+  const sz = Math.hypot(e[8], e[9], e[10]);
+  const isYawOnly = sx > 0 && sy > 0 && sz > 0 && Math.abs(e[5] / sy - 1) < 1e-4;
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const local = mesh.geometry.boundingBox;
+  if (!isYawOnly || !local) return meshColliders(mesh).map(solidFromBox);
+  local.getCenter(solidCenter).applyMatrix4(mesh.matrixWorld);
+  local.getSize(solidSize);
+  return [{
+    cx: solidCenter.x, cz: solidCenter.z, ux: e[0] / sx, uz: e[2] / sx, vx: e[8] / sz, vz: e[10] / sz,
+    hu: (solidSize.x * sx) / 2, hv: (solidSize.z * sz) / 2,
+    minY: solidCenter.y - (solidSize.y * sy) / 2, maxY: solidCenter.y + (solidSize.y * sy) / 2,
+  }];
+}
+
+function collectColliders(): { boxes: THREE.Box3[]; solids: Solid[] } {
   scene.updateMatrixWorld(true);
   const boxes = groundFenceBoxes(config);
+  const solids = boxes.map(solidFromBox);
+  const addMesh = (mesh: THREE.Mesh): void => {
+    boxes.push(...meshColliders(mesh));
+    solids.push(...meshSolids(mesh));
+  };
   world.room.traverse((obj) => {
     const strips = stripColliders.get(obj);
-    if (strips) boxes.push(...strips);
-    else if (obj instanceof THREE.Mesh && (obj.userData.isSolid || obj.parent?.userData.isSolid)) boxes.push(...meshColliders(obj));
+    if (strips) {
+      boxes.push(...strips);
+      solids.push(...strips.map(solidFromBox));
+    } else if (obj instanceof THREE.Mesh && (obj.userData.isSolid || obj.parent?.userData.isSolid)) addMesh(obj);
   });
   world.furniture.traverse((obj) => {
-    if (obj instanceof THREE.Mesh && !obj.userData.isOutline) boxes.push(...meshColliders(obj));
+    if (obj instanceof THREE.Mesh && !obj.userData.isOutline) addMesh(obj);
   });
-  return boxes;
+  return { boxes, solids };
+}
+
+// 點 (x, z) 換到方塊自身座標（u 沿第一軸、v 沿第二軸，原點在方塊中心）。
+const toSolidSpace = (s: Solid, x: number, z: number): [number, number] => [x * s.ux + z * s.uz, x * s.vx + z * s.vz];
+
+// 圓心 (x, z)、半徑 r 的圓和方塊在水平面上有沒有重疊。
+function circleOverlapsSolid(s: Solid, x: number, z: number, r: number): boolean {
+  const [u, v] = toSolidSpace(s, x - s.cx, z - s.cz);
+  const du = u - clamp(u, -s.hu, s.hu);
+  const dv = v - clamp(v, -s.hv, s.hv);
+  return du * du + dv * dv < r * r;
+}
+
+// 射線 p + d·t 和圓心 (cu, cv)、半徑 r 的圓第一次相交的 t（0–1），沒有就是 null。
+function rayCircle(pu: number, pv: number, du: number, dv: number, cu: number, cv: number, r: number): number | null {
+  const ou = pu - cu;
+  const ov = pv - cv;
+  const a = du * du + dv * dv;
+  const b = 2 * (ou * du + ov * dv);
+  const c = ou * ou + ov * ov - r * r;
+  const disc = b * b - 4 * a * c;
+  if (a === 0 || disc < 0) return null;
+  const t = (-b - Math.sqrt(disc)) / (2 * a);
+  return t >= 0 && t <= 1 ? t : null;
+}
+
+// 半徑 r 的圓從 (x, z) 移動 (dx, dz)：最早在哪一刻碰到方塊、碰到的表面朝哪裡，碰不到是 null。
+// 等於讓圓心這個點，對「方塊往外擴 r、四個角磨圓」的形狀打射線（Minkowski 和）：
+// 先打外擴後的長方形，落點在角落區時改打那個角的圓。
+// 一開始就貼著（重疊不到半徑）的方塊：往裡面走算 t = 0 撞到，往外走就放行，浮點誤差才不會讓圓慢慢陷進牆裡。
+function sweepCircle(s: Solid, x: number, z: number, dx: number, dz: number, r: number): SweepHit | null {
+  const [pu, pv] = toSolidSpace(s, x - s.cx, z - s.cz);
+  const [du, dv] = toSolidSpace(s, dx, dz);
+  const toWorld = (nu: number, nv: number, t: number): SweepHit => ({ t, nx: nu * s.ux + nv * s.vx, nz: nu * s.uz + nv * s.vz });
+
+  const gapU = pu - clamp(pu, -s.hu, s.hu);
+  const gapV = pv - clamp(pv, -s.hv, s.hv);
+  const gap = Math.hypot(gapU, gapV);
+  if (gap < r) {
+    if (gap === 0) return null;   // 圓心已經在方塊裡：交給呼叫端當成一開始就重疊
+    return gapU * du + gapV * dv < 0 ? toWorld(gapU / gap, gapV / gap, 0) : null;
+  }
+
+  let enter = 0;
+  let exit = 1;
+  let normalU = 0;
+  let normalV = 0;
+  const axes: [number, number, number, boolean][] = [[pu, du, s.hu + r, true], [pv, dv, s.hv + r, false]];
+  for (const [p, d, half, isU] of axes) {
+    if (Math.abs(d) < 1e-12) {
+      if (Math.abs(p) > half) return null;
+      continue;
+    }
+    const t1 = (-half - p) / d;
+    const t2 = (half - p) / d;
+    if (Math.min(t1, t2) > enter) {
+      enter = Math.min(t1, t2);
+      normalU = isU ? -Math.sign(d) : 0;
+      normalV = isU ? 0 : -Math.sign(d);
+    }
+    exit = Math.min(exit, Math.max(t1, t2));
+    if (enter > exit) return null;
+  }
+  const hitU = pu + du * enter;
+  const hitV = pv + dv * enter;
+  if (Math.abs(hitU) > s.hu && Math.abs(hitV) > s.hv) {
+    const cornerU = Math.sign(hitU) * s.hu;
+    const cornerV = Math.sign(hitV) * s.hv;
+    const t = rayCircle(pu, pv, du, dv, cornerU, cornerV, r);
+    if (t === null) return null;
+    return toWorld((pu + du * t - cornerU) / r, (pv + dv * t - cornerV) / r, t);
+  }
+  return normalU === 0 && normalV === 0 ? null : toWorld(normalU, normalV, enter);
 }
 
 // --- 樓層：編輯器一次只操作一層，環繞檢視時上面的樓層藏起來才看得到、點得到這層 ---
@@ -975,7 +1089,7 @@ function rebuildScene(): void {
   itemGroups.clear();
   world.room.add(buildHouse(config));
   for (const [key, item] of Object.entries(config.furniture)) renderItem(key, item);
-  world.colliders = collectColliders();
+  ({ boxes: world.colliders, solids: world.solids } = collectColliders());
   world.ramps = config.scene.house.levels.flatMap((level) =>
     level.ramps.map((ramp) => ({ ...ramp, bottom: level.elevation + ramp.bottom, top: level.elevation + ramp.top })));
   applyLevelVisibility();
@@ -1328,7 +1442,10 @@ function createOrbitMode(): ViewMode {
 const ORBIT_FOV = camera.fov;
 const HEAD_CLEARANCE = 0.1;      // 眼睛以上還有頭頂，門楣比這低就過不去
 const SURFACE_EPSILON = 1e-4;    // 判斷「站在表面上」的容差
-const MAX_SUBSTEP = 0.05;        // 每格移動切成小段，速度調高也不會穿過 0.1 m 的牆
+const MAX_SUBSTEP = 0.05;        // 每格移動切成小段（掃掠本身不會穿牆；這是讓跨台階、樓梯的高度每段都更新）
+const SLIDE_ITERATIONS = 4;      // 走進牆角時：第一次沿 A 牆滑、第二次被 B 牆削掉，再多留兩次給浮點誤差
+const SKIN = 0.005;              // 停在牆面前這麼遠，下一格一開始才不會卡在牆裡
+const MIN_SLIDE = 1e-6;          // 剩下的位移比這短就不再算
 const BLOCKED_SPEED_RATIO = 0.2;  // 實際速度不到想走速度的這個比例，算被擋住
 const BLOCKED_DELAY = 0.1;        // 連續被擋這麼久（秒）才切到受阻，擦過牆角不會閃一下
 const HAND_PROBE_MARGIN = 0.3;    // 手伸到的距離再往前多探這麼遠找牆
@@ -2162,28 +2279,47 @@ function createFirstPersonMode(): ViewMode {
   const isGrounded = (): boolean => isOnGround;
   const bodyHeight = (): number => eyeHeight() + HEAD_CLEARANCE;
   // 水平方向會擋的：頂面高過「能自動跨上的高度」、底面低於頭頂的方塊。
-  const blocksBody = (box: THREE.Box3): boolean =>
-    box.max.y > feetY + config.character.stepHeight && box.min.y < feetY + bodyHeight();
+  const blocksBody = (solid: Solid): boolean =>
+    solid.maxY > feetY + config.character.stepHeight && solid.minY < feetY + bodyHeight();
+  // 站上去、撞頭用的腳印是方形（軸對齊方塊）；水平移動用圓形，見 slide。
   const overlapsAt = (box: THREE.Box3, x: number, z: number): boolean =>
     x + config.character.radius > box.min.x && x - config.character.radius < box.max.x && z + config.character.radius > box.min.z && z - config.character.radius < box.max.z;
-  const isFree = (x: number, z: number): boolean => !world.colliders.some((box) => blocksBody(box) && overlapsAt(box, x, z));
+  const isFree = (x: number, z: number): boolean =>
+    !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius));
   const dismissHint = (): void => { hint.hidden = true; };
 
-  // 先走 X 再走 Z，撞到就停在表面、另一軸照走，貼著牆能沿牆滑。
-  // 一開始就重疊的方塊不擋（例如在環繞模式把家具搬到玩家身上），才走得出來。
+  // collide-and-slide：腳印是圓（從上往下看的膠囊體）。沿位移掃掠，碰到就停在表面前 SKIN，
+  // 剩下的位移去掉朝牆的分量、貼著牆面繼續走，最多 SLIDE_ITERATIONS 次。牆角會被推開繞過去，斜牆也滑得順。
+  // 圓心已經在方塊裡的不擋（例如在環繞模式把家具搬到玩家身上），才走得出來。
   function slide(dx: number, dz: number): void {
-    const p = body;
-    const solids = world.colliders.filter((box) => blocksBody(box) && !overlapsAt(box, p.x, p.z));
-    let x = p.x + dx;
-    for (const box of solids) {
-      if (overlapsAt(box, x, p.z)) x = dx > 0 ? box.min.x - config.character.radius - EPSILON : box.max.x + config.character.radius + EPSILON;
+    const r = config.character.radius;
+    const solids = world.solids.filter((solid) => blocksBody(solid) && !circleOverlapsSolid(solid, body.x, body.z, 0));
+    let restX = dx;
+    let restZ = dz;
+    for (let i = 0; i < SLIDE_ITERATIONS; i++) {
+      const length = Math.hypot(restX, restZ);
+      if (length < MIN_SLIDE) return;
+      let hit: SweepHit | null = null;
+      for (const solid of solids) {
+        const candidate = sweepCircle(solid, body.x, body.z, restX, restZ, r);
+        if (candidate && (!hit || candidate.t < hit.t)) hit = candidate;
+      }
+      if (!hit) {
+        body.x += restX;
+        body.z += restZ;
+        return;
+      }
+      const travel = Math.max(0, hit.t - SKIN / length);
+      body.x += restX * travel;
+      body.z += restZ * travel;
+      restX *= 1 - travel;
+      restZ *= 1 - travel;
+      const into = restX * hit.nx + restZ * hit.nz;
+      if (into < 0) {
+        restX -= into * hit.nx;
+        restZ -= into * hit.nz;
+      }
     }
-    let z = p.z + dz;
-    for (const box of solids) {
-      if (overlapsAt(box, x, z)) z = dz > 0 ? box.min.z - config.character.radius - EPSILON : box.max.z + config.character.radius + EPSILON;
-    }
-    p.x = x;
-    p.z = z;
   }
 
   // 站在 scene.spawn（預設是入口台階前、面向大門）；那裡被佔了就找最近的空位（和擺家具共用搜尋順序）。
@@ -2433,24 +2569,13 @@ function createFirstPersonMode(): ViewMode {
 
   // 實際位移轉成角色座標的前後／左右速度，交給方塊人決定步伐。
   // 從 (x, z) 沿水平方向 (dirX, dirZ) 往前，在高度 y 最先碰到的碰撞方塊有多遠；maxDistance 內沒有就是 Infinity。
-  // 用 slab 法算射線和方塊的交點；起點已經在方塊裡的不算。
+  // 半徑 0 的掃掠就是射線；斜牆也量得準。
   function distanceToSurface(x: number, z: number, dirX: number, dirZ: number, y: number, maxDistance: number): number {
     let nearest = Infinity;
-    for (const box of world.colliders) {
-      if (y < box.min.y || y > box.max.y) continue;
-      let near = 0;
-      let far = maxDistance;
-      for (const [origin, dir, min, max] of [[x, dirX, box.min.x, box.max.x], [z, dirZ, box.min.z, box.max.z]]) {
-        if (Math.abs(dir) < EPSILON) {
-          if (origin < min || origin > max) far = -1;
-          continue;
-        }
-        const t1 = (min - origin) / dir;
-        const t2 = (max - origin) / dir;
-        near = Math.max(near, Math.min(t1, t2));
-        far = Math.min(far, Math.max(t1, t2));
-      }
-      if (near > 0 && near <= far) nearest = Math.min(nearest, near);
+    for (const solid of world.solids) {
+      if (y < solid.minY || y > solid.maxY) continue;
+      const hit = sweepCircle(solid, x, z, dirX * maxDistance, dirZ * maxDistance, 0);
+      if (hit) nearest = Math.min(nearest, hit.t * maxDistance);
     }
     return nearest;
   }
