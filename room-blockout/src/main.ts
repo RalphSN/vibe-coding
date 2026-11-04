@@ -56,18 +56,21 @@ interface GaitStyle {
 }
 interface JumpKey { spinePitch: number; hipX: number; knee: number; foot: number; shoulderX: number; shoulderZ: number; elbow: number }
 // pushForward／pushSide：按著方向鍵、手的高度前方有牆時，想走的方向（角色座標的單位向量）；沒有是 0。
-// pushBack：手會穿進牆多少（m），角色畫面往後退這麼多，手剛好貼在牆面上（碰撞位置不變）。
+// pushBack：手會穿進牆多少（m），角色畫面往後退這麼多，手剛好搆到牆（碰撞位置不變）。
+// findWall：推牆時給手部 IK 找每隻手要貼的牆面；沒在推是 null。
 interface RigMotion {
   forwardSpeed: number; sideSpeed: number; turnRate: number; isGrounded: boolean; riseRatio: number;
-  pushForward: number; pushSide: number; pushBack: number;
+  pushForward: number; pushSide: number; pushBack: number; findWall: WallProbe | null;
 }
+// 從世界座標 (x, y, z) 沿水平方向 (dirX, dirZ) 往前，maxDistance 內最先碰到的牆：多遠、表面朝哪（朝外的單位向量）。
+type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, maxDistance: number) => { distance: number; nx: number; nz: number } | null;
 // 水平碰撞用的有向方塊（OBB）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。
 // 斜牆、斜放的家具就是一整個轉了角度的方塊，不用切成小段。
 interface Solid { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
 // 掃掠碰到的時刻（位移的比例 0–1）與表面法線（世界座標，朝外）。
 interface SweepHit { t: number; nx: number; nz: number }
-// 推牆時手掌在角色前方多遠、離腳底多高（m）。
-interface HandReach { forward: number; height: number }
+// 推牆時手掌在角色前方多遠、離腳底多高（m）；slack 是手部 IK 能再往前補的距離（沒有 IK 是 0）。
+interface HandReach { forward: number; height: number; slack: number }
 interface AvatarRig { root: THREE.Group; build(eyeHeight: number): void; animate(motion: RigMotion, dt: number): void; handReach(): HandReach }
 interface Character extends AvatarRig { load(): Promise<string[]>; syncSkeletonHelper(): void }
 interface PlayerPose { x: number; z: number; yaw: number; pitch: number; distance?: number; feetY?: number }
@@ -1903,7 +1906,7 @@ function createAvatarRig(): AvatarRig {
     tilt.rotation.z = DEG(state.bank);
   }
 
-  const handReach = (): HandReach => ({ forward: BRACE_HAND_REACH.forward * state.height, height: BRACE_HAND_REACH.height * state.height });
+  const handReach = (): HandReach => ({ forward: BRACE_HAND_REACH.forward * state.height, height: BRACE_HAND_REACH.height * state.height, slack: 0 });
 
   return { root, build, animate, handReach };
 }
@@ -1917,6 +1920,12 @@ const MODEL_FACING = Math.PI;      // 模型面向 +Z，遊戲裡角色面向 -Z
 const IDLE_SPEED = 0.1;            // 低於這個速度（m/s）算站著
 const BLOCKED_TIME_SCALE = 0.6;    // 推牆動畫放慢一點，看起來是頂著推不動，不是在走
 const HAND_BONES = ['hand_l', 'hand_r'];
+const ARM_CHAINS: [string, string, string][] = [['upperarm_l', 'lowerarm_l', 'hand_l'], ['upperarm_r', 'lowerarm_r', 'hand_r']];
+const IK_SMOOTH_TIME = 0.12;       // 手部 IK 淡入淡出
+const IK_MIN_WEIGHT = 1e-3;
+const IK_REACH_MARGIN = 0.15;      // 手臂伸直的長度再往前多探這麼遠找牆
+const IK_SLACK = 0.08;             // 有手部 IK 時身體少退這麼多，手肘留彎度，斜著推時遠的那隻手也搆得到
+const IK_STRETCH_LIMIT = 1e-3;     // 手臂不完全伸直，留一點彎度，手肘才不會在伸直附近翻來翻去
 const PUSH_BACK_SMOOTH_TIME = 0.15;
 const CLIP_END_EPSILON = 1e-3;
 const PHASE_FOOT_BONE = 'ball_l';  // 用左腳尖找步伐週期的起點
@@ -1981,10 +1990,79 @@ function measureHandReach(model: THREE.Object3D, clip: THREE.AnimationClip): Han
       forward += point.z / hands.length;
       height += point.y / hands.length;
     }
-    if (!best || forward > best.forward) best = { forward, height };
+    if (!best || forward > best.forward) best = { forward, height, slack: 0 };
   }
   probe.stopAllAction();
   return best;
+}
+
+// 一隻手臂的三根骨頭；restore 是 IK 改之前的姿勢（mixer 只在值改變時才寫回骨頭，下一格要先還原）。
+interface ArmChain {
+  upper: THREE.Object3D; lower: THREE.Object3D; hand: THREE.Object3D;
+  restoreUpper: THREE.Quaternion; restoreLower: THREE.Quaternion;
+  target: THREE.Vector3; hasTarget: boolean; isApplied: boolean;
+}
+
+function findArmChains(root: THREE.Object3D): ArmChain[] {
+  const chains: ArmChain[] = [];
+  for (const [upperName, lowerName, handName] of ARM_CHAINS) {
+    const upper = root.getObjectByName(upperName);
+    const lower = root.getObjectByName(lowerName);
+    const hand = root.getObjectByName(handName);
+    if (!upper || !lower || !hand) return [];
+    chains.push({
+      upper, lower, hand, restoreUpper: new THREE.Quaternion(), restoreLower: new THREE.Quaternion(),
+      target: new THREE.Vector3(), hasTarget: false, isApplied: false,
+    });
+  }
+  return chains;
+}
+
+const ikShoulder = new THREE.Vector3();
+const ikElbow = new THREE.Vector3();
+const ikHand = new THREE.Vector3();
+const ikGoal = new THREE.Vector3();
+const ikDir = new THREE.Vector3();
+const ikPole = new THREE.Vector3();
+const ikFrom = new THREE.Vector3();
+const ikTo = new THREE.Vector3();
+const ikParent = new THREE.Quaternion();
+const ikTurn = new THREE.Quaternion();
+const IK_FALLBACK_POLE = new THREE.Vector3(0, -1, 0);
+
+// 把骨頭繞自己的關節轉，讓世界座標裡的方向 from 轉成 to：local' = parent⁻¹ · 轉動 · parent · local。
+function turnBone(bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3): void {
+  if (!bone.parent || from.lengthSq() === 0 || to.lengthSq() === 0) return;
+  bone.parent.getWorldQuaternion(ikParent);
+  ikTurn.setFromUnitVectors(from.normalize(), to.normalize());
+  ikTurn.premultiply(ikParent.clone().invert()).multiply(ikParent);
+  bone.quaternion.premultiply(ikTurn);
+  bone.updateMatrixWorld(true);
+}
+
+// 兩骨 IK：上臂 a、前臂 b 長度已知，肩膀到目標距離 c，用餘弦定理算手肘位置，
+// 手肘往動畫原本彎的方向（pole）凸出；先轉上臂讓手肘到位，再轉前臂讓手到目標。
+function solveTwoBoneIk(chain: ArmChain, goal: THREE.Vector3): void {
+  chain.upper.getWorldPosition(ikShoulder);
+  chain.lower.getWorldPosition(ikElbow);
+  chain.hand.getWorldPosition(ikHand);
+  const a = ikShoulder.distanceTo(ikElbow);
+  const b = ikElbow.distanceTo(ikHand);
+  ikDir.subVectors(goal, ikShoulder);
+  const c = clamp(ikDir.length(), Math.abs(a - b) + IK_STRETCH_LIMIT, a + b - IK_STRETCH_LIMIT);
+  if (a === 0 || b === 0 || ikDir.lengthSq() === 0) return;
+  ikDir.normalize();
+  ikPole.subVectors(ikElbow, ikShoulder);
+  ikPole.addScaledVector(ikDir, -ikPole.dot(ikDir));
+  if (ikPole.lengthSq() < 1e-8) ikPole.copy(IK_FALLBACK_POLE).addScaledVector(ikDir, -IK_FALLBACK_POLE.dot(ikDir));
+  ikPole.normalize();
+  const cosA = clamp((a * a + c * c - b * b) / (2 * a * c), -1, 1);
+  const elbowGoal = ikShoulder.clone().addScaledVector(ikDir, a * cosA).addScaledVector(ikPole, a * Math.sqrt(1 - cosA * cosA));
+  turnBone(chain.upper, ikFrom.subVectors(ikElbow, ikShoulder), ikTo.subVectors(elbowGoal, ikShoulder));
+  chain.lower.getWorldPosition(ikElbow);
+  chain.hand.getWorldPosition(ikHand);
+  const handGoal = ikShoulder.clone().addScaledVector(ikDir, c);
+  turnBone(chain.lower, ikFrom.subVectors(ikHand, ikElbow), ikTo.subVectors(handGoal, ikElbow));
 }
 
 // 模型載入前（或載入失敗時）先用方塊人，介面和方塊人一樣，第一人稱模式不用知道是哪一個。
@@ -2008,6 +2086,9 @@ function createCharacter(): Character {
   const pushBackMotion = { velocity: 0 };
   const pushDir = { forward: 1, side: 0 };   // 最後一次推的方向，放開後沿原方向退回原位
   let pushBack = 0;
+  let armChains: ArmChain[] = [];
+  let ikWeight = 0;
+  const ikMotion = { velocity: 0 };
   const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0 };
   const facingMotion = { velocity: 0 };
   let phase: CharacterPhase = 'ground';
@@ -2190,7 +2271,53 @@ function createCharacter(): Character {
     if (!handReaches.has(clip)) handReaches.set(clip, measureHandReach(model, clip));
     const reach = handReaches.get(clip);
     const scale = config.character.scale;
-    return reach ? { forward: reach.forward * scale, height: reach.height * scale } : block.handReach();
+    return reach ? { forward: reach.forward * scale, height: reach.height * scale, slack: armChains.length > 0 ? IK_SLACK : 0 } : block.handReach();
+  }
+
+  // 從肩膀沿手伸出去的水平方向、在動畫裡手的高度找牆；找到就把目標設在牆面前 HAND_GAP。
+  function findHandTarget(chain: ArmChain, findWall: WallProbe): boolean {
+    chain.upper.getWorldPosition(ikShoulder);
+    chain.lower.getWorldPosition(ikElbow);
+    chain.hand.getWorldPosition(ikHand);
+    const dirX = ikHand.x - ikShoulder.x;
+    const dirZ = ikHand.z - ikShoulder.z;
+    const length = Math.hypot(dirX, dirZ);
+    if (length < EPSILON) return false;
+    const armLength = ikShoulder.distanceTo(ikElbow) + ikElbow.distanceTo(ikHand);
+    const hit = findWall(ikShoulder.x, ikHand.y, ikShoulder.z, dirX / length, dirZ / length, armLength + IK_REACH_MARGIN);
+    if (!hit) return false;
+    chain.target.set(
+      ikShoulder.x + (dirX / length) * hit.distance + hit.nx * HAND_GAP,
+      ikHand.y,
+      ikShoulder.z + (dirZ / length) * hit.distance + hit.nz * HAND_GAP,
+    );
+    return true;
+  }
+
+  // 疊在動畫（與方向扭轉）之上：推牆時每隻手各自找牆面貼上去，權重淡入淡出；那隻手前面沒有牆就維持動畫。
+  // 離開推牆時用最後一次的目標淡出。
+  function applyHandIk(findWall: WallProbe | null, dt: number): void {
+    const wantsIk = phase === 'blocked' && findWall !== null;
+    ikWeight = smoothDamp(ikWeight, wantsIk ? 1 : 0, ikMotion, IK_SMOOTH_TIME, dt);
+    if (!model || armChains.length === 0 || ikWeight < IK_MIN_WEIGHT) return;
+    model.updateMatrixWorld(true);
+    for (const chain of armChains) {
+      if (wantsIk && findWall) chain.hasTarget = findHandTarget(chain, findWall);
+      if (!chain.hasTarget) continue;
+      chain.restoreUpper.copy(chain.upper.quaternion);
+      chain.restoreLower.copy(chain.lower.quaternion);
+      chain.isApplied = true;
+      solveTwoBoneIk(chain, ikGoal.copy(chain.hand.getWorldPosition(ikHand)).lerp(chain.target, ikWeight));
+    }
+  }
+
+  function undoHandIk(): void {
+    for (const chain of armChains) {
+      if (!chain.isApplied) continue;
+      chain.upper.quaternion.copy(chain.restoreUpper);
+      chain.lower.quaternion.copy(chain.restoreLower);
+      chain.isApplied = false;
+    }
   }
 
   function animate(motion: RigMotion, dt: number): void {
@@ -2201,9 +2328,11 @@ function createCharacter(): Character {
     }
     if (dt <= 0) return;
     animateModel(motion, dt);
+    undoHandIk();
     undoOrientationWarp();
     mixer.update(dt);
     applyOrientationWarp();
+    applyHandIk(motion.findWall, dt);
   }
 
   async function load(): Promise<string[]> {
@@ -2215,6 +2344,7 @@ function createCharacter(): Character {
     model.rotation.y = MODEL_FACING;
     scaleModel();
     warpBones = findWarpBones(model);
+    armChains = findArmChains(model);
     clips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
     for (const role of LOCOMOTION_ROLES) phaseOffset(clips.get(config.character.clips[role]) ?? gltf.animations[0]);
     root.remove(block.root);
@@ -2567,18 +2697,16 @@ function createFirstPersonMode(): ViewMode {
     feetY = nextY;
   }
 
-  // 實際位移轉成角色座標的前後／左右速度，交給方塊人決定步伐。
-  // 從 (x, z) 沿水平方向 (dirX, dirZ) 往前，在高度 y 最先碰到的碰撞方塊有多遠；maxDistance 內沒有就是 Infinity。
-  // 半徑 0 的掃掠就是射線；斜牆也量得準。
-  function distanceToSurface(x: number, z: number, dirX: number, dirZ: number, y: number, maxDistance: number): number {
-    let nearest = Infinity;
+  // 半徑 0 的掃掠就是射線；斜牆也量得準。推牆判斷和手部 IK 共用。
+  const findWall: WallProbe = (x, y, z, dirX, dirZ, maxDistance) => {
+    let nearest: { distance: number; nx: number; nz: number } | null = null;
     for (const solid of world.solids) {
       if (y < solid.minY || y > solid.maxY) continue;
       const hit = sweepCircle(solid, x, z, dirX * maxDistance, dirZ * maxDistance, 0);
-      if (hit) nearest = Math.min(nearest, hit.t * maxDistance);
+      if (hit && (!nearest || hit.t * maxDistance < nearest.distance)) nearest = { distance: hit.t * maxDistance, nx: hit.nx, nz: hit.nz };
     }
     return nearest;
-  }
+  };
 
   // 被擋住時，在推牆動畫手的高度往前探：有牆面才推，手往後退到剛好貼著；
   // 手的高度是空的（窗洞、只到腰的欄杆或矮家具）就不推，維持站著。
@@ -2589,11 +2717,12 @@ function createFirstPersonMode(): ViewMode {
     const dirX = -sin * push.forward + cos * push.right;
     const dirZ = -cos * push.forward - sin * push.right;
     const reach = rig.handReach();
-    const distance = distanceToSurface(body.x, body.z, dirX, dirZ, feetY + reach.height, reach.forward + HAND_PROBE_MARGIN);
-    if (distance === Infinity) return null;
-    return { ...push, back: Math.max(0, reach.forward + HAND_GAP - distance) };
+    const hit = findWall(body.x, feetY + reach.height, body.z, dirX, dirZ, reach.forward + HAND_PROBE_MARGIN);
+    if (!hit) return null;
+    return { ...push, back: Math.max(0, reach.forward + HAND_GAP - reach.slack - hit.distance) };
   }
 
+  // 實際位移轉成角色座標的前後／左右速度，交給方塊人決定步伐。
   // push 是被擋住時想走的方向（角色座標：forward 往前、right 往右）與畫面要往後退多少，沒被擋住是 null。
   function animateAvatar(dx: number, dz: number, turn: number, push: { forward: number; right: number; back: number } | null, dt: number): void {
     if (dt <= 0) return;
@@ -2608,6 +2737,7 @@ function createFirstPersonMode(): ViewMode {
       pushForward: push?.forward ?? 0,
       pushSide: push?.right ?? 0,
       pushBack: push?.back ?? 0,
+      findWall: push ? findWall : null,
     }, dt);
   }
 
