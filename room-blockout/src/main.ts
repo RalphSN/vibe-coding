@@ -1961,6 +1961,10 @@ const FLOAT_SWAY_RATES = [0.9, 1.3];       // 兩腳晃動的速度（弧度/秒
 const FLY_LEAN_MAX = 18;                   // 往前（後）飛時身體從骨盆往行進方向傾的最大角度（度），往側邊飛時一半
 const FLY_LEAN_SPEED = 6;                  // 水平速度到這裡（m/s）就傾到最大
 const FLY_LEAN_SMOOTH_TIME = 0.35;
+const FLY_CRUISE_SMOOTH_TIME = 0.3;        // 漂浮 ↔ 飛行的過渡：水平速度先平滑過再拿去算前傾、四肢後拖、腿伸直；位移本身是瞬間到速，直接用會一格就跳到飛行姿勢
+const FLY_LEG_FOLLOW = 0.85;               // 前傾時腿跟著身體轉的比例：1 是腿和軀幹成一直線，0 是腿永遠垂直往下
+const FLY_ARM_FOLLOW = 0.5;                // 手跟著身體轉的比例（比腿垂得直）
+const FLY_CRUISE_LEG_STRETCH = 0.02;       // 全速飛時腿再伸直多少（reach 增加）
 const FLY_DRAG = 0.03;                     // 手腳被風往後帶：水平速度 × 這個秒數 = 往後偏多少（m）
 const FLY_DRAG_MAX = 0.15;
 const FLY_ARM_DRAG_SHARE = 0.5;            // 手被帶的比例（比腳輕）
@@ -2087,6 +2091,8 @@ const leanAxis = new THREE.Vector3();
 const leanTurn = new THREE.Quaternion();
 const leanRollTurn = new THREE.Quaternion();
 const leanLocal = new THREE.Quaternion();
+const floatDown = new THREE.Vector3();     // 四肢往下垂的方向：漂浮時是正下方，前傾時跟著身體往後轉
+const floatTilt = new THREE.Quaternion();
 
 // 把骨頭繞自己的關節轉，讓世界座標裡的方向 from 轉成 to：local' = parent⁻¹ · 轉動 · parent · local。
 function turnBone(bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3): void {
@@ -2190,6 +2196,10 @@ function createCharacter(): Character {
   let leanPitch = 0;   // 往前傾為正（弧度）
   let leanRoll = 0;    // 往右傾為正（弧度）
   let climbBlend = 0;  // -1 往下飛 … 1 往上飛
+  let cruiseForward = 0;   // 平滑過的水平速度（m/s，角色座標）：漂浮姿勢和飛行姿勢之間照這個漸變
+  let cruiseSide = 0;
+  const cruiseForwardMotion = { velocity: 0 };
+  const cruiseSideMotion = { velocity: 0 };
   const leanPitchMotion = { velocity: 0 };
   const leanRollMotion = { velocity: 0 };
   const climbMotion = { velocity: 0 };
@@ -2438,7 +2448,7 @@ function createCharacter(): Character {
     floatSide.y = 0;
     if (floatSide.lengthSq() > 0) floatSide.normalize();
     ikGoal.copy(ikShoulder)
-      .addScaledVector(WORLD_UP, -reach * length)
+      .addScaledVector(floatDown, reach * length)
       .addScaledVector(floatForward, forward)
       .addScaledVector(floatSide, outward)
       .addScaledVector(WORLD_UP, lift)
@@ -2470,31 +2480,43 @@ function createCharacter(): Character {
     isLeanApplied = false;
   }
 
+  // 四肢往下垂的方向跟著身體前傾轉 share 的比例。前傾角度是平滑過的，所以腿從垂直往下慢慢擺到身體後方。
+  function tiltFloatDown(share: number): void {
+    leanAxis.crossVectors(WORLD_UP, floatForward);
+    floatTilt.setFromAxisAngle(leanAxis, leanPitch * share);
+    floatTilt.multiply(leanRollTurn.setFromAxisAngle(floatForward, leanRoll * share));
+    floatDown.set(0, -1, 0).applyQuaternion(floatTilt);
+  }
+
   // 飛行時把站立動畫改成漂浮：腿併攏往下、膝蓋往前微彎；手往外張、手肘往後微彎。手臂若正在推牆 IK 就不動。
   // 次級動態：四肢浮動慢身體半拍、兩腳各自輕晃、被風往後帶；往上飛腿拉直，往下飛膝蓋縮、手往上浮。
-  function applyFloatPose(motion: RigMotion): void {
+  // 往前飛：腿跟著身體前傾擺到後方並伸直，和漂浮姿勢之間照平滑過的速度漸變。
+  function applyFloatPose(): void {
     if (!model || flyWeight < IK_MIN_WEIGHT) return;
     model.updateMatrixWorld(true);
     model.getWorldDirection(floatForward).setY(0).normalize();
     model.getWorldPosition(floatCenter);
     floatRight.crossVectors(floatForward, WORLD_UP);
-    floatDrag.copy(floatForward).multiplyScalar(motion.forwardSpeed).addScaledVector(floatRight, motion.sideSpeed).multiplyScalar(FLY_DRAG);
+    floatDrag.copy(floatForward).multiplyScalar(cruiseForward).addScaledVector(floatRight, cruiseSide).multiplyScalar(FLY_DRAG);
     if (floatDrag.length() > FLY_DRAG_MAX) floatDrag.setLength(FLY_DRAG_MAX);
     const isCalm = reducedMotion.matches;
     const bobPhase = floatTime * FLOAT_BOB_RATE;
     const lag = isCalm ? 0 : FLOAT_BOB * (Math.sin(bobPhase - FLOAT_LIMB_LAG) - Math.sin(bobPhase));
     const rising = Math.max(0, climbBlend);
     const falling = Math.max(0, -climbBlend);
+    const cruise = clamp(Math.hypot(cruiseForward, cruiseSide) / FLY_LEAN_SPEED, 0, 1);
     floatPole.copy(floatForward);
+    tiltFloatDown(FLY_LEG_FOLLOW);
     legChains.forEach((chain, i) => {
       chain.restoreUpper.copy(chain.upper.quaternion);
       chain.restoreLower.copy(chain.lower.quaternion);
       chain.isApplied = true;
-      const reach = FLOAT_LEG_REACH[i] + rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK;
+      const reach = FLOAT_LEG_REACH[i] + rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK + cruise * FLY_CRUISE_LEG_STRETCH;
       const sway = isCalm ? 0 : FLOAT_SWAY * Math.sin(floatTime * FLOAT_SWAY_RATES[i] + i * 2);
       solveTwoBoneIk(chain, floatGoal(chain, reach, FLOAT_LEG_FORWARD[i] + sway, -FLOAT_FEET_INWARD, lag, 1), floatPole);
     });
     floatPole.copy(floatForward).negate();
+    tiltFloatDown(FLY_ARM_FOLLOW);
     for (const chain of armChains) {
       if (chain.isApplied) continue;
       chain.restoreUpper.copy(chain.upper.quaternion);
@@ -2540,9 +2562,11 @@ function createCharacter(): Character {
       floatTime += dt;
       const bob = reducedMotion.matches ? 0 : FLOAT_BOB * Math.sin(floatTime * FLOAT_BOB_RATE);
       (model ?? block.root).position.y = bob * flyWeight;
-      const lean = (speed: number): number => (motion.isFlying ? clamp(speed / FLY_LEAN_SPEED, -1, 1) * DEG(FLY_LEAN_MAX) : 0);
-      leanPitch = smoothDamp(leanPitch, lean(motion.forwardSpeed), leanPitchMotion, FLY_LEAN_SMOOTH_TIME, dt);
-      leanRoll = smoothDamp(leanRoll, lean(motion.sideSpeed) / 2, leanRollMotion, FLY_LEAN_SMOOTH_TIME, dt);
+      cruiseForward = smoothDamp(cruiseForward, motion.isFlying ? motion.forwardSpeed : 0, cruiseForwardMotion, FLY_CRUISE_SMOOTH_TIME, dt);
+      cruiseSide = smoothDamp(cruiseSide, motion.isFlying ? motion.sideSpeed : 0, cruiseSideMotion, FLY_CRUISE_SMOOTH_TIME, dt);
+      const lean = (speed: number): number => clamp(speed / FLY_LEAN_SPEED, -1, 1) * DEG(FLY_LEAN_MAX);
+      leanPitch = smoothDamp(leanPitch, lean(cruiseForward), leanPitchMotion, FLY_LEAN_SMOOTH_TIME, dt);
+      leanRoll = smoothDamp(leanRoll, lean(cruiseSide) / 2, leanRollMotion, FLY_LEAN_SMOOTH_TIME, dt);
       const climb = motion.isFlying ? clamp(motion.climbSpeed / FLY_VERTICAL_SPEED, -1, 1) : 0;
       climbBlend = smoothDamp(climbBlend, climb, climbMotion, FLY_CLIMB_SMOOTH_TIME, dt);
     }
@@ -2561,7 +2585,7 @@ function createCharacter(): Character {
     applyOrientationWarp();
     applyFlyLean();
     applyHandIk(motion.findWall, dt);
-    applyFloatPose(motion);
+    applyFloatPose();
     applyFootDroop();
   }
 
@@ -3069,7 +3093,7 @@ function createFirstPersonMode(): ViewMode {
       velocityY = 0;
       isOnGround = false;   // 第一格由 updateVertical 找腳下的表面，落在正確的高度
       body.set(pose.x, 0, pose.z);
-      targetDistance = pose.distance ?? 0;
+      targetDistance = pose.distance ?? config.camera.thirdPerson.distance;   // 第一次進來用第三人稱預設距離
       zoomDistance = targetDistance;
       obstructionArm = config.camera.maxDistance;
       for (const motion of [zoomMotion, armMotion, followMotion, pitchMotion, distanceMotion]) motion.velocity = 0;
@@ -4370,8 +4394,11 @@ character.load()
     if (animationFolder) addClipControllers(animationFolder);
   })
   .catch((error: unknown) => console.error(`角色模型載入失敗（${MODEL_URL}），繼續用方塊人：`, error));
+// 開頁面時是第三人稱。先進一次環繞檢視：它的 exit() 會關掉 OrbitControls、記下俯瞰的鏡頭位置，按 Tab 才回得到。
+// 場景建好（碰撞體就位）之後才進人物模式，出生點才找得到空位。
 setViewMode('orbit');
 rebuildScene();
+setViewMode('firstPerson');
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
