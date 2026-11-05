@@ -1846,8 +1846,16 @@ function createFirstPersonMode(): ViewMode {
   };
   // 這一刻會水平擋住身體的圓形障礙（倒圓錐、半球）半徑；腳底 stepHeight 以下的部分跨得上去，不算。
   // 圓形牆（泳池池壁）擋不擋：頂面高過能跨上的高度、底面低於頭頂才擋。
-  const blocksBodyWall = (wall: RoundWall): boolean =>
-    wall.maxY > feetY + config.character.stepHeight && wall.minY < feetY + bodyHeight();
+  // 只擋一段角度的牆（圖書館書櫃）：位置的角度在那段裡才算，腳印半徑換成角度當寬容。
+  const blocksBodyWall = (wall: RoundWall, x = body.x, z = body.z): boolean => {
+    if (wall.maxY <= feetY + config.character.stepHeight || wall.minY >= feetY + bodyHeight()) return false;
+    if (!wall.arc) return true;
+    const distance = Math.hypot(x, z);
+    if (distance === 0) return true;
+    const fromStart = THREE.MathUtils.euclideanModulo(Math.atan2(x, z) - wall.arc.start, Math.PI * 2);
+    const slack = config.character.radius / distance;
+    return fromStart < wall.arc.length + slack || fromStart > Math.PI * 2 - slack;
+  };
   const blockingRoundRadii = (): number[] => {
     const bottom = feetY + config.character.stepHeight;
     const top = feetY + bodyHeight();

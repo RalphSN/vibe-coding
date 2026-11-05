@@ -15,7 +15,7 @@ export interface Floater { amplitude: number; speed: number; phase: number; appl
  * 圓心在原點的圓形牆（例如泳池池壁）：高度 minY–maxY 之間水平方向擋。solid 是哪一側是實心的：
  * inside 是半徑以內實心（只能待在外面），outside 是半徑以外實心（只能待在裡面）。
  */
-export interface RoundWall { radius: number; minY: number; maxY: number; solid: 'inside' | 'outside' }
+export interface RoundWall { radius: number; minY: number; maxY: number; solid: 'inside' | 'outside'; arc?: { start: number; length: number } }
 
 /** 水平方向擋人的有向方塊（和 main.ts 的 Solid 同形狀）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。 */
 export interface SolidBox { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
@@ -405,6 +405,11 @@ function arcSlab(inner: number, outer: number, minY: number, maxY: number, start
   return mesh;
 }
 
+// 有向方塊碰撞：中心 (cx, cz)、轉 yaw（和 Object3D.rotation.y 同方向）、自身 x 方向長 sizeX、z 方向長 sizeZ。
+function orientedSolid(cx: number, cz: number, yaw: number, sizeX: number, sizeZ: number, minY: number, maxY: number): SolidBox {
+  return { cx, cz, ux: Math.cos(yaw), uz: -Math.sin(yaw), vx: Math.sin(yaw), vz: Math.cos(yaw), hu: sizeX / 2, hv: sizeZ / 2, minY, maxY };
+}
+
 const fullDisc = (spec: RingSpec): Disc => ({ inner: spec.inner, outer: spec.outer, minY: spec.minY, maxY: spec.maxY });
 
 export function emptyBuild(): PropsBuild {
@@ -503,6 +508,7 @@ function buildHousesRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
         const yaw = theta + (house.turned ? Math.PI / 2 : 0);
         const [sizeX, sizeZ] = house.turned ? [depth, house.width] : [house.width, depth];
         addHouse(rng, bodies, roofs, [polarX(rowRadius, theta), spec.maxY, polarZ(rowRadius, theta), yaw, 0, 0], sizeX, house.height, sizeZ, !house.isTower);
+        build.solids.push(orientedSolid(polarX(rowRadius, theta), polarZ(rowRadius, theta), yaw, sizeX, sizeZ, spec.maxY, spec.maxY + house.height + Math.min(sizeX, sizeZ)));
         along += house.width + range(rng, HOUSE_GAP);
       }
       rowStart += rowDepth + range(rng, HOUSE_ROW_GAP);
@@ -692,6 +698,11 @@ function addShelfSegment(rng: Rng, build: PropsBuild, center: number, floorY: nu
   }
   addShelfFace(rng, { front: center + half, inward: -1, start, length, floorY, levelHeight }, dividers, books);
   addShelfFace(rng, { front: center - half, inward: 1, start, length, floorY, levelHeight }, dividers, books);
+  // 碰撞：書櫃外側那面擋住外面的走道、內側那面擋住裡面的走道，都只擋這一段角度（缺口可以穿過）；兩端再加端板，不會從側面走進書櫃
+  const arc = { start, length };
+  const top = floorY + LIBRARY_HEIGHT;
+  build.walls.push({ radius: center + half, minY: floorY, maxY: top, solid: 'inside', arc }, { radius: center - half, minY: floorY, maxY: top, solid: 'outside', arc });
+  for (const end of [start, start + length]) build.solids.push(orientedSolid(polarX(center, end), polarZ(center, end), end, 0.3, half * 2, floorY, top));
 }
 
 // 環面是木地板，上面 LIBRARY_WALLS 圈雙面書櫃，書櫃之間和內外兩側是走道；每圈書櫃在不同角度開幾個缺口，可以穿到隔壁走道。
@@ -730,7 +741,7 @@ function buildTripleRing(spec: RingSpec, build: PropsBuild): void {
 // ---------- 環狀美食街 ----------
 interface FoodBatches { roundTables: Batch; squareTables: Batch; chairs: Batch; longTables: Batch; benches: Batch; stalls: Batch; awnings: Batch; pots: Batch; bushes: Batch }
 // 一個分區：角度範圍、半徑範圍與地面高度；occupied 記錄已經放了東西的位置，避免重疊。
-interface FoodZone { start: number; end: number; inner: number; outer: number; y: number; occupied: { x: number; z: number; radius: number }[] }
+interface FoodZone { start: number; end: number; inner: number; outer: number; y: number; occupied: { x: number; z: number; radius: number }[]; solids: SolidBox[] }
 
 function isInZone(zone: FoodZone, x: number, z: number, margin: number): boolean {
   const r = Math.hypot(x, z);
@@ -770,9 +781,11 @@ function addTableSet(rng: Rng, batches: FoodBatches, zone: FoodZone, x: number, 
   };
   if (rng() < ROUND_TABLE_CHANCE) {
     batches.roundTables.add(transform(x, zone.y, z, yaw, 0, 0, 1, 1, 1), pick(rng, TABLE_COLORS));
+    zone.solids.push(orientedSolid(x, z, yaw, 1.25, 1.25, zone.y, zone.y + 0.8));
     for (let k = 0; k < 4; k++) addChair(yaw + (k * Math.PI) / 2 + spread(rng, 0.2), ROUND_CHAIR_OFFSET);
   } else {
     batches.squareTables.add(transform(x, zone.y, z, yaw, 0, 0, 1, 1, 1), pick(rng, TABLE_COLORS));
+    zone.solids.push(orientedSolid(x, z, yaw, 1.25, 0.85, zone.y, zone.y + 0.8));
     for (const side of [0, Math.PI]) addChair(yaw + side, SQUARE_CHAIR_OFFSET);
   }
 }
@@ -804,6 +817,7 @@ function addStallRow(rng: Rng, batches: FoodBatches, zone: FoodZone, radius: num
     // 攤位正面是自身的 +z；朝外緣的攤位轉向圓心（facing = π），朝內緣的轉向外面（facing = 0）
     const body = transform(x, zone.y, z, theta + facing, 0, 0, width, height, depth);
     batches.stalls.add(body, pick(rng, STALL_COLORS));
+    zone.solids.push(orientedSolid(x, z, theta + facing, width, depth, zone.y, zone.y + height + 0.4));
     const awning = body.clone()
       .multiply(new THREE.Matrix4().makeTranslation(0, 1, 0.5))
       .multiply(new THREE.Matrix4().makeRotationX(AWNING_DROOP))
@@ -839,6 +853,7 @@ function addLongTables(rng: Rng, batches: FoodBatches, zone: FoodZone): void {
       if (!isInZone(zone, x + (ux * length) / 2, z + (uz * length) / 2, 1) || !isInZone(zone, x - (ux * length) / 2, z - (uz * length) / 2, 1)) continue;
       if (zone.occupied.some((other) => Math.hypot(other.x - x, other.z - z) < other.radius + length / 2)) continue;
       batches.longTables.add(transform(x, zone.y, z, yaw, 0, 0, length, 1, 1), color);
+      zone.solids.push(orientedSolid(x, z, yaw, length, BENCH_OFFSET * 2 + 0.35, zone.y, zone.y + 0.8));
       for (const side of [1, -1]) {
         batches.benches.add(transform(x + vx * side * BENCH_OFFSET, zone.y, z + vz * side * BENCH_OFFSET, yaw, 0, 0, length, 1, 1), pick(rng, CHAIR_COLORS));
       }
@@ -854,6 +869,7 @@ function addPlanters(rng: Rng, batches: FoodBatches, zone: FoodZone, count: numb
     if (!spot) continue;
     const potHeight = size * 0.9;
     batches.pots.add(transform(spot.x, zone.y, spot.z, 0, 0, 0, size, potHeight, size), pick(rng, POT_COLORS));
+    zone.solids.push(orientedSolid(spot.x, spot.z, 0, size * 2, size * 2, zone.y, zone.y + potHeight + size * 1.4));
     batches.bushes.add(transform(spot.x, zone.y + potHeight + size * 0.6, spot.z, rng() * TAU, 0, 0, size * 1.1, size * 0.9, size * 1.1), pick(rng, BUSH_COLORS));
   }
 }
@@ -879,7 +895,7 @@ function buildFoodCourtRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   let previous: FoodZoneKind | null = null;
   for (const weight of weights) {
     const span = (weight / total) * TAU;
-    const zone: FoodZone = { start: angle + walkway / 2, end: angle + span - walkway / 2, inner: spec.inner + FOOD_EDGE, outer: spec.outer - FOOD_EDGE, y: spec.maxY + FOOD_PATCH, occupied: [] };
+    const zone: FoodZone = { start: angle + walkway / 2, end: angle + span - walkway / 2, inner: spec.inner + FOOD_EDGE, outer: spec.outer - FOOD_EDGE, y: spec.maxY + FOOD_PATCH, occupied: [], solids: build.solids };
     angle += span;
     build.decor.add(arcSlab(zone.inner, zone.outer, spec.maxY, zone.y, zone.start, zone.end - zone.start, colorMaterial(pick(rng, FOOD_PATCH_COLORS))));
     // 相鄰兩區不要同一種

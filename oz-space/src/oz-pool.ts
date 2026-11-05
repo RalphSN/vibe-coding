@@ -3,6 +3,7 @@
 // 波速照深水波公式），法線跟著波紋算，所以反光、折射都會動。池底與池壁疊上會動的光紋（caustics）。
 import * as THREE from 'three';
 import { annulus, bakeByMaterial, createRng, emptyBuild, getPropsEnvironment, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
+import { collectColliders, markChildGroups, markCollider, skipCollider } from './oz-kit';
 
 type Rng = () => number;
 type Vec3 = [number, number, number];
@@ -305,6 +306,7 @@ function poolWall(radius: number, bottom: number, height: number, material: THRE
 // ---------- 池畔設施 ----------
 // 不鏽鋼扶梯：兩根扶手從水裡往上、彎過池邊、插進池畔；水裡三階踏板。自身 z = 0 是池壁，-z 是水、+z 是池畔，y = 0 是池畔面。
 function addLadder(g: THREE.Object3D, M: PoolMaterials): void {
+  skipCollider(g);   // 扶梯靠在池邊，擋住的話游到池邊就上不了岸
   for (const x of [-0.28, 0.28]) {
     const curve = new THREE.CatmullRomCurve3([[x, -1.25, -0.16], [x, 0.55, -0.16], [x, 0.9, -0.02], [x, 0.92, 0.18], [x, 0.6, 0.4], [x, 0, 0.42]].map(([px = 0, py = 0, pz = 0]) => new THREE.Vector3(px, py, pz)));
     addMesh(g, new THREE.TubeGeometry(curve, 40, 0.022, 8), M.chrome, [0, 0, 0]);
@@ -334,6 +336,8 @@ function addLounger(g: THREE.Object3D, M: PoolMaterials, rng: Rng): void {
 // 陽傘：配重底座、桿子、16 片條紋傘布。
 function addUmbrella(g: THREE.Object3D, M: PoolMaterials, rng: Rng): void {
   const canopy = M.canopies[Math.floor(rng() * M.canopies.length)] ?? M.redCanopy;
+  skipCollider(g);   // 傘面很大但在頭頂上，只擋傘柱和底座
+  markCollider(g, [0.6, 2.5, 0.6], [0, 1.25, 0]);
   addMesh(g, new THREE.CylinderGeometry(0.28, 0.3, 0.08, 16), M.umbrellaBase, [0, 0.04, 0]);
   rod(g, M.chrome, [0, 0, 0], [0, 2.5, 0], 0.02);
   addMesh(g, new THREE.ConeGeometry(1.5, 0.45, 16, 1, true), canopy, [0, 2.32, 0]);
@@ -463,6 +467,9 @@ export function buildPoolRing(spec: RingSpec): PropsBuild {
 
   const props = new THREE.Group();
   addDeckProps(props, M, rng, poolIn, poolOut, maxY);
+  // 池畔設施（躺椅、救生員椅、淋浴柱、植栽、陽傘柱）各用自己的外框擋人
+  markChildGroups(props);
+  build.solids.push(...collectColliders(props));
   build.decor.add(bakeByMaterial(props));
   props.traverse((object) => {
     if (object instanceof THREE.Mesh) object.geometry.dispose();
