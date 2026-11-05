@@ -3069,7 +3069,7 @@ function createFirstPersonMode(): ViewMode {
       velocityY = 0;
       isOnGround = false;   // 第一格由 updateVertical 找腳下的表面，落在正確的高度
       body.set(pose.x, 0, pose.z);
-      targetDistance = pose.distance ?? 0;
+      targetDistance = pose.distance ?? config.camera.thirdPerson.distance;   // 第一次進來用第三人稱預設距離
       zoomDistance = targetDistance;
       obstructionArm = config.camera.maxDistance;
       for (const motion of [zoomMotion, armMotion, followMotion, pitchMotion, distanceMotion]) motion.velocity = 0;
@@ -4370,8 +4370,11 @@ character.load()
     if (animationFolder) addClipControllers(animationFolder);
   })
   .catch((error: unknown) => console.error(`角色模型載入失敗（${MODEL_URL}），繼續用方塊人：`, error));
+// 開頁面時是第三人稱。先進一次環繞檢視：它的 exit() 會關掉 OrbitControls、記下俯瞰的鏡頭位置，按 Tab 才回得到。
+// 場景建好（碰撞體就位）之後才進人物模式，出生點才找得到空位。
 setViewMode('orbit');
 rebuildScene();
+setViewMode('firstPerson');
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
