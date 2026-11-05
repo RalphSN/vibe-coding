@@ -11,6 +11,7 @@ import { buildCourtsRing } from './oz-sports';
 import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
 import { buildTrackRing } from './oz-track';
 import { buildFloatingHousesRing, buildHousesRing } from './oz-town';
+import { rod } from './oz-kit';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
 // ================= 0. 型別 =================
@@ -337,6 +338,21 @@ const EAR_SINK = 0.15;
 const INNER_EAR_SCALE = 0.62;
 const INNER_EAR_FORWARD = 0.22; // 內耳往前推（耳朵底半徑的倍數），粉紅色才露在正面
 const DOME_SEGMENTS = 64;
+// 貓臉：都長在頭（半球）朝前（+Z）的那一面，方向是從頭中心往外的單位向量；大小是頭半徑的倍數。
+const FACE = {
+  eye: { x: 0.36, y: 0.42, z: 0.83, width: 0.13, height: 0.16, depth: 0.05 },
+  pupil: { width: 0.035, height: 0.13 },
+  nose: { x: 0, y: 0.2, z: 0.98, width: 0.06, height: 0.04 },
+  mouth: { x: 0.05, y: 0.1, z: 0.99, radius: 0.05, tube: 0.008 },
+  cheek: { x: 0.24, y: 0.14, z: 0.96 },
+  whisker: { reach: 0.42, fan: 0.07, radius: 0.004 },
+  collar: { tube: 0.025, bell: 0.06 },
+};
+const CONE_BAND_SPACING = 40;   // 圓錐上一圈圈裝飾環帶的間距（m）
+const FACE_COLORS = { iris: 0xc8d94a, pupil: 0x1d1f24, glint: 0xffffff, line: 0x3a3340, collar: 0xd2463c, bell: 0xe2b23a, band: 0xa9b3c7 };
+const faceMaterials = Object.fromEntries(
+  Object.entries(FACE_COLORS).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]),
+) as Record<keyof typeof FACE_COLORS, THREE.MeshLambertMaterial>;
 
 // 中央：倒圓錐（上平下尖）上面接一個半球和兩隻耳朵，做成貓頭。
 // 碰撞：圓錐側面用 Cone、半球用 Dome（都是公式計算，貼著外觀）；耳朵只有外觀。
@@ -360,7 +376,69 @@ function buildCenter(center: CenterConfig): THREE.Group {
     ear.add(inner);
     group.add(ear);
   }
+  addCatFace(group, center);
+  addConeBands(group, center);
   return group;
+}
+
+// 頭表面上 direction 方向的一點往外推 lift 公尺，讓扁平的零件貼著曲面、正面朝外。
+function placeOnHead(mesh: THREE.Object3D, center: CenterConfig, direction: THREE.Vector3, lift: number): void {
+  const origin = new THREE.Vector3(0, center.topY, 0);
+  mesh.position.copy(direction).multiplyScalar(center.topRadius + lift).add(origin);
+  mesh.lookAt(direction.clone().multiplyScalar(center.topRadius * 2).add(origin));
+}
+
+// 眼睛（黃綠虹膜、直立的瞳孔、反光點）、粉紅鼻子、ω 形的嘴、兩側各三根鬍鬚，脖子上一圈紅項圈和金鈴鐺。只有外觀。
+function addCatFace(group: THREE.Group, center: CenterConfig): void {
+  const R = center.topRadius;
+  const sphere = new THREE.SphereGeometry(1, 24, 16);
+  for (const side of [-1, 1]) {
+    const direction = new THREE.Vector3(side * FACE.eye.x, FACE.eye.y, FACE.eye.z).normalize();
+    const iris = new THREE.Mesh(sphere, faceMaterials.iris);
+    iris.scale.set(R * FACE.eye.width, R * FACE.eye.height, R * FACE.eye.depth);
+    placeOnHead(iris, center, direction, -R * FACE.eye.depth * 0.5);
+    const pupil = new THREE.Mesh(sphere, faceMaterials.pupil);
+    pupil.scale.set(R * FACE.pupil.width, R * FACE.pupil.height, R * FACE.eye.depth);
+    placeOnHead(pupil, center, direction, -R * FACE.eye.depth * 0.3);
+    const glint = new THREE.Mesh(sphere, faceMaterials.glint);
+    glint.scale.setScalar(R * 0.025);
+    placeOnHead(glint, center, new THREE.Vector3(side * FACE.eye.x - 0.04, FACE.eye.y + 0.06, FACE.eye.z).normalize(), R * FACE.eye.depth * 0.45);
+    group.add(iris, pupil, glint);
+  }
+  const nose = new THREE.Mesh(sphere, materials.innerEar);
+  nose.scale.set(R * FACE.nose.width, R * FACE.nose.height, R * 0.03);
+  placeOnHead(nose, center, new THREE.Vector3(FACE.nose.x, FACE.nose.y, FACE.nose.z).normalize(), 0);
+  group.add(nose);
+  // ω：兩段下半圓弧（TorusGeometry 的弧從 +x 逆時針，轉半圈變成朝下的弧）
+  for (const side of [-1, 1]) {
+    const arc = new THREE.Mesh(new THREE.TorusGeometry(R * FACE.mouth.radius, R * FACE.mouth.tube, 6, 16, Math.PI).rotateZ(Math.PI), faceMaterials.line);
+    placeOnHead(arc, center, new THREE.Vector3(side * FACE.mouth.x, FACE.mouth.y, FACE.mouth.z).normalize(), 0);
+    group.add(arc);
+  }
+  for (const side of [-1, 1]) {
+    const cheek = new THREE.Vector3(side * FACE.cheek.x, FACE.cheek.y, FACE.cheek.z).normalize().multiplyScalar(R).add(new THREE.Vector3(0, center.topY, 0));
+    for (const k of [-1, 0, 1]) {
+      const tip = cheek.clone().add(new THREE.Vector3(side * R * FACE.whisker.reach, k * R * FACE.whisker.fan, R * 0.04));
+      rod(group, faceMaterials.line, [cheek.x, cheek.y, cheek.z], [tip.x, tip.y, tip.z], R * FACE.whisker.radius, R * FACE.whisker.radius * 0.4, 6);
+    }
+  }
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(R, R * FACE.collar.tube, 8, 96).rotateX(Math.PI / 2), faceMaterials.collar);
+  collar.position.y = center.topY;
+  const bell = new THREE.Mesh(sphere, faceMaterials.bell);
+  bell.scale.setScalar(R * FACE.collar.bell);
+  bell.position.set(0, center.topY - R * FACE.collar.bell * 0.8, R + R * FACE.collar.tube);
+  group.add(collar, bell);
+}
+
+// 圓錐側面每隔 CONE_BAND_SPACING 一圈細環帶，看得出圓錐往下收窄（只有外觀，比碰撞面凸出不到半公尺）。
+function addConeBands(group: THREE.Group, center: CenterConfig): void {
+  const tipY = center.topY - center.height;
+  for (let y = center.topY - CONE_BAND_SPACING; y > tipY + CONE_BAND_SPACING / 2; y -= CONE_BAND_SPACING) {
+    const radius = coneRadiusAt(center, y);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.6, 6, 96).rotateX(Math.PI / 2), faceMaterials.band);
+    band.position.y = y;
+    group.add(band);
+  }
 }
 
 // 頭頂（耳尖）大約多高：周圍漂浮物要避開的範圍。
@@ -1874,10 +1952,17 @@ function createFirstPersonMode(): ViewMode {
   // 半徑以外實心、這一刻會擋住身體的圓形牆（泳池外側池壁）。
   const blockingOuterRadii = (): number[] =>
     world.walls.filter((wall) => wall.solid === 'outside' && blocksBodyWall(wall)).map((wall) => wall.radius);
-  const isFree = (x: number, z: number): boolean =>
-    !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius)) &&
-    !blockingRoundRadii().some((radius) => Math.hypot(x, z) < radius + config.character.radius) &&
-    !blockingOuterRadii().some((radius) => Math.hypot(x, z) > radius - config.character.radius);
+  // 圓形牆在這裡當成薄牆：只有腳印壓在牆上才算被佔。走路時也只擋人所在的那一側，
+  // 當成半邊實心的話，三層環中間的欄杆會讓隔壁環上的位置全部算成被佔。
+  const isFree = (x: number, z: number): boolean => {
+    const distance = Math.hypot(x, z);
+    const bottom = feetY + config.character.stepHeight;
+    const top = feetY + bodyHeight();
+    const solidRadii = [...world.cones.map((cone) => coneWidestRadius(cone, bottom, top)), ...world.domes.map((dome) => domeWidestRadius(dome, bottom, top))];
+    return !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius)) &&
+      !solidRadii.some((radius) => radius !== null && distance < radius + config.character.radius) &&
+      !world.walls.some((wall) => blocksBodyWall(wall, x, z) && Math.abs(distance - wall.radius) < config.character.radius);
+  };
   const dismissHint = (): void => { hint.hidden = true; };
 
   // collide-and-slide：腳印是圓（從上往下看的膠囊體）。沿位移掃掠，碰到就停在表面前 SKIN，

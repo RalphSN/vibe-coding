@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { RingStyle } from './config/scene.config';
-import { addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod, skipCollider } from './oz-kit';
+import { addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod, skipCollider, type Vec3 } from './oz-kit';
 
 /** 圓心在原點的環形平板（inner 是 0 就是實心圓）：只管站上去和撞頭。有 arc 時只有這段角度站得住（角度 = atan2(x, z)）。 */
 export interface Disc { inner: number; outer: number; minY: number; maxY: number; arc?: { start: number; length: number } }
@@ -13,7 +13,7 @@ export interface Disc { inner: number; outer: number; minY: number; maxY: number
 export interface Floater {
   amplitude: number; speed: number; phase: number; apply: (dy: number) => void;
   /** 跟著飄的碰撞方塊：每格把 minY／maxY 設成基準高度 + dy，站在上面的人就跟著上下。 */
-  solid?: { box: SolidBox; minY: number; maxY: number };
+  solids?: { box: SolidBox; minY: number; maxY: number }[];
 }
 
 /**
@@ -70,6 +70,14 @@ const FRAGMENT_TILT = 0.5;
 const FRAGMENT_FLOAT_FROM = 0.12;      // 走過缺口一半的這個比例之後的碎片才飄，貼著斷口的固定不動
 const JAG_POINTS = 5;                  // 斷口的鋸齒點數
 const JAG_DEPTH = 4;                   // 鋸齒最多往完整段內咬幾公尺
+// 完整段上的施工現場
+const BREAK_BARRIER_AT = 7;            // 紐澤西護欄離斷口幾公尺
+const BREAK_BARRIER_GAP = 4;           // 護欄中間留的缺口：走得到斷口、跳得上碎片
+const BREAK_RAIL_MARGIN = 9;           // 環邊欄杆在斷口前幾公尺結束
+const BREAK_LAMP_SPACING = 22;
+const REBAR_PER_EDGE = 18;
+const RUBBLE_PER_EDGE = 26;
+const CONES_PER_EDGE = 7;
 
 // 全是碎塊的環
 const SHARD_AREA = 40;
@@ -79,6 +87,11 @@ const SHARD_RISE = 3;
 const SHARD_TILT = 0.5;
 const SHARD_CHUNK_CHANCE = 0.2;
 const SHARD_BOB = 0.6;
+// 碎片的材質比例（其餘是霧面）：亮面金屬、半透明玻璃、會發光的水晶
+const SHARD_GLOSSY_SHARE = 0.15;
+const SHARD_GLASS_SHARE = 0.08;
+const SHARD_CRYSTAL_SHARE = 0.07;
+const SHARD_CRYSTAL_STRETCH = 2.6;
 
 // 飄著的書：大小偏向小本（指數 > 1），少數是巨大的書。張開角度：0 闔上、π 攤平。
 const FLYING_BOOK_AREA = 70;
@@ -117,6 +130,18 @@ const BOOK_GAP: Range = [0.3, 1.2];
 // 三層環
 const TRIPLE_GAP = 5;
 const TRIPLE_SHADE = 0.08;
+// 三層步道的設施
+const TRIPLE_BRIDGES = 6;               // 每道空隙架幾座橋
+const BRIDGE_WIDTH = 3;
+const RAIL_HEIGHT = 1;
+const RAIL_POST_SPACING = 2;
+const FLOWER_BED_SPACING = 8;
+const FLOWERS_PER_BED = 14;
+const FLOWER_COLORS = [0xe63946, 0xf2c200, 0xff7ac3, 0xffffff, 0x8e44ad, 0xf4a261];
+const PROMENADE_LAMP_SPACING = 18;
+const PROMENADE_BENCH_SPACING = 18;
+const BINOCULAR_SPACING = 45;
+const BIKE_DECAL_SPACING = 25;
 
 // 環狀美食街：分成幾個區，每區一種擺法，區和區之間留走道；地面用低彩度的顏色。
 const FOOD_ZONES: Range = [8, 12];
@@ -156,10 +181,21 @@ const ISLAND_TOP: Range = [1.2, 2.5];
 const ISLAND_DEPTH: Range = [0.8, 1.6];    // 岩塊深度是半徑的幾倍
 const ISLAND_ROCK = 0.75;
 const ISLAND_TILT = 0.08;
+const ISLAND_TREE_SPACING = 6;         // 島上的樹大約隔幾公尺
+const ISLAND_TREE_MAX = 7;
+const ISLAND_TREE_HEIGHT: Range = [2.5, 5.5];
+const ISLAND_BOULDERS: Range = [1, 3.99];
+const TREE_COLORS = [0x4f9a4c, 0x5fa85d, 0x3f8a5f, 0x77b46f];
+const BLOSSOM_COLORS = [0xf7b6c8, 0xe39b3c];
+const BLOSSOM_CHANCE = 0.2;
+const TRUNK_COLOR = 0x7a5a3c;
 const PLATFORM_SIZE: Range = [4, 14];
 const PLATFORM_THICKNESS: Range = [0.6, 2];
 const PLATFORM_TILT = 0.06;
 const PLATFORM_TIER_CHANCE = 0.4;      // 上面再疊一層較小平台的機率
+const PLATFORM_TRIM = 0.14;            // 平台頂面的收邊厚度
+const PLATFORM_POTTED_SIZE = 8;        // 這麼大以上的平台放盆栽
+const PLATFORM_POTTED_SHAPES = [0, 1, 6];   // 方、圓、不規則：盆栽放在四角不會懸空
 const PLATFORM_TIER_SCALE: Range = [0.4, 0.7];
 const HEX_RADIUS: Range = [1.5, 3];
 const HEX_THICKNESS = 0.5;
@@ -371,13 +407,18 @@ function partsSolid(parts: Part[]): SolidBox {
   return { cx: center.x, cz: center.z, ux: 1, uz: 0, vx: 0, vz: 1, hu: size.x / 2, hv: size.z / 2, minY: bounds.min.y, maxY: bounds.max.y, standable: true };
 }
 
-/** 一組會飄的實例：加進飄動清單，同時加一個跟著飄的碰撞方塊。 */
-export function addFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[]): void {
+/**
+ * 一組會飄的實例：加進飄動清單，同時加跟著飄的碰撞方塊。
+ * colliders 是哪幾組實例各自算一個碰撞外框（預設整組一個）；島上的樹要和地面分開算，否則整座島的頂面會變成樹梢高。
+ */
+export function addFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[], colliders: Part[][] = [parts]): void {
   const floater = makeFloater(rng, scale, floatParts(parts));
-  const box = partsSolid(parts);
-  floater.solid = { box, minY: box.minY, maxY: box.maxY };
+  floater.solids = colliders.map((group) => {
+    const box = partsSolid(group);
+    build.solids.push(box);
+    return { box, minY: box.minY, maxY: box.maxY };
+  });
   build.floaters.push(floater);
-  build.solids.push(box);
 }
 
 /** 每格呼叫：time 是累計秒數。 */
@@ -387,9 +428,9 @@ export function updateFloaters(floaters: Floater[], time: number): void {
       Math.sin(time * floater.speed * BOB_HARMONIC + floater.phase * 2) * BOB_HARMONIC_SHARE;
     const dy = floater.amplitude * wave;
     floater.apply(dy);
-    if (floater.solid) {
-      floater.solid.box.minY = floater.solid.minY + dy;
-      floater.solid.box.maxY = floater.solid.maxY + dy;
+    for (const solid of floater.solids ?? []) {
+      solid.box.minY = solid.minY + dy;
+      solid.box.maxY = solid.maxY + dy;
     }
   }
 }
@@ -470,6 +511,98 @@ function drawCover(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(34, 64, 60, 6);
 }
 // 書頁：一行行文字
+// 草地：深淺不一的草葉點
+function drawLawn(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#6aa864';
+  ctx.fillRect(0, 0, 256, 256);
+  const rng = createRng(71);
+  for (let i = 0; i < 7000; i++) {
+    ctx.fillStyle = ['#5e9c58', '#77b46f', '#549050', '#82bd78'][Math.floor(rng() * 4)] ?? '#6aa864';
+    ctx.fillRect(rng() * 256, rng() * 256, 1, 3);
+  }
+}
+// 自行車道：藍灰色柏油
+function drawBikePath(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#4b6378';
+  ctx.fillRect(0, 0, 256, 256);
+  const rng = createRng(72);
+  for (let i = 0; i < 8000; i++) {
+    ctx.fillStyle = ['#415769', '#56708a', '#3a4f60', '#5f7891'][Math.floor(rng() * 4)] ?? '#4b6378';
+    ctx.fillRect(rng() * 256, rng() * 256, 1.5, 1.5);
+  }
+}
+// 地上的單車圖示：白色線條畫在透明底上（車頭朝貼圖上方）
+function drawBikeIcon(ctx: CanvasRenderingContext2D): void {
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(64, 28, 18, 0, TAU);
+  ctx.moveTo(82, 100);
+  ctx.arc(64, 100, 18, 0, TAU);
+  ctx.moveTo(64, 28);
+  ctx.lineTo(64, 64);
+  ctx.lineTo(64, 100);
+  ctx.moveTo(48, 40);
+  ctx.lineTo(80, 40);
+  ctx.stroke();
+}
+
+// 斷掉的水泥路面：淺色（材質再染上環的顏色）、伸縮縫、裂痕
+function drawCrackedConcrete(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#ece8e2';
+  ctx.fillRect(0, 0, 256, 256);
+  const rng = createRng(81);
+  for (let i = 0; i < 6000; i++) {
+    ctx.fillStyle = ['#e2ddd5', '#f4f1ec', '#d8d2c9'][Math.floor(rng() * 3)] ?? '#ece8e2';
+    ctx.fillRect(rng() * 256, rng() * 256, 2, 2);
+  }
+  ctx.fillStyle = '#c4beb4';
+  ctx.fillRect(0, 127, 256, 2);
+  ctx.fillRect(127, 0, 2, 256);
+  ctx.strokeStyle = '#8f887e';
+  ctx.lineWidth = 1.5;
+  for (let crack = 0; crack < 7; crack++) {
+    let x = rng() * 256;
+    let y = rng() * 256;
+    let heading = rng() * TAU;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let step = 0; step < 8; step++) {
+      heading += (rng() - 0.5) * 1.2;
+      x += Math.cos(heading) * 12;
+      y += Math.sin(heading) * 12;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+}
+// 斷口前的警告牌：黃底、黑框、三角形驚嘆號、「前方斷裂」
+function drawWarningSign(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#f2c200';
+  ctx.fillRect(0, 0, 256, 160);
+  ctx.strokeStyle = '#1f1f1f';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, 246, 150);
+  ctx.beginPath();
+  ctx.moveTo(60, 20);
+  ctx.lineTo(100, 90);
+  ctx.lineTo(20, 90);
+  ctx.closePath();
+  ctx.lineWidth = 7;
+  ctx.stroke();
+  ctx.fillStyle = '#1f1f1f';
+  ctx.font = 'bold 44px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('!', 60, 66);
+  ctx.font = 'bold 34px sans-serif';
+  ctx.fillText('前方', 175, 52);
+  ctx.fillText('斷裂', 175, 96);
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText('DANGER', 128, 132);
+}
+
 function drawPage(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = '#fbf8f0';
   ctx.fillRect(0, 0, 128, 128);
@@ -504,6 +637,21 @@ function createDetailMaterials() {
     carpet: mapped(pixelTexture(64, 64, drawCarpet)),
     cover: mapped(pixelTexture(128, 128, drawCover)),
     page: mapped(pixelTexture(128, 128, drawPage)),
+    lawn: mapped(pixelTexture(256, 256, drawLawn)),
+    bikePath: mapped(pixelTexture(256, 256, drawBikePath)),
+    bikeIcon: mapped(pixelTexture(128, 128, drawBikeIcon), { transparent: true, alphaTest: 0.3 }),
+    paint: colorMaterial(0xf4f4f4),
+    warning: mapped(pixelTexture(256, 160, drawWarningSign)),
+    hazard: mapped(pixelTexture(64, 8, drawStripes('#d23b2f', '#f4f1ea'))),
+    barrier: colorMaterial(0xd9d6d0),
+    trafficCone: colorMaterial(0xf26b1d),
+    rebar: colorMaterial(0x7a4a32),
+    rubble: colorMaterial(0xb3ada4),
+    soil: colorMaterial(0x6b4a33),
+    stone: colorMaterial(0xb7b0a5),
+    rail: colorMaterial(0xd5dae0),
+    flowers: FLOWER_COLORS.map((color) => colorMaterial(color)),
+    leaves: colorMaterial(0x5fa85d),
     window: colorMaterial(0x26313b),
     counter: colorMaterial(0x8a5a3b),
     stool: colorMaterial(0x2b2b2b),
@@ -627,8 +775,11 @@ function buildBrokenRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   const gapStart = rng() * TAU;
   const arcStart = gapStart + gapLength;
   const arcLength = TAU - gapLength;
-  build.solid.add(arcSlab(spec.inner, spec.outer, spec.minY, spec.maxY, arcStart, arcLength, colorMaterial(spec.color), rng));
+  const slab = arcSlab(spec.inner, spec.outer, spec.minY, spec.maxY, arcStart, arcLength, mapped(pixelTexture(256, 256, drawCrackedConcrete), { color: spec.color }), rng);
+  planarUv(slab.geometry, 10);
+  build.solid.add(slab);
   build.discs.push({ ...fullDisc(spec), arc: { start: arcStart, length: arcLength } });
+  addBreakSite(spec, build, rng, arcStart, arcLength);
 
   const batches = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
   const thickness = spec.maxY - spec.minY;
@@ -658,23 +809,130 @@ function buildBrokenRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   addBatches(build.decor, batches);
 }
 
+// 一段只擋 [start, start + length] 的環邊欄杆：柱子、扶手和一段圓形牆。
+// 走路時圓形牆只擋人所在的那一側，所以中間的欄杆不會擋到隔壁環上的人。
+function addArcRail(build: PropsBuild, props: THREE.Group, M: DetailMaterials, radius: number, y: number, start: number, length: number, solid: 'inside' | 'outside'): void {
+  const posts = Math.max(1, Math.round((length * radius) / RAIL_POST_SPACING));
+  for (let i = 0; i <= posts; i++) {
+    const angle = start + (length * i) / posts;
+    cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [polarX(radius, angle), y + RAIL_HEIGHT / 2, polarZ(radius, angle)], 6);
+  }
+  for (const height of [RAIL_HEIGHT, RAIL_HEIGHT / 2]) {
+    addMesh(props, new THREE.TorusGeometry(radius, height === RAIL_HEIGHT ? 0.035 : 0.02, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.rail, [0, y + height, 0], [0, start + length - Math.PI / 2, 0]);
+  }
+  build.walls.push({ radius, minY: y, maxY: y + RAIL_HEIGHT, solid, arc: { start, length } });
+}
+
+// 紐澤西護欄：下寬上窄的水泥塊，上半段漆紅白斜紋。自身 z 是長邊（沿環的半徑方向排）。
+function addJerseyBarrier(g: THREE.Group, M: DetailMaterials): void {
+  box(g, M.barrier, [0.6, 0.35, 1.9], [0, 0.175, 0]);
+  box(g, M.hazard, [0.3, 0.55, 1.9], [0, 0.62, 0]);
+}
+
+function addTrafficCone(g: THREE.Group, M: DetailMaterials): void {
+  box(g, M.stool, [0.42, 0.04, 0.42], [0, 0.02, 0]);
+  rod(g, M.trafficCone, [0, 0.04, 0], [0, 0.75, 0], 0.17, 0.03, 10);
+  cylinder(g, M.paint, 0.115, 0.08, [0, 0.42, 0], 10);
+}
+
+// 斷口前的施工現場：每個斷口前一排紐澤西護欄（中間留缺口）、交通錐、警告牌、
+// 斷面伸出來彎掉的鋼筋、散落的碎石；完整段兩側有欄杆，路燈沿內緣排，最靠近斷口的那盞歪了。
+// dir 是缺口在哪個方向（+1：角度變大的那一側），自身 x 沿圓周（角度變大的方向）。
+function addBreakSite(spec: RingSpec, build: PropsBuild, rng: Rng, arcStart: number, arcLength: number): void {
+  const M = getDetailMaterials();
+  const y = spec.maxY;
+  const props = new THREE.Group();
+  const middle = (spec.inner + spec.outer) / 2;
+  const thickness = spec.maxY - spec.minY;
+  const margin = BREAK_RAIL_MARGIN / middle;
+  addArcRail(build, props, M, spec.inner + 0.15, y, arcStart + margin, arcLength - 2 * margin, 'inside');
+  addArcRail(build, props, M, spec.outer - 0.15, y, arcStart + margin, arcLength - 2 * margin, 'outside');
+  const lampRadius = spec.inner + 1.2;
+  const lamps = Math.max(2, Math.round(((arcLength - 2 * margin) * lampRadius) / BREAK_LAMP_SPACING));
+  for (let i = 0; i <= lamps; i++) {
+    const g = ringGroup(props, lampRadius, y, arcStart + margin + ((arcLength - 2 * margin) * i) / lamps);
+    addPromenadeLamp(g, M);
+    if (i === 0) g.rotation.z = 0.35;          // 最靠近斷口的兩盞往缺口歪
+    if (i === lamps) g.rotation.z = -0.35;
+  }
+  for (const [edge, dir] of [[arcStart, -1], [arcStart + arcLength, 1]] as const) {
+    const at = (meters: number, r: number): number => edge - (dir * meters) / r;   // 從斷口往完整段走 meters 公尺
+    for (let r = spec.inner + 1.2; r < spec.outer - 1; r += 2.05) {
+      if (Math.abs(r - middle) < BREAK_BARRIER_GAP / 2 + 1) continue;
+      addJerseyBarrier(ringGroup(props, r, y, at(BREAK_BARRIER_AT, r)), M);
+    }
+    for (let i = 0; i < CONES_PER_EDGE; i++) {
+      const r = middle + spread(rng, BREAK_BARRIER_GAP * 1.6);
+      const cone = ringGroup(props, r, y, at(BREAK_BARRIER_AT + 1.5 + rng() * 3, r));
+      skipCollider(cone);
+      addTrafficCone(cone, M);
+    }
+    const sign = ringGroup(props, middle + BREAK_BARRIER_GAP, y, at(BREAK_BARRIER_AT + 4, middle + BREAK_BARRIER_GAP));
+    skipCollider(sign);
+    markCollider(sign, [0.3, 2.4, 0.3], [0, 1.2, 0]);
+    for (const z of [-0.6, 0.6]) rod(sign, M.darkMetal, [0, 0, z], [0, 2.4, z], 0.04);
+    addMesh(sign, new THREE.PlaneGeometry(1.6, 1), M.warning, [-dir * 0.05, 1.8, 0], [0, -dir * Math.PI / 2, 0]);
+    for (let i = 0; i < REBAR_PER_EDGE; i++) {
+      const r = spec.inner + 1 + rng() * (spec.outer - spec.inner - 2);
+      const rebarY = spec.minY + thickness * (rng() < 0.5 ? 0.3 : 0.7);
+      const out = range(rng, [0.8, 2.8]);
+      const from: Vec3 = [polarX(r, at(JAG_DEPTH + 0.5, r)), rebarY, polarZ(r, at(JAG_DEPTH + 0.5, r))];
+      const bend: Vec3 = [polarX(r, at(-out * 0.6, r)), rebarY, polarZ(r, at(-out * 0.6, r))];
+      const tipR = r + spread(rng, 0.6);
+      const tip: Vec3 = [polarX(tipR, at(-out, tipR)), rebarY - range(rng, [0.2, 1.2]), polarZ(tipR, at(-out, tipR))];
+      rod(props, M.rebar, from, bend, 0.05, 0.05, 5);
+      rod(props, M.rebar, bend, tip, 0.05, 0.05, 5);
+    }
+    for (let i = 0; i < RUBBLE_PER_EDGE; i++) {
+      const r = spec.inner + 1 + rng() * (spec.outer - spec.inner - 2);
+      const size = range(rng, [0.15, 0.55]);
+      const angle = at(JAG_DEPTH + 0.3 + rng() * 6, r);
+      addMesh(props, new THREE.DodecahedronGeometry(size, 0), M.rubble, [polarX(r, angle), y + size * 0.4, polarZ(r, angle)], [rng() * TAU, rng() * TAU, 0]);
+    }
+  }
+  markChildGroups(props);
+  build.solids.push(...collectColliders(props));
+  build.decor.add(bakeByMaterial(props));
+  disposeGeometries(props);
+}
+
 // 整圈都是各種形狀、顏色的碎塊，沒有環面，站不上去；全部都在飄。
+// 每次建環時才建：環境貼圖（反光用）要先設好
+const shardMaterials = (): { glossy: THREE.Material; glass: THREE.Material; crystal: THREE.Material } => ({
+  glossy: shinyMaterial(0xffffff, 0.6, 0.25),
+  glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.45, envMap: propsEnvironment, side: THREE.DoubleSide }),
+  crystal: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+});
+const crystalGeometry = new THREE.OctahedronGeometry(1, 0).scale(0.5, SHARD_CRYSTAL_STRETCH, 0.5);
+
 function buildShardsRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   const slabs = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
   const chunks = GEOMETRY.chunks.map((geometry) => new Batch(geometry, flatMaterial));
+  const looks = shardMaterials();
+  // 亮面和玻璃只用前兩種板子形狀，多一種材質只多兩次繪製
+  const glossy = GEOMETRY.slabs.slice(0, 2).map((geometry) => new Batch(geometry, looks.glossy));
+  const glass = GEOMETRY.slabs.slice(2, 4).map((geometry) => new Batch(geometry, looks.glass));
+  const crystals = new Batch(crystalGeometry, looks.crystal);
   const count = Math.round((Math.PI * (spec.outer ** 2 - spec.inner ** 2)) / SHARD_AREA);
   for (let i = 0; i < count; i++) {
     const { r, theta } = randomInRing(rng, spec.inner, spec.outer);
     const size = range(rng, SHARD_SIZE);
     const y = spec.maxY + spread(rng, SHARD_RISE);
-    const isChunk = rng() < SHARD_CHUNK_CHANCE;
+    const look = rng();
+    if (look < SHARD_CRYSTAL_SHARE) {
+      const crystal = transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, 0.4), spread(rng, 0.4), size / 3, size / 3, size / 3);
+      addFloater(build, rng, spec.bobScale * SHARD_BOB, [crystals.add(crystal, pick(rng, [0x9ff3ff, 0xffb3f0, 0xfff3a0, 0xb8ffcc]))]);
+      continue;
+    }
+    const special = look < SHARD_CRYSTAL_SHARE + SHARD_GLASS_SHARE ? glass : look < SHARD_CRYSTAL_SHARE + SHARD_GLASS_SHARE + SHARD_GLOSSY_SHARE ? glossy : null;
+    const isChunk = !special && rng() < SHARD_CHUNK_CHANCE;
     const matrix = isChunk
       ? transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, rng() * TAU, rng() * TAU, size / 2, (size / 2) * range(rng, [0.5, 1.2]), size / 2)
       : transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, SHARD_TILT), spread(rng, SHARD_TILT), size, range(rng, SHARD_THICKNESS), size * range(rng, [0.5, 1]));
-    const part = pick(rng, isChunk ? chunks : slabs).add(matrix, pick(rng, SHARD_COLORS));
+    const part = pick(rng, special ?? (isChunk ? chunks : slabs)).add(matrix, pick(rng, SHARD_COLORS));
     addFloater(build, rng, spec.bobScale * SHARD_BOB, [part]);
   }
-  addBatches(build.decor, [...slabs, ...chunks]);
+  addBatches(build.decor, [...slabs, ...chunks, ...glossy, ...glass, crystals]);
 }
 
 // ---------- 飄著的書 ----------
@@ -892,14 +1150,159 @@ function buildLibraryRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
 }
 
 // 同一高度的內、中、外三層細環，各自站得上去；顏色是環色的深淺變化。
-function buildTripleRing(spec: RingSpec, build: PropsBuild): void {
-  const width = (spec.outer - spec.inner - 2 * TRIPLE_GAP) / 3;
-  for (let k = 0; k < 3; k++) {
-    const inner = spec.inner + k * (width + TRIPLE_GAP);
-    build.solid.add(annulus(inner, inner + width, spec.minY, spec.maxY, colorMaterial(shade(spec.color, (k - 1) * TRIPLE_SHADE))));
-    build.discs.push({ inner, outer: inner + width, minY: spec.minY, maxY: spec.maxY });
+// 一圈上每隔 spacing 公尺的角度
+const anglesEvery = (radius: number, spacing: number, offset = 0): number[] => {
+  const count = Math.max(1, Math.round((TAU * radius) / spacing));
+  return Array.from({ length: count }, (_, i) => offset + (i / count) * TAU);
+};
+// angle 離 openings 裡任何一個角度在 half 弧度以內
+const nearAny = (angle: number, openings: number[], half: number): boolean =>
+  openings.some((opening) => Math.abs(THREE.MathUtils.euclideanModulo(angle - opening + Math.PI, TAU) - Math.PI) < half);
+
+// 環邊欄杆：每 RAIL_POST_SPACING 一根柱子、頂端一圈扶手，openings（橋的角度）前後留開口；
+// 碰撞是一段段只擋那幾段角度的圓形牆，人不會從環邊掉下去，但走得上橋。solid 是哪一側實心（inside：半徑以內）；
+// 走路時圓形牆只擋人所在的那一側，所以中間兩道欄杆不會擋到隔壁環上的人。
+function addEdgeRail(build: PropsBuild, props: THREE.Group, M: DetailMaterials, radius: number, y: number, openings: number[], solid: 'inside' | 'outside'): void {
+  const half = (BRIDGE_WIDTH / 2 + 0.3) / radius;
+  for (const angle of anglesEvery(radius, RAIL_POST_SPACING)) {
+    if (!nearAny(angle, openings, half)) cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [polarX(radius, angle), y + RAIL_HEIGHT / 2, polarZ(radius, angle)], 6);
+  }
+  const sorted = [...openings].sort((a, b) => a - b);
+  const segments: [number, number][] = sorted.length === 0 ? [[0, TAU]] : sorted.map((opening, i) => {
+    const next = sorted[(i + 1) % sorted.length] ?? opening;
+    const start = opening + half;
+    const end = (i + 1 < sorted.length ? next : next + TAU) - half;
+    return [start, end - start];
+  });
+  for (const [start, length] of segments) {
+    // TorusGeometry 從 +x 開始逆時針；轉成水平後再繞 y 轉，讓這段落在 [start, start + length]
+    addMesh(props, new THREE.TorusGeometry(radius, 0.035, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.rail, [0, y + RAIL_HEIGHT, 0], [0, start + length - Math.PI / 2, 0]);
+    build.walls.push({ radius, minY: y, maxY: y + RAIL_HEIGHT, solid, arc: { start, length } });
   }
 }
+
+// 花圃：石框、泥土、一叢叢小花。
+function addFlowerBed(g: THREE.Group, M: DetailMaterials, rng: Rng): void {
+  box(g, M.stone, [2.6, 0.35, 1.5], [0, 0.175, 0]);
+  box(g, M.soil, [2.4, 0.04, 1.3], [0, 0.36, 0]);
+  for (let i = 0; i < FLOWERS_PER_BED; i++) {
+    const x = (rng() - 0.5) * 2.1;
+    const z = (rng() - 0.5) * 1.0;
+    rod(g, M.leaves, [x, 0.36, z], [x, 0.55, z], 0.01, 0.01, 4);
+    addMesh(g, new THREE.IcosahedronGeometry(0.07, 0), M.flowers[Math.floor(rng() * M.flowers.length)] ?? M.paint, [x, 0.58, z]);
+  }
+}
+
+// 單車：兩個輪子、車架、坐墊和把手，停在停車架旁。自身 x 是車身方向。
+function addBicycle(g: THREE.Group, M: DetailMaterials, color: number): void {
+  const frame = colorMaterial(color);
+  for (const x of [-0.5, 0.5]) addMesh(g, new THREE.TorusGeometry(0.33, 0.025, 6, 20), M.stool, [x, 0.35, 0]);
+  rod(g, frame, [-0.5, 0.35, 0], [-0.05, 0.75, 0], 0.02);
+  rod(g, frame, [-0.05, 0.75, 0], [0.4, 0.75, 0], 0.02);
+  rod(g, frame, [0.4, 0.75, 0], [0.5, 0.35, 0], 0.02);
+  rod(g, frame, [-0.05, 0.75, 0], [0, 0.35, 0], 0.02);
+  rod(g, frame, [0, 0.35, 0], [-0.5, 0.35, 0], 0.015);
+  box(g, M.stool, [0.22, 0.05, 0.1], [-0.08, 0.86, 0]);
+  rod(g, M.darkMetal, [0.42, 0.75, 0], [0.42, 0.95, 0], 0.015);
+  rod(g, M.darkMetal, [0.42, 0.95, -0.25], [0.42, 0.95, 0.25], 0.015);
+}
+
+// 投幣望遠鏡：柱子上一個雙筒鏡身，朝環外看出去（自身 +z）。
+function addBinoculars(g: THREE.Group, M: DetailMaterials): void {
+  rod(g, M.darkMetal, [0, 0, 0], [0, 1.1, 0], 0.06);
+  box(g, colorMaterial(0x2f6fb0), [0.36, 0.22, 0.3], [0, 1.25, 0]);
+  for (const x of [-0.09, 0.09]) cylinder(g, M.darkMetal, 0.06, 0.25, [x, 1.28, 0.25], 10, [Math.PI / 2, 0, 0]);
+}
+
+function addPromenadeLamp(g: THREE.Group, M: DetailMaterials): void {
+  skipCollider(g);
+  markCollider(g, [0.3, 3.6, 0.3], [0, 1.8, 0]);
+  rod(g, M.darkMetal, [0, 0, 0], [0, 3.5, 0], 0.05, 0.04, 8);
+  addMesh(g, new THREE.SphereGeometry(0.2, 12, 8), M.lamp, [0, 3.65, 0]);
+  cylinder(g, M.darkMetal, 0.22, 0.05, [0, 3.88, 0], 12);
+}
+
+function addPromenadeBench(g: THREE.Group, M: DetailMaterials): void {
+  const wood = colorMaterial(WOOD);
+  for (const z of [-0.12, 0.02, 0.16]) box(g, wood, [1.8, 0.04, 0.12], [0, 0.45, z]);
+  for (const y of [0.6, 0.75]) box(g, wood, [1.8, 0.1, 0.03], [0, y, -0.22]);
+  for (const x of [-0.75, 0.75]) box(g, M.darkMetal, [0.05, 0.45, 0.42], [x, 0.225, 0]);
+}
+
+// 同一高度的內、中、外三層細環，各自站得上去：
+//   內圈是花園（草地、石框花圃），中圈是自行車道（邊線、中央虛線、單車圖示、停車架與單車），
+//   外圈是木棧道（長椅朝外看風景、路燈、投幣望遠鏡）。三圈之間每 60° 一座木橋，所有環邊都有欄杆（橋口除外）。
+function buildTripleRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
+  const M = getDetailMaterials();
+  const width = (spec.outer - spec.inner - 2 * TRIPLE_GAP) / 3;
+  const y = spec.maxY;
+  const props = new THREE.Group();
+  const innerOf = (k: number): number => spec.inner + k * (width + TRIPLE_GAP);
+  const bridges = [0, 1].map((gap) => Array.from({ length: TRIPLE_BRIDGES }, (_, j) => ((j + (gap === 0 ? 0 : 0.5)) / TRIPLE_BRIDGES) * TAU));
+  const surfaces = [M.lawn, M.bikePath, M.planks];
+  for (let k = 0; k < 3; k++) {
+    const inner = innerOf(k);
+    const outer = inner + width;
+    build.solid.add(annulus(inner, outer, spec.minY, y, colorMaterial(shade(spec.color, (k - 1) * TRIPLE_SHADE))));
+    build.discs.push({ inner, outer, minY: spec.minY, maxY: y });
+    const surface = annulus(inner, outer, y, y + 0.01, surfaces[k] ?? M.paint);
+    planarUv(surface.geometry, 2);
+    build.decor.add(surface);
+    addEdgeRail(build, props, M, inner + 0.15, y, k === 0 ? [] : bridges[k - 1] ?? [], 'inside');
+    addEdgeRail(build, props, M, outer - 0.15, y, k === 2 ? [] : bridges[k] ?? [], 'outside');
+  }
+  // 內圈花園：中線上每隔一段一座花圃
+  const garden = innerOf(0) + width / 2;
+  for (const angle of anglesEvery(garden, FLOWER_BED_SPACING)) {
+    if (!nearAny(angle, bridges[0] ?? [], 3 / garden)) addFlowerBed(ringGroup(props, garden, y, angle), M, rng);
+  }
+  // 中圈自行車道：兩側白色邊線、中央白色虛線、地上的單車圖示，幾處停車架停著單車
+  const lane = innerOf(1);
+  for (const r of [lane + 0.6, lane + width - 0.6]) build.decor.add(annulus(r - 0.06, r + 0.06, y + 0.01, y + 0.016, M.paint));
+  for (const angle of anglesEvery(lane + width / 2, 4)) box(ringGroup(props, lane + width / 2, y + 0.013, angle), M.paint, [2, 0.006, 0.12], [0, 0, 0]);
+  for (const angle of anglesEvery(lane + width / 2, BIKE_DECAL_SPACING, 0.03)) {
+    for (const side of [-1, 1]) {
+      const r = lane + width / 2 + side * 2.4;
+      addMesh(props, flat2(1.4, 1.4), M.bikeIcon, [polarX(r, angle), y + 0.014, polarZ(r, angle)], [0, angle + (side > 0 ? -Math.PI / 2 : Math.PI / 2), 0]);
+    }
+  }
+  for (const angle of anglesEvery(lane + width / 2, 120, 0.2)) {
+    const rack = ringGroup(props, lane + width - 1.2, y, angle);
+    for (let b = 0; b < 4; b++) {
+      addMesh(rack, new THREE.TorusGeometry(0.35, 0.025, 6, 16, Math.PI), M.rail, [b * 0.9 - 1.35, 0, 0], [0, Math.PI / 2, 0]);
+      if (b % 3 !== 2) addBicycle(childGroup(rack, [b * 0.9 - 1.35, 0, 0], Math.PI / 2), M, pick(rng, [0xc0392b, 0x2f6fb0, 0xf2c200, 0x3f8a5f, 0x2b2b2b]));
+    }
+  }
+  // 外圈木棧道：外緣長椅朝外看風景、內緣路燈、投幣望遠鏡
+  const deck = innerOf(2);
+  for (const angle of anglesEvery(deck + width - 1.4, PROMENADE_BENCH_SPACING, 0.02)) addPromenadeBench(ringGroup(props, deck + width - 1.4, y, angle), M);
+  for (const angle of anglesEvery(deck + 1, PROMENADE_LAMP_SPACING, 0.05)) addPromenadeLamp(ringGroup(props, deck + 1, y, angle), M);
+  for (const angle of anglesEvery(deck + width - 0.8, BINOCULAR_SPACING, 0.25)) addBinoculars(ringGroup(props, deck + width - 0.8, y, angle), M);
+  // 木橋：兩道空隙各 TRIPLE_BRIDGES 座，橋面和環面同高、可以走，兩側欄杆
+  for (let gap = 0; gap < 2; gap++) {
+    const from = innerOf(gap) + width - 0.2;
+    const to = innerOf(gap + 1) + 0.2;
+    for (const angle of bridges[gap] ?? []) {
+      const half = BRIDGE_WIDTH / 2 / ((from + to) / 2);
+      build.decor.add(arcSlab(from, to, y - 0.35, y + 0.01, angle - half, half * 2, colorMaterial(WOOD)));
+      build.discs.push({ inner: from, outer: to, minY: y - 0.35, maxY: y + 0.01, arc: { start: angle - half, length: half * 2 } });
+      for (const side of [-1, 1]) {
+        const edge = angle + side * half;
+        const a: Vec3 = [polarX(from, edge), y + RAIL_HEIGHT, polarZ(from, edge)];
+        const b: Vec3 = [polarX(to, edge), y + RAIL_HEIGHT, polarZ(to, edge)];
+        rod(props, M.rail, a, b, 0.035, 0.035, 6);
+        for (const t of [0, 0.5, 1]) cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [a[0] + (b[0] - a[0]) * t, y + RAIL_HEIGHT / 2, a[2] + (b[2] - a[2]) * t], 6);
+      }
+    }
+  }
+  markChildGroups(props);
+  build.solids.push(...collectColliders(props));
+  build.decor.add(bakeByMaterial(props));
+  disposeGeometries(props);
+}
+
+// 水平的平面（地上的圖示）
+const flat2 = (width: number, depth: number): THREE.BufferGeometry => new THREE.PlaneGeometry(width, depth).rotateX(-Math.PI / 2);
 
 // ---------- 環狀美食街 ----------
 interface FoodBatches { roundTables: Batch; squareTables: Batch; chairs: Batch; longTables: Batch; benches: Batch; stalls: Batch; awnings: Batch; pots: Batch; bushes: Batch }
@@ -1132,7 +1535,7 @@ export function buildRing(spec: RingSpec): PropsBuild {
     case 'floatingBooks': buildFloatingBooksRing(spec, build, rng); break;
     case 'shards': buildShardsRing(spec, build, rng); break;
     case 'bookshelf': buildLibraryRing(spec, build, rng); break;
-    case 'triple': buildTripleRing(spec, build); break;
+    case 'triple': buildTripleRing(spec, build, rng); break;
     case 'restaurant': buildFoodCourtRing(spec, build, rng); break;
     case 'courts':
     case 'track':
@@ -1213,7 +1616,9 @@ function addHexPad(rng: Rng, hexes: Batch, pad: THREE.Matrix4, cell: number, rin
   });
 }
 
-/** 環周圍的漂浮物：島嶼、各種形狀的平台、蜂窩狀六邊形平面、零碎小塊；大多聚在幾處，全部都在飄。 */
+const trunkGeometry = new THREE.CylinderGeometry(0.7, 1, 1, 6).translate(0, 0.5, 0);
+
+/** 環周圍的漂浮物：島嶼（有樹和石頭）、各種形狀的平台（有收邊與盆栽）、蜂窩狀六邊形平面、零碎小塊；大多聚在幾處，全部都在飄。 */
 export function buildFloatingField(spec: FieldSpec): PropsBuild {
   const build = emptyBuild();
   const rng = createRng(spec.seed);
@@ -1229,7 +1634,10 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
   const platforms = GEOMETRY.platforms.map((geometry) => new Batch(geometry, flatMaterial));
   const hexes = new Batch(GEOMETRY.hex, flatMaterial);
   const chunks = GEOMETRY.chunks.map((geometry) => new Batch(geometry, flatMaterial));
-  const float = (parts: Part[]): void => addFloater(build, rng, spec.bobScale, parts);
+  const trunks = new Batch(trunkGeometry, flatMaterial);
+  const crowns = new Batch(GEOMETRY.bush, flatMaterial);
+  const pots = new Batch(GEOMETRY.pot, flatMaterial);
+  const float = (parts: Part[], colliders?: Part[][]): void => addFloater(build, rng, spec.bobScale, parts, colliders);
 
   for (let i = 0; i < spec.islands; i++) {
     const radius = range(rng, ISLAND_RADIUS);
@@ -1237,10 +1645,41 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     if (!spot) continue;
     const top = range(rng, ISLAND_TOP);
     const turn: [number, number, number] = [rng() * TAU, spread(rng, ISLAND_TILT), spread(rng, ISLAND_TILT)];
-    float([
+    const ground = [
       pick(rng, grass).add(transform(spot.x, spot.y - top / 2, spot.z, ...turn, radius, top, radius), pick(rng, GRASS_COLORS)),
       rocks.add(transform(spot.x, spot.y - top, spot.z, ...turn, radius * ISLAND_ROCK, radius * range(rng, ISLAND_DEPTH), radius * ISLAND_ROCK), pick(rng, ROCK_COLORS)),
-    ]);
+    ];
+    // 島上的東西放在島頂面的座標系裡（跟著島一起歪），各自一個碰撞外框
+    const surface = transform(spot.x, spot.y, spot.z, ...turn, 1, 1, 1);
+    const onIsland = (x: number, z: number, local: THREE.Matrix4): THREE.Matrix4 => surface.clone().multiply(new THREE.Matrix4().makeTranslation(x, 0, z)).multiply(local);
+    const extras: Part[][] = [];
+    const trees = Math.min(ISLAND_TREE_MAX, Math.round((Math.PI * (radius * 0.45) ** 2) / ISLAND_TREE_SPACING ** 2));
+    for (let t = 0; t < trees; t++) {
+      const angle = rng() * TAU;
+      const distance = Math.sqrt(rng()) * radius * 0.45;
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+      const height = range(rng, ISLAND_TREE_HEIGHT);
+      const crown = height * 0.45;
+      const trunk = trunks.add(onIsland(x, z, new THREE.Matrix4().makeScale(height * 0.07, height, height * 0.07)), TRUNK_COLOR);
+      const color = rng() < BLOSSOM_CHANCE ? pick(rng, BLOSSOM_COLORS) : pick(rng, TREE_COLORS);
+      const leaves = [
+        crowns.add(onIsland(x, z, transform(0, height, 0, rng() * TAU, 0, 0, crown, crown * 0.9, crown)), color),
+        crowns.add(onIsland(x, z, transform(spread(rng, crown * 0.5), height - crown * 0.5, spread(rng, crown * 0.5), rng() * TAU, 0, 0, crown * 0.7, crown * 0.6, crown * 0.7)), shade(color, -0.05)),
+      ];
+      ground.push(trunk, ...leaves);
+      extras.push([trunk]);
+    }
+    const boulders = Math.floor(range(rng, ISLAND_BOULDERS));
+    for (let b = 0; b < boulders; b++) {
+      const angle = rng() * TAU;
+      const distance = (0.25 + rng() * 0.35) * radius;
+      const size = range(rng, [0.4, 1.2]);
+      const boulder = pick(rng, chunks).add(onIsland(Math.cos(angle) * distance, Math.sin(angle) * distance, transform(0, size * 0.4, 0, rng() * TAU, rng(), rng(), size, size * 0.7, size)), pick(rng, ROCK_COLORS));
+      ground.push(boulder);
+      extras.push([boulder]);
+    }
+    float(ground, [ground.slice(0, 2), ...extras]);
   }
 
   for (let i = 0; i < spec.platforms; i++) {
@@ -1252,15 +1691,33 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     if (!batch) continue;
     const thickness = range(rng, PLATFORM_THICKNESS);
     const base = transform(spot.x, spot.y, spot.z, rng() * TAU, spread(rng, PLATFORM_TILT), spread(rng, PLATFORM_TILT), 1, 1, 1);
-    const parts = [batch.add(base.clone().multiply(new THREE.Matrix4().makeScale(size, thickness, size * range(rng, [0.7, 1.3]))), pick(rng, PLATFORM_COLORS))];
-    if (rng() < PLATFORM_TIER_CHANCE) {
+    const depth = size * range(rng, [0.7, 1.3]);
+    const color = pick(rng, PLATFORM_COLORS);
+    const parts = [batch.add(base.clone().multiply(new THREE.Matrix4().makeScale(size, thickness, depth)), color)];
+    // 頂面收邊：同形狀、大一點點、薄薄一層深一階的顏色，平台邊緣看得出厚度
+    const trim = batch.add(base.clone().multiply(new THREE.Matrix4().makeTranslation(0, thickness / 2 - PLATFORM_TRIM / 2 + 0.01, 0)).multiply(new THREE.Matrix4().makeScale(size * 1.03, PLATFORM_TRIM, depth * 1.03)), shade(color, -0.12));
+    const colliders: Part[][] = [[...parts, trim]];
+    parts.push(trim);
+    const hasTier = rng() < PLATFORM_TIER_CHANCE;
+    if (!hasTier && size >= PLATFORM_POTTED_SIZE && PLATFORM_POTTED_SHAPES.includes(shape)) {
+      for (const [px, pz] of [[0.3, 0.3], [-0.3, -0.3]] as const) {
+        const at = base.clone().multiply(new THREE.Matrix4().makeTranslation(px * size, thickness / 2, pz * depth));
+        const pot = pots.add(at.clone().multiply(new THREE.Matrix4().makeScale(0.45, 0.7, 0.45)), pick(rng, POT_COLORS));
+        const bush = crowns.add(at.clone().multiply(transform(0, 1.2, 0, rng() * TAU, 0, 0, 0.7, 0.6, 0.7)), pick(rng, BUSH_COLORS));
+        parts.push(pot, bush);
+        colliders.push([pot, bush]);
+      }
+    }
+    if (hasTier) {
       const tier = size * range(rng, PLATFORM_TIER_SCALE);
       const tierMatrix = base.clone()
         .multiply(new THREE.Matrix4().makeTranslation(spread(rng, (size - tier) / 3), thickness, spread(rng, (size - tier) / 3)))
         .multiply(new THREE.Matrix4().makeScale(tier, thickness, tier));
-      parts.push(batch.add(tierMatrix, pick(rng, PLATFORM_ACCENTS)));
+      const tierPart = batch.add(tierMatrix, pick(rng, PLATFORM_ACCENTS));
+      parts.push(tierPart);
+      colliders.push([tierPart]);
     }
-    float(parts);
+    float(parts, colliders);
   }
 
   for (let i = 0; i < spec.hexPads; i++) {
@@ -1280,6 +1737,6 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     float([pick(rng, chunks).add(matrix, pick(rng, [...SHARD_COLORS, ...ROCK_COLORS]))]);
   }
 
-  addBatches(build.decor, [...grass, rocks, ...platforms, hexes, ...chunks]);
+  addBatches(build.decor, [...grass, rocks, ...platforms, hexes, ...chunks, trunks, crowns, pots]);
   return build;
 }
