@@ -17,14 +17,14 @@ type Vec3Tuple = [number, number, number];
 type SizeProp = 'width' | 'depth' | 'height';
 type ClearanceSide = 'front' | 'back' | 'right' | 'left';
 type StatusTone = 'ok' | 'warn' | 'bad';
-type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'toggleWalk';
+type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'descend' | 'toggleWalk';
 type ViewModeName = 'orbit' | 'firstPerson';
 type ActionType = 'move' | 'rotate' | 'resize';
 type HandleKind = 'rotate' | 'size';
 type GaitName = 'walk' | 'run';
 type Direction = 'forward' | 'backward' | 'side';
 type RigPose = Record<string, number>;
-type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land' | 'blocked';
+type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land' | 'blocked' | 'fly';
 
 interface Preset extends Sizes { name: string }
 interface ClearanceRule { sides: ClearanceSide[]; need?: 'any'; depth: number; name: string; ignoreTypes?: FurnitureType[] }
@@ -57,10 +57,11 @@ interface GaitStyle {
 interface JumpKey { spinePitch: number; hipX: number; knee: number; foot: number; shoulderX: number; shoulderZ: number; elbow: number }
 // pushForward／pushSide：按著方向鍵、手的高度前方有牆時，想走的方向（角色座標的單位向量）；沒有是 0。
 // pushBack：手會穿進牆多少（m），角色畫面往後退這麼多，手剛好搆到牆（碰撞位置不變）。
-// findWall：推牆時給手部 IK 找每隻手要貼的牆面；沒在推是 null。
+// findWall：推牆時給手部 IK 找每隻手要貼的牆面；沒在推是 null。isFlying：飛行模式（不算站在地上，也不算跳躍）。
 interface RigMotion {
   forwardSpeed: number; sideSpeed: number; turnRate: number; isGrounded: boolean; riseRatio: number;
-  pushForward: number; pushSide: number; pushBack: number; findWall: WallProbe | null;
+  pushForward: number; pushSide: number; pushBack: number; findWall: WallProbe | null; isFlying: boolean;
+  climbSpeed: number;   // 飛行時實際的上升速度（m/s，下降為負）
 }
 // 從世界座標 (x, y, z) 沿水平方向 (dirX, dirZ) 往前，maxDistance 內最先碰到的牆：多遠、表面朝哪（朝外的單位向量）。
 type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, maxDistance: number) => { distance: number; nx: number; nz: number } | null;
@@ -1449,6 +1450,10 @@ const MAX_SUBSTEP = 0.05;        // 每格移動切成小段（掃掠本身不�
 const SLIDE_ITERATIONS = 4;      // 走進牆角時：第一次沿 A 牆滑、第二次被 B 牆削掉，再多留兩次給浮點誤差
 const SKIN = 0.005;              // 停在牆面前這麼遠，下一格一開始才不會卡在牆裡
 const MIN_SLIDE = 1e-6;          // 剩下的位移比這短就不再算
+const DOUBLE_TAP_MS = 300;       // 兩下空白鍵間隔在這之內算連按，進入飛行
+const FLY_VERTICAL_SPEED = 3;    // 飛行時空白鍵上升、X 下降的速度（m/s）
+const FLY_PITCH_DEADZONE = 10;   // 滑鼠雙鍵飛行時，鏡頭俯仰離平視不到這幾度就不升降（度）
+const FLY_LAND_GRACE = 0.25;     // 剛進入飛行的這幾秒不因碰到地面解除，連按時第一下的跳躍還沒離地也不會馬上落地
 const BLOCKED_SPEED_RATIO = 0.2;  // 實際速度不到想走速度的這個比例，算被擋住
 const BLOCKED_DELAY = 0.1;        // 連續被擋這麼久（秒）才切到受阻，擦過牆角不會閃一下
 const HAND_PROBE_MARGIN = 0.3;    // 手伸到的距離再往前多探這麼遠找牆
@@ -1467,7 +1472,7 @@ const AVATAR_VISIBLE_DISTANCE = 0.4;
 const KEY_ACTIONS: Record<string, KeyAction | undefined> = {
   KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
   KeyA: 'turnLeft', ArrowLeft: 'turnLeft', KeyD: 'turnRight', ArrowRight: 'turnRight',
-  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', ShiftLeft: 'toggleWalk', ShiftRight: 'toggleWalk',
+  KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', KeyX: 'descend', ShiftLeft: 'toggleWalk', ShiftRight: 'toggleWalk',
 };
 
 // 臨界阻尼彈簧（和 Unity Mathf.SmoothDamp 同一套近似公式）：起步、停下都平順、不會過衝。
@@ -1516,6 +1521,11 @@ const LEAN_SMOOTH_TIME = 0.18;
 const ACCEL_LEAN_PER_MS2 = 1.5;   // 每 1 m/s² 加速度前傾幾度
 const MAX_ACCEL_LEAN = 8;
 const BRACE_SMOOTH_TIME = 0.15;   // 受阻姿勢淡入淡出
+const FLY_SMOOTH_TIME = 0.2;      // 飛行姿勢淡入淡出
+const FLY_FOOT_DROOP = 45;        // 飛行時腳板往下垂幾度（腳尖朝下）
+const FLY_KNEE_BEND = 8;          // 飛行時膝蓋放鬆微彎幾度
+const FLY_ARM_SPREAD = 12;        // 飛行時手臂往外張幾度
+const FLY_ELBOW_BEND = 15;        // 飛行時手肘多彎幾度
 const BRACE_HAND_REACH = { forward: 0.3, height: 0.74 };   // 撐牆姿勢的手掌位置，以身高為 1 的比例（依關節長度估計）
 const BANK_PER_TURN_SPEED = 1.2;   // 轉彎內傾：轉速（rad/s）× 速度（m/s）× 這個值 = 度
 const MAX_BANK = 10;
@@ -1700,11 +1710,11 @@ function createAvatarRig(): AvatarRig {
   const markerPos = new THREE.Vector3();
   const motions = {
     fwd: { velocity: 0 }, side: { velocity: 0 }, gait: { velocity: 0 }, air: { velocity: 0 },
-    land: { velocity: 0 }, lean: { velocity: 0 }, bank: { velocity: 0 }, brace: { velocity: 0 },
+    land: { velocity: 0 }, lean: { velocity: 0 }, bank: { velocity: 0 }, brace: { velocity: 0 }, fly: { velocity: 0 },
   };
   const state = {
     height: REFERENCE_HEIGHT, phase: 0, time: 0, fwd: 0, side: 0, sag: 1, lat: 0, gait: 0,
-    air: 0, land: 0, landHold: 0, lastRise: 0, wasGrounded: true, lean: 0, bank: 0, brace: 0,
+    air: 0, land: 0, landHold: 0, lastRise: 0, wasGrounded: true, lean: 0, bank: 0, brace: 0, fly: 0,
   };
   const emptyTable = (): Record<Direction, number[]> => ({ forward: [], backward: [], side: [] });
   const ground = { rest: 0, idle: 0, crouch: 0, walk: emptyTable(), run: emptyTable() };   // 烘焙好的骨盆高度
@@ -1887,8 +1897,11 @@ function createAvatarRig(): AvatarRig {
   function animate(motion: RigMotion, dt: number): void {
     if (!isBuilt || dt <= 0) return;
     state.time += dt;
-    const speed = updateLocomotion(motion, dt);
-    updateAirborne(motion, dt);
+    // 飛行時不踏步、不擺跳躍姿勢：當成原地站著，再把腳尖往下垂。
+    const footing = motion.isFlying ? { ...motion, forwardSpeed: 0, sideSpeed: 0, turnRate: 0, isGrounded: true } : motion;
+    const speed = updateLocomotion(footing, dt);
+    updateAirborne(footing, dt);
+    state.fly = smoothDamp(state.fly, motion.isFlying ? 1 : 0, motions.fly, FLY_SMOOTH_TIME, dt);
     const run = smoothstep(RUN_BLEND[0], RUN_BLEND[1], speed);
     const keys: GaitKeys = { hip: [], knee: [], foot: [] };
     for (const channel of GAIT_CHANNELS) keys[channel] = GAIT_KEYS.walk[channel].map((value, k) => lerp(value, GAIT_KEYS.run[channel][k], run));
@@ -1901,6 +1914,12 @@ function createAvatarRig(): AvatarRig {
     addLandingCrouch(grounded, state.land);
     const pose = blendPose(grounded, airPose(motion.riseRatio), state.air);
     pose.spinePitch -= state.lean;
+    for (const i of [0, 1]) {
+      pose['foot' + i] -= FLY_FOOT_DROOP * state.fly;
+      pose['knee' + i] -= FLY_KNEE_BEND * state.fly;
+      pose['shoulderZ' + i] += sideOf(i) * FLY_ARM_SPREAD * state.fly;
+      pose['elbow' + i] += FLY_ELBOW_BEND * state.fly;
+    }
     applyPose(pose);
     hips.position.y = ground.rest - groundHeight(run) * (1 - state.air);
     tilt.rotation.z = DEG(state.bank);
@@ -1924,6 +1943,34 @@ const ARM_CHAINS: [string, string, string][] = [['upperarm_l', 'lowerarm_l', 'ha
 const IK_SMOOTH_TIME = 0.12;       // 手部 IK 淡入淡出
 const IK_MIN_WEIGHT = 1e-3;
 const IK_REACH_MARGIN = 0.15;      // 手臂伸直的長度再往前多探這麼遠找牆
+const FOOT_CHAINS: [string, string][] = [['foot_l', 'ball_l'], ['foot_r', 'ball_r']];
+const LEG_CHAINS: [string, string, string][] = [['thigh_l', 'calf_l', 'foot_l'], ['thigh_r', 'calf_r', 'foot_r']];
+// 漂浮姿勢（疊在站立動畫上）參考 NASA 失重的「中性身體姿勢」（neutral body posture）：髖、膝微屈、腳尖往下、
+// 手臂往前外側浮起、手肘彎；但這裡有重力感，所以四肢仍往下垂。左右刻意不對稱（一腳膝蓋彎多一點），才不像立正。
+const FLOAT_LEG_REACH = [0.92, 0.955];     // 腳踝離髖關節的距離 / 腿長（左、右），越小膝蓋越彎
+const FLOAT_LEG_FORWARD = [0.07, 0.02];    // 腳踝在髖關節前方多少（m）
+const FLOAT_FEET_INWARD = 0.03;            // 兩腳往中間收多少（m）
+const FLOAT_ARM_REACH = 0.84;              // 手離肩膀的距離 / 手臂長
+const FLOAT_ARM_OUTWARD = 0.17;            // 手往外張多少（m）
+const FLOAT_ARM_FORWARD = 0.1;             // 手在肩膀前方多少（m）
+const FLOAT_BOB = 0.03;                    // 漂浮時上下浮動的幅度（m）
+const FLOAT_BOB_RATE = 2.4;                // 浮動速度（弧度/秒，約 2.6 秒一次）
+const FLOAT_LIMB_LAG = 0.5;                // 手腳跟著身體浮動慢多少相位（弧度）：身體先動、四肢後到，看起來是垂著的
+const FLOAT_SWAY = 0.02;                   // 兩腳各自前後輕晃的幅度（m）
+const FLOAT_SWAY_RATES = [0.9, 1.3];       // 兩腳晃動的速度（弧度/秒），不同步才不像機械
+const FLY_LEAN_MAX = 18;                   // 往前（後）飛時身體從骨盆往行進方向傾的最大角度（度），往側邊飛時一半
+const FLY_LEAN_SPEED = 6;                  // 水平速度到這裡（m/s）就傾到最大
+const FLY_LEAN_SMOOTH_TIME = 0.35;
+const FLY_DRAG = 0.03;                     // 手腳被風往後帶：水平速度 × 這個秒數 = 往後偏多少（m）
+const FLY_DRAG_MAX = 0.15;
+const FLY_ARM_DRAG_SHARE = 0.5;            // 手被帶的比例（比腳輕）
+const FLY_CLIMB_LEG_STRETCH = 0.015;       // 往上飛時腿被拉直多少（reach 增加）
+const FLY_CLIMB_KNEE_TUCK = 0.07;          // 往下飛時膝蓋縮多少（reach 減少）
+const FLY_CLIMB_ARM_LIFT = 0.1;            // 往下飛時手往上浮多少（reach 減少）
+const FLY_CLIMB_ARM_SPREAD = 0.06;         // 往下飛時手再往外張多少（m）
+const FLY_CLIMB_SMOOTH_TIME = 0.3;
+const FLOAT_REACH_MAX = 0.97;              // 加上浮動、風阻後，目標最遠只到鏈長的這個比例，膝蓋、手肘不會鎖直
+const FLY_TOE_ANGLE = 70;         // 飛行時腳掌往下垂：腳踝到腳尖和水平面的夾角（度）；站立時約 31°
 const IK_SLACK = 0.08;             // 有手部 IK 時身體少退這麼多，手肘留彎度，斜著推時遠的那隻手也搆得到
 const IK_STRETCH_LIMIT = 1e-3;     // 手臂不完全伸直，留一點彎度，手肘才不會在伸直附近翻來翻去
 const PUSH_BACK_SMOOTH_TIME = 0.15;
@@ -1934,13 +1981,13 @@ const PHASE_PROBE_SAMPLES = 48;
 const PELVIS_BONE = 'pelvis';
 const SPINE_COUNTER: [string, number][] = [['spine_01', 0.4], ['spine_02', 0.3], ['spine_03', 0.3]];
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
-type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked';
-const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked'];
+type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly';
+const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly'];
 const SLOT_OF_PHASE: Record<CharacterPhase, AnimSlot> = {
-  ground: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', land: 'jumpLand', blocked: 'blocked',
+  ground: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', land: 'jumpLand', blocked: 'blocked', fly: 'fly',
 };
 const SLOT_OF_ROLE: Record<ClipRole, AnimSlot> = {
-  idle: 'locomotion', walk: 'locomotion', run: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', jumpLand: 'jumpLand', blocked: 'blocked',
+  idle: 'locomotion', walk: 'locomotion', run: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', jumpLand: 'jumpLand', blocked: 'blocked', fly: 'fly',
 };
 
 // 找出「左腳踩到最前面」在動畫裡的位置（0–1），當成步伐週期的 0。
@@ -1996,16 +2043,16 @@ function measureHandReach(model: THREE.Object3D, clip: THREE.AnimationClip): Han
   return best;
 }
 
-// 一隻手臂的三根骨頭；restore 是 IK 改之前的姿勢（mixer 只在值改變時才寫回骨頭，下一格要先還原）。
-interface ArmChain {
+// 兩骨鏈（手臂：上臂、前臂、手；腿：大腿、小腿、腳踝）；restore 是 IK 改之前的姿勢（mixer 只在值改變時才寫回骨頭，下一格要先還原）。
+interface LimbChain {
   upper: THREE.Object3D; lower: THREE.Object3D; hand: THREE.Object3D;
   restoreUpper: THREE.Quaternion; restoreLower: THREE.Quaternion;
   target: THREE.Vector3; hasTarget: boolean; isApplied: boolean;
 }
 
-function findArmChains(root: THREE.Object3D): ArmChain[] {
-  const chains: ArmChain[] = [];
-  for (const [upperName, lowerName, handName] of ARM_CHAINS) {
+function findLimbChains(root: THREE.Object3D, names: [string, string, string][]): LimbChain[] {
+  const chains: LimbChain[] = [];
+  for (const [upperName, lowerName, handName] of names) {
     const upper = root.getObjectByName(upperName);
     const lower = root.getObjectByName(lowerName);
     const hand = root.getObjectByName(handName);
@@ -2029,6 +2076,17 @@ const ikTo = new THREE.Vector3();
 const ikParent = new THREE.Quaternion();
 const ikTurn = new THREE.Quaternion();
 const IK_FALLBACK_POLE = new THREE.Vector3(0, -1, 0);
+const floatForward = new THREE.Vector3();
+const floatSide = new THREE.Vector3();
+const floatCenter = new THREE.Vector3();
+const floatPole = new THREE.Vector3();
+const floatRight = new THREE.Vector3();
+const floatDrag = new THREE.Vector3();
+const floatOffset = new THREE.Vector3();   // 這一格手腳被風往後帶的方向與距離（世界座標）
+const leanAxis = new THREE.Vector3();
+const leanTurn = new THREE.Quaternion();
+const leanRollTurn = new THREE.Quaternion();
+const leanLocal = new THREE.Quaternion();
 
 // 把骨頭繞自己的關節轉，讓世界座標裡的方向 from 轉成 to：local' = parent⁻¹ · 轉動 · parent · local。
 function turnBone(bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3): void {
@@ -2041,8 +2099,8 @@ function turnBone(bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3):
 }
 
 // 兩骨 IK：上臂 a、前臂 b 長度已知，肩膀到目標距離 c，用餘弦定理算手肘位置，
-// 手肘往動畫原本彎的方向（pole）凸出；先轉上臂讓手肘到位，再轉前臂讓手到目標。
-function solveTwoBoneIk(chain: ArmChain, goal: THREE.Vector3): void {
+// 手肘往 pole 凸出（沒給就沿用動畫原本彎的方向）；先轉上臂讓手肘到位，再轉前臂讓手到目標。
+function solveTwoBoneIk(chain: LimbChain, goal: THREE.Vector3, pole?: THREE.Vector3): void {
   chain.upper.getWorldPosition(ikShoulder);
   chain.lower.getWorldPosition(ikElbow);
   chain.hand.getWorldPosition(ikHand);
@@ -2052,7 +2110,8 @@ function solveTwoBoneIk(chain: ArmChain, goal: THREE.Vector3): void {
   const c = clamp(ikDir.length(), Math.abs(a - b) + IK_STRETCH_LIMIT, a + b - IK_STRETCH_LIMIT);
   if (a === 0 || b === 0 || ikDir.lengthSq() === 0) return;
   ikDir.normalize();
-  ikPole.subVectors(ikElbow, ikShoulder);
+  if (pole) ikPole.copy(pole);
+  else ikPole.subVectors(ikElbow, ikShoulder);
   ikPole.addScaledVector(ikDir, -ikPole.dot(ikDir));
   if (ikPole.lengthSq() < 1e-8) ikPole.copy(IK_FALLBACK_POLE).addScaledVector(ikDir, -IK_FALLBACK_POLE.dot(ikDir));
   ikPole.normalize();
@@ -2065,11 +2124,45 @@ function solveTwoBoneIk(chain: ArmChain, goal: THREE.Vector3): void {
   turnBone(chain.lower, ikFrom.subVectors(ikHand, ikElbow), ikTo.subVectors(handGoal, ikElbow));
 }
 
+// 一隻腳的腳踝與腳尖骨頭；restore 是疊上下垂之前的姿勢（理由同 LimbChain）。
+interface FootChain { foot: THREE.Object3D; ball: THREE.Object3D; restore: THREE.Quaternion; isApplied: boolean }
+
+function findFootChains(root: THREE.Object3D): FootChain[] {
+  const chains: FootChain[] = [];
+  for (const [footName, ballName] of FOOT_CHAINS) {
+    const foot = root.getObjectByName(footName);
+    const ball = root.getObjectByName(ballName);
+    if (!foot || !ball) return [];
+    chains.push({ foot, ball, restore: new THREE.Quaternion(), isApplied: false });
+  }
+  return chains;
+}
+
+const toeHeel = new THREE.Vector3();
+const toeTip = new THREE.Vector3();
+const toeFrom = new THREE.Vector3();
+const toeTo = new THREE.Vector3();
+
+// 腳踝轉到腳跟→腳尖往下傾 FLY_TOE_ANGLE 度（水平方向維持動畫原本的朝向），weight 0–1 和動畫混合。
+function droopFoot(chain: FootChain, weight: number): void {
+  chain.foot.getWorldPosition(toeHeel);
+  chain.ball.getWorldPosition(toeTip);
+  toeFrom.subVectors(toeTip, toeHeel);
+  const length = toeFrom.length();
+  const horizontal = Math.hypot(toeFrom.x, toeFrom.z);
+  if (length === 0 || horizontal === 0) return;
+  const angle = DEG(FLY_TOE_ANGLE);
+  toeTo.set((toeFrom.x / horizontal) * Math.cos(angle), -Math.sin(angle), (toeFrom.z / horizontal) * Math.cos(angle));
+  toeTo.multiplyScalar(length).lerp(toeFrom, 1 - weight);
+  turnBone(chain.foot, toeFrom, toeTo);
+}
+
 // 模型載入前（或載入失敗時）先用方塊人，介面和方塊人一樣，第一人稱模式不用知道是哪一個。
 // 架構照遊戲引擎的動畫狀態機：
 // - 地面：一維混合空間（blend space），依速度在走路、跑步兩個節點之間插值，兩段共用同一個步伐週期；
 // - 跳躍：起跳（播一次）→ 空中（循環，起跳播完還沒落地才會用到）→ 落地（播一次，蹲夠久就能被走路打斷）；
 // - 受阻：在地面按著方向鍵卻被擋住（例如撞牆）時播推牆循環，身體轉向想走的方向；放開或轉離牆面就回到地面；
+// - 飛行：播站立循環、腳尖往下垂（骨頭疊在動畫上）；解除時碰到地面就播落地，還在空中就接空中循環；
 // - 狀態之間用權重淡入淡出，權重總和永遠是 1（three.js 不足 1 的部分會混進 T-pose）。
 // 平移沒有專用動畫：身體轉向移動方向（orient to movement），播一般的走跑。
 function createCharacter(): Character {
@@ -2086,10 +2179,24 @@ function createCharacter(): Character {
   const pushBackMotion = { velocity: 0 };
   const pushDir = { forward: 1, side: 0 };   // 最後一次推的方向，放開後沿原方向退回原位
   let pushBack = 0;
-  let armChains: ArmChain[] = [];
+  let armChains: LimbChain[] = [];
+  let legChains: LimbChain[] = [];
+  let floatTime = 0;
   let ikWeight = 0;
   const ikMotion = { velocity: 0 };
-  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0 };
+  let footChains: FootChain[] = [];
+  let flyWeight = 0;
+  const flyMotion = { velocity: 0 };
+  let leanPitch = 0;   // 往前傾為正（弧度）
+  let leanRoll = 0;    // 往右傾為正（弧度）
+  let climbBlend = 0;  // -1 往下飛 … 1 往上飛
+  const leanPitchMotion = { velocity: 0 };
+  const leanRollMotion = { velocity: 0 };
+  const climbMotion = { velocity: 0 };
+  let pelvisBone: THREE.Object3D | null = null;
+  const leanRestore = new THREE.Quaternion();
+  let isLeanApplied = false;
+  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0, fly: 0 };
   const facingMotion = { velocity: 0 };
   let phase: CharacterPhase = 'ground';
   let phaseTime = 0;
@@ -2242,6 +2349,14 @@ function createCharacter(): Character {
 
   function animateModel(motion: RigMotion, dt: number): void {
     phaseTime += dt;
+    if (motion.isFlying) {
+      if (phase !== 'fly') enterPhase('fly', 'fly');
+      wasGrounded = false;
+    } else if (phase === 'fly') {
+      if (motion.isGrounded) enterPhase('land', 'jumpLand');
+      else enterPhase('jumpLoop', 'jumpLoop');
+      wasGrounded = motion.isGrounded;
+    }
     if (motion.isGrounded !== wasGrounded) {
       if (motion.isGrounded) enterPhase('land', 'jumpLand');
       else enterPhase('jumpStart', 'jumpStart');
@@ -2276,7 +2391,7 @@ function createCharacter(): Character {
   }
 
   // 從肩膀沿手伸出去的水平方向、在動畫裡手的高度找牆；找到就把目標設在牆面前 HAND_GAP。
-  function findHandTarget(chain: ArmChain, findWall: WallProbe): boolean {
+  function findHandTarget(chain: LimbChain, findWall: WallProbe): boolean {
     chain.upper.getWorldPosition(ikShoulder);
     chain.lower.getWorldPosition(ikElbow);
     chain.hand.getWorldPosition(ikHand);
@@ -2312,8 +2427,105 @@ function createCharacter(): Character {
     }
   }
 
-  function undoHandIk(): void {
+  // 目標點相對於鏈根（髖、肩）：往下 reach × 鏈長，再加上往前、往外（outward 正的是離開身體中線）、往上 lift，
+  // 最後被風往後帶 drag × floatDrag。
+  function floatGoal(chain: LimbChain, reach: number, forward: number, outward: number, lift: number, drag: number): THREE.Vector3 {
+    chain.upper.getWorldPosition(ikShoulder);
+    chain.lower.getWorldPosition(ikElbow);
+    chain.hand.getWorldPosition(ikHand);
+    const length = ikShoulder.distanceTo(ikElbow) + ikElbow.distanceTo(ikHand);
+    floatSide.subVectors(ikShoulder, floatCenter).addScaledVector(floatForward, -floatSide.dot(floatForward));
+    floatSide.y = 0;
+    if (floatSide.lengthSq() > 0) floatSide.normalize();
+    ikGoal.copy(ikShoulder)
+      .addScaledVector(WORLD_UP, -reach * length)
+      .addScaledVector(floatForward, forward)
+      .addScaledVector(floatSide, outward)
+      .addScaledVector(WORLD_UP, lift)
+      .addScaledVector(floatDrag, -drag);
+    floatOffset.subVectors(ikGoal, ikShoulder);
+    if (floatOffset.length() > FLOAT_REACH_MAX * length) ikGoal.copy(ikShoulder).addScaledVector(floatOffset, (FLOAT_REACH_MAX * length) / floatOffset.length());
+    return ikGoal.lerp(ikHand, 1 - flyWeight);
+  }
+
+  // 飛行時身體從骨盆往水平行進方向傾（世界座標的轉軸換到骨盆父骨頭座標裡算），腿和手之後用 IK 往下垂，
+  // 所以身體前傾時四肢自然落在後面。
+  function applyFlyLean(): void {
+    if (!model || !pelvisBone?.parent || Math.abs(leanPitch) + Math.abs(leanRoll) < IK_MIN_WEIGHT) return;
+    model.updateMatrixWorld(true);
+    model.getWorldDirection(floatForward).setY(0).normalize();
+    leanRestore.copy(pelvisBone.quaternion);
+    leanAxis.crossVectors(WORLD_UP, floatForward);   // 繞這個軸轉正角度，頭往前
+    leanTurn.setFromAxisAngle(leanAxis, leanPitch);
+    leanTurn.multiply(leanRollTurn.setFromAxisAngle(floatForward, leanRoll));   // 繞前方轉正角度，頭往右
+    pelvisBone.parent.getWorldQuaternion(parentRotation);
+    leanLocal.copy(parentRotation).invert().multiply(leanTurn).multiply(parentRotation);
+    pelvisBone.quaternion.premultiply(leanLocal);
+    isLeanApplied = true;
+  }
+
+  function undoFlyLean(): void {
+    if (!isLeanApplied || !pelvisBone) return;
+    pelvisBone.quaternion.copy(leanRestore);
+    isLeanApplied = false;
+  }
+
+  // 飛行時把站立動畫改成漂浮：腿併攏往下、膝蓋往前微彎；手往外張、手肘往後微彎。手臂若正在推牆 IK 就不動。
+  // 次級動態：四肢浮動慢身體半拍、兩腳各自輕晃、被風往後帶；往上飛腿拉直，往下飛膝蓋縮、手往上浮。
+  function applyFloatPose(motion: RigMotion): void {
+    if (!model || flyWeight < IK_MIN_WEIGHT) return;
+    model.updateMatrixWorld(true);
+    model.getWorldDirection(floatForward).setY(0).normalize();
+    model.getWorldPosition(floatCenter);
+    floatRight.crossVectors(floatForward, WORLD_UP);
+    floatDrag.copy(floatForward).multiplyScalar(motion.forwardSpeed).addScaledVector(floatRight, motion.sideSpeed).multiplyScalar(FLY_DRAG);
+    if (floatDrag.length() > FLY_DRAG_MAX) floatDrag.setLength(FLY_DRAG_MAX);
+    const isCalm = reducedMotion.matches;
+    const bobPhase = floatTime * FLOAT_BOB_RATE;
+    const lag = isCalm ? 0 : FLOAT_BOB * (Math.sin(bobPhase - FLOAT_LIMB_LAG) - Math.sin(bobPhase));
+    const rising = Math.max(0, climbBlend);
+    const falling = Math.max(0, -climbBlend);
+    floatPole.copy(floatForward);
+    legChains.forEach((chain, i) => {
+      chain.restoreUpper.copy(chain.upper.quaternion);
+      chain.restoreLower.copy(chain.lower.quaternion);
+      chain.isApplied = true;
+      const reach = FLOAT_LEG_REACH[i] + rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK;
+      const sway = isCalm ? 0 : FLOAT_SWAY * Math.sin(floatTime * FLOAT_SWAY_RATES[i] + i * 2);
+      solveTwoBoneIk(chain, floatGoal(chain, reach, FLOAT_LEG_FORWARD[i] + sway, -FLOAT_FEET_INWARD, lag, 1), floatPole);
+    });
+    floatPole.copy(floatForward).negate();
     for (const chain of armChains) {
+      if (chain.isApplied) continue;
+      chain.restoreUpper.copy(chain.upper.quaternion);
+      chain.restoreLower.copy(chain.lower.quaternion);
+      chain.isApplied = true;
+      const reach = FLOAT_ARM_REACH - falling * FLY_CLIMB_ARM_LIFT;
+      const outward = FLOAT_ARM_OUTWARD + falling * FLY_CLIMB_ARM_SPREAD;
+      solveTwoBoneIk(chain, floatGoal(chain, reach, FLOAT_ARM_FORWARD, outward, lag, FLY_ARM_DRAG_SHARE), floatPole);
+    }
+  }
+
+  function applyFootDroop(): void {
+    if (!model || footChains.length === 0 || flyWeight < IK_MIN_WEIGHT) return;
+    model.updateMatrixWorld(true);
+    for (const chain of footChains) {
+      chain.restore.copy(chain.foot.quaternion);
+      chain.isApplied = true;
+      droopFoot(chain, flyWeight);
+    }
+  }
+
+  function undoFootDroop(): void {
+    for (const chain of footChains) {
+      if (!chain.isApplied) continue;
+      chain.foot.quaternion.copy(chain.restore);
+      chain.isApplied = false;
+    }
+  }
+
+  function undoLimbIk(chains: LimbChain[]): void {
+    for (const chain of chains) {
       if (!chain.isApplied) continue;
       chain.upper.quaternion.copy(chain.restoreUpper);
       chain.lower.quaternion.copy(chain.restoreLower);
@@ -2322,18 +2534,35 @@ function createCharacter(): Character {
   }
 
   function animate(motion: RigMotion, dt: number): void {
-    if (dt > 0) applyPushBack(motion, dt);
+    if (dt > 0) {
+      applyPushBack(motion, dt);
+      flyWeight = smoothDamp(flyWeight, motion.isFlying ? 1 : 0, flyMotion, FLY_SMOOTH_TIME, dt);
+      floatTime += dt;
+      const bob = reducedMotion.matches ? 0 : FLOAT_BOB * Math.sin(floatTime * FLOAT_BOB_RATE);
+      (model ?? block.root).position.y = bob * flyWeight;
+      const lean = (speed: number): number => (motion.isFlying ? clamp(speed / FLY_LEAN_SPEED, -1, 1) * DEG(FLY_LEAN_MAX) : 0);
+      leanPitch = smoothDamp(leanPitch, lean(motion.forwardSpeed), leanPitchMotion, FLY_LEAN_SMOOTH_TIME, dt);
+      leanRoll = smoothDamp(leanRoll, lean(motion.sideSpeed) / 2, leanRollMotion, FLY_LEAN_SMOOTH_TIME, dt);
+      const climb = motion.isFlying ? clamp(motion.climbSpeed / FLY_VERTICAL_SPEED, -1, 1) : 0;
+      climbBlend = smoothDamp(climbBlend, climb, climbMotion, FLY_CLIMB_SMOOTH_TIME, dt);
+    }
     if (!mixer) {
       block.animate(motion, dt);
       return;
     }
     if (dt <= 0) return;
     animateModel(motion, dt);
-    undoHandIk();
+    undoFootDroop();
+    undoLimbIk(legChains);
+    undoLimbIk(armChains);
+    undoFlyLean();
     undoOrientationWarp();
     mixer.update(dt);
     applyOrientationWarp();
+    applyFlyLean();
     applyHandIk(motion.findWall, dt);
+    applyFloatPose(motion);
+    applyFootDroop();
   }
 
   async function load(): Promise<string[]> {
@@ -2345,7 +2574,10 @@ function createCharacter(): Character {
     model.rotation.y = MODEL_FACING;
     scaleModel();
     warpBones = findWarpBones(model);
-    armChains = findArmChains(model);
+    armChains = findLimbChains(model, ARM_CHAINS);
+    legChains = findLimbChains(model, LEG_CHAINS);
+    pelvisBone = model.getObjectByName(PELVIS_BONE) ?? null;
+    footChains = findFootChains(model);
     clips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
     for (const role of LOCOMOTION_ROLES) phaseOffset(clips.get(config.character.clips[role]) ?? gltf.animations[0]);
     root.remove(block.root);
@@ -2405,6 +2637,10 @@ function createFirstPersonMode(): ViewMode {
   let savedPose: PlayerPose | null = null;   // 上次離開時站的位置與朝向，再進來時接著走
   let isWalking = false;  // 預設跑步；按一下 Shift 切成走路，再按一下切回來
   let blockedSeconds = 0;  // 按著方向鍵卻幾乎沒移動，持續了多久
+  let isFlying = false;
+  let flySeconds = 0;      // 這次飛行已經飛了多久
+  let flyClimbSpeed = 0;   // 這一格實際上升的速度（m/s），給漂浮姿勢用
+  let lastJumpPress = -Infinity;   // 上一次按下空白鍵的時間（event.timeStamp，毫秒），判斷連按
 
   const isHeld = (action: KeyAction): boolean => [...heldCodes].some((code) => KEY_ACTIONS[code] === action);
   const isGrounded = (): boolean => isOnGround;
@@ -2460,6 +2696,24 @@ function createFirstPersonMode(): ViewMode {
     return { x: x + offset.dx, z: z + offset.dz, yaw: DEG(facing), pitch: 0 };
   }
 
+  // 快速連按兩下進入飛行（第一下照常起跳）；飛行中空白鍵改成上升，由 updateFlying 讀按住的鍵。
+  // 按住不放的 repeat 不算連按，但站在地上時照舊可以一直跳。
+  function onJumpKey(event: KeyboardEvent): void {
+    const isDoubleTap = !event.repeat && event.timeStamp - lastJumpPress < DOUBLE_TAP_MS;
+    if (!event.repeat) lastJumpPress = isDoubleTap ? -Infinity : event.timeStamp;
+    if (isFlying) return;
+    if (isDoubleTap) {
+      isFlying = true;
+      flySeconds = 0;
+      isOnGround = false;
+      velocityY = 0;
+      return;
+    }
+    if (!isGrounded()) return;
+    velocityY = Math.sqrt(2 * config.character.gravity * config.character.jumpHeight);
+    isOnGround = false;
+  }
+
   function onKeyChange(event: KeyboardEvent): void {
     const action = KEY_ACTIONS[event.code];
     if (!isActive || !action) return;
@@ -2472,10 +2726,7 @@ function createFirstPersonMode(): ViewMode {
     heldCodes.add(event.code);
     // 按住不放時瀏覽器會連續送 keydown（repeat），只認第一下，不然會一直來回切換
     if (action === 'toggleWalk' && !event.repeat) isWalking = !isWalking;
-    if (action === 'jump' && isGrounded()) {
-      velocityY = Math.sqrt(2 * config.character.gravity * config.character.jumpHeight);
-      isOnGround = false;
-    }
+    if (action === 'jump') onJumpKey(event);
     dismissHint();
   }
 
@@ -2669,7 +2920,46 @@ function createFirstPersonMode(): ViewMode {
 
   // 垂直方向：站著時跟著腳下的表面上下（差在 stepHeight 內直接貼過去，像走樓梯），
   // 腳下突然空掉就開始掉；在空中受重力，落到表面就停，往上撞到底面就不再上升。
+  // 飛行：沒有重力，空白鍵往上（撞到天花板停住）、X 往下。腳底碰到站得上去的表面（往下降到，
+  // 或平飛時腳下的高度差在 stepHeight 內）就解除飛行站上去，角色播落地動作；往上飛時碰到只把腳墊高。
+  function updateFlying(dt: number): void {
+    flySeconds += dt;
+    velocityY = 0;
+    const rise = (Number(isHeld('jump')) - Number(isHeld('descend'))) * FLY_VERTICAL_SPEED + mouseFlyRise();
+    const climb = Math.sign(rise);
+    const previous = feetY;
+    const nextY = feetY + rise * dt;
+    if (climb > 0) {
+      const ceiling = ceilingHeight(body.x, body.z, feetY + bodyHeight(), nextY + bodyHeight());
+      feetY = Math.max(previous, Math.min(nextY, ceiling - bodyHeight()));
+    } else {
+      feetY = nextY;
+    }
+    flyClimbSpeed = dt > 0 ? (feetY - previous) / dt : 0;
+    const support = supportHeight(body.x, body.z, previous + config.character.stepHeight);
+    if (support < feetY) return;
+    feetY = support;
+    if (climb > 0 || (climb === 0 && flySeconds < FLY_LAND_GRACE)) return;
+    isFlying = false;
+    isOnGround = true;
+  }
+
+  // 滑鼠左右鍵一起按著往前飛時，順著鏡頭的俯仰升降：往上看就往上、往下看就往下（m/s）。
+  // 平視的角度第一人稱是 0、第三人稱是預設俯角；離平視 FLY_PITCH_DEADZONE 內不升降，平飛時不會慢慢飄。
+  function mouseFlyRise(): number {
+    if ((mouseButtons & MOUSE_LEFT) === 0 || (mouseButtons & MOUSE_RIGHT) === 0) return 0;
+    const level = isThirdPerson() ? DEG(config.camera.thirdPerson.pitch) : 0;
+    const offset = pitch - level;
+    const tilt = Math.sign(offset) * Math.max(0, Math.abs(offset) - DEG(FLY_PITCH_DEADZONE));
+    const speed = isWalking ? config.character.walkSpeed : config.character.runSpeed;
+    return speed * Math.sin(tilt);
+  }
+
   function updateVertical(dt: number): void {
+    if (isFlying) {
+      updateFlying(dt);
+      return;
+    }
     const { stepHeight, gravity } = config.character;
     if (isOnGround) {
       const support = supportHeight(body.x, body.z, feetY + stepHeight);
@@ -2739,6 +3029,8 @@ function createFirstPersonMode(): ViewMode {
       pushSide: push?.right ?? 0,
       pushBack: push?.back ?? 0,
       findWall: push ? findWall : null,
+      isFlying,
+      climbSpeed: isFlying ? flyClimbSpeed : 0,
     }, dt);
   }
 
@@ -3859,7 +4151,7 @@ function updateOverlay(): void {
 // 「儲存」只在 vite dev 有（寫回 JSON 的外掛在 vite.config.ts），打包後整段被移除。
 const SAVE_FEEDBACK_MS = 1500;
 const CLIP_ROLE_NAMES: Record<ClipRole, string> = {
-  idle: '站立', walk: '走路', run: '跑步', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地', blocked: '受阻',
+  idle: '站立', walk: '走路', run: '跑步', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地', blocked: '受阻', fly: '飛行',
 };
 const furnitureFolders = new Map<string, GUI>();
 let furnitureGroup: GUI | null = null;
