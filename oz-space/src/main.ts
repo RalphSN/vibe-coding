@@ -5,7 +5,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 import GUI, { type Controller } from 'lil-gui';
-import { CLIP_ROLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingsConfig, type SceneConfig } from './config/scene.config';
+import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingsConfig, type SceneConfig } from './config/scene.config';
+import { buildFloatingField, buildRing, updateFloaters, type Disc, type Floater, type PropsBuild } from './oz-props';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
 // ================= 0. 型別 =================
@@ -48,10 +49,10 @@ type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, m
 // 水平碰撞用的有向方塊（OBB）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。
 // 斜牆、斜放的家具就是一整個轉了角度的方塊，不用切成小段。
 interface Solid { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
-// 圓心在原點的環形平板（inner 是 0 就是實心圓）：只管站上去和撞頭，水平方向不擋。
-interface Disc { inner: number; outer: number; minY: number; maxY: number }
 // 圓心在原點、尖點朝下的倒圓錐：用公式算碰撞，碰撞面就是外觀的表面。頂面平台另外用 Disc 站上去。
 interface Cone { tipY: number; topY: number; topRadius: number }
+// 圓心在 (0, baseY, 0) 的上半球：站在球面上、水平方向擋。貓頭就是這個。
+interface Dome { baseY: number; radius: number }
 // 掃掠碰到的時刻（位移的比例 0–1）與表面法線（世界座標，朝外）。
 interface SweepHit { t: number; nx: number; nz: number }
 // 推牆時手掌在角色前方多遠、離腳底多高（m）；slack 是手部 IK 能再往前補的距離（沒有 IK 是 0）。
@@ -75,7 +76,6 @@ const config: SceneConfig = loadSceneConfig(rawSceneConfig);
 const EPSILON = 1e-3;
 const GROUND_THICKNESS = 0.2;
 const GRID_CELL = 5;               // 地面格線間距（m）：空間上千公尺，1 m 一格遠看會糊成一片灰
-const RING_SEGMENTS = 128;
 const CENTER_SEGMENTS = 64;
 const CAMERA_FAR_PER_GROUND = 2.5; // 鏡頭可視距離 = 地面邊長 × 這個比例，從空間一角看得到對角
 const GRID_LIFT = 0.002;           // 格線浮在地面上這麼高，才不會和地面互相閃爍
@@ -85,7 +85,7 @@ const SPAWN_SEARCH_STEP = 0.25;
 const SPAWN_SEARCH_RADIUS = 2;
 
 const COLORS = {
-  ground: 0xf4f5f7, grid: 0xdfe2e6, gridMajor: 0xc9cdd3, center: 0xdde3f0, seat: 0xb9c2d6,
+  ground: 0xf4f5f7, grid: 0xdfe2e6, gridMajor: 0xc9cdd3, center: 0xdde3f0, seat: 0xb9c2d6, innerEar: 0xf4a7b9,
   player: 0xff6f3c, playerFace: 0x3a2a20, playerSkin: 0xf0c39c, playerPants: 0x3d4f73, playerShoe: 0x2b2b2b,
 };
 
@@ -93,9 +93,8 @@ const materials: Record<string, THREE.Material> = Object.fromEntries(
   Object.entries(COLORS).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]),
 );
 
-// 同心環由內往外依序用這些顏色（紅橙黃綠藍靛紫），圈數比顏色多就從頭輪。
+// 環由上往下依序用這些顏色（紅橙黃綠藍靛紫），圈數比顏色多就從頭輪。
 const RING_COLORS = [0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9];
-const ringMaterials = RING_COLORS.map((color) => new THREE.MeshLambertMaterial({ color }));
 
 // ================= 2. 場景基礎 =================
 // 對數深度緩衝：空間很大，鏡頭拉遠時一般深度緩衝分不出只差幾公分的面（地面和格線會互相閃爍）。
@@ -109,7 +108,7 @@ scene.background = new THREE.Color(0xeef0f2);
 
 // 可視距離跟著地面大小，在 rebuildScene 裡更新。
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, config.scene.groundSize * CAMERA_FAR_PER_GROUND);
-camera.position.set(0, 280, 560);   // 環繞檢視第一次進來：從南邊高處斜看中央
+camera.position.set(0, 380, 720);   // 環繞檢視第一次進來：從南邊高處斜看中央
 
 scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
@@ -124,6 +123,9 @@ const world: {
   ramps: Ramp[];
   discs: Disc[];
   cones: Cone[];
+  domes: Dome[];
+  decor: THREE.Group;
+  floaters: Floater[];
 } = {
   room: new THREE.Group(),      // 空間裡看得到的東西（地面、之後的平台）；第三人稱鏡頭也拿它判斷有沒有被擋住
   colliders: [],
@@ -131,8 +133,11 @@ const world: {
   ramps: [],                    // 世界座標的碰撞斜面
   discs: [],                    // 圓心在原點的環形（或實心圓）平板：站上去、撞頭用；水平方向不擋
   cones: [],                    // 倒圓錐：水平方向擋、從下面往上撞頭
+  domes: [],                    // 上半球：站上去、水平方向擋
+  decor: new THREE.Group(),     // 沒有碰撞的裝飾（房屋、書、桌椅、碎片、漂浮物）；鏡頭不避開，數量多才不會每格打幾千次射線
+  floaters: [],                 // 會上下飄的東西，每格更新
 };
-scene.add(world.room);
+scene.add(world.room, world.decor);
 
 // ================= 3. 空白空間（地面、隱形圍欄、碰撞） =================
 function addBox(parent: THREE.Object3D, material: THREE.Material, size: Vec3Tuple, center: Vec3Tuple): THREE.Mesh {
@@ -280,21 +285,56 @@ const SEARCH_OFFSETS = (() => {
   return offsets.sort((a, b) => a.distance - b.distance);
 })();
 
-// 中央的倒圓錐：上面是平台、往下收成尖點，懸在空中。碰撞用 Cone（側面，公式計算）加上 Disc（頂面平台）。
-function buildCenter(center: CenterConfig): THREE.Mesh {
-  const geometry = new THREE.ConeGeometry(center.topRadius, center.height, CENTER_SEGMENTS);
-  geometry.rotateX(Math.PI);   // ConeGeometry 尖端朝上，翻過來變成上平下尖
-  const mesh = new THREE.Mesh(geometry, materials.center);
-  mesh.position.y = center.topY - center.height / 2;
-  return mesh;
+// 貓耳：長在頭（半球）上，從正上方往左右各偏 EAR_TILT，稍微朝前（+Z，出生點那一側）；三角錐的一面朝前，內側疊一片粉紅。
+const EAR_TILT = THREE.MathUtils.degToRad(42);
+const EAR_FORWARD = 0.15;
+const EAR_RADIUS = 0.38;        // 耳朵底半徑、高度、埋進頭裡的深度，都是頭半徑的倍數
+const EAR_HEIGHT = 0.7;
+const EAR_SINK = 0.15;
+const INNER_EAR_SCALE = 0.62;
+const INNER_EAR_FORWARD = 0.22; // 內耳往前推（耳朵底半徑的倍數），粉紅色才露在正面
+const DOME_SEGMENTS = 64;
+
+// 中央：倒圓錐（上平下尖）上面接一個半球和兩隻耳朵，做成貓頭。
+// 碰撞：圓錐側面用 Cone、半球用 Dome（都是公式計算，貼著外觀）；耳朵只有外觀。
+function buildCenter(center: CenterConfig): THREE.Group {
+  const group = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(center.topRadius, center.height, CENTER_SEGMENTS).rotateX(Math.PI), materials.center);
+  cone.position.y = center.topY - center.height / 2;   // ConeGeometry 尖端朝上，翻過來變成上平下尖
+  const head = new THREE.Mesh(new THREE.SphereGeometry(center.topRadius, DOME_SEGMENTS, DOME_SEGMENTS / 2, 0, Math.PI * 2, 0, Math.PI / 2), materials.center);
+  head.position.y = center.topY;
+  group.add(cone, head);
+  const R = center.topRadius;
+  for (const side of [-1, 1]) {
+    const direction = new THREE.Vector3(side * Math.sin(EAR_TILT), Math.cos(EAR_TILT), EAR_FORWARD).normalize();
+    const tilt = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    // 三個面的錐：頂點預設朝 +Z，轉半圈讓平的那一面朝前
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(R * EAR_RADIUS, R * EAR_HEIGHT, 3).rotateY(Math.PI).translate(0, (R * EAR_HEIGHT) / 2, 0), materials.center);
+    ear.quaternion.copy(tilt);
+    ear.position.copy(direction).multiplyScalar(R * (1 - EAR_SINK)).add(new THREE.Vector3(0, center.topY, 0));
+    const inner = new THREE.Mesh(ear.geometry.clone().scale(INNER_EAR_SCALE, INNER_EAR_SCALE, INNER_EAR_SCALE), materials.innerEar);
+    inner.position.set(0, 0, R * EAR_RADIUS * INNER_EAR_FORWARD);
+    ear.add(inner);
+    group.add(ear);
+  }
+  return group;
 }
 
-// 平台 Disc 沒有厚度：平台下面撞頭由 Cone 算，平台邊緣兩者在同一個半徑接上。
-function centerColliders(center: CenterConfig): { cone: Cone; disc: Disc } {
+// 頭頂（耳尖）大約多高：周圍漂浮物要避開的範圍。
+const centerTopY = (center: CenterConfig): number => center.topY + center.topRadius * (1 + EAR_HEIGHT);
+
+function centerColliders(center: CenterConfig): { cone: Cone; dome: Dome } {
   return {
     cone: { tipY: center.topY - center.height, topY: center.topY, topRadius: center.topRadius },
-    disc: { inner: 0, outer: center.topRadius, minY: center.topY, maxY: center.topY },
+    dome: { baseY: center.topY, radius: center.topRadius },
   };
+}
+
+// 身體高度範圍 (bottom, top) 和上半球重疊時，球在這段裡最寬的半徑（越往上越窄，取重疊段的最低點）；沒重疊是 null。
+function domeWidestRadius(dome: Dome, bottom: number, top: number): number | null {
+  if (top <= dome.baseY || bottom >= dome.baseY + dome.radius) return null;
+  const rise = Math.max(bottom, dome.baseY) - dome.baseY;
+  return Math.sqrt(dome.radius * dome.radius - rise * rise);
 }
 
 // 身體佔的高度範圍 (bottom, top) 和倒圓錐重疊時，圓錐在這段裡最寬的半徑（倒圓錐越高越寬，取重疊段的最高點）；沒重疊是 null。
@@ -321,38 +361,52 @@ function coneRadiusAt(center: CenterConfig, y: number): number {
   return center.topRadius * clamp((y - (center.topY - center.height)) / center.height, 0, 1);
 }
 
-// 第 i 圈環（從 0 起算、由上往下）的範圍：頂面在平台下方 (i + 1) × spacing，內緣離圓錐側面 clearance。
-function ringDisc(center: CenterConfig, rings: RingsConfig, i: number): Disc {
-  const maxY = center.topY - (i + 1) * rings.spacing;
-  const inner = coneRadiusAt(center, maxY) + rings.clearance;
-  return { inner, outer: inner + rings.width, minY: maxY - rings.thickness, maxY };
+// 每一層環的範圍（由上往下）：頂面高度是平台往下累加每層的 gap，內緣離圓錐側面 clearance。
+function ringShapes(center: CenterConfig, rings: RingsConfig): Disc[] {
+  let maxY = center.topY;
+  return rings.layers.map((layer) => {
+    maxY -= layer.gap;
+    const inner = coneRadiusAt(center, maxY) + rings.clearance;
+    return { inner, outer: inner + rings.width, minY: maxY - rings.thickness, maxY };
+  });
 }
 
-// 懸空的同心環：每圈是一片有厚度的環形平板（截面是長方形，繞 Y 軸轉一圈）。
-function buildRings(center: CenterConfig, rings: RingsConfig): THREE.Group {
-  const group = new THREE.Group();
-  for (let i = 0; i < rings.count; i++) {
-    const { inner, outer, minY, maxY } = ringDisc(center, rings, i);
-    // 截面點的順序決定面的朝向：逆著走一圈，法線朝外
-    const profile = [new THREE.Vector2(inner, minY), new THREE.Vector2(outer, minY), new THREE.Vector2(outer, maxY), new THREE.Vector2(inner, maxY), new THREE.Vector2(inner, minY)];
-    const ring = new THREE.Mesh(new THREE.LatheGeometry(profile, RING_SEGMENTS), ringMaterials[i % ringMaterials.length]);
-    group.add(ring);
-  }
-  return group;
+const RING_SEED = 1000;      // 每圈的亂數種子是 RING_SEED + 圈號，改圈的樣式不會讓其他圈重新洗牌
+const FIELD_SEED = 42;
+const FIELD_RADIUS_PER_GROUND = 0.4;   // 周圍漂浮物散布的半徑 = 地面邊長 × 這個比例
+
+// 懸空的環：每層依 rings.layers 的樣式建（見 oz-props.ts），再加上周圍的漂浮物。
+function buildRings(center: CenterConfig, rings: RingsConfig): PropsBuild[] {
+  const { floaters } = config.scene;
+  const shapes = ringShapes(center, rings);
+  const builds = shapes.map((shape, i) => buildRing({
+    ...shape, style: rings.layers[i]?.style ?? 'plain', color: RING_COLORS[i % RING_COLORS.length] ?? COLORS.center,
+    seed: RING_SEED + i, bobScale: floaters.bobScale,
+  }));
+  builds.push(buildFloatingField({
+    ...floaters, fieldRadius: config.scene.groundSize * FIELD_RADIUS_PER_GROUND, seed: FIELD_SEED, rings: shapes,
+    cone: { tipY: center.topY - center.height, topY: center.topY, topRadius: center.topRadius, headTop: centerTopY(center) },
+  }));
+  return builds;
 }
 
 // 改了地面大小時重建：地面網格、圍欄碰撞一起換。之後在空間裡加平台或物件，也放進 world.room，碰撞會一起收。
 function rebuildScene(): void {
   disposeChildren(world.room);
+  disposeChildren(world.decor);
   const { groundSize, center, rings } = config.scene;
-  world.room.add(buildGround(groundSize), buildRings(center, rings), buildCenter(center));
+  const ringBuilds = buildRings(center, rings);
+  world.room.add(buildGround(groundSize), buildCenter(center), ...ringBuilds.map((build) => build.solid));
+  world.decor.add(...ringBuilds.map((build) => build.decor));
+  world.floaters = ringBuilds.flatMap((build) => build.floaters);
   const fence = groundFenceBoxes(groundSize);
   const centerParts = centerColliders(center);
   world.colliders = fence;
   world.solids = fence.map(solidFromBox);
   world.cones = [centerParts.cone];
+  world.domes = [centerParts.dome];
   world.ramps = [];
-  world.discs = [centerParts.disc, ...Array.from({ length: rings.count }, (_, i) => ringDisc(center, rings, i))];
+  world.discs = ringBuilds.flatMap((build) => build.discs);
   camera.far = groundSize * CAMERA_FAR_PER_GROUND;
   camera.updateProjectionMatrix();
 }
@@ -362,7 +416,7 @@ function rebuildScene(): void {
 // Tab 在環繞檢視與第一人稱（可以走）之間切換，見 toggleViewMode。
 function createOrbitMode(): ViewMode {
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 110, 0);
+  controls.target.set(0, 170, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;
@@ -1660,16 +1714,27 @@ function createFirstPersonMode(): ViewMode {
   const overlapsAt = (box: THREE.Box3, x: number, z: number): boolean =>
     x + config.character.radius > box.min.x && x - config.character.radius < box.max.x && z + config.character.radius > box.min.z && z - config.character.radius < box.max.z;
   // 腳印（圓）有沒有碰到圓盤：離圓心的距離加減半徑落在內外緣之間。
+  // 只有一段角度的圓盤（破碎的環）：圓心的角度要落在那段裡，腳印半徑換成角度當寬容。
   const overlapsDisc = (disc: Disc, x: number, z: number): boolean => {
     const distance = Math.hypot(x, z);
-    return distance + config.character.radius > disc.inner && distance - config.character.radius < disc.outer;
+    if (distance + config.character.radius <= disc.inner || distance - config.character.radius >= disc.outer) return false;
+    if (!disc.arc || distance === 0) return true;
+    const fromStart = THREE.MathUtils.euclideanModulo(Math.atan2(x, z) - disc.arc.start, Math.PI * 2);
+    const slack = config.character.radius / distance;
+    return fromStart < disc.arc.length + slack || fromStart > Math.PI * 2 - slack;
   };
-  // 這一刻會水平擋住身體的倒圓錐半徑（腳底 stepHeight 以下的部分跨得上去，不算）。
-  const blockingConeRadii = (): number[] =>
-    world.cones.map((cone) => coneWidestRadius(cone, feetY + config.character.stepHeight, feetY + bodyHeight())).filter((radius): radius is number => radius !== null);
+  // 這一刻會水平擋住身體的圓形障礙（倒圓錐、半球）半徑；腳底 stepHeight 以下的部分跨得上去，不算。
+  const blockingRoundRadii = (): number[] => {
+    const bottom = feetY + config.character.stepHeight;
+    const top = feetY + bodyHeight();
+    return [
+      ...world.cones.map((cone) => coneWidestRadius(cone, bottom, top)),
+      ...world.domes.map((dome) => domeWidestRadius(dome, bottom, top)),
+    ].filter((radius): radius is number => radius !== null);
+  };
   const isFree = (x: number, z: number): boolean =>
     !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius)) &&
-    !blockingConeRadii().some((radius) => Math.hypot(x, z) < radius + config.character.radius);
+    !blockingRoundRadii().some((radius) => Math.hypot(x, z) < radius + config.character.radius);
   const dismissHint = (): void => { hint.hidden = true; };
 
   // collide-and-slide：腳印是圓（從上往下看的膠囊體）。沿位移掃掠，碰到就停在表面前 SKIN，
@@ -1678,7 +1743,7 @@ function createFirstPersonMode(): ViewMode {
   function slide(dx: number, dz: number): void {
     const r = config.character.radius;
     const solids = world.solids.filter((solid) => blocksBody(solid) && !circleOverlapsSolid(solid, body.x, body.z, 0));
-    const coneRadii = blockingConeRadii().filter((radius) => Math.hypot(body.x, body.z) >= radius);
+    const coneRadii = blockingRoundRadii().filter((radius) => Math.hypot(body.x, body.z) >= radius);
     let restX = dx;
     let restZ = dz;
     for (let i = 0; i < SLIDE_ITERATIONS; i++) {
@@ -1957,6 +2022,13 @@ function createFirstPersonMode(): ViewMode {
     for (const disc of world.discs) {
       if (disc.maxY <= maxTop + SURFACE_EPSILON && disc.maxY > height && overlapsDisc(disc, x, z)) height = disc.maxY;
     }
+    // 半球：腳印（圓）最靠近球心那一點下面的球面最高。
+    for (const dome of world.domes) {
+      const reach = Math.max(0, Math.hypot(x, z) - r);
+      if (reach >= dome.radius) continue;
+      const domeTop = dome.baseY + Math.sqrt(dome.radius * dome.radius - reach * reach);
+      if (domeTop <= maxTop + SURFACE_EPSILON && domeTop > height) height = domeTop;
+    }
     return height;
   }
 
@@ -2230,9 +2302,20 @@ function addSceneGroup(panel: GUI): void {
   const rings = group.addFolder('懸空同心環');
   rings.add(config.scene.rings, 'clearance', 0, 200, 1).name('離圓錐距離（m）').onChange(rebuildScene);
   rings.add(config.scene.rings, 'width', 5, 100, 1).name('每圈寬（m）').onChange(rebuildScene);
-  rings.add(config.scene.rings, 'spacing', 2, 80, 1).name('上下間距（m）').onChange(rebuildScene);
-  rings.add(config.scene.rings, 'count', 0, 14, 1).name('圈數').onChange(rebuildScene);
   rings.add(config.scene.rings, 'thickness', 0.5, 20, 0.5).name('厚度（m）').onChange(rebuildScene);
+  config.scene.rings.layers.forEach((layer, i) => {
+    const folder = rings.addFolder(`第 ${i + 1} 層`);
+    folder.add(layer, 'style', RING_STYLES).name('樣式').onChange(rebuildScene);
+    folder.add(layer, 'gap', 2, 80, 1).name('離上一層（m）').onChange(rebuildScene);
+    folder.close();
+  });
+  const floaters = group.addFolder('周圍漂浮物');
+  floaters.add(config.scene.floaters, 'clusters', 0, 20, 1).name('聚集處').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'islands', 0, 80, 1).name('島嶼').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'platforms', 0, 80, 1).name('平台').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'hexPads', 0, 80, 1).name('蜂窩平面').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'debris', 0, 400, 10).name('零碎小塊').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'bobScale', 0, 3, 0.1).name('飄動幅度倍率').onChange(rebuildScene);
   group.close();
 }
 
@@ -2395,6 +2478,7 @@ const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), MAX_FRAME_DT);
   currentMode().update(dt);
+  updateFloaters(world.floaters, clock.elapsedTime);
   character.syncSkeletonHelper();
   renderer.render(scene, camera);
 });

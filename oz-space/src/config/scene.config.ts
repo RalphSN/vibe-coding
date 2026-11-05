@@ -8,10 +8,30 @@ export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'sprint', 'jumpSta
 export interface CenterConfig { topRadius: number; topY: number; height: number }
 
 /**
- * 圍著中央倒圓錐、懸在空中的環（方塊稿，像星環）：從平台往下每隔 spacing 一圈，共 count 圈，每圈寬 width、厚 thickness。
- * 每圈內緣和圓錐側面保持同樣的水平距離 clearance；圓錐越往下越細，所以環越往下直徑越小。顏色依序輪替。
+ * 圍著中央倒圓錐、懸在空中的環（像星環）：由上往下一層一層，每層寬 width、厚 thickness。
+ * 每層內緣和圓錐側面保持同樣的水平距離 clearance；圓錐越往下越細，所以環越往下直徑越小。顏色依序輪替。
  */
-export interface RingsConfig { clearance: number; width: number; count: number; thickness: number; spacing: number }
+export interface RingsConfig {
+  clearance: number; width: number; thickness: number;
+  /** 由上往下的每一層：style 是樣式，gap 是這層頂面和上一層頂面（第一層是平台）的高度差（m）。 */
+  layers: RingLayer[];
+}
+
+export interface RingLayer { style: RingStyle; gap: number }
+
+/**
+ * 環的樣式：plain 平板、houses 蓋滿房屋、floatingHouses 沒有環面只有歪斜漂浮的房屋、broken 2/3 碎成由大到小的片段、
+ * floatingBooks 沒有環面只有飄著的書（開、半開、闔上）、shards 全是碎塊、bookshelf 空中圖書館（一圈圈書櫃中間有走道）、
+ * triple 同高三層、restaurant 分區的環狀美食街。floatingHouses、floatingBooks、shards 站不上去。
+ */
+export type RingStyle = 'plain' | 'houses' | 'floatingHouses' | 'broken' | 'floatingBooks' | 'shards' | 'bookshelf' | 'triple' | 'restaurant';
+export const RING_STYLES: RingStyle[] = ['plain', 'houses', 'floatingHouses', 'broken', 'floatingBooks', 'shards', 'bookshelf', 'triple', 'restaurant'];
+
+/**
+ * 環周圍的漂浮物數量。clusters 是聚集處的數量：大部分漂浮物聚在這幾處，少數零散分布。
+ * bobScale 是所有漂浮物上下飄動幅度的倍率（1 約 0.3–1.5 m，0 不動）。
+ */
+export interface FloatersConfig { islands: number; platforms: number; hexPads: number; debris: number; clusters: number; bobScale: number }
 
 export interface SceneSection {
   /** 空白地面的邊長（m），以原點為中心；邊緣有隱形圍欄。 */
@@ -20,6 +40,7 @@ export interface SceneSection {
   spawn: { x: number; z: number; facing: number };
   center: CenterConfig;
   rings: RingsConfig;
+  floaters: FloatersConfig;
 }
 
 export interface CharacterConfig {
@@ -104,13 +125,19 @@ function missingNumbers(value: unknown, keys: string[]): string[] {
   return keys.filter((key) => typeof value[key] !== 'number' || !Number.isFinite(value[key]));
 }
 
+const isRingLayerList = (value: unknown): value is RingLayer[] =>
+  Array.isArray(value) && value.every((layer) =>
+    isObject(layer) && (RING_STYLES as unknown[]).includes(layer.style) && missingNumbers(layer, ['gap']).length === 0);
+
 function collectSceneIssues(scene: unknown): string[] {
   if (!isObject(scene)) return ['scene'];
   return [
     ...missingNumbers(scene, ['groundSize']).map((key) => `scene.${key}`),
     ...missingNumbers(scene.spawn, ['x', 'z', 'facing']).map((key) => `scene.spawn.${key}`),
     ...missingNumbers(scene.center, ['topRadius', 'topY', 'height']).map((key) => `scene.center.${key}`),
-    ...missingNumbers(scene.rings, ['clearance', 'width', 'count', 'thickness', 'spacing']).map((key) => `scene.rings.${key}`),
+    ...missingNumbers(scene.rings, ['clearance', 'width', 'thickness']).map((key) => `scene.rings.${key}`),
+    ...(isRingLayerList(isObject(scene.rings) ? scene.rings.layers : undefined) ? [] : ['scene.rings.layers']),
+    ...missingNumbers(scene.floaters, ['islands', 'platforms', 'hexPads', 'debris', 'clusters', 'bobScale']).map((key) => `scene.floaters.${key}`),
   ];
 }
 
