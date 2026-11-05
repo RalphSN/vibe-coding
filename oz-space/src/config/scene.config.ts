@@ -22,11 +22,11 @@ export interface RingLayer { style: RingStyle; gap: number }
 /**
  * 環的樣式：plain 平板、houses 蓋滿房屋、floatingHouses 沒有環面只有歪斜漂浮的房屋、broken 2/3 碎成由大到小的片段、
  * floatingBooks 沒有環面只有飄著的書（開、半開、闔上）、shards 全是碎塊、bookshelf 空中圖書館（一圈圈書櫃中間有走道）、
- * triple 同高三層、restaurant 分區的環狀美食街、courts 各種球場（oz-sports.ts）、pool 環形游泳池（oz-pool.ts）。
+ * triple 同高三層、restaurant 分區的環狀美食街、courts 各種球場（oz-sports.ts）、track 環形 PU 跑道（oz-track.ts）、pool 環形游泳池（oz-pool.ts）。
  * floatingHouses、floatingBooks、shards 站不上去。
  */
-export type RingStyle = 'plain' | 'courts' | 'pool' | 'houses' | 'floatingHouses' | 'broken' | 'floatingBooks' | 'shards' | 'bookshelf' | 'triple' | 'restaurant';
-export const RING_STYLES: RingStyle[] = ['plain', 'courts', 'pool', 'houses', 'floatingHouses', 'broken', 'floatingBooks', 'shards', 'bookshelf', 'triple', 'restaurant'];
+export type RingStyle = 'plain' | 'courts' | 'track' | 'pool' | 'houses' | 'floatingHouses' | 'broken' | 'floatingBooks' | 'shards' | 'bookshelf' | 'triple' | 'restaurant';
+export const RING_STYLES: RingStyle[] = ['plain', 'courts', 'track', 'pool', 'houses', 'floatingHouses', 'broken', 'floatingBooks', 'shards', 'bookshelf', 'triple', 'restaurant'];
 
 /**
  * 環周圍的漂浮物數量。clusters 是聚集處的數量：大部分漂浮物聚在這幾處，少數零散分布。

@@ -127,6 +127,17 @@ export function collectColliders(root: THREE.Object3D): SolidBox[] {
   return solids;
 }
 
+/** 水平面的貼圖座標改成世界座標（公尺 / tileSize），磁磚、地墊在整圈上才會一樣大、不會被拉長。 */
+export function planarUv(geometry: THREE.BufferGeometry, tileSize: number): void {
+  const positions = geometry.getAttribute('position');
+  const uv = new Float32Array(positions.count * 2);
+  for (let i = 0; i < positions.count; i++) {
+    uv[i * 2] = positions.getX(i) / tileSize;
+    uv[i * 2 + 1] = positions.getZ(i) / tileSize;
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
+
 export function disposeGeometries(root: THREE.Object3D): void {
   root.traverse((object) => {
     if (object instanceof THREE.Mesh) object.geometry.dispose();

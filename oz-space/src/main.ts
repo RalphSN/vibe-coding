@@ -9,6 +9,7 @@ import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterCon
 import { buildFloatingField, buildRing, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
 import { buildCourtsRing } from './oz-sports';
 import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
+import { buildTrackRing } from './oz-track';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
 // ================= 0. 型別 =================
@@ -98,8 +99,8 @@ const materials: Record<string, THREE.Material> = Object.fromEntries(
   Object.entries(COLORS).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]),
 );
 
-// 環由上往下依序用這些顏色：最上面兩層（球場、泳池）用自己的地面，後面接紅橙黃綠藍靛紫；層數比顏色多就從頭輪。
-const RING_COLORS = [0xc5ced8, 0xe7dccb, 0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9];
+// 環由上往下依序用這些顏色：最上面三層（球場、跑道、泳池）用自己的地面，後面接紅橙黃綠藍靛紫；層數比顏色多就從頭輪。
+const RING_COLORS = [0xc5ced8, 0xb4472f, 0xe7dccb, 0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9];
 
 // ================= 2. 場景基礎 =================
 // 對數深度緩衝：空間很大，鏡頭拉遠時一般深度緩衝分不出只差幾公分的面（地面和格線會互相閃爍）。
@@ -145,7 +146,7 @@ const underwaterFog = new THREE.FogExp2(UNDERWATER_COLOR.getHex(), 0.11);
 
 // 可視距離跟著地面大小，在 rebuildScene 裡更新。
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, config.scene.groundSize * CAMERA_FAR_PER_GROUND);
-camera.position.set(0, 430, 800);   // 環繞檢視第一次進來：從南邊高處斜看中央
+camera.position.set(0, 450, 830);   // 環繞檢視第一次進來：從南邊高處斜看中央
 
 scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
@@ -438,6 +439,7 @@ const FIELD_RADIUS_PER_GROUND = 0.4;   // 周圍漂浮物散布的半徑 = 地�
 const buildLayer = (spec: RingSpec): PropsBuild => {
   if (spec.style === 'courts') return buildCourtsRing(spec);
   if (spec.style === 'pool') return buildPoolRing(spec);
+  if (spec.style === 'track') return buildTrackRing(spec);
   return buildRing(spec);
 };
 
@@ -486,7 +488,7 @@ function rebuildScene(): void {
 // Tab 在環繞檢視與第一人稱（可以走）之間切換，見 toggleViewMode。
 function createOrbitMode(): ViewMode {
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 200, 0);
+  controls.target.set(0, 215, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;

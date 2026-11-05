@@ -967,8 +967,9 @@ export function buildRing(spec: RingSpec): PropsBuild {
     case 'triple': buildTripleRing(spec, build); break;
     case 'restaurant': buildFoodCourtRing(spec, build, rng); break;
     case 'courts':
+    case 'track':
     case 'pool':
-      throw new Error(`環樣式 ${spec.style} 由 oz-sports.ts／oz-pool.ts 建，main.ts 會直接分派過去`);
+      throw new Error(`環樣式 ${spec.style} 由 oz-sports.ts／oz-track.ts／oz-pool.ts 建，main.ts 會直接分派過去`);
   }
   return build;
 }
