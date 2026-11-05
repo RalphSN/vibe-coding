@@ -10,6 +10,7 @@ import { buildFloatingField, buildRing, setPropsEnvironment, updateFloaters, typ
 import { buildCourtsRing } from './oz-sports';
 import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
 import { buildTrackRing } from './oz-track';
+import { buildFloatingHousesRing, buildHousesRing } from './oz-town';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
 // ================= 0. 型別 =================
@@ -440,6 +441,8 @@ const buildLayer = (spec: RingSpec): PropsBuild => {
   if (spec.style === 'courts') return buildCourtsRing(spec);
   if (spec.style === 'pool') return buildPoolRing(spec);
   if (spec.style === 'track') return buildTrackRing(spec);
+  if (spec.style === 'houses') return buildHousesRing(spec);
+  if (spec.style === 'floatingHouses') return buildFloatingHousesRing(spec);
   return buildRing(spec);
 };
 

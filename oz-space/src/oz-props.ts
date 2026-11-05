@@ -45,7 +45,8 @@ export interface FieldSpec {
 
 type Rng = () => number;
 type Range = [number, number];
-interface Part { batch: Batch; index: number; base: THREE.Matrix4 }
+/** Batch 裡的一個實例：哪一批、第幾個、原本的矩陣（漂浮時以它為基準上下移）。 */
+export interface Part { batch: Batch; index: number; base: THREE.Matrix4 }
 
 const TAU = Math.PI * 2;
 const RING_SEGMENTS = 128;
@@ -56,21 +57,6 @@ const BOB_PERIOD: Range = [4, 9];          // 秒
 const BOB_HARMONIC = 1.731;
 const BOB_HARMONIC_SHARE = 0.3;
 
-// 房屋（以人物 1.83 m 為準）
-const HOUSE_WIDTH: Range = [4, 8];
-const HOUSE_HEIGHT: Range = [3, 8];
-const TOWER_HEIGHT: Range = [10, 18];
-const TOWER_CHANCE = 0.1;              // 高樓是平頂，不加屋頂
-const HOUSE_GAP: Range = [1, 3];
-const HOUSE_ROW_DEPTH: Range = [5, 8];
-const HOUSE_ROW_GAP: Range = [1, 2.5];
-const HOUSE_EDGE = 1;                  // 離環內外緣留的距離
-const HOUSE_STREET = 8;                // 環中間留一條不蓋房子的大街，出生點在這裡
-const ROOF_OVERHANG = 1.08;
-const ROOF_RATIO: Range = [0.3, 0.6];
-const FLOATING_HOUSE_AREA = 260;       // 漂浮房屋：每這麼多平方公尺放一棟
-const FLOATING_HOUSE_RISE: Range = [-6, 10];
-const FLOATING_HOUSE_TILT = 0.35;      // 最多歪幾弧度（約 20°）
 const PLACE_ATTEMPTS = 30;
 
 // 破碎的環：2/3 碎掉。從兩邊斷口往缺口中間走，碎片由大漸漸變小、越來越稀、偏離越多。
@@ -181,8 +167,6 @@ const HEX_DROP_CHANCE = 0.25;
 const HEX_TILT = 0.1;
 const DEBRIS_SIZE: Range = [0.4, 3.5];
 
-const WALL_COLORS = [0xf4efe6, 0xf2d9c4, 0xdfe8f0, 0xe8e0f2, 0xf6e7b8, 0xd7ecd9, 0xf3c9c9, 0xcfd6e0];
-const ROOF_COLORS = [0xb5523b, 0x8a4b3a, 0x4f6d8f, 0x3f6b55, 0xc97b3c, 0x5c5470];
 const SHARD_COLORS = [0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9, 0xffffff, 0xe6e9f0, 0x2fd3c6, 0xff7ac3];
 const BOOK_COLORS = [0x8c2f39, 0xb5523b, 0xd9a441, 0x3f6b55, 0x2f4b7c, 0x5c5470, 0x1f2a36, 0xe8dcc2, 0x7a9e7e, 0xc96f53, 0x4a6fa5, 0x9b4f96];
 const PAGE_COLORS = [0xfbf8f0, 0xf4eedf, 0xfffdf7];
@@ -315,8 +299,8 @@ const GEOMETRY = (() => {
   };
 })();
 
-// 同一種形狀的一批實例：先收集位置與顏色，build() 時一次建成 InstancedMesh。
-class Batch {
+/** 同一種形狀的一批實例：先收集位置與顏色，build() 時一次建成 InstancedMesh。 */
+export class Batch {
   readonly geometry: THREE.BufferGeometry;
   readonly material: THREE.Material;
   mesh: THREE.InstancedMesh | null = null;
@@ -385,8 +369,8 @@ function partsSolid(parts: Part[]): SolidBox {
   return { cx: center.x, cz: center.z, ux: 1, uz: 0, vx: 0, vz: 1, hu: size.x / 2, hv: size.z / 2, minY: bounds.min.y, maxY: bounds.max.y, standable: true };
 }
 
-// 一組會飄的實例：加進飄動清單，同時加一個跟著飄的碰撞方塊。
-function addFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[]): void {
+/** 一組會飄的實例：加進飄動清單，同時加一個跟著飄的碰撞方塊。 */
+export function addFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[]): void {
   const floater = makeFloater(rng, scale, floatParts(parts));
   const box = partsSolid(parts);
   floater.solid = { box, minY: box.minY, maxY: box.maxY };
@@ -439,7 +423,7 @@ function arcSlab(inner: number, outer: number, minY: number, maxY: number, start
 }
 
 // 有向方塊碰撞：中心 (cx, cz)、轉 yaw（和 Object3D.rotation.y 同方向）、自身 x 方向長 sizeX、z 方向長 sizeZ。
-function orientedSolid(cx: number, cz: number, yaw: number, sizeX: number, sizeZ: number, minY: number, maxY: number): SolidBox {
+export function orientedSolid(cx: number, cz: number, yaw: number, sizeX: number, sizeZ: number, minY: number, maxY: number): SolidBox {
   return { cx, cz, ux: Math.cos(yaw), uz: -Math.sin(yaw), vx: Math.sin(yaw), vz: Math.cos(yaw), hu: sizeX / 2, hv: sizeZ / 2, minY, maxY };
 }
 
@@ -498,81 +482,6 @@ function addPlainSlab(spec: RingSpec, build: PropsBuild, color = spec.color): vo
 // 環範圍內隨機一點（面積均勻）。
 function randomInRing(rng: Rng, inner: number, outer: number): { r: number; theta: number } {
   return { r: Math.sqrt(inner * inner + rng() * (outer * outer - inner * inner)), theta: rng() * TAU };
-}
-
-// ---------- 房屋 ----------
-// 一棟房子：牆是單位方塊，屋頂接在牆頂（跟著牆一起歪）。平頂高樓不加屋頂。
-function addHouse(rng: Rng, bodies: Batch, roofs: Batch, matrixArgs: [number, number, number, number, number, number], width: number, height: number, depth: number, hasRoof: boolean): Part[] {
-  const body = transform(...matrixArgs, width, height, depth);
-  const parts = [bodies.add(body, pick(rng, WALL_COLORS))];
-  if (!hasRoof) return parts;
-  const roofHeight = Math.min(width, depth) * range(rng, ROOF_RATIO);
-  const roof = body.clone()
-    .multiply(new THREE.Matrix4().makeTranslation(0, 1, 0))
-    .multiply(new THREE.Matrix4().makeScale(ROOF_OVERHANG, roofHeight / height, ROOF_OVERHANG));
-  parts.push(roofs.add(roof, pick(rng, ROOF_COLORS)));
-  return parts;
-}
-
-// 隨機的房子尺寸；turned 時屋脊轉 90°（寬、深對調），整排看起來才不會一模一樣。
-function randomHouse(rng: Rng): { width: number; height: number; isTower: boolean; turned: boolean } {
-  const isTower = rng() < TOWER_CHANCE;
-  return { width: range(rng, HOUSE_WIDTH), height: range(rng, isTower ? TOWER_HEIGHT : HOUSE_HEIGHT), isTower, turned: rng() < 0.5 };
-}
-
-// 蓋滿房屋：環中間留一條大街，兩側一排排沿著圓周蓋。
-function buildHousesRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
-  addPlainSlab(spec, build);
-  const bodies = new Batch(GEOMETRY.baseBox);
-  const roofs = new Batch(GEOMETRY.roof);
-  const middle = (spec.inner + spec.outer) / 2;
-  const sides: Range[] = [[spec.inner + HOUSE_EDGE, middle - HOUSE_STREET / 2], [middle + HOUSE_STREET / 2, spec.outer - HOUSE_EDGE]];
-  for (const [from, to] of sides) {
-    let rowStart = from;
-    while (to - rowStart > HOUSE_ROW_DEPTH[0] / 2) {
-      const rowDepth = Math.min(range(rng, HOUSE_ROW_DEPTH), to - rowStart);
-      const rowRadius = rowStart + rowDepth / 2;
-      let along = rng() * HOUSE_GAP[1];
-      for (;;) {
-        const house = randomHouse(rng);
-        if (along + house.width > TAU * rowRadius) break;
-        const theta = (along + house.width / 2) / rowRadius;
-        const depth = rowDepth - rng() * 1.5;
-        const yaw = theta + (house.turned ? Math.PI / 2 : 0);
-        const [sizeX, sizeZ] = house.turned ? [depth, house.width] : [house.width, depth];
-        addHouse(rng, bodies, roofs, [polarX(rowRadius, theta), spec.maxY, polarZ(rowRadius, theta), yaw, 0, 0], sizeX, house.height, sizeZ, !house.isTower);
-        build.solids.push(orientedSolid(polarX(rowRadius, theta), polarZ(rowRadius, theta), yaw, sizeX, sizeZ, spec.maxY, spec.maxY + house.height + Math.min(sizeX, sizeZ)));
-        along += house.width + range(rng, HOUSE_GAP);
-      }
-      rowStart += rowDepth + range(rng, HOUSE_ROW_GAP);
-    }
-  }
-  addBatches(build.decor, [bodies, roofs]);
-}
-
-// 沒有環面，房屋歪歪斜斜地漂在環的位置上。房子之間至少隔開彼此的大小。
-function buildFloatingHousesRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
-  const bodies = new Batch(GEOMETRY.baseBox);
-  const roofs = new Batch(GEOMETRY.roof);
-  const count = Math.round((Math.PI * (spec.outer ** 2 - spec.inner ** 2)) / FLOATING_HOUSE_AREA);
-  const placed: { x: number; z: number; size: number }[] = [];
-  for (let i = 0; i < count; i++) {
-    const house = randomHouse(rng);
-    const depth = range(rng, HOUSE_WIDTH);
-    const size = Math.max(house.width, depth);
-    for (let attempt = 0; attempt < PLACE_ATTEMPTS; attempt++) {
-      const { r, theta } = randomInRing(rng, spec.inner + size / 2, spec.outer - size / 2);
-      const x = polarX(r, theta);
-      const z = polarZ(r, theta);
-      if (placed.some((other) => Math.hypot(other.x - x, other.z - z) < (other.size + size) / 2)) continue;
-      placed.push({ x, z, size });
-      const args: [number, number, number, number, number, number] = [x, spec.maxY + range(rng, FLOATING_HOUSE_RISE), z, rng() * TAU, spread(rng, FLOATING_HOUSE_TILT), spread(rng, FLOATING_HOUSE_TILT)];
-      const parts = addHouse(rng, bodies, roofs, args, house.width, house.height, depth, !house.isTower);
-      addFloater(build, rng, spec.bobScale, parts);
-      break;
-    }
-  }
-  addBatches(build.decor, [bodies, roofs]);
 }
 
 // ---------- 破碎的環 ----------
@@ -958,8 +867,6 @@ export function buildRing(spec: RingSpec): PropsBuild {
   const rng = createRng(spec.seed);
   switch (spec.style) {
     case 'plain': addPlainSlab(spec, build); break;
-    case 'houses': buildHousesRing(spec, build, rng); break;
-    case 'floatingHouses': buildFloatingHousesRing(spec, build, rng); break;
     case 'broken': buildBrokenRing(spec, build, rng); break;
     case 'floatingBooks': buildFloatingBooksRing(spec, build, rng); break;
     case 'shards': buildShardsRing(spec, build, rng); break;
@@ -968,8 +875,10 @@ export function buildRing(spec: RingSpec): PropsBuild {
     case 'restaurant': buildFoodCourtRing(spec, build, rng); break;
     case 'courts':
     case 'track':
+    case 'houses':
+    case 'floatingHouses':
     case 'pool':
-      throw new Error(`環樣式 ${spec.style} 由 oz-sports.ts／oz-track.ts／oz-pool.ts 建，main.ts 會直接分派過去`);
+      throw new Error(`環樣式 ${spec.style} 由 oz-sports.ts／oz-track.ts／oz-pool.ts／oz-town.ts 建，main.ts 會直接分派過去`);
   }
   return build;
 }
