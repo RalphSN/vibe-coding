@@ -1,14 +1,25 @@
 // scene.config.json 的型別。單位：公尺、秒、角度（度）。
 // 座標：原點在空間中心的地面；+X 東、-Z 北、+Y 上。
 
-export type ClipRole = 'idle' | 'walk' | 'run' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly';
-export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly'];
+export type ClipRole = 'idle' | 'walk' | 'run' | 'sprint' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly' | 'sitEnter' | 'sitLoop' | 'sitExit';
+export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'sprint', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly', 'sitEnter', 'sitLoop', 'sitExit'];
+
+/** 中央的倒圓錐（方塊稿）：圓心在原點，上面是半徑 topRadius 的平台、頂面高 topY，往下 height 收成尖點，懸在空中。 */
+export interface CenterConfig { topRadius: number; topY: number; height: number }
+
+/**
+ * 圍著中央倒圓錐、懸在空中的環（方塊稿，像星環）：從平台往下每隔 spacing 一圈，共 count 圈，每圈寬 width、厚 thickness。
+ * 每圈內緣和圓錐側面保持同樣的水平距離 clearance；圓錐越往下越細，所以環越往下直徑越小。顏色依序輪替。
+ */
+export interface RingsConfig { clearance: number; width: number; count: number; thickness: number; spacing: number }
 
 export interface SceneSection {
   /** 空白地面的邊長（m），以原點為中心；邊緣有隱形圍欄。 */
   groundSize: number;
   /** 第一次進入第一人稱時站的位置；facing 是面向（度，0 朝北、90 朝西，逆時針）。 */
   spawn: { x: number; z: number; facing: number };
+  center: CenterConfig;
+  rings: RingsConfig;
 }
 
 export interface CharacterConfig {
@@ -31,10 +42,18 @@ export interface CharacterConfig {
   fadeSeconds: number;
   /** 落地後至少蹲這麼久才接回走路（秒）。 */
   landLockSeconds: number;
-  /** 各動作用哪段動畫（glb 裡的片段名稱）。blocked 是按著方向鍵卻被牆擋住時播的（例如推牆）；fly 是飛行時的底層姿勢（腳尖下垂另外疊上去）。 */
+  /**
+   * 各動作用哪段動畫（glb 裡的片段名稱）。blocked 是按著方向鍵卻被牆擋住時播的（例如推牆）；fly 是飛行時的底層姿勢（腳尖下垂另外疊上去）；
+   * sprint 是加速時超過跑步速度用的；sitEnter／sitLoop／sitExit 是坐下、坐著、站起來。
+   */
   clips: Record<ClipRole, string>;
-  /** 走路、跑步動畫原本的移動速度（m/s），也是混合空間的兩個節點：速度介於兩者之間時兩段按比例混合，腳才不會滑。 */
-  clipSpeeds: { walk: number; run: number };
+  /**
+   * 走路、跑步、衝刺動畫原本的移動速度（m/s），也是混合空間的三個節點：速度介於兩個節點之間時兩段按比例混合，
+   * 一個步伐週期走的距離也跟著插值，腳才不會滑；超過 sprint 就加快步伐週期跟上。
+   */
+  clipSpeeds: { walk: number; run: number; sprint: number };
+  /** 按 Z 切換的加速：地面跑步速度乘 run、飛行速度（水平與升降）乘 fly；走路不加速。 */
+  boost: { run: number; fly: number };
   /** 平移時身體轉向移動方向的平滑時間（秒）。沒有平移動畫，用轉身代替。 */
   turnToMoveSeconds: number;
   /** 身體轉向移動方向的上限（度）；90 是純平移時完全側身。 */
@@ -90,6 +109,8 @@ function collectSceneIssues(scene: unknown): string[] {
   return [
     ...missingNumbers(scene, ['groundSize']).map((key) => `scene.${key}`),
     ...missingNumbers(scene.spawn, ['x', 'z', 'facing']).map((key) => `scene.spawn.${key}`),
+    ...missingNumbers(scene.center, ['topRadius', 'topY', 'height']).map((key) => `scene.center.${key}`),
+    ...missingNumbers(scene.rings, ['clearance', 'width', 'count', 'thickness', 'spacing']).map((key) => `scene.rings.${key}`),
   ];
 }
 
@@ -97,7 +118,8 @@ function collectCharacterIssues(character: unknown): string[] {
   if (!isObject(character)) return ['character'];
   const numbers = ['scale', 'radius', 'stepHeight', 'walkSpeed', 'runSpeed', 'turnSpeed', 'jumpHeight', 'gravity', 'fadeSeconds', 'landLockSeconds', 'turnToMoveSeconds', 'maxMoveTurn', 'legTurnLimit'];
   const issues = missingNumbers(character, numbers).map((key) => `character.${key}`);
-  issues.push(...missingNumbers(character.clipSpeeds, ['walk', 'run']).map((key) => `character.clipSpeeds.${key}`));
+  issues.push(...missingNumbers(character.clipSpeeds, ['walk', 'run', 'sprint']).map((key) => `character.clipSpeeds.${key}`));
+  issues.push(...missingNumbers(character.boost, ['run', 'fly']).map((key) => `character.boost.${key}`));
   const clips = isObject(character.clips) ? character.clips : {};
   issues.push(...CLIP_ROLES.filter((role) => typeof clips[role] !== 'string').map((role) => `character.clips.${role}`));
   if (typeof character.showSkeleton !== 'boolean') issues.push('character.showSkeleton');
