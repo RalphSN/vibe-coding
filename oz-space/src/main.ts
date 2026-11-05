@@ -52,7 +52,8 @@ interface RigMotion {
 type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, maxDistance: number) => { distance: number; nx: number; nz: number } | null;
 // 水平碰撞用的有向方塊（OBB）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。
 // 斜牆、斜放的家具就是一整個轉了角度的方塊，不用切成小段。
-interface Solid { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
+// standable：頂面站得上去（漂浮物）；這類方塊的高度每格會跟著飄動更新。
+interface Solid { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number; standable?: boolean }
 // 圓心在原點、尖點朝下的倒圓錐：用公式算碰撞，碰撞面就是外觀的表面。頂面平台另外用 Disc 站上去。
 interface Cone { tipY: number; topY: number; topRadius: number }
 // 圓心在 (0, baseY, 0) 的上半球：站在球面上、水平方向擋。貓頭就是這個。
@@ -2208,6 +2209,10 @@ function createFirstPersonMode(): ViewMode {
     for (const disc of world.discs) {
       if (disc.maxY <= maxTop + SURFACE_EPSILON && disc.maxY > height && overlapsDisc(disc, x, z)) height = disc.maxY;
     }
+    // 漂浮物的頂面：站在上面時每格重找一次，平台上下飄，腳也跟著上下（差在 stepHeight 內就貼過去）
+    for (const solid of world.solids) {
+      if (solid.standable && solid.maxY <= maxTop + SURFACE_EPSILON && solid.maxY > height && circleOverlapsSolid(solid, x, z, r)) height = solid.maxY;
+    }
     // 半球：腳印（圓）最靠近球心那一點下面的球面最高。
     for (const dome of world.domes) {
       const reach = Math.max(0, Math.hypot(x, z) - r);
@@ -2226,6 +2231,9 @@ function createFirstPersonMode(): ViewMode {
     }
     for (const disc of world.discs) {
       if (disc.minY >= fromHead - SURFACE_EPSILON && disc.minY < toHead && disc.minY < height && overlapsDisc(disc, x, z)) height = disc.minY;
+    }
+    for (const solid of world.solids) {
+      if (solid.standable && solid.minY >= fromHead - SURFACE_EPSILON && solid.minY < toHead && solid.minY < height && circleOverlapsSolid(solid, x, z, config.character.radius)) height = solid.minY;
     }
     // 倒圓錐的底面是斜的：頭頂（圓）最先碰到的是靠圓錐那一側的邊緣，離圓心 distance - radius 的那一點。
     for (const cone of world.cones) {

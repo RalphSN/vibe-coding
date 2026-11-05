@@ -9,7 +9,11 @@ import type { RingStyle } from './config/scene.config';
 export interface Disc { inner: number; outer: number; minY: number; maxY: number; arc?: { start: number; length: number } }
 
 /** 會上下飄的東西：apply(dy) 把它放到基準位置往上 dy 公尺。 */
-export interface Floater { amplitude: number; speed: number; phase: number; apply: (dy: number) => void }
+export interface Floater {
+  amplitude: number; speed: number; phase: number; apply: (dy: number) => void;
+  /** 跟著飄的碰撞方塊：每格把 minY／maxY 設成基準高度 + dy，站在上面的人就跟著上下。 */
+  solid?: { box: SolidBox; minY: number; maxY: number };
+}
 
 /**
  * 圓心在原點的圓形牆（例如泳池池壁）：高度 minY–maxY 之間水平方向擋。solid 是哪一側是實心的：
@@ -18,7 +22,7 @@ export interface Floater { amplitude: number; speed: number; phase: number; appl
 export interface RoundWall { radius: number; minY: number; maxY: number; solid: 'inside' | 'outside'; arc?: { start: number; length: number } }
 
 /** 水平方向擋人的有向方塊（和 main.ts 的 Solid 同形狀）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。 */
-export interface SolidBox { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
+export interface SolidBox { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number; standable?: boolean }
 
 /** 圓心在原點的環形水域（泳池）：半徑在 inner–outer 之間、高度在 floorY–surfaceY 之間是水。 */
 export interface WaterZone { inner: number; outer: number; surfaceY: number; floorY: number }
@@ -366,12 +370,41 @@ function floatParts(parts: Part[]): (dy: number) => void {
   };
 }
 
+// 漂浮物的碰撞：一組實例在世界座標裡的外框（不轉的方塊，斜放的東西外框會大一點），頂面站得上去。
+// 每個形狀先算一次單位幾何的外框，再用實例的矩陣換到世界座標。
+const partBox = new THREE.Box3();
+function partsSolid(parts: Part[]): SolidBox {
+  const bounds = new THREE.Box3();
+  for (const part of parts) {
+    part.batch.geometry.boundingBox ?? part.batch.geometry.computeBoundingBox();
+    const box = part.batch.geometry.boundingBox;
+    if (box) bounds.union(partBox.copy(box).applyMatrix4(part.base));
+  }
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  return { cx: center.x, cz: center.z, ux: 1, uz: 0, vx: 0, vz: 1, hu: size.x / 2, hv: size.z / 2, minY: bounds.min.y, maxY: bounds.max.y, standable: true };
+}
+
+// 一組會飄的實例：加進飄動清單，同時加一個跟著飄的碰撞方塊。
+function addFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[]): void {
+  const floater = makeFloater(rng, scale, floatParts(parts));
+  const box = partsSolid(parts);
+  floater.solid = { box, minY: box.minY, maxY: box.maxY };
+  build.floaters.push(floater);
+  build.solids.push(box);
+}
+
 /** 每格呼叫：time 是累計秒數。 */
 export function updateFloaters(floaters: Floater[], time: number): void {
   for (const floater of floaters) {
     const wave = Math.sin(time * floater.speed + floater.phase) * (1 - BOB_HARMONIC_SHARE) +
       Math.sin(time * floater.speed * BOB_HARMONIC + floater.phase * 2) * BOB_HARMONIC_SHARE;
-    floater.apply(floater.amplitude * wave);
+    const dy = floater.amplitude * wave;
+    floater.apply(dy);
+    if (floater.solid) {
+      floater.solid.box.minY = floater.solid.minY + dy;
+      floater.solid.box.maxY = floater.solid.maxY + dy;
+    }
   }
 }
 
@@ -535,7 +568,7 @@ function buildFloatingHousesRing(spec: RingSpec, build: PropsBuild, rng: Rng): v
       placed.push({ x, z, size });
       const args: [number, number, number, number, number, number] = [x, spec.maxY + range(rng, FLOATING_HOUSE_RISE), z, rng() * TAU, spread(rng, FLOATING_HOUSE_TILT), spread(rng, FLOATING_HOUSE_TILT)];
       const parts = addHouse(rng, bodies, roofs, args, house.width, house.height, depth, !house.isTower);
-      build.floaters.push(makeFloater(rng, spec.bobScale, floatParts(parts)));
+      addFloater(build, rng, spec.bobScale, parts);
       break;
     }
   }
@@ -572,7 +605,8 @@ function buildBrokenRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
         const matrix = transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, tilt), spread(rng, tilt),
           size * range(rng, [0.8, 1.1]), fragmentThickness, size * range(rng, [0.8, 1.1]));
         const part = pick(rng, batches).add(matrix, shade(spec.color, spread(rng, 0.06)));
-        if (progress > FRAGMENT_FLOAT_FROM) build.floaters.push(makeFloater(rng, spec.bobScale, floatParts([part])));
+        if (progress > FRAGMENT_FLOAT_FROM) addFloater(build, rng, spec.bobScale, [part]);
+        else build.solids.push(partsSolid([part]));
       }
       traveled += size * range(rng, [0.9, 1.2]);
     }
@@ -594,7 +628,7 @@ function buildShardsRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
       ? transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, rng() * TAU, rng() * TAU, size / 2, (size / 2) * range(rng, [0.5, 1.2]), size / 2)
       : transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, SHARD_TILT), spread(rng, SHARD_TILT), size, range(rng, SHARD_THICKNESS), size * range(rng, [0.5, 1]));
     const part = pick(rng, isChunk ? chunks : slabs).add(matrix, pick(rng, SHARD_COLORS));
-    build.floaters.push(makeFloater(rng, spec.bobScale * SHARD_BOB, floatParts([part])));
+    addFloater(build, rng, spec.bobScale * SHARD_BOB, [part]);
   }
   addBatches(build.decor, [...slabs, ...chunks]);
 }
@@ -644,7 +678,7 @@ function buildFloatingBooksRing(spec: RingSpec, build: PropsBuild, rng: Rng): vo
     const width = FLYING_BOOK_WIDTH[0] + (FLYING_BOOK_WIDTH[1] - FLYING_BOOK_WIDTH[0]) * rng() ** FLYING_BOOK_SIZE_BIAS;
     const base = transform(polarX(r, theta), spec.maxY + spread(rng, FLYING_BOOK_RISE), polarZ(r, theta), rng() * TAU, spread(rng, FLYING_BOOK_TILT), spread(rng, FLYING_BOOK_TILT), 1, 1, 1);
     const parts = addBook(rng, books, base, width, pickBookOpening(rng));
-    build.floaters.push(makeFloater(rng, spec.bobScale, floatParts(parts)));
+    addFloater(build, rng, spec.bobScale, parts);
   }
   addBatches(build.decor, [books.pagesRight, books.pagesLeft, books.coverRight, books.coverLeft]);
 }
@@ -1024,7 +1058,7 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
   const platforms = GEOMETRY.platforms.map((geometry) => new Batch(geometry, flatMaterial));
   const hexes = new Batch(GEOMETRY.hex, flatMaterial);
   const chunks = GEOMETRY.chunks.map((geometry) => new Batch(geometry, flatMaterial));
-  const float = (parts: Part[]): void => { build.floaters.push(makeFloater(rng, spec.bobScale, floatParts(parts))); };
+  const float = (parts: Part[]): void => addFloater(build, rng, spec.bobScale, parts);
 
   for (let i = 0; i < spec.islands; i++) {
     const radius = range(rng, ISLAND_RADIUS);
