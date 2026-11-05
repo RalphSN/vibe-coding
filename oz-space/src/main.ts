@@ -6,7 +6,9 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 import GUI, { type Controller } from 'lil-gui';
 import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingsConfig, type SceneConfig } from './config/scene.config';
-import { buildFloatingField, buildRing, updateFloaters, type Disc, type Floater, type PropsBuild } from './oz-props';
+import { buildFloatingField, buildRing, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
+import { buildCourtsRing } from './oz-sports';
+import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
 // ================= 0. 型別 =================
@@ -16,7 +18,7 @@ type ViewModeName = 'orbit' | 'firstPerson';
 type GaitName = 'walk' | 'run';
 type Direction = 'forward' | 'backward' | 'side';
 type RigPose = Record<string, number>;
-type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land' | 'blocked' | 'fly' | 'sitEnter' | 'sit' | 'sitExit';
+type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land' | 'blocked' | 'fly' | 'sitEnter' | 'sit' | 'sitExit' | 'swim';
 
 interface Motion { velocity: number }
 type RampDirection = 'north' | 'south' | 'east' | 'west';
@@ -43,6 +45,8 @@ interface RigMotion {
   pushForward: number; pushSide: number; pushBack: number; findWall: WallProbe | null; isFlying: boolean;
   climbSpeed: number;   // 飛行時實際的上升速度（m/s，下降為負）
   isSitting: boolean;   // 想坐著（按 X 坐下時 true，站起來時 false）；動畫自己播坐下、站起來的過程
+  isSwimming: boolean;  // 在水裡游泳：往前游播蛙式、停著播踩水
+  swimClimb: number;    // 游泳時實際的上升速度（m/s，下潛為負）：身體跟著往下或往上傾
 }
 // 從世界座標 (x, y, z) 沿水平方向 (dirX, dirZ) 往前，maxDistance 內最先碰到的牆：多遠、表面朝哪（朝外的單位向量）。
 type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, maxDistance: number) => { distance: number; nx: number; nz: number } | null;
@@ -93,8 +97,8 @@ const materials: Record<string, THREE.Material> = Object.fromEntries(
   Object.entries(COLORS).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]),
 );
 
-// 環由上往下依序用這些顏色（紅橙黃綠藍靛紫），圈數比顏色多就從頭輪。
-const RING_COLORS = [0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9];
+// 環由上往下依序用這些顏色：最上面兩層（球場、泳池）用自己的地面，後面接紅橙黃綠藍靛紫；層數比顏色多就從頭輪。
+const RING_COLORS = [0xc5ced8, 0xe7dccb, 0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9];
 
 // ================= 2. 場景基礎 =================
 // 對數深度緩衝：空間很大，鏡頭拉遠時一般深度緩衝分不出只差幾公分的面（地面和格線會互相閃爍）。
@@ -102,13 +106,45 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuff
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
+// 金屬與水面反射用的天空環境貼圖，要在第一次建場景之前設定。
+setPropsEnvironment(createSkyEnvironment(renderer));
+
+// 水面折射（transmission）是先把不透明物件畫成一張圖，再從水面去取樣、扭曲。水面以上的東西（人物露出水面的上半身、
+// 池畔的設施）也會被畫進那張圖，水裡就多出錯位的分身。所以畫那張圖時（render target 不是畫面），
+// 每個物件都切掉水面以上的部分；畫到畫面上時不切。
+const REFRACTION_CLIP_LIFT = 0.02;   // 切的高度比水面高一點點，水線附近才不會露出縫
+const refractionClip = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)];
+let hasRefractionClip = false;
+renderer.localClippingEnabled = true;
+
+function updateRefractionClip(): void {
+  const water = world.waters[0];
+  hasRefractionClip = water !== undefined;
+  if (water) refractionClip[0]?.set(new THREE.Vector3(0, -1, 0), water.surfaceY + REFRACTION_CLIP_LIFT);
+}
+
+function clipRefractionAboveWater(root: THREE.Object3D): void {
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
+    const material: THREE.Material = object.material;
+    if (material instanceof THREE.MeshPhysicalMaterial && material.transmission > 0) return;   // 水面自己
+    object.onBeforeRender = (activeRenderer) => {
+      material.clippingPlanes = hasRefractionClip && activeRenderer.getRenderTarget() !== null ? refractionClip : null;
+    };
+  });
+}
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xeef0f2);
+const SKY_COLOR = new THREE.Color(0xeef0f2);
+scene.background = SKY_COLOR;
+
+// 鏡頭進到水裡時：背景換成水的顏色、加上指數霧，越遠越看不清（泳池約 24 m 寬，看到對面就模糊了）。
+const UNDERWATER_COLOR = new THREE.Color(0x1f7f92);
+const underwaterFog = new THREE.FogExp2(UNDERWATER_COLOR.getHex(), 0.11);
 
 // 可視距離跟著地面大小，在 rebuildScene 裡更新。
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, config.scene.groundSize * CAMERA_FAR_PER_GROUND);
-camera.position.set(0, 380, 720);   // 環繞檢視第一次進來：從南邊高處斜看中央
+camera.position.set(0, 430, 800);   // 環繞檢視第一次進來：從南邊高處斜看中央
 
 scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
@@ -124,6 +160,8 @@ const world: {
   discs: Disc[];
   cones: Cone[];
   domes: Dome[];
+  walls: RoundWall[];
+  waters: WaterZone[];
   decor: THREE.Group;
   floaters: Floater[];
 } = {
@@ -134,6 +172,8 @@ const world: {
   discs: [],                    // 圓心在原點的環形（或實心圓）平板：站上去、撞頭用；水平方向不擋
   cones: [],                    // 倒圓錐：水平方向擋、從下面往上撞頭
   domes: [],                    // 上半球：站上去、水平方向擋
+  walls: [],                    // 圓形牆（泳池池壁）：水平方向擋
+  waters: [],                   // 水域（泳池）：進去就游泳
   decor: new THREE.Group(),     // 沒有碰撞的裝飾（房屋、書、桌椅、碎片、漂浮物）；鏡頭不避開，數量多才不會每格打幾千次射線
   floaters: [],                 // 會上下飄的東西，每格更新
 };
@@ -356,6 +396,24 @@ function sweepRound(radius: number, x: number, z: number, dx: number, dz: number
   return { t, nx: (x + dx * t) / reach, nz: (z + dz * t) / reach };
 }
 
+// 半徑 r 的圓從 (x, z) 移動 (dx, dz)，被關在圓心在原點、半徑 radius 的圓裡面（例如泳池外側池壁）：
+// 往外碰到牆的時刻與法線（朝內）。一開始就貼著牆的，往外走算 t = 0 撞到、往內走放行。
+function sweepInsideRound(radius: number, x: number, z: number, dx: number, dz: number, r: number): SweepHit | null {
+  const reach = radius - r;
+  const distance = Math.hypot(x, z);
+  if (reach <= 0) return null;
+  if (distance > reach) {
+    return x * dx + z * dz > 0 && distance > 0 ? { t: 0, nx: -x / distance, nz: -z / distance } : null;
+  }
+  const a = dx * dx + dz * dz;
+  if (a === 0) return null;
+  const b = 2 * (x * dx + z * dz);
+  const c = distance * distance - reach * reach;
+  const t = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);   // 從圓裡往外，取較大的根
+  if (t < 0 || t > 1) return null;
+  return { t, nx: -(x + dx * t) / reach, nz: -(z + dz * t) / reach };
+}
+
 // 倒圓錐在高度 y 的半徑：平台是 topRadius，往下線性收到尖點是 0；超出圓錐上下就是 0。
 function coneRadiusAt(center: CenterConfig, y: number): number {
   return center.topRadius * clamp((y - (center.topY - center.height)) / center.height, 0, 1);
@@ -375,11 +433,18 @@ const RING_SEED = 1000;      // 每圈的亂數種子是 RING_SEED + 圈號，�
 const FIELD_SEED = 42;
 const FIELD_RADIUS_PER_GROUND = 0.4;   // 周圍漂浮物散布的半徑 = 地面邊長 × 這個比例
 
+// 球場、泳池各自一個檔案，其他樣式在 oz-props.ts。
+const buildLayer = (spec: RingSpec): PropsBuild => {
+  if (spec.style === 'courts') return buildCourtsRing(spec);
+  if (spec.style === 'pool') return buildPoolRing(spec);
+  return buildRing(spec);
+};
+
 // 懸空的環：每層依 rings.layers 的樣式建（見 oz-props.ts），再加上周圍的漂浮物。
 function buildRings(center: CenterConfig, rings: RingsConfig): PropsBuild[] {
   const { floaters } = config.scene;
   const shapes = ringShapes(center, rings);
-  const builds = shapes.map((shape, i) => buildRing({
+  const builds = shapes.map((shape, i) => buildLayer({
     ...shape, style: rings.layers[i]?.style ?? 'plain', color: RING_COLORS[i % RING_COLORS.length] ?? COLORS.center,
     seed: RING_SEED + i, bobScale: floaters.bobScale,
   }));
@@ -402,11 +467,15 @@ function rebuildScene(): void {
   const fence = groundFenceBoxes(groundSize);
   const centerParts = centerColliders(center);
   world.colliders = fence;
-  world.solids = fence.map(solidFromBox);
+  world.solids = [...fence.map(solidFromBox), ...ringBuilds.flatMap((build) => build.solids)];
   world.cones = [centerParts.cone];
   world.domes = [centerParts.dome];
   world.ramps = [];
   world.discs = ringBuilds.flatMap((build) => build.discs);
+  world.walls = ringBuilds.flatMap((build) => build.walls);
+  world.waters = ringBuilds.flatMap((build) => build.waters);
+  updateRefractionClip();
+  clipRefractionAboveWater(scene);
   camera.far = groundSize * CAMERA_FAR_PER_GROUND;
   camera.updateProjectionMatrix();
 }
@@ -416,7 +485,7 @@ function rebuildScene(): void {
 // Tab 在環繞檢視與第一人稱（可以走）之間切換，見 toggleViewMode。
 function createOrbitMode(): ViewMode {
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 170, 0);
+  controls.target.set(0, 200, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;
@@ -446,6 +515,19 @@ const MIN_SLIDE = 1e-6;          // 剩下的位移比這短就不再算
 const DOUBLE_TAP_MS = 300;       // 兩下空白鍵間隔在這之內算連按，進入飛行
 const SIT_EXIT_LOCK_SECONDS = 1;  // 站起來時多久不能移動：Sitting_Exit 長 1.03 秒，提早一點放開，起步才不卡
 const FLY_VERTICAL_SPEED = 3;    // 飛行時空白鍵上升、X 下降的速度（m/s）
+// 游泳：游泳動畫的角色原點就是水面（Swim_Fwd_Loop 骨盆在原點附近、Swim_Idle_Loop 身體垂在原點下方），
+// 所以游泳時腳底高度（角色原點）放在水面下一點點，頭和肩膀露出水面。
+const SWIM_ROOT_DEPTH = 0.08;     // 游泳時角色原點在水面下多深（m）
+const SWIM_ENTER_DEPTH = 0.3;     // 腳底低於水面這麼多（而且不是往上跳）就開始游泳
+const SWIM_SETTLE_TIME = 0.45;    // 掉進水裡後浮回水面的平滑時間（秒）
+// 潛水：游泳時按住 X 往下潛、按住空白鍵往上游，什麼都不按就被浮力慢慢帶回水面。
+const SWIM_DIVE_SPEED = 0.9;      // m/s
+const SWIM_ASCEND_SPEED = 1;
+const SWIM_BUOYANCY = 0.35;
+const SWIM_FLOOR_CLEARANCE = 0.45; // 角色原點離池底至少這麼高，身體才不會穿過池底
+const SWIM_SURFACE_TOLERANCE = 0.1; // 潛深在這以內算浮在水面上，按空白鍵是跳出水面
+const SWIM_EYE_HEIGHT = 0.25;     // 游泳時眼睛在角色原點上方多高（抬頭蛙式的頭剛好露出水面）
+const VIEW_EYE_SMOOTH_TIME = 0.35;
 const FLY_PITCH_DEADZONE = 10;   // 滑鼠雙鍵飛行時，鏡頭俯仰離平視不到這幾度就不升降（度）
 const FLY_LAND_GRACE = 0.25;     // 剛進入飛行的這幾秒不因碰到地面解除，連按時第一下的跳躍還沒離地也不會馬上落地
 const BLOCKED_SPEED_RATIO = 0.2;  // 實際速度不到想走速度的這個比例，算被擋住
@@ -931,6 +1013,12 @@ const MODEL_URL = new URL('../assets/models/ual1-standard.glb', import.meta.url)
 const ONCE_ROLES: ClipRole[] = ['jumpStart', 'jumpLand', 'sitEnter', 'sitExit'];
 const LOCOMOTION_ROLES: ClipRole[] = ['walk', 'run', 'sprint'];
 const SIT_PHASES: CharacterPhase[] = ['sitEnter', 'sit', 'sitExit'];
+// 游泳：Swim_Fwd_Loop 是抬頭蛙式，一個週期 1.33 秒約前進 1.5 m；實際速度和它不同時加快或放慢播放。
+const SWIM_CLIP_SPEED = 1.1;
+const SWIM_TIME_SCALE: [number, number] = [0.5, 2];
+// 潛水時身體跟著前進方向傾：頭朝下潛的方向，最多 SWIM_PITCH_MAX（純往下潛時接近頭朝下）。
+const SWIM_PITCH_MAX = 1.2;
+const SWIM_PITCH_SMOOTH_TIME = 0.35;
 // 坐下動畫是坐椅子（Sitting_Idle_Loop 骨盆離地約 0.54 m、在腳後方 0.33 m），空地上會像坐在空氣上，
 // 所以坐著時在屁股底下放一塊方塊稿座椅。尺寸是模型原始比例（m），跟著模型一起縮放、轉向。
 const SEAT_SIZE: Vec3Tuple = [0.42, 0.48, 0.4];
@@ -985,15 +1073,15 @@ const PHASE_PROBE_SAMPLES = 48;
 const PELVIS_BONE = 'pelvis';
 const SPINE_COUNTER: [string, number][] = [['spine_01', 0.4], ['spine_02', 0.3], ['spine_03', 0.3]];
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
-type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly' | 'sitEnter' | 'sitLoop' | 'sitExit';
-const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly', 'sitEnter', 'sitLoop', 'sitExit'];
+type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly' | 'sitEnter' | 'sitLoop' | 'sitExit' | 'swim';
+const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly', 'sitEnter', 'sitLoop', 'sitExit', 'swim'];
 const SLOT_OF_PHASE: Record<CharacterPhase, AnimSlot> = {
   ground: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', land: 'jumpLand', blocked: 'blocked', fly: 'fly',
-  sitEnter: 'sitEnter', sit: 'sitLoop', sitExit: 'sitExit',
+  sitEnter: 'sitEnter', sit: 'sitLoop', sitExit: 'sitExit', swim: 'swim',
 };
 const SLOT_OF_ROLE: Record<ClipRole, AnimSlot> = {
   idle: 'locomotion', walk: 'locomotion', run: 'locomotion', sprint: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', jumpLand: 'jumpLand', blocked: 'blocked', fly: 'fly',
-  sitEnter: 'sitEnter', sitLoop: 'sitLoop', sitExit: 'sitExit',
+  sitEnter: 'sitEnter', sitLoop: 'sitLoop', sitExit: 'sitExit', swim: 'swim', swimIdle: 'swim',
 };
 type LocomotionWeights = Record<'idle' | 'walk' | 'run' | 'sprint', number>;
 
@@ -1209,7 +1297,10 @@ function createCharacter(): Character {
   let pelvisBone: THREE.Object3D | null = null;
   const leanRestore = new THREE.Quaternion();
   let isLeanApplied = false;
-  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0, fly: 0, sitEnter: 0, sitLoop: 0, sitExit: 0 };
+  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0, fly: 0, sitEnter: 0, sitLoop: 0, sitExit: 0, swim: 0 };
+  let swimBlend = 0;   // 游泳 slot 裡：0 = 踩水、1 = 往前游
+  let swimPitch = 0;   // 游泳時整個模型往前傾的角度（弧度，正的是頭朝下）
+  const swimPitchMotion = { velocity: 0 };
   let seat: THREE.Mesh | null = null;
   const facingMotion = { velocity: 0 };
   let phase: CharacterPhase = 'ground';
@@ -1313,7 +1404,8 @@ function createCharacter(): Character {
   function applyWeights(locomotion: LocomotionWeights): void {
     const weights = new Map<THREE.AnimationAction, number>();
     for (const role of CLIP_ROLES) {
-      const share = role === 'idle' || role === 'walk' || role === 'run' || role === 'sprint' ? locomotion[role] : 1;
+      const share = role === 'idle' || role === 'walk' || role === 'run' || role === 'sprint' ? locomotion[role]
+        : role === 'swim' ? swimBlend : role === 'swimIdle' ? 1 - swimBlend : 1;
       const action = actionFor(role);
       weights.set(action, (weights.get(action) ?? 0) + slotWeights[SLOT_OF_ROLE[role]] * share);
     }
@@ -1329,13 +1421,14 @@ function createCharacter(): Character {
     const fwd = isPushing ? motion.pushForward : motion.forwardSpeed;
     const side = isPushing ? motion.pushSide : motion.sideSpeed;
     let target = 0;
-    if ((phase === 'ground' && speed >= IDLE_SPEED) || isPushing) {
+    if (((phase === 'ground' || phase === 'swim') && speed >= IDLE_SPEED) || isPushing) {
       const isBackward = fwd < -IDLE_SPEED;
       const angle = isBackward ? Math.atan2(side, -fwd) : -Math.atan2(side, fwd);
       target = clamp(angle, -DEG(c.maxMoveTurn), DEG(c.maxMoveTurn));
     }
     facing = smoothDamp(facing, target, facingMotion, c.turnToMoveSeconds, dt);
-    legWarp = warpBones.length > 0 ? clamp(facing, -DEG(c.legTurnLimit), DEG(c.legTurnLimit)) : 0;
+    // 游泳時身體是平的，只扭下半身會很怪，整個身體一起轉
+    legWarp = warpBones.length > 0 && phase !== 'swim' ? clamp(facing, -DEG(c.legTurnLimit), DEG(c.legTurnLimit)) : 0;
     if (model) model.rotation.y = MODEL_FACING + facing - legWarp;
   }
 
@@ -1371,6 +1464,21 @@ function createCharacter(): Character {
       .map(({ bone, share }) => ({ bone, share, restore: new THREE.Quaternion() }));
   }
 
+  // 游泳：有在動就從踩水漸變到蛙式，蛙式的播放速度跟著實際速度（往後退就倒著播）。
+  // 往下潛、往上浮也算在動（純往下潛時播蛙式、頭朝下），速度把垂直方向一起算進去。
+  // 身體的傾角 = 垂直速度和水平速度的夾角（只在蛙式的比例裡生效，踩水時身體是直的不傾）。
+  function updateSwimBlend(motion: RigMotion, speed: number, dt: number): void {
+    const fade = config.character.fadeSeconds;
+    const step = fade > 0 ? dt / fade : 1;
+    const swimSpeed = Math.hypot(speed, motion.swimClimb);
+    swimBlend = motion.isSwimming && swimSpeed >= IDLE_SPEED ? Math.min(1, swimBlend + step) : Math.max(0, swimBlend - step);
+    const direction = motion.forwardSpeed < -IDLE_SPEED ? -1 : 1;
+    actionFor('swim').timeScale = direction * clamp(swimSpeed / SWIM_CLIP_SPEED, SWIM_TIME_SCALE[0], SWIM_TIME_SCALE[1]);
+    const pitchTarget = motion.isSwimming && swimSpeed >= IDLE_SPEED ? clamp(Math.atan2(-motion.swimClimb, speed), -SWIM_PITCH_MAX, SWIM_PITCH_MAX) : 0;
+    swimPitch = smoothDamp(swimPitch, pitchTarget, swimPitchMotion, SWIM_PITCH_SMOOTH_TIME, dt);
+    if (model) model.rotation.x = swimPitch * swimBlend;
+  }
+
   // 坐下：坐下動畫播完接坐著的循環；不想坐了就從目前的階段播站起來，播完回到站立。
   function updateSitPhase(motion: RigMotion): void {
     const isSitPhase = SIT_PHASES.includes(phase);
@@ -1386,12 +1494,15 @@ function createCharacter(): Character {
     if (motion.isFlying) {
       if (phase !== 'fly') enterPhase('fly', 'fly');
       wasGrounded = false;
-    } else if (phase === 'fly') {
+    } else if (motion.isSwimming) {
+      if (phase !== 'swim') enterPhase('swim', 'swimIdle');
+      wasGrounded = false;
+    } else if (phase === 'fly' || phase === 'swim') {
       if (motion.isGrounded) enterPhase('land', 'jumpLand');
       else enterPhase('jumpLoop', 'jumpLoop');
       wasGrounded = motion.isGrounded;
     }
-    if (motion.isGrounded !== wasGrounded) {
+    if (!motion.isSwimming && motion.isGrounded !== wasGrounded) {
       if (motion.isGrounded) enterPhase('land', 'jumpLand');
       else enterPhase('jumpStart', 'jumpStart');
       wasGrounded = motion.isGrounded;
@@ -1404,6 +1515,7 @@ function createCharacter(): Character {
     const isPushing = motion.isGrounded && (motion.pushForward !== 0 || motion.pushSide !== 0);
     if (phase === 'ground' && isPushing) enterPhase('blocked', 'blocked');
     else if (phase === 'blocked' && !isPushing) phase = 'ground';
+    updateSwimBlend(motion, speed, dt);
     fadeSlots(SLOT_OF_PHASE[phase], dt);
     applyWeights(updateLocomotion(motion, speed, dt));
     updateFacing(motion, speed, dt);
@@ -1620,6 +1732,7 @@ function createCharacter(): Character {
     const missing = CLIP_ROLES.map((role) => config.character.clips[role]).filter((name) => !names.includes(name));
     if (missing.length > 0) throw new Error(`${MODEL_URL} 裡沒有這些動畫片段：${missing.join('、')}`);
     model = gltf.scene;
+    model.rotation.order = 'YXZ';   // 先轉面向再前後傾：潛水時的傾角才會沿角色自己的前後方向
     model.rotation.y = MODEL_FACING;
     scaleModel();
     warpBones = findWarpBones(model);
@@ -1638,6 +1751,7 @@ function createCharacter(): Character {
     scene.add(skeletonHelper);
     mixer = new THREE.AnimationMixer(model);
     applyWeights({ idle: 1, walk: 0, run: 0, sprint: 0 });
+    clipRefractionAboveWater(model);
     return names;
   }
 
@@ -1692,6 +1806,12 @@ function createFirstPersonMode(): ViewMode {
   let standUpLock = 0;    // 站起來動畫還在播的秒數，這段時間不能移動
   let blockedSeconds = 0;  // 按著方向鍵卻幾乎沒移動，持續了多久
   let isFlying = false;
+  let isSwimming = false;  // 在水裡：自動游泳，空白鍵跳出水面、連按兩下飛走
+  const swimRiseMotion = { velocity: 0 };
+  let swimDepth = 0;       // 潛到水面下多深（m）；0 是浮在水面
+  let viewEye = eyeHeight();   // 鏡頭用的眼睛高度（離腳底），游泳時平滑降到 SWIM_EYE_HEIGHT
+  const viewEyeMotion = { velocity: 0 };
+  let swimClimbSpeed = 0;  // 這一格實際上升的速度（m/s），給潛水的身體傾角用
   let flySeconds = 0;      // 這次飛行已經飛了多久
   let flyClimbSpeed = 0;   // 這一格實際上升的速度（m/s），給漂浮姿勢用
   let lastJumpPress = -Infinity;   // 上一次按下空白鍵的時間（event.timeStamp，毫秒），判斷連按
@@ -1699,7 +1819,8 @@ function createFirstPersonMode(): ViewMode {
   const isHeld = (action: KeyAction): boolean => [...heldCodes].some((code) => KEY_ACTIONS[code] === action);
   // 這一刻的移動速度（m/s）：走路不加速；飛行用加速倍率 boost.fly，地面跑步用 boost.run。
   const moveSpeed = (): number => {
-    const { walkSpeed, runSpeed, boost } = config.character;
+    const { walkSpeed, runSpeed, boost, swimSpeed } = config.character;
+    if (isSwimming) return swimSpeed;
     if (isWalking) return isFlying && isBoosted ? walkSpeed * boost.fly : walkSpeed;
     if (!isBoosted) return runSpeed;
     return runSpeed * (isFlying ? boost.fly : boost.run);
@@ -1724,17 +1845,25 @@ function createFirstPersonMode(): ViewMode {
     return fromStart < disc.arc.length + slack || fromStart > Math.PI * 2 - slack;
   };
   // 這一刻會水平擋住身體的圓形障礙（倒圓錐、半球）半徑；腳底 stepHeight 以下的部分跨得上去，不算。
+  // 圓形牆（泳池池壁）擋不擋：頂面高過能跨上的高度、底面低於頭頂才擋。
+  const blocksBodyWall = (wall: RoundWall): boolean =>
+    wall.maxY > feetY + config.character.stepHeight && wall.minY < feetY + bodyHeight();
   const blockingRoundRadii = (): number[] => {
     const bottom = feetY + config.character.stepHeight;
     const top = feetY + bodyHeight();
     return [
       ...world.cones.map((cone) => coneWidestRadius(cone, bottom, top)),
       ...world.domes.map((dome) => domeWidestRadius(dome, bottom, top)),
+      ...world.walls.filter((wall) => wall.solid === 'inside' && blocksBodyWall(wall)).map((wall) => wall.radius),
     ].filter((radius): radius is number => radius !== null);
   };
+  // 半徑以外實心、這一刻會擋住身體的圓形牆（泳池外側池壁）。
+  const blockingOuterRadii = (): number[] =>
+    world.walls.filter((wall) => wall.solid === 'outside' && blocksBodyWall(wall)).map((wall) => wall.radius);
   const isFree = (x: number, z: number): boolean =>
     !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius)) &&
-    !blockingRoundRadii().some((radius) => Math.hypot(x, z) < radius + config.character.radius);
+    !blockingRoundRadii().some((radius) => Math.hypot(x, z) < radius + config.character.radius) &&
+    !blockingOuterRadii().some((radius) => Math.hypot(x, z) > radius - config.character.radius);
   const dismissHint = (): void => { hint.hidden = true; };
 
   // collide-and-slide：腳印是圓（從上往下看的膠囊體）。沿位移掃掠，碰到就停在表面前 SKIN，
@@ -1744,6 +1873,7 @@ function createFirstPersonMode(): ViewMode {
     const r = config.character.radius;
     const solids = world.solids.filter((solid) => blocksBody(solid) && !circleOverlapsSolid(solid, body.x, body.z, 0));
     const coneRadii = blockingRoundRadii().filter((radius) => Math.hypot(body.x, body.z) >= radius);
+    const outerRadii = blockingOuterRadii().filter((radius) => Math.hypot(body.x, body.z) <= radius);
     let restX = dx;
     let restZ = dz;
     for (let i = 0; i < SLIDE_ITERATIONS; i++) {
@@ -1756,6 +1886,10 @@ function createFirstPersonMode(): ViewMode {
       }
       for (const radius of coneRadii) {
         const candidate = sweepRound(radius, body.x, body.z, restX, restZ, r);
+        if (candidate && (!hit || candidate.t < hit.t)) hit = candidate;
+      }
+      for (const radius of outerRadii) {
+        const candidate = sweepInsideRound(radius, body.x, body.z, restX, restZ, r);
         if (candidate && (!hit || candidate.t < hit.t)) hit = candidate;
       }
       if (!hit) {
@@ -1790,7 +1924,7 @@ function createFirstPersonMode(): ViewMode {
   // 按住不放的 repeat 不算連按，但站在地上時照舊可以一直跳。
   // X 在飛行時是下降（updateFlying 讀按住的鍵），站在地上時切換坐下／站起來。
   function toggleSit(): void {
-    if (isFlying) return;
+    if (isFlying || isSwimming) return;
     if (isSitting) {
       standUp();
       return;
@@ -1814,15 +1948,57 @@ function createFirstPersonMode(): ViewMode {
     if (!event.repeat) lastJumpPress = isDoubleTap ? -Infinity : event.timeStamp;
     if (isFlying) return;
     if (isDoubleTap) {
+      isSwimming = false;
       isFlying = true;
       flySeconds = 0;
       isOnGround = false;
       velocityY = 0;
       return;
     }
-    if (!isGrounded()) return;
+    if (!isGrounded() && !isSwimming) return;
+    if (isSwimming && swimDepth > SWIM_SURFACE_TOLERANCE) return;   // 在水下按空白鍵是往上游（updateSwimming 讀按住的鍵）
+    // 游泳時也能跳：從水面跳起來，同時往池邊走就能跳上池畔（跳高時池壁就不擋了）
+    isSwimming = false;
     velocityY = Math.sqrt(2 * config.character.gravity * config.character.jumpHeight);
     isOnGround = false;
+  }
+
+  // 位置 (x, z) 的水域；不在水裡是 null。
+  const waterAt = (x: number, z: number): WaterZone | null => {
+    const distance = Math.hypot(x, z);
+    return world.waters.find((water) => distance > water.inner && distance < water.outer) ?? null;
+  };
+
+  // 走進、掉進、飛降到水裡（腳底低於水面 SWIM_ENTER_DEPTH，而且不是正往上跳）就開始游泳。
+  function startSwimmingIfInWater(): void {
+    const water = waterAt(body.x, body.z);
+    if (isSwimming || !water || velocityY > 0 || feetY >= water.surfaceY - SWIM_ENTER_DEPTH || feetY < water.floorY - SURFACE_EPSILON) return;
+    isSwimming = true;
+    isFlying = false;
+    isOnGround = false;
+    isSitting = false;
+    velocityY = 0;
+    swimRiseMotion.velocity = 0;
+    swimDepth = clamp(water.surfaceY - SWIM_ROOT_DEPTH - feetY, 0, maxSwimDepth(water));   // 掉進水裡從當下的深度開始浮上來
+  }
+
+  const maxSwimDepth = (water: WaterZone): number => Math.max(0, water.surfaceY - SWIM_ROOT_DEPTH - (water.floorY + SWIM_FLOOR_CLEARANCE));
+
+  // 游泳：沒有重力，角色原點平滑地浮到水面下 SWIM_ROOT_DEPTH；離開水域（例如設定改了）就恢復一般狀態往下掉。
+  function updateSwimming(dt: number): void {
+    const water = waterAt(body.x, body.z);
+    if (!water) {
+      isSwimming = false;
+      return;
+    }
+    isOnGround = false;
+    velocityY = 0;
+    const climb = Number(isHeld('jump')) - Number(isHeld('descend'));
+    const change = climb < 0 ? SWIM_DIVE_SPEED : climb > 0 ? -SWIM_ASCEND_SPEED : -SWIM_BUOYANCY;
+    swimDepth = clamp(swimDepth + change * dt, 0, maxSwimDepth(water));
+    const previous = feetY;
+    feetY = smoothDamp(feetY, water.surfaceY - SWIM_ROOT_DEPTH - swimDepth, swimRiseMotion, SWIM_SETTLE_TIME, dt);
+    swimClimbSpeed = dt > 0 ? (feetY - previous) / dt : 0;
   }
 
   function onKeyChange(event: KeyboardEvent): void {
@@ -1984,7 +2160,9 @@ function createFirstPersonMode(): ViewMode {
   function placeCamera(dt: number): void {
     zoomDistance = smoothDamp(zoomDistance, targetDistance, zoomMotion, config.camera.zoomSmoothTime, dt);
     const lift = config.camera.thirdPerson.height * Math.min(1, zoomDistance / config.camera.minDistance);
-    head.set(body.x, feetY + eyeHeight() + lift, body.z);
+    // 游泳時身體是平的，眼睛在角色原點附近（不是站著的眼睛高度）；平滑換過去，掉進水裡時鏡頭才不會跳
+    viewEye = smoothDamp(viewEye, isSwimming ? SWIM_EYE_HEIGHT : eyeHeight(), viewEyeMotion, VIEW_EYE_SMOOTH_TIME, dt);
+    head.set(body.x, feetY + viewEye + lift, body.z);
     camera.quaternion.setFromEuler(view.set(pitch, cameraYaw, 0));
     lookDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
 
@@ -2088,6 +2266,11 @@ function createFirstPersonMode(): ViewMode {
   }
 
   function updateVertical(dt: number): void {
+    startSwimmingIfInWater();
+    if (isSwimming) {
+      updateSwimming(dt);
+      return;
+    }
     if (isFlying) {
       updateFlying(dt);
       return;
@@ -2170,6 +2353,8 @@ function createFirstPersonMode(): ViewMode {
       isFlying,
       climbSpeed: isFlying ? flyClimbSpeed : 0,
       isSitting,
+      isSwimming,
+      swimClimb: isSwimming ? swimClimbSpeed : 0,
     }, dt);
   }
 
@@ -2285,7 +2470,7 @@ function setViewMode(name: ViewModeName): void {
 const SAVE_FEEDBACK_MS = 1500;
 const CLIP_ROLE_NAMES: Record<ClipRole, string> = {
   idle: '站立', walk: '走路', run: '跑步', sprint: '衝刺', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地', blocked: '受阻', fly: '飛行',
-  sitEnter: '坐下', sitLoop: '坐著', sitExit: '站起來',
+  sitEnter: '坐下', sitLoop: '坐著', sitExit: '站起來', swim: '游泳（蛙式）', swimIdle: '踩水',
 };
 let clipNames: string[] = [];
 // 「還原預設」回到上次儲存的內容（還沒存過就是開頁面時讀到的 JSON）。
@@ -2337,6 +2522,7 @@ function addCharacterGroup(panel: GUI): void {
   group.add(c, 'stepHeight', 0, 0.6, 0.01).name('自動跨上高度（m）');
   group.add(c, 'walkSpeed', 0.5, 4, 0.1).name('走路（m/s）');
   group.add(c, 'runSpeed', 1, 8, 0.1).name('跑步（m/s）');
+  group.add(c, 'swimSpeed', 0.3, 3, 0.1).name('游泳（m/s）');
   group.add(c.boost, 'run', 1, 10, 0.5).name('Z 加速：跑步倍率');
   group.add(c.boost, 'fly', 1, 20, 0.5).name('Z 加速：飛行倍率');
   group.add(c, 'turnSpeed', 60, 360, 10).name('轉身（度/秒）');
@@ -2431,9 +2617,53 @@ function addFileButtons(panel: GUI): void {
   panel.add({ restore: restoreDefaults }, 'restore').name('還原預設');
 }
 
+function updateUnderwater(): void {
+  const { x, y, z } = camera.position;
+  const distance = Math.hypot(x, z);
+  const isUnderwater = world.waters.some((water) => distance > water.inner && distance < water.outer && y < water.surfaceY && y > water.floorY - 1);
+  scene.fog = isUnderwater ? underwaterFog : null;
+  scene.background = isUnderwater ? UNDERWATER_COLOR : SKY_COLOR;
+}
+
+// ================= 效能顯示 =================
+// Inspector 勾選「顯示效能」時，左上角每 0.5 秒更新一次：平均 FPS 與每格毫秒數、上一格的繪製次數與三角形數
+// （水面在畫面裡時，折射會把不透明物件多畫一次，也算在內）、目前載入的幾何與貼圖數、畫面解析度。
+// 這是檢視用的開關，不存進設定檔。
+const PERF_SAMPLE_SECONDS = 0.5;
+const perfStats = requireElement('#perf-stats', HTMLElement);
+const perf = { visible: false, frames: 0, elapsed: 0 };
+
+function setPerfVisible(visible: boolean): void {
+  perf.visible = visible;
+  perf.frames = 0;
+  perf.elapsed = 0;
+  perfStats.hidden = !visible;
+  perfStats.textContent = '量測中…';
+}
+
+function updatePerfStats(frameSeconds: number): void {
+  if (!perf.visible) return;
+  perf.frames += 1;
+  perf.elapsed += frameSeconds;
+  if (perf.elapsed < PERF_SAMPLE_SECONDS) return;
+  const fps = perf.frames / perf.elapsed;
+  const { calls, triangles } = renderer.info.render;
+  const { geometries, textures } = renderer.info.memory;
+  const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+  perfStats.textContent = [
+    `${fps.toFixed(0)} FPS · ${(1000 / fps).toFixed(1)} ms`,
+    `繪製 ${calls} 次 · ${(triangles / 1e6).toFixed(2)} M 三角形`,
+    `幾何 ${geometries} · 貼圖 ${textures}`,
+    `畫面 ${size.x}×${size.y}（像素比 ${renderer.getPixelRatio()}）`,
+  ].join('\n');
+  perf.frames = 0;
+  perf.elapsed = 0;
+}
+
 function buildInspector(): GUI {
   const panel = new GUI({ title: 'Inspector' });
   addFileButtons(panel);
+  panel.add(perf, 'visible').name('顯示效能（FPS）').onChange(setPerfVisible);
   addSceneGroup(panel);
   addCharacterGroup(panel);
   addCameraGroup(panel);
@@ -2476,9 +2706,13 @@ addEventListener('resize', () => {
 const MAX_FRAME_DT = 0.1;
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), MAX_FRAME_DT);
+  const frameSeconds = clock.getDelta();
+  const dt = Math.min(frameSeconds, MAX_FRAME_DT);
   currentMode().update(dt);
   updateFloaters(world.floaters, clock.elapsedTime);
+  updateWater(clock.elapsedTime);
+  updateUnderwater();
   character.syncSkeletonHelper();
   renderer.render(scene, camera);
+  updatePerfStats(frameSeconds);
 });

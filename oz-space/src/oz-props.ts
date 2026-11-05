@@ -12,10 +12,22 @@ export interface Disc { inner: number; outer: number; minY: number; maxY: number
 export interface Floater { amplitude: number; speed: number; phase: number; apply: (dy: number) => void }
 
 /**
+ * 圓心在原點的圓形牆（例如泳池池壁）：高度 minY–maxY 之間水平方向擋。solid 是哪一側是實心的：
+ * inside 是半徑以內實心（只能待在外面），outside 是半徑以外實心（只能待在裡面）。
+ */
+export interface RoundWall { radius: number; minY: number; maxY: number; solid: 'inside' | 'outside' }
+
+/** 水平方向擋人的有向方塊（和 main.ts 的 Solid 同形狀）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。 */
+export interface SolidBox { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
+
+/** 圓心在原點的環形水域（泳池）：半徑在 inner–outer 之間、高度在 floorY–surfaceY 之間是水。 */
+export interface WaterZone { inner: number; outer: number; surfaceY: number; floorY: number }
+
+/**
  * 建出來的東西分兩組：solid 是環本體（站得上去，第三人稱鏡頭會避開），decor 是裝飾（沒有碰撞，鏡頭直接穿過，
  * 數量多時才不會每格都對幾千個物件打射線）。
  */
-export interface PropsBuild { solid: THREE.Group; decor: THREE.Group; discs: Disc[]; floaters: Floater[] }
+export interface PropsBuild { solid: THREE.Group; decor: THREE.Group; discs: Disc[]; floaters: Floater[]; walls: RoundWall[]; waters: WaterZone[]; solids: SolidBox[] }
 
 /** 一圈環的位置與樣式。 */
 export interface RingSpec { style: RingStyle; inner: number; outer: number; minY: number; maxY: number; color: number; seed: number; bobScale: number }
@@ -230,7 +242,7 @@ function transform(x: number, y: number, z: number, yaw: number, tiltX: number, 
 const instanceMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
 const flatMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
 const colorMaterials = new Map<number, THREE.MeshLambertMaterial>();
-function colorMaterial(color: number): THREE.MeshLambertMaterial {
+export function colorMaterial(color: number): THREE.MeshLambertMaterial {
   const existing = colorMaterials.get(color);
   if (existing) return existing;
   const material = new THREE.MeshLambertMaterial({ color });
@@ -365,7 +377,7 @@ export function updateFloaters(floaters: Floater[], time: number): void {
 
 // ---------- 環本體 ----------
 // 有厚度的完整環形平板：截面是長方形，繞 Y 軸轉一圈。
-function annulus(inner: number, outer: number, minY: number, maxY: number, material: THREE.Material): THREE.Mesh {
+export function annulus(inner: number, outer: number, minY: number, maxY: number, material: THREE.Material): THREE.Mesh {
   const profile = outline([[inner, minY], [outer, minY], [outer, maxY], [inner, maxY], [inner, minY]]);
   return new THREE.Mesh(new THREE.LatheGeometry(profile, RING_SEGMENTS), material);
 }
@@ -395,8 +407,49 @@ function arcSlab(inner: number, outer: number, minY: number, maxY: number, start
 
 const fullDisc = (spec: RingSpec): Disc => ({ inner: spec.inner, outer: spec.outer, minY: spec.minY, maxY: spec.maxY });
 
-function emptyBuild(): PropsBuild {
-  return { solid: new THREE.Group(), decor: new THREE.Group(), discs: [], floaters: [] };
+export function emptyBuild(): PropsBuild {
+  return { solid: new THREE.Group(), decor: new THREE.Group(), discs: [], floaters: [], walls: [], waters: [], solids: [] };
+}
+
+// 金屬類材質要反射天空才像金屬：環境貼圖由 main.ts 建好後設定一次（setPropsEnvironment），之後建的材質都會用到。
+let propsEnvironment: THREE.Texture | null = null;
+/** 設定金屬、水面材質反射用的環境貼圖；要在第一次建場景之前呼叫。 */
+export function setPropsEnvironment(texture: THREE.Texture): void {
+  propsEnvironment = texture;
+}
+/** 會反射環境的材質（金屬、亮面塑膠）。 */
+export function shinyMaterial(color: number, metalness: number, roughness: number): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({ color, metalness, roughness, envMap: propsEnvironment });
+}
+/** 目前的環境貼圖（水面材質用）。 */
+export const getPropsEnvironment = (): THREE.Texture | null => propsEnvironment;
+
+/**
+ * 把一群靜態網格依材質合併成少數幾個網格：細節多的場景（球場、泳池設施）有上千個小零件，
+ * 合併後每種材質只畫一次。網格的縮放不能是負的（合併時不會翻轉面的方向）。
+ */
+export function bakeByMaterial(source: THREE.Object3D): THREE.Group {
+  source.updateMatrixWorld(true);
+  const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  source.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
+    const material: THREE.Material = object.material;
+    const geometry = (object.geometry.index ? object.geometry.toNonIndexed() : object.geometry.clone()).applyMatrix4(object.matrixWorld);
+    for (const name of Object.keys(geometry.attributes)) {
+      if (name !== 'position' && name !== 'normal' && name !== 'uv') geometry.deleteAttribute(name);
+    }
+    const list = buckets.get(material) ?? [];
+    list.push(geometry);
+    buckets.set(material, list);
+  });
+  const baked = new THREE.Group();
+  for (const [material, list] of buckets) {
+    const merged = mergeGeometries(list);
+    if (!merged) throw new Error(`合併網格失敗：材質 ${material.type} 的零件屬性不一致`);
+    list.forEach((geometry) => geometry.dispose());
+    baked.add(new THREE.Mesh(merged, material));
+  }
+  return baked;
 }
 
 function addPlainSlab(spec: RingSpec, build: PropsBuild, color = spec.color): void {
@@ -863,6 +916,9 @@ export function buildRing(spec: RingSpec): PropsBuild {
     case 'bookshelf': buildLibraryRing(spec, build, rng); break;
     case 'triple': buildTripleRing(spec, build); break;
     case 'restaurant': buildFoodCourtRing(spec, build, rng); break;
+    case 'courts':
+    case 'pool':
+      throw new Error(`環樣式 ${spec.style} 由 oz-sports.ts／oz-pool.ts 建，main.ts 會直接分派過去`);
   }
   return build;
 }

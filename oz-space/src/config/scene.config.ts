@@ -1,8 +1,8 @@
 // scene.config.json 的型別。單位：公尺、秒、角度（度）。
 // 座標：原點在空間中心的地面；+X 東、-Z 北、+Y 上。
 
-export type ClipRole = 'idle' | 'walk' | 'run' | 'sprint' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly' | 'sitEnter' | 'sitLoop' | 'sitExit';
-export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'sprint', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly', 'sitEnter', 'sitLoop', 'sitExit'];
+export type ClipRole = 'idle' | 'walk' | 'run' | 'sprint' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly' | 'sitEnter' | 'sitLoop' | 'sitExit' | 'swim' | 'swimIdle';
+export const CLIP_ROLES: ClipRole[] = ['idle', 'walk', 'run', 'sprint', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly', 'sitEnter', 'sitLoop', 'sitExit', 'swim', 'swimIdle'];
 
 /** 中央的倒圓錐（方塊稿）：圓心在原點，上面是半徑 topRadius 的平台、頂面高 topY，往下 height 收成尖點，懸在空中。 */
 export interface CenterConfig { topRadius: number; topY: number; height: number }
@@ -22,10 +22,11 @@ export interface RingLayer { style: RingStyle; gap: number }
 /**
  * 環的樣式：plain 平板、houses 蓋滿房屋、floatingHouses 沒有環面只有歪斜漂浮的房屋、broken 2/3 碎成由大到小的片段、
  * floatingBooks 沒有環面只有飄著的書（開、半開、闔上）、shards 全是碎塊、bookshelf 空中圖書館（一圈圈書櫃中間有走道）、
- * triple 同高三層、restaurant 分區的環狀美食街。floatingHouses、floatingBooks、shards 站不上去。
+ * triple 同高三層、restaurant 分區的環狀美食街、courts 各種球場（oz-sports.ts）、pool 環形游泳池（oz-pool.ts）。
+ * floatingHouses、floatingBooks、shards 站不上去。
  */
-export type RingStyle = 'plain' | 'houses' | 'floatingHouses' | 'broken' | 'floatingBooks' | 'shards' | 'bookshelf' | 'triple' | 'restaurant';
-export const RING_STYLES: RingStyle[] = ['plain', 'houses', 'floatingHouses', 'broken', 'floatingBooks', 'shards', 'bookshelf', 'triple', 'restaurant'];
+export type RingStyle = 'plain' | 'courts' | 'pool' | 'houses' | 'floatingHouses' | 'broken' | 'floatingBooks' | 'shards' | 'bookshelf' | 'triple' | 'restaurant';
+export const RING_STYLES: RingStyle[] = ['plain', 'courts', 'pool', 'houses', 'floatingHouses', 'broken', 'floatingBooks', 'shards', 'bookshelf', 'triple', 'restaurant'];
 
 /**
  * 環周圍的漂浮物數量。clusters 是聚集處的數量：大部分漂浮物聚在這幾處，少數零散分布。
@@ -65,7 +66,7 @@ export interface CharacterConfig {
   landLockSeconds: number;
   /**
    * 各動作用哪段動畫（glb 裡的片段名稱）。blocked 是按著方向鍵卻被牆擋住時播的（例如推牆）；fly 是飛行時的底層姿勢（腳尖下垂另外疊上去）；
-   * sprint 是加速時超過跑步速度用的；sitEnter／sitLoop／sitExit 是坐下、坐著、站起來。
+   * sprint 是加速時超過跑步速度用的；sitEnter／sitLoop／sitExit 是坐下、坐著、站起來；swim 是往前游（抬頭蛙式）、swimIdle 是停在水中踩水。
    */
   clips: Record<ClipRole, string>;
   /**
@@ -73,7 +74,9 @@ export interface CharacterConfig {
    * 一個步伐週期走的距離也跟著插值，腳才不會滑；超過 sprint 就加快步伐週期跟上。
    */
   clipSpeeds: { walk: number; run: number; sprint: number };
-  /** 按 Z 切換的加速：地面跑步速度乘 run、飛行速度（水平與升降）乘 fly；走路不加速。 */
+  /** 游泳速度（m/s）：水深超過一定深度就自動游泳，不受走路／跑步切換與加速影響。 */
+  swimSpeed: number;
+  /** 按 Z 切換的加速：地面跑步速度乘 run、飛行速度（水平與升降）乘 fly；走路、游泳不加速。 */
   boost: { run: number; fly: number };
   /** 平移時身體轉向移動方向的平滑時間（秒）。沒有平移動畫，用轉身代替。 */
   turnToMoveSeconds: number;
@@ -143,7 +146,7 @@ function collectSceneIssues(scene: unknown): string[] {
 
 function collectCharacterIssues(character: unknown): string[] {
   if (!isObject(character)) return ['character'];
-  const numbers = ['scale', 'radius', 'stepHeight', 'walkSpeed', 'runSpeed', 'turnSpeed', 'jumpHeight', 'gravity', 'fadeSeconds', 'landLockSeconds', 'turnToMoveSeconds', 'maxMoveTurn', 'legTurnLimit'];
+  const numbers = ['scale', 'radius', 'stepHeight', 'walkSpeed', 'runSpeed', 'swimSpeed', 'turnSpeed', 'jumpHeight', 'gravity', 'fadeSeconds', 'landLockSeconds', 'turnToMoveSeconds', 'maxMoveTurn', 'legTurnLimit'];
   const issues = missingNumbers(character, numbers).map((key) => `character.${key}`);
   issues.push(...missingNumbers(character.clipSpeeds, ['walk', 'run', 'sprint']).map((key) => `character.clipSpeeds.${key}`));
   issues.push(...missingNumbers(character.boost, ['run', 'fly']).map((key) => `character.boost.${key}`));
