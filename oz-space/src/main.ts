@@ -5,17 +5,18 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 import GUI, { type Controller } from 'lil-gui';
-import { CLIP_ROLES, SAVE_ENDPOINT, loadSceneConfig, type ClipRole, type SceneConfig } from './config/scene.config';
+import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingsConfig, type SceneConfig } from './config/scene.config';
+import { buildFloatingField, buildRing, updateFloaters, type Disc, type Floater, type PropsBuild } from './oz-props';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
 // ================= 0. 型別 =================
 type Vec3Tuple = [number, number, number];
-type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'descend' | 'toggleWalk';
+type KeyAction = 'forward' | 'back' | 'turnLeft' | 'turnRight' | 'strafeLeft' | 'strafeRight' | 'jump' | 'descend' | 'toggleWalk' | 'toggleBoost';
 type ViewModeName = 'orbit' | 'firstPerson';
 type GaitName = 'walk' | 'run';
 type Direction = 'forward' | 'backward' | 'side';
 type RigPose = Record<string, number>;
-type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land' | 'blocked' | 'fly';
+type CharacterPhase = 'ground' | 'jumpStart' | 'jumpLoop' | 'land' | 'blocked' | 'fly' | 'sitEnter' | 'sit' | 'sitExit';
 
 interface Motion { velocity: number }
 type RampDirection = 'north' | 'south' | 'east' | 'west';
@@ -41,12 +42,17 @@ interface RigMotion {
   forwardSpeed: number; sideSpeed: number; turnRate: number; isGrounded: boolean; riseRatio: number;
   pushForward: number; pushSide: number; pushBack: number; findWall: WallProbe | null; isFlying: boolean;
   climbSpeed: number;   // 飛行時實際的上升速度（m/s，下降為負）
+  isSitting: boolean;   // 想坐著（按 X 坐下時 true，站起來時 false）；動畫自己播坐下、站起來的過程
 }
 // 從世界座標 (x, y, z) 沿水平方向 (dirX, dirZ) 往前，maxDistance 內最先碰到的牆：多遠、表面朝哪（朝外的單位向量）。
 type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, maxDistance: number) => { distance: number; nx: number; nz: number } | null;
 // 水平碰撞用的有向方塊（OBB）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。
 // 斜牆、斜放的家具就是一整個轉了角度的方塊，不用切成小段。
 interface Solid { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number }
+// 圓心在原點、尖點朝下的倒圓錐：用公式算碰撞，碰撞面就是外觀的表面。頂面平台另外用 Disc 站上去。
+interface Cone { tipY: number; topY: number; topRadius: number }
+// 圓心在 (0, baseY, 0) 的上半球：站在球面上、水平方向擋。貓頭就是這個。
+interface Dome { baseY: number; radius: number }
 // 掃掠碰到的時刻（位移的比例 0–1）與表面法線（世界座標，朝外）。
 interface SweepHit { t: number; nx: number; nz: number }
 // 推牆時手掌在角色前方多遠、離腳底多高（m）；slack 是手部 IK 能再往前補的距離（沒有 IK 是 0）。
@@ -69,7 +75,9 @@ const config: SceneConfig = loadSceneConfig(rawSceneConfig);
 
 const EPSILON = 1e-3;
 const GROUND_THICKNESS = 0.2;
-const GRID_CELL = 1;               // 地面格線間距（m）
+const GRID_CELL = 5;               // 地面格線間距（m）：空間上千公尺，1 m 一格遠看會糊成一片灰
+const CENTER_SEGMENTS = 64;
+const CAMERA_FAR_PER_GROUND = 2.5; // 鏡頭可視距離 = 地面邊長 × 這個比例，從空間一角看得到對角
 const GRID_LIFT = 0.002;           // 格線浮在地面上這麼高，才不會和地面互相閃爍
 const FENCE_HEIGHT = 3;            // 地面邊緣隱形圍欄的高度
 const FENCE_THICKNESS = 0.2;
@@ -77,13 +85,16 @@ const SPAWN_SEARCH_STEP = 0.25;
 const SPAWN_SEARCH_RADIUS = 2;
 
 const COLORS = {
-  ground: 0xf4f5f7, grid: 0xdfe2e6, gridMajor: 0xc9cdd3,
+  ground: 0xf4f5f7, grid: 0xdfe2e6, gridMajor: 0xc9cdd3, center: 0xdde3f0, seat: 0xb9c2d6, innerEar: 0xf4a7b9,
   player: 0xff6f3c, playerFace: 0x3a2a20, playerSkin: 0xf0c39c, playerPants: 0x3d4f73, playerShoe: 0x2b2b2b,
 };
 
 const materials: Record<string, THREE.Material> = Object.fromEntries(
   Object.entries(COLORS).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]),
 );
+
+// 環由上往下依序用這些顏色（紅橙黃綠藍靛紫），圈數比顏色多就從頭輪。
+const RING_COLORS = [0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9];
 
 // ================= 2. 場景基礎 =================
 // 對數深度緩衝：空間很大，鏡頭拉遠時一般深度緩衝分不出只差幾公分的面（地面和格線會互相閃爍）。
@@ -95,9 +106,9 @@ document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeef0f2);
 
-const CAMERA_FAR = 500;   // 地面預設 200 m 寬，拉遠看整區時才不會被切掉
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, CAMERA_FAR);
-camera.position.set(8, 6, 10);
+// 可視距離跟著地面大小，在 rebuildScene 裡更新。
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, config.scene.groundSize * CAMERA_FAR_PER_GROUND);
+camera.position.set(0, 380, 720);   // 環繞檢視第一次進來：從南邊高處斜看中央
 
 scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
@@ -110,13 +121,23 @@ const world: {
   colliders: THREE.Box3[];
   solids: Solid[];
   ramps: Ramp[];
+  discs: Disc[];
+  cones: Cone[];
+  domes: Dome[];
+  decor: THREE.Group;
+  floaters: Floater[];
 } = {
   room: new THREE.Group(),      // 空間裡看得到的東西（地面、之後的平台）；第三人稱鏡頭也拿它判斷有沒有被擋住
   colliders: [],
   solids: [],
   ramps: [],                    // 世界座標的碰撞斜面
+  discs: [],                    // 圓心在原點的環形（或實心圓）平板：站上去、撞頭用；水平方向不擋
+  cones: [],                    // 倒圓錐：水平方向擋、從下面往上撞頭
+  domes: [],                    // 上半球：站上去、水平方向擋
+  decor: new THREE.Group(),     // 沒有碰撞的裝飾（房屋、書、桌椅、碎片、漂浮物）；鏡頭不避開，數量多才不會每格打幾千次射線
+  floaters: [],                 // 會上下飄的東西，每格更新
 };
-scene.add(world.room);
+scene.add(world.room, world.decor);
 
 // ================= 3. 空白空間（地面、隱形圍欄、碰撞） =================
 function addBox(parent: THREE.Object3D, material: THREE.Material, size: Vec3Tuple, center: Vec3Tuple): THREE.Mesh {
@@ -264,13 +285,130 @@ const SEARCH_OFFSETS = (() => {
   return offsets.sort((a, b) => a.distance - b.distance);
 })();
 
+// 貓耳：長在頭（半球）上，從正上方往左右各偏 EAR_TILT，稍微朝前（+Z，出生點那一側）；三角錐的一面朝前，內側疊一片粉紅。
+const EAR_TILT = THREE.MathUtils.degToRad(42);
+const EAR_FORWARD = 0.15;
+const EAR_RADIUS = 0.38;        // 耳朵底半徑、高度、埋進頭裡的深度，都是頭半徑的倍數
+const EAR_HEIGHT = 0.7;
+const EAR_SINK = 0.15;
+const INNER_EAR_SCALE = 0.62;
+const INNER_EAR_FORWARD = 0.22; // 內耳往前推（耳朵底半徑的倍數），粉紅色才露在正面
+const DOME_SEGMENTS = 64;
+
+// 中央：倒圓錐（上平下尖）上面接一個半球和兩隻耳朵，做成貓頭。
+// 碰撞：圓錐側面用 Cone、半球用 Dome（都是公式計算，貼著外觀）；耳朵只有外觀。
+function buildCenter(center: CenterConfig): THREE.Group {
+  const group = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(center.topRadius, center.height, CENTER_SEGMENTS).rotateX(Math.PI), materials.center);
+  cone.position.y = center.topY - center.height / 2;   // ConeGeometry 尖端朝上，翻過來變成上平下尖
+  const head = new THREE.Mesh(new THREE.SphereGeometry(center.topRadius, DOME_SEGMENTS, DOME_SEGMENTS / 2, 0, Math.PI * 2, 0, Math.PI / 2), materials.center);
+  head.position.y = center.topY;
+  group.add(cone, head);
+  const R = center.topRadius;
+  for (const side of [-1, 1]) {
+    const direction = new THREE.Vector3(side * Math.sin(EAR_TILT), Math.cos(EAR_TILT), EAR_FORWARD).normalize();
+    const tilt = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    // 三個面的錐：頂點預設朝 +Z，轉半圈讓平的那一面朝前
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(R * EAR_RADIUS, R * EAR_HEIGHT, 3).rotateY(Math.PI).translate(0, (R * EAR_HEIGHT) / 2, 0), materials.center);
+    ear.quaternion.copy(tilt);
+    ear.position.copy(direction).multiplyScalar(R * (1 - EAR_SINK)).add(new THREE.Vector3(0, center.topY, 0));
+    const inner = new THREE.Mesh(ear.geometry.clone().scale(INNER_EAR_SCALE, INNER_EAR_SCALE, INNER_EAR_SCALE), materials.innerEar);
+    inner.position.set(0, 0, R * EAR_RADIUS * INNER_EAR_FORWARD);
+    ear.add(inner);
+    group.add(ear);
+  }
+  return group;
+}
+
+// 頭頂（耳尖）大約多高：周圍漂浮物要避開的範圍。
+const centerTopY = (center: CenterConfig): number => center.topY + center.topRadius * (1 + EAR_HEIGHT);
+
+function centerColliders(center: CenterConfig): { cone: Cone; dome: Dome } {
+  return {
+    cone: { tipY: center.topY - center.height, topY: center.topY, topRadius: center.topRadius },
+    dome: { baseY: center.topY, radius: center.topRadius },
+  };
+}
+
+// 身體高度範圍 (bottom, top) 和上半球重疊時，球在這段裡最寬的半徑（越往上越窄，取重疊段的最低點）；沒重疊是 null。
+function domeWidestRadius(dome: Dome, bottom: number, top: number): number | null {
+  if (top <= dome.baseY || bottom >= dome.baseY + dome.radius) return null;
+  const rise = Math.max(bottom, dome.baseY) - dome.baseY;
+  return Math.sqrt(dome.radius * dome.radius - rise * rise);
+}
+
+// 身體佔的高度範圍 (bottom, top) 和倒圓錐重疊時，圓錐在這段裡最寬的半徑（倒圓錐越高越寬，取重疊段的最高點）；沒重疊是 null。
+function coneWidestRadius(cone: Cone, bottom: number, top: number): number | null {
+  if (top <= cone.tipY || bottom >= cone.topY) return null;
+  return (cone.topRadius * (Math.min(top, cone.topY) - cone.tipY)) / (cone.topY - cone.tipY);
+}
+
+// 半徑 r 的圓從 (x, z) 移動 (dx, dz)，對圓心在原點、半徑 radius 的圓柱做掃掠（規則同 sweepCircle）。
+function sweepRound(radius: number, x: number, z: number, dx: number, dz: number, r: number): SweepHit | null {
+  const reach = radius + r;
+  const distance = Math.hypot(x, z);
+  if (distance < reach) {
+    if (distance === 0) return null;
+    return x * dx + z * dz < 0 ? { t: 0, nx: x / distance, nz: z / distance } : null;
+  }
+  const t = rayCircle(x, z, dx, dz, 0, 0, reach);
+  if (t === null) return null;
+  return { t, nx: (x + dx * t) / reach, nz: (z + dz * t) / reach };
+}
+
+// 倒圓錐在高度 y 的半徑：平台是 topRadius，往下線性收到尖點是 0；超出圓錐上下就是 0。
+function coneRadiusAt(center: CenterConfig, y: number): number {
+  return center.topRadius * clamp((y - (center.topY - center.height)) / center.height, 0, 1);
+}
+
+// 每一層環的範圍（由上往下）：頂面高度是平台往下累加每層的 gap，內緣離圓錐側面 clearance。
+function ringShapes(center: CenterConfig, rings: RingsConfig): Disc[] {
+  let maxY = center.topY;
+  return rings.layers.map((layer) => {
+    maxY -= layer.gap;
+    const inner = coneRadiusAt(center, maxY) + rings.clearance;
+    return { inner, outer: inner + rings.width, minY: maxY - rings.thickness, maxY };
+  });
+}
+
+const RING_SEED = 1000;      // 每圈的亂數種子是 RING_SEED + 圈號，改圈的樣式不會讓其他圈重新洗牌
+const FIELD_SEED = 42;
+const FIELD_RADIUS_PER_GROUND = 0.4;   // 周圍漂浮物散布的半徑 = 地面邊長 × 這個比例
+
+// 懸空的環：每層依 rings.layers 的樣式建（見 oz-props.ts），再加上周圍的漂浮物。
+function buildRings(center: CenterConfig, rings: RingsConfig): PropsBuild[] {
+  const { floaters } = config.scene;
+  const shapes = ringShapes(center, rings);
+  const builds = shapes.map((shape, i) => buildRing({
+    ...shape, style: rings.layers[i]?.style ?? 'plain', color: RING_COLORS[i % RING_COLORS.length] ?? COLORS.center,
+    seed: RING_SEED + i, bobScale: floaters.bobScale,
+  }));
+  builds.push(buildFloatingField({
+    ...floaters, fieldRadius: config.scene.groundSize * FIELD_RADIUS_PER_GROUND, seed: FIELD_SEED, rings: shapes,
+    cone: { tipY: center.topY - center.height, topY: center.topY, topRadius: center.topRadius, headTop: centerTopY(center) },
+  }));
+  return builds;
+}
+
 // 改了地面大小時重建：地面網格、圍欄碰撞一起換。之後在空間裡加平台或物件，也放進 world.room，碰撞會一起收。
 function rebuildScene(): void {
   disposeChildren(world.room);
-  world.room.add(buildGround(config.scene.groundSize));
-  world.colliders = groundFenceBoxes(config.scene.groundSize);
-  world.solids = world.colliders.map(solidFromBox);
+  disposeChildren(world.decor);
+  const { groundSize, center, rings } = config.scene;
+  const ringBuilds = buildRings(center, rings);
+  world.room.add(buildGround(groundSize), buildCenter(center), ...ringBuilds.map((build) => build.solid));
+  world.decor.add(...ringBuilds.map((build) => build.decor));
+  world.floaters = ringBuilds.flatMap((build) => build.floaters);
+  const fence = groundFenceBoxes(groundSize);
+  const centerParts = centerColliders(center);
+  world.colliders = fence;
+  world.solids = fence.map(solidFromBox);
+  world.cones = [centerParts.cone];
+  world.domes = [centerParts.dome];
   world.ramps = [];
+  world.discs = ringBuilds.flatMap((build) => build.discs);
+  camera.far = groundSize * CAMERA_FAR_PER_GROUND;
+  camera.updateProjectionMatrix();
 }
 
 // ================= 5. 視角模式 =================
@@ -278,11 +416,11 @@ function rebuildScene(): void {
 // Tab 在環繞檢視與第一人稱（可以走）之間切換，見 toggleViewMode。
 function createOrbitMode(): ViewMode {
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 0.8, 0);
+  controls.target.set(0, 170, 0);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;
-  controls.maxDistance = 220;
+  controls.maxDistance = config.scene.groundSize;
   let savedPosition: THREE.Vector3 | null = null;   // 切回來時回到離開前的鏡頭位置
   return {
     enter() {
@@ -306,6 +444,7 @@ const SLIDE_ITERATIONS = 4;      // 走進牆角時：第一次沿 A 牆滑、�
 const SKIN = 0.005;              // 停在牆面前這麼遠，下一格一開始才不會卡在牆裡
 const MIN_SLIDE = 1e-6;          // 剩下的位移比這短就不再算
 const DOUBLE_TAP_MS = 300;       // 兩下空白鍵間隔在這之內算連按，進入飛行
+const SIT_EXIT_LOCK_SECONDS = 1;  // 站起來時多久不能移動：Sitting_Exit 長 1.03 秒，提早一點放開，起步才不卡
 const FLY_VERTICAL_SPEED = 3;    // 飛行時空白鍵上升、X 下降的速度（m/s）
 const FLY_PITCH_DEADZONE = 10;   // 滑鼠雙鍵飛行時，鏡頭俯仰離平視不到這幾度就不升降（度）
 const FLY_LAND_GRACE = 0.25;     // 剛進入飛行的這幾秒不因碰到地面解除，連按時第一下的跳躍還沒離地也不會馬上落地
@@ -328,6 +467,7 @@ const KEY_ACTIONS: Record<string, KeyAction | undefined> = {
   KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back',
   KeyA: 'turnLeft', ArrowLeft: 'turnLeft', KeyD: 'turnRight', ArrowRight: 'turnRight',
   KeyQ: 'strafeLeft', KeyE: 'strafeRight', Space: 'jump', KeyX: 'descend', ShiftLeft: 'toggleWalk', ShiftRight: 'toggleWalk',
+  KeyZ: 'toggleBoost',
 };
 
 // 臨界阻尼彈簧（和 Unity Mathf.SmoothDamp 同一套近似公式）：起步、停下都平順、不會過衝。
@@ -788,8 +928,13 @@ function createAvatarRig(): AvatarRig {
 // ---------- glTF 角色（Quaternius UAL1 Standard，CC0） ----------
 // 用沒有根運動的版本：角色怎麼移動由程式決定，動畫只負責原地的姿勢。
 const MODEL_URL = new URL('../assets/models/ual1-standard.glb', import.meta.url).href;
-const ONCE_ROLES: ClipRole[] = ['jumpStart', 'jumpLand'];
-const LOCOMOTION_ROLES: ClipRole[] = ['walk', 'run'];
+const ONCE_ROLES: ClipRole[] = ['jumpStart', 'jumpLand', 'sitEnter', 'sitExit'];
+const LOCOMOTION_ROLES: ClipRole[] = ['walk', 'run', 'sprint'];
+const SIT_PHASES: CharacterPhase[] = ['sitEnter', 'sit', 'sitExit'];
+// 坐下動畫是坐椅子（Sitting_Idle_Loop 骨盆離地約 0.54 m、在腳後方 0.33 m），空地上會像坐在空氣上，
+// 所以坐著時在屁股底下放一塊方塊稿座椅。尺寸是模型原始比例（m），跟著模型一起縮放、轉向。
+const SEAT_SIZE: Vec3Tuple = [0.42, 0.48, 0.4];
+const SEAT_CENTER: Vec3Tuple = [0, 0.24, -0.36];
 const MODEL_FACING = Math.PI;      // 模型面向 +Z，遊戲裡角色面向 -Z
 const IDLE_SPEED = 0.1;            // 低於這個速度（m/s）算站著
 const BLOCKED_TIME_SCALE = 0.6;    // 推牆動畫放慢一點，看起來是頂著推不動，不是在走
@@ -840,14 +985,17 @@ const PHASE_PROBE_SAMPLES = 48;
 const PELVIS_BONE = 'pelvis';
 const SPINE_COUNTER: [string, number][] = [['spine_01', 0.4], ['spine_02', 0.3], ['spine_03', 0.3]];
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
-type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly';
-const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly'];
+type AnimSlot = 'locomotion' | 'jumpStart' | 'jumpLoop' | 'jumpLand' | 'blocked' | 'fly' | 'sitEnter' | 'sitLoop' | 'sitExit';
+const ANIM_SLOTS: AnimSlot[] = ['locomotion', 'jumpStart', 'jumpLoop', 'jumpLand', 'blocked', 'fly', 'sitEnter', 'sitLoop', 'sitExit'];
 const SLOT_OF_PHASE: Record<CharacterPhase, AnimSlot> = {
   ground: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', land: 'jumpLand', blocked: 'blocked', fly: 'fly',
+  sitEnter: 'sitEnter', sit: 'sitLoop', sitExit: 'sitExit',
 };
 const SLOT_OF_ROLE: Record<ClipRole, AnimSlot> = {
-  idle: 'locomotion', walk: 'locomotion', run: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', jumpLand: 'jumpLand', blocked: 'blocked', fly: 'fly',
+  idle: 'locomotion', walk: 'locomotion', run: 'locomotion', sprint: 'locomotion', jumpStart: 'jumpStart', jumpLoop: 'jumpLoop', jumpLand: 'jumpLand', blocked: 'blocked', fly: 'fly',
+  sitEnter: 'sitEnter', sitLoop: 'sitLoop', sitExit: 'sitExit',
 };
+type LocomotionWeights = Record<'idle' | 'walk' | 'run' | 'sprint', number>;
 
 // 找出「左腳踩到最前面」在動畫裡的位置（0–1），當成步伐週期的 0。
 // 走路和跑步都從這裡對齊，混合時兩段才會同一隻腳一起落地，不會互相抵消成小碎步。
@@ -1061,7 +1209,8 @@ function createCharacter(): Character {
   let pelvisBone: THREE.Object3D | null = null;
   const leanRestore = new THREE.Quaternion();
   let isLeanApplied = false;
-  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0, fly: 0 };
+  const slotWeights: Record<AnimSlot, number> = { locomotion: 1, jumpStart: 0, jumpLoop: 0, jumpLand: 0, blocked: 0, fly: 0, sitEnter: 0, sitLoop: 0, sitExit: 0 };
+  let seat: THREE.Mesh | null = null;
   const facingMotion = { velocity: 0 };
   let phase: CharacterPhase = 'ground';
   let phaseTime = 0;
@@ -1133,28 +1282,38 @@ function createCharacter(): Character {
     for (const slot of ANIM_SLOTS) slotWeights[slot] /= total;
   }
 
-  // 混合空間：blend 0 是走路原速、1 是跑步原速，中間的速度兩段按比例混。
-  // 一個週期走的距離也跟著插值，所以腳不滑；往後退時週期倒著走。回傳站立／走路／跑步各自的權重。
-  function updateLocomotion(motion: RigMotion, speed: number, dt: number): Record<'idle' | 'walk' | 'run', number> {
-    const c = config.character;
-    const blend = clamp((speed - c.clipSpeeds.walk) / (c.clipSpeeds.run - c.clipSpeeds.walk), 0, 1);
+  // 混合空間：三個節點是走路、跑步、衝刺的原速，速度落在兩個節點之間就那兩段按比例混。
+  // 一個週期走的距離也跟著插值，所以腳不滑；比衝刺原速還快（Z 加速）時週期照實際速度加快，腳步跟上。
+  // 往後退時週期倒著走。回傳站立／走路／跑步／衝刺各自的權重。
+  function updateLocomotion(motion: RigMotion, speed: number, dt: number): LocomotionWeights {
+    const { clipSpeeds, fadeSeconds } = config.character;
     const walk = actionFor('walk');
     const run = actionFor('run');
-    const cycleLength = lerp(c.clipSpeeds.walk * walk.getClip().duration, c.clipSpeeds.run * run.getClip().duration, blend);
+    const sprint = actionFor('sprint');
+    const runBlend = clamp((speed - clipSpeeds.walk) / (clipSpeeds.run - clipSpeeds.walk), 0, 1);
+    const sprintBlend = clamp((speed - clipSpeeds.run) / (clipSpeeds.sprint - clipSpeeds.run), 0, 1);
+    const stride = (action: THREE.AnimationAction, clipSpeed: number): number => clipSpeed * action.getClip().duration;
+    const cycleLength = sprintBlend > 0
+      ? lerp(stride(run, clipSpeeds.run), stride(sprint, clipSpeeds.sprint), sprintBlend)
+      : lerp(stride(walk, clipSpeeds.walk), stride(run, clipSpeeds.run), runBlend);
     const direction = motion.forwardSpeed < -IDLE_SPEED ? -1 : 1;
     cycle = wrap01(cycle + (direction * speed * dt) / cycleLength);
-    for (const action of [walk, run]) action.time = wrap01(cycle + phaseOffset(action.getClip())) * action.getClip().duration;
-    const fade = c.fadeSeconds;
-    const step = fade > 0 ? dt / fade : 1;
+    for (const action of [walk, run, sprint]) action.time = wrap01(cycle + phaseOffset(action.getClip())) * action.getClip().duration;
+    const step = fadeSeconds > 0 ? dt / fadeSeconds : 1;
     moveBlend = speed >= IDLE_SPEED ? Math.min(1, moveBlend + step) : Math.max(0, moveBlend - step);
-    return { idle: 1 - moveBlend, walk: moveBlend * (1 - blend), run: moveBlend * blend };
+    return {
+      idle: 1 - moveBlend,
+      walk: moveBlend * (1 - runBlend),
+      run: moveBlend * runBlend * (1 - sprintBlend),
+      sprint: moveBlend * sprintBlend,
+    };
   }
 
   // 下拉選單換掉的舊動作權重歸零，免得還混在姿勢裡。
-  function applyWeights(locomotion: Record<'idle' | 'walk' | 'run', number>): void {
+  function applyWeights(locomotion: LocomotionWeights): void {
     const weights = new Map<THREE.AnimationAction, number>();
     for (const role of CLIP_ROLES) {
-      const share = role === 'idle' || role === 'walk' || role === 'run' ? locomotion[role] : 1;
+      const share = role === 'idle' || role === 'walk' || role === 'run' || role === 'sprint' ? locomotion[role] : 1;
       const action = actionFor(role);
       weights.set(action, (weights.get(action) ?? 0) + slotWeights[SLOT_OF_ROLE[role]] * share);
     }
@@ -1212,6 +1371,16 @@ function createCharacter(): Character {
       .map(({ bone, share }) => ({ bone, share, restore: new THREE.Quaternion() }));
   }
 
+  // 坐下：坐下動畫播完接坐著的循環；不想坐了就從目前的階段播站起來，播完回到站立。
+  function updateSitPhase(motion: RigMotion): void {
+    const isSitPhase = SIT_PHASES.includes(phase);
+    if (motion.isSitting && motion.isGrounded && !isSitPhase && (phase === 'ground' || phase === 'land')) enterPhase('sitEnter', 'sitEnter');
+    else if (phase === 'sitEnter' && isFinished('sitEnter')) enterPhase('sit', 'sitLoop');
+    if (!motion.isSitting && (phase === 'sitEnter' || phase === 'sit')) enterPhase('sitExit', 'sitExit');
+    else if (phase === 'sitExit' && isFinished('sitExit')) phase = 'ground';
+    if (seat) seat.visible = SIT_PHASES.includes(phase);
+  }
+
   function animateModel(motion: RigMotion, dt: number): void {
     phaseTime += dt;
     if (motion.isFlying) {
@@ -1228,6 +1397,7 @@ function createCharacter(): Character {
       wasGrounded = motion.isGrounded;
     }
     if (phase === 'jumpStart' && isFinished('jumpStart')) enterPhase('jumpLoop', 'jumpLoop');
+    updateSitPhase(motion);
     const speed = Math.hypot(motion.forwardSpeed, motion.sideSpeed);
     const canLeaveLanding = isFinished('jumpLand') || (phaseTime >= config.character.landLockSeconds && speed > IDLE_SPEED);
     if (phase === 'land' && canLeaveLanding) phase = 'ground';
@@ -1457,6 +1627,8 @@ function createCharacter(): Character {
     legChains = findLimbChains(model, LEG_CHAINS);
     pelvisBone = model.getObjectByName(PELVIS_BONE) ?? null;
     footChains = findFootChains(model);
+    seat = addBox(model, materials.seat, SEAT_SIZE, SEAT_CENTER);
+    seat.visible = false;
     clips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
     for (const role of LOCOMOTION_ROLES) phaseOffset(clips.get(config.character.clips[role]) ?? gltf.animations[0]);
     root.remove(block.root);
@@ -1465,7 +1637,7 @@ function createCharacter(): Character {
     skeletonHelper.visible = false;
     scene.add(skeletonHelper);
     mixer = new THREE.AnimationMixer(model);
-    applyWeights({ idle: 1, walk: 0, run: 0 });
+    applyWeights({ idle: 1, walk: 0, run: 0, sprint: 0 });
     return names;
   }
 
@@ -1515,6 +1687,9 @@ function createFirstPersonMode(): ViewMode {
   let lastPointer: { x: number; y: number } | null = null;
   let savedPose: PlayerPose | null = null;   // 上次離開時站的位置與朝向，再進來時接著走
   let isWalking = false;  // 預設跑步；按一下 Shift 切成走路，再按一下切回來
+  let isBoosted = false;  // 按一下 Z 加速（跑步 × boost.run、飛行 × boost.fly），再按一下切回來
+  let isSitting = false;  // 按 X 坐下（不在飛行時），再按 X 或按方向鍵、空白鍵站起來
+  let standUpLock = 0;    // 站起來動畫還在播的秒數，這段時間不能移動
   let blockedSeconds = 0;  // 按著方向鍵卻幾乎沒移動，持續了多久
   let isFlying = false;
   let flySeconds = 0;      // 這次飛行已經飛了多久
@@ -1522,6 +1697,14 @@ function createFirstPersonMode(): ViewMode {
   let lastJumpPress = -Infinity;   // 上一次按下空白鍵的時間（event.timeStamp，毫秒），判斷連按
 
   const isHeld = (action: KeyAction): boolean => [...heldCodes].some((code) => KEY_ACTIONS[code] === action);
+  // 這一刻的移動速度（m/s）：走路不加速；飛行用加速倍率 boost.fly，地面跑步用 boost.run。
+  const moveSpeed = (): number => {
+    const { walkSpeed, runSpeed, boost } = config.character;
+    if (isWalking) return isFlying && isBoosted ? walkSpeed * boost.fly : walkSpeed;
+    if (!isBoosted) return runSpeed;
+    return runSpeed * (isFlying ? boost.fly : boost.run);
+  };
+  const flyVerticalSpeed = (): number => FLY_VERTICAL_SPEED * (isBoosted ? config.character.boost.fly : 1);
   const isGrounded = (): boolean => isOnGround;
   const bodyHeight = (): number => eyeHeight() + HEAD_CLEARANCE;
   // 水平方向會擋的：頂面高過「能自動跨上的高度」、底面低於頭頂的方塊。
@@ -1530,8 +1713,28 @@ function createFirstPersonMode(): ViewMode {
   // 站上去、撞頭用的腳印是方形（軸對齊方塊）；水平移動用圓形，見 slide。
   const overlapsAt = (box: THREE.Box3, x: number, z: number): boolean =>
     x + config.character.radius > box.min.x && x - config.character.radius < box.max.x && z + config.character.radius > box.min.z && z - config.character.radius < box.max.z;
+  // 腳印（圓）有沒有碰到圓盤：離圓心的距離加減半徑落在內外緣之間。
+  // 只有一段角度的圓盤（破碎的環）：圓心的角度要落在那段裡，腳印半徑換成角度當寬容。
+  const overlapsDisc = (disc: Disc, x: number, z: number): boolean => {
+    const distance = Math.hypot(x, z);
+    if (distance + config.character.radius <= disc.inner || distance - config.character.radius >= disc.outer) return false;
+    if (!disc.arc || distance === 0) return true;
+    const fromStart = THREE.MathUtils.euclideanModulo(Math.atan2(x, z) - disc.arc.start, Math.PI * 2);
+    const slack = config.character.radius / distance;
+    return fromStart < disc.arc.length + slack || fromStart > Math.PI * 2 - slack;
+  };
+  // 這一刻會水平擋住身體的圓形障礙（倒圓錐、半球）半徑；腳底 stepHeight 以下的部分跨得上去，不算。
+  const blockingRoundRadii = (): number[] => {
+    const bottom = feetY + config.character.stepHeight;
+    const top = feetY + bodyHeight();
+    return [
+      ...world.cones.map((cone) => coneWidestRadius(cone, bottom, top)),
+      ...world.domes.map((dome) => domeWidestRadius(dome, bottom, top)),
+    ].filter((radius): radius is number => radius !== null);
+  };
   const isFree = (x: number, z: number): boolean =>
-    !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius));
+    !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius)) &&
+    !blockingRoundRadii().some((radius) => Math.hypot(x, z) < radius + config.character.radius);
   const dismissHint = (): void => { hint.hidden = true; };
 
   // collide-and-slide：腳印是圓（從上往下看的膠囊體）。沿位移掃掠，碰到就停在表面前 SKIN，
@@ -1540,6 +1743,7 @@ function createFirstPersonMode(): ViewMode {
   function slide(dx: number, dz: number): void {
     const r = config.character.radius;
     const solids = world.solids.filter((solid) => blocksBody(solid) && !circleOverlapsSolid(solid, body.x, body.z, 0));
+    const coneRadii = blockingRoundRadii().filter((radius) => Math.hypot(body.x, body.z) >= radius);
     let restX = dx;
     let restZ = dz;
     for (let i = 0; i < SLIDE_ITERATIONS; i++) {
@@ -1548,6 +1752,10 @@ function createFirstPersonMode(): ViewMode {
       let hit: SweepHit | null = null;
       for (const solid of solids) {
         const candidate = sweepCircle(solid, body.x, body.z, restX, restZ, r);
+        if (candidate && (!hit || candidate.t < hit.t)) hit = candidate;
+      }
+      for (const radius of coneRadii) {
+        const candidate = sweepRound(radius, body.x, body.z, restX, restZ, r);
         if (candidate && (!hit || candidate.t < hit.t)) hit = candidate;
       }
       if (!hit) {
@@ -1568,16 +1776,40 @@ function createFirstPersonMode(): ViewMode {
     }
   }
 
-  // 站在 scene.spawn（預設是空間中心、面向北）；那裡被佔了就找最近的空位。
+  // 站在 scene.spawn（預設在第一圈環上、面向北看著中央）；那裡被佔了就找最近的空位。
+  // 高度是那個位置最高的表面：環和平台懸在空中，從地面開始的話會掉在環底下。
   function findSpawn(): PlayerPose {
     const { x, z, facing } = config.scene.spawn;
     const offset = [{ dx: 0, dz: 0 }, ...SEARCH_OFFSETS].find(({ dx, dz }) => isFree(x + dx, z + dz)) ?? { dx: 0, dz: 0 };
-    return { x: x + offset.dx, z: z + offset.dz, yaw: DEG(facing), pitch: 0 };
+    const spawnX = x + offset.dx;
+    const spawnZ = z + offset.dz;
+    return { x: spawnX, z: spawnZ, yaw: DEG(facing), pitch: 0, feetY: supportHeight(spawnX, spawnZ, Infinity) };
   }
 
   // 快速連按兩下進入飛行（第一下照常起跳）；飛行中空白鍵改成上升，由 updateFlying 讀按住的鍵。
   // 按住不放的 repeat 不算連按，但站在地上時照舊可以一直跳。
+  // X 在飛行時是下降（updateFlying 讀按住的鍵），站在地上時切換坐下／站起來。
+  function toggleSit(): void {
+    if (isFlying) return;
+    if (isSitting) {
+      standUp();
+      return;
+    }
+    if (!isOnGround || standUpLock > 0) return;
+    isSitting = true;
+  }
+
+  function standUp(): void {
+    if (!isSitting) return;
+    isSitting = false;
+    standUpLock = SIT_EXIT_LOCK_SECONDS;
+  }
+
   function onJumpKey(event: KeyboardEvent): void {
+    if (isSitting || standUpLock > 0) {
+      standUp();
+      return;
+    }
     const isDoubleTap = !event.repeat && event.timeStamp - lastJumpPress < DOUBLE_TAP_MS;
     if (!event.repeat) lastJumpPress = isDoubleTap ? -Infinity : event.timeStamp;
     if (isFlying) return;
@@ -1605,6 +1837,8 @@ function createFirstPersonMode(): ViewMode {
     heldCodes.add(event.code);
     // 按住不放時瀏覽器會連續送 keydown（repeat），只認第一下，不然會一直來回切換
     if (action === 'toggleWalk' && !event.repeat) isWalking = !isWalking;
+    if (action === 'toggleBoost' && !event.repeat) isBoosted = !isBoosted;
+    if (action === 'descend' && !event.repeat) toggleSit();
     if (action === 'jump') onJumpKey(event);
     dismissHint();
   }
@@ -1785,6 +2019,16 @@ function createFirstPersonMode(): ViewMode {
       const rampTop = rampHeightAt(ramp, x, z);
       if (rampTop <= maxTop + SURFACE_EPSILON && rampTop > height) height = rampTop;
     }
+    for (const disc of world.discs) {
+      if (disc.maxY <= maxTop + SURFACE_EPSILON && disc.maxY > height && overlapsDisc(disc, x, z)) height = disc.maxY;
+    }
+    // 半球：腳印（圓）最靠近球心那一點下面的球面最高。
+    for (const dome of world.domes) {
+      const reach = Math.max(0, Math.hypot(x, z) - r);
+      if (reach >= dome.radius) continue;
+      const domeTop = dome.baseY + Math.sqrt(dome.radius * dome.radius - reach * reach);
+      if (domeTop <= maxTop + SURFACE_EPSILON && domeTop > height) height = domeTop;
+    }
     return height;
   }
 
@@ -1793,6 +2037,16 @@ function createFirstPersonMode(): ViewMode {
     let height = Infinity;
     for (const box of world.colliders) {
       if (box.min.y >= fromHead - SURFACE_EPSILON && box.min.y < toHead && box.min.y < height && overlapsAt(box, x, z)) height = box.min.y;
+    }
+    for (const disc of world.discs) {
+      if (disc.minY >= fromHead - SURFACE_EPSILON && disc.minY < toHead && disc.minY < height && overlapsDisc(disc, x, z)) height = disc.minY;
+    }
+    // 倒圓錐的底面是斜的：頭頂（圓）最先碰到的是靠圓錐那一側的邊緣，離圓心 distance - radius 的那一點。
+    for (const cone of world.cones) {
+      const reach = Math.max(0, Math.hypot(x, z) - config.character.radius);
+      if (reach >= cone.topRadius) continue;
+      const surfaceY = cone.tipY + (reach / cone.topRadius) * (cone.topY - cone.tipY);
+      if (surfaceY >= fromHead - SURFACE_EPSILON && surfaceY < toHead && surfaceY < height) height = surfaceY;
     }
     return height;
   }
@@ -1804,7 +2058,7 @@ function createFirstPersonMode(): ViewMode {
   function updateFlying(dt: number): void {
     flySeconds += dt;
     velocityY = 0;
-    const rise = (Number(isHeld('jump')) - Number(isHeld('descend'))) * FLY_VERTICAL_SPEED + mouseFlyRise();
+    const rise = (Number(isHeld('jump')) - Number(isHeld('descend'))) * flyVerticalSpeed() + mouseFlyRise();
     const climb = Math.sign(rise);
     const previous = feetY;
     const nextY = feetY + rise * dt;
@@ -1830,8 +2084,7 @@ function createFirstPersonMode(): ViewMode {
     const level = isThirdPerson() ? DEG(config.camera.thirdPerson.pitch) : 0;
     const offset = pitch - level;
     const tilt = Math.sign(offset) * Math.max(0, Math.abs(offset) - DEG(FLY_PITCH_DEADZONE));
-    const speed = isWalking ? config.character.walkSpeed : config.character.runSpeed;
-    return speed * Math.sin(tilt);
+    return moveSpeed() * Math.sin(tilt);
   }
 
   function updateVertical(dt: number): void {
@@ -1875,6 +2128,12 @@ function createFirstPersonMode(): ViewMode {
       const hit = sweepCircle(solid, x, z, dirX * maxDistance, dirZ * maxDistance, 0);
       if (hit && (!nearest || hit.t * maxDistance < nearest.distance)) nearest = { distance: hit.t * maxDistance, nx: hit.nx, nz: hit.nz };
     }
+    for (const cone of world.cones) {
+      if (y < cone.tipY || y > cone.topY) continue;
+      const radius = (cone.topRadius * (y - cone.tipY)) / (cone.topY - cone.tipY);
+      const hit = sweepRound(radius, x, z, dirX * maxDistance, dirZ * maxDistance, 0);
+      if (hit && (!nearest || hit.t * maxDistance < nearest.distance)) nearest = { distance: hit.t * maxDistance, nx: hit.nx, nz: hit.nz };
+    }
     return nearest;
   };
 
@@ -1910,13 +2169,14 @@ function createFirstPersonMode(): ViewMode {
       findWall: push ? findWall : null,
       isFlying,
       climbSpeed: isFlying ? flyClimbSpeed : 0,
+      isSitting,
     }, dt);
   }
 
   // 有方向輸入、站在地上，實際速度卻遠低於想走的速度，連續 BLOCKED_DELAY 秒就回傳想走的方向。
   function detectPush(forward: number, right: number, moved: number, dt: number): { forward: number; right: number } | null {
     const length = Math.hypot(forward, right);
-    const intended = isWalking ? config.character.walkSpeed : config.character.runSpeed;
+    const intended = moveSpeed();
     const isStuck = length > 0 && isOnGround && dt > 0 && moved / dt < intended * BLOCKED_SPEED_RATIO;
     blockedSeconds = isStuck ? blockedSeconds + dt : 0;
     return blockedSeconds >= BLOCKED_DELAY ? { forward: forward / length, right: right / length } : null;
@@ -1928,8 +2188,7 @@ function createFirstPersonMode(): ViewMode {
     dismissHint();
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
-    const speed = isWalking ? config.character.walkSpeed : config.character.runSpeed;
-    const step = (speed * dt) / length;
+    const step = (moveSpeed() * dt) / length;
     const dx = (-sin * forward + cos * right) * step;
     const dz = (-cos * forward - sin * right) * step;
     const substeps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / MAX_SUBSTEP));
@@ -1977,11 +2236,18 @@ function createFirstPersonMode(): ViewMode {
       const turn = isRightHeld ? 0 : Number(isTurnLeftHeld) - Number(isTurnRightHeld);
       let right = Number(isHeld('strafeRight')) - Number(isHeld('strafeLeft'));
       if (isRightHeld) right += Number(isTurnRightHeld) - Number(isTurnLeftHeld);
-      const forward = clamp(Number(isHeld('forward')) - Number(isHeld('back')) + Number(isBothHeld), -1, 1);
+      let forward = clamp(Number(isHeld('forward')) - Number(isHeld('back')) + Number(isBothHeld), -1, 1);
       right = clamp(right, -1, 1);
+      // 坐著時按方向鍵就站起來；站起來的動畫播完前原地不動。
+      if (isSitting && (forward !== 0 || right !== 0 || turn !== 0)) standUp();
+      standUpLock = Math.max(0, standUpLock - dt);
+      if (isSitting || standUpLock > 0) {
+        forward = 0;
+        right = 0;
+      }
 
       // 鍵盤轉身時鏡頭同步轉（沒抓著畫面時），不經過平滑；平滑只負責收回左鍵轉開的那段角度。
-      const turnDelta = turn * THREE.MathUtils.degToRad(config.character.turnSpeed) * dt;
+      const turnDelta = (isSitting || standUpLock > 0 ? 0 : turn) * THREE.MathUtils.degToRad(config.character.turnSpeed) * dt;
       yaw += turnDelta;
       if (mouseButtons === 0) cameraYaw += turnDelta;
       const startX = body.x;
@@ -2018,7 +2284,8 @@ function setViewMode(name: ViewModeName): void {
 // 「儲存」只在 vite dev 有（寫回 JSON 的外掛在 vite.config.ts），打包後整段被移除。
 const SAVE_FEEDBACK_MS = 1500;
 const CLIP_ROLE_NAMES: Record<ClipRole, string> = {
-  idle: '站立', walk: '走路', run: '跑步', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地', blocked: '受阻', fly: '飛行',
+  idle: '站立', walk: '走路', run: '跑步', sprint: '衝刺', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地', blocked: '受阻', fly: '飛行',
+  sitEnter: '坐下', sitLoop: '坐著', sitExit: '站起來',
 };
 let clipNames: string[] = [];
 // 「還原預設」回到上次儲存的內容（還沒存過就是開頁面時讀到的 JSON）。
@@ -2027,7 +2294,28 @@ let savedSnapshot: SceneConfig = structuredClone(config);
 // 地面大小在這裡調；之後加的空間設定也放這組。
 function addSceneGroup(panel: GUI): void {
   const group = panel.addFolder('場景');
-  group.add(config.scene, 'groundSize', 20, 400, 10).name('地面邊長（m）').onChange(rebuildScene);
+  group.add(config.scene, 'groundSize', 200, 3000, 50).name('地面邊長（m）').onChange(rebuildScene);
+  const center = group.addFolder('中央倒圓錐');
+  center.add(config.scene.center, 'topRadius', 10, 200, 1).name('平台半徑（m）').onChange(rebuildScene);
+  center.add(config.scene.center, 'topY', 10, 400, 1).name('平台高度（m）').onChange(rebuildScene);
+  center.add(config.scene.center, 'height', 10, 300, 1).name('錐高（m）').onChange(rebuildScene);
+  const rings = group.addFolder('懸空同心環');
+  rings.add(config.scene.rings, 'clearance', 0, 200, 1).name('離圓錐距離（m）').onChange(rebuildScene);
+  rings.add(config.scene.rings, 'width', 5, 100, 1).name('每圈寬（m）').onChange(rebuildScene);
+  rings.add(config.scene.rings, 'thickness', 0.5, 20, 0.5).name('厚度（m）').onChange(rebuildScene);
+  config.scene.rings.layers.forEach((layer, i) => {
+    const folder = rings.addFolder(`第 ${i + 1} 層`);
+    folder.add(layer, 'style', RING_STYLES).name('樣式').onChange(rebuildScene);
+    folder.add(layer, 'gap', 2, 80, 1).name('離上一層（m）').onChange(rebuildScene);
+    folder.close();
+  });
+  const floaters = group.addFolder('周圍漂浮物');
+  floaters.add(config.scene.floaters, 'clusters', 0, 20, 1).name('聚集處').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'islands', 0, 80, 1).name('島嶼').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'platforms', 0, 80, 1).name('平台').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'hexPads', 0, 80, 1).name('蜂窩平面').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'debris', 0, 400, 10).name('零碎小塊').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'bobScale', 0, 3, 0.1).name('飄動幅度倍率').onChange(rebuildScene);
   group.close();
 }
 
@@ -2049,6 +2337,8 @@ function addCharacterGroup(panel: GUI): void {
   group.add(c, 'stepHeight', 0, 0.6, 0.01).name('自動跨上高度（m）');
   group.add(c, 'walkSpeed', 0.5, 4, 0.1).name('走路（m/s）');
   group.add(c, 'runSpeed', 1, 8, 0.1).name('跑步（m/s）');
+  group.add(c.boost, 'run', 1, 10, 0.5).name('Z 加速：跑步倍率');
+  group.add(c.boost, 'fly', 1, 20, 0.5).name('Z 加速：飛行倍率');
   group.add(c, 'turnSpeed', 60, 360, 10).name('轉身（度/秒）');
   group.add(c, 'jumpHeight', 0.1, 1.5, 0.05).name('跳躍高度（m）');
   group.add(c, 'gravity', 1, 30, 0.1).name('重力（m/s²）');
@@ -2059,6 +2349,7 @@ function addCharacterGroup(panel: GUI): void {
   animationFolder.add(c, 'fadeSeconds', 0, 1, 0.05).name('過渡（秒）');
   animationFolder.add(c.clipSpeeds, 'walk', 0.3, 3, 0.01).name('走路動畫原速（m/s）');
   animationFolder.add(c.clipSpeeds, 'run', 1, 8, 0.01).name('跑步動畫原速（m/s）');
+  animationFolder.add(c.clipSpeeds, 'sprint', 2, 15, 0.01).name('衝刺動畫原速（m/s）');
   animationFolder.add(c, 'landLockSeconds', 0, 1.2, 0.05).name('落地硬直（秒）');
   animationFolder.add(c, 'showSkeleton').name('顯示骨架');
   addClipControllers(animationFolder);
@@ -2187,6 +2478,7 @@ const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), MAX_FRAME_DT);
   currentMode().update(dt);
+  updateFloaters(world.floaters, clock.elapsedTime);
   character.syncSkeletonHelper();
   renderer.render(scene, camera);
 });
