@@ -5,8 +5,10 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { RingStyle } from './config/scene.config';
 import { THEMED_ISLANDS, buildIsland } from './oz-islands';
-import { SYMBOLS, symbolGeometry } from './oz-symbols';
-import { addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod, skipCollider, type Vec3 } from './oz-kit';
+import { RUNES, runeGeometry } from './oz-runes';
+import { SHOP_LAYOUT, addBackToBackRows, addInnerShopRow } from './oz-shops';
+import { CODE_SYMBOLS, LETTERS, ZHUYIN, symbolGeometry } from './oz-symbols';
+import { addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod, skipCollider } from './oz-kit';
 
 /** 圓心在原點的環形平板（inner 是 0 就是實心圓）：只管站上去和撞頭。有 arc 時只有這段角度站得住（角度 = atan2(x, z)）。 */
 export interface Disc { inner: number; outer: number; minY: number; maxY: number; arc?: { start: number; length: number } }
@@ -74,19 +76,14 @@ const PLACE_ATTEMPTS = 30;
 const JAG_POINTS = 5;                  // 斷口的鋸齒點數
 const JAG_DEPTH = 4;                   // 鋸齒最多往完整段內咬幾公尺
 
-// 全是碎塊的環
-const SHARD_AREA = 40;
-const SHARD_SIZE: Range = [1.5, 6];
-const SHARD_THICKNESS: Range = [0.3, 1.5];
+// 全是符號的環：每 SHARD_AREA 平方公尺一個；注音、程式符號各佔的比例，其餘是英文字母
+const SHARD_AREA = 45;
+const SHARD_SIZE: Range = [1.5, 5];
 const SHARD_RISE = 3;
-const SHARD_TILT = 0.5;
-const SHARD_CHUNK_CHANCE = 0.2;
 const SHARD_BOB = 0.6;
-// 碎片的材質比例（其餘是霧面）：亮面金屬、半透明玻璃、會發光的水晶
-const SHARD_GLOSSY_SHARE = 0.15;
-const SHARD_GLASS_SHARE = 0.08;
-const SHARD_CRYSTAL_SHARE = 0.07;
-const SHARD_CRYSTAL_STRETCH = 2.6;
+const SHARD_MIX = { zhuyin: 0.45, code: 0.4 };
+const SHARD_SPACING = 0.9;             // 兩個符號中心至少隔（兩者大小平均 × 這個倍數），盡量不重疊
+const SHARD_PLACE_TRIES = 8;
 
 // 飄著的書：大小偏向小本（指數 > 1），少數是巨大的書。張開角度：0 闔上、π 攤平。
 const FLYING_BOOK_AREA = 70;
@@ -122,40 +119,20 @@ const BOOK_DEPTH: Range = [0.75, 0.95];    // 佔書格深度的比例
 const BOOK_GAP_CHANCE = 0.05;
 const BOOK_GAP: Range = [0.3, 1.2];
 
-// 三層環
-const TRIPLE_GAP = 5;
-const TRIPLE_SHADE = 0.08;
-// 三層步道的設施
-const TRIPLE_BRIDGES = 6;               // 每道空隙架幾座橋
-const BRIDGE_WIDTH = 3;
-const RAIL_HEIGHT = 1;
-const RAIL_POST_SPACING = 2;
-const FLOWER_BED_SPACING = 8;
-const FLOWERS_PER_BED = 14;
-const FLOWER_COLORS = [0xe63946, 0xf2c200, 0xff7ac3, 0xffffff, 0x8e44ad, 0xf4a261];
-const PROMENADE_LAMP_SPACING = 18;
-const PROMENADE_BENCH_SPACING = 18;
-const BINOCULAR_SPACING = 45;
-const BIKE_DECAL_SPACING = 25;
 
-// 環狀美食街：分成幾個區，每區一種擺法，區和區之間留走道；地面用低彩度的顏色。
-const FOOD_ZONES: Range = [8, 12];
-const FOOD_WALKWAY = 5;                // 區和區之間的走道寬（m）
-const FOOD_EDGE = 2;
-const FOOD_PATCH = 0.03;               // 每區地面色塊的厚度：疊在環面上，看得出分區
-const STALL_SPACING: Range = [4.2, 5.5];
-const STALL_SIZE: [number, number, number] = [3.5, 2.6, 2.5];
-const AWNING_DEPTH = 1.4;
-const AWNING_DROOP = 0.3;
-const TABLE_CLEARANCE = 2.8;           // 桌子之間至少隔多遠（中心距）
-const CLUSTER_TABLES: Range = [5, 12];
-const CLUSTER_SPREAD: Range = [4, 8];
-const LONG_TABLE_LENGTH: Range = [5, 8];
-const LONG_TABLE_ROW = 3.4;
-const LONG_TABLE_COLUMN = 1.5;         // 長桌之間沿長邊方向的空隙
-const PLANTERS: Range = [5, 10];
-const ROUND_TABLE_CHANCE = 0.55;
-const TABLE_UMBRELLA_CHANCE = 0.35;
+// 美食區（由圓心往外）：A 排店（朝外）→ 街道 → 用餐區 → B 排店（朝內）＋ C 排店（朝外，背靠背）→ 用餐區 → 外緣街道。
+// 用餐區被 B、C 排的通道對齊切成一格一格，每格一種桌椅，整齊排成一列一列的弧；通道兩旁一排植栽。
+const FOOD_STREET = 6;                 // 街道寬（m）
+const FOOD_PATCH = 0.03;               // 用餐區地面色塊的厚度：疊在環面上，和街道分得出來
+const DINING_FRONTAGE = 2.5;           // 店門口到第一列桌子留的走道
+const DINING_EDGE = 1;                 // 靠街道那一側留的空間
+const DINING = {
+  round: { row: 3.4, column: 3.4 },
+  square: { row: 2.8, column: 2.6 },
+  long: { row: 3.4, length: 6, column: 1.5 },
+};
+const AISLE_PLANTER = { spacing: 5, size: 0.8, inset: 0.6 };
+const STREET_LAMP_SPACING = 16;
 const ROUND_CHAIR_OFFSET = 0.95;
 const SQUARE_CHAIR_OFFSET = 0.75;
 const BENCH_OFFSET = 0.7;
@@ -193,8 +170,6 @@ const PAGE_COLORS = [0xfbf8f0, 0xf4eedf, 0xfffdf7];
 const TABLE_COLORS = [0xffffff, 0xf4efe6, 0xb9b2a6, 0x8a5a3b, 0x6b7280];
 const CHAIR_COLORS = [0x8a5a3b, 0x2b2b2b, 0xa89f94, 0x6b7f8e, 0xc7b299, 0xe6e9f0];
 const FOOD_FLOOR = 0xd9d3c9;
-const FOOD_PATCH_COLORS = [0xcfc7ba, 0xc8ccd0, 0xd4cbbd, 0xc2c9bd, 0xd0c6c2, 0xc9c3b5];
-const STALL_COLORS = [0xf4efe6, 0xe8e2d6, 0xdfe3e8, 0xefe6dc];
 const AWNING_COLORS = [0xc0574f, 0xd49a4a, 0x6f9c6a, 0x5d8fb0, 0x8c6fa8, 0xc7764a];
 const POT_COLORS = [0x9a8f84, 0xb8afa4, 0x857b72];
 const BUSH_COLORS = [0x6cb86a, 0x5fa85d, 0x7cc576];
@@ -219,8 +194,6 @@ export function createRng(seed: number): Rng {
 }
 const range = (rng: Rng, [min, max]: Range): number => min + (max - min) * rng();
 const spread = (rng: Rng, half: number): number => (rng() * 2 - 1) * half;
-// 近似常態分布（四個均勻亂數相加），標準差約 0.58
-const gaussian = (rng: Rng): number => rng() + rng() + rng() + rng() - 2;
 function pick<T>(rng: Rng, items: readonly T[]): T {
   const item = items[Math.floor(rng() * items.length)];
   if (item === undefined) throw new Error('pick：清單是空的');
@@ -452,7 +425,7 @@ export function addPartsFloater(build: PropsBuild, rng: Rng, scale: number, part
 }
 
 // 漂浮的符號：上下飄，同時繞垂直軸慢慢轉（各自的速度與方向）。碰撞方塊是符號沒歪時的外框，每格跟著轉同樣的角度。
-function addSpinningSymbol(build: PropsBuild, rng: Rng, scale: number, batch: Batch, geometry: THREE.BufferGeometry, spot: Spot, size: number): void {
+function addSpinningSymbol(build: PropsBuild, rng: Rng, scale: number, batch: Batch, geometry: THREE.BufferGeometry, spot: Spot, size: number, hasCollider = true): void {
   const yaw0 = rng() * TAU;
   const tiltX = spread(rng, SYMBOL_TILT);
   const tiltZ = spread(rng, SYMBOL_TILT);
@@ -475,8 +448,10 @@ function addSpinningSymbol(build: PropsBuild, rng: Rng, scale: number, batch: Ba
     box.vx = Math.sin(yaw);
     box.vz = Math.cos(yaw);
   });
-  floater.solids = [{ box, minY: box.minY, maxY: box.maxY }];
-  build.solids.push(box);
+  if (hasCollider) {
+    floater.solids = [{ box, minY: box.minY, maxY: box.maxY }];
+    build.solids.push(box);
+  }
   build.floaters.push(floater);
 }
 
@@ -506,7 +481,6 @@ export function updateFloaters(floaters: Floater[], time: number): void {
 }
 
 // ---------- 細節材質（美食街攤位、圖書館、飄著的書） ----------
-const STALL_NAMES = ['拉麵', '珍珠奶茶', '披薩', '咖哩飯', '烤肉串', '甜點', '壽司', '漢堡', '鹹酥雞', '刨冰', '咖啡', '水餃'];
 const LIBRARY_SECTIONS = ['文學', '歷史', '科學', '藝術', '哲學', '地理', '音樂', '童書', '語言', '電腦'];
 
 const drawSignText = (text: string, background: string) => (ctx: CanvasRenderingContext2D): void => {
@@ -521,17 +495,6 @@ const drawSignText = (text: string, background: string) => (ctx: CanvasRendering
   ctx.textBaseline = 'middle';
   ctx.fillText(text, 128, 34);
 };
-function drawMenu(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#1f2a24';
-  ctx.fillRect(0, 0, 128, 96);
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = 'bold 13px sans-serif';
-  ctx.fillText('MENU', 44, 16);
-  for (let i = 0; i < 5; i++) {
-    ctx.fillRect(12, 28 + i * 13, 60 + ((i * 17) % 30), 3);
-    ctx.fillRect(100, 28 + i * 13, 16, 3);
-  }
-}
 const drawStripes = (a: string, b: string) => (ctx: CanvasRenderingContext2D): void => {
   for (let i = 0; i < 8; i++) {
     ctx.fillStyle = i % 2 === 0 ? a : b;
@@ -581,42 +544,6 @@ function drawCover(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(34, 64, 60, 6);
 }
 // 書頁：一行行文字
-// 草地：深淺不一的草葉點
-function drawLawn(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#6aa864';
-  ctx.fillRect(0, 0, 256, 256);
-  const rng = createRng(71);
-  for (let i = 0; i < 7000; i++) {
-    ctx.fillStyle = ['#5e9c58', '#77b46f', '#549050', '#82bd78'][Math.floor(rng() * 4)] ?? '#6aa864';
-    ctx.fillRect(rng() * 256, rng() * 256, 1, 3);
-  }
-}
-// 自行車道：藍灰色柏油
-function drawBikePath(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#4b6378';
-  ctx.fillRect(0, 0, 256, 256);
-  const rng = createRng(72);
-  for (let i = 0; i < 8000; i++) {
-    ctx.fillStyle = ['#415769', '#56708a', '#3a4f60', '#5f7891'][Math.floor(rng() * 4)] ?? '#4b6378';
-    ctx.fillRect(rng() * 256, rng() * 256, 1.5, 1.5);
-  }
-}
-// 地上的單車圖示：白色線條畫在透明底上（車頭朝貼圖上方）
-function drawBikeIcon(ctx: CanvasRenderingContext2D): void {
-  ctx.clearRect(0, 0, 128, 128);
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.arc(64, 28, 18, 0, TAU);
-  ctx.moveTo(82, 100);
-  ctx.arc(64, 100, 18, 0, TAU);
-  ctx.moveTo(64, 28);
-  ctx.lineTo(64, 64);
-  ctx.lineTo(64, 100);
-  ctx.moveTo(48, 40);
-  ctx.lineTo(80, 40);
-  ctx.stroke();
-}
 
 function drawPage(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = '#fbf8f0';
@@ -647,22 +574,10 @@ function createDetailMaterials() {
       stripes.set(key, material);
       return material;
     },
-    menu: mapped(pixelTexture(128, 96, drawMenu)),
     planks: mapped(pixelTexture(256, 256, drawPlanks)),
     carpet: mapped(pixelTexture(64, 64, drawCarpet)),
     cover: mapped(pixelTexture(128, 128, drawCover)),
     page: mapped(pixelTexture(128, 128, drawPage)),
-    lawn: mapped(pixelTexture(256, 256, drawLawn)),
-    bikePath: mapped(pixelTexture(256, 256, drawBikePath)),
-    bikeIcon: mapped(pixelTexture(128, 128, drawBikeIcon), { transparent: true, alphaTest: 0.3 }),
-    paint: colorMaterial(0xf4f4f4),
-    soil: colorMaterial(0x6b4a33),
-    stone: colorMaterial(0xb7b0a5),
-    rail: colorMaterial(0xd5dae0),
-    flowers: FLOWER_COLORS.map((color) => colorMaterial(color)),
-    leaves: colorMaterial(0x5fa85d),
-    window: colorMaterial(0x26313b),
-    counter: colorMaterial(0x8a5a3b),
     stool: colorMaterial(0x2b2b2b),
     darkMetal: colorMaterial(0x3a3f45),
     lamp: new THREE.MeshBasicMaterial({ color: 0xfff1c9 }),
@@ -810,43 +725,39 @@ function randomInRing(rng: Rng, inner: number, outer: number): { r: number; thet
   return { r: Math.sqrt(inner * inner + rng() * (outer * outer - inner * inner)), theta: rng() * TAU };
 }
 
-// 整圈都是各種形狀、顏色的碎塊，沒有環面，站不上去；全部都在飄。
-// 每次建環時才建：環境貼圖（反光用）要先設好
-const shardMaterials = (): { glossy: THREE.Material; glass: THREE.Material; crystal: THREE.Material } => ({
-  glossy: shinyMaterial(0xffffff, 0.6, 0.25),
-  glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.45, envMap: propsEnvironment, side: THREE.DoubleSide }),
-  crystal: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-});
-const crystalGeometry = new THREE.OctahedronGeometry(1, 0).scale(0.5, SHARD_CRYSTAL_STRETCH, 0.5);
+// 整圈都是漂浮的立體符號（注音、程式符號、少量英文字母），沒有環面；上下飄、慢慢轉，只有外觀沒有碰撞。
+function pickShardSymbol(rng: Rng): string {
+  const roll = rng();
+  if (roll < SHARD_MIX.zhuyin) return pick(rng, ZHUYIN);
+  if (roll < SHARD_MIX.zhuyin + SHARD_MIX.code) return pick(rng, CODE_SYMBOLS);
+  return pick(rng, LETTERS);
+}
 
 function buildShardsRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
-  const slabs = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
-  const chunks = GEOMETRY.chunks.map((geometry) => new Batch(geometry, flatMaterial));
-  const looks = shardMaterials();
-  // 亮面和玻璃只用前兩種板子形狀，多一種材質只多兩次繪製
-  const glossy = GEOMETRY.slabs.slice(0, 2).map((geometry) => new Batch(geometry, looks.glossy));
-  const glass = GEOMETRY.slabs.slice(2, 4).map((geometry) => new Batch(geometry, looks.glass));
-  const crystals = new Batch(crystalGeometry, looks.crystal);
+  const batches = new Map<string, Batch>();
+  const placed: { x: number; z: number; size: number }[] = [];
   const count = Math.round((Math.PI * (spec.outer ** 2 - spec.inner ** 2)) / SHARD_AREA);
   for (let i = 0; i < count; i++) {
-    const { r, theta } = randomInRing(rng, spec.inner, spec.outer);
+    const text = pickShardSymbol(rng);
+    const geometry = symbolGeometry(text);
+    if (!geometry) continue;
     const size = range(rng, SHARD_SIZE);
-    const y = spec.maxY + spread(rng, SHARD_RISE);
-    const look = rng();
-    if (look < SHARD_CRYSTAL_SHARE) {
-      const crystal = transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, 0.4), spread(rng, 0.4), size / 3, size / 3, size / 3);
-      addFloater(build, rng, spec.bobScale * SHARD_BOB, [crystals.add(crystal, pick(rng, [0x9ff3ff, 0xffb3f0, 0xfff3a0, 0xb8ffcc]))]);
-      continue;
+    for (let attempt = 0; attempt < SHARD_PLACE_TRIES; attempt++) {
+      const { r, theta } = randomInRing(rng, spec.inner + size / 2, spec.outer - size / 2);
+      const x = polarX(r, theta);
+      const z = polarZ(r, theta);
+      if (placed.some((other) => Math.hypot(other.x - x, other.z - z) < ((other.size + size) / 2) * SHARD_SPACING)) continue;
+      placed.push({ x, z, size });
+      let batch = batches.get(text);
+      if (!batch) {
+        batch = new Batch(geometry, instanceMaterial);
+        batches.set(text, batch);
+      }
+      addSpinningSymbol(build, rng, spec.bobScale * SHARD_BOB, batch, geometry, { x, y: spec.maxY + spread(rng, SHARD_RISE), z }, size, false);
+      break;
     }
-    const special = look < SHARD_CRYSTAL_SHARE + SHARD_GLASS_SHARE ? glass : look < SHARD_CRYSTAL_SHARE + SHARD_GLASS_SHARE + SHARD_GLOSSY_SHARE ? glossy : null;
-    const isChunk = !special && rng() < SHARD_CHUNK_CHANCE;
-    const matrix = isChunk
-      ? transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, rng() * TAU, rng() * TAU, size / 2, (size / 2) * range(rng, [0.5, 1.2]), size / 2)
-      : transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, SHARD_TILT), spread(rng, SHARD_TILT), size, range(rng, SHARD_THICKNESS), size * range(rng, [0.5, 1]));
-    const part = pick(rng, special ?? (isChunk ? chunks : slabs)).add(matrix, pick(rng, SHARD_COLORS));
-    addFloater(build, rng, spec.bobScale * SHARD_BOB, [part]);
   }
-  addBatches(build.decor, [...slabs, ...chunks, ...glossy, ...glass, crystals]);
+  addBatches(build.decor, [...batches.values()]);
 }
 
 // ---------- 飄著的書 ----------
@@ -1026,14 +937,19 @@ function buildLibraryRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
     const openingAngle = LIBRARY_OPENING_WIDTH / center;
     const offset = rng() * TAU;
     const segment = TAU / LIBRARY_OPENINGS;
+    // 先決定每個缺口的中心（各自隨機偏一點），書櫃從一個缺口填到下一個缺口：
+    // 若改成「起點隨機、長度固定」，相鄰兩段會重疊，端點的分類牌會卡進隔壁書櫃裡
+    const openings = Array.from({ length: LIBRARY_OPENINGS }, (_, k) => offset + k * segment + spread(rng, segment * 0.15));
     for (let k = 0; k < LIBRARY_OPENINGS; k++) {
-      const start = offset + k * segment + openingAngle / 2 + spread(rng, segment * 0.15);
-      const length = segment - openingAngle;
+      const start = (openings[k] ?? 0) + openingAngle / 2;
+      const nextOpening = (openings[(k + 1) % LIBRARY_OPENINGS] ?? 0) + (k + 1 === LIBRARY_OPENINGS ? TAU : 0);
+      const length = nextOpening - openingAngle / 2 - start;
       addShelfSegment(rng, build, center, maxY, start, length, dividers, books);
       // 兩端的分類牌（面向缺口）、書櫃兩面各一把梯子
       const label = LIBRARY_SECTIONS[(wall * LIBRARY_OPENINGS + k) % LIBRARY_SECTIONS.length] ?? '書';
       for (const [end, facing] of [[start, -1], [start + length, 1]] as const) {
-        const plaque = ringGroup(props, center, maxY + 2.6, end + (facing * 0.06) / center);
+        // 端點的隔板以端點為中心、往外凸半個隔板厚；分類牌要掛在隔板外面，否則被埋在隔板裡
+        const plaque = ringGroup(props, center, maxY + 2.6, end + (facing * (SHELF_DIVIDER / 2 + 0.05)) / center);
         box(plaque, M.stallSign(label, WOOD_DARK), [0.04, 0.5, 2], [0, 0, 0]);
       }
       const half = LIBRARY_BAY_DEPTH + LIBRARY_BACK / 2;
@@ -1064,227 +980,30 @@ function buildLibraryRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   disposeGeometries(props);
 }
 
-// 同一高度的內、中、外三層細環，各自站得上去；顏色是環色的深淺變化。
-// 一圈上每隔 spacing 公尺的角度
-const anglesEvery = (radius: number, spacing: number, offset = 0): number[] => {
-  const count = Math.max(1, Math.round((TAU * radius) / spacing));
-  return Array.from({ length: count }, (_, i) => offset + (i / count) * TAU);
-};
-// angle 離 openings 裡任何一個角度在 half 弧度以內
-const nearAny = (angle: number, openings: number[], half: number): boolean =>
-  openings.some((opening) => Math.abs(THREE.MathUtils.euclideanModulo(angle - opening + Math.PI, TAU) - Math.PI) < half);
 
-// 環邊欄杆：每 RAIL_POST_SPACING 一根柱子、頂端一圈扶手，openings（橋的角度）前後留開口；
-// 碰撞是一段段只擋那幾段角度的圓形牆，人不會從環邊掉下去，但走得上橋。solid 是哪一側實心（inside：半徑以內）；
-// 走路時圓形牆只擋人所在的那一側，所以中間兩道欄杆不會擋到隔壁環上的人。
-function addEdgeRail(build: PropsBuild, props: THREE.Group, M: DetailMaterials, radius: number, y: number, openings: number[], solid: 'inside' | 'outside'): void {
-  const half = (BRIDGE_WIDTH / 2 + 0.3) / radius;
-  for (const angle of anglesEvery(radius, RAIL_POST_SPACING)) {
-    if (!nearAny(angle, openings, half)) cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [polarX(radius, angle), y + RAIL_HEIGHT / 2, polarZ(radius, angle)], 6);
-  }
-  const sorted = [...openings].sort((a, b) => a - b);
-  const segments: [number, number][] = sorted.length === 0 ? [[0, TAU]] : sorted.map((opening, i) => {
-    const next = sorted[(i + 1) % sorted.length] ?? opening;
-    const start = opening + half;
-    const end = (i + 1 < sorted.length ? next : next + TAU) - half;
-    return [start, end - start];
-  });
-  for (const [start, length] of segments) {
-    // TorusGeometry 從 +x 開始逆時針；轉成水平後再繞 y 轉，讓這段落在 [start, start + length]
-    addMesh(props, new THREE.TorusGeometry(radius, 0.035, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.rail, [0, y + RAIL_HEIGHT, 0], [0, start + length - Math.PI / 2, 0]);
-    build.walls.push({ radius, minY: y, maxY: y + RAIL_HEIGHT, solid, arc: { start, length } });
-  }
+// ---------- 環狀美食區 ----------
+interface FoodBatches { roundTables: Batch; squareTables: Batch; chairs: Batch; longTables: Batch; benches: Batch; pots: Batch; bushes: Batch }
+type TableKind = 'round' | 'square' | 'long';
+const TABLE_KINDS: TableKind[] = ['round', 'square', 'long'];
+// 一格用餐區：半徑 inner–outer，角度在兩條通道中線 from–to 之間（每一列再扣掉通道寬）
+interface DiningCell { inner: number; outer: number; from: number; to: number; y: number; tableColor: number; chairColor: number; umbrella: number | null }
+
+// 在 inner–outer 之間排幾列，列距 spacing，整組置中
+function rowRadii(inner: number, outer: number, spacing: number): number[] {
+  const rows = Math.floor((outer - inner) / spacing);
+  const offset = (outer - inner - rows * spacing) / 2;
+  return Array.from({ length: rows }, (_, i) => inner + offset + spacing * (i + 0.5));
 }
 
-// 花圃：石框、泥土、一叢叢小花。
-function addFlowerBed(g: THREE.Group, M: DetailMaterials, rng: Rng): void {
-  box(g, M.stone, [2.6, 0.35, 1.5], [0, 0.175, 0]);
-  box(g, M.soil, [2.4, 0.04, 1.3], [0, 0.36, 0]);
-  for (let i = 0; i < FLOWERS_PER_BED; i++) {
-    const x = (rng() - 0.5) * 2.1;
-    const z = (rng() - 0.5) * 1.0;
-    rod(g, M.leaves, [x, 0.36, z], [x, 0.55, z], 0.01, 0.01, 4);
-    addMesh(g, new THREE.IcosahedronGeometry(0.07, 0), M.flowers[Math.floor(rng() * M.flowers.length)] ?? M.paint, [x, 0.58, z]);
-  }
-}
-
-// 單車：兩個輪子、車架、坐墊和把手，停在停車架旁。自身 x 是車身方向。
-function addBicycle(g: THREE.Group, M: DetailMaterials, color: number): void {
-  const frame = colorMaterial(color);
-  for (const x of [-0.5, 0.5]) addMesh(g, new THREE.TorusGeometry(0.33, 0.025, 6, 20), M.stool, [x, 0.35, 0]);
-  rod(g, frame, [-0.5, 0.35, 0], [-0.05, 0.75, 0], 0.02);
-  rod(g, frame, [-0.05, 0.75, 0], [0.4, 0.75, 0], 0.02);
-  rod(g, frame, [0.4, 0.75, 0], [0.5, 0.35, 0], 0.02);
-  rod(g, frame, [-0.05, 0.75, 0], [0, 0.35, 0], 0.02);
-  rod(g, frame, [0, 0.35, 0], [-0.5, 0.35, 0], 0.015);
-  box(g, M.stool, [0.22, 0.05, 0.1], [-0.08, 0.86, 0]);
-  rod(g, M.darkMetal, [0.42, 0.75, 0], [0.42, 0.95, 0], 0.015);
-  rod(g, M.darkMetal, [0.42, 0.95, -0.25], [0.42, 0.95, 0.25], 0.015);
-}
-
-// 投幣望遠鏡：柱子上一個雙筒鏡身，朝環外看出去（自身 +z）。
-function addBinoculars(g: THREE.Group, M: DetailMaterials): void {
-  rod(g, M.darkMetal, [0, 0, 0], [0, 1.1, 0], 0.06);
-  box(g, colorMaterial(0x2f6fb0), [0.36, 0.22, 0.3], [0, 1.25, 0]);
-  for (const x of [-0.09, 0.09]) cylinder(g, M.darkMetal, 0.06, 0.25, [x, 1.28, 0.25], 10, [Math.PI / 2, 0, 0]);
-}
-
-function addPromenadeLamp(g: THREE.Group, M: DetailMaterials): void {
-  skipCollider(g);
-  markCollider(g, [0.3, 3.6, 0.3], [0, 1.8, 0]);
-  rod(g, M.darkMetal, [0, 0, 0], [0, 3.5, 0], 0.05, 0.04, 8);
-  addMesh(g, new THREE.SphereGeometry(0.2, 12, 8), M.lamp, [0, 3.65, 0]);
-  cylinder(g, M.darkMetal, 0.22, 0.05, [0, 3.88, 0], 12);
-}
-
-function addPromenadeBench(g: THREE.Group, M: DetailMaterials): void {
-  const wood = colorMaterial(WOOD);
-  for (const z of [-0.12, 0.02, 0.16]) box(g, wood, [1.8, 0.04, 0.12], [0, 0.45, z]);
-  for (const y of [0.6, 0.75]) box(g, wood, [1.8, 0.1, 0.03], [0, y, -0.22]);
-  for (const x of [-0.75, 0.75]) box(g, M.darkMetal, [0.05, 0.45, 0.42], [x, 0.225, 0]);
-}
-
-// 同一高度的內、中、外三層細環，各自站得上去：
-//   內圈是花園（草地、石框花圃），中圈是自行車道（邊線、中央虛線、單車圖示、停車架與單車），
-//   外圈是木棧道（長椅朝外看風景、路燈、投幣望遠鏡）。三圈之間每 60° 一座木橋，所有環邊都有欄杆（橋口除外）。
-function buildTripleRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
-  const M = getDetailMaterials();
-  const width = (spec.outer - spec.inner - 2 * TRIPLE_GAP) / 3;
-  const y = spec.maxY;
-  const props = new THREE.Group();
-  const innerOf = (k: number): number => spec.inner + k * (width + TRIPLE_GAP);
-  const bridges = [0, 1].map((gap) => Array.from({ length: TRIPLE_BRIDGES }, (_, j) => ((j + (gap === 0 ? 0 : 0.5)) / TRIPLE_BRIDGES) * TAU));
-  const surfaces = [M.lawn, M.bikePath, M.planks];
-  for (let k = 0; k < 3; k++) {
-    const inner = innerOf(k);
-    const outer = inner + width;
-    build.solid.add(annulus(inner, outer, spec.minY, y, colorMaterial(shade(spec.color, (k - 1) * TRIPLE_SHADE))));
-    build.discs.push({ inner, outer, minY: spec.minY, maxY: y });
-    const surface = annulus(inner, outer, y, y + 0.01, surfaces[k] ?? M.paint);
-    planarUv(surface.geometry, 2);
-    build.decor.add(surface);
-    addEdgeRail(build, props, M, inner + 0.15, y, k === 0 ? [] : bridges[k - 1] ?? [], 'inside');
-    addEdgeRail(build, props, M, outer - 0.15, y, k === 2 ? [] : bridges[k] ?? [], 'outside');
-  }
-  // 內圈花園：中線上每隔一段一座花圃
-  const garden = innerOf(0) + width / 2;
-  for (const angle of anglesEvery(garden, FLOWER_BED_SPACING)) {
-    if (!nearAny(angle, bridges[0] ?? [], 3 / garden)) addFlowerBed(ringGroup(props, garden, y, angle), M, rng);
-  }
-  // 中圈自行車道：兩側白色邊線、中央白色虛線、地上的單車圖示，幾處停車架停著單車
-  const lane = innerOf(1);
-  for (const r of [lane + 0.6, lane + width - 0.6]) build.decor.add(annulus(r - 0.06, r + 0.06, y + 0.01, y + 0.016, M.paint));
-  for (const angle of anglesEvery(lane + width / 2, 4)) box(ringGroup(props, lane + width / 2, y + 0.013, angle), M.paint, [2, 0.006, 0.12], [0, 0, 0]);
-  for (const angle of anglesEvery(lane + width / 2, BIKE_DECAL_SPACING, 0.03)) {
-    for (const side of [-1, 1]) {
-      const r = lane + width / 2 + side * 2.4;
-      addMesh(props, flat2(1.4, 1.4), M.bikeIcon, [polarX(r, angle), y + 0.014, polarZ(r, angle)], [0, angle + (side > 0 ? -Math.PI / 2 : Math.PI / 2), 0]);
-    }
-  }
-  for (const angle of anglesEvery(lane + width / 2, 120, 0.2)) {
-    const rack = ringGroup(props, lane + width - 1.2, y, angle);
-    for (let b = 0; b < 4; b++) {
-      addMesh(rack, new THREE.TorusGeometry(0.35, 0.025, 6, 16, Math.PI), M.rail, [b * 0.9 - 1.35, 0, 0], [0, Math.PI / 2, 0]);
-      if (b % 3 !== 2) addBicycle(childGroup(rack, [b * 0.9 - 1.35, 0, 0], Math.PI / 2), M, pick(rng, [0xc0392b, 0x2f6fb0, 0xf2c200, 0x3f8a5f, 0x2b2b2b]));
-    }
-  }
-  // 外圈木棧道：外緣長椅朝外看風景、內緣路燈、投幣望遠鏡
-  const deck = innerOf(2);
-  for (const angle of anglesEvery(deck + width - 1.4, PROMENADE_BENCH_SPACING, 0.02)) addPromenadeBench(ringGroup(props, deck + width - 1.4, y, angle), M);
-  for (const angle of anglesEvery(deck + 1, PROMENADE_LAMP_SPACING, 0.05)) addPromenadeLamp(ringGroup(props, deck + 1, y, angle), M);
-  for (const angle of anglesEvery(deck + width - 0.8, BINOCULAR_SPACING, 0.25)) addBinoculars(ringGroup(props, deck + width - 0.8, y, angle), M);
-  // 木橋：兩道空隙各 TRIPLE_BRIDGES 座，橋面和環面同高、可以走，兩側欄杆
-  for (let gap = 0; gap < 2; gap++) {
-    const from = innerOf(gap) + width - 0.2;
-    const to = innerOf(gap + 1) + 0.2;
-    for (const angle of bridges[gap] ?? []) {
-      const half = BRIDGE_WIDTH / 2 / ((from + to) / 2);
-      build.decor.add(arcSlab(from, to, y - 0.35, y + 0.01, angle - half, half * 2, colorMaterial(WOOD)));
-      build.discs.push({ inner: from, outer: to, minY: y - 0.35, maxY: y + 0.01, arc: { start: angle - half, length: half * 2 } });
-      for (const side of [-1, 1]) {
-        const edge = angle + side * half;
-        const a: Vec3 = [polarX(from, edge), y + RAIL_HEIGHT, polarZ(from, edge)];
-        const b: Vec3 = [polarX(to, edge), y + RAIL_HEIGHT, polarZ(to, edge)];
-        rod(props, M.rail, a, b, 0.035, 0.035, 6);
-        for (const t of [0, 0.5, 1]) cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [a[0] + (b[0] - a[0]) * t, y + RAIL_HEIGHT / 2, a[2] + (b[2] - a[2]) * t], 6);
-      }
-    }
-  }
-  markChildGroups(props);
-  build.solids.push(...collectColliders(props));
-  build.decor.add(bakeByMaterial(props));
-  disposeGeometries(props);
-}
-
-// 水平的平面（地上的圖示）
-const flat2 = (width: number, depth: number): THREE.BufferGeometry => new THREE.PlaneGeometry(width, depth).rotateX(-Math.PI / 2);
-
-// ---------- 環狀美食街 ----------
-interface FoodBatches { roundTables: Batch; squareTables: Batch; chairs: Batch; longTables: Batch; benches: Batch; stalls: Batch; awnings: Batch; pots: Batch; bushes: Batch }
-// 一個分區：角度範圍、半徑範圍與地面高度；occupied 記錄已經放了東西的位置，避免重疊。
-interface FoodZone { start: number; end: number; inner: number; outer: number; y: number; occupied: { x: number; z: number; radius: number }[]; solids: SolidBox[]; props: THREE.Group }
-
-function isInZone(zone: FoodZone, x: number, z: number, margin: number): boolean {
-  const r = Math.hypot(x, z);
-  if (r < zone.inner + margin || r > zone.outer - margin) return false;
-  const angle = THREE.MathUtils.euclideanModulo(Math.atan2(x, z) - zone.start, TAU);
-  return angle > margin / r && angle < zone.end - zone.start - margin / r;
-}
-
-// 在分區裡找一個不和其他東西重疊的位置；near 有給時在那附近（常態分布）找。
-function findZoneSpot(rng: Rng, zone: FoodZone, radius: number, near?: { x: number; z: number; spread: number }): { x: number; z: number } | null {
-  for (let attempt = 0; attempt < PLACE_ATTEMPTS; attempt++) {
-    let x: number;
-    let z: number;
-    if (near) {
-      x = near.x + gaussian(rng) * near.spread;
-      z = near.z + gaussian(rng) * near.spread;
-    } else {
-      const r = range(rng, [zone.inner, zone.outer]);
-      const theta = range(rng, [zone.start, zone.end]);
-      x = polarX(r, theta);
-      z = polarZ(r, theta);
-    }
-    if (!isInZone(zone, x, z, radius)) continue;
-    if (zone.occupied.some((other) => Math.hypot(other.x - x, other.z - z) < other.radius + radius)) continue;
-    zone.occupied.push({ x, z, radius });
-    return { x, z };
-  }
-  return null;
-}
-
-// 一組桌椅：圓桌配 4 張椅子、方桌配 2 張，椅子面向桌子（椅背在椅子的 -z）。
-function addTableSet(rng: Rng, batches: FoodBatches, zone: FoodZone, x: number, z: number): void {
-  const yaw = rng() * TAU;
-  const chairColor = pick(rng, CHAIR_COLORS);
-  const addChair = (direction: number, offset: number): void => {
-    batches.chairs.add(transform(x + polarX(offset, direction), zone.y, z + polarZ(offset, direction), direction + Math.PI, 0, 0, 1, 1, 1), chairColor);
-  };
-  if (rng() < ROUND_TABLE_CHANCE) {
-    batches.roundTables.add(transform(x, zone.y, z, yaw, 0, 0, 1, 1, 1), pick(rng, TABLE_COLORS));
-    if (rng() < TABLE_UMBRELLA_CHANCE) addTableUmbrella(childGroup(zone.props, [x, zone.y, z]), getDetailMaterials(), pick(rng, AWNING_COLORS));
-    zone.solids.push(orientedSolid(x, z, yaw, 1.25, 1.25, zone.y, zone.y + 0.8));
-    for (let k = 0; k < 4; k++) addChair(yaw + (k * Math.PI) / 2 + spread(rng, 0.2), ROUND_CHAIR_OFFSET);
-  } else {
-    batches.squareTables.add(transform(x, zone.y, z, yaw, 0, 0, 1, 1, 1), pick(rng, TABLE_COLORS));
-    zone.solids.push(orientedSolid(x, z, yaw, 1.25, 0.85, zone.y, zone.y + 0.8));
-    for (const side of [0, Math.PI]) addChair(yaw + side, SQUARE_CHAIR_OFFSET);
-  }
-}
-
-// 幾團桌椅聚在一起，團和團之間是空地。
-function addTableClusters(rng: Rng, batches: FoodBatches, zone: FoodZone, clusters: number): void {
-  for (let c = 0; c < clusters; c++) {
-    const center = findZoneSpot(rng, zone, 0);
-    if (!center) continue;
-    zone.occupied.pop();   // 只是找團的中心，不佔位置
-    const spreadRadius = range(rng, CLUSTER_SPREAD);
-    const tables = Math.round(range(rng, CLUSTER_TABLES));
-    for (let t = 0; t < tables; t++) {
-      const spot = findZoneSpot(rng, zone, TABLE_CLEARANCE / 2, { ...center, spread: spreadRadius });
-      if (spot) addTableSet(rng, batches, zone, spot.x, spot.z);
-    }
-  }
+// 半徑 r 這一列可以放東西的角度：兩條通道之間，扣掉通道寬；每個位置間隔 spacing 公尺（弧長），整列置中
+function arcSlots(cell: DiningCell, r: number, spacing: number, size: number): number[] {
+  const start = cell.from + SHOP_LAYOUT.passage / 2 / r;
+  const end = cell.to - SHOP_LAYOUT.passage / 2 / r;
+  const usable = (end - start) * r - size;
+  if (usable < 0) return [];
+  const count = Math.floor(usable / spacing) + 1;
+  const middle = (start + end) / 2;
+  return Array.from({ length: count }, (_, i) => middle + ((i - (count - 1) / 2) * spacing) / r);
 }
 
 // 桌傘：配重底座、桿子、八片條紋傘布。
@@ -1294,145 +1013,129 @@ function addTableUmbrella(g: THREE.Group, M: DetailMaterials, color: number): vo
   addMesh(g, new THREE.ConeGeometry(1.3, 0.4, 8, 1, true), M.awning(color), [0, 2.25, 0]);
 }
 
-// 一個攤位：機身、服務窗、木頭櫃台與彩色櫃台面板、條紋遮雨棚、寫著攤名的招牌、黑板菜單、櫃台前三張吧台椅。正面是自身 +z。
-function addStall(g: THREE.Group, M: DetailMaterials, rng: Rng, bodyColor: number, awningColor: number): void {
-  const [width, height, depth] = STALL_SIZE;
-  box(g, colorMaterial(bodyColor), [width, height, depth], [0, height / 2, 0]);
-  box(g, M.window, [width * 0.72, 1, 0.04], [0, 1.45, depth / 2 + 0.01]);
-  box(g, M.counter, [width * 0.86, 0.08, 0.55], [0, 1.02, depth / 2 + 0.22]);
-  box(g, colorMaterial(awningColor), [width * 0.86, 0.98, 0.05], [0, 0.49, depth / 2 + 0.47]);
-  const awning = childGroup(g, [0, height, depth / 2]);
-  awning.rotation.x = AWNING_DROOP;
-  box(awning, M.awning(awningColor), [width * 1.08, 0.05, AWNING_DEPTH], [0, 0, AWNING_DEPTH / 2]);
-  box(g, M.stallSign(pick(rng, STALL_NAMES), awningColor), [width * 0.9, 0.55, 0.08], [0, height + 0.45, depth / 2 - 0.1]);
-  box(g, M.menu, [0.7, 0.5, 0.03], [width * 0.36, 1.75, depth / 2 + 0.03]);
-  for (const x of [-0.9, 0, 0.9]) {
-    const stool = childGroup(g, [x, 0, depth / 2 + 1.05]);
-    cylinder(stool, M.stool, 0.17, 0.05, [0, 0.72, 0], 12);
-    rod(stool, M.darkMetal, [0, 0, 0], [0, 0.7, 0], 0.03);
-    cylinder(stool, M.darkMetal, 0.18, 0.03, [0, 0.015, 0], 12);
+// 椅子放在離 (x, z) offset 公尺、direction 方向的位置，面向中心
+function addChairFacing(batches: FoodBatches, cell: DiningCell, x: number, z: number, direction: number, offset: number): void {
+  batches.chairs.add(transform(x + polarX(offset, direction), cell.y, z + polarZ(offset, direction), direction + Math.PI, 0, 0, 1, 1, 1), cell.chairColor);
+}
+
+// 圓桌：四張椅子斜放成 X；有 umbrella 顏色時每桌一支傘
+function addRoundTables(batches: FoodBatches, cell: DiningCell, solids: SolidBox[], props: THREE.Group): void {
+  const { row, column } = DINING.round;
+  for (const r of rowRadii(cell.inner, cell.outer, row)) {
+    for (const theta of arcSlots(cell, r, column, column)) {
+      const x = polarX(r, theta);
+      const z = polarZ(r, theta);
+      batches.roundTables.add(transform(x, cell.y, z, theta, 0, 0, 1, 1, 1), cell.tableColor);
+      solids.push(orientedSolid(x, z, theta, 1.25, 1.25, cell.y, cell.y + 0.8));
+      for (let k = 0; k < 4; k++) addChairFacing(batches, cell, x, z, theta + Math.PI / 4 + (k * Math.PI) / 2, ROUND_CHAIR_OFFSET);
+      if (cell.umbrella !== null) addTableUmbrella(childGroup(props, [x, cell.y, z]), getDetailMaterials(), cell.umbrella);
+    }
   }
 }
 
-// 攤位：沿著環的外緣（或內緣）一排，正面朝向分區中間。
-function addStallRow(rng: Rng, _batches: FoodBatches, zone: FoodZone, radius: number, facing: number): void {
-  const [width, height, depth] = STALL_SIZE;
-  const awningColor = pick(rng, AWNING_COLORS);
-  let along = zone.start * radius + width;
-  while (along < zone.end * radius - width) {
-    const theta = along / radius;
-    const x = polarX(radius, theta);
-    const z = polarZ(radius, theta);
-    // 攤位正面是自身的 +z；朝外緣的攤位轉向圓心（facing = π），朝內緣的轉向外面（facing = 0）
-    const stall = childGroup(zone.props, [x, zone.y, z], theta + facing);
-    skipCollider(stall);   // 攤位本體用下面的有向方塊擋；吧台椅很矮
-    addStall(stall, getDetailMaterials(), rng, pick(rng, STALL_COLORS), rng() < 0.3 ? pick(rng, AWNING_COLORS) : awningColor);
-    zone.solids.push(orientedSolid(x, z, theta + facing, width, depth, zone.y, zone.y + height + 0.4));
-    zone.occupied.push({ x, z, radius: width / 2 + 1 });
-    along += range(rng, STALL_SPACING);
+// 方桌：長邊沿圓周，兩張椅子一內一外
+function addSquareTables(batches: FoodBatches, cell: DiningCell, solids: SolidBox[]): void {
+  const { row, column } = DINING.square;
+  for (const r of rowRadii(cell.inner, cell.outer, row)) {
+    for (const theta of arcSlots(cell, r, column, column)) {
+      const x = polarX(r, theta);
+      const z = polarZ(r, theta);
+      batches.squareTables.add(transform(x, cell.y, z, theta, 0, 0, 1, 1, 1), cell.tableColor);
+      solids.push(orientedSolid(x, z, theta, 1.25, 0.85, cell.y, cell.y + 0.8));
+      for (const direction of [theta, theta + Math.PI]) addChairFacing(batches, cell, x, z, direction, SQUARE_CHAIR_OFFSET);
+    }
   }
 }
 
-// 長桌區：整區用同一個隨機方向排成幾列長桌，兩側是長椅；出了分區的不放。
-function addLongTables(rng: Rng, batches: FoodBatches, zone: FoodZone): void {
-  const middleAngle = (zone.start + zone.end) / 2;
-  const middleRadius = (zone.inner + zone.outer) / 2;
-  const cx = polarX(middleRadius, middleAngle);
-  const cz = polarZ(middleRadius, middleAngle);
-  const yaw = rng() * TAU;
-  const ux = Math.cos(yaw);
-  const uz = -Math.sin(yaw);   // 長桌沿自身 x 軸，轉 yaw 後的方向
-  const vx = Math.sin(yaw);
-  const vz = Math.cos(yaw);
-  const reach = zone.outer - zone.inner;
-  const color = pick(rng, TABLE_COLORS);
-  for (let row = -reach; row <= reach; row += LONG_TABLE_ROW) {
-    let column = -reach;
-    while (column <= reach) {
-      const length = range(rng, LONG_TABLE_LENGTH);
-      const along = column + length / 2;
-      const x = cx + ux * along + vx * row;
-      const z = cz + uz * along + vz * row;
-      column += length + LONG_TABLE_COLUMN;
-      if (!isInZone(zone, x + (ux * length) / 2, z + (uz * length) / 2, 1) || !isInZone(zone, x - (ux * length) / 2, z - (uz * length) / 2, 1)) continue;
-      if (zone.occupied.some((other) => Math.hypot(other.x - x, other.z - z) < other.radius + length / 2)) continue;
-      batches.longTables.add(transform(x, zone.y, z, yaw, 0, 0, length, 1, 1), color);
-      zone.solids.push(orientedSolid(x, z, yaw, length, BENCH_OFFSET * 2 + 0.35, zone.y, zone.y + 0.8));
+// 長桌：沿圓周一段一段，內外兩側各一張長椅
+function addLongTables(batches: FoodBatches, cell: DiningCell, solids: SolidBox[]): void {
+  const { row, length, column } = DINING.long;
+  for (const r of rowRadii(cell.inner, cell.outer, row)) {
+    for (const theta of arcSlots(cell, r, length + column, length)) {
+      const x = polarX(r, theta);
+      const z = polarZ(r, theta);
+      batches.longTables.add(transform(x, cell.y, z, theta, 0, 0, length, 1, 1), cell.tableColor);
+      solids.push(orientedSolid(x, z, theta, length, BENCH_OFFSET * 2 + 0.35, cell.y, cell.y + 0.8));
       for (const side of [1, -1]) {
-        batches.benches.add(transform(x + vx * side * BENCH_OFFSET, zone.y, z + vz * side * BENCH_OFFSET, yaw, 0, 0, length, 1, 1), pick(rng, CHAIR_COLORS));
+        batches.benches.add(transform(x + polarX(side * BENCH_OFFSET, theta), cell.y, z + polarZ(side * BENCH_OFFSET, theta), theta, 0, 0, length, 1, 1), cell.chairColor);
       }
     }
   }
 }
 
-// 植栽：盆子加一團綠葉。
-function addPlanters(rng: Rng, batches: FoodBatches, zone: FoodZone, count: number): void {
-  for (let i = 0; i < count; i++) {
-    const size = range(rng, [0.5, 1.2]);
-    const spot = findZoneSpot(rng, zone, size + 0.5);
-    if (!spot) continue;
-    const potHeight = size * 0.9;
-    batches.pots.add(transform(spot.x, zone.y, spot.z, 0, 0, 0, size, potHeight, size), pick(rng, POT_COLORS));
-    zone.solids.push(orientedSolid(spot.x, spot.z, 0, size * 2, size * 2, zone.y, zone.y + potHeight + size * 1.4));
-    batches.bushes.add(transform(spot.x, zone.y + potHeight + size * 0.6, spot.z, rng() * TAU, 0, 0, size * 1.1, size * 0.9, size * 1.1), pick(rng, BUSH_COLORS));
+// 通道兩旁一排植栽（盆子加一團綠葉），從 inner 排到 outer
+function addAislePlanters(batches: FoodBatches, solids: SolidBox[], passage: number, inner: number, outer: number, y: number): void {
+  const { spacing, size, inset } = AISLE_PLANTER;
+  const potHeight = size * 0.9;
+  for (let r = inner + size; r <= outer - size; r += spacing) {
+    for (const side of [-1, 1]) {
+      const theta = passage + (side * (SHOP_LAYOUT.passage / 2 - inset)) / r;
+      const x = polarX(r, theta);
+      const z = polarZ(r, theta);
+      batches.pots.add(transform(x, y, z, theta, 0, 0, size, potHeight, size), POT_COLORS[0] ?? 0x9a8f84);
+      batches.bushes.add(transform(x, y + potHeight + size * 0.6, z, theta, 0, 0, size * 1.1, size * 0.9, size * 1.1), BUSH_COLORS[1] ?? 0x5fa85d);
+      solids.push(orientedSolid(x, z, theta, size * 2, size * 2, y, y + potHeight + size * 1.4));
+    }
   }
 }
 
-type FoodZoneKind = 'stalls' | 'clusters' | 'longTables' | 'plaza';
-const FOOD_ZONE_KINDS: FoodZoneKind[] = ['stalls', 'clusters', 'longTables', 'plaza'];
+// 街道上一圈路燈（每 STREET_LAMP_SPACING 公尺一盞，雙燈頭），每隔一盞旁邊一組分類垃圾桶
+function addStreetLamps(props: THREE.Group, r: number, y: number, start: number): void {
+  const M = getDetailMaterials();
+  const count = Math.round((TAU * r) / STREET_LAMP_SPACING);
+  for (let i = 0; i < count; i++) {
+    const angle = start + (i * TAU) / count;
+    const lamp = ringGroup(props, r, y, angle);
+    skipCollider(lamp);
+    markCollider(lamp, [0.3, 4.2, 0.3], [0, 2.1, 0]);
+    rod(lamp, M.darkMetal, [0, 0, 0], [0, 4.2, 0], 0.06, 0.045, 8);
+    for (const side of [-1, 1]) {
+      rod(lamp, M.darkMetal, [0, 4.1, 0], [side * 0.6, 4.25, 0], 0.025, 0.025, 6);
+      addMesh(lamp, new THREE.SphereGeometry(0.16, 12, 8), M.lamp, [side * 0.6, 4.1, 0]);
+    }
+    if (i % 2 === 0) M.bins.forEach((material, k) => cylinder(ringGroup(props, r, y, angle + (1.2 + k * 0.5) / r), material, 0.2, 0.85, [0, 0.425, 0], 14));
+  }
+}
 
-// 環狀美食街：分成大小不一的幾區，每區一種擺法（攤位街、桌椅群、長桌區、植栽廣場），區和區之間留走道；
-// 每區地面疊一片低彩度的色塊，看得出分區。
 function buildFoodCourtRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   addPlainSlab(spec, build, FOOD_FLOOR);
   const batches: FoodBatches = {
     roundTables: new Batch(GEOMETRY.roundTable), squareTables: new Batch(GEOMETRY.squareTable), chairs: new Batch(GEOMETRY.chair),
-    longTables: new Batch(GEOMETRY.longTable), benches: new Batch(GEOMETRY.bench),
-    stalls: new Batch(GEOMETRY.baseBox), awnings: new Batch(GEOMETRY.baseBox), pots: new Batch(GEOMETRY.pot), bushes: new Batch(GEOMETRY.bush, flatMaterial),
+    longTables: new Batch(GEOMETRY.longTable), benches: new Batch(GEOMETRY.bench), pots: new Batch(GEOMETRY.pot), bushes: new Batch(GEOMETRY.bush, flatMaterial),
   };
   const props = new THREE.Group();
-  const M = getDetailMaterials();
-  const zoneCount = Math.round(range(rng, FOOD_ZONES));
-  const weights = Array.from({ length: zoneCount }, () => range(rng, [0.6, 1.4]));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  const middleRadius = (spec.inner + spec.outer) / 2;
-  const walkway = FOOD_WALKWAY / middleRadius;
-  let angle = rng() * TAU;
-  let previous: FoodZoneKind | null = null;
-  for (const weight of weights) {
-    const span = (weight / total) * TAU;
-    const zone: FoodZone = { start: angle + walkway / 2, end: angle + span - walkway / 2, inner: spec.inner + FOOD_EDGE, outer: spec.outer - FOOD_EDGE, y: spec.maxY + FOOD_PATCH, occupied: [], solids: build.solids, props };
-    // 分區之間的走道：內外兩側各一盞路燈與一組分類垃圾桶
-    for (const r of [spec.inner + 3, spec.outer - 3]) {
-      const lamp = ringGroup(props, r, spec.maxY, angle);
-      skipCollider(lamp);
-      markCollider(lamp, [0.3, 4.2, 0.3], [0, 2.1, 0]);
-      rod(lamp, M.darkMetal, [0, 0, 0], [0, 4.2, 0], 0.06, 0.045, 8);
-      for (const side of [-1, 1]) {
-        rod(lamp, M.darkMetal, [0, 4.1, 0], [side * 0.6, 4.25, 0], 0.025, 0.025, 6);
-        addMesh(lamp, new THREE.SphereGeometry(0.16, 12, 8), M.lamp, [side * 0.6, 4.1, 0]);
-      }
-      M.bins.forEach((material, k) => cylinder(ringGroup(props, r, spec.maxY, angle + (1.2 + k * 0.5) / r), material, 0.2, 0.85, [0, 0.425, 0], 14));
-    }
-    angle += span;
-    build.decor.add(arcSlab(zone.inner, zone.outer, spec.maxY, zone.y, zone.start, zone.end - zone.start, colorMaterial(pick(rng, FOOD_PATCH_COLORS))));
-    // 相鄰兩區不要同一種
-    const kind: FoodZoneKind = pick(rng, FOOD_ZONE_KINDS.filter((candidate) => candidate !== previous));
-    previous = kind;
-    if (kind === 'stalls') {
-      addStallRow(rng, batches, zone, zone.outer - STALL_SIZE[2] / 2 - 0.5, Math.PI);
-      if (rng() < 0.5) addStallRow(rng, batches, zone, zone.inner + STALL_SIZE[2] / 2 + 0.5, 0);
-      addTableClusters(rng, batches, zone, 2);
-    } else if (kind === 'clusters') {
-      addTableClusters(rng, batches, zone, 3 + Math.floor(rng() * 2));
-      addPlanters(rng, batches, zone, 3);
-    } else if (kind === 'longTables') {
-      addLongTables(rng, batches, zone);
-    } else {
-      addPlanters(rng, batches, zone, Math.round(range(rng, PLANTERS)));
-      addTableClusters(rng, batches, zone, 1);
-    }
-  }
+  const y = spec.maxY;
+  const start = rng() * TAU;
+  const { depth, backGap } = SHOP_LAYOUT;
+  // 半徑由內往外：A 排店 → 街道 → 用餐區 1 → B＋C 排店 → 用餐區 2 → 外緣街道；兩塊用餐區一樣深
+  const innerFront = addInnerShopRow(props, build.solids, spec.inner, y, start);
+  const diningStart = innerFront + FOOD_STREET;
+  const diningEnd = spec.outer - FOOD_STREET;
+  const diningDepth = (diningEnd - diningStart - depth * 2 - backGap) / 2;
+  const passages = addBackToBackRows(props, build.solids, diningStart + diningDepth + depth + backGap / 2, y, start);
+  const areas = [
+    { from: diningStart, to: diningStart + diningDepth, tablesFrom: diningStart + DINING_EDGE, tablesTo: diningStart + diningDepth - DINING_FRONTAGE, floor: 0xcfc7ba },
+    { from: diningEnd - diningDepth, to: diningEnd, tablesFrom: diningEnd - diningDepth + DINING_FRONTAGE, tablesTo: diningEnd - DINING_EDGE, floor: 0xc9c3b5 },
+  ];
+  const tableY = y + FOOD_PATCH;
+  areas.forEach((area, band) => {
+    build.decor.add(annulus(area.from, area.to, y, tableY, colorMaterial(area.floor)));
+    passages.forEach((passage, k) => {
+      const next = passages[(k + 1) % passages.length] ?? passage;
+      const cell: DiningCell = {
+        inner: area.tablesFrom, outer: area.tablesTo, from: passage, to: next <= passage ? next + TAU : next, y: tableY,
+        tableColor: TABLE_COLORS[k % TABLE_COLORS.length] ?? 0xffffff, chairColor: CHAIR_COLORS[k % CHAIR_COLORS.length] ?? 0x8a5a3b,
+        umbrella: band === 1 ? (AWNING_COLORS[k % AWNING_COLORS.length] ?? null) : null,
+      };
+      const kind = TABLE_KINDS[(k + band) % TABLE_KINDS.length];
+      if (kind === 'round') addRoundTables(batches, cell, build.solids, props);
+      else if (kind === 'square') addSquareTables(batches, cell, build.solids);
+      else addLongTables(batches, cell, build.solids);
+      addAislePlanters(batches, build.solids, passage, area.tablesFrom, area.tablesTo, tableY);
+    });
+  });
+  addStreetLamps(props, diningStart - 0.6, y, start);
+  addStreetLamps(props, spec.outer - 0.8, y, start);
   addBatches(build.decor, Object.values(batches));
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
@@ -1449,7 +1152,6 @@ export function buildRing(spec: RingSpec): PropsBuild {
     case 'floatingBooks': buildFloatingBooksRing(spec, build, rng); break;
     case 'shards': buildShardsRing(spec, build, rng); break;
     case 'bookshelf': buildLibraryRing(spec, build, rng); break;
-    case 'triple': buildTripleRing(spec, build, rng); break;
     case 'restaurant': buildFoodCourtRing(spec, build, rng); break;
     case 'courts':
     case 'broken':
@@ -1457,6 +1159,7 @@ export function buildRing(spec: RingSpec): PropsBuild {
     case 'houses':
     case 'floatingHouses':
     case 'pool':
+    case 'greenway':
       throw new Error(`環樣式 ${spec.style} 由 oz-sports.ts／oz-track.ts／oz-pool.ts／oz-town.ts 建，main.ts 會直接分派過去`);
   }
   return build;
@@ -1663,11 +1366,10 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     addPartsFloater(build, rng, spec.bobScale, parts, solids);
   }
 
-  // 漂浮的符號（數學符號、盧恩符文、注音、英文字母、化學分子式）：大多直立、稍微歪，上下飄的同時繞垂直軸慢慢轉
+  // 漂浮的盧恩符文：大多直立、稍微歪，上下飄的同時繞垂直軸慢慢轉
   for (let i = 0; i < spec.debris; i++) {
-    const text = pick(rng, SYMBOLS);
-    const geometry = symbolGeometry(text);
-    if (!geometry) continue;
+    const text = pick(rng, RUNES);
+    const geometry = runeGeometry(text);
     const size = range(rng, SYMBOL_SIZE);
     const spot = findFieldSpot(rng, spec, size, placed);
     if (!spot) continue;
