@@ -11,6 +11,7 @@ import { buildCourtsRing } from './oz-sports';
 import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
 import { buildTrackRing } from './oz-track';
 import { buildGardenRing } from './oz-garden';
+import { buildGreenwayRing } from './oz-greenway';
 import { buildFloatingHousesRing, buildHousesRing } from './oz-town';
 import { CAT_EAR_REACH, CAT_HEAD_SQUASH, buildCatHead } from './oz-cat';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
@@ -401,6 +402,7 @@ const buildLayer = (spec: RingSpec): PropsBuild => {
   if (spec.style === 'houses') return buildHousesRing(spec);
   if (spec.style === 'floatingHouses') return buildFloatingHousesRing(spec);
   if (spec.style === 'broken') return buildGardenRing(spec);
+  if (spec.style === 'greenway') return buildGreenwayRing(spec);
   return buildRing(spec);
 };
 
