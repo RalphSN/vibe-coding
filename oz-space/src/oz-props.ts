@@ -176,16 +176,15 @@ const SQUARE_CHAIR_OFFSET = 0.75;
 const BENCH_OFFSET = 0.7;
 
 // 周圍漂浮物：大部分聚在幾個聚集處（常態分布散開），少數零散。
-const FIELD_INNER = 20;
+// 漂浮物散在環區外面一圈：環區是最外層環的半徑再加 FIELD_RING_CLEAR（不進入環區），往外 FIELD_SPREAD 公尺內平均散落
+const FIELD_RING_CLEAR = 15;
+const FIELD_SPREAD = 120;
 const FIELD_LOW = 15;
 const FIELD_ABOVE_HEAD = 60;
-const FIELD_RADIUS_BIAS = 1.6;         // > 1 時越靠近中央越密
+const FIELD_GAP = 6;                   // 平台、蜂窩、符號彼此至少多隔這麼遠（平均散開，不擠成一團）
 const FIELD_RING_MARGIN = 14;          // 和環上下至少隔多遠（含書櫃、漂浮房屋的範圍）
 const FIELD_CONE_MARGIN = 5;
 const FIELD_HEAD_WIDTH = 1.3;          // 貓頭（含耳朵）的水平半徑是平台半徑的幾倍
-const CLUSTER_SHARE = 0.8;
-const CLUSTER_RADIUS: Range = [25, 60];
-const CLUSTER_FLATNESS = 0.4;          // 聚集處上下比水平方向集中
 const ISLAND_RADIUS: Range = [4.5, 10];     // 自然小島；有用途的大島見 oz-islands.ts
 const THEMED_PLACE_TRIES = 12;
 const ISLAND_GAP = 30;                 // 島和島之間至少多留這麼遠（不聚在一起、分散開來）
@@ -1595,13 +1594,13 @@ export function buildRing(spec: RingSpec): PropsBuild {
 
 // ---------- 周圍的漂浮物 ----------
 interface Spot { x: number; y: number; z: number }
-interface Cluster extends Spot { radius: number }
 
 // 這個位置會不會碰到環、圓錐、貓頭，或是太低、太遠。
 function isFieldBlocked(spec: FieldSpec, x: number, y: number, z: number, size: number): boolean {
   const { cone } = spec;
   const r = Math.hypot(x, z);
-  if (r < FIELD_INNER || r > spec.fieldRadius || y < FIELD_LOW + size) return true;
+  const { inner, outer } = fieldShell(spec);
+  if (r - size < inner || r + size > outer || y < FIELD_LOW + size) return true;
   const nearRing = spec.rings.some((ring) =>
     r > ring.inner - size && r < ring.outer + size && y > ring.minY - FIELD_RING_MARGIN - size && y < ring.maxY + FIELD_RING_MARGIN + size);
   if (nearRing) return true;
@@ -1612,25 +1611,24 @@ function isFieldBlocked(spec: FieldSpec, x: number, y: number, z: number, size: 
   return r < width + size + FIELD_CONE_MARGIN;
 }
 
-// 隨機一個漂浮物的位置：大部分在某個聚集處附近，少數在整個範圍內隨機。
-function randomFieldPoint(rng: Rng, spec: FieldSpec, clusters: Cluster[]): Spot {
-  if (clusters.length > 0 && rng() < CLUSTER_SHARE) {
-    const cluster = pick(rng, clusters);
-    return {
-      x: cluster.x + gaussian(rng) * cluster.radius,
-      y: cluster.y + gaussian(rng) * cluster.radius * CLUSTER_FLATNESS,
-      z: cluster.z + gaussian(rng) * cluster.radius,
-    };
-  }
-  const r = FIELD_INNER + (spec.fieldRadius - FIELD_INNER) * rng() ** FIELD_RADIUS_BIAS;
+// 漂浮物散布的那一圈（水平半徑）：內緣是最外層環再往外 FIELD_RING_CLEAR，外緣再往外 FIELD_SPREAD（不超過 fieldRadius）。
+function fieldShell(spec: FieldSpec): { inner: number; outer: number } {
+  const inner = Math.max(0, ...spec.rings.map((ring) => ring.outer)) + FIELD_RING_CLEAR;
+  return { inner, outer: Math.min(spec.fieldRadius, inner + FIELD_SPREAD) };
+}
+
+// 隨機一個漂浮物的位置：在那一圈裡按面積平均（越外圈越多，密度一樣），高度也平均。
+function randomFieldPoint(rng: Rng, spec: FieldSpec): Spot {
+  const { inner, outer } = fieldShell(spec);
+  const r = Math.sqrt(inner * inner + rng() * (outer * outer - inner * inner));
   const theta = rng() * TAU;
   return { x: polarX(r, theta), y: range(rng, [FIELD_LOW, spec.cone.headTop + FIELD_ABOVE_HEAD]), z: polarZ(r, theta) };
 }
 
 // 找一個不碰到環、圓錐、其他漂浮物的位置；試 PLACE_ATTEMPTS 次都找不到就放棄這一個。
-function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & { size: number })[], clusters: Cluster[], extraGap = 0): Spot | null {
+function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & { size: number })[], extraGap = FIELD_GAP): Spot | null {
   for (let attempt = 0; attempt < PLACE_ATTEMPTS; attempt++) {
-    const spot = randomFieldPoint(rng, spec, clusters);
+    const spot = randomFieldPoint(rng, spec);
     if (isFieldBlocked(spec, spot.x, spot.y, spot.z, size)) continue;
     if (placed.some((other) => Math.hypot(other.x - spot.x, other.y - spot.y, other.z - spot.z) < other.size + size + extraGap)) continue;
     placed.push({ ...spot, size });
@@ -1750,12 +1748,6 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
   const build = emptyBuild();
   const rng = createRng(spec.seed);
   const placed: (Spot & { size: number })[] = [];
-  const clusters: Cluster[] = [];
-  for (let i = 0; i < spec.clusters; i++) {
-    const radius = range(rng, CLUSTER_RADIUS);
-    const center = findFieldSpot(rng, spec, radius / 2, [], []);
-    if (center) clusters.push({ ...center, radius });
-  }
   const hexes = new Batch(GEOMETRY.hex, flatMaterial);
   const tiles = new Batch(GEOMETRY.box, flatMaterial);
   const symbols = new Map<string, Batch>();
@@ -1765,7 +1757,7 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
   for (const { theme, radius } of islands) {
     const tries = theme === 'nature' ? ISLAND_PLACE_TRIES : THEMED_PLACE_TRIES;
     let spot: Spot | null = null;
-    for (let attempt = 0; attempt < tries && !spot; attempt++) spot = findFieldSpot(rng, spec, radius, placed, [], ISLAND_GAP);
+    for (let attempt = 0; attempt < tries && !spot; attempt++) spot = findFieldSpot(rng, spec, radius, placed, ISLAND_GAP);
     if (!spot) continue;
     const island = buildIsland(rng, theme, radius);
     island.group.position.set(spot.x, spot.y, spot.z);
@@ -1778,7 +1770,7 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
   for (let i = 0; i < spec.platforms; i++) {
     const isRing = i % 2 === 0;
     const ringPadRadius = RING_PAD.disc[1] + 2 * (RING_PAD.gap[1] + RING_PAD.ring[1]);
-    const spot = findFieldSpot(rng, spec, isRing ? ringPadRadius : TILE_PAD.cell[1] * TILE_PAD.cells[1] * 0.75, placed, clusters);
+    const spot = findFieldSpot(rng, spec, isRing ? ringPadRadius : TILE_PAD.cell[1] * TILE_PAD.cells[1] * 0.75, placed);
     if (!spot) continue;
     const solids: SolidBox[] = [];
     if (isRing) {
@@ -1793,7 +1785,7 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
   for (let i = 0; i < spec.hexPads; i++) {
     const cell = range(rng, HEX_RADIUS);
     const rings = rng() < 0.5 ? 1 : 2;
-    const spot = findFieldSpot(rng, spec, Math.sqrt(3) * cell * HEX_SPACING * (rings + 0.5), placed, clusters);
+    const spot = findFieldSpot(rng, spec, Math.sqrt(3) * cell * HEX_SPACING * (rings + 0.5), placed);
     if (!spot) continue;
     const pad = transform(spot.x, spot.y, spot.z, rng() * TAU, 0, 0, 1, 1, 1);
     const solids: SolidBox[] = [];
@@ -1807,7 +1799,7 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     const geometry = symbolGeometry(text);
     if (!geometry) continue;
     const size = range(rng, SYMBOL_SIZE);
-    const spot = findFieldSpot(rng, spec, size, placed, clusters);
+    const spot = findFieldSpot(rng, spec, size, placed);
     if (!spot) continue;
     let batch = symbols.get(text);
     if (!batch) {
