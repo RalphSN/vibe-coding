@@ -13,11 +13,11 @@ export interface CenterConfig { topRadius: number; topY: number; height: number 
  */
 export interface RingsConfig {
   clearance: number; width: number; thickness: number;
-  /** 由上往下的每一層：style 是樣式，gap 是這層頂面和上一層頂面（第一層是平台）的高度差（m）。 */
+  /** 由上往下的每一層：style 是樣式，gap 是這層頂面和上一層頂面（第一層是平台）的高度差（m），width 是這層的寬（沒寫就用 rings.width）。 */
   layers: RingLayer[];
 }
 
-export interface RingLayer { style: RingStyle; gap: number }
+export interface RingLayer { style: RingStyle; gap: number; width?: number }
 
 /**
  * 環的樣式：plain 平板、houses 蓋滿房屋、floatingHouses 沒有環面只有歪斜漂浮的房屋、broken 2/3 碎成由大到小的片段、
@@ -130,7 +130,8 @@ function missingNumbers(value: unknown, keys: string[]): string[] {
 
 const isRingLayerList = (value: unknown): value is RingLayer[] =>
   Array.isArray(value) && value.every((layer) =>
-    isObject(layer) && (RING_STYLES as unknown[]).includes(layer.style) && missingNumbers(layer, ['gap']).length === 0);
+    isObject(layer) && (RING_STYLES as unknown[]).includes(layer.style) && missingNumbers(layer, ['gap']).length === 0 &&
+    (layer.width === undefined || (typeof layer.width === 'number' && Number.isFinite(layer.width) && layer.width > 0)));
 
 function collectSceneIssues(scene: unknown): string[] {
   if (!isObject(scene)) return ['scene'];

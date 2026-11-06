@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { RingStyle } from './config/scene.config';
+import { THEMED_ISLANDS, buildIsland } from './oz-islands';
+import { SYMBOLS, symbolGeometry } from './oz-symbols';
 import { addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod, skipCollider, type Vec3 } from './oz-kit';
 
 /** 圓心在原點的環形平板（inner 是 0 就是實心圓）：只管站上去和撞頭。有 arc 時只有這段角度站得住（角度 = atan2(x, z)）。 */
@@ -11,7 +13,7 @@ export interface Disc { inner: number; outer: number; minY: number; maxY: number
 
 /** 會上下飄的東西：apply(dy) 把它放到基準位置往上 dy 公尺。 */
 export interface Floater {
-  amplitude: number; speed: number; phase: number; apply: (dy: number) => void;
+  amplitude: number; speed: number; phase: number; apply: (dy: number, time: number) => void;
   /** 跟著飄的碰撞方塊：每格把 minY／maxY 設成基準高度 + dy，站在上面的人就跟著上下。 */
   solids?: { box: SolidBox; minY: number; maxY: number }[];
 }
@@ -25,8 +27,16 @@ export interface RoundWall { radius: number; minY: number; maxY: number; solid: 
 /** 水平方向擋人的有向方塊（和 main.ts 的 Solid 同形狀）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。 */
 export interface SolidBox { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number; standable?: boolean }
 
-/** 圓心在原點的環形水域（泳池）：半徑在 inner–outer 之間、高度在 floorY–surfaceY 之間是水。 */
-export interface WaterZone { inner: number; outer: number; surfaceY: number; floorY: number }
+/** 圓心在原點的環形水域（泳池）：半徑在 inner–outer 之間、高度在 floorY–surfaceY 之間是水；有 arc 時只有那段角度是水（連接兩座池的水道）。 */
+export interface WaterZone { inner: number; outer: number; surfaceY: number; floorY: number; arc?: { start: number; length: number } }
+
+/** (x, z) 在不在這個水域的範圍裡（只看水平位置）。 */
+export function isInWaterZone(water: WaterZone, x: number, z: number): boolean {
+  const distance = Math.hypot(x, z);
+  if (distance <= water.inner || distance >= water.outer) return false;
+  if (!water.arc) return true;
+  return THREE.MathUtils.euclideanModulo(Math.atan2(x, z) - water.arc.start, Math.PI * 2) < water.arc.length;
+}
 
 /**
  * 建出來的東西分兩組：solid 是環本體（站得上去，第三人稱鏡頭會避開），decor 是裝飾（沒有碰撞，鏡頭直接穿過，
@@ -176,34 +186,22 @@ const FIELD_HEAD_WIDTH = 1.3;          // 貓頭（含耳朵）的水平半徑�
 const CLUSTER_SHARE = 0.8;
 const CLUSTER_RADIUS: Range = [25, 60];
 const CLUSTER_FLATNESS = 0.4;          // 聚集處上下比水平方向集中
-const ISLAND_RADIUS: Range = [6, 22];
-const ISLAND_TOP: Range = [1.2, 2.5];
-const ISLAND_DEPTH: Range = [0.8, 1.6];    // 岩塊深度是半徑的幾倍
-const ISLAND_ROCK = 0.75;
-const ISLAND_TILT = 0.08;
-const ISLAND_TREE_SPACING = 6;         // 島上的樹大約隔幾公尺
-const ISLAND_TREE_MAX = 7;
-const ISLAND_TREE_HEIGHT: Range = [2.5, 5.5];
-const ISLAND_BOULDERS: Range = [1, 3.99];
-const TREE_COLORS = [0x4f9a4c, 0x5fa85d, 0x3f8a5f, 0x77b46f];
-const BLOSSOM_COLORS = [0xf7b6c8, 0xe39b3c];
-const BLOSSOM_CHANCE = 0.2;
-const TRUNK_COLOR = 0x7a5a3c;
-const PLATFORM_SIZE: Range = [4, 14];
-const PLATFORM_THICKNESS: Range = [0.6, 2];
-const PLATFORM_TILT = 0.06;
-const PLATFORM_TIER_CHANCE = 0.4;      // 上面再疊一層較小平台的機率
-const PLATFORM_TRIM = 0.14;            // 平台頂面的收邊厚度
-const PLATFORM_POTTED_SIZE = 8;        // 這麼大以上的平台放盆栽
-const PLATFORM_POTTED_SHAPES = [0, 1, 6];   // 方、圓、不規則：盆栽放在四角不會懸空
-const PLATFORM_TIER_SCALE: Range = [0.4, 0.7];
+const ISLAND_RADIUS: Range = [4.5, 10];     // 自然小島；有用途的大島見 oz-islands.ts
+const THEMED_PLACE_TRIES = 12;
+const ISLAND_GAP = 30;                 // 島和島之間至少多留這麼遠（不聚在一起、分散開來）
+const ISLAND_PLACE_TRIES = 4;
+// 同心圓環平台：中間一個圓盤，外面兩圈環，彼此之間留空隙（同一個高度）
+const RING_PAD = { disc: [1.6, 2.6] as Range, ring: [0.9, 1.6] as Range, gap: [0.5, 0.9] as Range, thickness: 0.4, segments: 24 };
+// 方格平台：方磚排成 n × n，隨機少幾格、高低略有不同
+const TILE_PAD = { cells: [3, 5.99] as Range, cell: [1.4, 2.2] as Range, spacing: 1.06, thickness: 0.45, jitter: 0.25, drop: 0.2 };
+const SYMBOL_SIZE: Range = [1.6, 5];
+const SYMBOL_TILT = 0.35;
+const SYMBOL_SPIN: Range = [0.12, 0.35];   // 繞垂直軸慢慢轉的角速度（rad/s），方向隨機
 const HEX_RADIUS: Range = [1.5, 3];
 const HEX_THICKNESS = 0.5;
 const HEX_JITTER = 0.3;
 const HEX_SPACING = 1.06;
 const HEX_DROP_CHANCE = 0.25;
-const HEX_TILT = 0.1;
-const DEBRIS_SIZE: Range = [0.4, 3.5];
 
 const SHARD_COLORS = [0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9, 0xffffff, 0xe6e9f0, 0x2fd3c6, 0xff7ac3];
 const BOOK_COLORS = [0x8c2f39, 0xb5523b, 0xd9a441, 0x3f6b55, 0x2f4b7c, 0x5c5470, 0x1f2a36, 0xe8dcc2, 0x7a9e7e, 0xc96f53, 0x4a6fa5, 0x9b4f96];
@@ -216,10 +214,8 @@ const STALL_COLORS = [0xf4efe6, 0xe8e2d6, 0xdfe3e8, 0xefe6dc];
 const AWNING_COLORS = [0xc0574f, 0xd49a4a, 0x6f9c6a, 0x5d8fb0, 0x8c6fa8, 0xc7764a];
 const POT_COLORS = [0x9a8f84, 0xb8afa4, 0x857b72];
 const BUSH_COLORS = [0x6cb86a, 0x5fa85d, 0x7cc576];
-const GRASS_COLORS = [0x7cc576, 0x6cb86a, 0x8fd18a, 0x5fa85d];
-const ROCK_COLORS = [0x9a8f84, 0x857b72, 0xa89f94];
 const PLATFORM_COLORS = [0xffffff, 0xe6e9f0, 0xdfe8f0, 0xf4efe6, 0xcfe3f7, 0xf7d9e3, 0xe0f2e9];
-const PLATFORM_ACCENTS = [0x4aa8e8, 0xf2d04b, 0xff7ac3, 0x2fd3c6, 0xf59a3a];
+const PLATFORM_ACCENTS = [0x4aa8e8, 0xf2d04b, 0xff7ac3, 0x2fd3c6, 0xf59a3a, 0xf2545b];
 const HEX_COLORS = [0x2fd3c6, 0xf2d04b, 0xffffff, 0x4aa8e8, 0xff7ac3, 0x6cc56b];
 const WOOD = 0xb08a63;
 const WOOD_DARK = 0x6e5440;
@@ -310,7 +306,6 @@ const GEOMETRY = (() => {
     slabs: Array.from({ length: 8 }, slab),
     chunks: [new THREE.DodecahedronGeometry(1), new THREE.IcosahedronGeometry(1), new THREE.OctahedronGeometry(1), new THREE.TetrahedronGeometry(1)],
     hex: new THREE.CylinderGeometry(1, 1, 1, 6),
-    rock: new THREE.ConeGeometry(1, 1, 7).rotateX(Math.PI).translate(0, -0.5, 0),   // 尖端朝下，底面在 y = 0
     // 漂浮平台的各種形狀（都是厚 1、置中）：方、圓、三角、環、十字、L、不規則
     platforms: [
       new THREE.BoxGeometry(1, 1, 1),
@@ -374,7 +369,7 @@ function addBatches(group: THREE.Group, batches: Batch[]): void {
   }
 }
 
-function makeFloater(rng: Rng, scale: number, apply: (dy: number) => void): Floater {
+function makeFloater(rng: Rng, scale: number, apply: (dy: number, time: number) => void): Floater {
   return { amplitude: range(rng, BOB_AMPLITUDE) * scale, speed: TAU / range(rng, BOB_PERIOD), phase: rng() * TAU, apply };
 }
 
@@ -421,13 +416,64 @@ export function addFloater(build: PropsBuild, rng: Rng, scale: number, parts: Pa
   build.floaters.push(floater);
 }
 
+/** 一組會飄的實例，碰撞方塊由呼叫端算好（世界座標、和外觀相符），跟著一起飄。 */
+export function addPartsFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[], solids: SolidBox[]): void {
+  const floater = makeFloater(rng, scale, floatParts(parts));
+  floater.solids = solids.map((box) => {
+    build.solids.push(box);
+    return { box, minY: box.minY, maxY: box.maxY };
+  });
+  build.floaters.push(floater);
+}
+
+// 漂浮的符號：上下飄，同時繞垂直軸慢慢轉（各自的速度與方向）。碰撞方塊是符號沒歪時的外框，每格跟著轉同樣的角度。
+function addSpinningSymbol(build: PropsBuild, rng: Rng, scale: number, batch: Batch, geometry: THREE.BufferGeometry, spot: Spot, size: number): void {
+  const yaw0 = rng() * TAU;
+  const tiltX = spread(rng, SYMBOL_TILT);
+  const tiltZ = spread(rng, SYMBOL_TILT);
+  const spin = range(rng, SYMBOL_SPIN) * (rng() < 0.5 ? -1 : 1);
+  const part = batch.add(transform(spot.x, spot.y, spot.z, yaw0, tiltX, tiltZ, size, size, size), pick(rng, SHARD_COLORS));
+  geometry.boundingBox ?? geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox ?? new THREE.Box3();
+  const halfHeight = ((bounds.max.y - bounds.min.y) / 2) * size;
+  const box: SolidBox = {
+    ...orientedSolid(spot.x, spot.z, yaw0, (bounds.max.x - bounds.min.x) * size, (bounds.max.z - bounds.min.z) * size, spot.y - halfHeight, spot.y + halfHeight),
+    standable: true,
+  };
+  const matrix = new THREE.Matrix4();
+  const floater = makeFloater(rng, scale, (dy, time) => {
+    const yaw = yaw0 + spin * time;
+    matrix.copy(transform(spot.x, spot.y + dy, spot.z, yaw, tiltX, tiltZ, size, size, size));
+    part.batch.mesh?.setMatrixAt(part.index, matrix);
+    if (part.batch.mesh) part.batch.mesh.instanceMatrix.needsUpdate = true;
+    box.ux = Math.cos(yaw);
+    box.uz = -Math.sin(yaw);
+    box.vx = Math.sin(yaw);
+    box.vz = Math.cos(yaw);
+  });
+  floater.solids = [{ box, minY: box.minY, maxY: box.maxY }];
+  build.solids.push(box);
+  build.floaters.push(floater);
+}
+
+/** 一整個物件（例如一座島）一起飄：每格把 position.y 設成基準 + dy；solids 是世界座標的碰撞方塊，跟著飄。 */
+export function addObjectFloater(build: PropsBuild, rng: Rng, scale: number, object: THREE.Object3D, solids: SolidBox[]): void {
+  const baseY = object.position.y;
+  const floater = makeFloater(rng, scale, (dy) => { object.position.y = baseY + dy; });
+  floater.solids = solids.map((box) => {
+    build.solids.push(box);
+    return { box, minY: box.minY, maxY: box.maxY };
+  });
+  build.floaters.push(floater);
+}
+
 /** 每格呼叫：time 是累計秒數。 */
 export function updateFloaters(floaters: Floater[], time: number): void {
   for (const floater of floaters) {
     const wave = Math.sin(time * floater.speed + floater.phase) * (1 - BOB_HARMONIC_SHARE) +
       Math.sin(time * floater.speed * BOB_HARMONIC + floater.phase * 2) * BOB_HARMONIC_SHARE;
     const dy = floater.amplitude * wave;
-    floater.apply(dy);
+    floater.apply(dy, time);
     for (const solid of floater.solids ?? []) {
       solid.box.minY = solid.minY + dy;
       solid.box.maxY = solid.maxY + dy;
@@ -1582,11 +1628,11 @@ function randomFieldPoint(rng: Rng, spec: FieldSpec, clusters: Cluster[]): Spot 
 }
 
 // 找一個不碰到環、圓錐、其他漂浮物的位置；試 PLACE_ATTEMPTS 次都找不到就放棄這一個。
-function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & { size: number })[], clusters: Cluster[]): Spot | null {
+function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & { size: number })[], clusters: Cluster[], extraGap = 0): Spot | null {
   for (let attempt = 0; attempt < PLACE_ATTEMPTS; attempt++) {
     const spot = randomFieldPoint(rng, spec, clusters);
     if (isFieldBlocked(spec, spot.x, spot.y, spot.z, size)) continue;
-    if (placed.some((other) => Math.hypot(other.x - spot.x, other.y - spot.y, other.z - spot.z) < other.size + size)) continue;
+    if (placed.some((other) => Math.hypot(other.x - spot.x, other.y - spot.y, other.z - spot.z) < other.size + size + extraGap)) continue;
     placed.push({ ...spot, size });
     return spot;
   }
@@ -1595,7 +1641,8 @@ function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & 
 
 // 蜂窩狀六邊形平面：|q|、|p|、|q + p| 都不超過 rings 的軸座標格子組成一個大六邊形，隨機少幾格。
 // 設計規則：一定有一格是不同顏色。
-function addHexPad(rng: Rng, hexes: Batch, pad: THREE.Matrix4, cell: number, rings: number): Part[] {
+// 每格的碰撞：正六邊形剛好是三個轉了 0°、60°、120° 的矩形（寬 = 對邊距、深 = 外接圓半徑）疊起來，和外觀完全相符。
+function addHexPad(rng: Rng, hexes: Batch, pad: THREE.Matrix4, cell: number, rings: number, solids: SolidBox[]): Part[] {
   // CylinderGeometry 六邊形的尖角朝 ±z，邊垂直 x 軸，所以鄰格在 x 軸和 60° 方向上，不用再轉。
   const step = Math.sqrt(3) * cell * HEX_SPACING;
   const tiles: [number, number][] = [];
@@ -1612,13 +1659,93 @@ function addHexPad(rng: Rng, hexes: Batch, pad: THREE.Matrix4, cell: number, rin
   return tiles.map(([q, p], i) => {
     const local = transform(step * (q + p / 2), spread(rng, HEX_JITTER), (step * p * Math.sqrt(3)) / 2, 0, 0, 0, cell, HEX_THICKNESS, cell);
     const tileColor = i === accentIndex ? accent : shade(color, spread(rng, 0.05));
-    return hexes.add(pad.clone().multiply(local), tileColor);
+    const world = pad.clone().multiply(local);
+    const center = new THREE.Vector3().setFromMatrixPosition(world);
+    const yaw = new THREE.Euler().setFromRotationMatrix(pad, 'YXZ').y;
+    for (const turn of [0, Math.PI / 3, (2 * Math.PI) / 3]) {
+      solids.push({ ...orientedSolid(center.x, center.z, yaw + turn, Math.sqrt(3) * cell, cell, center.y - HEX_THICKNESS / 2, center.y + HEX_THICKNESS / 2), standable: true });
+    }
+    return hexes.add(world, tileColor);
   });
 }
 
-const trunkGeometry = new THREE.CylinderGeometry(0.7, 1, 1, 6).translate(0, 0.5, 0);
+// 一個圓盤（半徑 radius）的碰撞：從圓心往外 DISC_STRIPS 條長條，相鄰兩條在圓周上剛好接上，邊角最多超出圓 2%。
+const DISC_STRIPS = 16;
+function discSolids(x: number, z: number, radius: number, minY: number, maxY: number): SolidBox[] {
+  const width = 2 * radius * Math.tan(Math.PI / DISC_STRIPS);
+  return Array.from({ length: DISC_STRIPS }, (_, k) => {
+    const angle = (k / DISC_STRIPS) * TAU;
+    // yaw = angle 時自身 z 朝外（徑向）
+    return { ...orientedSolid(x + Math.sin(angle) * radius / 2, z + Math.cos(angle) * radius / 2, angle, width, radius, minY, maxY), standable: true };
+  });
+}
 
-/** 環周圍的漂浮物：島嶼（有樹和石頭）、各種形狀的平台（有收邊與盆栽）、蜂窩狀六邊形平面、零碎小塊；大多聚在幾處，全部都在飄。 */
+// 一圈環（內半徑 inner、外半徑 outer）的碰撞：沿圓周切成 RING_PAD.segments 段切線方向的長方塊，
+// 每段在環的中線剛好接上，空隙那一側不會多出來（差不到環寬的 7%）。
+function annulusSolids(x: number, z: number, inner: number, outer: number, minY: number, maxY: number): SolidBox[] {
+  const middle = (inner + outer) / 2;
+  const length = 2 * middle * Math.tan(Math.PI / RING_PAD.segments);
+  return Array.from({ length: RING_PAD.segments }, (_, k) => {
+    const angle = (k / RING_PAD.segments) * TAU;
+    // yaw = angle 時自身 z 朝外（徑向）、自身 x 沿切線
+    return { ...orientedSolid(x + Math.sin(angle) * middle, z + Math.cos(angle) * middle, angle, length, outer - inner, minY, maxY), standable: true };
+  });
+}
+
+// 同心圓環平台：中間一個圓盤、外面兩圈環，彼此之間是空的（可以從縫掉下去）；三塊顏色深淺交錯，一定有一塊是不同顏色。
+// 回傳一個 Group（原點在平台中心），碰撞方塊是世界座標。
+function addRingPad(rng: Rng, spot: Spot, solids: SolidBox[]): THREE.Group {
+  const group = new THREE.Group();
+  group.position.set(spot.x, spot.y, spot.z);
+  const color = pick(rng, PLATFORM_COLORS);
+  const accent = pick(rng, PLATFORM_ACCENTS);
+  const accentPiece = Math.floor(rng() * 3);
+  const half = RING_PAD.thickness / 2;
+  const pieceColor = (k: number): number => (k === accentPiece ? accent : shade(color, k % 2 === 0 ? 0 : -0.14));
+  const disc = range(rng, RING_PAD.disc);
+  group.add(new THREE.Mesh(new THREE.CylinderGeometry(disc, disc, RING_PAD.thickness, 48), colorMaterial(pieceColor(0))));
+  solids.push(...discSolids(spot.x, spot.z, disc, spot.y - half, spot.y + half));
+  let inner = disc;
+  for (let k = 1; k <= 2; k++) {
+    inner += range(rng, RING_PAD.gap);
+    const outer = inner + range(rng, RING_PAD.ring);
+    group.add(annulus(inner, outer, -half, half, colorMaterial(pieceColor(k))));
+    solids.push(...annulusSolids(spot.x, spot.z, inner, outer, spot.y - half, spot.y + half));
+    inner = outer;
+  }
+  return group;
+}
+
+// 方格平台：n × n 塊方磚，中間那塊一定在，其他隨機少幾塊、高低略有不同；一定有一塊是不同顏色。每塊自己的碰撞。
+function addTilePad(rng: Rng, tiles: Batch, spot: Spot, solids: SolidBox[]): Part[] {
+  const n = Math.floor(range(rng, TILE_PAD.cells));
+  const cell = range(rng, TILE_PAD.cell);
+  const step = cell * TILE_PAD.spacing;
+  const yaw = rng() * TAU;
+  const color = pick(rng, HEX_COLORS);
+  const accent = pick(rng, HEX_COLORS.filter((candidate) => candidate !== color));
+  const cells: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const isCenter = i === Math.floor(n / 2) && j === Math.floor(n / 2);
+      if (!isCenter && rng() < TILE_PAD.drop) continue;
+      cells.push([i - (n - 1) / 2, j - (n - 1) / 2]);
+    }
+  }
+  const accentIndex = Math.floor(rng() * cells.length);
+  return cells.map(([i, j], index) => {
+    const x = spot.x + Math.cos(yaw) * i * step + Math.sin(yaw) * j * step;
+    const z = spot.z - Math.sin(yaw) * i * step + Math.cos(yaw) * j * step;
+    const y = spot.y + spread(rng, TILE_PAD.jitter);
+    solids.push({ ...orientedSolid(x, z, yaw, cell, cell, y - TILE_PAD.thickness / 2, y + TILE_PAD.thickness / 2), standable: true });
+    return tiles.add(transform(x, y, z, yaw, 0, 0, cell, TILE_PAD.thickness, cell), index === accentIndex ? accent : shade(color, spread(rng, 0.05)));
+  });
+}
+
+/**
+ * 環周圍的漂浮物：島嶼（見 oz-islands.ts，分散在整個範圍）、同心圓環（圓盤＋兩圈環，中間有空隙）與方格平台、
+ * 蜂窩狀六邊形平面、立體符號（見 oz-symbols.ts，會慢慢轉）；平台和符號大多聚在幾處，全部都在飄。
+ */
 export function buildFloatingField(spec: FieldSpec): PropsBuild {
   const build = emptyBuild();
   const rng = createRng(spec.seed);
@@ -1629,95 +1756,38 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     const center = findFieldSpot(rng, spec, radius / 2, [], []);
     if (center) clusters.push({ ...center, radius });
   }
-  const grass = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
-  const rocks = new Batch(GEOMETRY.rock, flatMaterial);
-  const platforms = GEOMETRY.platforms.map((geometry) => new Batch(geometry, flatMaterial));
   const hexes = new Batch(GEOMETRY.hex, flatMaterial);
-  const chunks = GEOMETRY.chunks.map((geometry) => new Batch(geometry, flatMaterial));
-  const trunks = new Batch(trunkGeometry, flatMaterial);
-  const crowns = new Batch(GEOMETRY.bush, flatMaterial);
-  const pots = new Batch(GEOMETRY.pot, flatMaterial);
-  const float = (parts: Part[], colliders?: Part[][]): void => addFloater(build, rng, spec.bobScale, parts, colliders);
+  const tiles = new Batch(GEOMETRY.box, flatMaterial);
+  const symbols = new Map<string, Batch>();
 
-  for (let i = 0; i < spec.islands; i++) {
-    const radius = range(rng, ISLAND_RADIUS);
-    const spot = findFieldSpot(rng, spec, radius, placed, clusters);
+  // 島嶼：有用途的大島先放，再放自然的小島；不跟著聚集處、彼此多留 ISLAND_GAP，分散在整個範圍
+  const islands = [...THEMED_ISLANDS, ...Array.from({ length: spec.islands }, () => ({ theme: 'nature' as const, radius: range(rng, ISLAND_RADIUS) }))];
+  for (const { theme, radius } of islands) {
+    const tries = theme === 'nature' ? ISLAND_PLACE_TRIES : THEMED_PLACE_TRIES;
+    let spot: Spot | null = null;
+    for (let attempt = 0; attempt < tries && !spot; attempt++) spot = findFieldSpot(rng, spec, radius, placed, [], ISLAND_GAP);
     if (!spot) continue;
-    const top = range(rng, ISLAND_TOP);
-    const turn: [number, number, number] = [rng() * TAU, spread(rng, ISLAND_TILT), spread(rng, ISLAND_TILT)];
-    const ground = [
-      pick(rng, grass).add(transform(spot.x, spot.y - top / 2, spot.z, ...turn, radius, top, radius), pick(rng, GRASS_COLORS)),
-      rocks.add(transform(spot.x, spot.y - top, spot.z, ...turn, radius * ISLAND_ROCK, radius * range(rng, ISLAND_DEPTH), radius * ISLAND_ROCK), pick(rng, ROCK_COLORS)),
-    ];
-    // 島上的東西放在島頂面的座標系裡（跟著島一起歪），各自一個碰撞外框
-    const surface = transform(spot.x, spot.y, spot.z, ...turn, 1, 1, 1);
-    const onIsland = (x: number, z: number, local: THREE.Matrix4): THREE.Matrix4 => surface.clone().multiply(new THREE.Matrix4().makeTranslation(x, 0, z)).multiply(local);
-    const extras: Part[][] = [];
-    const trees = Math.min(ISLAND_TREE_MAX, Math.round((Math.PI * (radius * 0.45) ** 2) / ISLAND_TREE_SPACING ** 2));
-    for (let t = 0; t < trees; t++) {
-      const angle = rng() * TAU;
-      const distance = Math.sqrt(rng()) * radius * 0.45;
-      const x = Math.cos(angle) * distance;
-      const z = Math.sin(angle) * distance;
-      const height = range(rng, ISLAND_TREE_HEIGHT);
-      const crown = height * 0.45;
-      const trunk = trunks.add(onIsland(x, z, new THREE.Matrix4().makeScale(height * 0.07, height, height * 0.07)), TRUNK_COLOR);
-      const color = rng() < BLOSSOM_CHANCE ? pick(rng, BLOSSOM_COLORS) : pick(rng, TREE_COLORS);
-      const leaves = [
-        crowns.add(onIsland(x, z, transform(0, height, 0, rng() * TAU, 0, 0, crown, crown * 0.9, crown)), color),
-        crowns.add(onIsland(x, z, transform(spread(rng, crown * 0.5), height - crown * 0.5, spread(rng, crown * 0.5), rng() * TAU, 0, 0, crown * 0.7, crown * 0.6, crown * 0.7)), shade(color, -0.05)),
-      ];
-      ground.push(trunk, ...leaves);
-      extras.push([trunk]);
-    }
-    const boulders = Math.floor(range(rng, ISLAND_BOULDERS));
-    for (let b = 0; b < boulders; b++) {
-      const angle = rng() * TAU;
-      const distance = (0.25 + rng() * 0.35) * radius;
-      const size = range(rng, [0.4, 1.2]);
-      const boulder = pick(rng, chunks).add(onIsland(Math.cos(angle) * distance, Math.sin(angle) * distance, transform(0, size * 0.4, 0, rng() * TAU, rng(), rng(), size, size * 0.7, size)), pick(rng, ROCK_COLORS));
-      ground.push(boulder);
-      extras.push([boulder]);
-    }
-    float(ground, [ground.slice(0, 2), ...extras]);
+    const island = buildIsland(rng, theme, radius);
+    island.group.position.set(spot.x, spot.y, spot.z);
+    build.decor.add(island.group);
+    const at = spot;
+    addObjectFloater(build, rng, spec.bobScale, island.group, island.solids.map((solid) => ({ ...solid, cx: solid.cx + at.x, cz: solid.cz + at.z, minY: solid.minY + at.y, maxY: solid.maxY + at.y })));
   }
 
+  // 平台：一半是同心圓環、一半是方格，都是平的，碰撞和外觀相符
   for (let i = 0; i < spec.platforms; i++) {
-    const size = range(rng, PLATFORM_SIZE);
-    const spot = findFieldSpot(rng, spec, size / 2, placed, clusters);
+    const isRing = i % 2 === 0;
+    const ringPadRadius = RING_PAD.disc[1] + 2 * (RING_PAD.gap[1] + RING_PAD.ring[1]);
+    const spot = findFieldSpot(rng, spec, isRing ? ringPadRadius : TILE_PAD.cell[1] * TILE_PAD.cells[1] * 0.75, placed, clusters);
     if (!spot) continue;
-    const shape = Math.floor(rng() * platforms.length);
-    const batch = platforms[shape];
-    if (!batch) continue;
-    const thickness = range(rng, PLATFORM_THICKNESS);
-    const base = transform(spot.x, spot.y, spot.z, rng() * TAU, spread(rng, PLATFORM_TILT), spread(rng, PLATFORM_TILT), 1, 1, 1);
-    const depth = size * range(rng, [0.7, 1.3]);
-    const color = pick(rng, PLATFORM_COLORS);
-    const parts = [batch.add(base.clone().multiply(new THREE.Matrix4().makeScale(size, thickness, depth)), color)];
-    // 頂面收邊：同形狀、大一點點、薄薄一層深一階的顏色，平台邊緣看得出厚度
-    const trim = batch.add(base.clone().multiply(new THREE.Matrix4().makeTranslation(0, thickness / 2 - PLATFORM_TRIM / 2 + 0.01, 0)).multiply(new THREE.Matrix4().makeScale(size * 1.03, PLATFORM_TRIM, depth * 1.03)), shade(color, -0.12));
-    const colliders: Part[][] = [[...parts, trim]];
-    parts.push(trim);
-    const hasTier = rng() < PLATFORM_TIER_CHANCE;
-    if (!hasTier && size >= PLATFORM_POTTED_SIZE && PLATFORM_POTTED_SHAPES.includes(shape)) {
-      for (const [px, pz] of [[0.3, 0.3], [-0.3, -0.3]] as const) {
-        const at = base.clone().multiply(new THREE.Matrix4().makeTranslation(px * size, thickness / 2, pz * depth));
-        const pot = pots.add(at.clone().multiply(new THREE.Matrix4().makeScale(0.45, 0.7, 0.45)), pick(rng, POT_COLORS));
-        const bush = crowns.add(at.clone().multiply(transform(0, 1.2, 0, rng() * TAU, 0, 0, 0.7, 0.6, 0.7)), pick(rng, BUSH_COLORS));
-        parts.push(pot, bush);
-        colliders.push([pot, bush]);
-      }
+    const solids: SolidBox[] = [];
+    if (isRing) {
+      const pad = addRingPad(rng, spot, solids);
+      build.decor.add(pad);
+      addObjectFloater(build, rng, spec.bobScale, pad, solids);
+      continue;
     }
-    if (hasTier) {
-      const tier = size * range(rng, PLATFORM_TIER_SCALE);
-      const tierMatrix = base.clone()
-        .multiply(new THREE.Matrix4().makeTranslation(spread(rng, (size - tier) / 3), thickness, spread(rng, (size - tier) / 3)))
-        .multiply(new THREE.Matrix4().makeScale(tier, thickness, tier));
-      const tierPart = batch.add(tierMatrix, pick(rng, PLATFORM_ACCENTS));
-      parts.push(tierPart);
-      colliders.push([tierPart]);
-    }
-    float(parts, colliders);
+    addPartsFloater(build, rng, spec.bobScale, addTilePad(rng, tiles, spot, solids), solids);
   }
 
   for (let i = 0; i < spec.hexPads; i++) {
@@ -1725,18 +1795,28 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     const rings = rng() < 0.5 ? 1 : 2;
     const spot = findFieldSpot(rng, spec, Math.sqrt(3) * cell * HEX_SPACING * (rings + 0.5), placed, clusters);
     if (!spot) continue;
-    const pad = transform(spot.x, spot.y, spot.z, rng() * TAU, spread(rng, HEX_TILT), spread(rng, HEX_TILT), 1, 1, 1);
-    float(addHexPad(rng, hexes, pad, cell, rings));
+    const pad = transform(spot.x, spot.y, spot.z, rng() * TAU, 0, 0, 1, 1, 1);
+    const solids: SolidBox[] = [];
+    const parts = addHexPad(rng, hexes, pad, cell, rings, solids);
+    addPartsFloater(build, rng, spec.bobScale, parts, solids);
   }
 
+  // 漂浮的符號（數學符號、盧恩符文、注音、英文字母、化學分子式）：大多直立、稍微歪，上下飄的同時繞垂直軸慢慢轉
   for (let i = 0; i < spec.debris; i++) {
-    const size = range(rng, DEBRIS_SIZE);
+    const text = pick(rng, SYMBOLS);
+    const geometry = symbolGeometry(text);
+    if (!geometry) continue;
+    const size = range(rng, SYMBOL_SIZE);
     const spot = findFieldSpot(rng, spec, size, placed, clusters);
     if (!spot) continue;
-    const matrix = transform(spot.x, spot.y, spot.z, rng() * TAU, rng() * TAU, rng() * TAU, size * range(rng, [0.6, 1.4]), size * range(rng, [0.6, 1.4]), size * range(rng, [0.6, 1.4]));
-    float([pick(rng, chunks).add(matrix, pick(rng, [...SHARD_COLORS, ...ROCK_COLORS]))]);
+    let batch = symbols.get(text);
+    if (!batch) {
+      batch = new Batch(geometry, instanceMaterial);
+      symbols.set(text, batch);
+    }
+    addSpinningSymbol(build, rng, spec.bobScale, batch, geometry, spot, size);
   }
 
-  addBatches(build.decor, [...grass, rocks, ...platforms, hexes, ...chunks, trunks, crowns, pots]);
+  addBatches(build.decor, [hexes, tiles, ...symbols.values()]);
   return build;
 }

@@ -1,24 +1,57 @@
 // OZ 世界的環形游泳池：沿著圓周繞一圈的水道（8 條圓形水道），內外兩側是石材池畔。
+// 由內往外：內側池畔（薄石板，躺椅、陽傘、救生員椅、淋浴柱、植栽）→ 競速池（6 條水道）→ 池邊步道 → 空中縫隙
+// （兩側欄杆；四條玻璃水道跨過縫隙，兩座池的水是連通的，可以直接游過去）→ 池邊步道 → 無邊際池：水面一路延伸到環的外緣，越過略低於水面的不鏽鋼溢流口，
+// 沿外緣往下流成水幕（每一段的水量、流速、長度都不一樣），流到盡頭化成霧氣慢慢飄散。
+// 兩座池的池底和池壁都是透明玻璃（水面以下帶一點水的藍綠色，從外面看像水族箱），轉角有不鏽鋼框。
 // 水面：會折射的透明材質（MeshPhysicalMaterial transmission），波紋在著色器裡即時計算（幾道不同方向、波長的深水波相加，
 // 波速照深水波公式），法線跟著波紋算，所以反光、折射都會動。池底與池壁疊上會動的光紋（caustics）。
 import * as THREE from 'three';
-import { annulus, bakeByMaterial, createRng, emptyBuild, getPropsEnvironment, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
+import { annulus, bakeByMaterial, createRng, emptyBuild, getPropsEnvironment, orientedSolid, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
 import { collectColliders, markChildGroups, markCollider, skipCollider } from './oz-kit';
 
 type Rng = () => number;
 type Vec3 = [number, number, number];
 
 const TAU = Math.PI * 2;
-// 池子的剖面：內側池畔 deckInner、外側池畔 deckOuter；水面比池畔低 waterDrop，水深 waterDepth（跳水池的深度：潛到底時第三人稱鏡頭也會進到水裡）。
-const POOL = { deckInner: 7, deckOuter: 9, waterDrop: 0.25, waterDepth: 2.5, floorSlab: 0.05, base: 0.6, lanes: 8, laneMargin: 1, laneLine: 0.25, coping: 0.35, copingLip: 0.04, copingRise: 0.03 };
+// 池子的剖面：內側池畔 deckInner、外側池畔 deckOuter（都是 deckThickness 厚的薄石板）；水面比池畔低 waterDrop，水深 waterDepth；
+// 池底玻璃厚 floorSlab。
+const POOL = { deckInner: 6.5, deckThickness: 0.3, waterDrop: 0.25, waterDepth: 2, floorSlab: 0.08, lanes: 6, laneMargin: 0.25, laneLine: 0.25, coping: 0.35, copingLip: 0.04, copingRise: 0.03 };
+const GLASS_FRAME = { tube: 0.06, mullionSpacing: 8, mullion: 0.08 };
+// 兩座池之間：競速池寬 raceWidth（6 道 × 2 m），兩邊各一條 rim 寬的池邊步道，中間 gap 的空中縫隙，
+// channels 條 channelWidth 寬的玻璃水道跨過縫隙把兩座池連起來
+const SPLIT = { raceWidth: 12.5, rim: 0.5, gap: 1.7, channels: 4, channelWidth: 3, railHeight: 1.05, railPosts: 2.5 };
+// 水面折射：遊戲常見做法是用波紋法線讓畫面輕微扭曲，不照真實折射率與水深位移；
+// 太強的話，人物露出水面的上半身和水裡的下半身會錯開。ior 接近 1、厚度很薄，只留下波紋的晃動。
+const REFRACTION = { ior: 1.05, thickness: 0.4, attenuationDistance: 0.48 };
+// 無邊際的外緣：溢流口比水面低 weirDrop、寬 lip；看不見的牆比池畔高 barrier（游泳游不出去）
+const EDGE = { lip: 0.3, weirDrop: 0.03, barrier: 1 };
+// 水幕：往下 height 公尺，底部往外張開 flare；霧氣在水幕底部，count 顆、往上飄 rise、帶寬 band
+const FALL = { height: 30, flare: 2, segments: 256 };
+const MIST = { count: 4000, rise: 4, band: 2.5, cycle: 12 };
+
+// 水幕每一段的變化（x 是沿外緣的弧長，m；t 是時間）：在哪裡結束（佔總高的比例）、流多快、水量多少。
+// 水幕著色器和霧氣都用同一組函式，霧氣才會出現在每一段水流的盡頭。
+const FALL_GLSL = `
+float ozHash1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+float ozNoise1(float x) {
+  float i = floor(x);
+  float f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(ozHash1(i), ozHash1(i + 1.0), f);
+}
+float ozFallEnd(float x, float t) {
+  return mix(0.12, 1.0, ozNoise1(x * 0.09) * 0.5 + ozNoise1(x * 0.5 + t * 0.06) * 0.3 + ozNoise1(x * 2.3 + 17.0) * 0.2);
+}
+float ozFallSpeed(float x) { return mix(0.3, 2.6, ozNoise1(x * 0.23 + 13.0) * 0.7 + ozNoise1(x * 1.7 + 3.0) * 0.3); }
+float ozFallAmount(float x, float t) { return smoothstep(0.28, 0.68, ozNoise1(x * 0.15 + 31.0) * 0.6 + ozNoise1(x * 0.7 - t * 0.03 + 5.0) * 0.4); }
+`;
 const WATER_SEGMENTS = { around: 720, across: 16 };
 const WALL_SEGMENTS = 512;
 const DECK_TILE = 1.2;              // 池畔石板貼圖一張涵蓋幾公尺
-const WATERLINE = { below: 0.2, height: 0.3, tileHeight: 0.25 };
 const ROPE = { radius: 0.06, length: 0.6, tubular: 1440 };
 const WAVE_TIME_SCALE = '0.55';     // 波紋時間倍率（GLSL 字面值）：泳池比海面平靜
 const SUN_DIRECTION = [3, 6, 2];    // 和 main.ts 的太陽方向一樣，水面高光才對得上
-const LOUNGE_SPACING = 7;           // 外側池畔：每 7 m 一組（兩張躺椅加一把陽傘）
+const LOUNGE_SPACING = 7;           // 內側池畔：每 7 m 一組（兩張躺椅加一把陽傘）
 const LADDER_SPACING = 45;
 const LIFEGUARD_CHAIRS = 4;
 const SHOWERS = 6;
@@ -79,8 +112,8 @@ float ozCaustic(vec2 p, float t) {
 // 會折射的水面：transmission 讓池底、池壁透過水面看得到，attenuation 讓越深越偏藍綠；法線由波紋即時計算。
 function createWaterMaterial(): THREE.MeshPhysicalMaterial {
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: 0, roughness: 0.04, transmission: 1, thickness: POOL.waterDepth, ior: 1.333,
-    attenuationColor: new THREE.Color(0x3fb0c4), attenuationDistance: 2.4, specularIntensity: 1,
+    color: 0xffffff, metalness: 0, roughness: 0.04, transmission: 1, thickness: REFRACTION.thickness, ior: REFRACTION.ior,
+    attenuationColor: new THREE.Color(0x3fb0c4), attenuationDistance: REFRACTION.attenuationDistance, specularIntensity: 1,
     envMap: getPropsEnvironment(), envMapIntensity: 1.2,
   });
   material.onBeforeCompile = (shader) => {
@@ -117,6 +150,102 @@ function createUndersideMaterial(): THREE.MeshBasicMaterial {
         diffuseColor.rgb *= mix(0.7, 1.3, clamp(1.0 - 5.0 * length(ozSlope.yz), 0.0, 1.0));`);
   };
   return material;
+}
+
+// 無邊際池外緣往下流的水幕：圓筒內外兩面都畫，uv.y 頂端是 1。沿外緣每一段的水量、流速、結束高度都不一樣（FALL_GLSL），
+// 再細分成一條條約 25 cm 的水柱，各自的速度與長度再亂一點；上面較濃、往下越來越淡，到盡頭消失（霧氣接在那裡）。
+// 場景用對數深度緩衝，自訂著色器要加上對應的片段才不會閃。
+function createFallMaterial(around: number): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uOzTime: waterTime, uAround: { value: around } },
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    vertexShader: `
+      #include <common>
+      #include <logdepthbuf_pars_vertex>
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: `
+      #include <common>
+      #include <logdepthbuf_pars_fragment>
+      uniform float uOzTime;
+      uniform float uAround;
+      varying vec2 vUv;
+      ${FALL_GLSL}
+      float ozHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float ozNoise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(ozHash(i), ozHash(i + vec2(1.0, 0.0)), f.x), mix(ozHash(i + vec2(0.0, 1.0)), ozHash(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
+      void main() {
+        #include <logdepthbuf_fragment>
+        float fall = 1.0 - vUv.y;
+        float x = vUv.x * uAround;
+        float speed = ozFallSpeed(x);
+        float amount = ozFallAmount(x, uOzTime);
+        // 兩種寬度的水柱（約 25 cm 與 75 cm），各自的長度與速度再亂一次
+        float columnRand = ozHash1(floor(x * 4.0) + 0.5);
+        float bandRand = ozHash1(floor(x * 1.3) + 7.5);
+        float end = ozFallEnd(x, uOzTime) * mix(0.4, 1.25, columnRand) * mix(0.7, 1.15, bandRand);
+        float t = uOzTime * speed * mix(0.5, 1.8, columnRand);
+        float strand = ozNoise(vec2(x * 4.0, fall * mix(5.0, 9.0, columnRand) - t));
+        float streak = ozNoise(vec2(x * 1.3, fall * 5.0 - t * 0.8)) * 0.5 + strand * 0.5;
+        float along = clamp(fall / max(end, 0.01), 0.0, 1.0);
+        float sheet = mix(0.7, 0.18, along);
+        float alpha = (sheet + streak * 0.5) * amount * smoothstep(0.0, 0.02, fall) * (1.0 - smoothstep(0.6, 1.0, along));
+        // 帶藍綠色：天空很淡，全白的水幕在天空前面會看不見
+        vec3 color = mix(vec3(0.42, 0.7, 0.84), vec3(0.9, 0.97, 1.0), streak);
+        gl_FragColor = vec4(color, min(alpha, 0.95));
+      }`,
+  });
+}
+
+// 水幕盡頭化成的霧氣：每顆粒子在外緣的角度固定，高度是那一段水流的盡頭（和水幕用同一個函式），水量少的地方霧也淡；
+// 每顆有自己的起始時間（aSeed），一個週期裡往上飄、往外散、變大，淡入再淡出。position.y 存的是相對盡頭的高低。
+function createMistMaterial(top: number, radius: number): THREE.ShaderMaterial {
+  // 透視投影下，世界大小 1 m 的點在距離 d 時約佔 (畫面高 / 2 / tan(半視角)) / d 個像素；視角 50°
+  const scale = (Math.min(devicePixelRatio, 2) * innerHeight) / 2 / Math.tan(THREE.MathUtils.degToRad(25));
+  return new THREE.ShaderMaterial({
+    uniforms: { uOzTime: waterTime, uScale: { value: scale }, uTop: { value: top }, uRadius: { value: radius } },
+    transparent: true, depthWrite: false,
+    vertexShader: `
+      #include <common>
+      #include <logdepthbuf_pars_vertex>
+      attribute float aSeed;
+      uniform float uOzTime;
+      uniform float uScale;
+      uniform float uTop;
+      uniform float uRadius;
+      varying float vAlpha;
+      ${FALL_GLSL}
+      void main() {
+        float life = fract(uOzTime / ${MIST.cycle.toFixed(1)} + aSeed);
+        float angle = atan(position.x, position.z);
+        float x = (angle < 0.0 ? angle + 6.2831853 : angle) * uRadius;
+        vec3 p = position;
+        p.y += uTop - ozFallEnd(x, uOzTime) * ${FALL.height.toFixed(1)} * 0.85 + life * ${MIST.rise.toFixed(1)};
+        p.xz *= 1.0 + life * 0.02;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = min(256.0, (2.0 + life * 5.0) * uScale / -mv.z);
+        vAlpha = sin(life * 3.14159) * 0.22 * ozFallAmount(x, uOzTime);
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: `
+      #include <common>
+      #include <logdepthbuf_pars_fragment>
+      varying float vAlpha;
+      void main() {
+        #include <logdepthbuf_fragment>
+        float d = length(gl_PointCoord - 0.5);
+        gl_FragColor = vec4(0.93, 0.97, 1.0, smoothstep(0.5, 0.0, d) * vAlpha);
+      }`,
+  });
 }
 
 // 水面以下的池底、池壁：在原本的打光上加一層會動的光紋，越接近水面越亮，水面以上沒有。
@@ -174,9 +303,6 @@ function drawTiles(ctx: CanvasRenderingContext2D, rng: Rng, width: number, heigh
 // 泳池磁磚：一張 1 m，25 cm 一塊
 const drawPoolTile = (ctx: CanvasRenderingContext2D): void =>
   drawTiles(ctx, createRng(21), 256, 256, 4, 4, ['#e8f4f7', '#dff0f4', '#ebf6f8', '#d6ecf1'], '#a7c6ce', 3);
-// 水線磁磚：深藍小馬賽克，一張 1 m × 0.25 m
-const drawWaterline = (ctx: CanvasRenderingContext2D): void =>
-  drawTiles(ctx, createRng(22), 256, 64, 40, 10, ['#1f4f8f', '#235aa0', '#1b4580', '#2a6ab0'], '#d9e3ea', 1);
 // 池畔石板：一張 1.2 m，60 cm 一塊，表面有細微斑點
 function drawDeck(ctx: CanvasRenderingContext2D): void {
   const rng = createRng(23);
@@ -225,7 +351,10 @@ function createPoolMaterials() {
     water: createWaterMaterial(),
     waterUnderside: createUndersideMaterial(),
     tile: pixelTexture(256, 256, drawPoolTile),
-    waterline: pixelTexture(256, 64, drawWaterline),
+    // 玻璃：裝水的部分帶藍綠色、水面以上幾乎透明；兩面都畫，不寫深度，後面的東西看得到
+    waterGlass: new THREE.MeshStandardMaterial({ color: 0x5cc8e0, transparent: true, opacity: 0.38, roughness: 0.05, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false, envMap: getPropsEnvironment() }),
+    clearGlass: new THREE.MeshStandardMaterial({ color: 0xdff4f8, transparent: true, opacity: 0.18, roughness: 0.03, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false, envMap: getPropsEnvironment() }),
+    steel: shinyMaterial(0xc9ced4, 0.85, 0.25),
     deck: new THREE.MeshLambertMaterial({ map: pixelTexture(256, 256, drawDeck) }),
     coping: lambert(0xf2efe8),
     concrete: lambert(0xb7bcc2),
@@ -296,12 +425,6 @@ function planarUv(geometry: THREE.BufferGeometry, tileSize: number): void {
   geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
 
-// 圓筒池壁：只有側面。朝哪一面由材質的 side 決定：內側池壁用 FrontSide（面朝外，水在它外面），外側池壁用 BackSide。
-function poolWall(radius: number, bottom: number, height: number, material: THREE.Material): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, WALL_SEGMENTS, 1, true), material);
-  mesh.position.y = bottom + height / 2;
-  return mesh;
-}
 
 // ---------- 池畔設施 ----------
 // 不鏽鋼扶梯：兩根扶手從水裡往上、彎過池邊、插進池畔；水裡三階踏板。自身 z = 0 是池壁，-z 是水、+z 是池畔，y = 0 是池畔面。
@@ -379,75 +502,198 @@ function anglesAround(radius: number, spacing: number, offset: number): number[]
   return Array.from({ length: count }, (_, i) => offset + (i / count) * TAU);
 }
 
-function addDeckProps(props: THREE.Object3D, M: PoolMaterials, rng: Rng, poolIn: number, poolOut: number, deckY: number): void {
-  const loungeRadius = poolOut + POOL.coping + 2.3;
-  // 每組兩張躺椅並排，中間空隙的椅背那一端插一把陽傘
+// 池畔設施都在內側池畔（外側是無邊際的水）：由池邊往內是扶梯、救生員椅、一排躺椅（椅背朝內、陽傘插在椅背那端）、
+// 淋浴柱、植栽。躺椅避開救生員椅與淋浴柱前後各一段。
+function addDeckProps(props: THREE.Object3D, M: PoolMaterials, rng: Rng, poolIn: number, deckY: number): void {
+  const loungeRadius = poolIn - 2;
+  const showerRadius = poolIn - 4.6;
+  const guardAngles = anglesAround(poolIn, (TAU * poolIn) / LIFEGUARD_CHAIRS, TAU / 8);
+  const showerAngles = anglesAround(poolIn, (TAU * poolIn) / SHOWERS, 0.3);
+  const near = (angle: number, others: number[], meters: number): boolean =>
+    others.some((other) => Math.abs(THREE.MathUtils.euclideanModulo(angle - other + Math.PI, TAU) - Math.PI) * loungeRadius < meters);
   for (const angle of anglesAround(loungeRadius, LOUNGE_SPACING, 0)) {
-    for (const offset of [-0.6, 0.6]) addLounger(placeOnRing(props, loungeRadius, deckY, angle + offset / loungeRadius), M, rng);
-    addUmbrella(placeOnRing(props, loungeRadius + 0.6, deckY, angle), M, rng);
+    if (near(angle, guardAngles, 3)) continue;
+    for (const offset of [-0.6, 0.6]) addLounger(placeOnRing(props, loungeRadius, deckY, angle + offset / loungeRadius, true), M, rng);
+    addUmbrella(placeOnRing(props, loungeRadius - 0.6, deckY, angle), M, rng);
   }
-  for (const angle of anglesAround(poolOut, (TAU * poolOut) / LIFEGUARD_CHAIRS, TAU / 8)) addLifeguardChair(placeOnRing(props, poolOut + 1.3, deckY, angle), M);
-  for (const angle of anglesAround(poolOut, LADDER_SPACING, 0.05)) addLadder(placeOnRing(props, poolOut, deckY, angle), M);
+  for (const angle of guardAngles) addLifeguardChair(placeOnRing(props, poolIn - 1.3, deckY, angle, true), M);
   for (const angle of anglesAround(poolIn, LADDER_SPACING, 0.12)) addLadder(placeOnRing(props, poolIn, deckY, angle, true), M);
-  for (const angle of anglesAround(poolIn, (TAU * poolIn) / SHOWERS, 0.3)) addShower(placeOnRing(props, poolIn - 2.5, deckY, angle, true), M);
-  for (const angle of anglesAround(poolIn - 4.5, PLANTER_SPACING, 0)) addPlanter(placeOnRing(props, poolIn - 4.5, deckY, angle), M, rng);
+  for (const angle of showerAngles) addShower(placeOnRing(props, showerRadius, deckY, angle, true), M);
+  const planterRadius = poolIn - 5.4;
+  for (const angle of anglesAround(planterRadius, PLANTER_SPACING, 0)) {
+    if (!near(angle, showerAngles, 2)) addPlanter(placeOnRing(props, planterRadius, deckY, angle), M, rng);
+  }
 }
 
 /**
  * 環形游泳池：內外兩側是石材池畔，中間一圈水道（8 條圓形水道、水道繩、池底水道線）。
  * 碰撞：兩側池畔與池底站得住；池壁從池底到池畔水平方向擋（掉進池子要飛出來）。
  */
+// ---------- 有開口的環形零件 ----------
+// 一段角度的環形平板（LatheGeometry 的 phi 和這裡的角度同方向：x = r sin θ、z = r cos θ）。
+const arcRing = (inner: number, outer: number, minY: number, maxY: number, start: number, length: number, material: THREE.Material): THREE.Mesh =>
+  new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(inner, minY), new THREE.Vector2(outer, minY), new THREE.Vector2(outer, maxY), new THREE.Vector2(inner, maxY), new THREE.Vector2(inner, minY)],
+    Math.max(4, Math.round((length / TAU) * WALL_SEGMENTS)), start, length), material);
+// 一段角度的圓筒池壁（CylinderGeometry 的 theta 也是 x = r sin θ、z = r cos θ）。
+function wallArc(radius: number, bottom: number, height: number, start: number, length: number, material: THREE.Material): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, Math.max(4, Math.round((length / TAU) * WALL_SEGMENTS)), 1, true, start, length), material);
+  mesh.position.y = bottom + height / 2;
+  return mesh;
+}
+// 一圈上除了 openings（中心角度）前後各 half 弧度以外的各段：[起點, 長度]。沒有開口時就是整圈。
+function arcsBetween(openings: number[], half: number): [number, number][] {
+  if (openings.length === 0) return [[0, TAU]];
+  return openings.map((opening, i) => {
+    const next = (openings[(i + 1) % openings.length] ?? opening) + (i + 1 < openings.length ? 0 : TAU);
+    return [opening + half, next - opening - 2 * half];
+  });
+}
+
+interface Basin { from: number; to: number; waterTo: number; waterY: number; floorY: number; glassBottom: number; outerWeir?: number; fromOpenings?: number[]; toOpenings?: number[] }
+
+// 一面玻璃池壁（水面以下帶水色、上面透明）、上下框與直框、擋人的圓形牆；openings 的角度留開口（接水道）。
+function addPoolWall(build: PropsBuild, props: THREE.Group, M: PoolMaterials, b: Basin, radius: number, solid: 'inside' | 'outside', top: number, deckTop: number, openings: number[], isWeir: boolean): void {
+  const half = SPLIT.channelWidth / 2 / radius;
+  const glassTop = isWeir ? top : b.waterY;
+  for (const [start, length] of arcsBetween(openings, half)) {
+    build.decor.add(wallArc(radius, b.glassBottom, glassTop - b.glassBottom, start, length, M.waterGlass));
+    if (!isWeir) build.decor.add(wallArc(radius, b.waterY, deckTop - b.waterY, start, length, M.clearGlass));
+    for (const y of [b.glassBottom, top]) {
+      addMesh(props, new THREE.TorusGeometry(radius, GLASS_FRAME.tube, 6, Math.max(8, Math.round((length / TAU) * WALL_SEGMENTS)), length).rotateX(Math.PI / 2), M.steel, [0, y, 0], [0, start + length - Math.PI / 2, 0]);
+    }
+    const mullions = Math.max(1, Math.round((length * radius) / GLASS_FRAME.mullionSpacing));
+    for (let k = 0; k <= mullions; k++) {
+      if (openings.length === 0 && k === mullions) continue;
+      const angle = start + (length * k) / mullions;
+      box(props, M.steel, [GLASS_FRAME.mullion, top - b.glassBottom, GLASS_FRAME.mullion], [radius * Math.sin(angle), (b.glassBottom + top) / 2, radius * Math.cos(angle)], [0, angle, 0]);
+    }
+    const maxY = deckTop + (isWeir ? EDGE.barrier : 0);
+    build.walls.push(openings.length === 0 ? { radius, minY: b.floorY, maxY, solid } : { radius, minY: b.floorY, maxY, solid, arc: { start, length } });
+  }
+}
+
+// 一座池：玻璃池底（站得住）、兩側玻璃池壁、水面與從水下看的那一面、游泳的水域。
+// outerWeir 時外側池壁只到溢流口（無邊際），外緣的牆比池畔高 EDGE.barrier、看不見。框與直框放進 props 一起合併。
+function addBasin(build: PropsBuild, props: THREE.Group, M: PoolMaterials, b: Basin, deckTop: number, deckBottom: number): void {
+  build.decor.add(annulus(b.from, b.to, b.glassBottom, b.floorY, M.waterGlass));
+  build.discs.push({ inner: b.from, outer: b.to, minY: b.glassBottom, maxY: b.floorY });
+  build.waters.push({ inner: b.from, outer: b.to, surfaceY: b.waterY, floorY: b.floorY });
+  addPoolWall(build, props, M, b, b.from, 'inside', deckBottom, deckTop, b.fromOpenings ?? [], false);
+  const isWeir = b.outerWeir !== undefined;
+  addPoolWall(build, props, M, b, b.to, 'outside', isWeir ? (b.outerWeir ?? b.waterY) : deckBottom, deckTop, b.toOpenings ?? [], isWeir);
+  addWaterSurface(build, M, b.from, b.waterTo, b.waterY, 0, TAU);
+}
+
+// 水面與從水下看的那一面。RingGeometry 轉成水平後角度 θ 對應這裡的 θ + π/2，所以起點減 π/2。
+function addWaterSurface(build: PropsBuild, M: PoolMaterials, inner: number, outer: number, waterY: number, start: number, length: number): void {
+  const segments = Math.max(8, Math.round((length / TAU) * WATER_SEGMENTS.around));
+  const geometry = new THREE.RingGeometry(inner, outer, segments, WATER_SEGMENTS.across / 2, start - Math.PI / 2, length).rotateX(-Math.PI / 2);
+  const water = new THREE.Mesh(geometry, M.water);
+  water.position.y = waterY;
+  const underside = new THREE.Mesh(geometry, M.waterUnderside);
+  underside.position.y = waterY;
+  build.decor.add(water, underside);
+}
+
+// 連接兩座池的玻璃水道：池底、兩側玻璃牆（水面以下帶水色、上面透明）、水面、只佔那段角度的水域；側牆擋人。
+function addChannel(build: PropsBuild, props: THREE.Group, M: PoolMaterials, from: number, to: number, angle: number, b: Basin, deckTop: number): void {
+  const middle = (from + to) / 2;
+  const half = SPLIT.channelWidth / 2 / middle;
+  const start = angle - half;
+  build.decor.add(arcRing(from, to, b.glassBottom, b.floorY, start, half * 2, M.waterGlass));
+  build.discs.push({ inner: from, outer: to, minY: b.glassBottom, maxY: b.floorY, arc: { start, length: half * 2 } });
+  build.waters.push({ inner: from, outer: to, surfaceY: b.waterY, floorY: b.floorY, arc: { start, length: half * 2 } });
+  addWaterSurface(build, M, from - 0.05, to + 0.05, b.waterY, start, half * 2);
+  const length = to - from;
+  for (const side of [-1, 1]) {
+    const edge = angle + side * half;
+    const cx = middle * Math.sin(edge);
+    const cz = middle * Math.cos(edge);
+    for (const [bottom, height, material] of [[b.glassBottom, b.waterY - b.glassBottom, M.waterGlass], [b.waterY, deckTop - b.waterY, M.clearGlass]] as const) {
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(length, height), material);
+      pane.position.set(cx, bottom + height / 2, cz);
+      pane.rotation.y = edge - Math.PI / 2;
+      build.decor.add(pane);
+    }
+    for (const r of [from, to]) box(props, M.steel, [GLASS_FRAME.mullion, deckTop - b.glassBottom, GLASS_FRAME.mullion], [r * Math.sin(edge), (b.glassBottom + deckTop) / 2, r * Math.cos(edge)], [0, edge, 0]);
+    box(props, M.steel, [GLASS_FRAME.mullion, GLASS_FRAME.mullion, length], [cx, b.glassBottom, cz], [0, edge, 0]);
+    build.solids.push(orientedSolid(cx, cz, edge, 0.12, length + 0.4, b.floorY, deckTop));
+  }
+}
+
+// 縫隙邊的欄杆：柱子、上下兩道扶手，水道口留開口；碰撞是一段段只擋那幾段角度的圓形牆（走路時只擋人所在的那一側）。
+function addGapRail(build: PropsBuild, props: THREE.Group, M: PoolMaterials, radius: number, y: number, channels: number[], solid: 'inside' | 'outside'): void {
+  for (const [start, length] of arcsBetween(channels, (SPLIT.channelWidth / 2 + 0.1) / radius)) {
+    const posts = Math.max(1, Math.round((length * radius) / SPLIT.railPosts));
+    for (let k = 0; k <= posts; k++) {
+      const angle = start + (length * k) / posts;
+      box(props, M.chrome, [0.05, SPLIT.railHeight, 0.05], [radius * Math.sin(angle), y + SPLIT.railHeight / 2, radius * Math.cos(angle)], [0, angle, 0]);
+    }
+    for (const height of [SPLIT.railHeight, SPLIT.railHeight / 2]) {
+      addMesh(props, new THREE.TorusGeometry(radius, 0.025, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.chrome, [0, y + height, 0], [0, start + length - Math.PI / 2, 0]);
+    }
+    build.walls.push({ radius, minY: y, maxY: y + SPLIT.railHeight, solid, arc: { start, length } });
+  }
+}
+
+/**
+ * 環形泳池：內側池畔、競速池、空中縫隙（兩側池邊步道與欄杆、四條連通兩座池的玻璃水道）、無邊際池。
+ * 碰撞：池畔、池邊步道與池底站得住；池壁、水道側牆、縫隙欄杆擋人，無邊際池外緣是一道看不見的牆。
+ */
 export function buildPoolRing(spec: RingSpec): PropsBuild {
   const build = emptyBuild();
   const rng = createRng(spec.seed);
   const M = getPoolMaterials();
   const { inner, outer, maxY } = spec;
-  const poolIn = inner + POOL.deckInner;
-  const poolOut = outer - POOL.deckOuter;
   const waterY = maxY - POOL.waterDrop;
   const floorY = waterY - POOL.waterDepth;
-  const bottomY = floorY - POOL.base;
+  const deckBottom = maxY - POOL.deckThickness;
+  const glassBottom = floorY - POOL.floorSlab;
+  const weirY = waterY - EDGE.weirDrop;
+  const raceIn = inner + POOL.deckInner;
+  const raceOut = raceIn + SPLIT.raceWidth;
+  const gapIn = raceOut + SPLIT.rim;
+  const gapOut = gapIn + SPLIT.gap;
+  const infinityIn = gapOut + SPLIT.rim;
+  const poolOut = outer - EDGE.lip;
+  const channels = Array.from({ length: SPLIT.channels }, (_, k) => Math.PI / 4 + (k / SPLIT.channels) * TAU);
+  const props = new THREE.Group();
 
-  const decks = [annulus(inner, poolIn, bottomY, maxY, M.deck), annulus(poolOut, outer, bottomY, maxY, M.deck)];
-  decks.forEach((deck) => planarUv(deck.geometry, DECK_TILE));
-  const floor = annulus(poolIn, poolOut, floorY - POOL.floorSlab, floorY, causticMaterial(waterY, { map: M.tile }));
-  planarUv(floor.geometry, 1);
-  build.solid.add(...decks, floor, annulus(poolIn, poolOut, bottomY, floorY - POOL.floorSlab, M.concrete));
-  build.discs.push(
-    { inner, outer: poolIn, minY: bottomY, maxY },
-    { inner: poolOut, outer, minY: bottomY, maxY },
-    { inner: poolIn, outer: poolOut, minY: bottomY, maxY: floorY },
-  );
-  build.walls.push(
-    { radius: poolIn, minY: floorY, maxY, solid: 'inside' },
-    { radius: poolOut, minY: floorY, maxY, solid: 'outside' },
-  );
-  build.waters.push({ inner: poolIn, outer: poolOut, surfaceY: waterY, floorY });
-
-  // 池壁磁磚（貼圖沿圓周每公尺重複一次）、水線上的深藍馬賽克帶、池邊的白色收邊石
-  const wallHeight = maxY - floorY;
-  for (const [radius, side] of [[poolIn + 0.005, THREE.FrontSide], [poolOut - 0.005, THREE.BackSide]] as const) {
-    const around = TAU * radius;
-    build.decor.add(
-      poolWall(radius, floorY, wallHeight, causticMaterial(waterY, { map: repeated(M.tile, around, wallHeight), side })),
-      poolWall(radius + (side === THREE.FrontSide ? 0.003 : -0.003), waterY - WATERLINE.below, WATERLINE.height,
-        causticMaterial(waterY, { map: repeated(M.waterline, around, WATERLINE.height / WATERLINE.tileHeight), side })),
-    );
+  // 內側池畔（整圈）與兩條池邊步道（水道口斷開）
+  const deck = annulus(inner, raceIn, deckBottom, maxY, M.deck);
+  planarUv(deck.geometry, DECK_TILE);
+  build.solid.add(deck, annulus(raceIn - POOL.coping, raceIn + POOL.copingLip, maxY - 0.1, maxY + POOL.copingRise, M.coping));
+  build.discs.push({ inner, outer: raceIn, minY: deckBottom, maxY });
+  for (const [from, to] of [[raceOut, gapIn], [gapOut, infinityIn]] as const) {
+    for (const [start, length] of arcsBetween(channels, SPLIT.channelWidth / 2 / ((from + to) / 2))) {
+      const rim = arcRing(from, to, deckBottom, maxY, start, length, M.deck);
+      planarUv(rim.geometry, DECK_TILE);
+      build.solid.add(rim);
+      build.discs.push({ inner: from, outer: to, minY: deckBottom, maxY, arc: { start, length } });
+    }
   }
-  build.solid.add(
-    annulus(poolIn - POOL.coping, poolIn + POOL.copingLip, maxY - 0.1, maxY + POOL.copingRise, M.coping),
-    annulus(poolOut - POOL.copingLip, poolOut + POOL.coping, maxY - 0.1, maxY + POOL.copingRise, M.coping),
-  );
+  addMesh(props, new THREE.TorusGeometry(inner, 0.05, 6, WALL_SEGMENTS).rotateX(Math.PI / 2), M.steel, [0, maxY - 0.1, 0]);
 
-  // 水道：池底的深藍水道線，水面上的浮球水道繩
-  const laneWidth = (poolOut - poolIn - 2 * POOL.laneMargin) / POOL.lanes;
+  const race: Basin = { from: raceIn, to: raceOut, waterTo: raceOut, waterY, floorY, glassBottom, toOpenings: channels };
+  addBasin(build, props, M, race, maxY, deckBottom);
+  addBasin(build, props, M, { from: infinityIn, to: poolOut, waterTo: outer, waterY, floorY, glassBottom, outerWeir: weirY, fromOpenings: channels }, maxY, deckBottom);
+  // 溢流口：外緣一圈略低於水面的不鏽鋼唇口，水面蓋過它往外流
+  build.decor.add(annulus(poolOut, outer, weirY - 0.12, weirY, M.steel));
+
+  // 縫隙：兩側欄杆（水道口留開口）、四條玻璃水道
+  addGapRail(build, props, M, gapIn - 0.1, maxY, channels, 'outside');
+  addGapRail(build, props, M, gapOut + 0.1, maxY, channels, 'inside');
+  for (const angle of channels) addChannel(build, props, M, raceOut, infinityIn, angle, race, maxY);
+
+  // 競速池的水道：池底的深藍水道線，水面上的浮球水道繩
+  const laneWidth = (raceOut - raceIn - 2 * POOL.laneMargin) / POOL.lanes;
   const laneLine = causticMaterial(waterY, { color: 0x1d3f7a });
   for (let lane = 0; lane < POOL.lanes; lane++) {
-    const center = poolIn + POOL.laneMargin + (lane + 0.5) * laneWidth;
+    const center = raceIn + POOL.laneMargin + (lane + 0.5) * laneWidth;
     build.decor.add(annulus(center - POOL.laneLine / 2, center + POOL.laneLine / 2, floorY, floorY + 0.012, laneLine));
   }
   for (let k = 0; k <= POOL.lanes; k++) {
-    const radius = poolIn + POOL.laneMargin + k * laneWidth;
+    const radius = raceIn + POOL.laneMargin + k * laneWidth;
     const base = M.ropes[k === 0 || k === POOL.lanes ? 0 : k % 2 === 0 ? 1 : 2] ?? M.tile;
     // transparent：水面折射是先把不透明物件畫成一張圖再扭曲，浮在水面上的繩子若是不透明，會在水下多出一條倒影；
     // 標成透明物件就不會被畫進那張圖（opacity 仍是 1，看起來不透明）。
@@ -459,15 +705,30 @@ export function buildPoolRing(spec: RingSpec): PropsBuild {
     build.decor.add(rope);
   }
 
-  const water = new THREE.Mesh(new THREE.RingGeometry(poolIn, poolOut, WATER_SEGMENTS.around, WATER_SEGMENTS.across).rotateX(-Math.PI / 2), M.water);
-  water.position.y = waterY;
-  const underside = new THREE.Mesh(water.geometry, M.waterUnderside);
-  underside.position.y = waterY;
-  build.decor.add(water, underside);
+  // 水幕：從溢流口往下流，底部稍微往外張開；每一段的盡頭一團霧氣
+  const curtain = new THREE.Mesh(
+    new THREE.CylinderGeometry(outer + 0.02, outer + FALL.flare, FALL.height, FALL.segments, 8, true),
+    createFallMaterial(TAU * outer),
+  );
+  curtain.position.y = weirY - FALL.height / 2;
+  build.decor.add(curtain);
+  const mistPositions = new Float32Array(MIST.count * 3);
+  const mistSeeds = new Float32Array(MIST.count);
+  for (let i = 0; i < MIST.count; i++) {
+    const angle = rng() * TAU;
+    const radius = outer + FALL.flare * 0.6 + (rng() - 0.3) * MIST.band;
+    mistPositions.set([radius * Math.sin(angle), (rng() - 0.5) * MIST.band, radius * Math.cos(angle)], i * 3);
+    mistSeeds[i] = rng();
+  }
+  const mistGeometry = new THREE.BufferGeometry();
+  mistGeometry.setAttribute('position', new THREE.BufferAttribute(mistPositions, 3));
+  mistGeometry.setAttribute('aSeed', new THREE.BufferAttribute(mistSeeds, 1));
+  const mist = new THREE.Points(mistGeometry, createMistMaterial(weirY, outer));
+  mist.frustumCulled = false;
+  build.decor.add(mist);
 
-  const props = new THREE.Group();
-  addDeckProps(props, M, rng, poolIn, poolOut, maxY);
-  // 池畔設施（躺椅、救生員椅、淋浴柱、植栽、陽傘柱）各用自己的外框擋人
+  addDeckProps(props, M, rng, raceIn, maxY);
+  // 池畔設施（躺椅、救生員椅、淋浴柱、植栽、陽傘柱）各用自己的外框擋人；框、直框、欄杆一起合併
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
   build.decor.add(bakeByMaterial(props));

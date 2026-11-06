@@ -1,7 +1,8 @@
 // OZ 世界的環形 PU 跑道（在運動場與泳池之間）。由內往外：
 //   步道（石板地、規律間隔的樹與路燈、每隔一段一座休息區：木格柵涼亭、長椅、小桌、販賣機、飲水台、分類垃圾桶）
-//   → 鋁製路緣 → 8 條跑道（每條 1.22 m，PU 顆粒面、白色分道線、終點線、依弧長錯開的起跑線與道次號碼、起跑器、
-//     每 100 m 的標記、最外道一排欄架）→ 外側人工草皮（計時鐘、終點攝影塔、距離牌、欄架堆、照明燈、外緣欄杆）。
+//   → 紅色 PU 跑道（鋁製路緣、8 條跑道：白色分道線、終點線、依弧長錯開的起跑線與道次號碼、起跑器、每 100 m 的標記）
+//   → 空中縫隙（兩側欄杆，四座小橋跨過去）
+//   → 藍色 PU 跑道（同樣 8 條跑道，最外道一排欄架）→ 外側藍色 PU 空地（計時鐘、終點攝影塔、距離牌、欄架堆、照明燈、外緣欄杆）。
 // 跑的方向是角度增加的方向；起點／終點在角度 START_ANGLE。
 import * as THREE from 'three';
 import { annulus, bakeByMaterial, createRng, emptyBuild, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
@@ -17,31 +18,34 @@ const LINE_LIFT = 0.014;             // 跑道線再高一點點，才不會和�
 const PROMENADE = 13;                // 內側步道寬
 const KERB = { width: 0.05, height: 0.05 };
 const LANE = { width: 1.22, count: 8, line: 0.05, firstOffset: 0.3, otherOffset: 0.2 };   // 量跑距的線：第 1 道離內緣 0.3 m，其他道 0.2 m
-const RUNOFF = 1;                    // 最外道外面的緩衝
+const RUNOFF = 0.6;                  // 紅色跑道最外道外面到縫隙的緩衝
+const AIR_GAP = 2.5;                 // 紅、藍兩條跑道之間的空中縫隙
+const BRIDGES = { count: 4, width: 3, offset: Math.PI / 4 };   // 跨過縫隙的小橋（避開起點）
+const GAP_RAIL = { inset: 0.15, height: 1.05, posts: 2.5 };
 const HURDLE = { height: 0.914, width: 1.18, spacing: 9.14, count: 10, firstFrom: 13.72 };   // 110 m 欄：第一欄在起跑線後 13.72 m、欄距 9.14 m
 // 步道設施的間隔（沿內側步道的弧長，m）
 const TREE = { spacing: 9, radius: 3 };            // 樹距、樹在步道裡離內緣多遠
 const LAMP = { spacing: 18, radius: 6.5, height: 4.2 };
-const REST = { spacing: 72, radius: 8.6, width: 6, depth: 4, height: 2.7 };
+const REST = { spacing: 36, radius: 8.6, width: 6, depth: 4, height: 2.7 };
 const VENDING = { width: 0.95, height: 1.83, depth: 0.75 };
-// 外側草皮的設施
+// 外側空地的設施
 const LIGHT = { spacing: 36, height: 9, fromOuter: 1.6 };
 const RAIL = { fromOuter: 0.3, posts: 2.5, heights: [0.5, 1.05] };
 
 const TREE_KINDS = ['round', 'cone'] as const;
 
 // ---------- 貼圖 ----------
-// PU 跑道：一張 1 m，磚紅底加深淺不一的橡膠顆粒
-function drawPu(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#b4472f';
+// PU 跑道：一張 1 m，底色加深淺不一的橡膠顆粒（紅色與藍色兩種）
+const drawPu = (base: string, specks: string[]) => (ctx: CanvasRenderingContext2D): void => {
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, 256, 256);
   const rng = createRng(41);
   for (let i = 0; i < 9000; i++) {
-    ctx.fillStyle = ['#9c3a26', '#c55a40', '#8a3322', '#d06a50', '#a8432c'][Math.floor(rng() * 5)] ?? '#b4472f';
+    ctx.fillStyle = specks[Math.floor(rng() * specks.length)] ?? base;
     const s = 1 + rng() * 2;
     ctx.fillRect(rng() * 256, rng() * 256, s, s);
   }
-}
+};
 // 步道石板：一張 1 m，50 cm 一塊，灰色深淺不同
 function drawPavers(ctx: CanvasRenderingContext2D): void {
   const rng = createRng(42);
@@ -56,16 +60,6 @@ function drawPavers(ctx: CanvasRenderingContext2D): void {
   for (let i = 0; i < 2500; i++) {
     ctx.fillStyle = rng() < 0.5 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.12)';
     ctx.fillRect(rng() * 256, rng() * 256, 1.5, 1.5);
-  }
-}
-// 人工草皮：一張 1 m，綠色加細碎的草葉點
-function drawTurf(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#4f9a58';
-  ctx.fillRect(0, 0, 256, 256);
-  const rng = createRng(43);
-  for (let i = 0; i < 7000; i++) {
-    ctx.fillStyle = ['#468f50', '#5aa664', '#3f8549', '#62ad6b'][Math.floor(rng() * 4)] ?? '#4f9a58';
-    ctx.fillRect(rng() * 256, rng() * 256, 1, 3);
   }
 }
 // 道次號碼：白色大字畫在透明底上，平放在跑道上
@@ -132,9 +126,9 @@ const drawVendingDisplay = (seed: number) => (ctx: CanvasRenderingContext2D): vo
 // ---------- 材質 ----------
 function createTrackMaterials() {
   return {
-    pu: mapped(pixelTexture(256, 256, drawPu)),
+    pu: mapped(pixelTexture(256, 256, drawPu('#b4472f', ['#9c3a26', '#c55a40', '#8a3322', '#d06a50', '#a8432c']))),
+    bluePu: mapped(pixelTexture(256, 256, drawPu('#2f6fb0', ['#285f98', '#3a7dc0', '#22548a', '#4a8bc9', '#2b67a5']))),
     pavers: mapped(pixelTexture(256, 256, drawPavers)),
-    turf: mapped(pixelTexture(256, 256, drawTurf)),
     base: lambert(0x9aa1a8),
     white: lambert(0xffffff),
     yellow: lambert(0xf2c200),
@@ -235,7 +229,7 @@ function addHurdle(g: THREE.Group, M: TrackMaterials): void {
   for (const z of [-0.35, 0, 0.35]) box(g, M.black, [0.022, 0.071, 0.12], [0, HURDLE.height - 0.035, z]);
 }
 
-// 最外道擺一排欄架（從終點線往後數），外側草皮上再堆一疊備用的。
+// 最外道擺一排欄架（從終點線往後數），外側空地上再堆一疊備用的。
 function addHurdles(props: THREE.Group, M: TrackMaterials, L: TrackLayout): void {
   const lane = LANE.count - 1;
   const center = L.laneInner + (lane + 0.5) * LANE.width;
@@ -323,8 +317,8 @@ function addRestArea(g: THREE.Group, M: TrackMaterials, rng: Rng): void {
   markChildGroups(g);
 }
 
-// ---------- 外側草皮 ----------
-// 外側草皮上的東西都用 flip 擺放：自身 +z 朝圓心，也就是朝跑道。
+// ---------- 外側空地 ----------
+// 外側空地上的東西都用 flip 擺放：自身 +z 朝圓心，也就是朝跑道。
 // 計時鐘：兩支腳撐著的黑色看板，面向跑道。
 function addClock(g: THREE.Group, M: TrackMaterials): void {
   for (const x of [-1.3, 1.3]) box(g, M.darkMetal, [0.1, 2.2, 0.1], [x, 1.1, 0.05]);
@@ -362,34 +356,85 @@ function addFloodLight(g: THREE.Group, M: TrackMaterials): void {
   for (const x of [-0.45, 0, 0.45]) box(head, M.lamp, [0.38, 0.25, 0.02], [x, 0, 0.11]);
 }
 
-/** 環形 PU 跑道：整圈站得住；步道、跑道、外側草皮各自鋪面，外緣有欄杆（會擋，不會掉下去）。 */
+// 縫隙邊的欄杆：柱子、兩道扶手，橋口留開口；碰撞是一段段只擋那幾段角度的圓形牆（走路時只擋人所在的那一側）。
+function addGapRail(build: PropsBuild, props: THREE.Group, M: TrackMaterials, radius: number, y: number, bridges: number[], solid: 'inside' | 'outside'): void {
+  const half = (BRIDGES.width / 2 + 0.2) / radius;
+  const sorted = [...bridges].sort((a, b) => a - b);
+  sorted.forEach((bridge, i) => {
+    const next = (sorted[(i + 1) % sorted.length] ?? bridge) + (i + 1 < sorted.length ? 0 : TAU);
+    const start = bridge + half;
+    const length = next - half - start;
+    const posts = Math.max(1, Math.round((length * radius) / GAP_RAIL.posts));
+    for (let k = 0; k <= posts; k++) {
+      const angle = start + (length * k) / posts;
+      cylinder(props, M.metal, 0.025, GAP_RAIL.height, [radius * Math.sin(angle), y + GAP_RAIL.height / 2, radius * Math.cos(angle)], 6);
+    }
+    for (const height of [GAP_RAIL.height, GAP_RAIL.height / 2]) {
+      addMesh(props, new THREE.TorusGeometry(radius, 0.025, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.metal, [0, y + height, 0], [0, start + length - Math.PI / 2, 0]);
+    }
+    build.walls.push({ radius, minY: y, maxY: y + GAP_RAIL.height, solid, arc: { start, length } });
+  });
+}
+
+// 跨過縫隙的小橋：鋼格柵橋面、兩側扶手，橋面和跑道同高、站得住。
+function addGapBridge(build: PropsBuild, props: THREE.Group, M: TrackMaterials, from: number, to: number, y: number, angle: number): void {
+  const middle = (from + to) / 2;
+  const length = to - from + 0.4;
+  const g = onRing(props, middle, y, angle);
+  skipCollider(g);
+  box(g, M.grate, [BRIDGES.width, 0.12, length], [0, -0.05, 0]);
+  for (const side of [-1, 1]) {
+    const x = side * (BRIDGES.width / 2 - 0.05);
+    for (const z of [-length / 2 + 0.1, 0, length / 2 - 0.1]) box(g, M.metal, [0.05, GAP_RAIL.height, 0.05], [x, GAP_RAIL.height / 2, z]);
+    for (const height of [GAP_RAIL.height, GAP_RAIL.height / 2]) box(g, M.metal, [0.05, 0.05, length], [x, height, 0]);
+    markCollider(g, [0.1, GAP_RAIL.height, length], [x, GAP_RAIL.height / 2, 0]);
+  }
+  const half = BRIDGES.width / 2 / middle;
+  build.discs.push({ inner: from - 0.2, outer: to + 0.2, minY: y - 0.15, maxY: y + SURFACE_LIFT, arc: { start: angle - half, length: half * 2 } });
+}
+
+/** 環形 PU 跑道：步道、紅色跑道、空中縫隙、藍色跑道、外側藍色空地；外緣與縫隙兩側有欄杆（會擋，不會掉下去），四座小橋跨過縫隙。 */
 export function buildTrackRing(spec: RingSpec): PropsBuild {
   const build = emptyBuild();
   const rng = createRng(spec.seed);
   const M = getTrackMaterials();
   const { inner, outer, minY, maxY } = spec;
-  const kerbInner = inner + PROMENADE;
-  const laneInner = kerbInner + KERB.width;
-  const laneOuter = laneInner + LANE.count * LANE.width;
-  const surfaceOuter = laneOuter + RUNOFF;
-  const layout: TrackLayout = {
-    y: maxY, laneInner, laneOuter, surfaceOuter,
-    measure: (lane) => laneInner + lane * LANE.width + (lane === 0 ? LANE.firstOffset : LANE.otherOffset),
+  const trackLayout = (kerb: number): TrackLayout => {
+    const laneInner = kerb + KERB.width;
+    const laneOuter = laneInner + LANE.count * LANE.width;
+    return {
+      y: maxY, laneInner, laneOuter, surfaceOuter: laneOuter + RUNOFF,
+      measure: (lane) => laneInner + lane * LANE.width + (lane === 0 ? LANE.firstOffset : LANE.otherOffset),
+    };
   };
+  const red = trackLayout(inner + PROMENADE);
+  const gapInner = red.surfaceOuter;
+  const gapOuter = gapInner + AIR_GAP;
+  const blue = trackLayout(gapOuter);
 
-  build.solid.add(annulus(inner, outer, minY, maxY, M.base));
-  build.discs.push({ inner, outer, minY, maxY });
-  const surfaces: [number, number, THREE.Material, number][] = [[inner, kerbInner, M.pavers, 1], [laneInner, surfaceOuter, M.pu, 1], [surfaceOuter, outer, M.turf, 1]];
-  for (const [from, to, material, tile] of surfaces) {
+  // 環本體分成縫隙內外兩圈
+  for (const [from, to] of [[inner, gapInner], [gapOuter, outer]] as const) {
+    build.solid.add(annulus(from, to, minY, maxY, M.base));
+    build.discs.push({ inner: from, outer: to, minY, maxY });
+  }
+  const surfaces: [number, number, THREE.Material][] = [[inner, red.laneInner - KERB.width, M.pavers], [red.laneInner, gapInner, M.pu], [blue.laneInner, outer, M.bluePu]];
+  for (const [from, to, material] of surfaces) {
     const layer = annulus(from, to, maxY, maxY + SURFACE_LIFT, material);
-    planarUv(layer.geometry, tile);
+    planarUv(layer.geometry, 1);
     build.decor.add(layer);
   }
-  build.decor.add(annulus(kerbInner, laneInner, maxY, maxY + KERB.height, M.kerb));
+  for (const layout of [red, blue]) build.decor.add(annulus(layout.laneInner - KERB.width, layout.laneInner, maxY, maxY + KERB.height, M.kerb));
 
   const props = new THREE.Group();
-  addLaneMarkings(build, props, M, layout);
-  addHurdles(props, M, layout);
+  addLaneMarkings(build, props, M, red);
+  addLaneMarkings(build, props, M, blue);
+  addHurdles(props, M, blue);
+
+  // 縫隙：兩側欄杆（橋口留開口）、四座小橋
+  const bridges = Array.from({ length: BRIDGES.count }, (_, k) => START_ANGLE + BRIDGES.offset + (k / BRIDGES.count) * TAU);
+  addGapRail(build, props, M, gapInner - GAP_RAIL.inset, maxY, bridges, 'outside');
+  addGapRail(build, props, M, gapOuter + GAP_RAIL.inset, maxY, bridges, 'inside');
+  for (const angle of bridges) addGapBridge(build, props, M, gapInner, gapOuter, maxY, angle);
 
   // 步道：休息區之間規律地種樹、立路燈（休息區那一段不種）
   const restAngles = anglesEvery(inner + REST.radius, REST.spacing, START_ANGLE + Math.PI);
@@ -403,12 +448,13 @@ export function buildTrackRing(spec: RingSpec): PropsBuild {
   }
   for (const angle of restAngles) addRestArea(onRing(props, inner + REST.radius, maxY, angle), M, rng);
 
-  // 外側草皮：終點的計時鐘與攝影塔、每 100 m 的距離牌、照明燈、外緣欄杆
-  addClock(onRing(props, surfaceOuter + 4, maxY, START_ANGLE + 6 / surfaceOuter, true), M);
-  addFinishTower(onRing(props, surfaceOuter + 2.2, maxY, START_ANGLE, true), M);
-  const first = layout.measure(0);
+  // 外側空地：終點的計時鐘與攝影塔、每 100 m 的距離牌、照明燈、外緣欄杆
+  const apron = blue.surfaceOuter;
+  addClock(onRing(props, apron + 2.4, maxY, START_ANGLE + 6 / apron, true), M);
+  addFinishTower(onRing(props, apron + 1.4, maxY, START_ANGLE, true), M);
+  const first = blue.measure(0);
   for (let k = 1; k <= Math.floor((TAU * first) / 100); k++) {
-    addSign(onRing(props, surfaceOuter + 1.2, maxY, START_ANGLE + (k * 100) / first, true), M, `${k * 100} m`);
+    addSign(onRing(props, apron + 0.8, maxY, START_ANGLE + (k * 100) / first, true), M, `${k * 100} m`);
   }
   for (const angle of anglesEvery(outer - LIGHT.fromOuter, LIGHT.spacing, 0.01)) addFloodLight(onRing(props, outer - LIGHT.fromOuter, maxY, angle, true), M);
   const railRadius = outer - RAIL.fromOuter;

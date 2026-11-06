@@ -1,10 +1,12 @@
-// OZ 世界最頂層的運動場環：籃球、網球、排球（室內、沙灘）、匹克球、羽球、桌球、五人制足球、壁球、拳擊、抱石、撞球，
-// 再加一整區健身房（oz-gym.ts）；環的內外兩側是一整圈階梯觀眾席，後面立著照明燈塔。
+// OZ 世界最頂層的運動場環：籃球、網球、排球（室內、沙灘）、匹克球、羽球、五人制足球、壁球、拳擊、抱石、撞球，
+// 再加一整區健身房（oz-gym.ts）；環的內側是一整圈階梯觀眾席，後面立著照明燈塔，外緣是一圈矮欄杆，欄杆內側也有一排照明燈塔。
+// 球類場地旁都有放球的地方（球架、球桶、羽球盒、網球推車）和球。
+// 區段之間的間距一樣寬（照每個區段實際建出來的範圍算），每個間隔放四組戶外桌椅（木紋長桌、兩張長凳、黑色 X 形桌腳，桌上不放東西）。
 // 尺寸照各運動的規格（FIBA、ITF、FIVB、USA Pickleball、BWF、ITTF、FIFA 室內足球、WSF、WPA）：球場線畫在 canvas 貼圖上，
 // 籃框、球網、圍網、球桌做成 3D 零件；整圈的零件最後依材質合併（bakeByMaterial），每種材質只畫一次。
 import * as THREE from 'three';
 import { annulus, bakeByMaterial, colorMaterial, createRng, emptyBuild, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
-import { buildGym, GYM_SIZE } from './oz-gym';
+import { buildGym } from './oz-gym';
 import {
   TAU, addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, fillDot, flat, lambert, mapped, markChildGroups, markCollider,
   merge, meterTexture, pixelTexture, range, rod, skipCollider, speckle, sphere, strokeArc, strokeBox, strokeLine, upright, type Range, type Rng, type Vec3,
@@ -46,6 +48,13 @@ const FENCE_POST_SPACING = 3;
 // 觀眾席：6 排，每排深 0.8 m、高 0.45 m；後面是 1.1 m 高的矮牆；每隔約 24 m 留一條走道
 const STANDS = { rows: 6, tread: 0.8, rise: 0.45, parapet: 1.1, back: 0.25, frontGap: 0.2, seatSpacing: 0.52, aisleEvery: 24, aisleWidth: 1.3, railHeight: 1, colorBlocks: 24, segments: 360 };
 const TOWER = { spacing: 48, height: 22, tilt: 0.35 };
+// 外緣欄杆：離環外緣 inset 公尺，柱距 postSpacing
+const OUTER_RAIL = { inset: 0.4, height: 1.1, postSpacing: 2.5 };
+// 戶外桌椅組（以人物 1.83 m 為準）：長桌、兩張長凳；一個間隔放 PICNIC_SETS 組，沿徑向排成一列，間距 PICNIC_SPACING
+const PICNIC = { length: 2.2, tableWidth: 0.8, tableHeight: 0.75, benchWidth: 0.34, benchHeight: 0.45, benchOffset: 0.78, plank: 0.04, leg: 0.06 };
+const PICNIC_SETS = 4;
+const PICNIC_SPACING = 3.4;
+const PICNIC_WOOD = [0xa47a52, 0x9b7049, 0xae835a];
 
 const BALL_COLORS = ['#f4f1e8', '#f2c200', '#1a4fb5', '#d32f2f', '#5b2a86', '#f26b1d', '#1d7a3a', '#7a1f1f', '#111111'];
 const HOLD_COLORS = [0xe63946, 0xf2c200, 0x2a9d8f, 0x1f5fbf, 0x8e44ad, 0xf4a261, 0xff7ac3, 0x1b1b1b, 0xf4f4f4];
@@ -471,6 +480,8 @@ function createMaterials() {
     cork: lambert(0xe8dcc8),
     shuttle: lambert(0xffffff, { side: THREE.DoubleSide }),
     pickleball: lambert(0xf2d43b),
+    bucket: lambert(0xf26b1d, { side: THREE.DoubleSide }),
+    crate: lambert(0x2f6fb0),
     tennisBall: lambert(0xd7e64a),
     squashBall: lambert(0x1b1b1b),
     leaves: lambert(0x5fa85d, { flatShading: true }),
@@ -551,15 +562,35 @@ function addBench(g: THREE.Object3D, M: SportsMaterials, position: Vec3, length:
   for (const x of [-length / 2 + 0.15, length / 2 - 0.15]) box(bench, M.darkMetal, [0.05, 0.45, 0.36], [x, 0.225, 0]);
 }
 
-// 樹：方形花台、樹幹、多面體樹冠。
-function addTree(g: THREE.Object3D, M: SportsMaterials, rng: Rng, position: Vec3): void {
-  const tree = childGroup(g, position, rng() * TAU);
-  skipCollider(tree);
-  markCollider(tree, [1.3, 2.4, 1.3], [0, 1.2, 0]);
-  const crown = range(rng, [1, 1.6]);
-  box(tree, M.planter, [1.3, 0.5, 1.3], [0, 0.25, 0]);
-  rod(tree, M.trunk, [0, 0.5, 0], [0, 2.2, 0], 0.1, 0.07);
-  addMesh(tree, new THREE.IcosahedronGeometry(crown, 1), M.leaves, [0, 2.2 + crown * 0.7, 0]).scale.set(1, 0.85, 1);
+// 戶外桌椅組：木紋板條長桌（X 形黑鐵桌腳）、兩側各一張板條長凳（ㄇ形鐵腳），桌上不放東西。長邊沿自身 x。
+function addPicnicSet(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
+  const P = PICNIC;
+  const wood = colorMaterial(PICNIC_WOOD[Math.floor(rng() * PICNIC_WOOD.length)] ?? 0xa47a52);
+  const iron = M.darkMetal;
+  // 桌面：5 條板條，中間留細縫
+  const planks = 5;
+  const plankWidth = P.tableWidth / planks;
+  for (let k = 0; k < planks; k++) box(g, wood, [P.length, P.plank, plankWidth - 0.012], [0, P.tableHeight - P.plank / 2, -P.tableWidth / 2 + plankWidth * (k + 0.5)]);
+  // 桌腳：兩端各一個 X 形框（兩根斜桿交叉、上橫樑、下踏腳）
+  const legX = P.length / 2 - 0.25;
+  const legSpread = P.tableWidth / 2 - 0.05;
+  const legTop = P.tableHeight - P.plank;
+  for (const x of [-legX, legX]) {
+    rod(g, iron, [x, 0, -legSpread], [x, legTop, legSpread], P.leg / 2, P.leg / 2, 4);
+    rod(g, iron, [x, 0, legSpread], [x, legTop, -legSpread], P.leg / 2, P.leg / 2, 4);
+    box(g, iron, [P.leg, P.leg, P.tableWidth - 0.04], [x, legTop - P.leg / 2, 0]);
+    box(g, iron, [P.leg, P.leg, P.tableWidth - 0.04], [x, P.leg / 2, 0]);
+  }
+  box(g, iron, [legX * 2, P.leg * 0.8, P.leg * 0.8], [0, legTop - P.leg, 0]);
+  // 長凳：兩條板條，兩端ㄇ形鐵腳
+  for (const side of [-1, 1]) {
+    const z = side * P.benchOffset;
+    for (const k of [-1, 1]) box(g, wood, [P.length, P.plank, P.benchWidth / 2 - 0.01], [0, P.benchHeight - P.plank / 2, z + (k * P.benchWidth) / 4]);
+    for (const x of [-legX, legX]) {
+      for (const dz of [-1, 1]) box(g, iron, [P.leg, P.benchHeight - P.plank, P.leg], [x, (P.benchHeight - P.plank) / 2, z + dz * (P.benchWidth / 2 - P.leg / 2)]);
+      box(g, iron, [P.leg, P.leg, P.benchWidth], [x, P.benchHeight - P.plank - P.leg / 2, z]);
+    }
+  }
 }
 
 // 鐵絲圍網：每 FENCE_POST_SPACING 一根柱子，上下橫桿，網面是鏤空貼圖；windscreen 時長邊下半部加深綠防風布。
@@ -655,6 +686,55 @@ function buildBasketball(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
   for (const side of [1, -1]) addHoop(g, M, side);
   for (const x of [-3, 3]) addBench(g, M, [x, 0, BB.apronWidth / 2 - 0.6], 3, Math.PI);
   for (let i = 0; i < 3; i++) sphere(g, M.basketball, BALL_RADIUS.basketball, [range(rng, [-12, 12]), COURT_LIFT + BALL_RADIUS.basketball, range(rng, [-6, 6])], 20);
+  addBallRack(g, M, rng, M.basketball, BALL_RADIUS.basketball, [-9.5, 0, BB.apronWidth / 2 - 0.7], 0);
+}
+
+// ---------- 放球的地方 ----------
+// 兩層球架：四支腳、每層兩根平行的橫桿，球卡在兩根桿子中間排成一列；最上面少一兩顆（被拿去用了）。自身 x 是長邊。
+function addBallRack(g: THREE.Object3D, M: SportsMaterials, rng: Rng, ball: THREE.Material, radius: number, position: Vec3, yaw: number): void {
+  const rack = childGroup(g, position, yaw);
+  const length = 1.5;
+  const tiers = [0.32, 0.82];
+  const railGap = radius * 1.2;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) rod(rack, M.metal, [sx * length / 2, 0, sz * (railGap / 2 + 0.03)], [sx * length / 2, tiers[1] ?? 0.82, sz * (railGap / 2 + 0.03)], 0.016, 0.016, 6);
+  }
+  const perTier = Math.floor((length - 0.1) / (radius * 2 + 0.01));
+  tiers.forEach((y, tier) => {
+    for (const sz of [-1, 1]) rod(rack, M.metal, [-length / 2, y, sz * railGap / 2], [length / 2, y, sz * railGap / 2], 0.012, 0.012, 6);
+    for (let k = 0; k < perTier; k++) {
+      if (tier === tiers.length - 1 && rng() < 0.2) continue;
+      sphere(rack, ball, radius, [-length / 2 + 0.05 + radius + k * (radius * 2 + 0.01), y + radius * 0.55, 0], 16);
+    }
+  });
+}
+
+// 球桶：開口的塑膠桶，裡面堆滿球（匹克球、壁球這種小球）。
+function addBallBucket(g: THREE.Object3D, M: SportsMaterials, ball: THREE.Material, radius: number, position: Vec3): void {
+  const bucket = childGroup(g, position);
+  addMesh(bucket, new THREE.CylinderGeometry(0.17, 0.14, 0.32, 16, 1, true), M.bucket, [0, 0.16, 0]);
+  cylinder(bucket, M.bucket, 0.14, 0.01, [0, 0.005, 0], 16);
+  addMesh(bucket, new THREE.TorusGeometry(0.17, 0.012, 6, 20).rotateX(Math.PI / 2), M.bucket, [0, 0.32, 0]);
+  for (let k = 0; k < 14; k++) {
+    const angle = k * 2.4;
+    const ring = (k % 7) / 7;
+    sphere(bucket, ball, radius, [Math.cos(angle) * 0.11 * ring, 0.28 + Math.floor(k / 7) * radius * 1.6, Math.sin(angle) * 0.11 * ring], 10);
+  }
+}
+
+// 羽球盒：藍色開口小箱子，裡面直立一排排羽毛球。
+function addShuttleCrate(g: THREE.Object3D, M: SportsMaterials, position: Vec3): void {
+  const crate = childGroup(g, position);
+  box(crate, M.crate, [0.42, 0.02, 0.3], [0, 0.01, 0]);
+  for (const sx of [-1, 1]) box(crate, M.crate, [0.02, 0.18, 0.3], [sx * 0.2, 0.09, 0]);
+  for (const sz of [-1, 1]) box(crate, M.crate, [0.42, 0.18, 0.02], [0, 0.09, sz * 0.14]);
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 3; j++) {
+      const shuttle = childGroup(crate, [-0.135 + i * 0.09, 0.02, -0.08 + j * 0.08]);
+      addMesh(shuttle, new THREE.SphereGeometry(0.0125, 10, 6, 0, TAU, Math.PI / 2, Math.PI / 2), M.cork, [0, 0.0125, 0], [Math.PI, 0, 0]);
+      addMesh(shuttle, new THREE.CylinderGeometry(0.033, 0.013, 0.06, 12, 1, true), M.shuttle, [0, 0.045, 0]);
+    }
+  }
 }
 
 // ---------- 網球 ----------
@@ -726,6 +806,7 @@ function buildVolleyball(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
   addRefereeStand(g, M, -(VB.width / 2 + VB.postOffset + 0.9), COURT_LIFT);
   for (const x of [-4.5, 4.5]) addBench(g, M, [x, 0, VB.width / 2 + 2.4], 3, Math.PI);
   sphere(g, M.volleyball, BALL_RADIUS.volleyball, [range(rng, [-6, 6]), COURT_LIFT + BALL_RADIUS.volleyball, range(rng, [-3, 3])], 20);
+  addBallRack(g, M, rng, M.volleyball, BALL_RADIUS.volleyball, [8.5, 0, VB.width / 2 + 2.4], 0);
 }
 
 // 沙灘排球：架高的沙坑（木框圍邊），場線是藍色織帶，網子和室內一樣。
@@ -745,6 +826,7 @@ function buildBeachVolleyball(g: THREE.Group, M: SportsMaterials, rng: Rng): voi
   addVolleyNet(g, M, BEACH.width, sand);
   addRefereeStand(g, M, -(BEACH.width / 2 + VB.postOffset + 0.9), sand);
   sphere(g, M.volleyball, BALL_RADIUS.volleyball, [range(rng, [-5, 5]), sand + BALL_RADIUS.volleyball * 0.8, range(rng, [-3, 3])], 20);
+  addBallRack(g, M, rng, M.volleyball, BALL_RADIUS.volleyball, [pitchLength / 2 - 1.2, sand, pitchWidth / 2 - 0.8], 0);
 }
 
 // ---------- 匹克球、羽球 ----------
@@ -754,6 +836,7 @@ function buildPickleball(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
       courtFloor(g, M.courtPickleball, PB.areaLength, PB.areaWidth, [cx, COURT_LIFT, cz]);
       addSagNet(g, M, cx, cz, PB.width / 2 + PB.postOffset, PB.netPost, PB.netCenter, 0.04, 0.03);
       for (let i = 0; i < 2; i++) sphere(g, M.pickleball, BALL_RADIUS.pickleball, [cx + range(rng, [-5, 5]), COURT_LIFT + BALL_RADIUS.pickleball, cz + range(rng, [-2.5, 2.5])], 12);
+      addBallBucket(g, M, M.pickleball, BALL_RADIUS.pickleball, [cx + Math.sign(cx) * (PB.areaLength / 2 - 0.6), 0, cz + Math.sign(cz) * (PB.areaWidth / 2 - 0.6)]);
     }
   }
   addFence(g, M, PB.areaLength * 2, PB.areaWidth * 2, PB.fence, true);
@@ -785,6 +868,7 @@ function buildBadminton(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
       courtFloor(g, M.courtBadminton, BD.areaLength, BD.areaWidth, [cx, COURT_LIFT, cz]);
       addBadmintonNet(g, M, cx, cz);
       for (let i = 0; i < 2; i++) addShuttlecock(g, M, [cx + range(rng, [-5, 5]), COURT_LIFT + 0.03, cz + range(rng, [-2.5, 2.5])], rng() * TAU);
+      addShuttleCrate(g, M, [cx + Math.sign(cx) * (BD.areaLength / 2 - 0.6), 0, cz + Math.sign(cz) * (BD.areaWidth / 2 - 0.5)]);
     }
   }
 }
@@ -876,6 +960,7 @@ function buildFutsal(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
   for (const side of [1, -1]) addFutsalGoal(g, M, side);
   for (const x of [-4, 4]) addBench(g, M, [x, 0, FS.areaWidth / 2 - 0.4], 3, Math.PI);
   for (let i = 0; i < 2; i++) sphere(g, M.soccerBall, BALL_RADIUS.futsal, [range(rng, [-15, 15]), COURT_LIFT + BALL_RADIUS.futsal, range(rng, [-7, 7])], 20);
+  addBallRack(g, M, rng, M.soccerBall, BALL_RADIUS.futsal, [9.5, 0, FS.areaWidth / 2 - 0.5], 0);
 }
 
 // ---------- 壁球 ----------
@@ -910,6 +995,7 @@ function addSquashCourt(g: THREE.Object3D, M: SportsMaterials, rng: Rng, centerX
 function buildSquash(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
   const offset = SQ.width / 2 + SQ.wall / 2;
   for (const side of [1, -1]) addSquashCourt(g, M, rng, side * offset);
+  addBallBucket(g, M, M.squashBall, BALL_RADIUS.squash * 2, [SQ.width + 0.1, 0, SQ.length / 2 + 0.6]);
   for (const [z, y] of [[SQ.length / 2 + 1, 0], [SQ.length / 2 + 2, 0.4]] as const) {
     if (y > 0) {
       box(g, M.concrete, [SQ.width * 2 + 0.6, y, 1], [0, y / 2, z]);
@@ -1139,45 +1225,28 @@ function buildBilliards(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
   addCueRack(g, M, postX[2] ?? 0, -postZ, 1);
 }
 
-// 廣場：中間留空（出生點在這裡），兩側長椅、四角種樹，外側一座飲水台。
-function buildPlaza(g: THREE.Group, M: SportsMaterials, rng: Rng): void {
-  for (const sx of [1, -1]) {
-    addBench(g, M, [sx * 4.5, 0, 7.5], 2.4, Math.PI);
-    addBench(g, M, [sx * 4.5, 0, -11.5], 2.4, 0);
-    for (const sz of [1, -1]) addTree(g, M, rng, [sx * 6.5, 0, sz * 10]);
-  }
-  cylinder(g, M.concrete, 0.16, 0.9, [0, 0.45, 10], 12);
-  markCollider(g, [0.5, 1, 0.5], [0, 0.5, 10]);
-  cylinder(g, M.metal, 0.25, 0.08, [0, 0.94, 10], 16);
-}
-
 // ---------- 區段配置 ----------
-type SectionKind = 'plaza' | 'basketball' | 'tennis' | 'volleyball' | 'beachVolleyball' | 'pickleball' | 'badminton' | 'tableTennis'
+type SectionKind = 'basketball' | 'tennis' | 'volleyball' | 'beachVolleyball' | 'pickleball' | 'badminton' | 'tableTennis'
   | 'futsal' | 'squash' | 'boxing' | 'bouldering' | 'billiards' | 'gym';
 type SectionBuilder = (g: THREE.Group, M: SportsMaterials, rng: Rng) => void;
 const SECTION_BUILDERS: Record<SectionKind, SectionBuilder> = {
-  plaza: buildPlaza, basketball: buildBasketball, tennis: buildTennis, volleyball: buildVolleyball, beachVolleyball: buildBeachVolleyball,
+  basketball: buildBasketball, tennis: buildTennis, volleyball: buildVolleyball, beachVolleyball: buildBeachVolleyball,
   pickleball: buildPickleball, badminton: buildBadminton, tableTennis: buildTableTennis, futsal: buildFutsal, squash: buildSquash,
   boxing: (g, M) => buildBoxing(g, M), bouldering: buildBouldering, billiards: buildBilliards, gym: (g, _M, rng) => buildGym(g, rng),
 };
-// 每種區段沿圓周的長度（自身 x）與徑向寬度（自身 z），用來算它在環上要佔多少角度。
-const SECTION_SIZE: Record<SectionKind, [number, number]> = {
-  plaza: [16, 24], basketball: [BB.apronLength, BB.apronWidth], tennis: [TN.areaLength + 6, TN.areaWidth], volleyball: [VB.apronLength, VB.apronWidth],
-  beachVolleyball: [BEACH.pitchLength + 0.4, BEACH.pitchWidth + 0.4], pickleball: [PB.areaLength * 2, PB.areaWidth * 2], badminton: [BD.areaLength * 2, BD.areaWidth * 2],
-  tableTennis: [TT.areaLength * 3, TT.areaWidth * 2], futsal: [FS.areaLength + 2, FS.areaWidth], squash: [(SQ.width + SQ.wall * 2) * 2, 13],
-  boxing: [RING.area, RING.area], bouldering: [BOULDER.panelWidth * BOULDER.angles.length, 9], billiards: [PAVILION.length, PAVILION.width], gym: GYM_SIZE,
-};
-// 沿圓周的順序；第一段（廣場）的中心在角度 0，也就是出生點那一側。
+// 沿圓周的順序（從角度 gap / 2 開始排，出生點前面是最後一個間隔的桌椅）。
 const SECTION_ORDER: SectionKind[] = [
-  'plaza', 'basketball', 'tennis', 'volleyball', 'pickleball', 'gym', 'badminton', 'tableTennis', 'futsal', 'squash', 'boxing',
-  'bouldering', 'plaza', 'billiards', 'beachVolleyball', 'tennis', 'basketball', 'badminton', 'volleyball', 'pickleball', 'tableTennis',
+  // 排球（三座室內、一座沙灘）排在一起
+  'basketball', 'tennis', 'volleyball', 'volleyball', 'volleyball', 'beachVolleyball', 'pickleball', 'gym', 'badminton',
+  'futsal', 'squash', 'boxing', 'bouldering', 'billiards', 'tennis', 'basketball', 'badminton', 'pickleball',
 ];
 
-// 直的區段放在彎的環上，內緣兩角會比圓弧多凸出去；用內緣半徑算它的半角，區段之間才不會互相重疊。
-const halfAngleOf = (kind: SectionKind, middle: number): number => {
-  const [length, width] = SECTION_SIZE[kind];
-  return Math.atan(length / 2 / (middle - width / 2));
-};
+// 直的區段放在彎的環上，內緣兩角會比圓弧多凸出去；用內緣半徑算左右兩邊各佔多少角度，區段之間的間隔才一樣寬、不重疊。
+function sectionExtent(g: THREE.Group, center: number): { left: number; right: number } {
+  const bounds = new THREE.Box3().setFromObject(g);
+  const innerRadius = center + bounds.min.z;
+  return { left: Math.atan(-bounds.min.x / innerRadius), right: Math.atan(bounds.max.x / innerRadius) };
+}
 
 // 在環上 angle 的位置放一組設施：自身 x 沿圓周（切線）、z 朝外（徑向）。
 const placeOnRing = (parent: THREE.Object3D, radius: number, y: number, angle: number): THREE.Group =>
@@ -1238,6 +1307,20 @@ function addStandSeats(group: THREE.Group, M: SportsMaterials, front: number, in
   group.add(seats);
 }
 
+// 照明燈塔：一根高桿、六格燈頭往下斜照；facingOut 時燈頭朝外（+徑向），否則朝圓心。
+function addLightTower(props: THREE.Group, M: SportsMaterials, radius: number, baseY: number, angle: number, facingOut: boolean): void {
+  const tower = childGroup(props, [radius * Math.sin(angle), baseY, radius * Math.cos(angle)], angle + (facingOut ? 0 : Math.PI));
+  skipCollider(tower);
+  markCollider(tower, [0.6, TOWER.height, 0.6], [0, TOWER.height / 2, 0]);
+  rod(tower, M.metal, [0, 0, 0], [0, TOWER.height, 0], 0.3, 0.18, 10);
+  const head = childGroup(tower, [0, TOWER.height, 0.3]);
+  head.rotation.x = TOWER.tilt;
+  box(head, M.darkMetal, [3, 1.8, 0.35], [0, 0, 0]);
+  for (const x of [-1, 0, 1]) {
+    for (const y of [-0.45, 0.45]) box(head, M.lamp, [0.8, 0.7, 0.02], [x * 0.95, y, 0.19]);
+  }
+}
+
 // 走道扶手、前緣欄杆與看台後方的照明燈塔（零件會再合併）。
 function addStandFixtures(props: THREE.Group, M: SportsMaterials, front: number, inward: number, baseY: number): void {
   const { rows, tread, rise, aisleEvery, railHeight, back } = STANDS;
@@ -1252,20 +1335,7 @@ function addStandFixtures(props: THREE.Group, M: SportsMaterials, front: number,
   const towerRadius = front + inward * (depth + back / 2);
   const towerBase = baseY + rows * rise + STANDS.parapet;
   const towers = Math.max(4, Math.round((TAU * towerRadius) / TOWER.spacing));
-  for (let t = 0; t < towers; t++) {
-    const angle = ((t + 0.5) / towers) * TAU;
-    // 燈塔立在看台後方的矮牆上；燈頭朝球場：內側看台的燈塔朝外（+徑向），外側的朝內
-    const tower = childGroup(props, [towerRadius * Math.sin(angle), towerBase, towerRadius * Math.cos(angle)], angle + (inward < 0 ? 0 : Math.PI));
-    skipCollider(tower);
-    markCollider(tower, [0.6, TOWER.height, 0.6], [0, TOWER.height / 2, 0]);
-    rod(tower, M.metal, [0, 0, 0], [0, TOWER.height, 0], 0.3, 0.18, 10);
-    const head = childGroup(tower, [0, TOWER.height, 0.3]);
-    head.rotation.x = TOWER.tilt;
-    box(head, M.darkMetal, [3, 1.8, 0.35], [0, 0, 0]);
-    for (const x of [-1, 0, 1]) {
-      for (const y of [-0.45, 0.45]) box(head, M.lamp, [0.8, 0.7, 0.02], [x * 0.95, y, 0.19]);
-    }
-  }
+  for (let t = 0; t < towers; t++) addLightTower(props, M, towerRadius, towerBase, ((t + 0.5) / towers) * TAU, inward < 0);
 }
 
 // 看台的碰撞：每一排的踏面是一圈站得住的環（Disc），每一排前緣的立面是一圈圓形牆（每階 0.45 m，比自動跨上的高度高，要跳）；
@@ -1297,33 +1367,68 @@ function addStandCollision(build: PropsBuild, props: THREE.Group, M: SportsMater
   }
 }
 
-/** 最頂層的運動場環：環面整圈站得住，球場與健身房沿圓周排滿，內外兩側是一整圈觀眾席。 */
+// 外緣一圈矮欄杆：柱子、上下兩道扶手；碰撞是一道圓形牆（只能待在裡面）。
+function addOuterRail(build: PropsBuild, props: THREE.Group, M: SportsMaterials, radius: number, y: number): void {
+  const posts = Math.round((TAU * radius) / OUTER_RAIL.postSpacing);
+  for (let k = 0; k < posts; k++) {
+    const angle = (k / posts) * TAU;
+    box(props, M.aluminum, [0.06, OUTER_RAIL.height, 0.06], [radius * Math.sin(angle), y + OUTER_RAIL.height / 2, radius * Math.cos(angle)], [0, angle, 0]);
+  }
+  for (const [height, tube] of [[OUTER_RAIL.height, 0.035], [OUTER_RAIL.height * 0.5, 0.02]] as const) {
+    addMesh(props, new THREE.TorusGeometry(radius, tube, 6, 720).rotateX(Math.PI / 2), M.aluminum, [0, y + height, 0]);
+  }
+  build.walls.push({ radius, minY: y, maxY: y + OUTER_RAIL.height, solid: 'outside' });
+}
+
+// 兩個區段之間的間隔：中線上沿徑向排一列戶外桌椅，長邊沿圓周。
+function addPicnicRow(props: THREE.Group, M: SportsMaterials, rng: Rng, center: number, y: number, angle: number): void {
+  for (let k = 0; k < PICNIC_SETS; k++) {
+    const radius = center + (k - (PICNIC_SETS - 1) / 2) * PICNIC_SPACING;
+    const set = placeOnRing(props, radius, y, angle);
+    addPicnicSet(set, M, rng);
+  }
+}
+
+/** 最頂層的運動場環：環面整圈站得住，球場與健身房沿圓周排滿（間隔一樣寬、每個間隔四組戶外桌椅），內側一整圈觀眾席，外緣欄杆。 */
 export function buildCourtsRing(spec: RingSpec): PropsBuild {
   const build = emptyBuild();
   const rng = createRng(spec.seed);
   const M = getMaterials();
   build.solid.add(annulus(spec.inner, spec.outer, spec.minY, spec.maxY, colorMaterial(RING_FLOOR)));
   build.discs.push({ inner: spec.inner, outer: spec.outer, minY: spec.minY, maxY: spec.maxY });
-  const middle = (spec.inner + spec.outer) / 2;
-  const used = SECTION_ORDER.reduce((sum, kind) => sum + 2 * halfAngleOf(kind, middle), 0);
-  const gap = (TAU - used) / SECTION_ORDER.length;
-  if (gap < 0) throw new Error(`運動場環放不下所有區段：環中線半徑 ${middle.toFixed(1)} m，區段需要 ${used.toFixed(2)} 弧度（一圈 ${TAU.toFixed(2)}）`);
-  const props = new THREE.Group();
-  let angle = -halfAngleOf(SECTION_ORDER[0] ?? 'plaza', middle);
-  for (const kind of SECTION_ORDER) {
-    const half = halfAngleOf(kind, middle);
-    const section = placeOnRing(props, middle, spec.maxY, angle + half);
-    SECTION_BUILDERS[kind](section, M, rng);
-    markChildGroups(section);
-    angle += 2 * half + gap;
-  }
   const standDepth = STANDS.rows * STANDS.tread + STANDS.back;
-  for (const [front, inward] of [[spec.inner + standDepth + STANDS.frontGap, -1], [spec.outer - standDepth - STANDS.frontGap, 1]] as const) {
-    build.decor.add(new THREE.Mesh(new THREE.LatheGeometry(standProfile(front, inward, spec.maxY), STANDS.segments), M.standConcrete));
-    addStandSeats(build.decor, M, front, inward, spec.maxY);
-    addStandFixtures(props, M, front, inward, spec.maxY);
-    addStandCollision(build, props, M, front, inward, spec.maxY);
+  const standFront = spec.inner + standDepth + STANDS.frontGap;
+  const railRadius = spec.outer - OUTER_RAIL.inset;
+  // 區段放在觀眾席前緣到外緣欄杆之間的正中間
+  const center = (standFront + railRadius) / 2;
+  const sections = SECTION_ORDER.map((kind) => {
+    const g = new THREE.Group();
+    SECTION_BUILDERS[kind](g, M, rng);
+    return { kind, g, ...sectionExtent(g, center) };
+  });
+  const used = sections.reduce((sum, section) => sum + section.left + section.right, 0);
+  const gap = (TAU - used) / sections.length;
+  if (gap < 0) throw new Error(`運動場環放不下所有區段：區段中心半徑 ${center.toFixed(1)} m，區段需要 ${used.toFixed(2)} 弧度（一圈 ${TAU.toFixed(2)}）`);
+  const props = new THREE.Group();
+  // 從角度 gap / 2 開始排，最後一個間隔的正中間剛好是角度 0：出生點（scene.spawn）前面是一列桌椅，不是球場
+  let angle = gap / 2;
+  for (const section of sections) {
+    const middleAngle = angle + section.left;
+    section.g.position.set(center * Math.sin(middleAngle), spec.maxY, center * Math.cos(middleAngle));
+    section.g.rotation.y = middleAngle;
+    props.add(section.g);
+    markChildGroups(section.g);
+    addPicnicRow(props, M, rng, center, spec.maxY, middleAngle + section.right + gap / 2);
+    angle = middleAngle + section.right + gap;
   }
+  build.decor.add(new THREE.Mesh(new THREE.LatheGeometry(standProfile(standFront, -1, spec.maxY), STANDS.segments), M.standConcrete));
+  addStandSeats(build.decor, M, standFront, -1, spec.maxY);
+  addStandFixtures(props, M, standFront, -1, spec.maxY);
+  addStandCollision(build, props, M, standFront, -1, spec.maxY);
+  addOuterRail(build, props, M, railRadius, spec.maxY);
+  // 外緣欄杆內側一排照明燈塔，燈頭朝球場（和內側燈塔錯開半格）
+  const outerTowers = Math.max(4, Math.round((TAU * railRadius) / TOWER.spacing));
+  for (let k = 0; k < outerTowers; k++) addLightTower(props, M, railRadius - 0.8, spec.maxY, (k / outerTowers) * TAU, false);
   build.solids.push(...collectColliders(props));
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);

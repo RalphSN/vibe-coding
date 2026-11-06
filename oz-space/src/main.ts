@@ -6,12 +6,12 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 import GUI, { type Controller } from 'lil-gui';
 import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingsConfig, type SceneConfig } from './config/scene.config';
-import { buildFloatingField, buildRing, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
+import { buildFloatingField, buildRing, isInWaterZone, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
 import { buildCourtsRing } from './oz-sports';
 import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
 import { buildTrackRing } from './oz-track';
 import { buildFloatingHousesRing, buildHousesRing } from './oz-town';
-import { rod } from './oz-kit';
+import { CAT_EAR_REACH, CAT_HEAD_SQUASH, buildCatHead } from './oz-cat';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
 
 // ================= 0. 型別 =================
@@ -59,8 +59,8 @@ type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, m
 interface Solid { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number; standable?: boolean }
 // 圓心在原點、尖點朝下的倒圓錐：用公式算碰撞，碰撞面就是外觀的表面。頂面平台另外用 Disc 站上去。
 interface Cone { tipY: number; topY: number; topRadius: number }
-// 圓心在 (0, baseY, 0) 的上半球：站在球面上、水平方向擋。貓頭就是這個。
-interface Dome { baseY: number; radius: number }
+// 圓心在 (0, baseY, 0) 的上半橢球（水平半徑 radius、高 height）：站在表面上、水平方向擋。貓頭就是這個。
+interface Dome { baseY: number; radius: number; height: number }
 // 掃掠碰到的時刻（位移的比例 0–1）與表面法線（世界座標，朝外）。
 interface SweepHit { t: number; nx: number; nz: number }
 // 推牆時手掌在角色前方多遠、離腳底多高（m）；slack 是手部 IK 能再往前補的距離（沒有 IK 是 0）。
@@ -329,105 +329,19 @@ const SEARCH_OFFSETS = (() => {
   return offsets.sort((a, b) => a.distance - b.distance);
 })();
 
-// 貓耳：長在頭（半球）上，從正上方往左右各偏 EAR_TILT，稍微朝前（+Z，出生點那一側）；三角錐的一面朝前，內側疊一片粉紅。
-const EAR_TILT = THREE.MathUtils.degToRad(42);
-const EAR_FORWARD = 0.15;
-const EAR_RADIUS = 0.38;        // 耳朵底半徑、高度、埋進頭裡的深度，都是頭半徑的倍數
-const EAR_HEIGHT = 0.7;
-const EAR_SINK = 0.15;
-const INNER_EAR_SCALE = 0.62;
-const INNER_EAR_FORWARD = 0.22; // 內耳往前推（耳朵底半徑的倍數），粉紅色才露在正面
-const DOME_SEGMENTS = 64;
-// 貓臉：都長在頭（半球）朝前（+Z）的那一面，方向是從頭中心往外的單位向量；大小是頭半徑的倍數。
-const FACE = {
-  eye: { x: 0.36, y: 0.42, z: 0.83, width: 0.13, height: 0.16, depth: 0.05 },
-  pupil: { width: 0.035, height: 0.13 },
-  nose: { x: 0, y: 0.2, z: 0.98, width: 0.06, height: 0.04 },
-  mouth: { x: 0.05, y: 0.1, z: 0.99, radius: 0.05, tube: 0.008 },
-  cheek: { x: 0.24, y: 0.14, z: 0.96 },
-  whisker: { reach: 0.42, fan: 0.07, radius: 0.004 },
-  collar: { tube: 0.025, bell: 0.06 },
-};
 const CONE_BAND_SPACING = 40;   // 圓錐上一圈圈裝飾環帶的間距（m）
-const FACE_COLORS = { iris: 0xc8d94a, pupil: 0x1d1f24, glint: 0xffffff, line: 0x3a3340, collar: 0xd2463c, bell: 0xe2b23a, band: 0xa9b3c7 };
-const faceMaterials = Object.fromEntries(
-  Object.entries(FACE_COLORS).map(([key, color]) => [key, new THREE.MeshLambertMaterial({ color })]),
-) as Record<keyof typeof FACE_COLORS, THREE.MeshLambertMaterial>;
+const coneBandMaterial = new THREE.MeshLambertMaterial({ color: 0xa9b3c7 });
 
-// 中央：倒圓錐（上平下尖）上面接一個半球和兩隻耳朵，做成貓頭。
-// 碰撞：圓錐側面用 Cone、半球用 Dome（都是公式計算，貼著外觀）；耳朵只有外觀。
+// 中央：倒圓錐（上平下尖）上面接貓頭（見 oz-cat.ts）。
+// 碰撞：圓錐側面用 Cone、頭用 Dome（都是公式計算，貼著外觀）；耳朵、五官只有外觀。
 function buildCenter(center: CenterConfig): THREE.Group {
   const group = new THREE.Group();
   const cone = new THREE.Mesh(new THREE.ConeGeometry(center.topRadius, center.height, CENTER_SEGMENTS).rotateX(Math.PI), materials.center);
   cone.position.y = center.topY - center.height / 2;   // ConeGeometry 尖端朝上，翻過來變成上平下尖
-  const head = new THREE.Mesh(new THREE.SphereGeometry(center.topRadius, DOME_SEGMENTS, DOME_SEGMENTS / 2, 0, Math.PI * 2, 0, Math.PI / 2), materials.center);
-  head.position.y = center.topY;
-  group.add(cone, head);
-  const R = center.topRadius;
-  for (const side of [-1, 1]) {
-    const direction = new THREE.Vector3(side * Math.sin(EAR_TILT), Math.cos(EAR_TILT), EAR_FORWARD).normalize();
-    const tilt = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-    // 三個面的錐：頂點預設朝 +Z，轉半圈讓平的那一面朝前
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(R * EAR_RADIUS, R * EAR_HEIGHT, 3).rotateY(Math.PI).translate(0, (R * EAR_HEIGHT) / 2, 0), materials.center);
-    ear.quaternion.copy(tilt);
-    ear.position.copy(direction).multiplyScalar(R * (1 - EAR_SINK)).add(new THREE.Vector3(0, center.topY, 0));
-    const inner = new THREE.Mesh(ear.geometry.clone().scale(INNER_EAR_SCALE, INNER_EAR_SCALE, INNER_EAR_SCALE), materials.innerEar);
-    inner.position.set(0, 0, R * EAR_RADIUS * INNER_EAR_FORWARD);
-    ear.add(inner);
-    group.add(ear);
-  }
-  addCatFace(group, center);
+  group.add(cone);
+  buildCatHead(group, center.topY, center.topRadius, materials.center, materials.innerEar);
   addConeBands(group, center);
   return group;
-}
-
-// 頭表面上 direction 方向的一點往外推 lift 公尺，讓扁平的零件貼著曲面、正面朝外。
-function placeOnHead(mesh: THREE.Object3D, center: CenterConfig, direction: THREE.Vector3, lift: number): void {
-  const origin = new THREE.Vector3(0, center.topY, 0);
-  mesh.position.copy(direction).multiplyScalar(center.topRadius + lift).add(origin);
-  mesh.lookAt(direction.clone().multiplyScalar(center.topRadius * 2).add(origin));
-}
-
-// 眼睛（黃綠虹膜、直立的瞳孔、反光點）、粉紅鼻子、ω 形的嘴、兩側各三根鬍鬚，脖子上一圈紅項圈和金鈴鐺。只有外觀。
-function addCatFace(group: THREE.Group, center: CenterConfig): void {
-  const R = center.topRadius;
-  const sphere = new THREE.SphereGeometry(1, 24, 16);
-  for (const side of [-1, 1]) {
-    const direction = new THREE.Vector3(side * FACE.eye.x, FACE.eye.y, FACE.eye.z).normalize();
-    const iris = new THREE.Mesh(sphere, faceMaterials.iris);
-    iris.scale.set(R * FACE.eye.width, R * FACE.eye.height, R * FACE.eye.depth);
-    placeOnHead(iris, center, direction, -R * FACE.eye.depth * 0.5);
-    const pupil = new THREE.Mesh(sphere, faceMaterials.pupil);
-    pupil.scale.set(R * FACE.pupil.width, R * FACE.pupil.height, R * FACE.eye.depth);
-    placeOnHead(pupil, center, direction, -R * FACE.eye.depth * 0.3);
-    const glint = new THREE.Mesh(sphere, faceMaterials.glint);
-    glint.scale.setScalar(R * 0.025);
-    placeOnHead(glint, center, new THREE.Vector3(side * FACE.eye.x - 0.04, FACE.eye.y + 0.06, FACE.eye.z).normalize(), R * FACE.eye.depth * 0.45);
-    group.add(iris, pupil, glint);
-  }
-  const nose = new THREE.Mesh(sphere, materials.innerEar);
-  nose.scale.set(R * FACE.nose.width, R * FACE.nose.height, R * 0.03);
-  placeOnHead(nose, center, new THREE.Vector3(FACE.nose.x, FACE.nose.y, FACE.nose.z).normalize(), 0);
-  group.add(nose);
-  // ω：兩段下半圓弧（TorusGeometry 的弧從 +x 逆時針，轉半圈變成朝下的弧）
-  for (const side of [-1, 1]) {
-    const arc = new THREE.Mesh(new THREE.TorusGeometry(R * FACE.mouth.radius, R * FACE.mouth.tube, 6, 16, Math.PI).rotateZ(Math.PI), faceMaterials.line);
-    placeOnHead(arc, center, new THREE.Vector3(side * FACE.mouth.x, FACE.mouth.y, FACE.mouth.z).normalize(), 0);
-    group.add(arc);
-  }
-  for (const side of [-1, 1]) {
-    const cheek = new THREE.Vector3(side * FACE.cheek.x, FACE.cheek.y, FACE.cheek.z).normalize().multiplyScalar(R).add(new THREE.Vector3(0, center.topY, 0));
-    for (const k of [-1, 0, 1]) {
-      const tip = cheek.clone().add(new THREE.Vector3(side * R * FACE.whisker.reach, k * R * FACE.whisker.fan, R * 0.04));
-      rod(group, faceMaterials.line, [cheek.x, cheek.y, cheek.z], [tip.x, tip.y, tip.z], R * FACE.whisker.radius, R * FACE.whisker.radius * 0.4, 6);
-    }
-  }
-  const collar = new THREE.Mesh(new THREE.TorusGeometry(R, R * FACE.collar.tube, 8, 96).rotateX(Math.PI / 2), faceMaterials.collar);
-  collar.position.y = center.topY;
-  const bell = new THREE.Mesh(sphere, faceMaterials.bell);
-  bell.scale.setScalar(R * FACE.collar.bell);
-  bell.position.set(0, center.topY - R * FACE.collar.bell * 0.8, R + R * FACE.collar.tube);
-  group.add(collar, bell);
 }
 
 // 圓錐側面每隔 CONE_BAND_SPACING 一圈細環帶，看得出圓錐往下收窄（只有外觀，比碰撞面凸出不到半公尺）。
@@ -435,27 +349,27 @@ function addConeBands(group: THREE.Group, center: CenterConfig): void {
   const tipY = center.topY - center.height;
   for (let y = center.topY - CONE_BAND_SPACING; y > tipY + CONE_BAND_SPACING / 2; y -= CONE_BAND_SPACING) {
     const radius = coneRadiusAt(center, y);
-    const band = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.6, 6, 96).rotateX(Math.PI / 2), faceMaterials.band);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.6, 6, 96).rotateX(Math.PI / 2), coneBandMaterial);
     band.position.y = y;
     group.add(band);
   }
 }
 
 // 頭頂（耳尖）大約多高：周圍漂浮物要避開的範圍。
-const centerTopY = (center: CenterConfig): number => center.topY + center.topRadius * (1 + EAR_HEIGHT);
+const centerTopY = (center: CenterConfig): number => center.topY + center.topRadius * (CAT_HEAD_SQUASH + CAT_EAR_REACH);
 
 function centerColliders(center: CenterConfig): { cone: Cone; dome: Dome } {
   return {
     cone: { tipY: center.topY - center.height, topY: center.topY, topRadius: center.topRadius },
-    dome: { baseY: center.topY, radius: center.topRadius },
+    dome: { baseY: center.topY, radius: center.topRadius, height: center.topRadius * CAT_HEAD_SQUASH },
   };
 }
 
 // 身體高度範圍 (bottom, top) 和上半球重疊時，球在這段裡最寬的半徑（越往上越窄，取重疊段的最低點）；沒重疊是 null。
 function domeWidestRadius(dome: Dome, bottom: number, top: number): number | null {
-  if (top <= dome.baseY || bottom >= dome.baseY + dome.radius) return null;
-  const rise = Math.max(bottom, dome.baseY) - dome.baseY;
-  return Math.sqrt(dome.radius * dome.radius - rise * rise);
+  if (top <= dome.baseY || bottom >= dome.baseY + dome.height) return null;
+  const rise = (Math.max(bottom, dome.baseY) - dome.baseY) / dome.height;
+  return dome.radius * Math.sqrt(1 - rise * rise);
 }
 
 // 身體佔的高度範圍 (bottom, top) 和倒圓錐重疊時，圓錐在這段裡最寬的半徑（倒圓錐越高越寬，取重疊段的最高點）；沒重疊是 null。
@@ -506,7 +420,7 @@ function ringShapes(center: CenterConfig, rings: RingsConfig): Disc[] {
   return rings.layers.map((layer) => {
     maxY -= layer.gap;
     const inner = coneRadiusAt(center, maxY) + rings.clearance;
-    return { inner, outer: inner + rings.width, minY: maxY - rings.thickness, maxY };
+    return { inner, outer: inner + (layer.width ?? rings.width), minY: maxY - rings.thickness, maxY };
   });
 }
 
@@ -570,6 +484,7 @@ function rebuildScene(): void {
 function createOrbitMode(): ViewMode {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 215, 0);
+
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;
@@ -2063,10 +1978,7 @@ function createFirstPersonMode(): ViewMode {
   }
 
   // 位置 (x, z) 的水域；不在水裡是 null。
-  const waterAt = (x: number, z: number): WaterZone | null => {
-    const distance = Math.hypot(x, z);
-    return world.waters.find((water) => distance > water.inner && distance < water.outer) ?? null;
-  };
+  const waterAt = (x: number, z: number): WaterZone | null => world.waters.find((water) => isInWaterZone(water, x, z)) ?? null;
 
   // 走進、掉進、飛降到水裡（腳底低於水面 SWIM_ENTER_DEPTH，而且不是正往上跳）就開始游泳。
   function startSwimmingIfInWater(): void {
@@ -2307,7 +2219,7 @@ function createFirstPersonMode(): ViewMode {
     for (const dome of world.domes) {
       const reach = Math.max(0, Math.hypot(x, z) - r);
       if (reach >= dome.radius) continue;
-      const domeTop = dome.baseY + Math.sqrt(dome.radius * dome.radius - reach * reach);
+      const domeTop = dome.baseY + dome.height * Math.sqrt(1 - (reach / dome.radius) ** 2);
       if (domeTop <= maxTop + SURFACE_EPSILON && domeTop > height) height = domeTop;
     }
     return height;
@@ -2597,15 +2509,16 @@ function addSceneGroup(panel: GUI): void {
   config.scene.rings.layers.forEach((layer, i) => {
     const folder = rings.addFolder(`第 ${i + 1} 層`);
     folder.add(layer, 'style', RING_STYLES).name('樣式').onChange(rebuildScene);
-    folder.add(layer, 'gap', 2, 80, 1).name('離上一層（m）').onChange(rebuildScene);
+    folder.add(layer, 'gap', 0, 80, 1).name('離上一層（m）').onChange(rebuildScene);
+    if (layer.width !== undefined) folder.add(layer, 'width', 5, 150, 1).name('這層寬（m）').onChange(rebuildScene);
     folder.close();
   });
   const floaters = group.addFolder('周圍漂浮物');
   floaters.add(config.scene.floaters, 'clusters', 0, 20, 1).name('聚集處').onChange(rebuildScene);
   floaters.add(config.scene.floaters, 'islands', 0, 80, 1).name('島嶼').onChange(rebuildScene);
-  floaters.add(config.scene.floaters, 'platforms', 0, 80, 1).name('平台').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'platforms', 0, 80, 1).name('平台（同心圓環、方格）').onChange(rebuildScene);
   floaters.add(config.scene.floaters, 'hexPads', 0, 80, 1).name('蜂窩平面').onChange(rebuildScene);
-  floaters.add(config.scene.floaters, 'debris', 0, 400, 10).name('零碎小塊').onChange(rebuildScene);
+  floaters.add(config.scene.floaters, 'debris', 0, 400, 10).name('漂浮符號').onChange(rebuildScene);
   floaters.add(config.scene.floaters, 'bobScale', 0, 3, 0.1).name('飄動幅度倍率').onChange(rebuildScene);
   group.close();
 }
@@ -2725,8 +2638,7 @@ function addFileButtons(panel: GUI): void {
 
 function updateUnderwater(): void {
   const { x, y, z } = camera.position;
-  const distance = Math.hypot(x, z);
-  const isUnderwater = world.waters.some((water) => distance > water.inner && distance < water.outer && y < water.surfaceY && y > water.floorY - 1);
+  const isUnderwater = world.waters.some((water) => isInWaterZone(water, x, z) && y < water.surfaceY && y > water.floorY - 1);
   scene.fog = isUnderwater ? underwaterFog : null;
   scene.background = isUnderwater ? UNDERWATER_COLOR : SKY_COLOR;
 }
