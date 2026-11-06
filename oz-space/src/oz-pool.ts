@@ -3,8 +3,8 @@
 // （兩側欄杆；四條玻璃水道跨過縫隙，兩座池的水是連通的，可以直接游過去）→ 池邊步道 → 無邊際池：水面一路延伸到環的外緣，越過略低於水面的不鏽鋼溢流口，
 // 沿外緣往下流成水幕（每一段的水量、流速、長度都不一樣），流到盡頭化成霧氣慢慢飄散。
 // 兩座池的池底和池壁都是透明玻璃（水面以下帶一點水的藍綠色，從外面看像水族箱），轉角有不鏽鋼框。
-// 水面：會折射的透明材質（MeshPhysicalMaterial transmission），波紋在著色器裡即時計算（幾道不同方向、波長的深水波相加，
-// 波速照深水波公式），法線跟著波紋算，所以反光、折射都會動。池底與池壁疊上會動的光紋（caustics）。
+// 水面：半透明的藍綠色水面（不用折射：折射要把整個場景多畫一次，效能差一倍，遊戲常見做法也是只用半透明＋反光），
+// 波紋在著色器裡即時計算（幾道不同方向、波長的深水波相加，波速照深水波公式），法線跟著波紋算，所以反光會動。
 import * as THREE from 'three';
 import { annulus, bakeByMaterial, createRng, emptyBuild, getPropsEnvironment, orientedSolid, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
 import { collectColliders, markChildGroups, markCollider, skipCollider } from './oz-kit';
@@ -20,9 +20,8 @@ const GLASS_FRAME = { tube: 0.06, mullionSpacing: 8, mullion: 0.08 };
 // 兩座池之間：競速池寬 raceWidth（6 道 × 2 m），兩邊各一條 rim 寬的池邊步道，中間 gap 的空中縫隙，
 // channels 條 channelWidth 寬的玻璃水道跨過縫隙把兩座池連起來
 const SPLIT = { raceWidth: 12.5, rim: 0.5, gap: 1.7, channels: 4, channelWidth: 3, railHeight: 1.05, railPosts: 2.5 };
-// 水面折射：遊戲常見做法是用波紋法線讓畫面輕微扭曲，不照真實折射率與水深位移；
-// 太強的話，人物露出水面的上半身和水裡的下半身會錯開。ior 接近 1、厚度很薄，只留下波紋的晃動。
-const REFRACTION = { ior: 1.05, thickness: 0.4, attenuationDistance: 0.48 };
+// 水面的樣子：藍綠色、半透明（看得到水裡的人和池底），粗糙度很低、反射天空
+const WATER_LOOK = { color: 0x3fa9c8, opacity: 0.55, roughness: 0.05, metalness: 0.1, envMapIntensity: 1.3 };
 // 無邊際的外緣：溢流口比水面低 weirDrop、寬 lip；看不見的牆比池畔高 barrier（游泳游不出去）
 const EDGE = { lip: 0.3, weirDrop: 0.03, barrier: 1 };
 // 水幕：往下 height 公尺，底部往外張開 flare；霧氣在水幕底部，count 顆、往上飄 rise、帶寬 band
@@ -109,12 +108,11 @@ float ozCaustic(vec2 p, float t) {
 `;
 
 // ---------- 材質 ----------
-// 會折射的水面：transmission 讓池底、池壁透過水面看得到，attenuation 讓越深越偏藍綠；法線由波紋即時計算。
-function createWaterMaterial(): THREE.MeshPhysicalMaterial {
-  const material = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, metalness: 0, roughness: 0.04, transmission: 1, thickness: REFRACTION.thickness, ior: REFRACTION.ior,
-    attenuationColor: new THREE.Color(0x3fb0c4), attenuationDistance: REFRACTION.attenuationDistance, specularIntensity: 1,
-    envMap: getPropsEnvironment(), envMapIntensity: 1.2,
+// 半透明水面：透過它看得到水裡的東西（不扭曲），反射天空；法線由波紋即時計算，反光會跟著波紋晃。
+function createWaterMaterial(): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({
+    color: WATER_LOOK.color, metalness: WATER_LOOK.metalness, roughness: WATER_LOOK.roughness, transparent: true, opacity: WATER_LOOK.opacity,
+    depthWrite: false, envMap: getPropsEnvironment(), envMapIntensity: WATER_LOOK.envMapIntensity,
   });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uOzTime = waterTime;
@@ -695,11 +693,9 @@ export function buildPoolRing(spec: RingSpec): PropsBuild {
   for (let k = 0; k <= POOL.lanes; k++) {
     const radius = raceIn + POOL.laneMargin + k * laneWidth;
     const base = M.ropes[k === 0 || k === POOL.lanes ? 0 : k % 2 === 0 ? 1 : 2] ?? M.tile;
-    // transparent：水面折射是先把不透明物件畫成一張圖再扭曲，浮在水面上的繩子若是不透明，會在水下多出一條倒影；
-    // 標成透明物件就不會被畫進那張圖（opacity 仍是 1，看起來不透明）。
     const rope = new THREE.Mesh(
       new THREE.TorusGeometry(radius, ROPE.radius, 6, ROPE.tubular).rotateX(Math.PI / 2),
-      new THREE.MeshLambertMaterial({ map: repeated(base, (TAU * radius) / ROPE.length, 1), transparent: true }),
+      new THREE.MeshLambertMaterial({ map: repeated(base, (TAU * radius) / ROPE.length, 1) }),
     );
     rope.position.y = waterY + 0.015;
     build.decor.add(rope);

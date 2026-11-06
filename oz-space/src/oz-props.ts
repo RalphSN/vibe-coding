@@ -70,24 +70,9 @@ const BOB_HARMONIC_SHARE = 0.3;
 
 const PLACE_ATTEMPTS = 30;
 
-// 破碎的環：2/3 碎掉。從兩邊斷口往缺口中間走，碎片由大漸漸變小、越來越稀、偏離越多。
-const BROKEN_SHARE = 2 / 3;
-const FRAGMENT_LARGE = 10;             // 斷口旁的碎片大小（m）
-const FRAGMENT_SMALL = 1.5;            // 缺口正中間的碎片大小
-const FRAGMENT_SPARSE = 0.55;          // 缺口正中間有這個比例的位置是空的
-const FRAGMENT_DRIFT = 7;              // 缺口正中間的碎片最多偏離環面幾公尺
-const FRAGMENT_TILT = 0.5;
-const FRAGMENT_FLOAT_FROM = 0.12;      // 走過缺口一半的這個比例之後的碎片才飄，貼著斷口的固定不動
+// 一段角度平板的不規則斷口（arcSlab 給 rng 時用）
 const JAG_POINTS = 5;                  // 斷口的鋸齒點數
 const JAG_DEPTH = 4;                   // 鋸齒最多往完整段內咬幾公尺
-// 完整段上的施工現場
-const BREAK_BARRIER_AT = 7;            // 紐澤西護欄離斷口幾公尺
-const BREAK_BARRIER_GAP = 4;           // 護欄中間留的缺口：走得到斷口、跳得上碎片
-const BREAK_RAIL_MARGIN = 9;           // 環邊欄杆在斷口前幾公尺結束
-const BREAK_LAMP_SPACING = 22;
-const REBAR_PER_EDGE = 18;
-const RUBBLE_PER_EDGE = 26;
-const CONES_PER_EDGE = 7;
 
 // 全是碎塊的環
 const SHARD_AREA = 40;
@@ -331,17 +316,34 @@ const GEOMETRY = (() => {
   };
 })();
 
-/** 同一種形狀的一批實例：先收集位置與顏色，build() 時一次建成 InstancedMesh。 */
+// 實例很多的一批，依繞中心的角度切成 BATCH_SECTORS 塊各自一個 InstancedMesh，各自算包圍球，畫面外的那幾塊就不畫。
+// 包圍球多留 BATCH_CULL_MARGIN 公尺：實例會上下飄、會轉，包圍球不跟著更新。
+const BATCH_SECTOR_MIN = 1500;
+const BATCH_SECTORS = 8;
+const BATCH_CULL_MARGIN = 6;
+// 有設 cullDistance 的小東西（果實、作物、欄杆、窗台線腳）：切得更細（DETAIL_SECTORS 塊），每塊各自依離鏡頭的距離決定畫不畫。
+// 塊切細一點，鏡頭附近那幾塊才不會把整圈都帶進來。
+const DETAIL_SECTOR_MIN = 200;
+const DETAIL_SECTORS = 24;
+/** InstancedMesh.userData 裡放「離鏡頭超過幾公尺就不畫」的鍵名；main.ts 每格依它切換 visible。 */
+export const CULL_DISTANCE_KEY = 'cullDistance';
+
+/** 同一種形狀的一批實例：先收集位置與顏色，build() 時建成 InstancedMesh（實例多時依角度分成幾塊，畫面外的不畫）。 */
 export class Batch {
   readonly geometry: THREE.BufferGeometry;
   readonly material: THREE.Material;
-  mesh: THREE.InstancedMesh | null = null;
   private readonly matrices: THREE.Matrix4[] = [];
   private readonly colors: THREE.Color[] = [];
+  /** 第 i 個實例在哪個 InstancedMesh 的第幾個 */
+  private readonly slots: { mesh: THREE.InstancedMesh; index: number }[] = [];
 
-  constructor(geometry: THREE.BufferGeometry, material: THREE.Material = instanceMaterial) {
+  /** 離鏡頭超過這個距離（公尺，量到包圍球表面）就不畫；undefined 是一直畫。 */
+  readonly cullDistance: number | undefined;
+
+  constructor(geometry: THREE.BufferGeometry, material: THREE.Material = instanceMaterial, cullDistance?: number) {
     this.geometry = geometry;
     this.material = material;
+    this.cullDistance = cullDistance;
   }
 
   add(matrix: THREE.Matrix4, color: number): Part {
@@ -350,14 +352,41 @@ export class Batch {
     return { batch: this, index: this.matrices.length - 1, base: matrix };
   }
 
-  build(): THREE.InstancedMesh | null {
-    if (this.matrices.length === 0) return null;
-    const mesh = new THREE.InstancedMesh(this.geometry, this.material, this.matrices.length);
-    this.matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix));
-    this.colors.forEach((color, i) => mesh.setColorAt(i, color));
-    mesh.frustumCulled = false;   // 實例會上下飄，整批的包圍球不會跟著更新；一批一次繪製，不裁切也不貴
-    this.mesh = mesh;
-    return mesh;
+  build(): THREE.Object3D | null {
+    const count = this.matrices.length;
+    if (count === 0) return null;
+    const sectors = this.cullDistance !== undefined
+      ? (count >= DETAIL_SECTOR_MIN ? DETAIL_SECTORS : 1)
+      : (count >= BATCH_SECTOR_MIN ? BATCH_SECTORS : 1);
+    const members: number[][] = Array.from({ length: sectors }, () => []);
+    this.matrices.forEach((matrix, i) => {
+      const angle = THREE.MathUtils.euclideanModulo(Math.atan2(matrix.elements[12] ?? 0, matrix.elements[14] ?? 0), TAU);
+      members[Math.min(sectors - 1, Math.floor((angle / TAU) * sectors))]?.push(i);
+    });
+    const meshes = members.filter((list) => list.length > 0).map((list) => {
+      const mesh = new THREE.InstancedMesh(this.geometry, this.material, list.length);
+      list.forEach((i, local) => {
+        mesh.setMatrixAt(local, this.matrices[i] ?? new THREE.Matrix4());
+        mesh.setColorAt(local, this.colors[i] ?? new THREE.Color());
+        this.slots[i] = { mesh, index: local };
+      });
+      mesh.computeBoundingSphere();
+      if (mesh.boundingSphere) mesh.boundingSphere.radius += BATCH_CULL_MARGIN;
+      if (this.cullDistance !== undefined) mesh.userData[CULL_DISTANCE_KEY] = this.cullDistance;
+      return mesh;
+    });
+    if (meshes.length === 1) return meshes[0] ?? null;
+    const group = new THREE.Group();
+    group.add(...meshes);
+    return group;
+  }
+
+  /** 改第 index 個實例的矩陣（漂浮物每格用）。 */
+  setMatrix(index: number, matrix: THREE.Matrix4): void {
+    const slot = this.slots[index];
+    if (!slot) return;
+    slot.mesh.setMatrixAt(slot.index, matrix);
+    slot.mesh.instanceMatrix.needsUpdate = true;
   }
 }
 
@@ -376,12 +405,9 @@ function makeFloater(rng: Rng, scale: number, apply: (dy: number, time: number) 
 function floatParts(parts: Part[]): (dy: number) => void {
   return (dy) => {
     for (const part of parts) {
-      const mesh = part.batch.mesh;
-      if (!mesh) continue;
       tmpMatrix.copy(part.base);
       tmpMatrix.elements[13] += dy;
-      mesh.setMatrixAt(part.index, tmpMatrix);
-      mesh.instanceMatrix.needsUpdate = true;
+      part.batch.setMatrix(part.index, tmpMatrix);
     }
   };
 }
@@ -443,8 +469,7 @@ function addSpinningSymbol(build: PropsBuild, rng: Rng, scale: number, batch: Ba
   const floater = makeFloater(rng, scale, (dy, time) => {
     const yaw = yaw0 + spin * time;
     matrix.copy(transform(spot.x, spot.y + dy, spot.z, yaw, tiltX, tiltZ, size, size, size));
-    part.batch.mesh?.setMatrixAt(part.index, matrix);
-    if (part.batch.mesh) part.batch.mesh.instanceMatrix.needsUpdate = true;
+    part.batch.setMatrix(part.index, matrix);
     box.ux = Math.cos(yaw);
     box.uz = -Math.sin(yaw);
     box.vx = Math.sin(yaw);
@@ -593,61 +618,6 @@ function drawBikeIcon(ctx: CanvasRenderingContext2D): void {
   ctx.stroke();
 }
 
-// 斷掉的水泥路面：淺色（材質再染上環的顏色）、伸縮縫、裂痕
-function drawCrackedConcrete(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#ece8e2';
-  ctx.fillRect(0, 0, 256, 256);
-  const rng = createRng(81);
-  for (let i = 0; i < 6000; i++) {
-    ctx.fillStyle = ['#e2ddd5', '#f4f1ec', '#d8d2c9'][Math.floor(rng() * 3)] ?? '#ece8e2';
-    ctx.fillRect(rng() * 256, rng() * 256, 2, 2);
-  }
-  ctx.fillStyle = '#c4beb4';
-  ctx.fillRect(0, 127, 256, 2);
-  ctx.fillRect(127, 0, 2, 256);
-  ctx.strokeStyle = '#8f887e';
-  ctx.lineWidth = 1.5;
-  for (let crack = 0; crack < 7; crack++) {
-    let x = rng() * 256;
-    let y = rng() * 256;
-    let heading = rng() * TAU;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    for (let step = 0; step < 8; step++) {
-      heading += (rng() - 0.5) * 1.2;
-      x += Math.cos(heading) * 12;
-      y += Math.sin(heading) * 12;
-      ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
-}
-// 斷口前的警告牌：黃底、黑框、三角形驚嘆號、「前方斷裂」
-function drawWarningSign(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = '#f2c200';
-  ctx.fillRect(0, 0, 256, 160);
-  ctx.strokeStyle = '#1f1f1f';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(5, 5, 246, 150);
-  ctx.beginPath();
-  ctx.moveTo(60, 20);
-  ctx.lineTo(100, 90);
-  ctx.lineTo(20, 90);
-  ctx.closePath();
-  ctx.lineWidth = 7;
-  ctx.stroke();
-  ctx.fillStyle = '#1f1f1f';
-  ctx.font = 'bold 44px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('!', 60, 66);
-  ctx.font = 'bold 34px sans-serif';
-  ctx.fillText('前方', 175, 52);
-  ctx.fillText('斷裂', 175, 96);
-  ctx.font = 'bold 22px sans-serif';
-  ctx.fillText('DANGER', 128, 132);
-}
-
 function drawPage(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = '#fbf8f0';
   ctx.fillRect(0, 0, 128, 128);
@@ -686,12 +656,6 @@ function createDetailMaterials() {
     bikePath: mapped(pixelTexture(256, 256, drawBikePath)),
     bikeIcon: mapped(pixelTexture(128, 128, drawBikeIcon), { transparent: true, alphaTest: 0.3 }),
     paint: colorMaterial(0xf4f4f4),
-    warning: mapped(pixelTexture(256, 160, drawWarningSign)),
-    hazard: mapped(pixelTexture(64, 8, drawStripes('#d23b2f', '#f4f1ea'))),
-    barrier: colorMaterial(0xd9d6d0),
-    trafficCone: colorMaterial(0xf26b1d),
-    rebar: colorMaterial(0x7a4a32),
-    rubble: colorMaterial(0xb3ada4),
     soil: colorMaterial(0x6b4a33),
     stone: colorMaterial(0xb7b0a5),
     rail: colorMaterial(0xd5dae0),
@@ -778,15 +742,49 @@ export const getPropsEnvironment = (): THREE.Texture | null => propsEnvironment;
  * 把一群靜態網格依材質合併成少數幾個網格：細節多的場景（球場、泳池設施）有上千個小零件，
  * 合併後每種材質只畫一次。網格的縮放不能是負的（合併時不會翻轉面的方向）。
  */
+// 單色 Lambert 零件合併後共用的材質：顏色放在頂點上（Lambert 的 color 是乘上去的，白色 × 頂點顏色 = 原本的顏色）
+// 依「哪一面畫、要不要平面著色」各一個（這兩項不能放在頂點上）
+const bakedColorMaterials = new Map<string, THREE.MeshLambertMaterial>();
+const bakedColorMaterial = (side: THREE.Side, flatShading: boolean): THREE.MeshLambertMaterial => {
+  const key = `${side}|${flatShading}`;
+  const existing = bakedColorMaterials.get(key);
+  if (existing) return existing;
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, side, flatShading });
+  bakedColorMaterials.set(key, material);
+  return material;
+};
+// 可以改成頂點顏色的材質：純色、不透明、不發光、沒有任何貼圖、沒有自訂著色器
+function isPlainColor(material: THREE.Material): material is THREE.MeshLambertMaterial {
+  if (!(material instanceof THREE.MeshLambertMaterial)) return false;
+  return !material.map && !material.alphaMap && !material.emissiveMap && !material.lightMap && !material.aoMap && !material.envMap &&
+    !material.transparent && !material.vertexColors && material.emissive.getHex() === 0 && material.opacity === 1 &&
+    !material.wireframe && material.onBeforeCompile === THREE.Material.prototype.onBeforeCompile;
+}
+
+/**
+ * 把 source 底下的網格依材質合併，每種材質一次繪製；單色 Lambert 的零件再跨顏色合成一個（顏色放頂點上），
+ * 一圈常有幾十種顏色的零件，這樣只剩一兩次繪製。
+ */
 export function bakeByMaterial(source: THREE.Object3D): THREE.Group {
   source.updateMatrixWorld(true);
   const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
   source.traverse((object) => {
     if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
-    const material: THREE.Material = object.material;
+    const original: THREE.Material = object.material;
     const geometry = (object.geometry.index ? object.geometry.toNonIndexed() : object.geometry.clone()).applyMatrix4(object.matrixWorld);
+    const isPlain = isPlainColor(original);
     for (const name of Object.keys(geometry.attributes)) {
-      if (name !== 'position' && name !== 'normal' && name !== 'uv') geometry.deleteAttribute(name);
+      if (name !== 'position' && name !== 'normal' && (isPlain || name !== 'uv')) geometry.deleteAttribute(name);
+    }
+    if (!geometry.attributes.normal) geometry.computeVertexNormals();
+    let material = original;
+    if (isPlain) {
+      const { r, g, b } = original.color;
+      const count = geometry.attributes.position?.count ?? 0;
+      const colors = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) colors.set([r, g, b], i * 3);
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      material = bakedColorMaterial(original.side, original.flatShading);
     }
     const list = buckets.get(material) ?? [];
     list.push(geometry);
@@ -810,135 +808,6 @@ function addPlainSlab(spec: RingSpec, build: PropsBuild, color = spec.color): vo
 // 環範圍內隨機一點（面積均勻）。
 function randomInRing(rng: Rng, inner: number, outer: number): { r: number; theta: number } {
   return { r: Math.sqrt(inner * inner + rng() * (outer * outer - inner * inner)), theta: rng() * TAU };
-}
-
-// ---------- 破碎的環 ----------
-// 1/3 是完整的環（站得住），2/3 碎掉：從兩邊斷口往缺口中間，一欄一欄沿著環寬鋪碎片，
-// 走得越遠（progress 0 → 1）碎片越小、越稀、偏離環面越多也越歪；離開斷口一小段之後的碎片會飄。
-function buildBrokenRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
-  const gapLength = TAU * BROKEN_SHARE;
-  const gapStart = rng() * TAU;
-  const arcStart = gapStart + gapLength;
-  const arcLength = TAU - gapLength;
-  const slab = arcSlab(spec.inner, spec.outer, spec.minY, spec.maxY, arcStart, arcLength, mapped(pixelTexture(256, 256, drawCrackedConcrete), { color: spec.color }), rng);
-  planarUv(slab.geometry, 10);
-  build.solid.add(slab);
-  build.discs.push({ ...fullDisc(spec), arc: { start: arcStart, length: arcLength } });
-  addBreakSite(spec, build, rng, arcStart, arcLength);
-
-  const batches = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
-  const thickness = spec.maxY - spec.minY;
-  const middleRadius = (spec.inner + spec.outer) / 2;
-  const halfGap = (gapLength / 2) * middleRadius;   // 斷口到缺口中間的弧長（m）
-  for (const side of [1, -1]) {
-    const edge = side > 0 ? gapStart : gapStart + gapLength;
-    let traveled = 0;
-    while (traveled < halfGap) {
-      const progress = traveled / halfGap;
-      const size = FRAGMENT_LARGE * (FRAGMENT_SMALL / FRAGMENT_LARGE) ** progress;
-      for (let r = spec.inner + size / 2; r < spec.outer - size / 4; r += size * range(rng, [0.9, 1.25])) {
-        if (rng() < progress * FRAGMENT_SPARSE) continue;
-        const theta = edge + (side * (traveled + size / 2 + spread(rng, size * 0.25))) / r;
-        const y = spec.maxY - thickness / 2 + spread(rng, progress * FRAGMENT_DRIFT);
-        const tilt = progress * FRAGMENT_TILT;
-        const fragmentThickness = thickness * (progress < 0.3 ? 1 : range(rng, [0.5, 1]));
-        const matrix = transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, tilt), spread(rng, tilt),
-          size * range(rng, [0.8, 1.1]), fragmentThickness, size * range(rng, [0.8, 1.1]));
-        const part = pick(rng, batches).add(matrix, shade(spec.color, spread(rng, 0.06)));
-        if (progress > FRAGMENT_FLOAT_FROM) addFloater(build, rng, spec.bobScale, [part]);
-        else build.solids.push(partsSolid([part]));
-      }
-      traveled += size * range(rng, [0.9, 1.2]);
-    }
-  }
-  addBatches(build.decor, batches);
-}
-
-// 一段只擋 [start, start + length] 的環邊欄杆：柱子、扶手和一段圓形牆。
-// 走路時圓形牆只擋人所在的那一側，所以中間的欄杆不會擋到隔壁環上的人。
-function addArcRail(build: PropsBuild, props: THREE.Group, M: DetailMaterials, radius: number, y: number, start: number, length: number, solid: 'inside' | 'outside'): void {
-  const posts = Math.max(1, Math.round((length * radius) / RAIL_POST_SPACING));
-  for (let i = 0; i <= posts; i++) {
-    const angle = start + (length * i) / posts;
-    cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [polarX(radius, angle), y + RAIL_HEIGHT / 2, polarZ(radius, angle)], 6);
-  }
-  for (const height of [RAIL_HEIGHT, RAIL_HEIGHT / 2]) {
-    addMesh(props, new THREE.TorusGeometry(radius, height === RAIL_HEIGHT ? 0.035 : 0.02, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.rail, [0, y + height, 0], [0, start + length - Math.PI / 2, 0]);
-  }
-  build.walls.push({ radius, minY: y, maxY: y + RAIL_HEIGHT, solid, arc: { start, length } });
-}
-
-// 紐澤西護欄：下寬上窄的水泥塊，上半段漆紅白斜紋。自身 z 是長邊（沿環的半徑方向排）。
-function addJerseyBarrier(g: THREE.Group, M: DetailMaterials): void {
-  box(g, M.barrier, [0.6, 0.35, 1.9], [0, 0.175, 0]);
-  box(g, M.hazard, [0.3, 0.55, 1.9], [0, 0.62, 0]);
-}
-
-function addTrafficCone(g: THREE.Group, M: DetailMaterials): void {
-  box(g, M.stool, [0.42, 0.04, 0.42], [0, 0.02, 0]);
-  rod(g, M.trafficCone, [0, 0.04, 0], [0, 0.75, 0], 0.17, 0.03, 10);
-  cylinder(g, M.paint, 0.115, 0.08, [0, 0.42, 0], 10);
-}
-
-// 斷口前的施工現場：每個斷口前一排紐澤西護欄（中間留缺口）、交通錐、警告牌、
-// 斷面伸出來彎掉的鋼筋、散落的碎石；完整段兩側有欄杆，路燈沿內緣排，最靠近斷口的那盞歪了。
-// dir 是缺口在哪個方向（+1：角度變大的那一側），自身 x 沿圓周（角度變大的方向）。
-function addBreakSite(spec: RingSpec, build: PropsBuild, rng: Rng, arcStart: number, arcLength: number): void {
-  const M = getDetailMaterials();
-  const y = spec.maxY;
-  const props = new THREE.Group();
-  const middle = (spec.inner + spec.outer) / 2;
-  const thickness = spec.maxY - spec.minY;
-  const margin = BREAK_RAIL_MARGIN / middle;
-  addArcRail(build, props, M, spec.inner + 0.15, y, arcStart + margin, arcLength - 2 * margin, 'inside');
-  addArcRail(build, props, M, spec.outer - 0.15, y, arcStart + margin, arcLength - 2 * margin, 'outside');
-  const lampRadius = spec.inner + 1.2;
-  const lamps = Math.max(2, Math.round(((arcLength - 2 * margin) * lampRadius) / BREAK_LAMP_SPACING));
-  for (let i = 0; i <= lamps; i++) {
-    const g = ringGroup(props, lampRadius, y, arcStart + margin + ((arcLength - 2 * margin) * i) / lamps);
-    addPromenadeLamp(g, M);
-    if (i === 0) g.rotation.z = 0.35;          // 最靠近斷口的兩盞往缺口歪
-    if (i === lamps) g.rotation.z = -0.35;
-  }
-  for (const [edge, dir] of [[arcStart, -1], [arcStart + arcLength, 1]] as const) {
-    const at = (meters: number, r: number): number => edge - (dir * meters) / r;   // 從斷口往完整段走 meters 公尺
-    for (let r = spec.inner + 1.2; r < spec.outer - 1; r += 2.05) {
-      if (Math.abs(r - middle) < BREAK_BARRIER_GAP / 2 + 1) continue;
-      addJerseyBarrier(ringGroup(props, r, y, at(BREAK_BARRIER_AT, r)), M);
-    }
-    for (let i = 0; i < CONES_PER_EDGE; i++) {
-      const r = middle + spread(rng, BREAK_BARRIER_GAP * 1.6);
-      const cone = ringGroup(props, r, y, at(BREAK_BARRIER_AT + 1.5 + rng() * 3, r));
-      skipCollider(cone);
-      addTrafficCone(cone, M);
-    }
-    const sign = ringGroup(props, middle + BREAK_BARRIER_GAP, y, at(BREAK_BARRIER_AT + 4, middle + BREAK_BARRIER_GAP));
-    skipCollider(sign);
-    markCollider(sign, [0.3, 2.4, 0.3], [0, 1.2, 0]);
-    for (const z of [-0.6, 0.6]) rod(sign, M.darkMetal, [0, 0, z], [0, 2.4, z], 0.04);
-    addMesh(sign, new THREE.PlaneGeometry(1.6, 1), M.warning, [-dir * 0.05, 1.8, 0], [0, -dir * Math.PI / 2, 0]);
-    for (let i = 0; i < REBAR_PER_EDGE; i++) {
-      const r = spec.inner + 1 + rng() * (spec.outer - spec.inner - 2);
-      const rebarY = spec.minY + thickness * (rng() < 0.5 ? 0.3 : 0.7);
-      const out = range(rng, [0.8, 2.8]);
-      const from: Vec3 = [polarX(r, at(JAG_DEPTH + 0.5, r)), rebarY, polarZ(r, at(JAG_DEPTH + 0.5, r))];
-      const bend: Vec3 = [polarX(r, at(-out * 0.6, r)), rebarY, polarZ(r, at(-out * 0.6, r))];
-      const tipR = r + spread(rng, 0.6);
-      const tip: Vec3 = [polarX(tipR, at(-out, tipR)), rebarY - range(rng, [0.2, 1.2]), polarZ(tipR, at(-out, tipR))];
-      rod(props, M.rebar, from, bend, 0.05, 0.05, 5);
-      rod(props, M.rebar, bend, tip, 0.05, 0.05, 5);
-    }
-    for (let i = 0; i < RUBBLE_PER_EDGE; i++) {
-      const r = spec.inner + 1 + rng() * (spec.outer - spec.inner - 2);
-      const size = range(rng, [0.15, 0.55]);
-      const angle = at(JAG_DEPTH + 0.3 + rng() * 6, r);
-      addMesh(props, new THREE.DodecahedronGeometry(size, 0), M.rubble, [polarX(r, angle), y + size * 0.4, polarZ(r, angle)], [rng() * TAU, rng() * TAU, 0]);
-    }
-  }
-  markChildGroups(props);
-  build.solids.push(...collectColliders(props));
-  build.decor.add(bakeByMaterial(props));
-  disposeGeometries(props);
 }
 
 // 整圈都是各種形狀、顏色的碎塊，沒有環面，站不上去；全部都在飄。
@@ -1070,7 +939,8 @@ function addShelfSegment(rng: Rng, build: PropsBuild, center: number, floorY: nu
   const levelHeight = (LIBRARY_HEIGHT - LIBRARY_TOP) / LIBRARY_LEVELS;
   const wood = colorMaterial(WOOD);
   build.solid.add(
-    arcSlab(center - LIBRARY_BACK / 2, center + LIBRARY_BACK / 2, floorY, floorY + LIBRARY_HEIGHT, start, length, colorMaterial(WOOD_DARK)),
+    // 背板只到頂板底下：背板頂面和頂板頂面若在同一高度，兩個面搶同一個深度，中線會閃爍（深度衝突）
+    arcSlab(center - LIBRARY_BACK / 2, center + LIBRARY_BACK / 2, floorY, floorY + LIBRARY_HEIGHT - LIBRARY_TOP, start, length, colorMaterial(WOOD_DARK)),
     arcSlab(center - half, center + half, floorY + LIBRARY_HEIGHT - LIBRARY_TOP, floorY + LIBRARY_HEIGHT, start, length, wood),
   );
   for (let level = 0; level < LIBRARY_LEVELS; level++) {
@@ -1576,13 +1446,13 @@ export function buildRing(spec: RingSpec): PropsBuild {
   const rng = createRng(spec.seed);
   switch (spec.style) {
     case 'plain': addPlainSlab(spec, build); break;
-    case 'broken': buildBrokenRing(spec, build, rng); break;
     case 'floatingBooks': buildFloatingBooksRing(spec, build, rng); break;
     case 'shards': buildShardsRing(spec, build, rng); break;
     case 'bookshelf': buildLibraryRing(spec, build, rng); break;
     case 'triple': buildTripleRing(spec, build, rng); break;
     case 'restaurant': buildFoodCourtRing(spec, build, rng); break;
     case 'courts':
+    case 'broken':
     case 'track':
     case 'houses':
     case 'floatingHouses':

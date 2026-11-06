@@ -6,10 +6,11 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 import GUI, { type Controller } from 'lil-gui';
 import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingsConfig, type SceneConfig } from './config/scene.config';
-import { buildFloatingField, buildRing, isInWaterZone, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
+import { CULL_DISTANCE_KEY, buildFloatingField, buildRing, isInWaterZone, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
 import { buildCourtsRing } from './oz-sports';
 import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
 import { buildTrackRing } from './oz-track';
+import { buildGardenRing } from './oz-garden';
 import { buildFloatingHousesRing, buildHousesRing } from './oz-town';
 import { CAT_EAR_REACH, CAT_HEAD_SQUASH, buildCatHead } from './oz-cat';
 import rawSceneConfig from './config/scene.config.json' with { type: 'json' };
@@ -109,31 +110,6 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 // 金屬與水面反射用的天空環境貼圖，要在第一次建場景之前設定。
 setPropsEnvironment(createSkyEnvironment(renderer));
-
-// 水面折射（transmission）是先把不透明物件畫成一張圖，再從水面去取樣、扭曲。水面以上的東西（人物露出水面的上半身、
-// 池畔的設施）也會被畫進那張圖，水裡就多出錯位的分身。所以畫那張圖時（render target 不是畫面），
-// 每個物件都切掉水面以上的部分；畫到畫面上時不切。
-const REFRACTION_CLIP_LIFT = 0.02;   // 切的高度比水面高一點點，水線附近才不會露出縫
-const refractionClip = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)];
-let hasRefractionClip = false;
-renderer.localClippingEnabled = true;
-
-function updateRefractionClip(): void {
-  const water = world.waters[0];
-  hasRefractionClip = water !== undefined;
-  if (water) refractionClip[0]?.set(new THREE.Vector3(0, -1, 0), water.surfaceY + REFRACTION_CLIP_LIFT);
-}
-
-function clipRefractionAboveWater(root: THREE.Object3D): void {
-  root.traverse((object) => {
-    if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
-    const material: THREE.Material = object.material;
-    if (material instanceof THREE.MeshPhysicalMaterial && material.transmission > 0) return;   // 水面自己
-    object.onBeforeRender = (activeRenderer) => {
-      material.clippingPlanes = hasRefractionClip && activeRenderer.getRenderTarget() !== null ? refractionClip : null;
-    };
-  });
-}
 
 const scene = new THREE.Scene();
 const SKY_COLOR = new THREE.Color(0xeef0f2);
@@ -424,6 +400,7 @@ const buildLayer = (spec: RingSpec): PropsBuild => {
   if (spec.style === 'track') return buildTrackRing(spec);
   if (spec.style === 'houses') return buildHousesRing(spec);
   if (spec.style === 'floatingHouses') return buildFloatingHousesRing(spec);
+  if (spec.style === 'broken') return buildGardenRing(spec);
   return buildRing(spec);
 };
 
@@ -442,6 +419,70 @@ function buildRings(center: CenterConfig, rings: RingsConfig): PropsBuild[] {
   return builds;
 }
 
+// ---------- 水平碰撞的格網 ----------
+// 世界裡有六千多個碰撞方塊；走路、找地面、找天花板每格都全部掃一遍很浪費。從上往下看的外框放進 SOLID_CELL 公尺見方的格子，
+// 查詢時只看附近幾格。方塊中心不會水平移動（漂浮物只上下飄、原地轉），重建場景時建一次就好。
+const SOLID_CELL = 8;
+// 小方塊用外接圓放格子（會原地轉的符號轉到哪個角度都蓋得到）；大的（圍欄、長牆）用軸對齊外框，外接圓會蓋到一大片沒用的格子
+const SOLID_ROUND_LIMIT = SOLID_CELL * 2;
+const SOLID_GRID_OFFSET = 32768;
+const solidGrid = new Map<number, Solid[]>();
+const cellIndex = (value: number): number => Math.floor(value / SOLID_CELL);
+const cellKey = (ix: number, iz: number): number => (ix + SOLID_GRID_OFFSET) * 2 * SOLID_GRID_OFFSET + (iz + SOLID_GRID_OFFSET);
+
+function indexSolids(solids: Solid[]): void {
+  solidGrid.clear();
+  for (const solid of solids) {
+    const round = Math.hypot(solid.hu, solid.hv);
+    const isSmall = round < SOLID_ROUND_LIMIT;
+    const extentX = isSmall ? round : Math.abs(solid.ux) * solid.hu + Math.abs(solid.vx) * solid.hv;
+    const extentZ = isSmall ? round : Math.abs(solid.uz) * solid.hu + Math.abs(solid.vz) * solid.hv;
+    for (let ix = cellIndex(solid.cx - extentX); ix <= cellIndex(solid.cx + extentX); ix++) {
+      for (let iz = cellIndex(solid.cz - extentZ); iz <= cellIndex(solid.cz + extentZ); iz++) {
+        const key = cellKey(ix, iz);
+        const list = solidGrid.get(key);
+        if (list) list.push(solid);
+        else solidGrid.set(key, [solid]);
+      }
+    }
+  }
+}
+
+/** (x, z) 方圓 reach 公尺內可能碰到的碰撞方塊（同一個只回傳一次）。 */
+function solidsNear(x: number, z: number, reach: number): Solid[] {
+  const found = new Set<Solid>();
+  for (let ix = cellIndex(x - reach); ix <= cellIndex(x + reach); ix++) {
+    for (let iz = cellIndex(z - reach); iz <= cellIndex(z + reach); iz++) {
+      for (const solid of solidGrid.get(cellKey(ix, iz)) ?? []) found.add(solid);
+    }
+  }
+  return [...found];
+}
+
+// ---------- 小細節的距離裁切 ----------
+// 果實、作物、窗台線腳這些批次（userData 有 CULL_DISTANCE_KEY）離鏡頭遠了就不畫。每塊的位置不會水平移動，重建時記下世界座標的包圍球。
+interface DetailMesh { mesh: THREE.Object3D; center: THREE.Vector3; reachSquared: number }
+let detailMeshes: DetailMesh[] = [];
+const cameraPosition = new THREE.Vector3();
+
+function collectDetailMeshes(): void {
+  detailMeshes = [];
+  for (const root of [world.room, world.decor]) {
+    root.updateMatrixWorld(true);
+    root.traverse((object) => {
+      const distance: unknown = object.userData[CULL_DISTANCE_KEY];
+      if (!(object instanceof THREE.InstancedMesh) || typeof distance !== 'number' || !object.boundingSphere) return;
+      const reach = distance + object.boundingSphere.radius;
+      detailMeshes.push({ mesh: object, center: object.boundingSphere.center.clone().applyMatrix4(object.matrixWorld), reachSquared: reach * reach });
+    });
+  }
+}
+
+function updateDetailCulling(): void {
+  camera.getWorldPosition(cameraPosition);
+  for (const detail of detailMeshes) detail.mesh.visible = detail.center.distanceToSquared(cameraPosition) < detail.reachSquared;
+}
+
 // 改了地面大小時重建：地面網格、圍欄碰撞一起換。之後在空間裡加平台或物件，也放進 world.room，碰撞會一起收。
 function rebuildScene(): void {
   disposeChildren(world.room);
@@ -455,14 +496,14 @@ function rebuildScene(): void {
   const centerParts = centerColliders(center);
   world.colliders = fence;
   world.solids = [...fence.map(solidFromBox), ...ringBuilds.flatMap((build) => build.solids)];
+  indexSolids(world.solids);
   world.cones = [centerParts.cone];
   world.domes = [centerParts.dome];
   world.ramps = [];
   world.discs = ringBuilds.flatMap((build) => build.discs);
   world.walls = ringBuilds.flatMap((build) => build.walls);
   world.waters = ringBuilds.flatMap((build) => build.waters);
-  updateRefractionClip();
-  clipRefractionAboveWater(scene);
+  collectDetailMeshes();
   camera.far = groundSize * CAMERA_FAR_PER_GROUND;
   camera.updateProjectionMatrix();
 }
@@ -473,7 +514,6 @@ function rebuildScene(): void {
 function createOrbitMode(): ViewMode {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 215, 0);
-
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.49;
   controls.minDistance = 1;
@@ -1739,7 +1779,6 @@ function createCharacter(): Character {
     scene.add(skeletonHelper);
     mixer = new THREE.AnimationMixer(model);
     applyWeights({ idle: 1, walk: 0, run: 0, sprint: 0 });
-    clipRefractionAboveWater(model);
     return names;
   }
 
@@ -1862,7 +1901,7 @@ function createFirstPersonMode(): ViewMode {
     const bottom = feetY + config.character.stepHeight;
     const top = feetY + bodyHeight();
     const solidRadii = [...world.cones.map((cone) => coneWidestRadius(cone, bottom, top)), ...world.domes.map((dome) => domeWidestRadius(dome, bottom, top))];
-    return !world.solids.some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius)) &&
+    return !solidsNear(x, z, config.character.radius).some((solid) => blocksBody(solid) && circleOverlapsSolid(solid, x, z, config.character.radius)) &&
       !solidRadii.some((radius) => radius !== null && distance < radius + config.character.radius) &&
       !world.walls.some((wall) => blocksBodyWall(wall, x, z) && Math.abs(distance - wall.radius) < config.character.radius);
   };
@@ -1872,7 +1911,7 @@ function createFirstPersonMode(): ViewMode {
   // 圓心已經在方塊裡的不擋（例如改設定後物件長在玩家身上），才走得出來。
   function slide(dx: number, dz: number): void {
     const r = config.character.radius;
-    const solids = world.solids.filter((solid) => blocksBody(solid) && !circleOverlapsSolid(solid, body.x, body.z, 0));
+    const solids = solidsNear(body.x, body.z, Math.hypot(dx, dz) + r).filter((solid) => blocksBody(solid) && !circleOverlapsSolid(solid, body.x, body.z, 0));
     const coneRadii = blockingRoundRadii().filter((radius) => Math.hypot(body.x, body.z) >= radius);
     const outerRadii = blockingOuterRadii().filter((radius) => Math.hypot(body.x, body.z) <= radius);
     let restX = dx;
@@ -2196,7 +2235,7 @@ function createFirstPersonMode(): ViewMode {
       if (disc.maxY <= maxTop + SURFACE_EPSILON && disc.maxY > height && overlapsDisc(disc, x, z)) height = disc.maxY;
     }
     // 漂浮物的頂面：站在上面時每格重找一次，平台上下飄，腳也跟著上下（差在 stepHeight 內就貼過去）
-    for (const solid of world.solids) {
+    for (const solid of solidsNear(x, z, r)) {
       if (solid.standable && solid.maxY <= maxTop + SURFACE_EPSILON && solid.maxY > height && circleOverlapsSolid(solid, x, z, r)) height = solid.maxY;
     }
     // 半球：腳印（圓）最靠近球心那一點下面的球面最高。
@@ -2218,7 +2257,7 @@ function createFirstPersonMode(): ViewMode {
     for (const disc of world.discs) {
       if (disc.minY >= fromHead - SURFACE_EPSILON && disc.minY < toHead && disc.minY < height && overlapsDisc(disc, x, z)) height = disc.minY;
     }
-    for (const solid of world.solids) {
+    for (const solid of solidsNear(x, z, config.character.radius)) {
       if (solid.standable && solid.minY >= fromHead - SURFACE_EPSILON && solid.minY < toHead && solid.minY < height && circleOverlapsSolid(solid, x, z, config.character.radius)) height = solid.minY;
     }
     // 倒圓錐的底面是斜的：頭頂（圓）最先碰到的是靠圓錐那一側的邊緣，離圓心 distance - radius 的那一點。
@@ -2308,7 +2347,7 @@ function createFirstPersonMode(): ViewMode {
   // 半徑 0 的掃掠就是射線；斜牆也量得準。推牆判斷和手部 IK 共用。
   const findWall: WallProbe = (x, y, z, dirX, dirZ, maxDistance) => {
     let nearest: { distance: number; nx: number; nz: number } | null = null;
-    for (const solid of world.solids) {
+    for (const solid of solidsNear(x, z, maxDistance)) {
       if (y < solid.minY || y > solid.maxY) continue;
       const hit = sweepCircle(solid, x, z, dirX * maxDistance, dirZ * maxDistance, 0);
       if (hit && (!nearest || hit.t * maxDistance < nearest.distance)) nearest = { distance: hit.t * maxDistance, nx: hit.nx, nz: hit.nz };
@@ -2720,6 +2759,7 @@ renderer.setAnimationLoop(() => {
   updateWater(clock.elapsedTime);
   updateUnderwater();
   character.syncSkeletonHelper();
+  updateDetailCulling();
   renderer.render(scene, camera);
   updatePerfStats(frameSeconds);
 });

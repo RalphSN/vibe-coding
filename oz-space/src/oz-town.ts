@@ -52,6 +52,7 @@ const PLINTH_COLORS = [0x8c867d, 0x9a948b, 0x7d776f];
 const PLANTER = 0x7a4f33;
 const PLANTS = [0x5fa85d, 0x4f9a4c, 0x77b46f];
 const ROOF_TRIM = 0x5b4a3e;
+const PLINTH_SINK = 0.05;
 
 // 外牆貼圖上的窗戶排法（和下面 drawFacade 一致，立體窗台才對得準）：上方留 FACADE_TOP 像素，
 // 其下 FACADE_ROWS_PX 平均分成 rows 層，每格窗戶寬 WINDOW_SHARE.w、高 WINDOW_SHARE.h。
@@ -250,6 +251,9 @@ interface HouseBatches {
   trim: Batch; lamps: Batch; tanks: Batch;
 }
 
+// 窗台、線腳、燈這些幾公分到幾十公分的細節，離鏡頭超過 DETAIL_CULL 公尺就不畫（牆、屋頂照畫，遠看房子輪廓不變）
+const DETAIL_CULL = 180;
+
 function createHouseBatches(M: TownMaterials): HouseBatches {
   const wall = facadeBox();
   const styles = (materials: Record<WallStyle, THREE.Material>): Record<WallStyle, Batch> =>
@@ -259,8 +263,8 @@ function createHouseBatches(M: TownMaterials): HouseBatches {
     roofs: new Batch(new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(-0.5, 0), new THREE.Vector2(0.5, 0), new THREE.Vector2(0, 1)]), { depth: 1, bevelEnabled: false }).translate(0, 0, -0.5), M.roof),
     doors: new Batch(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M.plain),
     chimneys: new Batch(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M.plain),
-    trim: new Batch(new THREE.BoxGeometry(1, 1, 1), M.plain),
-    lamps: new Batch(new THREE.BoxGeometry(1, 1, 1), M.lamp),
+    trim: new Batch(new THREE.BoxGeometry(1, 1, 1), M.plain, DETAIL_CULL),
+    lamps: new Batch(new THREE.BoxGeometry(1, 1, 1), M.lamp, DETAIL_CULL),
     tanks: new Batch(new THREE.CylinderGeometry(0.5, 0.5, 1, 14), M.plain),
   };
 }
@@ -310,7 +314,8 @@ function addFacadeDetails(rng: Rng, B: HouseBatches, body: THREE.Matrix4, shape:
   };
   const layout = isTower ? FACADE_LAYOUT.tower : FACADE_LAYOUT.house;
   // 牆基、樓層腰帶、屋簷線腳
-  at([0, DETAIL.plinth / 2, 0], [w + 0.1, DETAIL.plinth, d + 0.1], pick(rng, PLINTH_COLORS, 0x8c867d));
+  // 牆基往下多 PLINTH_SINK：牆的底面和牆基的底面若都在 y = 0，從下面看（漂浮房屋）兩個面搶同一個深度會閃爍
+  at([0, (DETAIL.plinth - PLINTH_SINK) / 2, 0], [w + 0.1, DETAIL.plinth + PLINTH_SINK, d + 0.1], pick(rng, PLINTH_COLORS, 0x8c867d));
   for (const y of floorBands(h, layout.rows)) at([0, y, 0], [w + 0.07, DETAIL.band, d + 0.07], TRIM);
   at([0, h - DETAIL.cornice / 2, 0], [w + 0.26, DETAIL.cornice, d + 0.26], TRIM);
   const hasShutters = !isTower && rng() < DETAIL.shutterChance;
