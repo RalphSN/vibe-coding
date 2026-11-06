@@ -82,18 +82,15 @@ function requireElement<T extends Element>(selector: string, type: new () => T):
 const config: SceneConfig = loadSceneConfig(rawSceneConfig);
 
 const EPSILON = 1e-3;
-const GROUND_THICKNESS = 0.2;
-const GRID_CELL = 5;               // 地面格線間距（m）：空間上千公尺，1 m 一格遠看會糊成一片灰
 const CENTER_SEGMENTS = 64;
 const CAMERA_FAR_PER_GROUND = 2.5; // 鏡頭可視距離 = 地面邊長 × 這個比例，從空間一角看得到對角
-const GRID_LIFT = 0.002;           // 格線浮在地面上這麼高，才不會和地面互相閃爍
 const FENCE_HEIGHT = 3;            // 地面邊緣隱形圍欄的高度
 const FENCE_THICKNESS = 0.2;
 const SPAWN_SEARCH_STEP = 0.25;
 const SPAWN_SEARCH_RADIUS = 2;
 
 const COLORS = {
-  ground: 0xf4f5f7, grid: 0xdfe2e6, gridMajor: 0xc9cdd3, center: 0xdde3f0, seat: 0xb9c2d6, innerEar: 0xf4a7b9,
+  center: 0xdde3f0, seat: 0xb9c2d6, innerEar: 0xf4a7b9,
   player: 0xff6f3c, playerFace: 0x3a2a20, playerSkin: 0xf0c39c, playerPants: 0x3d4f73, playerShoe: 0x2b2b2b,
 };
 
@@ -214,15 +211,7 @@ function disposeChildren(group: THREE.Object3D): void {
   group.clear();
 }
 
-// 地面頂面在 y = 0，往下挖 GROUND_THICKNESS；格線浮在地面上一點點，才不會和地面互相閃爍。
-function buildGround(size: number): THREE.Group {
-  const group = new THREE.Group();
-  addBox(group, materials.ground, [size, GROUND_THICKNESS, size], [0, -GROUND_THICKNESS / 2, 0]);
-  const grid = new THREE.GridHelper(size, Math.round(size / GRID_CELL), COLORS.gridMajor, COLORS.grid);
-  grid.position.y = GRID_LIFT;
-  group.add(grid);
-  return group;
-}
+// 地面不畫（留白）：站的高度 y = 0 由 supportHeight 處理，四邊的隱形圍欄照舊擋人。
 
 // 地面四邊的隱形圍欄：只給第一人稱碰撞用，走到邊緣就停住，不會走進虛空；推牆動作也是撞這裡。
 function groundFenceBoxes(size: number): THREE.Box3[] {
@@ -459,7 +448,7 @@ function rebuildScene(): void {
   disposeChildren(world.decor);
   const { groundSize, center, rings } = config.scene;
   const ringBuilds = buildRings(center, rings);
-  world.room.add(buildGround(groundSize), buildCenter(center), ...ringBuilds.map((build) => build.solid));
+  world.room.add(buildCenter(center), ...ringBuilds.map((build) => build.solid));
   world.decor.add(...ringBuilds.map((build) => build.decor));
   world.floaters = ringBuilds.flatMap((build) => build.floaters);
   const fence = groundFenceBoxes(groundSize);
@@ -2506,7 +2495,6 @@ function addSceneGroup(panel: GUI): void {
     folder.close();
   });
   const floaters = group.addFolder('周圍漂浮物');
-  floaters.add(config.scene.floaters, 'clusters', 0, 20, 1).name('聚集處').onChange(rebuildScene);
   floaters.add(config.scene.floaters, 'islands', 0, 80, 1).name('島嶼').onChange(rebuildScene);
   floaters.add(config.scene.floaters, 'platforms', 0, 80, 1).name('平台（同心圓環、方格）').onChange(rebuildScene);
   floaters.add(config.scene.floaters, 'hexPads', 0, 80, 1).name('蜂窩平面').onChange(rebuildScene);
