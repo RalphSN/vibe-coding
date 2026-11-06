@@ -1786,7 +1786,6 @@ function createFirstPersonMode(): ViewMode {
   const upDir = new THREE.Vector3();
   const backDir = new THREE.Vector3();
   const probeOrigin = new THREE.Vector3();
-  const hint = requireElement('#fp-hint', HTMLElement);
   const heldCodes = new Set<string>();
   const view = new THREE.Euler(0, 0, 0, 'YXZ');
   let isActive = false;
@@ -1878,7 +1877,6 @@ function createFirstPersonMode(): ViewMode {
       !solidRadii.some((radius) => radius !== null && distance < radius + config.character.radius) &&
       !world.walls.some((wall) => blocksBodyWall(wall, x, z) && Math.abs(distance - wall.radius) < config.character.radius);
   };
-  const dismissHint = (): void => { hint.hidden = true; };
 
   // collide-and-slide：腳印是圓（從上往下看的膠囊體）。沿位移掃掠，碰到就停在表面前 SKIN，
   // 剩下的位移去掉朝牆的分量、貼著牆面繼續走，最多 SLIDE_ITERATIONS 次。牆角會被推開繞過去，斜牆也滑得順。
@@ -2027,7 +2025,6 @@ function createFirstPersonMode(): ViewMode {
     if (action === 'toggleBoost' && !event.repeat) isBoosted = !isBoosted;
     if (action === 'descend' && !event.repeat) toggleSit();
     if (action === 'jump') onJumpKey(event);
-    dismissHint();
   }
 
   // 拖曳畫面轉視角（左右鍵都可以）；buttons 記住目前按著哪些鍵，右鍵會讓 A／D 變平移。
@@ -2050,7 +2047,6 @@ function createFirstPersonMode(): ViewMode {
     lastPointer = { x: event.clientX, y: event.clientY };
     canvas.setPointerCapture(event.pointerId);
     setCursor('grabbing');
-    dismissHint();
   }
 
   function onPointerMove(event: PointerEvent): void {
@@ -2106,7 +2102,6 @@ function createFirstPersonMode(): ViewMode {
     if (!isActive) return;
     event.preventDefault();
     zoom(event.deltaY);
-    dismissHint();
   }, { passive: false });
 
   // 停止追目標時不急停：速度按 FOLLOW_COAST_DAMPING 衰減，數值再滑一小段。
@@ -2388,7 +2383,6 @@ function createFirstPersonMode(): ViewMode {
   function walk(forward: number, right: number, dt: number): void {
     const length = Math.hypot(right, forward);
     if (length === 0) return;
-    dismissHint();
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
     const step = (moveSpeed() * dt) / length;
@@ -2416,7 +2410,6 @@ function createFirstPersonMode(): ViewMode {
       placeCamera(0);
       camera.fov = config.camera.firstPersonFov;
       camera.updateProjectionMatrix();
-      hint.hidden = false;
       setCursor('grab');
     },
     exit() {
@@ -2425,7 +2418,6 @@ function createFirstPersonMode(): ViewMode {
       avatar.visible = false;
       heldCodes.clear();
       mouseButtons = 0;
-      hint.hidden = true;
       camera.fov = ORBIT_FOV;
       camera.updateProjectionMatrix();
       setCursor('');
@@ -2678,8 +2670,17 @@ function updatePerfStats(frameSeconds: number): void {
   perf.elapsed = 0;
 }
 
+// 操作說明（index.html 的 #hud）放在 Inspector 最上面一個可收合的資料夾裡；依目前視角只顯示那一段。
+// 還原預設會重建 Inspector，所以保留這個元素的參照，每次重建再搬進新的資料夾。
+const helpPanel = requireElement('#hud', HTMLElement);
+function addHelpFolder(panel: GUI): void {
+  const folder = panel.addFolder('操作說明');
+  folder.$children.append(helpPanel);
+}
+
 function buildInspector(): GUI {
   const panel = new GUI({ title: 'Inspector' });
+  addHelpFolder(panel);
   addFileButtons(panel);
   panel.add(perf, 'visible').name('顯示效能（FPS）').onChange(setPerfVisible);
   addSceneGroup(panel);
