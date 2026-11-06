@@ -4,18 +4,45 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { RingStyle } from './config/scene.config';
+import { THEMED_ISLANDS, buildIsland } from './oz-islands';
+import { SYMBOLS, symbolGeometry } from './oz-symbols';
+import { addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod, skipCollider, type Vec3 } from './oz-kit';
 
 /** 圓心在原點的環形平板（inner 是 0 就是實心圓）：只管站上去和撞頭。有 arc 時只有這段角度站得住（角度 = atan2(x, z)）。 */
 export interface Disc { inner: number; outer: number; minY: number; maxY: number; arc?: { start: number; length: number } }
 
 /** 會上下飄的東西：apply(dy) 把它放到基準位置往上 dy 公尺。 */
-export interface Floater { amplitude: number; speed: number; phase: number; apply: (dy: number) => void }
+export interface Floater {
+  amplitude: number; speed: number; phase: number; apply: (dy: number, time: number) => void;
+  /** 跟著飄的碰撞方塊：每格把 minY／maxY 設成基準高度 + dy，站在上面的人就跟著上下。 */
+  solids?: { box: SolidBox; minY: number; maxY: number }[];
+}
+
+/**
+ * 圓心在原點的圓形牆（例如泳池池壁）：高度 minY–maxY 之間水平方向擋。solid 是哪一側是實心的：
+ * inside 是半徑以內實心（只能待在外面），outside 是半徑以外實心（只能待在裡面）。
+ */
+export interface RoundWall { radius: number; minY: number; maxY: number; solid: 'inside' | 'outside'; arc?: { start: number; length: number } }
+
+/** 水平方向擋人的有向方塊（和 main.ts 的 Solid 同形狀）：中心、自身兩個水平軸的方向（單位向量）與半長、高度範圍。 */
+export interface SolidBox { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; hu: number; hv: number; minY: number; maxY: number; standable?: boolean }
+
+/** 圓心在原點的環形水域（泳池）：半徑在 inner–outer 之間、高度在 floorY–surfaceY 之間是水；有 arc 時只有那段角度是水（連接兩座池的水道）。 */
+export interface WaterZone { inner: number; outer: number; surfaceY: number; floorY: number; arc?: { start: number; length: number } }
+
+/** (x, z) 在不在這個水域的範圍裡（只看水平位置）。 */
+export function isInWaterZone(water: WaterZone, x: number, z: number): boolean {
+  const distance = Math.hypot(x, z);
+  if (distance <= water.inner || distance >= water.outer) return false;
+  if (!water.arc) return true;
+  return THREE.MathUtils.euclideanModulo(Math.atan2(x, z) - water.arc.start, Math.PI * 2) < water.arc.length;
+}
 
 /**
  * 建出來的東西分兩組：solid 是環本體（站得上去，第三人稱鏡頭會避開），decor 是裝飾（沒有碰撞，鏡頭直接穿過，
  * 數量多時才不會每格都對幾千個物件打射線）。
  */
-export interface PropsBuild { solid: THREE.Group; decor: THREE.Group; discs: Disc[]; floaters: Floater[] }
+export interface PropsBuild { solid: THREE.Group; decor: THREE.Group; discs: Disc[]; floaters: Floater[]; walls: RoundWall[]; waters: WaterZone[]; solids: SolidBox[] }
 
 /** 一圈環的位置與樣式。 */
 export interface RingSpec { style: RingStyle; inner: number; outer: number; minY: number; maxY: number; color: number; seed: number; bobScale: number }
@@ -29,7 +56,8 @@ export interface FieldSpec {
 
 type Rng = () => number;
 type Range = [number, number];
-interface Part { batch: Batch; index: number; base: THREE.Matrix4 }
+/** Batch 裡的一個實例：哪一批、第幾個、原本的矩陣（漂浮時以它為基準上下移）。 */
+export interface Part { batch: Batch; index: number; base: THREE.Matrix4 }
 
 const TAU = Math.PI * 2;
 const RING_SEGMENTS = 128;
@@ -40,21 +68,6 @@ const BOB_PERIOD: Range = [4, 9];          // 秒
 const BOB_HARMONIC = 1.731;
 const BOB_HARMONIC_SHARE = 0.3;
 
-// 房屋（以人物 1.83 m 為準）
-const HOUSE_WIDTH: Range = [4, 8];
-const HOUSE_HEIGHT: Range = [3, 8];
-const TOWER_HEIGHT: Range = [10, 18];
-const TOWER_CHANCE = 0.1;              // 高樓是平頂，不加屋頂
-const HOUSE_GAP: Range = [1, 3];
-const HOUSE_ROW_DEPTH: Range = [5, 8];
-const HOUSE_ROW_GAP: Range = [1, 2.5];
-const HOUSE_EDGE = 1;                  // 離環內外緣留的距離
-const HOUSE_STREET = 8;                // 環中間留一條不蓋房子的大街，出生點在這裡
-const ROOF_OVERHANG = 1.08;
-const ROOF_RATIO: Range = [0.3, 0.6];
-const FLOATING_HOUSE_AREA = 260;       // 漂浮房屋：每這麼多平方公尺放一棟
-const FLOATING_HOUSE_RISE: Range = [-6, 10];
-const FLOATING_HOUSE_TILT = 0.35;      // 最多歪幾弧度（約 20°）
 const PLACE_ATTEMPTS = 30;
 
 // 破碎的環：2/3 碎掉。從兩邊斷口往缺口中間走，碎片由大漸漸變小、越來越稀、偏離越多。
@@ -67,6 +80,14 @@ const FRAGMENT_TILT = 0.5;
 const FRAGMENT_FLOAT_FROM = 0.12;      // 走過缺口一半的這個比例之後的碎片才飄，貼著斷口的固定不動
 const JAG_POINTS = 5;                  // 斷口的鋸齒點數
 const JAG_DEPTH = 4;                   // 鋸齒最多往完整段內咬幾公尺
+// 完整段上的施工現場
+const BREAK_BARRIER_AT = 7;            // 紐澤西護欄離斷口幾公尺
+const BREAK_BARRIER_GAP = 4;           // 護欄中間留的缺口：走得到斷口、跳得上碎片
+const BREAK_RAIL_MARGIN = 9;           // 環邊欄杆在斷口前幾公尺結束
+const BREAK_LAMP_SPACING = 22;
+const REBAR_PER_EDGE = 18;
+const RUBBLE_PER_EDGE = 26;
+const CONES_PER_EDGE = 7;
 
 // 全是碎塊的環
 const SHARD_AREA = 40;
@@ -76,6 +97,11 @@ const SHARD_RISE = 3;
 const SHARD_TILT = 0.5;
 const SHARD_CHUNK_CHANCE = 0.2;
 const SHARD_BOB = 0.6;
+// 碎片的材質比例（其餘是霧面）：亮面金屬、半透明玻璃、會發光的水晶
+const SHARD_GLOSSY_SHARE = 0.15;
+const SHARD_GLASS_SHARE = 0.08;
+const SHARD_CRYSTAL_SHARE = 0.07;
+const SHARD_CRYSTAL_STRETCH = 2.6;
 
 // 飄著的書：大小偏向小本（指數 > 1），少數是巨大的書。張開角度：0 闔上、π 攤平。
 const FLYING_BOOK_AREA = 70;
@@ -114,6 +140,18 @@ const BOOK_GAP: Range = [0.3, 1.2];
 // 三層環
 const TRIPLE_GAP = 5;
 const TRIPLE_SHADE = 0.08;
+// 三層步道的設施
+const TRIPLE_BRIDGES = 6;               // 每道空隙架幾座橋
+const BRIDGE_WIDTH = 3;
+const RAIL_HEIGHT = 1;
+const RAIL_POST_SPACING = 2;
+const FLOWER_BED_SPACING = 8;
+const FLOWERS_PER_BED = 14;
+const FLOWER_COLORS = [0xe63946, 0xf2c200, 0xff7ac3, 0xffffff, 0x8e44ad, 0xf4a261];
+const PROMENADE_LAMP_SPACING = 18;
+const PROMENADE_BENCH_SPACING = 18;
+const BINOCULAR_SPACING = 45;
+const BIKE_DECAL_SPACING = 25;
 
 // 環狀美食街：分成幾個區，每區一種擺法，區和區之間留走道；地面用低彩度的顏色。
 const FOOD_ZONES: Range = [8, 12];
@@ -132,6 +170,7 @@ const LONG_TABLE_ROW = 3.4;
 const LONG_TABLE_COLUMN = 1.5;         // 長桌之間沿長邊方向的空隙
 const PLANTERS: Range = [5, 10];
 const ROUND_TABLE_CHANCE = 0.55;
+const TABLE_UMBRELLA_CHANCE = 0.35;
 const ROUND_CHAIR_OFFSET = 0.95;
 const SQUARE_CHAIR_OFFSET = 0.75;
 const BENCH_OFFSET = 0.7;
@@ -147,26 +186,23 @@ const FIELD_HEAD_WIDTH = 1.3;          // 貓頭（含耳朵）的水平半徑�
 const CLUSTER_SHARE = 0.8;
 const CLUSTER_RADIUS: Range = [25, 60];
 const CLUSTER_FLATNESS = 0.4;          // 聚集處上下比水平方向集中
-const ISLAND_RADIUS: Range = [6, 22];
-const ISLAND_TOP: Range = [1.2, 2.5];
-const ISLAND_DEPTH: Range = [0.8, 1.6];    // 岩塊深度是半徑的幾倍
-const ISLAND_ROCK = 0.75;
-const ISLAND_TILT = 0.08;
-const PLATFORM_SIZE: Range = [4, 14];
-const PLATFORM_THICKNESS: Range = [0.6, 2];
-const PLATFORM_TILT = 0.06;
-const PLATFORM_TIER_CHANCE = 0.4;      // 上面再疊一層較小平台的機率
-const PLATFORM_TIER_SCALE: Range = [0.4, 0.7];
+const ISLAND_RADIUS: Range = [4.5, 10];     // 自然小島；有用途的大島見 oz-islands.ts
+const THEMED_PLACE_TRIES = 12;
+const ISLAND_GAP = 30;                 // 島和島之間至少多留這麼遠（不聚在一起、分散開來）
+const ISLAND_PLACE_TRIES = 4;
+// 同心圓環平台：中間一個圓盤，外面兩圈環，彼此之間留空隙（同一個高度）
+const RING_PAD = { disc: [1.6, 2.6] as Range, ring: [0.9, 1.6] as Range, gap: [0.5, 0.9] as Range, thickness: 0.4, segments: 24 };
+// 方格平台：方磚排成 n × n，隨機少幾格、高低略有不同
+const TILE_PAD = { cells: [3, 5.99] as Range, cell: [1.4, 2.2] as Range, spacing: 1.06, thickness: 0.45, jitter: 0.25, drop: 0.2 };
+const SYMBOL_SIZE: Range = [1.6, 5];
+const SYMBOL_TILT = 0.35;
+const SYMBOL_SPIN: Range = [0.12, 0.35];   // 繞垂直軸慢慢轉的角速度（rad/s），方向隨機
 const HEX_RADIUS: Range = [1.5, 3];
 const HEX_THICKNESS = 0.5;
 const HEX_JITTER = 0.3;
 const HEX_SPACING = 1.06;
 const HEX_DROP_CHANCE = 0.25;
-const HEX_TILT = 0.1;
-const DEBRIS_SIZE: Range = [0.4, 3.5];
 
-const WALL_COLORS = [0xf4efe6, 0xf2d9c4, 0xdfe8f0, 0xe8e0f2, 0xf6e7b8, 0xd7ecd9, 0xf3c9c9, 0xcfd6e0];
-const ROOF_COLORS = [0xb5523b, 0x8a4b3a, 0x4f6d8f, 0x3f6b55, 0xc97b3c, 0x5c5470];
 const SHARD_COLORS = [0xf2545b, 0xf59a3a, 0xf2d04b, 0x6cc56b, 0x4aa8e8, 0x5b6ee1, 0xa064d9, 0xffffff, 0xe6e9f0, 0x2fd3c6, 0xff7ac3];
 const BOOK_COLORS = [0x8c2f39, 0xb5523b, 0xd9a441, 0x3f6b55, 0x2f4b7c, 0x5c5470, 0x1f2a36, 0xe8dcc2, 0x7a9e7e, 0xc96f53, 0x4a6fa5, 0x9b4f96];
 const PAGE_COLORS = [0xfbf8f0, 0xf4eedf, 0xfffdf7];
@@ -178,10 +214,8 @@ const STALL_COLORS = [0xf4efe6, 0xe8e2d6, 0xdfe3e8, 0xefe6dc];
 const AWNING_COLORS = [0xc0574f, 0xd49a4a, 0x6f9c6a, 0x5d8fb0, 0x8c6fa8, 0xc7764a];
 const POT_COLORS = [0x9a8f84, 0xb8afa4, 0x857b72];
 const BUSH_COLORS = [0x6cb86a, 0x5fa85d, 0x7cc576];
-const GRASS_COLORS = [0x7cc576, 0x6cb86a, 0x8fd18a, 0x5fa85d];
-const ROCK_COLORS = [0x9a8f84, 0x857b72, 0xa89f94];
 const PLATFORM_COLORS = [0xffffff, 0xe6e9f0, 0xdfe8f0, 0xf4efe6, 0xcfe3f7, 0xf7d9e3, 0xe0f2e9];
-const PLATFORM_ACCENTS = [0x4aa8e8, 0xf2d04b, 0xff7ac3, 0x2fd3c6, 0xf59a3a];
+const PLATFORM_ACCENTS = [0x4aa8e8, 0xf2d04b, 0xff7ac3, 0x2fd3c6, 0xf59a3a, 0xf2545b];
 const HEX_COLORS = [0x2fd3c6, 0xf2d04b, 0xffffff, 0x4aa8e8, 0xff7ac3, 0x6cc56b];
 const WOOD = 0xb08a63;
 const WOOD_DARK = 0x6e5440;
@@ -230,7 +264,7 @@ function transform(x: number, y: number, z: number, yaw: number, tiltX: number, 
 const instanceMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
 const flatMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
 const colorMaterials = new Map<number, THREE.MeshLambertMaterial>();
-function colorMaterial(color: number): THREE.MeshLambertMaterial {
+export function colorMaterial(color: number): THREE.MeshLambertMaterial {
   const existing = colorMaterials.get(color);
   if (existing) return existing;
   const material = new THREE.MeshLambertMaterial({ color });
@@ -272,7 +306,6 @@ const GEOMETRY = (() => {
     slabs: Array.from({ length: 8 }, slab),
     chunks: [new THREE.DodecahedronGeometry(1), new THREE.IcosahedronGeometry(1), new THREE.OctahedronGeometry(1), new THREE.TetrahedronGeometry(1)],
     hex: new THREE.CylinderGeometry(1, 1, 1, 6),
-    rock: new THREE.ConeGeometry(1, 1, 7).rotateX(Math.PI).translate(0, -0.5, 0),   // 尖端朝下，底面在 y = 0
     // 漂浮平台的各種形狀（都是厚 1、置中）：方、圓、三角、環、十字、L、不規則
     platforms: [
       new THREE.BoxGeometry(1, 1, 1),
@@ -299,8 +332,8 @@ const GEOMETRY = (() => {
   };
 })();
 
-// 同一種形狀的一批實例：先收集位置與顏色，build() 時一次建成 InstancedMesh。
-class Batch {
+/** 同一種形狀的一批實例：先收集位置與顏色，build() 時一次建成 InstancedMesh。 */
+export class Batch {
   readonly geometry: THREE.BufferGeometry;
   readonly material: THREE.Material;
   mesh: THREE.InstancedMesh | null = null;
@@ -336,7 +369,7 @@ function addBatches(group: THREE.Group, batches: Batch[]): void {
   }
 }
 
-function makeFloater(rng: Rng, scale: number, apply: (dy: number) => void): Floater {
+function makeFloater(rng: Rng, scale: number, apply: (dy: number, time: number) => void): Floater {
   return { amplitude: range(rng, BOB_AMPLITUDE) * scale, speed: TAU / range(rng, BOB_PERIOD), phase: rng() * TAU, apply };
 }
 
@@ -354,18 +387,343 @@ function floatParts(parts: Part[]): (dy: number) => void {
   };
 }
 
+// 漂浮物的碰撞：一組實例在世界座標裡的外框（不轉的方塊，斜放的東西外框會大一點），頂面站得上去。
+// 每個形狀先算一次單位幾何的外框，再用實例的矩陣換到世界座標。
+const partBox = new THREE.Box3();
+function partsSolid(parts: Part[]): SolidBox {
+  const bounds = new THREE.Box3();
+  for (const part of parts) {
+    part.batch.geometry.boundingBox ?? part.batch.geometry.computeBoundingBox();
+    const box = part.batch.geometry.boundingBox;
+    if (box) bounds.union(partBox.copy(box).applyMatrix4(part.base));
+  }
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  return { cx: center.x, cz: center.z, ux: 1, uz: 0, vx: 0, vz: 1, hu: size.x / 2, hv: size.z / 2, minY: bounds.min.y, maxY: bounds.max.y, standable: true };
+}
+
+/**
+ * 一組會飄的實例：加進飄動清單，同時加跟著飄的碰撞方塊。
+ * colliders 是哪幾組實例各自算一個碰撞外框（預設整組一個）；島上的樹要和地面分開算，否則整座島的頂面會變成樹梢高。
+ */
+export function addFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[], colliders: Part[][] = [parts]): void {
+  const floater = makeFloater(rng, scale, floatParts(parts));
+  floater.solids = colliders.map((group) => {
+    const box = partsSolid(group);
+    build.solids.push(box);
+    return { box, minY: box.minY, maxY: box.maxY };
+  });
+  build.floaters.push(floater);
+}
+
+/** 一組會飄的實例，碰撞方塊由呼叫端算好（世界座標、和外觀相符），跟著一起飄。 */
+export function addPartsFloater(build: PropsBuild, rng: Rng, scale: number, parts: Part[], solids: SolidBox[]): void {
+  const floater = makeFloater(rng, scale, floatParts(parts));
+  floater.solids = solids.map((box) => {
+    build.solids.push(box);
+    return { box, minY: box.minY, maxY: box.maxY };
+  });
+  build.floaters.push(floater);
+}
+
+// 漂浮的符號：上下飄，同時繞垂直軸慢慢轉（各自的速度與方向）。碰撞方塊是符號沒歪時的外框，每格跟著轉同樣的角度。
+function addSpinningSymbol(build: PropsBuild, rng: Rng, scale: number, batch: Batch, geometry: THREE.BufferGeometry, spot: Spot, size: number): void {
+  const yaw0 = rng() * TAU;
+  const tiltX = spread(rng, SYMBOL_TILT);
+  const tiltZ = spread(rng, SYMBOL_TILT);
+  const spin = range(rng, SYMBOL_SPIN) * (rng() < 0.5 ? -1 : 1);
+  const part = batch.add(transform(spot.x, spot.y, spot.z, yaw0, tiltX, tiltZ, size, size, size), pick(rng, SHARD_COLORS));
+  geometry.boundingBox ?? geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox ?? new THREE.Box3();
+  const halfHeight = ((bounds.max.y - bounds.min.y) / 2) * size;
+  const box: SolidBox = {
+    ...orientedSolid(spot.x, spot.z, yaw0, (bounds.max.x - bounds.min.x) * size, (bounds.max.z - bounds.min.z) * size, spot.y - halfHeight, spot.y + halfHeight),
+    standable: true,
+  };
+  const matrix = new THREE.Matrix4();
+  const floater = makeFloater(rng, scale, (dy, time) => {
+    const yaw = yaw0 + spin * time;
+    matrix.copy(transform(spot.x, spot.y + dy, spot.z, yaw, tiltX, tiltZ, size, size, size));
+    part.batch.mesh?.setMatrixAt(part.index, matrix);
+    if (part.batch.mesh) part.batch.mesh.instanceMatrix.needsUpdate = true;
+    box.ux = Math.cos(yaw);
+    box.uz = -Math.sin(yaw);
+    box.vx = Math.sin(yaw);
+    box.vz = Math.cos(yaw);
+  });
+  floater.solids = [{ box, minY: box.minY, maxY: box.maxY }];
+  build.solids.push(box);
+  build.floaters.push(floater);
+}
+
+/** 一整個物件（例如一座島）一起飄：每格把 position.y 設成基準 + dy；solids 是世界座標的碰撞方塊，跟著飄。 */
+export function addObjectFloater(build: PropsBuild, rng: Rng, scale: number, object: THREE.Object3D, solids: SolidBox[]): void {
+  const baseY = object.position.y;
+  const floater = makeFloater(rng, scale, (dy) => { object.position.y = baseY + dy; });
+  floater.solids = solids.map((box) => {
+    build.solids.push(box);
+    return { box, minY: box.minY, maxY: box.maxY };
+  });
+  build.floaters.push(floater);
+}
+
 /** 每格呼叫：time 是累計秒數。 */
 export function updateFloaters(floaters: Floater[], time: number): void {
   for (const floater of floaters) {
     const wave = Math.sin(time * floater.speed + floater.phase) * (1 - BOB_HARMONIC_SHARE) +
       Math.sin(time * floater.speed * BOB_HARMONIC + floater.phase * 2) * BOB_HARMONIC_SHARE;
-    floater.apply(floater.amplitude * wave);
+    const dy = floater.amplitude * wave;
+    floater.apply(dy, time);
+    for (const solid of floater.solids ?? []) {
+      solid.box.minY = solid.minY + dy;
+      solid.box.maxY = solid.maxY + dy;
+    }
   }
 }
 
+// ---------- 細節材質（美食街攤位、圖書館、飄著的書） ----------
+const STALL_NAMES = ['拉麵', '珍珠奶茶', '披薩', '咖哩飯', '烤肉串', '甜點', '壽司', '漢堡', '鹹酥雞', '刨冰', '咖啡', '水餃'];
+const LIBRARY_SECTIONS = ['文學', '歷史', '科學', '藝術', '哲學', '地理', '音樂', '童書', '語言', '電腦'];
+
+const drawSignText = (text: string, background: string) => (ctx: CanvasRenderingContext2D): void => {
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, 256, 64);
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(4, 4, 248, 56);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 34);
+};
+function drawMenu(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#1f2a24';
+  ctx.fillRect(0, 0, 128, 96);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillText('MENU', 44, 16);
+  for (let i = 0; i < 5; i++) {
+    ctx.fillRect(12, 28 + i * 13, 60 + ((i * 17) % 30), 3);
+    ctx.fillRect(100, 28 + i * 13, 16, 3);
+  }
+}
+const drawStripes = (a: string, b: string) => (ctx: CanvasRenderingContext2D): void => {
+  for (let i = 0; i < 8; i++) {
+    ctx.fillStyle = i % 2 === 0 ? a : b;
+    ctx.fillRect(i * 8, 0, 8, 8);
+  }
+};
+// 木地板：長條木板、接縫錯開，一張 2 m
+function drawPlanks(ctx: CanvasRenderingContext2D): void {
+  const rng = createRng(61);
+  for (let row = 0; row < 16; row++) {
+    let x = -rng() * 128;
+    while (x < 256) {
+      const length = 64 + rng() * 96;
+      const tone = Math.round((rng() - 0.5) * 30);
+      ctx.fillStyle = `rgb(${196 + tone}, ${150 + tone}, ${100 + tone})`;
+      ctx.fillRect(x, row * 16, length, 16);
+      ctx.fillStyle = 'rgba(80, 50, 25, 0.35)';
+      ctx.fillRect(x, row * 16, 1.5, 16);
+      ctx.fillRect(x, row * 16 + 15, length, 1);
+      x += length;
+    }
+  }
+}
+// 地毯：深紅底、金色細邊花紋
+function drawCarpet(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#7a2230';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.strokeStyle = 'rgba(217, 164, 65, 0.55)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(32, 6);
+  ctx.lineTo(58, 32);
+  ctx.lineTo(32, 58);
+  ctx.lineTo(6, 32);
+  ctx.closePath();
+  ctx.stroke();
+}
+// 書的封面：外框與燙金標題帶（白底，實例顏色乘上去變成各色封面）
+function drawCover(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#f2f2f2';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.strokeStyle = '#c9a24a';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(10, 10, 108, 108);
+  ctx.fillStyle = '#d9b45a';
+  ctx.fillRect(22, 40, 84, 16);
+  ctx.fillRect(34, 64, 60, 6);
+}
+// 書頁：一行行文字
+// 草地：深淺不一的草葉點
+function drawLawn(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#6aa864';
+  ctx.fillRect(0, 0, 256, 256);
+  const rng = createRng(71);
+  for (let i = 0; i < 7000; i++) {
+    ctx.fillStyle = ['#5e9c58', '#77b46f', '#549050', '#82bd78'][Math.floor(rng() * 4)] ?? '#6aa864';
+    ctx.fillRect(rng() * 256, rng() * 256, 1, 3);
+  }
+}
+// 自行車道：藍灰色柏油
+function drawBikePath(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#4b6378';
+  ctx.fillRect(0, 0, 256, 256);
+  const rng = createRng(72);
+  for (let i = 0; i < 8000; i++) {
+    ctx.fillStyle = ['#415769', '#56708a', '#3a4f60', '#5f7891'][Math.floor(rng() * 4)] ?? '#4b6378';
+    ctx.fillRect(rng() * 256, rng() * 256, 1.5, 1.5);
+  }
+}
+// 地上的單車圖示：白色線條畫在透明底上（車頭朝貼圖上方）
+function drawBikeIcon(ctx: CanvasRenderingContext2D): void {
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(64, 28, 18, 0, TAU);
+  ctx.moveTo(82, 100);
+  ctx.arc(64, 100, 18, 0, TAU);
+  ctx.moveTo(64, 28);
+  ctx.lineTo(64, 64);
+  ctx.lineTo(64, 100);
+  ctx.moveTo(48, 40);
+  ctx.lineTo(80, 40);
+  ctx.stroke();
+}
+
+// 斷掉的水泥路面：淺色（材質再染上環的顏色）、伸縮縫、裂痕
+function drawCrackedConcrete(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#ece8e2';
+  ctx.fillRect(0, 0, 256, 256);
+  const rng = createRng(81);
+  for (let i = 0; i < 6000; i++) {
+    ctx.fillStyle = ['#e2ddd5', '#f4f1ec', '#d8d2c9'][Math.floor(rng() * 3)] ?? '#ece8e2';
+    ctx.fillRect(rng() * 256, rng() * 256, 2, 2);
+  }
+  ctx.fillStyle = '#c4beb4';
+  ctx.fillRect(0, 127, 256, 2);
+  ctx.fillRect(127, 0, 2, 256);
+  ctx.strokeStyle = '#8f887e';
+  ctx.lineWidth = 1.5;
+  for (let crack = 0; crack < 7; crack++) {
+    let x = rng() * 256;
+    let y = rng() * 256;
+    let heading = rng() * TAU;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let step = 0; step < 8; step++) {
+      heading += (rng() - 0.5) * 1.2;
+      x += Math.cos(heading) * 12;
+      y += Math.sin(heading) * 12;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+}
+// 斷口前的警告牌：黃底、黑框、三角形驚嘆號、「前方斷裂」
+function drawWarningSign(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#f2c200';
+  ctx.fillRect(0, 0, 256, 160);
+  ctx.strokeStyle = '#1f1f1f';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, 246, 150);
+  ctx.beginPath();
+  ctx.moveTo(60, 20);
+  ctx.lineTo(100, 90);
+  ctx.lineTo(20, 90);
+  ctx.closePath();
+  ctx.lineWidth = 7;
+  ctx.stroke();
+  ctx.fillStyle = '#1f1f1f';
+  ctx.font = 'bold 44px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('!', 60, 66);
+  ctx.font = 'bold 34px sans-serif';
+  ctx.fillText('前方', 175, 52);
+  ctx.fillText('斷裂', 175, 96);
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText('DANGER', 128, 132);
+}
+
+function drawPage(ctx: CanvasRenderingContext2D): void {
+  ctx.fillStyle = '#fbf8f0';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.fillStyle = 'rgba(40, 40, 40, 0.35)';
+  for (let y = 14; y < 118; y += 8) ctx.fillRect(12, y, 104 - ((y * 7) % 23), 2);
+}
+
+function createDetailMaterials() {
+  const signs = new Map<string, THREE.MeshLambertMaterial>();
+  const stripes = new Map<string, THREE.MeshLambertMaterial>();
+  return {
+    stallSign: (name: string, color: number): THREE.MeshLambertMaterial => {
+      const key = `${name}:${color}`;
+      const cached = signs.get(key);
+      if (cached) return cached;
+      const material = mapped(pixelTexture(256, 64, drawSignText(name, `#${new THREE.Color(color).getHexString()}`)));
+      signs.set(key, material);
+      return material;
+    },
+    awning: (color: number): THREE.MeshLambertMaterial => {
+      const key = String(color);
+      const cached = stripes.get(key);
+      if (cached) return cached;
+      const map = pixelTexture(64, 8, drawStripes(`#${new THREE.Color(color).getHexString()}`, '#f4f1ea'));
+      map.repeat.set(3, 1);
+      const material = mapped(map, { side: THREE.DoubleSide });
+      stripes.set(key, material);
+      return material;
+    },
+    menu: mapped(pixelTexture(128, 96, drawMenu)),
+    planks: mapped(pixelTexture(256, 256, drawPlanks)),
+    carpet: mapped(pixelTexture(64, 64, drawCarpet)),
+    cover: mapped(pixelTexture(128, 128, drawCover)),
+    page: mapped(pixelTexture(128, 128, drawPage)),
+    lawn: mapped(pixelTexture(256, 256, drawLawn)),
+    bikePath: mapped(pixelTexture(256, 256, drawBikePath)),
+    bikeIcon: mapped(pixelTexture(128, 128, drawBikeIcon), { transparent: true, alphaTest: 0.3 }),
+    paint: colorMaterial(0xf4f4f4),
+    warning: mapped(pixelTexture(256, 160, drawWarningSign)),
+    hazard: mapped(pixelTexture(64, 8, drawStripes('#d23b2f', '#f4f1ea'))),
+    barrier: colorMaterial(0xd9d6d0),
+    trafficCone: colorMaterial(0xf26b1d),
+    rebar: colorMaterial(0x7a4a32),
+    rubble: colorMaterial(0xb3ada4),
+    soil: colorMaterial(0x6b4a33),
+    stone: colorMaterial(0xb7b0a5),
+    rail: colorMaterial(0xd5dae0),
+    flowers: FLOWER_COLORS.map((color) => colorMaterial(color)),
+    leaves: colorMaterial(0x5fa85d),
+    window: colorMaterial(0x26313b),
+    counter: colorMaterial(0x8a5a3b),
+    stool: colorMaterial(0x2b2b2b),
+    darkMetal: colorMaterial(0x3a3f45),
+    lamp: new THREE.MeshBasicMaterial({ color: 0xfff1c9 }),
+    bankerShade: colorMaterial(0x1f6b45),
+    brass: colorMaterial(0xc9a24a),
+    globe: colorMaterial(0x4a8fc0),
+    land: colorMaterial(0x6cc56b),
+    bins: [0x1f5fbf, 0x3f8a5f, 0x6b7280].map((color) => colorMaterial(color)),
+  };
+}
+type DetailMaterials = ReturnType<typeof createDetailMaterials>;
+let detailMaterials: DetailMaterials | null = null;
+// 貼圖要用到 document，第一次建這些環時才建。
+function getDetailMaterials(): DetailMaterials {
+  detailMaterials ??= createDetailMaterials();
+  return detailMaterials;
+}
+// 在環上半徑 radius、角度 angle 放一組零件：自身 x 沿圓周、z 朝外（徑向）。
+const ringGroup = (parent: THREE.Object3D, radius: number, y: number, angle: number, yaw = angle): THREE.Group =>
+  childGroup(parent, [polarX(radius, angle), y, polarZ(radius, angle)], yaw);
+
 // ---------- 環本體 ----------
 // 有厚度的完整環形平板：截面是長方形，繞 Y 軸轉一圈。
-function annulus(inner: number, outer: number, minY: number, maxY: number, material: THREE.Material): THREE.Mesh {
+export function annulus(inner: number, outer: number, minY: number, maxY: number, material: THREE.Material): THREE.Mesh {
   const profile = outline([[inner, minY], [outer, minY], [outer, maxY], [inner, maxY], [inner, minY]]);
   return new THREE.Mesh(new THREE.LatheGeometry(profile, RING_SEGMENTS), material);
 }
@@ -393,10 +751,56 @@ function arcSlab(inner: number, outer: number, minY: number, maxY: number, start
   return mesh;
 }
 
+// 有向方塊碰撞：中心 (cx, cz)、轉 yaw（和 Object3D.rotation.y 同方向）、自身 x 方向長 sizeX、z 方向長 sizeZ。
+export function orientedSolid(cx: number, cz: number, yaw: number, sizeX: number, sizeZ: number, minY: number, maxY: number): SolidBox {
+  return { cx, cz, ux: Math.cos(yaw), uz: -Math.sin(yaw), vx: Math.sin(yaw), vz: Math.cos(yaw), hu: sizeX / 2, hv: sizeZ / 2, minY, maxY };
+}
+
 const fullDisc = (spec: RingSpec): Disc => ({ inner: spec.inner, outer: spec.outer, minY: spec.minY, maxY: spec.maxY });
 
-function emptyBuild(): PropsBuild {
-  return { solid: new THREE.Group(), decor: new THREE.Group(), discs: [], floaters: [] };
+export function emptyBuild(): PropsBuild {
+  return { solid: new THREE.Group(), decor: new THREE.Group(), discs: [], floaters: [], walls: [], waters: [], solids: [] };
+}
+
+// 金屬類材質要反射天空才像金屬：環境貼圖由 main.ts 建好後設定一次（setPropsEnvironment），之後建的材質都會用到。
+let propsEnvironment: THREE.Texture | null = null;
+/** 設定金屬、水面材質反射用的環境貼圖；要在第一次建場景之前呼叫。 */
+export function setPropsEnvironment(texture: THREE.Texture): void {
+  propsEnvironment = texture;
+}
+/** 會反射環境的材質（金屬、亮面塑膠）。 */
+export function shinyMaterial(color: number, metalness: number, roughness: number): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({ color, metalness, roughness, envMap: propsEnvironment });
+}
+/** 目前的環境貼圖（水面材質用）。 */
+export const getPropsEnvironment = (): THREE.Texture | null => propsEnvironment;
+
+/**
+ * 把一群靜態網格依材質合併成少數幾個網格：細節多的場景（球場、泳池設施）有上千個小零件，
+ * 合併後每種材質只畫一次。網格的縮放不能是負的（合併時不會翻轉面的方向）。
+ */
+export function bakeByMaterial(source: THREE.Object3D): THREE.Group {
+  source.updateMatrixWorld(true);
+  const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  source.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
+    const material: THREE.Material = object.material;
+    const geometry = (object.geometry.index ? object.geometry.toNonIndexed() : object.geometry.clone()).applyMatrix4(object.matrixWorld);
+    for (const name of Object.keys(geometry.attributes)) {
+      if (name !== 'position' && name !== 'normal' && name !== 'uv') geometry.deleteAttribute(name);
+    }
+    const list = buckets.get(material) ?? [];
+    list.push(geometry);
+    buckets.set(material, list);
+  });
+  const baked = new THREE.Group();
+  for (const [material, list] of buckets) {
+    const merged = mergeGeometries(list);
+    if (!merged) throw new Error(`合併網格失敗：材質 ${material.type} 的零件屬性不一致`);
+    list.forEach((geometry) => geometry.dispose());
+    baked.add(new THREE.Mesh(merged, material));
+  }
+  return baked;
 }
 
 function addPlainSlab(spec: RingSpec, build: PropsBuild, color = spec.color): void {
@@ -409,80 +813,6 @@ function randomInRing(rng: Rng, inner: number, outer: number): { r: number; thet
   return { r: Math.sqrt(inner * inner + rng() * (outer * outer - inner * inner)), theta: rng() * TAU };
 }
 
-// ---------- 房屋 ----------
-// 一棟房子：牆是單位方塊，屋頂接在牆頂（跟著牆一起歪）。平頂高樓不加屋頂。
-function addHouse(rng: Rng, bodies: Batch, roofs: Batch, matrixArgs: [number, number, number, number, number, number], width: number, height: number, depth: number, hasRoof: boolean): Part[] {
-  const body = transform(...matrixArgs, width, height, depth);
-  const parts = [bodies.add(body, pick(rng, WALL_COLORS))];
-  if (!hasRoof) return parts;
-  const roofHeight = Math.min(width, depth) * range(rng, ROOF_RATIO);
-  const roof = body.clone()
-    .multiply(new THREE.Matrix4().makeTranslation(0, 1, 0))
-    .multiply(new THREE.Matrix4().makeScale(ROOF_OVERHANG, roofHeight / height, ROOF_OVERHANG));
-  parts.push(roofs.add(roof, pick(rng, ROOF_COLORS)));
-  return parts;
-}
-
-// 隨機的房子尺寸；turned 時屋脊轉 90°（寬、深對調），整排看起來才不會一模一樣。
-function randomHouse(rng: Rng): { width: number; height: number; isTower: boolean; turned: boolean } {
-  const isTower = rng() < TOWER_CHANCE;
-  return { width: range(rng, HOUSE_WIDTH), height: range(rng, isTower ? TOWER_HEIGHT : HOUSE_HEIGHT), isTower, turned: rng() < 0.5 };
-}
-
-// 蓋滿房屋：環中間留一條大街，兩側一排排沿著圓周蓋。
-function buildHousesRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
-  addPlainSlab(spec, build);
-  const bodies = new Batch(GEOMETRY.baseBox);
-  const roofs = new Batch(GEOMETRY.roof);
-  const middle = (spec.inner + spec.outer) / 2;
-  const sides: Range[] = [[spec.inner + HOUSE_EDGE, middle - HOUSE_STREET / 2], [middle + HOUSE_STREET / 2, spec.outer - HOUSE_EDGE]];
-  for (const [from, to] of sides) {
-    let rowStart = from;
-    while (to - rowStart > HOUSE_ROW_DEPTH[0] / 2) {
-      const rowDepth = Math.min(range(rng, HOUSE_ROW_DEPTH), to - rowStart);
-      const rowRadius = rowStart + rowDepth / 2;
-      let along = rng() * HOUSE_GAP[1];
-      for (;;) {
-        const house = randomHouse(rng);
-        if (along + house.width > TAU * rowRadius) break;
-        const theta = (along + house.width / 2) / rowRadius;
-        const depth = rowDepth - rng() * 1.5;
-        const yaw = theta + (house.turned ? Math.PI / 2 : 0);
-        const [sizeX, sizeZ] = house.turned ? [depth, house.width] : [house.width, depth];
-        addHouse(rng, bodies, roofs, [polarX(rowRadius, theta), spec.maxY, polarZ(rowRadius, theta), yaw, 0, 0], sizeX, house.height, sizeZ, !house.isTower);
-        along += house.width + range(rng, HOUSE_GAP);
-      }
-      rowStart += rowDepth + range(rng, HOUSE_ROW_GAP);
-    }
-  }
-  addBatches(build.decor, [bodies, roofs]);
-}
-
-// 沒有環面，房屋歪歪斜斜地漂在環的位置上。房子之間至少隔開彼此的大小。
-function buildFloatingHousesRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
-  const bodies = new Batch(GEOMETRY.baseBox);
-  const roofs = new Batch(GEOMETRY.roof);
-  const count = Math.round((Math.PI * (spec.outer ** 2 - spec.inner ** 2)) / FLOATING_HOUSE_AREA);
-  const placed: { x: number; z: number; size: number }[] = [];
-  for (let i = 0; i < count; i++) {
-    const house = randomHouse(rng);
-    const depth = range(rng, HOUSE_WIDTH);
-    const size = Math.max(house.width, depth);
-    for (let attempt = 0; attempt < PLACE_ATTEMPTS; attempt++) {
-      const { r, theta } = randomInRing(rng, spec.inner + size / 2, spec.outer - size / 2);
-      const x = polarX(r, theta);
-      const z = polarZ(r, theta);
-      if (placed.some((other) => Math.hypot(other.x - x, other.z - z) < (other.size + size) / 2)) continue;
-      placed.push({ x, z, size });
-      const args: [number, number, number, number, number, number] = [x, spec.maxY + range(rng, FLOATING_HOUSE_RISE), z, rng() * TAU, spread(rng, FLOATING_HOUSE_TILT), spread(rng, FLOATING_HOUSE_TILT)];
-      const parts = addHouse(rng, bodies, roofs, args, house.width, house.height, depth, !house.isTower);
-      build.floaters.push(makeFloater(rng, spec.bobScale, floatParts(parts)));
-      break;
-    }
-  }
-  addBatches(build.decor, [bodies, roofs]);
-}
-
 // ---------- 破碎的環 ----------
 // 1/3 是完整的環（站得住），2/3 碎掉：從兩邊斷口往缺口中間，一欄一欄沿著環寬鋪碎片，
 // 走得越遠（progress 0 → 1）碎片越小、越稀、偏離環面越多也越歪；離開斷口一小段之後的碎片會飄。
@@ -491,8 +821,11 @@ function buildBrokenRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   const gapStart = rng() * TAU;
   const arcStart = gapStart + gapLength;
   const arcLength = TAU - gapLength;
-  build.solid.add(arcSlab(spec.inner, spec.outer, spec.minY, spec.maxY, arcStart, arcLength, colorMaterial(spec.color), rng));
+  const slab = arcSlab(spec.inner, spec.outer, spec.minY, spec.maxY, arcStart, arcLength, mapped(pixelTexture(256, 256, drawCrackedConcrete), { color: spec.color }), rng);
+  planarUv(slab.geometry, 10);
+  build.solid.add(slab);
   build.discs.push({ ...fullDisc(spec), arc: { start: arcStart, length: arcLength } });
+  addBreakSite(spec, build, rng, arcStart, arcLength);
 
   const batches = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
   const thickness = spec.maxY - spec.minY;
@@ -513,7 +846,8 @@ function buildBrokenRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
         const matrix = transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, tilt), spread(rng, tilt),
           size * range(rng, [0.8, 1.1]), fragmentThickness, size * range(rng, [0.8, 1.1]));
         const part = pick(rng, batches).add(matrix, shade(spec.color, spread(rng, 0.06)));
-        if (progress > FRAGMENT_FLOAT_FROM) build.floaters.push(makeFloater(rng, spec.bobScale, floatParts([part])));
+        if (progress > FRAGMENT_FLOAT_FROM) addFloater(build, rng, spec.bobScale, [part]);
+        else build.solids.push(partsSolid([part]));
       }
       traveled += size * range(rng, [0.9, 1.2]);
     }
@@ -521,23 +855,130 @@ function buildBrokenRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   addBatches(build.decor, batches);
 }
 
+// 一段只擋 [start, start + length] 的環邊欄杆：柱子、扶手和一段圓形牆。
+// 走路時圓形牆只擋人所在的那一側，所以中間的欄杆不會擋到隔壁環上的人。
+function addArcRail(build: PropsBuild, props: THREE.Group, M: DetailMaterials, radius: number, y: number, start: number, length: number, solid: 'inside' | 'outside'): void {
+  const posts = Math.max(1, Math.round((length * radius) / RAIL_POST_SPACING));
+  for (let i = 0; i <= posts; i++) {
+    const angle = start + (length * i) / posts;
+    cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [polarX(radius, angle), y + RAIL_HEIGHT / 2, polarZ(radius, angle)], 6);
+  }
+  for (const height of [RAIL_HEIGHT, RAIL_HEIGHT / 2]) {
+    addMesh(props, new THREE.TorusGeometry(radius, height === RAIL_HEIGHT ? 0.035 : 0.02, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.rail, [0, y + height, 0], [0, start + length - Math.PI / 2, 0]);
+  }
+  build.walls.push({ radius, minY: y, maxY: y + RAIL_HEIGHT, solid, arc: { start, length } });
+}
+
+// 紐澤西護欄：下寬上窄的水泥塊，上半段漆紅白斜紋。自身 z 是長邊（沿環的半徑方向排）。
+function addJerseyBarrier(g: THREE.Group, M: DetailMaterials): void {
+  box(g, M.barrier, [0.6, 0.35, 1.9], [0, 0.175, 0]);
+  box(g, M.hazard, [0.3, 0.55, 1.9], [0, 0.62, 0]);
+}
+
+function addTrafficCone(g: THREE.Group, M: DetailMaterials): void {
+  box(g, M.stool, [0.42, 0.04, 0.42], [0, 0.02, 0]);
+  rod(g, M.trafficCone, [0, 0.04, 0], [0, 0.75, 0], 0.17, 0.03, 10);
+  cylinder(g, M.paint, 0.115, 0.08, [0, 0.42, 0], 10);
+}
+
+// 斷口前的施工現場：每個斷口前一排紐澤西護欄（中間留缺口）、交通錐、警告牌、
+// 斷面伸出來彎掉的鋼筋、散落的碎石；完整段兩側有欄杆，路燈沿內緣排，最靠近斷口的那盞歪了。
+// dir 是缺口在哪個方向（+1：角度變大的那一側），自身 x 沿圓周（角度變大的方向）。
+function addBreakSite(spec: RingSpec, build: PropsBuild, rng: Rng, arcStart: number, arcLength: number): void {
+  const M = getDetailMaterials();
+  const y = spec.maxY;
+  const props = new THREE.Group();
+  const middle = (spec.inner + spec.outer) / 2;
+  const thickness = spec.maxY - spec.minY;
+  const margin = BREAK_RAIL_MARGIN / middle;
+  addArcRail(build, props, M, spec.inner + 0.15, y, arcStart + margin, arcLength - 2 * margin, 'inside');
+  addArcRail(build, props, M, spec.outer - 0.15, y, arcStart + margin, arcLength - 2 * margin, 'outside');
+  const lampRadius = spec.inner + 1.2;
+  const lamps = Math.max(2, Math.round(((arcLength - 2 * margin) * lampRadius) / BREAK_LAMP_SPACING));
+  for (let i = 0; i <= lamps; i++) {
+    const g = ringGroup(props, lampRadius, y, arcStart + margin + ((arcLength - 2 * margin) * i) / lamps);
+    addPromenadeLamp(g, M);
+    if (i === 0) g.rotation.z = 0.35;          // 最靠近斷口的兩盞往缺口歪
+    if (i === lamps) g.rotation.z = -0.35;
+  }
+  for (const [edge, dir] of [[arcStart, -1], [arcStart + arcLength, 1]] as const) {
+    const at = (meters: number, r: number): number => edge - (dir * meters) / r;   // 從斷口往完整段走 meters 公尺
+    for (let r = spec.inner + 1.2; r < spec.outer - 1; r += 2.05) {
+      if (Math.abs(r - middle) < BREAK_BARRIER_GAP / 2 + 1) continue;
+      addJerseyBarrier(ringGroup(props, r, y, at(BREAK_BARRIER_AT, r)), M);
+    }
+    for (let i = 0; i < CONES_PER_EDGE; i++) {
+      const r = middle + spread(rng, BREAK_BARRIER_GAP * 1.6);
+      const cone = ringGroup(props, r, y, at(BREAK_BARRIER_AT + 1.5 + rng() * 3, r));
+      skipCollider(cone);
+      addTrafficCone(cone, M);
+    }
+    const sign = ringGroup(props, middle + BREAK_BARRIER_GAP, y, at(BREAK_BARRIER_AT + 4, middle + BREAK_BARRIER_GAP));
+    skipCollider(sign);
+    markCollider(sign, [0.3, 2.4, 0.3], [0, 1.2, 0]);
+    for (const z of [-0.6, 0.6]) rod(sign, M.darkMetal, [0, 0, z], [0, 2.4, z], 0.04);
+    addMesh(sign, new THREE.PlaneGeometry(1.6, 1), M.warning, [-dir * 0.05, 1.8, 0], [0, -dir * Math.PI / 2, 0]);
+    for (let i = 0; i < REBAR_PER_EDGE; i++) {
+      const r = spec.inner + 1 + rng() * (spec.outer - spec.inner - 2);
+      const rebarY = spec.minY + thickness * (rng() < 0.5 ? 0.3 : 0.7);
+      const out = range(rng, [0.8, 2.8]);
+      const from: Vec3 = [polarX(r, at(JAG_DEPTH + 0.5, r)), rebarY, polarZ(r, at(JAG_DEPTH + 0.5, r))];
+      const bend: Vec3 = [polarX(r, at(-out * 0.6, r)), rebarY, polarZ(r, at(-out * 0.6, r))];
+      const tipR = r + spread(rng, 0.6);
+      const tip: Vec3 = [polarX(tipR, at(-out, tipR)), rebarY - range(rng, [0.2, 1.2]), polarZ(tipR, at(-out, tipR))];
+      rod(props, M.rebar, from, bend, 0.05, 0.05, 5);
+      rod(props, M.rebar, bend, tip, 0.05, 0.05, 5);
+    }
+    for (let i = 0; i < RUBBLE_PER_EDGE; i++) {
+      const r = spec.inner + 1 + rng() * (spec.outer - spec.inner - 2);
+      const size = range(rng, [0.15, 0.55]);
+      const angle = at(JAG_DEPTH + 0.3 + rng() * 6, r);
+      addMesh(props, new THREE.DodecahedronGeometry(size, 0), M.rubble, [polarX(r, angle), y + size * 0.4, polarZ(r, angle)], [rng() * TAU, rng() * TAU, 0]);
+    }
+  }
+  markChildGroups(props);
+  build.solids.push(...collectColliders(props));
+  build.decor.add(bakeByMaterial(props));
+  disposeGeometries(props);
+}
+
 // 整圈都是各種形狀、顏色的碎塊，沒有環面，站不上去；全部都在飄。
+// 每次建環時才建：環境貼圖（反光用）要先設好
+const shardMaterials = (): { glossy: THREE.Material; glass: THREE.Material; crystal: THREE.Material } => ({
+  glossy: shinyMaterial(0xffffff, 0.6, 0.25),
+  glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.45, envMap: propsEnvironment, side: THREE.DoubleSide }),
+  crystal: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+});
+const crystalGeometry = new THREE.OctahedronGeometry(1, 0).scale(0.5, SHARD_CRYSTAL_STRETCH, 0.5);
+
 function buildShardsRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   const slabs = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
   const chunks = GEOMETRY.chunks.map((geometry) => new Batch(geometry, flatMaterial));
+  const looks = shardMaterials();
+  // 亮面和玻璃只用前兩種板子形狀，多一種材質只多兩次繪製
+  const glossy = GEOMETRY.slabs.slice(0, 2).map((geometry) => new Batch(geometry, looks.glossy));
+  const glass = GEOMETRY.slabs.slice(2, 4).map((geometry) => new Batch(geometry, looks.glass));
+  const crystals = new Batch(crystalGeometry, looks.crystal);
   const count = Math.round((Math.PI * (spec.outer ** 2 - spec.inner ** 2)) / SHARD_AREA);
   for (let i = 0; i < count; i++) {
     const { r, theta } = randomInRing(rng, spec.inner, spec.outer);
     const size = range(rng, SHARD_SIZE);
     const y = spec.maxY + spread(rng, SHARD_RISE);
-    const isChunk = rng() < SHARD_CHUNK_CHANCE;
+    const look = rng();
+    if (look < SHARD_CRYSTAL_SHARE) {
+      const crystal = transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, 0.4), spread(rng, 0.4), size / 3, size / 3, size / 3);
+      addFloater(build, rng, spec.bobScale * SHARD_BOB, [crystals.add(crystal, pick(rng, [0x9ff3ff, 0xffb3f0, 0xfff3a0, 0xb8ffcc]))]);
+      continue;
+    }
+    const special = look < SHARD_CRYSTAL_SHARE + SHARD_GLASS_SHARE ? glass : look < SHARD_CRYSTAL_SHARE + SHARD_GLASS_SHARE + SHARD_GLOSSY_SHARE ? glossy : null;
+    const isChunk = !special && rng() < SHARD_CHUNK_CHANCE;
     const matrix = isChunk
       ? transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, rng() * TAU, rng() * TAU, size / 2, (size / 2) * range(rng, [0.5, 1.2]), size / 2)
       : transform(polarX(r, theta), y, polarZ(r, theta), rng() * TAU, spread(rng, SHARD_TILT), spread(rng, SHARD_TILT), size, range(rng, SHARD_THICKNESS), size * range(rng, [0.5, 1]));
-    const part = pick(rng, isChunk ? chunks : slabs).add(matrix, pick(rng, SHARD_COLORS));
-    build.floaters.push(makeFloater(rng, spec.bobScale * SHARD_BOB, floatParts([part])));
+    const part = pick(rng, special ?? (isChunk ? chunks : slabs)).add(matrix, pick(rng, SHARD_COLORS));
+    addFloater(build, rng, spec.bobScale * SHARD_BOB, [part]);
   }
-  addBatches(build.decor, [...slabs, ...chunks]);
+  addBatches(build.decor, [...slabs, ...chunks, ...glossy, ...glass, crystals]);
 }
 
 // ---------- 飄著的書 ----------
@@ -576,8 +1017,8 @@ function pickBookOpening(rng: Rng): number {
 // 沒有環面，整層都是不規則漂浮的書：有的攤開、有的半開、有的闔上，大小不一，全都在飄。
 function buildFloatingBooksRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   const books: BookBatches = {
-    pagesRight: new Batch(GEOMETRY.pagesRight), pagesLeft: new Batch(GEOMETRY.pagesLeft),
-    coverRight: new Batch(GEOMETRY.coverRight), coverLeft: new Batch(GEOMETRY.coverLeft),
+    pagesRight: new Batch(GEOMETRY.pagesRight, getDetailMaterials().page), pagesLeft: new Batch(GEOMETRY.pagesLeft, getDetailMaterials().page),
+    coverRight: new Batch(GEOMETRY.coverRight, getDetailMaterials().cover), coverLeft: new Batch(GEOMETRY.coverLeft, getDetailMaterials().cover),
   };
   const count = Math.round((Math.PI * (spec.outer ** 2 - spec.inner ** 2)) / FLYING_BOOK_AREA);
   for (let i = 0; i < count; i++) {
@@ -585,7 +1026,7 @@ function buildFloatingBooksRing(spec: RingSpec, build: PropsBuild, rng: Rng): vo
     const width = FLYING_BOOK_WIDTH[0] + (FLYING_BOOK_WIDTH[1] - FLYING_BOOK_WIDTH[0]) * rng() ** FLYING_BOOK_SIZE_BIAS;
     const base = transform(polarX(r, theta), spec.maxY + spread(rng, FLYING_BOOK_RISE), polarZ(r, theta), rng() * TAU, spread(rng, FLYING_BOOK_TILT), spread(rng, FLYING_BOOK_TILT), 1, 1, 1);
     const parts = addBook(rng, books, base, width, pickBookOpening(rng));
-    build.floaters.push(makeFloater(rng, spec.bobScale, floatParts(parts)));
+    addFloater(build, rng, spec.bobScale, parts);
   }
   addBatches(build.decor, [books.pagesRight, books.pagesLeft, books.coverRight, books.coverLeft]);
 }
@@ -639,17 +1080,78 @@ function addShelfSegment(rng: Rng, build: PropsBuild, center: number, floorY: nu
   }
   addShelfFace(rng, { front: center + half, inward: -1, start, length, floorY, levelHeight }, dividers, books);
   addShelfFace(rng, { front: center - half, inward: 1, start, length, floorY, levelHeight }, dividers, books);
+  // 碰撞：書櫃外側那面擋住外面的走道、內側那面擋住裡面的走道，都只擋這一段角度（缺口可以穿過）；兩端再加端板，不會從側面走進書櫃
+  const arc = { start, length };
+  const top = floorY + LIBRARY_HEIGHT;
+  build.walls.push({ radius: center + half, minY: floorY, maxY: top, solid: 'inside', arc }, { radius: center - half, minY: floorY, maxY: top, solid: 'outside', arc });
+  for (const end of [start, start + length]) build.solids.push(orientedSolid(polarX(center, end), polarZ(center, end), end, 0.3, half * 2, floorY, top));
+}
+
+// 閱覽桌：木桌、兩盞綠色檯燈、兩側各兩張椅子、桌上幾本書。自身 x 沿走道。
+function addReadingDesk(g: THREE.Group, M: DetailMaterials, rng: Rng): void {
+  const wood = colorMaterial(WOOD);
+  const dark = colorMaterial(WOOD_DARK);
+  box(g, wood, [2.2, 0.06, 0.95], [0, 0.76, 0]);
+  for (const x of [-1, 1]) box(g, dark, [0.08, 0.73, 0.85], [x, 0.365, 0]);
+  box(g, dark, [2, 0.06, 0.06], [0, 0.25, 0]);
+  for (const x of [-0.6, 0.6]) {
+    cylinder(g, M.brass, 0.08, 0.02, [x, 0.8, 0], 12);
+    rod(g, M.brass, [x, 0.8, 0], [x, 1.1, 0], 0.012);
+    addMesh(g, new THREE.CylinderGeometry(0.11, 0.11, 0.35, 12, 1, false, 0, Math.PI), M.bankerShade, [x, 1.12, 0], [0, 0, Math.PI / 2]);
+    box(g, M.lamp, [0.3, 0.01, 0.16], [x, 1.08, 0]);
+  }
+  for (const z of [-0.85, 0.85]) {
+    for (const x of [-0.55, 0.55]) {
+      const chair = childGroup(g, [x, 0, z], z > 0 ? Math.PI : 0);
+      box(chair, wood, [0.45, 0.05, 0.45], [0, 0.46, 0]);
+      box(chair, wood, [0.45, 0.55, 0.05], [0, 0.75, -0.21]);
+      for (const [lx, lz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) box(chair, dark, [0.04, 0.46, 0.04], [lx ?? 0, 0.23, lz ?? 0]);
+    }
+  }
+  for (let i = 0; i < 3; i++) box(g, colorMaterial(pick(rng, BOOK_COLORS)), [0.22, 0.05, 0.3], [-0.2 + i * 0.25, 0.815 + (i === 1 ? 0.05 : 0), 0.15], [0, rng() * 0.6 - 0.3, 0]);
+}
+
+// 地球儀：木底座、黃銅弧形支架、藍色球體加綠色陸塊。
+function addGlobe(g: THREE.Group, M: DetailMaterials): void {
+  const dark = colorMaterial(WOOD_DARK);
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * TAU;
+    rod(g, dark, [0.25 * Math.cos(a), 0, 0.25 * Math.sin(a)], [0, 0.6, 0], 0.025);
+  }
+  rod(g, dark, [0, 0.6, 0], [0, 0.8, 0], 0.03);
+  addMesh(g, new THREE.TorusGeometry(0.33, 0.012, 6, 32, Math.PI), M.brass, [0, 1.1, 0], [0, 0, -Math.PI / 2]);
+  const globe = addMesh(g, new THREE.SphereGeometry(0.3, 24, 16), M.globe, [0, 1.1, 0], [0.4, 0, 0]);
+  for (const [lat, lon, size] of [[0.4, 0.5, 0.12], [-0.2, 2, 0.1], [0.9, 3.5, 0.09], [-0.6, 4.5, 0.08]] as const) {
+    addMesh(globe, new THREE.SphereGeometry(size, 8, 6), M.land, [0.27 * Math.cos(lat) * Math.sin(lon), 0.27 * Math.sin(lat), 0.27 * Math.cos(lat) * Math.cos(lon)]).scale.set(1, 0.5, 1);
+  }
+}
+
+// 書櫃梯：兩根斜靠在書櫃正面的木梯腳加橫桿，底部離書櫃 0.9 m、頂端靠在 4 m 高。自身 z 朝書櫃。
+function addLadder(g: THREE.Group): void {
+  skipCollider(g);
+  const wood = colorMaterial(WOOD);
+  for (const x of [-0.25, 0.25]) rod(g, wood, [x, 0, 0], [x, 4, 0.85], 0.025);
+  for (let k = 1; k < 12; k++) {
+    const t = k / 12;
+    rod(g, wood, [-0.25, 4 * t, 0.85 * t], [0.25, 4 * t, 0.85 * t], 0.015);
+  }
 }
 
 // 環面是木地板，上面 LIBRARY_WALLS 圈雙面書櫃，書櫃之間和內外兩側是走道；每圈書櫃在不同角度開幾個缺口，可以穿到隔壁走道。
+// 走道鋪地毯，每隔一段一張閱覽桌（有些旁邊放地球儀），書櫃前斜靠著梯子，書櫃兩端掛分類牌。
 function buildLibraryRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   const { inner, outer, maxY } = spec;
+  const M = getDetailMaterials();
   build.solid.add(annulus(inner, outer, maxY - LIBRARY_FLOOR, maxY, colorMaterial(WOOD_FLOOR)));
+  const floor = annulus(inner, outer, maxY, maxY + 0.01, M.planks);
+  planarUv(floor.geometry, 2);
+  build.decor.add(floor);
   build.discs.push({ inner, outer, minY: maxY - LIBRARY_FLOOR, maxY });
   const wallDepth = 2 * LIBRARY_BAY_DEPTH + LIBRARY_BACK;
   const aisle = (outer - inner - LIBRARY_WALLS * wallDepth) / (LIBRARY_WALLS + 1);
   const dividers = new Batch(GEOMETRY.box);
   const books = new Batch(GEOMETRY.box);
+  const props = new THREE.Group();
   for (let wall = 0; wall < LIBRARY_WALLS; wall++) {
     const center = inner + aisle * (wall + 1) + wallDepth * (wall + 0.5);
     const openingAngle = LIBRARY_OPENING_WIDTH / center;
@@ -659,25 +1161,199 @@ function buildLibraryRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
       const start = offset + k * segment + openingAngle / 2 + spread(rng, segment * 0.15);
       const length = segment - openingAngle;
       addShelfSegment(rng, build, center, maxY, start, length, dividers, books);
+      // 兩端的分類牌（面向缺口）、書櫃兩面各一把梯子
+      const label = LIBRARY_SECTIONS[(wall * LIBRARY_OPENINGS + k) % LIBRARY_SECTIONS.length] ?? '書';
+      for (const [end, facing] of [[start, -1], [start + length, 1]] as const) {
+        const plaque = ringGroup(props, center, maxY + 2.6, end + (facing * 0.06) / center);
+        box(plaque, M.stallSign(label, WOOD_DARK), [0.04, 0.5, 2], [0, 0, 0]);
+      }
+      const half = LIBRARY_BAY_DEPTH + LIBRARY_BACK / 2;
+      for (const side of [1, -1]) {
+        const angle = start + length * (0.3 + rng() * 0.4);
+        addLadder(ringGroup(props, center + side * (half + 0.9), maxY, angle, angle + (side > 0 ? Math.PI : 0)));
+      }
+    }
+  }
+  // 走道：地毯，每隔約 28 m 一張閱覽桌
+  for (let k = 0; k <= LIBRARY_WALLS; k++) {
+    const middle = inner + aisle * (k + 0.5) + wallDepth * k;
+    const carpet = annulus(middle - 1.1, middle + 1.1, maxY + 0.01, maxY + 0.02, M.carpet);
+    planarUv(carpet.geometry, 0.8);
+    build.decor.add(carpet);
+    if (k === 0 || k === LIBRARY_WALLS) continue;
+    const desks = Math.max(3, Math.round((TAU * middle) / 28));
+    for (let d = 0; d < desks; d++) {
+      const angle = ((d + 0.5) / desks) * TAU;
+      addReadingDesk(ringGroup(props, middle, maxY + 0.02, angle), M, rng);
+      if (d % 3 === 0) addGlobe(ringGroup(props, middle, maxY + 0.02, angle + 2.2 / middle), M);
     }
   }
   addBatches(build.decor, [dividers, books]);
+  markChildGroups(props);
+  build.solids.push(...collectColliders(props));
+  build.decor.add(bakeByMaterial(props));
+  disposeGeometries(props);
 }
 
 // 同一高度的內、中、外三層細環，各自站得上去；顏色是環色的深淺變化。
-function buildTripleRing(spec: RingSpec, build: PropsBuild): void {
-  const width = (spec.outer - spec.inner - 2 * TRIPLE_GAP) / 3;
-  for (let k = 0; k < 3; k++) {
-    const inner = spec.inner + k * (width + TRIPLE_GAP);
-    build.solid.add(annulus(inner, inner + width, spec.minY, spec.maxY, colorMaterial(shade(spec.color, (k - 1) * TRIPLE_SHADE))));
-    build.discs.push({ inner, outer: inner + width, minY: spec.minY, maxY: spec.maxY });
+// 一圈上每隔 spacing 公尺的角度
+const anglesEvery = (radius: number, spacing: number, offset = 0): number[] => {
+  const count = Math.max(1, Math.round((TAU * radius) / spacing));
+  return Array.from({ length: count }, (_, i) => offset + (i / count) * TAU);
+};
+// angle 離 openings 裡任何一個角度在 half 弧度以內
+const nearAny = (angle: number, openings: number[], half: number): boolean =>
+  openings.some((opening) => Math.abs(THREE.MathUtils.euclideanModulo(angle - opening + Math.PI, TAU) - Math.PI) < half);
+
+// 環邊欄杆：每 RAIL_POST_SPACING 一根柱子、頂端一圈扶手，openings（橋的角度）前後留開口；
+// 碰撞是一段段只擋那幾段角度的圓形牆，人不會從環邊掉下去，但走得上橋。solid 是哪一側實心（inside：半徑以內）；
+// 走路時圓形牆只擋人所在的那一側，所以中間兩道欄杆不會擋到隔壁環上的人。
+function addEdgeRail(build: PropsBuild, props: THREE.Group, M: DetailMaterials, radius: number, y: number, openings: number[], solid: 'inside' | 'outside'): void {
+  const half = (BRIDGE_WIDTH / 2 + 0.3) / radius;
+  for (const angle of anglesEvery(radius, RAIL_POST_SPACING)) {
+    if (!nearAny(angle, openings, half)) cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [polarX(radius, angle), y + RAIL_HEIGHT / 2, polarZ(radius, angle)], 6);
+  }
+  const sorted = [...openings].sort((a, b) => a - b);
+  const segments: [number, number][] = sorted.length === 0 ? [[0, TAU]] : sorted.map((opening, i) => {
+    const next = sorted[(i + 1) % sorted.length] ?? opening;
+    const start = opening + half;
+    const end = (i + 1 < sorted.length ? next : next + TAU) - half;
+    return [start, end - start];
+  });
+  for (const [start, length] of segments) {
+    // TorusGeometry 從 +x 開始逆時針；轉成水平後再繞 y 轉，讓這段落在 [start, start + length]
+    addMesh(props, new THREE.TorusGeometry(radius, 0.035, 6, Math.max(8, Math.round(length * radius)), length).rotateX(Math.PI / 2), M.rail, [0, y + RAIL_HEIGHT, 0], [0, start + length - Math.PI / 2, 0]);
+    build.walls.push({ radius, minY: y, maxY: y + RAIL_HEIGHT, solid, arc: { start, length } });
   }
 }
+
+// 花圃：石框、泥土、一叢叢小花。
+function addFlowerBed(g: THREE.Group, M: DetailMaterials, rng: Rng): void {
+  box(g, M.stone, [2.6, 0.35, 1.5], [0, 0.175, 0]);
+  box(g, M.soil, [2.4, 0.04, 1.3], [0, 0.36, 0]);
+  for (let i = 0; i < FLOWERS_PER_BED; i++) {
+    const x = (rng() - 0.5) * 2.1;
+    const z = (rng() - 0.5) * 1.0;
+    rod(g, M.leaves, [x, 0.36, z], [x, 0.55, z], 0.01, 0.01, 4);
+    addMesh(g, new THREE.IcosahedronGeometry(0.07, 0), M.flowers[Math.floor(rng() * M.flowers.length)] ?? M.paint, [x, 0.58, z]);
+  }
+}
+
+// 單車：兩個輪子、車架、坐墊和把手，停在停車架旁。自身 x 是車身方向。
+function addBicycle(g: THREE.Group, M: DetailMaterials, color: number): void {
+  const frame = colorMaterial(color);
+  for (const x of [-0.5, 0.5]) addMesh(g, new THREE.TorusGeometry(0.33, 0.025, 6, 20), M.stool, [x, 0.35, 0]);
+  rod(g, frame, [-0.5, 0.35, 0], [-0.05, 0.75, 0], 0.02);
+  rod(g, frame, [-0.05, 0.75, 0], [0.4, 0.75, 0], 0.02);
+  rod(g, frame, [0.4, 0.75, 0], [0.5, 0.35, 0], 0.02);
+  rod(g, frame, [-0.05, 0.75, 0], [0, 0.35, 0], 0.02);
+  rod(g, frame, [0, 0.35, 0], [-0.5, 0.35, 0], 0.015);
+  box(g, M.stool, [0.22, 0.05, 0.1], [-0.08, 0.86, 0]);
+  rod(g, M.darkMetal, [0.42, 0.75, 0], [0.42, 0.95, 0], 0.015);
+  rod(g, M.darkMetal, [0.42, 0.95, -0.25], [0.42, 0.95, 0.25], 0.015);
+}
+
+// 投幣望遠鏡：柱子上一個雙筒鏡身，朝環外看出去（自身 +z）。
+function addBinoculars(g: THREE.Group, M: DetailMaterials): void {
+  rod(g, M.darkMetal, [0, 0, 0], [0, 1.1, 0], 0.06);
+  box(g, colorMaterial(0x2f6fb0), [0.36, 0.22, 0.3], [0, 1.25, 0]);
+  for (const x of [-0.09, 0.09]) cylinder(g, M.darkMetal, 0.06, 0.25, [x, 1.28, 0.25], 10, [Math.PI / 2, 0, 0]);
+}
+
+function addPromenadeLamp(g: THREE.Group, M: DetailMaterials): void {
+  skipCollider(g);
+  markCollider(g, [0.3, 3.6, 0.3], [0, 1.8, 0]);
+  rod(g, M.darkMetal, [0, 0, 0], [0, 3.5, 0], 0.05, 0.04, 8);
+  addMesh(g, new THREE.SphereGeometry(0.2, 12, 8), M.lamp, [0, 3.65, 0]);
+  cylinder(g, M.darkMetal, 0.22, 0.05, [0, 3.88, 0], 12);
+}
+
+function addPromenadeBench(g: THREE.Group, M: DetailMaterials): void {
+  const wood = colorMaterial(WOOD);
+  for (const z of [-0.12, 0.02, 0.16]) box(g, wood, [1.8, 0.04, 0.12], [0, 0.45, z]);
+  for (const y of [0.6, 0.75]) box(g, wood, [1.8, 0.1, 0.03], [0, y, -0.22]);
+  for (const x of [-0.75, 0.75]) box(g, M.darkMetal, [0.05, 0.45, 0.42], [x, 0.225, 0]);
+}
+
+// 同一高度的內、中、外三層細環，各自站得上去：
+//   內圈是花園（草地、石框花圃），中圈是自行車道（邊線、中央虛線、單車圖示、停車架與單車），
+//   外圈是木棧道（長椅朝外看風景、路燈、投幣望遠鏡）。三圈之間每 60° 一座木橋，所有環邊都有欄杆（橋口除外）。
+function buildTripleRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
+  const M = getDetailMaterials();
+  const width = (spec.outer - spec.inner - 2 * TRIPLE_GAP) / 3;
+  const y = spec.maxY;
+  const props = new THREE.Group();
+  const innerOf = (k: number): number => spec.inner + k * (width + TRIPLE_GAP);
+  const bridges = [0, 1].map((gap) => Array.from({ length: TRIPLE_BRIDGES }, (_, j) => ((j + (gap === 0 ? 0 : 0.5)) / TRIPLE_BRIDGES) * TAU));
+  const surfaces = [M.lawn, M.bikePath, M.planks];
+  for (let k = 0; k < 3; k++) {
+    const inner = innerOf(k);
+    const outer = inner + width;
+    build.solid.add(annulus(inner, outer, spec.minY, y, colorMaterial(shade(spec.color, (k - 1) * TRIPLE_SHADE))));
+    build.discs.push({ inner, outer, minY: spec.minY, maxY: y });
+    const surface = annulus(inner, outer, y, y + 0.01, surfaces[k] ?? M.paint);
+    planarUv(surface.geometry, 2);
+    build.decor.add(surface);
+    addEdgeRail(build, props, M, inner + 0.15, y, k === 0 ? [] : bridges[k - 1] ?? [], 'inside');
+    addEdgeRail(build, props, M, outer - 0.15, y, k === 2 ? [] : bridges[k] ?? [], 'outside');
+  }
+  // 內圈花園：中線上每隔一段一座花圃
+  const garden = innerOf(0) + width / 2;
+  for (const angle of anglesEvery(garden, FLOWER_BED_SPACING)) {
+    if (!nearAny(angle, bridges[0] ?? [], 3 / garden)) addFlowerBed(ringGroup(props, garden, y, angle), M, rng);
+  }
+  // 中圈自行車道：兩側白色邊線、中央白色虛線、地上的單車圖示，幾處停車架停著單車
+  const lane = innerOf(1);
+  for (const r of [lane + 0.6, lane + width - 0.6]) build.decor.add(annulus(r - 0.06, r + 0.06, y + 0.01, y + 0.016, M.paint));
+  for (const angle of anglesEvery(lane + width / 2, 4)) box(ringGroup(props, lane + width / 2, y + 0.013, angle), M.paint, [2, 0.006, 0.12], [0, 0, 0]);
+  for (const angle of anglesEvery(lane + width / 2, BIKE_DECAL_SPACING, 0.03)) {
+    for (const side of [-1, 1]) {
+      const r = lane + width / 2 + side * 2.4;
+      addMesh(props, flat2(1.4, 1.4), M.bikeIcon, [polarX(r, angle), y + 0.014, polarZ(r, angle)], [0, angle + (side > 0 ? -Math.PI / 2 : Math.PI / 2), 0]);
+    }
+  }
+  for (const angle of anglesEvery(lane + width / 2, 120, 0.2)) {
+    const rack = ringGroup(props, lane + width - 1.2, y, angle);
+    for (let b = 0; b < 4; b++) {
+      addMesh(rack, new THREE.TorusGeometry(0.35, 0.025, 6, 16, Math.PI), M.rail, [b * 0.9 - 1.35, 0, 0], [0, Math.PI / 2, 0]);
+      if (b % 3 !== 2) addBicycle(childGroup(rack, [b * 0.9 - 1.35, 0, 0], Math.PI / 2), M, pick(rng, [0xc0392b, 0x2f6fb0, 0xf2c200, 0x3f8a5f, 0x2b2b2b]));
+    }
+  }
+  // 外圈木棧道：外緣長椅朝外看風景、內緣路燈、投幣望遠鏡
+  const deck = innerOf(2);
+  for (const angle of anglesEvery(deck + width - 1.4, PROMENADE_BENCH_SPACING, 0.02)) addPromenadeBench(ringGroup(props, deck + width - 1.4, y, angle), M);
+  for (const angle of anglesEvery(deck + 1, PROMENADE_LAMP_SPACING, 0.05)) addPromenadeLamp(ringGroup(props, deck + 1, y, angle), M);
+  for (const angle of anglesEvery(deck + width - 0.8, BINOCULAR_SPACING, 0.25)) addBinoculars(ringGroup(props, deck + width - 0.8, y, angle), M);
+  // 木橋：兩道空隙各 TRIPLE_BRIDGES 座，橋面和環面同高、可以走，兩側欄杆
+  for (let gap = 0; gap < 2; gap++) {
+    const from = innerOf(gap) + width - 0.2;
+    const to = innerOf(gap + 1) + 0.2;
+    for (const angle of bridges[gap] ?? []) {
+      const half = BRIDGE_WIDTH / 2 / ((from + to) / 2);
+      build.decor.add(arcSlab(from, to, y - 0.35, y + 0.01, angle - half, half * 2, colorMaterial(WOOD)));
+      build.discs.push({ inner: from, outer: to, minY: y - 0.35, maxY: y + 0.01, arc: { start: angle - half, length: half * 2 } });
+      for (const side of [-1, 1]) {
+        const edge = angle + side * half;
+        const a: Vec3 = [polarX(from, edge), y + RAIL_HEIGHT, polarZ(from, edge)];
+        const b: Vec3 = [polarX(to, edge), y + RAIL_HEIGHT, polarZ(to, edge)];
+        rod(props, M.rail, a, b, 0.035, 0.035, 6);
+        for (const t of [0, 0.5, 1]) cylinder(props, M.rail, 0.03, RAIL_HEIGHT, [a[0] + (b[0] - a[0]) * t, y + RAIL_HEIGHT / 2, a[2] + (b[2] - a[2]) * t], 6);
+      }
+    }
+  }
+  markChildGroups(props);
+  build.solids.push(...collectColliders(props));
+  build.decor.add(bakeByMaterial(props));
+  disposeGeometries(props);
+}
+
+// 水平的平面（地上的圖示）
+const flat2 = (width: number, depth: number): THREE.BufferGeometry => new THREE.PlaneGeometry(width, depth).rotateX(-Math.PI / 2);
 
 // ---------- 環狀美食街 ----------
 interface FoodBatches { roundTables: Batch; squareTables: Batch; chairs: Batch; longTables: Batch; benches: Batch; stalls: Batch; awnings: Batch; pots: Batch; bushes: Batch }
 // 一個分區：角度範圍、半徑範圍與地面高度；occupied 記錄已經放了東西的位置，避免重疊。
-interface FoodZone { start: number; end: number; inner: number; outer: number; y: number; occupied: { x: number; z: number; radius: number }[] }
+interface FoodZone { start: number; end: number; inner: number; outer: number; y: number; occupied: { x: number; z: number; radius: number }[]; solids: SolidBox[]; props: THREE.Group }
 
 function isInZone(zone: FoodZone, x: number, z: number, margin: number): boolean {
   const r = Math.hypot(x, z);
@@ -717,9 +1393,12 @@ function addTableSet(rng: Rng, batches: FoodBatches, zone: FoodZone, x: number, 
   };
   if (rng() < ROUND_TABLE_CHANCE) {
     batches.roundTables.add(transform(x, zone.y, z, yaw, 0, 0, 1, 1, 1), pick(rng, TABLE_COLORS));
+    if (rng() < TABLE_UMBRELLA_CHANCE) addTableUmbrella(childGroup(zone.props, [x, zone.y, z]), getDetailMaterials(), pick(rng, AWNING_COLORS));
+    zone.solids.push(orientedSolid(x, z, yaw, 1.25, 1.25, zone.y, zone.y + 0.8));
     for (let k = 0; k < 4; k++) addChair(yaw + (k * Math.PI) / 2 + spread(rng, 0.2), ROUND_CHAIR_OFFSET);
   } else {
     batches.squareTables.add(transform(x, zone.y, z, yaw, 0, 0, 1, 1, 1), pick(rng, TABLE_COLORS));
+    zone.solids.push(orientedSolid(x, z, yaw, 1.25, 0.85, zone.y, zone.y + 0.8));
     for (const side of [0, Math.PI]) addChair(yaw + side, SQUARE_CHAIR_OFFSET);
   }
 }
@@ -739,8 +1418,35 @@ function addTableClusters(rng: Rng, batches: FoodBatches, zone: FoodZone, cluste
   }
 }
 
-// 攤位：沿著環的外緣（或內緣）一排，正面朝向分區中間；攤位上方有往前斜的遮雨棚。
-function addStallRow(rng: Rng, batches: FoodBatches, zone: FoodZone, radius: number, facing: number): void {
+// 桌傘：配重底座、桿子、八片條紋傘布。
+function addTableUmbrella(g: THREE.Group, M: DetailMaterials, color: number): void {
+  skipCollider(g);
+  rod(g, M.darkMetal, [0, 0, 0], [0, 2.4, 0], 0.025);
+  addMesh(g, new THREE.ConeGeometry(1.3, 0.4, 8, 1, true), M.awning(color), [0, 2.25, 0]);
+}
+
+// 一個攤位：機身、服務窗、木頭櫃台與彩色櫃台面板、條紋遮雨棚、寫著攤名的招牌、黑板菜單、櫃台前三張吧台椅。正面是自身 +z。
+function addStall(g: THREE.Group, M: DetailMaterials, rng: Rng, bodyColor: number, awningColor: number): void {
+  const [width, height, depth] = STALL_SIZE;
+  box(g, colorMaterial(bodyColor), [width, height, depth], [0, height / 2, 0]);
+  box(g, M.window, [width * 0.72, 1, 0.04], [0, 1.45, depth / 2 + 0.01]);
+  box(g, M.counter, [width * 0.86, 0.08, 0.55], [0, 1.02, depth / 2 + 0.22]);
+  box(g, colorMaterial(awningColor), [width * 0.86, 0.98, 0.05], [0, 0.49, depth / 2 + 0.47]);
+  const awning = childGroup(g, [0, height, depth / 2]);
+  awning.rotation.x = AWNING_DROOP;
+  box(awning, M.awning(awningColor), [width * 1.08, 0.05, AWNING_DEPTH], [0, 0, AWNING_DEPTH / 2]);
+  box(g, M.stallSign(pick(rng, STALL_NAMES), awningColor), [width * 0.9, 0.55, 0.08], [0, height + 0.45, depth / 2 - 0.1]);
+  box(g, M.menu, [0.7, 0.5, 0.03], [width * 0.36, 1.75, depth / 2 + 0.03]);
+  for (const x of [-0.9, 0, 0.9]) {
+    const stool = childGroup(g, [x, 0, depth / 2 + 1.05]);
+    cylinder(stool, M.stool, 0.17, 0.05, [0, 0.72, 0], 12);
+    rod(stool, M.darkMetal, [0, 0, 0], [0, 0.7, 0], 0.03);
+    cylinder(stool, M.darkMetal, 0.18, 0.03, [0, 0.015, 0], 12);
+  }
+}
+
+// 攤位：沿著環的外緣（或內緣）一排，正面朝向分區中間。
+function addStallRow(rng: Rng, _batches: FoodBatches, zone: FoodZone, radius: number, facing: number): void {
   const [width, height, depth] = STALL_SIZE;
   const awningColor = pick(rng, AWNING_COLORS);
   let along = zone.start * radius + width;
@@ -749,14 +1455,10 @@ function addStallRow(rng: Rng, batches: FoodBatches, zone: FoodZone, radius: num
     const x = polarX(radius, theta);
     const z = polarZ(radius, theta);
     // 攤位正面是自身的 +z；朝外緣的攤位轉向圓心（facing = π），朝內緣的轉向外面（facing = 0）
-    const body = transform(x, zone.y, z, theta + facing, 0, 0, width, height, depth);
-    batches.stalls.add(body, pick(rng, STALL_COLORS));
-    const awning = body.clone()
-      .multiply(new THREE.Matrix4().makeTranslation(0, 1, 0.5))
-      .multiply(new THREE.Matrix4().makeRotationX(AWNING_DROOP))
-      .multiply(new THREE.Matrix4().makeScale(1.08, 0.05, AWNING_DEPTH / depth))
-      .multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.5));
-    batches.awnings.add(awning, rng() < 0.3 ? pick(rng, AWNING_COLORS) : awningColor);
+    const stall = childGroup(zone.props, [x, zone.y, z], theta + facing);
+    skipCollider(stall);   // 攤位本體用下面的有向方塊擋；吧台椅很矮
+    addStall(stall, getDetailMaterials(), rng, pick(rng, STALL_COLORS), rng() < 0.3 ? pick(rng, AWNING_COLORS) : awningColor);
+    zone.solids.push(orientedSolid(x, z, theta + facing, width, depth, zone.y, zone.y + height + 0.4));
     zone.occupied.push({ x, z, radius: width / 2 + 1 });
     along += range(rng, STALL_SPACING);
   }
@@ -786,6 +1488,7 @@ function addLongTables(rng: Rng, batches: FoodBatches, zone: FoodZone): void {
       if (!isInZone(zone, x + (ux * length) / 2, z + (uz * length) / 2, 1) || !isInZone(zone, x - (ux * length) / 2, z - (uz * length) / 2, 1)) continue;
       if (zone.occupied.some((other) => Math.hypot(other.x - x, other.z - z) < other.radius + length / 2)) continue;
       batches.longTables.add(transform(x, zone.y, z, yaw, 0, 0, length, 1, 1), color);
+      zone.solids.push(orientedSolid(x, z, yaw, length, BENCH_OFFSET * 2 + 0.35, zone.y, zone.y + 0.8));
       for (const side of [1, -1]) {
         batches.benches.add(transform(x + vx * side * BENCH_OFFSET, zone.y, z + vz * side * BENCH_OFFSET, yaw, 0, 0, length, 1, 1), pick(rng, CHAIR_COLORS));
       }
@@ -801,6 +1504,7 @@ function addPlanters(rng: Rng, batches: FoodBatches, zone: FoodZone, count: numb
     if (!spot) continue;
     const potHeight = size * 0.9;
     batches.pots.add(transform(spot.x, zone.y, spot.z, 0, 0, 0, size, potHeight, size), pick(rng, POT_COLORS));
+    zone.solids.push(orientedSolid(spot.x, spot.z, 0, size * 2, size * 2, zone.y, zone.y + potHeight + size * 1.4));
     batches.bushes.add(transform(spot.x, zone.y + potHeight + size * 0.6, spot.z, rng() * TAU, 0, 0, size * 1.1, size * 0.9, size * 1.1), pick(rng, BUSH_COLORS));
   }
 }
@@ -817,6 +1521,8 @@ function buildFoodCourtRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
     longTables: new Batch(GEOMETRY.longTable), benches: new Batch(GEOMETRY.bench),
     stalls: new Batch(GEOMETRY.baseBox), awnings: new Batch(GEOMETRY.baseBox), pots: new Batch(GEOMETRY.pot), bushes: new Batch(GEOMETRY.bush, flatMaterial),
   };
+  const props = new THREE.Group();
+  const M = getDetailMaterials();
   const zoneCount = Math.round(range(rng, FOOD_ZONES));
   const weights = Array.from({ length: zoneCount }, () => range(rng, [0.6, 1.4]));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
@@ -826,7 +1532,19 @@ function buildFoodCourtRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   let previous: FoodZoneKind | null = null;
   for (const weight of weights) {
     const span = (weight / total) * TAU;
-    const zone: FoodZone = { start: angle + walkway / 2, end: angle + span - walkway / 2, inner: spec.inner + FOOD_EDGE, outer: spec.outer - FOOD_EDGE, y: spec.maxY + FOOD_PATCH, occupied: [] };
+    const zone: FoodZone = { start: angle + walkway / 2, end: angle + span - walkway / 2, inner: spec.inner + FOOD_EDGE, outer: spec.outer - FOOD_EDGE, y: spec.maxY + FOOD_PATCH, occupied: [], solids: build.solids, props };
+    // 分區之間的走道：內外兩側各一盞路燈與一組分類垃圾桶
+    for (const r of [spec.inner + 3, spec.outer - 3]) {
+      const lamp = ringGroup(props, r, spec.maxY, angle);
+      skipCollider(lamp);
+      markCollider(lamp, [0.3, 4.2, 0.3], [0, 2.1, 0]);
+      rod(lamp, M.darkMetal, [0, 0, 0], [0, 4.2, 0], 0.06, 0.045, 8);
+      for (const side of [-1, 1]) {
+        rod(lamp, M.darkMetal, [0, 4.1, 0], [side * 0.6, 4.25, 0], 0.025, 0.025, 6);
+        addMesh(lamp, new THREE.SphereGeometry(0.16, 12, 8), M.lamp, [side * 0.6, 4.1, 0]);
+      }
+      M.bins.forEach((material, k) => cylinder(ringGroup(props, r, spec.maxY, angle + (1.2 + k * 0.5) / r), material, 0.2, 0.85, [0, 0.425, 0], 14));
+    }
     angle += span;
     build.decor.add(arcSlab(zone.inner, zone.outer, spec.maxY, zone.y, zone.start, zone.end - zone.start, colorMaterial(pick(rng, FOOD_PATCH_COLORS))));
     // 相鄰兩區不要同一種
@@ -847,6 +1565,10 @@ function buildFoodCourtRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
     }
   }
   addBatches(build.decor, Object.values(batches));
+  markChildGroups(props);
+  build.solids.push(...collectColliders(props));
+  build.decor.add(bakeByMaterial(props));
+  disposeGeometries(props);
 }
 
 /** 依樣式建出一圈環。 */
@@ -855,14 +1577,18 @@ export function buildRing(spec: RingSpec): PropsBuild {
   const rng = createRng(spec.seed);
   switch (spec.style) {
     case 'plain': addPlainSlab(spec, build); break;
-    case 'houses': buildHousesRing(spec, build, rng); break;
-    case 'floatingHouses': buildFloatingHousesRing(spec, build, rng); break;
     case 'broken': buildBrokenRing(spec, build, rng); break;
     case 'floatingBooks': buildFloatingBooksRing(spec, build, rng); break;
     case 'shards': buildShardsRing(spec, build, rng); break;
     case 'bookshelf': buildLibraryRing(spec, build, rng); break;
-    case 'triple': buildTripleRing(spec, build); break;
+    case 'triple': buildTripleRing(spec, build, rng); break;
     case 'restaurant': buildFoodCourtRing(spec, build, rng); break;
+    case 'courts':
+    case 'track':
+    case 'houses':
+    case 'floatingHouses':
+    case 'pool':
+      throw new Error(`環樣式 ${spec.style} 由 oz-sports.ts／oz-track.ts／oz-pool.ts／oz-town.ts 建，main.ts 會直接分派過去`);
   }
   return build;
 }
@@ -902,11 +1628,11 @@ function randomFieldPoint(rng: Rng, spec: FieldSpec, clusters: Cluster[]): Spot 
 }
 
 // 找一個不碰到環、圓錐、其他漂浮物的位置；試 PLACE_ATTEMPTS 次都找不到就放棄這一個。
-function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & { size: number })[], clusters: Cluster[]): Spot | null {
+function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & { size: number })[], clusters: Cluster[], extraGap = 0): Spot | null {
   for (let attempt = 0; attempt < PLACE_ATTEMPTS; attempt++) {
     const spot = randomFieldPoint(rng, spec, clusters);
     if (isFieldBlocked(spec, spot.x, spot.y, spot.z, size)) continue;
-    if (placed.some((other) => Math.hypot(other.x - spot.x, other.y - spot.y, other.z - spot.z) < other.size + size)) continue;
+    if (placed.some((other) => Math.hypot(other.x - spot.x, other.y - spot.y, other.z - spot.z) < other.size + size + extraGap)) continue;
     placed.push({ ...spot, size });
     return spot;
   }
@@ -915,7 +1641,8 @@ function findFieldSpot(rng: Rng, spec: FieldSpec, size: number, placed: (Spot & 
 
 // 蜂窩狀六邊形平面：|q|、|p|、|q + p| 都不超過 rings 的軸座標格子組成一個大六邊形，隨機少幾格。
 // 設計規則：一定有一格是不同顏色。
-function addHexPad(rng: Rng, hexes: Batch, pad: THREE.Matrix4, cell: number, rings: number): Part[] {
+// 每格的碰撞：正六邊形剛好是三個轉了 0°、60°、120° 的矩形（寬 = 對邊距、深 = 外接圓半徑）疊起來，和外觀完全相符。
+function addHexPad(rng: Rng, hexes: Batch, pad: THREE.Matrix4, cell: number, rings: number, solids: SolidBox[]): Part[] {
   // CylinderGeometry 六邊形的尖角朝 ±z，邊垂直 x 軸，所以鄰格在 x 軸和 60° 方向上，不用再轉。
   const step = Math.sqrt(3) * cell * HEX_SPACING;
   const tiles: [number, number][] = [];
@@ -932,11 +1659,93 @@ function addHexPad(rng: Rng, hexes: Batch, pad: THREE.Matrix4, cell: number, rin
   return tiles.map(([q, p], i) => {
     const local = transform(step * (q + p / 2), spread(rng, HEX_JITTER), (step * p * Math.sqrt(3)) / 2, 0, 0, 0, cell, HEX_THICKNESS, cell);
     const tileColor = i === accentIndex ? accent : shade(color, spread(rng, 0.05));
-    return hexes.add(pad.clone().multiply(local), tileColor);
+    const world = pad.clone().multiply(local);
+    const center = new THREE.Vector3().setFromMatrixPosition(world);
+    const yaw = new THREE.Euler().setFromRotationMatrix(pad, 'YXZ').y;
+    for (const turn of [0, Math.PI / 3, (2 * Math.PI) / 3]) {
+      solids.push({ ...orientedSolid(center.x, center.z, yaw + turn, Math.sqrt(3) * cell, cell, center.y - HEX_THICKNESS / 2, center.y + HEX_THICKNESS / 2), standable: true });
+    }
+    return hexes.add(world, tileColor);
   });
 }
 
-/** 環周圍的漂浮物：島嶼、各種形狀的平台、蜂窩狀六邊形平面、零碎小塊；大多聚在幾處，全部都在飄。 */
+// 一個圓盤（半徑 radius）的碰撞：從圓心往外 DISC_STRIPS 條長條，相鄰兩條在圓周上剛好接上，邊角最多超出圓 2%。
+const DISC_STRIPS = 16;
+function discSolids(x: number, z: number, radius: number, minY: number, maxY: number): SolidBox[] {
+  const width = 2 * radius * Math.tan(Math.PI / DISC_STRIPS);
+  return Array.from({ length: DISC_STRIPS }, (_, k) => {
+    const angle = (k / DISC_STRIPS) * TAU;
+    // yaw = angle 時自身 z 朝外（徑向）
+    return { ...orientedSolid(x + Math.sin(angle) * radius / 2, z + Math.cos(angle) * radius / 2, angle, width, radius, minY, maxY), standable: true };
+  });
+}
+
+// 一圈環（內半徑 inner、外半徑 outer）的碰撞：沿圓周切成 RING_PAD.segments 段切線方向的長方塊，
+// 每段在環的中線剛好接上，空隙那一側不會多出來（差不到環寬的 7%）。
+function annulusSolids(x: number, z: number, inner: number, outer: number, minY: number, maxY: number): SolidBox[] {
+  const middle = (inner + outer) / 2;
+  const length = 2 * middle * Math.tan(Math.PI / RING_PAD.segments);
+  return Array.from({ length: RING_PAD.segments }, (_, k) => {
+    const angle = (k / RING_PAD.segments) * TAU;
+    // yaw = angle 時自身 z 朝外（徑向）、自身 x 沿切線
+    return { ...orientedSolid(x + Math.sin(angle) * middle, z + Math.cos(angle) * middle, angle, length, outer - inner, minY, maxY), standable: true };
+  });
+}
+
+// 同心圓環平台：中間一個圓盤、外面兩圈環，彼此之間是空的（可以從縫掉下去）；三塊顏色深淺交錯，一定有一塊是不同顏色。
+// 回傳一個 Group（原點在平台中心），碰撞方塊是世界座標。
+function addRingPad(rng: Rng, spot: Spot, solids: SolidBox[]): THREE.Group {
+  const group = new THREE.Group();
+  group.position.set(spot.x, spot.y, spot.z);
+  const color = pick(rng, PLATFORM_COLORS);
+  const accent = pick(rng, PLATFORM_ACCENTS);
+  const accentPiece = Math.floor(rng() * 3);
+  const half = RING_PAD.thickness / 2;
+  const pieceColor = (k: number): number => (k === accentPiece ? accent : shade(color, k % 2 === 0 ? 0 : -0.14));
+  const disc = range(rng, RING_PAD.disc);
+  group.add(new THREE.Mesh(new THREE.CylinderGeometry(disc, disc, RING_PAD.thickness, 48), colorMaterial(pieceColor(0))));
+  solids.push(...discSolids(spot.x, spot.z, disc, spot.y - half, spot.y + half));
+  let inner = disc;
+  for (let k = 1; k <= 2; k++) {
+    inner += range(rng, RING_PAD.gap);
+    const outer = inner + range(rng, RING_PAD.ring);
+    group.add(annulus(inner, outer, -half, half, colorMaterial(pieceColor(k))));
+    solids.push(...annulusSolids(spot.x, spot.z, inner, outer, spot.y - half, spot.y + half));
+    inner = outer;
+  }
+  return group;
+}
+
+// 方格平台：n × n 塊方磚，中間那塊一定在，其他隨機少幾塊、高低略有不同；一定有一塊是不同顏色。每塊自己的碰撞。
+function addTilePad(rng: Rng, tiles: Batch, spot: Spot, solids: SolidBox[]): Part[] {
+  const n = Math.floor(range(rng, TILE_PAD.cells));
+  const cell = range(rng, TILE_PAD.cell);
+  const step = cell * TILE_PAD.spacing;
+  const yaw = rng() * TAU;
+  const color = pick(rng, HEX_COLORS);
+  const accent = pick(rng, HEX_COLORS.filter((candidate) => candidate !== color));
+  const cells: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const isCenter = i === Math.floor(n / 2) && j === Math.floor(n / 2);
+      if (!isCenter && rng() < TILE_PAD.drop) continue;
+      cells.push([i - (n - 1) / 2, j - (n - 1) / 2]);
+    }
+  }
+  const accentIndex = Math.floor(rng() * cells.length);
+  return cells.map(([i, j], index) => {
+    const x = spot.x + Math.cos(yaw) * i * step + Math.sin(yaw) * j * step;
+    const z = spot.z - Math.sin(yaw) * i * step + Math.cos(yaw) * j * step;
+    const y = spot.y + spread(rng, TILE_PAD.jitter);
+    solids.push({ ...orientedSolid(x, z, yaw, cell, cell, y - TILE_PAD.thickness / 2, y + TILE_PAD.thickness / 2), standable: true });
+    return tiles.add(transform(x, y, z, yaw, 0, 0, cell, TILE_PAD.thickness, cell), index === accentIndex ? accent : shade(color, spread(rng, 0.05)));
+  });
+}
+
+/**
+ * 環周圍的漂浮物：島嶼（見 oz-islands.ts，分散在整個範圍）、同心圓環（圓盤＋兩圈環，中間有空隙）與方格平台、
+ * 蜂窩狀六邊形平面、立體符號（見 oz-symbols.ts，會慢慢轉）；平台和符號大多聚在幾處，全部都在飄。
+ */
 export function buildFloatingField(spec: FieldSpec): PropsBuild {
   const build = emptyBuild();
   const rng = createRng(spec.seed);
@@ -947,43 +1756,38 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     const center = findFieldSpot(rng, spec, radius / 2, [], []);
     if (center) clusters.push({ ...center, radius });
   }
-  const grass = GEOMETRY.slabs.map((geometry) => new Batch(geometry, flatMaterial));
-  const rocks = new Batch(GEOMETRY.rock, flatMaterial);
-  const platforms = GEOMETRY.platforms.map((geometry) => new Batch(geometry, flatMaterial));
   const hexes = new Batch(GEOMETRY.hex, flatMaterial);
-  const chunks = GEOMETRY.chunks.map((geometry) => new Batch(geometry, flatMaterial));
-  const float = (parts: Part[]): void => { build.floaters.push(makeFloater(rng, spec.bobScale, floatParts(parts))); };
+  const tiles = new Batch(GEOMETRY.box, flatMaterial);
+  const symbols = new Map<string, Batch>();
 
-  for (let i = 0; i < spec.islands; i++) {
-    const radius = range(rng, ISLAND_RADIUS);
-    const spot = findFieldSpot(rng, spec, radius, placed, clusters);
+  // 島嶼：有用途的大島先放，再放自然的小島；不跟著聚集處、彼此多留 ISLAND_GAP，分散在整個範圍
+  const islands = [...THEMED_ISLANDS, ...Array.from({ length: spec.islands }, () => ({ theme: 'nature' as const, radius: range(rng, ISLAND_RADIUS) }))];
+  for (const { theme, radius } of islands) {
+    const tries = theme === 'nature' ? ISLAND_PLACE_TRIES : THEMED_PLACE_TRIES;
+    let spot: Spot | null = null;
+    for (let attempt = 0; attempt < tries && !spot; attempt++) spot = findFieldSpot(rng, spec, radius, placed, [], ISLAND_GAP);
     if (!spot) continue;
-    const top = range(rng, ISLAND_TOP);
-    const turn: [number, number, number] = [rng() * TAU, spread(rng, ISLAND_TILT), spread(rng, ISLAND_TILT)];
-    float([
-      pick(rng, grass).add(transform(spot.x, spot.y - top / 2, spot.z, ...turn, radius, top, radius), pick(rng, GRASS_COLORS)),
-      rocks.add(transform(spot.x, spot.y - top, spot.z, ...turn, radius * ISLAND_ROCK, radius * range(rng, ISLAND_DEPTH), radius * ISLAND_ROCK), pick(rng, ROCK_COLORS)),
-    ]);
+    const island = buildIsland(rng, theme, radius);
+    island.group.position.set(spot.x, spot.y, spot.z);
+    build.decor.add(island.group);
+    const at = spot;
+    addObjectFloater(build, rng, spec.bobScale, island.group, island.solids.map((solid) => ({ ...solid, cx: solid.cx + at.x, cz: solid.cz + at.z, minY: solid.minY + at.y, maxY: solid.maxY + at.y })));
   }
 
+  // 平台：一半是同心圓環、一半是方格，都是平的，碰撞和外觀相符
   for (let i = 0; i < spec.platforms; i++) {
-    const size = range(rng, PLATFORM_SIZE);
-    const spot = findFieldSpot(rng, spec, size / 2, placed, clusters);
+    const isRing = i % 2 === 0;
+    const ringPadRadius = RING_PAD.disc[1] + 2 * (RING_PAD.gap[1] + RING_PAD.ring[1]);
+    const spot = findFieldSpot(rng, spec, isRing ? ringPadRadius : TILE_PAD.cell[1] * TILE_PAD.cells[1] * 0.75, placed, clusters);
     if (!spot) continue;
-    const shape = Math.floor(rng() * platforms.length);
-    const batch = platforms[shape];
-    if (!batch) continue;
-    const thickness = range(rng, PLATFORM_THICKNESS);
-    const base = transform(spot.x, spot.y, spot.z, rng() * TAU, spread(rng, PLATFORM_TILT), spread(rng, PLATFORM_TILT), 1, 1, 1);
-    const parts = [batch.add(base.clone().multiply(new THREE.Matrix4().makeScale(size, thickness, size * range(rng, [0.7, 1.3]))), pick(rng, PLATFORM_COLORS))];
-    if (rng() < PLATFORM_TIER_CHANCE) {
-      const tier = size * range(rng, PLATFORM_TIER_SCALE);
-      const tierMatrix = base.clone()
-        .multiply(new THREE.Matrix4().makeTranslation(spread(rng, (size - tier) / 3), thickness, spread(rng, (size - tier) / 3)))
-        .multiply(new THREE.Matrix4().makeScale(tier, thickness, tier));
-      parts.push(batch.add(tierMatrix, pick(rng, PLATFORM_ACCENTS)));
+    const solids: SolidBox[] = [];
+    if (isRing) {
+      const pad = addRingPad(rng, spot, solids);
+      build.decor.add(pad);
+      addObjectFloater(build, rng, spec.bobScale, pad, solids);
+      continue;
     }
-    float(parts);
+    addPartsFloater(build, rng, spec.bobScale, addTilePad(rng, tiles, spot, solids), solids);
   }
 
   for (let i = 0; i < spec.hexPads; i++) {
@@ -991,18 +1795,28 @@ export function buildFloatingField(spec: FieldSpec): PropsBuild {
     const rings = rng() < 0.5 ? 1 : 2;
     const spot = findFieldSpot(rng, spec, Math.sqrt(3) * cell * HEX_SPACING * (rings + 0.5), placed, clusters);
     if (!spot) continue;
-    const pad = transform(spot.x, spot.y, spot.z, rng() * TAU, spread(rng, HEX_TILT), spread(rng, HEX_TILT), 1, 1, 1);
-    float(addHexPad(rng, hexes, pad, cell, rings));
+    const pad = transform(spot.x, spot.y, spot.z, rng() * TAU, 0, 0, 1, 1, 1);
+    const solids: SolidBox[] = [];
+    const parts = addHexPad(rng, hexes, pad, cell, rings, solids);
+    addPartsFloater(build, rng, spec.bobScale, parts, solids);
   }
 
+  // 漂浮的符號（數學符號、盧恩符文、注音、英文字母、化學分子式）：大多直立、稍微歪，上下飄的同時繞垂直軸慢慢轉
   for (let i = 0; i < spec.debris; i++) {
-    const size = range(rng, DEBRIS_SIZE);
+    const text = pick(rng, SYMBOLS);
+    const geometry = symbolGeometry(text);
+    if (!geometry) continue;
+    const size = range(rng, SYMBOL_SIZE);
     const spot = findFieldSpot(rng, spec, size, placed, clusters);
     if (!spot) continue;
-    const matrix = transform(spot.x, spot.y, spot.z, rng() * TAU, rng() * TAU, rng() * TAU, size * range(rng, [0.6, 1.4]), size * range(rng, [0.6, 1.4]), size * range(rng, [0.6, 1.4]));
-    float([pick(rng, chunks).add(matrix, pick(rng, [...SHARD_COLORS, ...ROCK_COLORS]))]);
+    let batch = symbols.get(text);
+    if (!batch) {
+      batch = new Batch(geometry, instanceMaterial);
+      symbols.set(text, batch);
+    }
+    addSpinningSymbol(build, rng, spec.bobScale, batch, geometry, spot, size);
   }
 
-  addBatches(build.decor, [...grass, rocks, ...platforms, hexes, ...chunks]);
+  addBatches(build.decor, [hexes, tiles, ...symbols.values()]);
   return build;
 }
