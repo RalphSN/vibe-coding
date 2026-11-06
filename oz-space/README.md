@@ -33,7 +33,7 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 
 ## 專案結構
 
-- `index.html`：頁面骨架（操作說明、第一人稱提示）
+- `index.html`：頁面骨架（操作說明，啟動時搬進 Inspector 的「操作說明」資料夾）
 - `src/main.ts`：主程式（空白地面、碰撞、視角模式、角色、Inspector）
 - `src/oz-props.ts`：各種環的樣式與周圍漂浮物（外觀、站得住的範圍、上下飄動），以及共用的合併網格、環境貼圖工具
 - `src/oz-islands.ts`：周圍的漂浮島嶼（土塊本體、自然小島、6 座有用途的大島）
@@ -125,7 +125,7 @@ Windows（PowerShell）和 macOS（zsh）指令相同。直接雙擊 `index.html
 
 ## Inspector（參數面板）
 
-右上角的面板仿 Unity Inspector，分成三組，改了立刻生效：
+右上角的面板仿 Unity Inspector。最上面是可收合的「操作說明」（依目前視角只顯示那一段的按鍵；切換視角時不再跳出提示），下面三組參數改了立刻生效：
 
 | 分組 | 內容 |
 |---|---|
