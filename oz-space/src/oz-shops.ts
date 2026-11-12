@@ -3,6 +3,7 @@
 // 店名都是「稍微錯開」的仿作（88度C、54嵐、McDanold's……），只靠配色和一兩個造型特徵讓人認得出來。
 // 只做外觀與外框碰撞：進不去，招牌、雨遮、屋頂造型都沒有碰撞（站不上去）。
 import * as THREE from 'three';
+import { glowAtNight } from './oz-night';
 import { colorMaterial, orientedSolid, type SolidBox } from './oz-props';
 import { TAU, addMesh, box, childGroup, cylinder, mapped, pixelTexture, rod, skipCollider } from './oz-kit';
 
@@ -67,13 +68,19 @@ const AWNING = { y: 3.25, depth: 1.4, droop: 0.35, stripe: 0.7 };
 const SIGN_PX = { height: 128, perMeter: 64, font: 76 };
 const FONT_FAMILY = '"Microsoft JhengHei", "PingFang TC", "Arial", sans-serif';
 
-const glass = (): THREE.Material => colorMaterial(0x8fb4c4);
+// 店面玻璃晚上透出店裡的暖光；招牌照自己的圖案發光（見 glowAtNight）
+const SHOP_NIGHT = { glass: 0xffdca8, glassStrength: 0.85, sign: 0xffffff, signStrength: 0.8 };
+let shopGlass: THREE.MeshLambertMaterial | null = null;
+const glass = (): THREE.Material => {
+  shopGlass ??= glowAtNight(new THREE.MeshLambertMaterial({ color: 0x8fb4c4 }), SHOP_NIGHT.glass, SHOP_NIGHT.glassStrength);
+  return shopGlass;
+};
 const frame = (): THREE.Material => colorMaterial(0x2f3338);
 
 // 招牌字：店名置中，字太長就縮小字級塞進去
 function signMaterial(brand: Brand, widthM: number): THREE.Material {
   const width = Math.round(widthM * SIGN_PX.perMeter);
-  return mapped(pixelTexture(width, SIGN_PX.height, (ctx) => {
+  return glowAtNight(mapped(pixelTexture(width, SIGN_PX.height, (ctx) => {
     ctx.fillStyle = brand.sign.bg;
     ctx.fillRect(0, 0, width, SIGN_PX.height);
     ctx.fillStyle = brand.sign.fg;
@@ -86,7 +93,7 @@ function signMaterial(brand: Brand, widthM: number): THREE.Material {
       ctx.font = `bold ${size}px ${FONT_FAMILY}`;
     }
     ctx.fillText(brand.name, width / 2, SIGN_PX.height / 2 + 4);
-  }));
+  })), SHOP_NIGHT.sign, SHOP_NIGHT.signStrength, true);
 }
 
 // 店面本體：牆、屋頂收邊、落地玻璃與窗框、門、招牌帶。正面是自身 +z。

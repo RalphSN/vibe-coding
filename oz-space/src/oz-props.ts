@@ -8,7 +8,7 @@ import { THEMED_ISLANDS, buildIsland } from './oz-islands';
 import { RUNES, runeGeometry } from './oz-runes';
 import { SHOP_LAYOUT, addBackToBackRows, addInnerShopRow } from './oz-shops';
 import { CODE_SYMBOLS, LETTERS, ZHUYIN, symbolGeometry } from './oz-symbols';
-import { addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod, skipCollider } from './oz-kit';
+import { addMesh, box, childGroup, collectColliders, collectLights, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, markLight, pixelTexture, planarUv, rod, skipCollider, type LightSpot } from './oz-kit';
 
 /** 圓心在原點的環形平板（inner 是 0 就是實心圓）：只管站上去和撞頭。有 arc 時只有這段角度站得住（角度 = atan2(x, z)）。 */
 export interface Disc { inner: number; outer: number; minY: number; maxY: number; arc?: { start: number; length: number } }
@@ -44,7 +44,8 @@ export function isInWaterZone(water: WaterZone, x: number, z: number): boolean {
  * 建出來的東西分兩組：solid 是環本體（站得上去，第三人稱鏡頭會避開），decor 是裝飾（沒有碰撞，鏡頭直接穿過，
  * 數量多時才不會每格都對幾千個物件打射線）。
  */
-export interface PropsBuild { solid: THREE.Group; decor: THREE.Group; discs: Disc[]; floaters: Floater[]; walls: RoundWall[]; waters: WaterZone[]; solids: SolidBox[] }
+/** lights：這一圈的燈（世界座標），夜晚的光暈、光斑照這份畫。 */
+export interface PropsBuild { solid: THREE.Group; decor: THREE.Group; discs: Disc[]; floaters: Floater[]; walls: RoundWall[]; waters: WaterZone[]; solids: SolidBox[]; lights: LightSpot[] }
 
 /** 一圈環的位置與樣式。 */
 export interface RingSpec { style: RingStyle; inner: number; outer: number; minY: number; maxY: number; color: number; seed: number; bobScale: number }
@@ -637,7 +638,7 @@ export function orientedSolid(cx: number, cz: number, yaw: number, sizeX: number
 const fullDisc = (spec: RingSpec): Disc => ({ inner: spec.inner, outer: spec.outer, minY: spec.minY, maxY: spec.maxY });
 
 export function emptyBuild(): PropsBuild {
-  return { solid: new THREE.Group(), decor: new THREE.Group(), discs: [], floaters: [], walls: [], waters: [], solids: [] };
+  return { solid: new THREE.Group(), decor: new THREE.Group(), discs: [], floaters: [], walls: [], waters: [], solids: [], lights: [] };
 }
 
 // 金屬類材質要反射天空才像金屬：環境貼圖由 main.ts 建好後設定一次（setPropsEnvironment），之後建的材質都會用到。
@@ -976,6 +977,7 @@ function buildLibraryRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   addBatches(build.decor, [dividers, books]);
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
+  build.lights.push(...collectLights(props));
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);
 }
@@ -1088,6 +1090,7 @@ function addStreetLamps(props: THREE.Group, r: number, y: number, start: number)
     const lamp = ringGroup(props, r, y, angle);
     skipCollider(lamp);
     markCollider(lamp, [0.3, 4.2, 0.3], [0, 2.1, 0]);
+    markLight(lamp, [0, 4.1, 0], 'street');
     rod(lamp, M.darkMetal, [0, 0, 0], [0, 4.2, 0], 0.06, 0.045, 8);
     for (const side of [-1, 1]) {
       rod(lamp, M.darkMetal, [0, 4.1, 0], [side * 0.6, 4.25, 0], 0.025, 0.025, 6);
@@ -1139,6 +1142,7 @@ function buildFoodCourtRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
   addBatches(build.decor, Object.values(batches));
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
+  build.lights.push(...collectLights(props));
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);
 }

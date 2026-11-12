@@ -8,7 +8,9 @@ import GUI from 'lil-gui';
 import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingStyle, type RingsConfig, type SceneConfig } from './config/scene.config';
 import { CULL_DISTANCE_KEY, buildFloatingField, buildRing, isInWaterZone, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
 import { buildCourtsRing } from './oz-sports';
-import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
+import { NIGHT_SKY, buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
+import { createLampLights, createNightSky, nightUniform, updateLampVisibility } from './oz-night';
+import type { LightSpot } from './oz-kit';
 import { buildTrackRing } from './oz-track';
 import { buildGardenRing } from './oz-garden';
 import { buildGreenwayRing } from './oz-greenway';
@@ -110,11 +112,13 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuff
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
-// 金屬與水面反射用的天空環境貼圖，要在第一次建場景之前設定。
-setPropsEnvironment(createSkyEnvironment(renderer));
+// 金屬與水面反射用的天空環境貼圖，要在第一次建場景之前設定；夜晚換成暗的那張（見 syncEnvironment）。
+const dayEnvironment = createSkyEnvironment(renderer);
+const nightEnvironment = createSkyEnvironment(renderer, NIGHT_SKY);
+setPropsEnvironment(dayEnvironment);
 
 const scene = new THREE.Scene();
-const SKY_COLOR = new THREE.Color(0xeef0f2);
+const SKY_COLOR = new THREE.Color(0xeef0f2);   // 白天的顏色；晚上由 updateDayNight 原地改成夜空色
 scene.background = SKY_COLOR;
 
 // 鏡頭進到水裡時：背景換成水的顏色、加上指數霧，越遠越看不清（泳池約 24 m 寬，看到對面就模糊了）。
@@ -125,10 +129,28 @@ const underwaterFog = new THREE.FogExp2(UNDERWATER_COLOR.getHex(), 0.11);
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, config.scene.groundSize * CAMERA_FAR_PER_GROUND);
 camera.position.set(0, 450, 830);   // 環繞檢視第一次進來：從南邊高處斜看中央
 
-scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+scene.add(ambient);
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
 sun.position.set(3, 6, 2);
 scene.add(sun);
+
+// ---------- 白天／黑夜 ----------
+// 只在畫面上切換（Inspector「場景」頁或 N 鍵），不存進設定檔；開頁面是白天。切換時 NIGHT_FADE_SECONDS 秒內漸變：
+// 背景、環境光、太陽（晚上當月光）跟著變，星空、路燈光暈這些發光貼片讀 nightUniform 淡入。
+const NIGHT_FADE_SECONDS = 1.5;
+const DAY_LOOK = { sky: new THREE.Color(0xeef0f2), ambient: new THREE.Color(0xffffff), ambientIntensity: 1.2, sun: new THREE.Color(0xffffff), sunIntensity: 1.8 };
+const NIGHT_LOOK = { sky: new THREE.Color(0x060a18), ambient: new THREE.Color(0x7d90c8), ambientIntensity: 0.32, sun: new THREE.Color(0xa9bcff), sunIntensity: 0.35 };
+const dayNight = { isNight: false };
+const nightSky = createNightSky(renderer.getPixelRatio());
+scene.add(nightSky.group);
+let lampLights: THREE.Group = new THREE.Group();
+let lampSpots: LightSpot[] = [];
+// 唯一一盞真的點光源：晚上放在離角色最近的那盞路燈，角色與附近的牆、樹才真的被照亮（其他燈只有發光貼片）。
+// 一直留在場景裡、白天亮度 0：光源數量一變，所有材質都要重新編譯著色器，切換時會卡一下。
+const PLAYER_LAMP = { color: 0xffc77a, intensity: 70, distance: 16, reach: 14, below: 0.3 };
+const playerLamp = new THREE.PointLight(PLAYER_LAMP.color, 0, PLAYER_LAMP.distance, 2);
+scene.add(playerLamp);
 
 // world 是之後第一人稱模式也會用到的共用狀態：colliders 給垂直方向（站上去、撞頭），solids 給水平移動。
 const world: {
@@ -494,6 +516,9 @@ function rebuildScene(): void {
   const ringBuilds = buildRings(center, rings);
   world.room.add(buildCenter(center), ...ringBuilds.map((build) => build.solid));
   world.decor.add(...ringBuilds.map((build) => build.decor));
+  lampSpots = ringBuilds.flatMap((build) => build.lights);
+  lampLights = createLampLights(lampSpots);
+  world.decor.add(lampLights);
   world.floaters = ringBuilds.flatMap((build) => build.floaters);
   const fence = groundFenceBoxes(groundSize);
   const centerParts = centerColliders(center);
@@ -507,6 +532,7 @@ function rebuildScene(): void {
   world.walls = ringBuilds.flatMap((build) => build.walls);
   world.waters = ringBuilds.flatMap((build) => build.waters);
   collectDetailMeshes();
+  syncEnvironment();
   camera.far = groundSize * CAMERA_FAR_PER_GROUND;
   camera.updateProjectionMatrix();
 }
@@ -2655,6 +2681,7 @@ function addSceneGroup(panel: GUI): GUI {
     rebuildScene();
     refreshLayerTitles();
   };
+  group.add(dayNight, 'isNight').name('夜晚（N）').onChange(setNight).listen();
   group.add(config.scene, 'groundSize', 200, 3000, 50).name('地面邊長（m）').onChange(rebuild);
   const center = group.addFolder('中央倒圓錐');
   center.add(config.scene.center, 'topRadius', 10, 200, 1).name('平台半徑（m）').onChange(rebuild);
@@ -2847,6 +2874,72 @@ function addPerfToggle(panel: GUI): void {
   panel.domElement.append(toggle);
 }
 
+// 夜晚程度往目標走一步，背景、環境光、太陽跟著插值；過了一半就把金屬與水面的反射換成夜晚那張。
+function updateDayNight(dt: number): void {
+  const target = dayNight.isNight ? 1 : 0;
+  const before = nightUniform.value;
+  const step = dt / NIGHT_FADE_SECONDS;
+  nightUniform.value = target > before ? Math.min(target, before + step) : Math.max(target, before - step);
+  const amount = nightUniform.value;
+  if (amount !== before) {
+    SKY_COLOR.lerpColors(DAY_LOOK.sky, NIGHT_LOOK.sky, amount);
+    ambient.color.lerpColors(DAY_LOOK.ambient, NIGHT_LOOK.ambient, amount);
+    ambient.intensity = lerp(DAY_LOOK.ambientIntensity, NIGHT_LOOK.ambientIntensity, amount);
+    sun.color.lerpColors(DAY_LOOK.sun, NIGHT_LOOK.sun, amount);
+    sun.intensity = lerp(DAY_LOOK.sunIntensity, NIGHT_LOOK.sunIntensity, amount);
+    if ((before < 0.5) !== (amount < 0.5)) syncEnvironment();
+  }
+  updateLampVisibility(lampLights);
+  updatePlayerLamp();
+}
+
+// 會反射天空的材質（金屬、水面、玻璃）改用現在白天或夜晚的環境貼圖。兩張格式相同，換貼圖不會重新編譯著色器。
+// 新建的材質從 setPropsEnvironment 拿；已經在場景裡的逐一換（有些材質是模組裡共用、建場景前就建好的）。
+function syncEnvironment(): void {
+  const current = nightUniform.value >= 0.5 ? nightEnvironment : dayEnvironment;
+  setPropsEnvironment(current);
+  scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const list: THREE.Material[] = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of list) {
+      if (!('envMap' in material)) continue;
+      if (material.envMap === dayEnvironment || material.envMap === nightEnvironment) material.envMap = current;
+    }
+  });
+}
+
+// 角色附近 reach 公尺內最近的一盞燈：光源移到那裡，越遠越暗（平方衰減），換燈的那一刻兩盞都很暗，不會跳。
+const playerPosition = new THREE.Vector3();
+function updatePlayerLamp(): void {
+  playerLamp.intensity = 0;
+  if (nightUniform.value <= 0 || activeModeName !== 'firstPerson') return;
+  character.root.getWorldPosition(playerPosition);
+  let nearest: LightSpot | null = null;
+  let nearestDistance = PLAYER_LAMP.reach;
+  for (const spot of lampSpots) {
+    if (spot.kind === 'flood') continue;
+    const distance = Math.hypot(spot.x - playerPosition.x, (spot.y - playerPosition.y) * 0.5, spot.z - playerPosition.z);
+    if (distance < nearestDistance) {
+      nearest = spot;
+      nearestDistance = distance;
+    }
+  }
+  if (!nearest) return;
+  const falloff = 1 - nearestDistance / PLAYER_LAMP.reach;
+  playerLamp.position.set(nearest.x, nearest.y - PLAYER_LAMP.below, nearest.z);
+  playerLamp.intensity = PLAYER_LAMP.intensity * falloff * falloff * nightUniform.value;
+}
+
+function setNight(isNight: boolean): void {
+  dayNight.isNight = isNight;
+}
+
+addEventListener('keydown', (event) => {
+  if (event.code !== 'KeyN' || event.repeat) return;
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+  setNight(!dayNight.isNight);
+});
+
 function updateUnderwater(): void {
   const { x, y, z } = camera.position;
   const isUnderwater = world.waters.some((water) => isInWaterZone(water, x, z) && y < water.surfaceY && y > water.floorY - 1);
@@ -2954,6 +3047,8 @@ renderer.setAnimationLoop(() => {
   updateFloaters(world.floaters, clock.elapsedTime);
   updateWater(clock.elapsedTime);
   updateUnderwater();
+  updateDayNight(dt);
+  nightSky.update(camera, clock.elapsedTime);
   character.syncSkeletonHelper();
   updateDetailCulling();
   renderer.render(scene, camera);

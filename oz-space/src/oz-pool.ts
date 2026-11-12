@@ -734,11 +734,18 @@ export function buildPoolRing(spec: RingSpec): PropsBuild {
   return build;
 }
 
+/** 環境貼圖的天空配色（線性 RGB 0–1）：地平線、天頂、下方，以及太陽（或月亮）亮點的顏色與強度。 */
+export interface SkyPalette { horizon: Vec3; zenith: Vec3; ground: Vec3; sun: Vec3; sunStrength: number }
+const DAY_SKY: SkyPalette = { horizon: [0.86, 0.89, 0.92], zenith: [0.32, 0.55, 0.82], ground: [0.62, 0.64, 0.66], sun: [1, 0.96, 0.88], sunStrength: 30 };
+/** 夜晚：深藍天空、更暗的下方，太陽方向換成很弱的月光，金屬與水面晚上不會反射白天的天空。 */
+export const NIGHT_SKY: SkyPalette = { horizon: [0.07, 0.09, 0.16], zenith: [0.02, 0.03, 0.08], ground: [0.03, 0.03, 0.05], sun: [0.75, 0.82, 1], sunStrength: 2 };
+const glslVec3 = ([r, g, b]: Vec3): string => `vec3(${r.toFixed(3)}, ${g.toFixed(3)}, ${b.toFixed(3)})`;
+
 /**
  * 給金屬、水面反射用的天空環境貼圖：上面藍、地平線淡、下面灰，太陽方向一個很亮的點（水面高光就是它）。
- * 只設定在需要反射的材質上，不改 scene.environment，角色模型的打光才不會跟著變。
+ * 只設定在需要反射的材質上，不改 scene.environment，角色模型的打光才不會跟著變。palette 換成 NIGHT_SKY 就是夜晚版。
  */
-export function createSkyEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
+export function createSkyEnvironment(renderer: THREE.WebGLRenderer, palette: SkyPalette = DAY_SKY): THREE.Texture {
   const sky = new THREE.Scene();
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
@@ -747,12 +754,12 @@ export function createSkyEnvironment(renderer: THREE.WebGLRenderer): THREE.Textu
     fragmentShader: `varying vec3 vDirection;
       void main() {
         vec3 d = normalize(vDirection);
-        vec3 horizon = vec3(0.86, 0.89, 0.92);
-        vec3 zenith = vec3(0.32, 0.55, 0.82);
-        vec3 ground = vec3(0.62, 0.64, 0.66);
+        vec3 horizon = ${glslVec3(palette.horizon)};
+        vec3 zenith = ${glslVec3(palette.zenith)};
+        vec3 ground = ${glslVec3(palette.ground)};
         vec3 color = d.y > 0.0 ? mix(horizon, zenith, pow(d.y, 0.55)) : mix(horizon, ground, pow(-d.y, 0.4));
         float sun = pow(max(dot(d, normalize(vec3(${SUN_DIRECTION.join('.0, ')}.0))), 0.0), 900.0);
-        gl_FragColor = vec4(color + vec3(1.0, 0.96, 0.88) * sun * 30.0, 1.0);
+        gl_FragColor = vec4(color + ${glslVec3(palette.sun)} * sun * ${palette.sunStrength.toFixed(1)}, 1.0);
       }`,
   });
   const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32), material);

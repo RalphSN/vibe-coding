@@ -6,10 +6,11 @@
 // （路緣石、行道樹、路燈、消防栓、郵筒、長椅），中間兩排房子背對背、隔一條後巷；兩條路之間有兩條沿徑向的連通道，
 // 路口人行道斷開、畫斑馬線。斑馬線和路口的範圍不畫黃色中央虛線（兩種標線疊在一起會閃爍，現實中也不會疊）。房子很多，所以牆、屋頂、門、煙囪都用 InstancedMesh（Batch），街道設施合併網格。
 import * as THREE from 'three';
+import { nightUniform } from './oz-night';
 import { Batch, addFloater, annulus, bakeByMaterial, createRng, emptyBuild, orientedSolid, shinyMaterial, type Part, type PropsBuild, type RingSpec } from './oz-props';
 import {
-  TAU, addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, lambert, mapped, markChildGroups, pixelTexture, planarUv, range, rod,
-  skipCollider, markCollider, type Range, type Rng, type Vec3,
+  TAU, addMesh, box, childGroup, collectColliders, collectLights, cylinder, disposeGeometries, lambert, mapped, markChildGroups, pixelTexture, planarUv, range, rod,
+  skipCollider, markCollider, markLight, type Range, type Rng, type Vec3,
 } from './oz-kit';
 
 type Matrix6 = [number, number, number, number, number, number];
@@ -210,11 +211,56 @@ function facadeBox(): THREE.BufferGeometry {
   return geometry;
 }
 
+// ---------- 夜晚的窗戶 ----------
+// 不另外加網格：外牆材質的著色器裡，照貼圖上的窗戶排法算出這個像素落在哪一扇窗，
+// 再用「房子位置 + 這面牆的方向 + 第幾扇窗」當亂數，決定這扇窗晚上亮不亮、亮什麼顏色。
+// 窗櫺（白色十字）不發光；白天 nightUniform 是 0，看起來和原本一樣。
+const WINDOW_GLOW = { litShare: 0.42, tvShare: 0.12, warm: '1.0, 0.72, 0.38', cool: '0.62, 0.78, 1.0', strength: 0.95 };
+const WINDOW_VERTEX = `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  vWindowSeed = instanceMatrix[3].xyz + normal * 7.31;
+#else
+  vWindowSeed = normal * 7.31;
+#endif`;
+const WINDOW_FRAGMENT = `#include <emissivemap_fragment>
+{
+  vec2 px = vec2(vMapUv.x, 1.0 - vMapUv.y) * ${TEXTURE_PX.toFixed(1)};
+  vec2 cell = vec2(${TEXTURE_PX.toFixed(1)} / WINDOW_COLUMNS, ${FACADE_ROWS_PX.toFixed(1)} / WINDOW_ROWS);
+  vec2 local = vec2(px.x, px.y - ${FACADE_TOP.toFixed(1)});
+  vec2 index = floor(local / cell);
+  vec2 size = cell * vec2(${WINDOW_SHARE.w}, ${WINDOW_SHARE.h});
+  vec2 inCell = local - index * cell - (cell - size) * 0.5;
+  bool isGlass = local.y >= 0.0 && index.y < WINDOW_ROWS && all(greaterThanEqual(inCell, vec2(0.0))) && all(lessThan(inCell, size));
+  bool isMullion = abs(inCell.x - size.x * 0.5) < 1.5 || abs(inCell.y - size.y * 0.4) < 1.5;
+  if (isGlass && !isMullion) {
+    // 種子先取整數再縮小範圍：內插後的 varying 會有極小的誤差，直接丟進 sin 會被放大成整扇窗的雜點
+    vec3 seed = mod(floor(vWindowSeed * 2.0 + 0.5) + vec3(index, 0.0) * vec3(7.0, 11.0, 0.0), 251.0);
+    float pick = fract(sin(dot(seed, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    if (pick < ${WINDOW_GLOW.litShare}) {
+      vec3 tone = pick < ${WINDOW_GLOW.litShare * WINDOW_GLOW.tvShare} ? vec3(${WINDOW_GLOW.cool}) : vec3(${WINDOW_GLOW.warm});
+      totalEmissiveRadiance += tone * (0.7 + 0.3 * fract(pick * 91.7)) * ${WINDOW_GLOW.strength} * uNight;
+    }
+  }
+}`;
+function addWindowGlow(material: THREE.MeshLambertMaterial, layout: { columns: number; rows: number }): THREE.MeshLambertMaterial {
+  // 排法放在 defines：three.js 依 defines 區分著色器，同一個 onBeforeCompile 也不會把房屋和高樓的排法搞混
+  material.defines = { WINDOW_COLUMNS: layout.columns.toFixed(1), WINDOW_ROWS: layout.rows.toFixed(1) };
+  material.onBeforeCompile = applyWindowShader;
+  return material;
+}
+function applyWindowShader(shader: THREE.WebGLProgramParametersWithUniforms): void {
+  shader.uniforms.uNight = nightUniform;
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWindowSeed;').replace('#include <begin_vertex>', WINDOW_VERTEX);
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vWindowSeed;\nuniform float uNight;')
+    .replace('#include <emissivemap_fragment>', WINDOW_FRAGMENT);
+}
+
 function createTownMaterials() {
   const roofMap = pixelTexture(128, 128, drawRoofTiles);
   roofMap.repeat.set(3, 3);
   const facade = (layout: { columns: number; rows: number }, style: WallStyle): THREE.MeshLambertMaterial =>
-    mapped(pixelTexture(TEXTURE_PX, TEXTURE_PX, drawFacade(layout.columns, layout.rows, style)));
+    addWindowGlow(mapped(pixelTexture(TEXTURE_PX, TEXTURE_PX, drawFacade(layout.columns, layout.rows, style))), layout);
   return {
     houseWalls: { siding: facade(FACADE_LAYOUT.house, 'siding'), brick: facade(FACADE_LAYOUT.house, 'brick'), stucco: facade(FACADE_LAYOUT.house, 'stucco') },
     towerWalls: { siding: facade(FACADE_LAYOUT.tower, 'stucco'), brick: facade(FACADE_LAYOUT.tower, 'brick'), stucco: facade(FACADE_LAYOUT.tower, 'stucco') },
@@ -435,6 +481,7 @@ const anglesEvery = (radius: number, spacing: number, offset = 0): number[] => {
 function addStreetLamp(g: THREE.Group, M: TownMaterials): void {
   skipCollider(g);
   markCollider(g, [0.3, 5, 0.3], [0, 2.5, 0]);
+  markLight(g, [0, 4.84, -1.05], 'street');
   cylinder(g, M.darkMetal, 0.14, 0.4, [0, 0.2, 0], 10);
   rod(g, M.darkMetal, [0, 0.4, 0], [0, 4.8, 0], 0.06, 0.045, 8);
   rod(g, M.darkMetal, [0, 4.8, 0], [0, 4.95, -0.9], 0.035, 0.035, 6);
@@ -663,6 +710,7 @@ export function buildHousesRing(spec: RingSpec): PropsBuild {
   addHouseBatches(build.decor, B);
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
+  build.lights.push(...collectLights(props));
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);
   return build;

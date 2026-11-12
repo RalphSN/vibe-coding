@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { Batch, annulus, bakeByMaterial, colorMaterial, createRng, emptyBuild, orientedSolid, type PropsBuild, type RingSpec } from './oz-props';
 import {
-  TAU, addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, rod,
+  TAU, addMesh, box, childGroup, collectColliders, collectLights, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, markLight, pixelTexture, planarUv, rod,
   skipCollider, type Rng,
 } from './oz-kit';
 
@@ -276,6 +276,7 @@ function addRadialPath(props: THREE.Group, M: GreenwayMaterials, angle: number, 
 function addLamp(g: THREE.Group, M: GreenwayMaterials): void {
   skipCollider(g);
   markCollider(g, [0.3, 3.6, 0.3], [0, 1.8, 0]);
+  markLight(g, [0, 3.65, 0], 'path');
   rod(g, M.darkMetal, [0, 0, 0], [0, 3.5, 0], 0.05, 0.04, 8);
   addMesh(g, new THREE.SphereGeometry(0.2, 12, 8), M.lamp, [0, 3.65, 0]);
   cylinder(g, M.darkMetal, 0.22, 0.05, [0, 3.88, 0], 12);
@@ -404,6 +405,7 @@ export function buildGreenwayRing(spec: RingSpec): PropsBuild {
   for (const angle of anglesEvery(benchRadius, BENCH_SPACING, 0.02)) addBench(ringGroup(props, benchRadius, y, angle), M);
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
+  build.lights.push(...collectLights(props));
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);
   return build;
