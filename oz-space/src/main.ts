@@ -4,8 +4,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
-import GUI, { type Controller } from 'lil-gui';
-import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingsConfig, type SceneConfig } from './config/scene.config';
+import GUI from 'lil-gui';
+import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingStyle, type RingsConfig, type SceneConfig } from './config/scene.config';
 import { CULL_DISTANCE_KEY, buildFloatingField, buildRing, isInWaterZone, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
 import { buildCourtsRing } from './oz-sports';
 import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
@@ -2505,61 +2505,72 @@ function setViewMode(name: ViewModeName): void {
 }
 
 // ================= 7. Inspector（lil-gui） =================
-// 仿 Unity Inspector：分成場景／角色／鏡頭三組，改的就是 config（也就是 scene.config.json 的內容）。
+// 淺色玻璃浮窗（樣式在 style.css）：頂部分頁切換場景／角色／鏡頭／說明，一次只顯示一頁；
+// 改的就是 config（也就是 scene.config.json 的內容）。底部固定「儲存」與「還原預設」，標題列右邊是效能顯示開關。
 // 「儲存」只在 vite dev 有（寫回 JSON 的外掛在 vite.config.ts），打包後整段被移除。
 const SAVE_FEEDBACK_MS = 1500;
-const CLIP_ROLE_NAMES: Record<ClipRole, string> = {
-  idle: '站立', walk: '走路', run: '跑步', sprint: '衝刺', jumpStart: '起跳', jumpLoop: '空中', jumpLand: '落地', blocked: '受阻', fly: '飛行',
-  sitEnter: '坐下', sitLoop: '坐著', sitExit: '站起來', swim: '游泳（蛙式）', swimIdle: '踩水',
+const RESTORE_CONFIRM_MS = 3000;          // 「還原預設」按第一下之後，幾毫秒內再按一次才真的還原
+const INSPECTOR_TAB_KEY = 'oz-inspector-tab';
+// 環的樣式在面板上顯示的中文名稱（下拉選單與每層的標題）
+const RING_STYLE_NAMES: Record<RingStyle, string> = {
+  plain: '素面', courts: '運動場', track: '跑道', pool: '泳池', houses: '住宅區', floatingHouses: '漂浮房屋', broken: '田園',
+  floatingBooks: '飄著的書', shards: '符號', bookshelf: '圖書館', restaurant: '飲食區', greenway: '綠道',
 };
-let clipNames: string[] = [];
 // 「還原預設」回到上次儲存的內容（還沒存過就是開頁面時讀到的 JSON）。
 let savedSnapshot: SceneConfig = structuredClone(config);
 
-// 地面大小在這裡調；之後加的空間設定也放這組。
-function addSceneGroup(panel: GUI): void {
+// 每層的標題寫出第幾層、樣式、高度，不用點開就知道是哪一層；改了樣式或間距後重算
+function layerTitle(index: number, style: RingStyle, height: number): string {
+  return `${index + 1}　${RING_STYLE_NAMES[style]}　${Math.round(height)} m`;
+}
+
+// 地面、中央圓錐、懸空環、周圍漂浮物；地面大小在這裡調，之後加的空間設定也放這頁。
+function addSceneGroup(panel: GUI): GUI {
   const group = panel.addFolder('場景');
-  group.add(config.scene, 'groundSize', 200, 3000, 50).name('地面邊長（m）').onChange(rebuildScene);
+  const layerFolders: GUI[] = [];
+  const refreshLayerTitles = (): void => {
+    const shapes = ringShapes(config.scene.center, config.scene.rings);
+    config.scene.rings.layers.forEach((layer, i) => layerFolders[i]?.title(layerTitle(i, layer.style, shapes[i]?.maxY ?? 0)));
+  };
+  const rebuild = (): void => {
+    rebuildScene();
+    refreshLayerTitles();
+  };
+  group.add(config.scene, 'groundSize', 200, 3000, 50).name('地面邊長（m）').onChange(rebuild);
   const center = group.addFolder('中央倒圓錐');
-  center.add(config.scene.center, 'topRadius', 10, 200, 1).name('平台半徑（m）').onChange(rebuildScene);
-  center.add(config.scene.center, 'topY', 10, 400, 1).name('平台高度（m）').onChange(rebuildScene);
-  center.add(config.scene.center, 'height', 10, 300, 1).name('錐高（m）').onChange(rebuildScene);
+  center.add(config.scene.center, 'topRadius', 10, 200, 1).name('平台半徑（m）').onChange(rebuild);
+  center.add(config.scene.center, 'topY', 10, 400, 1).name('平台高度（m）').onChange(rebuild);
+  center.add(config.scene.center, 'height', 10, 300, 1).name('錐高（m）').onChange(rebuild);
   const rings = group.addFolder('懸空同心環');
-  rings.add(config.scene.rings, 'clearance', 0, 200, 1).name('離圓錐距離（m）').onChange(rebuildScene);
-  rings.add(config.scene.rings, 'width', 5, 100, 1).name('每圈寬（m）').onChange(rebuildScene);
-  rings.add(config.scene.rings, 'thickness', 0.5, 20, 0.5).name('厚度（m）').onChange(rebuildScene);
-  config.scene.rings.layers.forEach((layer, i) => {
-    const folder = rings.addFolder(`第 ${i + 1} 層`);
-    folder.add(layer, 'style', RING_STYLES).name('樣式').onChange(rebuildScene);
-    folder.add(layer, 'gap', 0, 80, 1).name('離上一層（m）').onChange(rebuildScene);
-    if (layer.width !== undefined) folder.add(layer, 'width', 5, 150, 1).name('這層寬（m）').onChange(rebuildScene);
+  rings.add(config.scene.rings, 'clearance', 0, 200, 1).name('離圓錐距離（m）').onChange(rebuild);
+  rings.add(config.scene.rings, 'width', 5, 100, 1).name('每圈寬（m）').onChange(rebuild);
+  rings.add(config.scene.rings, 'thickness', 0.5, 20, 0.5).name('厚度（m）').onChange(rebuild);
+  const styleOptions = Object.fromEntries(RING_STYLES.map((style) => [RING_STYLE_NAMES[style], style]));
+  config.scene.rings.layers.forEach((layer) => {
+    const folder = rings.addFolder('');
+    folder.domElement.classList.add('oz-layer');
+    folder.add(layer, 'style', styleOptions).name('樣式').onChange(rebuild);
+    folder.add(layer, 'gap', 0, 80, 1).name('離上一層（m）').onChange(rebuild);
+    if (layer.width !== undefined) folder.add(layer, 'width', 5, 150, 1).name('這層寬（m）').onChange(rebuild);
     folder.close();
+    layerFolders.push(folder);
   });
+  refreshLayerTitles();
   const floaters = group.addFolder('周圍漂浮物');
-  floaters.add(config.scene.floaters, 'islands', 0, 80, 1).name('島嶼').onChange(rebuildScene);
-  floaters.add(config.scene.floaters, 'platforms', 0, 80, 1).name('平台（同心圓環、方格）').onChange(rebuildScene);
-  floaters.add(config.scene.floaters, 'hexPads', 0, 80, 1).name('蜂窩平面').onChange(rebuildScene);
-  floaters.add(config.scene.floaters, 'debris', 0, 400, 10).name('漂浮符號').onChange(rebuildScene);
-  floaters.add(config.scene.floaters, 'bobScale', 0, 3, 0.1).name('飄動幅度倍率').onChange(rebuildScene);
-  group.close();
+  floaters.add(config.scene.floaters, 'islands', 0, 80, 1).name('島嶼').onChange(rebuild);
+  floaters.add(config.scene.floaters, 'platforms', 0, 80, 1).name('平台（同心圓環、方格）').onChange(rebuild);
+  floaters.add(config.scene.floaters, 'hexPads', 0, 80, 1).name('蜂窩平面').onChange(rebuild);
+  floaters.add(config.scene.floaters, 'debris', 0, 400, 10).name('漂浮符號').onChange(rebuild);
+  floaters.add(config.scene.floaters, 'bobScale', 0, 3, 0.1).name('飄動幅度倍率').onChange(rebuild);
+  floaters.close();
+  return group;
 }
 
-// 動畫名稱要等模型載入後才知道有哪些，下拉選單晚一點才加；重建面板時用記下來的名單。
-function addClipControllers(parent: GUI): void {
-  if (clipNames.length === 0) return;
-  const clips = parent.addFolder('動畫片段');
-  for (const role of CLIP_ROLES) clips.add(config.character.clips, role, clipNames).name(CLIP_ROLE_NAMES[role]);
-  clips.close();
-}
-
-let animationFolder: GUI | null = null;
-
-function addCharacterGroup(panel: GUI): void {
+// 面板只放實際走起來最有感的幾項；碰撞、轉向、動畫校準、鏡頭平滑這些調好就固定的參數，
+// 直接改 scene.config.json（移植來的專案原本全部放在面板上，這裡用不到那麼細）。
+function addCharacterGroup(panel: GUI): GUI {
   const c = config.character;
   const group = panel.addFolder('角色');
-  group.add(c, 'scale', 0.5, 1.5, 0.01).name('縮放');
-  group.add(c, 'radius', 0.1, 0.45, 0.01).name('碰撞半徑（m）');
-  group.add(c, 'stepHeight', 0, 0.6, 0.01).name('自動跨上高度（m）');
   group.add(c, 'walkSpeed', 0.5, 4, 0.1).name('走路（m/s）');
   group.add(c, 'runSpeed', 1, 8, 0.1).name('跑步（m/s）');
   group.add(c, 'swimSpeed', 0.3, 3, 0.1).name('游泳（m/s）');
@@ -2568,18 +2579,7 @@ function addCharacterGroup(panel: GUI): void {
   group.add(c, 'turnSpeed', 60, 360, 10).name('轉身（度/秒）');
   group.add(c, 'jumpHeight', 0.1, 1.5, 0.05).name('跳躍高度（m）');
   group.add(c, 'gravity', 1, 30, 0.1).name('重力（m/s²）');
-  group.add(c, 'turnToMoveSeconds', 0.02, 1, 0.01).name('轉向移動方向（秒）');
-  group.add(c, 'maxMoveTurn', 0, 90, 1).name('轉向上限（度）');
-  group.add(c, 'legTurnLimit', 0, 90, 1).name('下半身轉向上限（度）');
-  animationFolder = group.addFolder('動畫');
-  animationFolder.add(c, 'fadeSeconds', 0, 1, 0.05).name('過渡（秒）');
-  animationFolder.add(c.clipSpeeds, 'walk', 0.3, 3, 0.01).name('走路動畫原速（m/s）');
-  animationFolder.add(c.clipSpeeds, 'run', 1, 8, 0.01).name('跑步動畫原速（m/s）');
-  animationFolder.add(c.clipSpeeds, 'sprint', 2, 15, 0.01).name('衝刺動畫原速（m/s）');
-  animationFolder.add(c, 'landLockSeconds', 0, 1.2, 0.05).name('落地硬直（秒）');
-  animationFolder.add(c, 'showSkeleton').name('顯示骨架');
-  addClipControllers(animationFolder);
-  group.close();
+  return group;
 }
 
 function applyFirstPersonFov(): void {
@@ -2588,7 +2588,7 @@ function applyFirstPersonFov(): void {
   camera.updateProjectionMatrix();
 }
 
-function addCameraGroup(panel: GUI): void {
+function addCameraGroup(panel: GUI): GUI {
   const cam = config.camera;
   const group = panel.addFolder('鏡頭');
   const preset = group.addFolder('第三人稱預設視角');
@@ -2597,18 +2597,7 @@ function addCameraGroup(panel: GUI): void {
   preset.add(cam.thirdPerson, 'height', 0, 0.6, 0.05).name('鏡頭高度（m）');
   group.add(cam, 'firstPersonFov', 40, 100, 1).name('第一人稱視角（度）').onChange(applyFirstPersonFov);
   group.add(cam, 'lookSensitivity', 0.001, 0.01, 0.0005).name('滑鼠靈敏度');
-  group.add(cam, 'maxPitch', 30, 89, 1).name('俯仰上限（度）');
-  group.add(cam, 'zoomPerWheel', 0.001, 0.01, 0.0005).name('滾輪縮放');
-  group.add(cam, 'minDistance', 0.5, 3, 0.1).name('最近距離（m）');
-  group.add(cam, 'maxDistance', 2, 10, 0.1).name('最遠距離（m）');
-  const smoothing = group.addFolder('平滑時間（秒）');
-  smoothing.add(cam, 'zoomSmoothTime', 0.01, 1, 0.01).name('滾輪縮放');
-  smoothing.add(cam, 'obstructSmoothTime', 0.01, 0.5, 0.01).name('被擋住拉近');
-  smoothing.add(cam, 'releaseSmoothTime', 0.05, 2, 0.05).name('障礙離開退回');
-  smoothing.add(cam, 'followSmoothTime', 0.05, 2, 0.05).name('轉回角色背後');
-  smoothing.add(cam, 'resetSmoothTime', 0.05, 2, 0.05).name('回到預設視角');
-  smoothing.close();
-  group.close();
+  return group;
 }
 
 /**
@@ -2625,11 +2614,6 @@ async function saveConfig(): Promise<void> {
   savedSnapshot = structuredClone(config);
 }
 
-function flashName(controller: Controller, text: string, original: string): void {
-  controller.name(text);
-  setTimeout(() => controller.name(original), SAVE_FEEDBACK_MS);
-}
-
 // 整份換掉後重建面板：控制項綁的是舊物件，原地改值比逐欄同步單純。
 function restoreDefaults(): void {
   Object.assign(config, structuredClone(savedSnapshot));
@@ -2639,22 +2623,109 @@ function restoreDefaults(): void {
   applyFirstPersonFov();
 }
 
-function addFileButtons(panel: GUI): void {
+function createButton(label: string, className: string): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = className;
+  button.textContent = label;
+  return button;
+}
+
+// 底部固定的兩個按鈕：儲存（主要動作，只在 dev）、還原預設（按兩下才生效，避免誤按丟掉調了半天的數值）
+function addFooter(panel: GUI): void {
+  const footer = document.createElement('div');
+  footer.className = 'oz-footer';
   if (import.meta.env.DEV) {
-    const label = '儲存';
-    const actions = {
-      save: (): void => {
-        saveConfig()
-          .then(() => flashName(saveButton, '已儲存', label))
-          .catch((error: unknown) => {
-            console.error(error);
-            flashName(saveButton, '儲存失敗（看 console）', label);
-          });
-      },
-    };
-    const saveButton = panel.add(actions, 'save').name(label);
+    const save = createButton('儲存', 'oz-button oz-button-primary');
+    save.addEventListener('click', () => {
+      saveConfig()
+        .then(() => flashLabel(save, '已儲存', '儲存'))
+        .catch((error: unknown) => {
+          console.error(error);
+          flashLabel(save, '儲存失敗（看 console）', '儲存');
+        });
+    });
+    footer.append(save);
   }
-  panel.add({ restore: restoreDefaults }, 'restore').name('還原預設');
+  const restore = createButton('還原預設', 'oz-button');
+  let confirmTimer = 0;
+  restore.addEventListener('click', () => {
+    if (restore.dataset.confirm === 'true') {
+      window.clearTimeout(confirmTimer);
+      restoreDefaults();
+      return;
+    }
+    restore.dataset.confirm = 'true';
+    restore.textContent = '再按一次還原';
+    confirmTimer = window.setTimeout(() => {
+      delete restore.dataset.confirm;
+      restore.textContent = '還原預設';
+    }, RESTORE_CONFIRM_MS);
+  });
+  footer.append(restore);
+  panel.domElement.append(footer);
+}
+
+function flashLabel(button: HTMLButtonElement, text: string, original: string): void {
+  button.textContent = text;
+  window.setTimeout(() => { button.textContent = original; }, SAVE_FEEDBACK_MS);
+}
+
+// 上次看的分頁存在 localStorage（只是方便，讀寫失敗就用第一頁）
+function readSavedTab(count: number): number {
+  try {
+    const saved = Number(localStorage.getItem(INSPECTOR_TAB_KEY));
+    return Number.isInteger(saved) && saved >= 0 && saved < count ? saved : 0;
+  } catch (error) {
+    console.warn('讀取 Inspector 分頁設定失敗，改用第一頁', error);
+    return 0;
+  }
+}
+function saveTab(index: number): void {
+  try {
+    localStorage.setItem(INSPECTOR_TAB_KEY, String(index));
+  } catch (error) {
+    console.warn('儲存 Inspector 分頁設定失敗', error);
+  }
+}
+
+// 分頁列：每頁是一個最上層資料夾，一次只顯示一個（資料夾自己的標題列由 CSS 藏起來）
+function addTabs(panel: GUI, pages: { label: string; folder: GUI }[]): void {
+  const bar = document.createElement('div');
+  bar.className = 'oz-tabs';
+  bar.setAttribute('role', 'tablist');
+  const buttons = pages.map(({ label, folder }) => {
+    folder.domElement.classList.add('oz-tab-page');
+    const button = createButton(label, 'oz-tab');
+    button.setAttribute('role', 'tab');
+    bar.append(button);
+    return button;
+  });
+  const select = (index: number): void => {
+    pages.forEach(({ folder }, i) => {
+      const isActive = i === index;
+      folder.domElement.hidden = !isActive;
+      if (isActive) folder.open();
+      buttons[i]?.setAttribute('aria-selected', String(isActive));
+    });
+    saveTab(index);
+  };
+  buttons.forEach((button, i) => button.addEventListener('click', () => select(i)));
+  panel.domElement.insertBefore(bar, panel.$children);
+  select(readSavedTab(pages.length));
+}
+
+// 標題列右邊的效能顯示開關（左上角的 FPS 等數字），不存進設定檔
+function addPerfToggle(panel: GUI): void {
+  const toggle = createButton('FPS', 'oz-perf-toggle');
+  toggle.setAttribute('aria-pressed', String(perf.visible));
+  toggle.title = '顯示效能（FPS、繪製次數、三角形數）';
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setPerfVisible(!perf.visible);
+    toggle.setAttribute('aria-pressed', String(perf.visible));
+  });
+  panel.domElement.append(toggle);
 }
 
 function updateUnderwater(): void {
@@ -2702,19 +2773,27 @@ function updatePerfStats(frameSeconds: number): void {
 // 操作說明（index.html 的 #hud）放在 Inspector 最上面一個可收合的資料夾裡；依目前視角只顯示那一段。
 // 還原預設會重建 Inspector，所以保留這個元素的參照，每次重建再搬進新的資料夾。
 const helpPanel = requireElement('#hud', HTMLElement);
-function addHelpFolder(panel: GUI): void {
-  const folder = panel.addFolder('操作說明');
+function addHelpFolder(panel: GUI): GUI {
+  const folder = panel.addFolder('說明');
   folder.$children.append(helpPanel);
+  return folder;
 }
 
 function buildInspector(): GUI {
   const panel = new GUI({ title: 'Inspector' });
-  addHelpFolder(panel);
-  addFileButtons(panel);
-  panel.add(perf, 'visible').name('顯示效能（FPS）').onChange(setPerfVisible);
-  addSceneGroup(panel);
-  addCharacterGroup(panel);
-  addCameraGroup(panel);
+  panel.domElement.classList.add('oz-inspector');
+  addTabs(panel, [
+    { label: '場景', folder: addSceneGroup(panel) },
+    { label: '角色', folder: addCharacterGroup(panel) },
+    { label: '鏡頭', folder: addCameraGroup(panel) },
+    { label: '說明', folder: addHelpFolder(panel) },
+  ]);
+  // 分頁裡的子資料夾預設全部收起，一打開只看到標題清單；分頁本身由 addTabs 控制開關
+  for (const folder of panel.foldersRecursive()) {
+    if (!folder.domElement.classList.contains('oz-tab-page')) folder.close();
+  }
+  addPerfToggle(panel);
+  addFooter(panel);
   if (innerWidth < 768) panel.close();
   return panel;
 }
@@ -2734,10 +2813,6 @@ addEventListener('keydown', (event) => {
 // ================= 8. 啟動 =================
 let gui = buildInspector();
 character.load()
-  .then((names) => {
-    clipNames = names;
-    if (animationFolder) addClipControllers(animationFolder);
-  })
   .catch((error: unknown) => console.error(`角色模型載入失敗（${MODEL_URL}），繼續用方塊人：`, error));
 // 開頁面時是第三人稱。先進一次環繞檢視：它的 exit() 會關掉 OrbitControls、記下俯瞰的鏡頭位置，按 Tab 才回得到。
 // 場景建好（碰撞體就位）之後才進人物模式，出生點才找得到空位。
