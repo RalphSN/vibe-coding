@@ -52,6 +52,7 @@ interface RigMotion {
   isSitting: boolean;   // 想坐著（按 X 坐下時 true，站起來時 false）；動畫自己播坐下、站起來的過程
   isSwimming: boolean;  // 在水裡游泳：往前游播蛙式、停著播踩水
   swimClimb: number;    // 游泳時實際的上升速度（m/s，下潛為負）：身體跟著往下或往上傾
+  isDashing: boolean;   // Z 加速中：跑、跳換成雙手拖在身後的衝刺姿勢，往前飛時身體趴平
 }
 // 從世界座標 (x, y, z) 沿水平方向 (dirX, dirZ) 往前，maxDistance 內最先碰到的牆：多遠、表面朝哪（朝外的單位向量）。
 type WallProbe = (x: number, y: number, z: number, dirX: number, dirZ: number, maxDistance: number) => { distance: number; nx: number; nz: number } | null;
@@ -1092,6 +1093,21 @@ const FLY_CLIMB_ARM_LIFT = 0.1;            // 往下飛時手往上浮多少（r
 const FLY_CLIMB_ARM_SPREAD = 0.06;         // 往下飛時手再往外張多少（m）
 const FLY_CLIMB_SMOOTH_TIME = 0.3;
 const FLOAT_REACH_MAX = 0.97;              // 加上浮動、風阻後，目標最遠只到鏈長的這個比例，膝蓋、手肘不會鎖直
+// 衝刺姿勢（Z 加速時，疊在動畫上）：跑、跳時上半身前傾、雙手幾乎伸直拖在身後不擺動、頭抬起看前方；
+// 往前飛時整個身體從骨盆轉成接近水平（趴著飛），腿伸直併攏、雙手貼著身體往腳的方向伸，只有臉朝前。
+const DASH_SMOOTH_TIME = 0.15;             // 衝刺姿勢淡入淡出
+const DASH_LEAN = 20;                      // 跑、跳時上半身再前傾（度；衝刺動畫本身已經前傾），照 SPINE_COUNTER 的比例分給三節脊椎
+const DASH_ARM_DROP = 30;                  // 手臂在身後、低於水平幾度
+const DASH_ARM_REACH = 0.95;               // 手離肩膀的距離 / 手臂長：接近伸直，手肘留一點彎
+const DASH_ARM_OUTWARD = 0.06;             // 手往外張多少（m）
+const SUPERMAN_PITCH = 80;                 // 往前飛時身體前傾到幾度（90 是完全水平；留一點，頭不會壓太低）
+const SUPERMAN_MIN_SPEED = 2;              // 往前飛的速度超過這裡（m/s）才趴平，停下或倒退就回到漂浮
+const SUPERMAN_SMOOTH_TIME = 0.4;
+const SUPERMAN_LEG_STRETCH = 0.04;         // 趴平時腿再伸直多少（reach 增加）
+const SUPERMAN_ARM_REACH = 0.93;           // 趴平時手沿著身體往腳的方向伸
+const SUPERMAN_ARM_OUTWARD = 0.1;
+const HEAD_LIFT_SHARE = 0.85;              // 頭往回抬、抵銷身體傾角的比例（衝刺與趴平時才抬），分給脖子與頭
+const NECK_BONES: [string, number][] = [['neck_01', 0.4], ['Head', 0.6]];
 const FLY_TOE_ANGLE = 70;         // 飛行時腳掌往下垂：腳踝到腳尖和水平面的夾角（度）；站立時約 31°
 const IK_SLACK = 0.08;             // 有手部 IK 時身體少退這麼多，手肘留彎度，斜著推時遠的那隻手也搆得到
 const IK_STRETCH_LIMIT = 1e-3;     // 手臂不完全伸直，留一點彎度，手肘才不會在伸直附近翻來翻去
@@ -1251,6 +1267,39 @@ function solveTwoBoneIk(chain: LimbChain, goal: THREE.Vector3, pole?: THREE.Vect
   turnBone(chain.lower, ikFrom.subVectors(ikHand, ikElbow), ikTo.subVectors(handGoal, ikElbow));
 }
 
+// 一串骨頭各自繞同一個世界座標軸轉 angle × share（衝刺時脊椎前傾、頭往回抬）；restore 理由同 undoOrientationWarp。
+interface BendBone { bone: THREE.Object3D; share: number; restore: THREE.Quaternion; isApplied: boolean }
+const bendParent = new THREE.Quaternion();
+const bendTurn = new THREE.Quaternion();
+
+function findBendBones(root: THREE.Object3D, names: [string, number][]): BendBone[] {
+  const bones = names.map(([name, share]) => ({ bone: root.getObjectByName(name), share }));
+  if (bones.some(({ bone }) => !bone)) return [];
+  return bones.flatMap(({ bone, share }) => (bone ? [{ bone, share, restore: new THREE.Quaternion(), isApplied: false }] : []));
+}
+
+// 由上往下（父骨頭先）轉，每轉一根就更新世界矩陣，子骨頭換算轉軸時才用到新的父骨頭方向。
+function bendBones(bones: BendBone[], axis: THREE.Vector3, angle: number): void {
+  for (const item of bones) {
+    if (!item.bone.parent) continue;
+    item.restore.copy(item.bone.quaternion);
+    item.isApplied = true;
+    item.bone.parent.getWorldQuaternion(bendParent);
+    bendTurn.setFromAxisAngle(axis, angle * item.share);
+    bendTurn.premultiply(bendParent.clone().invert()).multiply(bendParent);
+    item.bone.quaternion.premultiply(bendTurn);
+    item.bone.updateMatrixWorld(true);
+  }
+}
+
+function unbendBones(bones: BendBone[]): void {
+  for (const item of bones) {
+    if (!item.isApplied) continue;
+    item.bone.quaternion.copy(item.restore);
+    item.isApplied = false;
+  }
+}
+
 // 一隻腳的腳踝與腳尖骨頭；restore 是疊上下垂之前的姿勢（理由同 LimbChain）。
 interface FootChain { foot: THREE.Object3D; ball: THREE.Object3D; restore: THREE.Quaternion; isApplied: boolean }
 
@@ -1324,6 +1373,12 @@ function createCharacter(): Character {
   const leanPitchMotion = { velocity: 0 };
   const leanRollMotion = { velocity: 0 };
   const climbMotion = { velocity: 0 };
+  let dashWeight = 0;       // 跑、跳的衝刺姿勢：0 = 一般動畫、1 = 雙手拖在身後
+  const dashMotion = { velocity: 0 };
+  let supermanWeight = 0;   // 往前飛的趴平姿勢
+  const supermanMotion = { velocity: 0 };
+  let spineBones: BendBone[] = [];
+  let neckBones: BendBone[] = [];
   let pelvisBone: THREE.Object3D | null = null;
   const leanRestore = new THREE.Quaternion();
   let isLeanApplied = false;
@@ -1672,26 +1727,71 @@ function createCharacter(): Character {
     const rising = Math.max(0, climbBlend);
     const falling = Math.max(0, -climbBlend);
     const cruise = clamp(Math.hypot(cruiseForward, cruiseSide) / FLY_LEAN_SPEED, 0, 1);
+    const prone = supermanWeight;   // 趴平時四肢完全跟著身體轉、不晃，手腳往腳的方向伸直
     floatPole.copy(floatForward);
-    tiltFloatDown(FLY_LEG_FOLLOW);
+    tiltFloatDown(lerp(FLY_LEG_FOLLOW, 1, prone));
     legChains.forEach((chain, i) => {
       chain.restoreUpper.copy(chain.upper.quaternion);
       chain.restoreLower.copy(chain.lower.quaternion);
       chain.isApplied = true;
-      const reach = FLOAT_LEG_REACH[i] + rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK + cruise * FLY_CRUISE_LEG_STRETCH;
+      const reach = FLOAT_LEG_REACH[i] + rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK + cruise * FLY_CRUISE_LEG_STRETCH + prone * SUPERMAN_LEG_STRETCH;
       const sway = isCalm ? 0 : FLOAT_SWAY * Math.sin(floatTime * FLOAT_SWAY_RATES[i] + i * 2);
-      solveTwoBoneIk(chain, floatGoal(chain, reach, FLOAT_LEG_FORWARD[i] + sway, -FLOAT_FEET_INWARD, lag, 1), floatPole);
+      solveTwoBoneIk(chain, floatGoal(chain, reach, (FLOAT_LEG_FORWARD[i] + sway) * (1 - prone), -FLOAT_FEET_INWARD, lag, 1), floatPole);
     });
-    floatPole.copy(floatForward).negate();
-    tiltFloatDown(FLY_ARM_FOLLOW);
+    floatPole.copy(floatForward).negate().lerp(WORLD_UP, prone);
+    tiltFloatDown(lerp(FLY_ARM_FOLLOW, 1, prone));
     for (const chain of armChains) {
       if (chain.isApplied) continue;
       chain.restoreUpper.copy(chain.upper.quaternion);
       chain.restoreLower.copy(chain.lower.quaternion);
       chain.isApplied = true;
-      const reach = FLOAT_ARM_REACH - falling * FLY_CLIMB_ARM_LIFT;
-      const outward = FLOAT_ARM_OUTWARD + falling * FLY_CLIMB_ARM_SPREAD;
-      solveTwoBoneIk(chain, floatGoal(chain, reach, FLOAT_ARM_FORWARD, outward, lag, FLY_ARM_DRAG_SHARE), floatPole);
+      const reach = lerp(FLOAT_ARM_REACH - falling * FLY_CLIMB_ARM_LIFT, SUPERMAN_ARM_REACH, prone);
+      const outward = lerp(FLOAT_ARM_OUTWARD + falling * FLY_CLIMB_ARM_SPREAD, SUPERMAN_ARM_OUTWARD, prone);
+      solveTwoBoneIk(chain, floatGoal(chain, reach, FLOAT_ARM_FORWARD * (1 - prone), outward, lag, FLY_ARM_DRAG_SHARE), floatPole);
+    }
+  }
+
+  // 衝刺：上半身照 SPINE_COUNTER 的比例前傾；頭往回抬，抵銷脊椎前傾與趴平時骨盆的傾角，臉維持看前方。
+  function applyDashLean(): void {
+    if (!model || dashWeight + supermanWeight < IK_MIN_WEIGHT) return;
+    model.updateMatrixWorld(true);
+    model.getWorldDirection(floatForward).setY(0).normalize();
+    leanAxis.crossVectors(WORLD_UP, floatForward);   // 繞這個軸轉正角度，頭往前
+    const spineLean = DEG(DASH_LEAN) * dashWeight;
+    if (spineLean > 0) bendBones(spineBones, leanAxis, spineLean);
+    bendBones(neckBones, leanAxis, -(spineLean + leanPitch * supermanWeight) * HEAD_LIFT_SHARE);
+  }
+
+  function undoDashLean(): void {
+    unbendBones(neckBones);
+    unbendBones(spineBones);
+  }
+
+  // 衝刺時雙手接近伸直、拖在肩膀後下方，不跟著動畫擺；手肘往外。推牆 IK 正在用的手不動。
+  function applyDashArms(): void {
+    if (!model || armChains.length === 0 || dashWeight < IK_MIN_WEIGHT) return;
+    model.updateMatrixWorld(true);
+    model.getWorldDirection(floatForward).setY(0).normalize();
+    model.getWorldPosition(floatCenter);
+    const drop = DEG(DASH_ARM_DROP);
+    for (const chain of armChains) {
+      if (chain.isApplied) continue;
+      chain.restoreUpper.copy(chain.upper.quaternion);
+      chain.restoreLower.copy(chain.lower.quaternion);
+      chain.isApplied = true;
+      chain.upper.getWorldPosition(ikShoulder);
+      chain.lower.getWorldPosition(ikElbow);
+      chain.hand.getWorldPosition(ikHand);
+      const length = (ikShoulder.distanceTo(ikElbow) + ikElbow.distanceTo(ikHand)) * DASH_ARM_REACH;
+      floatSide.subVectors(ikShoulder, floatCenter).addScaledVector(floatForward, -floatSide.dot(floatForward));
+      floatSide.y = 0;
+      if (floatSide.lengthSq() > 0) floatSide.normalize();
+      ikGoal.copy(ikShoulder)
+        .addScaledVector(floatForward, -Math.cos(drop) * length)
+        .addScaledVector(WORLD_UP, -Math.sin(drop) * length)
+        .addScaledVector(floatSide, DASH_ARM_OUTWARD)
+        .lerp(ikHand, 1 - dashWeight);
+      solveTwoBoneIk(chain, ikGoal, floatSide);
     }
   }
 
@@ -1732,7 +1832,10 @@ function createCharacter(): Character {
       cruiseForward = smoothDamp(cruiseForward, motion.isFlying ? motion.forwardSpeed : 0, cruiseForwardMotion, FLY_CRUISE_SMOOTH_TIME, dt);
       cruiseSide = smoothDamp(cruiseSide, motion.isFlying ? motion.sideSpeed : 0, cruiseSideMotion, FLY_CRUISE_SMOOTH_TIME, dt);
       const lean = (speed: number): number => clamp(speed / FLY_LEAN_SPEED, -1, 1) * DEG(FLY_LEAN_MAX);
-      leanPitch = smoothDamp(leanPitch, lean(cruiseForward), leanPitchMotion, FLY_LEAN_SMOOTH_TIME, dt);
+      const wantsSuperman = motion.isFlying && motion.isDashing && motion.forwardSpeed > SUPERMAN_MIN_SPEED;
+      supermanWeight = smoothDamp(supermanWeight, wantsSuperman ? 1 : 0, supermanMotion, SUPERMAN_SMOOTH_TIME, dt);
+      const pitchTarget = lerp(lean(cruiseForward), DEG(SUPERMAN_PITCH), supermanWeight);
+      leanPitch = smoothDamp(leanPitch, pitchTarget, leanPitchMotion, FLY_LEAN_SMOOTH_TIME, dt);
       leanRoll = smoothDamp(leanRoll, lean(cruiseSide) / 2, leanRollMotion, FLY_LEAN_SMOOTH_TIME, dt);
       const climb = motion.isFlying ? clamp(motion.climbSpeed / FLY_VERTICAL_SPEED, -1, 1) : 0;
       climbBlend = smoothDamp(climbBlend, climb, climbMotion, FLY_CLIMB_SMOOTH_TIME, dt);
@@ -1743,17 +1846,30 @@ function createCharacter(): Character {
     }
     if (dt <= 0) return;
     animateModel(motion, dt);
+    updateDashWeight(motion, dt);
     undoFootDroop();
     undoLimbIk(legChains);
     undoLimbIk(armChains);
+    undoDashLean();
     undoFlyLean();
     undoOrientationWarp();
     mixer.update(dt);
     applyOrientationWarp();
     applyFlyLean();
+    applyDashLean();
     applyHandIk(motion.findWall, dt);
     applyFloatPose();
+    applyDashArms();
     applyFootDroop();
+  }
+
+  // 衝刺姿勢只在地面跑（不是站著）、起跳到落地之間；飛行、游泳、坐下、推牆都不用。
+  function updateDashWeight(motion: RigMotion, dt: number): void {
+    const speed = Math.hypot(motion.forwardSpeed, motion.sideSpeed);
+    const isJumping = phase === 'jumpStart' || phase === 'jumpLoop' || phase === 'land';
+    const isRunning = phase === 'ground' && speed >= IDLE_SPEED;
+    const wantsDash = motion.isDashing && !motion.isFlying && !motion.isSwimming && (isJumping || isRunning);
+    dashWeight = smoothDamp(dashWeight, wantsDash ? 1 : 0, dashMotion, DASH_SMOOTH_TIME, dt);
   }
 
   async function load(): Promise<string[]> {
@@ -1769,6 +1885,8 @@ function createCharacter(): Character {
     armChains = findLimbChains(model, ARM_CHAINS);
     legChains = findLimbChains(model, LEG_CHAINS);
     pelvisBone = model.getObjectByName(PELVIS_BONE) ?? null;
+    spineBones = findBendBones(model, SPINE_COUNTER);
+    neckBones = findBendBones(model, NECK_BONES);
     footChains = findFootChains(model);
     seat = addBox(model, materials.seat, SEAT_SIZE, SEAT_CENTER);
     seat.visible = false;
@@ -2398,6 +2516,7 @@ function createFirstPersonMode(): ViewMode {
       isSitting,
       isSwimming,
       swimClimb: isSwimming ? swimClimbSpeed : 0,
+      isDashing: isBoosted && (isFlying || !isWalking),   // 地面走路不加速（見 moveSpeed），飛行時走路也加速
     }, dt);
   }
 
