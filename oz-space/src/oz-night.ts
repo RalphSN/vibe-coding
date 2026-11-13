@@ -98,28 +98,37 @@ const poolShader = glowMaterial(`
   attribute vec2 corner;
   attribute vec3 tint;
   attribute float seed;
+  attribute vec2 clip;
   uniform float uNight;
   varying vec2 vCorner;
   varying vec3 vTint;
   varying float vOn;
+  varying vec2 vGround;
+  varying vec2 vClip;
   void main() {
     vOn = smoothstep(seed * ${LAMP_STAGGER}, seed * ${LAMP_STAGGER} + ${LAMP_FADE}, uNight);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     #include <logdepthbuf_vertex>
     vCorner = corner;
     vTint = tint;
+    vGround = position.xz;   // 光斑網格放在原點、頂點就是世界座標
+    vClip = clip;
   }`, `
   ${LOGDEPTH_FRAGMENT_PARS}
   varying vec2 vCorner;
   varying vec3 vTint;
   varying float vOn;
+  varying vec2 vGround;
+  varying vec2 vClip;
   void main() {
     #include <logdepthbuf_fragment>
     float d = length(vCorner);
-    if (d > 1.0) discard;
+    float fromCenter = length(vGround);
+    // 只畫在環面上：超出這盞燈所在那一段環（離圓心 clip.x–clip.y）的部分是空中或縫隙，不畫
+    if (d > 1.0 || fromCenter < vClip.x || fromCenter > vClip.y) discard;
     float falloff = 1.0 - d * d;
     gl_FragColor = vec4(vTint * falloff * falloff * vOn, 1.0);
-  }`, THREE.DoubleSide);   // 方形的頂點順序是給面向鏡頭的光暈用的，平放時正面朝下；兩面都畫，從上面看才看得到
+  }`);   // 只畫朝上那面（頂點順序見 quadGeometry 的 faceUp）：從環的下方看不到光斑
 
 // 照明燈光束：開口的圓錐，燈頭端亮、往地面淡，兩面都畫。
 const beamShader = glowMaterial(`
@@ -147,24 +156,31 @@ const lampSeed = (i: number): number => {
 const QUAD_INDEX = [0, 1, 2, 0, 2, 3];
 
 // 每盞燈 4 個頂點的方形合成一個網格：光暈與光斑都是一次繪製。
-function quadGeometry(count: number, fill: (i: number, corner: [number, number], k: number) => { position: THREE.Vector3Like; tint: THREE.Color; radius: number }): THREE.BufferGeometry {
+// 面向鏡頭的光暈用原本的頂點順序；平放的光斑（faceUp）反過來，正面朝上。clip 是光斑的裁切範圍（離圓心的距離）。
+interface QuadVertex { position: THREE.Vector3Like; tint: THREE.Color; radius: number; clip?: [number, number] }
+const FACE_UP_INDEX = [0, 2, 1, 0, 3, 2];
+const NO_CLIP: [number, number] = [0, 1e6];
+function quadGeometry(count: number, fill: (i: number, corner: [number, number], k: number) => QuadVertex, faceUp = false): THREE.BufferGeometry {
   const positions = new Float32Array(count * 12);
   const corners = new Float32Array(count * 8);
   const tints = new Float32Array(count * 12);
   const radii = new Float32Array(count * 4);
   const seeds = new Float32Array(count * 4);
+  const clips = new Float32Array(count * 8);
+  const order = faceUp ? FACE_UP_INDEX : QUAD_INDEX;
   const index: number[] = [];
   for (let i = 0; i < count; i++) {
     CORNERS.forEach((corner, k) => {
       const v = i * 4 + k;
-      const { position, tint, radius } = fill(i, corner, k);
+      const { position, tint, radius, clip = NO_CLIP } = fill(i, corner, k);
       positions.set([position.x, position.y, position.z], v * 3);
       corners.set(corner, v * 2);
       tints.set([tint.r, tint.g, tint.b], v * 3);
       radii[v] = radius;
       seeds[v] = lampSeed(i);
+      clips.set(clip, v * 2);
     });
-    index.push(...QUAD_INDEX.map((n) => i * 4 + n));
+    index.push(...order.map((n) => i * 4 + n));
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -172,9 +188,12 @@ function quadGeometry(count: number, fill: (i: number, corner: [number, number],
   geometry.setAttribute('tint', new THREE.BufferAttribute(tints, 3));
   geometry.setAttribute('radius', new THREE.BufferAttribute(radii, 1));
   geometry.setAttribute('seed', new THREE.BufferAttribute(seeds, 1));
+  geometry.setAttribute('clip', new THREE.BufferAttribute(clips, 2));
   geometry.setIndex(index);
   return geometry;
 }
+
+const poolRadius = (spot: LightSpot): number => spot.poolRadius > 0 ? spot.poolRadius : LAMP_LOOK[spot.kind].pool;
 
 function beamGeometry(spots: LightSpot[]): THREE.BufferGeometry | null {
   const parts: THREE.BufferGeometry[] = [];
@@ -187,7 +206,7 @@ function beamGeometry(spots: LightSpot[]): THREE.BufferGeometry | null {
     const length = top.distanceTo(bottom);
     if (length < 1) continue;
     // CylinderGeometry 的 uv.y 從底部 0 到頂部 1：頂部是燈頭
-    const cone = new THREE.CylinderGeometry(BEAM_TOP_RADIUS, LAMP_LOOK.flood.pool * BEAM_BOTTOM_SHARE, length, 16, 1, true);
+    const cone = new THREE.CylinderGeometry(BEAM_TOP_RADIUS, poolRadius(spot) * BEAM_BOTTOM_SHARE, length, 16, 1, true);
     cone.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, top.clone().sub(bottom).normalize()));
     cone.translate((top.x + bottom.x) / 2, (top.y + bottom.y) / 2, (top.z + bottom.z) / 2);
     parts.push(cone.toNonIndexed());
@@ -236,11 +255,13 @@ export function createLampLights(spots: LightSpot[]): THREE.Group {
   const pool = quadGeometry(spots.length, (i, [cx, cz]) => {
     const spot = spots[i] as LightSpot;
     const look = LAMP_LOOK[spot.kind];
+    const radius = poolRadius(spot);
     return {
-      position: { x: spot.poolX + cx * look.pool, y: spot.poolY + POOL_LIFT, z: spot.poolZ + cz * look.pool },
-      tint: tint.set(look.color).multiplyScalar(look.strength), radius: look.pool,
+      position: { x: spot.poolX + cx * radius, y: spot.poolY + POOL_LIFT, z: spot.poolZ + cz * radius },
+      tint: tint.set(look.color).multiplyScalar(look.strength), radius,
+      clip: [spot.clipInner, Math.min(spot.clipOuter, NO_CLIP[1])],
     };
-  });
+  }, true);
   // 光斑先畫、光束再畫、光暈最後：疊加混合本身不分先後，順序固定只是避免每格重新排序
   group.add(nightMesh(pool, poolShader, 1), nightMesh(glow, glowShader, 3));
   const beams = beamGeometry(spots.filter((spot) => spot.kind === 'flood'));

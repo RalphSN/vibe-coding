@@ -430,7 +430,19 @@ const FIELD_SEED = 42;
 const FIELD_RADIUS_PER_GROUND = 0.4;   // 周圍漂浮物散布的半徑 = 地面邊長 × 這個比例
 
 // 球場、泳池各自一個檔案，其他樣式在 oz-props.ts。
-const buildLayer = (spec: RingSpec): PropsBuild => {
+// 燈的光斑只畫在這一圈環上：沒指定範圍的燈設成整圈（有縫隙的環，例如跑道，建環時自己設好）。
+// 不裁的話，靠環邊的路燈光斑會伸出環外，浮在半空中，從下面或旁邊看得到。
+function clipLightsToRing(build: PropsBuild, spec: RingSpec): PropsBuild {
+  for (const spot of build.lights) {
+    if (Number.isFinite(spot.clipOuter)) continue;
+    spot.clipInner = spec.inner;
+    spot.clipOuter = spec.outer;
+  }
+  return build;
+}
+
+const buildLayer = (spec: RingSpec): PropsBuild => clipLightsToRing(buildLayerStyle(spec), spec);
+const buildLayerStyle = (spec: RingSpec): PropsBuild => {
   if (spec.style === 'courts') return buildCourtsRing(spec);
   if (spec.style === 'pool') return buildPoolRing(spec);
   if (spec.style === 'track') return buildTrackRing(spec);

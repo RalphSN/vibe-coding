@@ -29,7 +29,8 @@ const LAMP = { spacing: 18, radius: 6.5, height: 4.2 };
 const REST = { spacing: 36, radius: 8.6, width: 6, depth: 4, height: 2.7 };
 const VENDING = { width: 0.95, height: 1.83, depth: 0.75 };
 // 外側空地的設施
-const LIGHT = { spacing: 36, height: 9, fromOuter: 1.6, reach: 12 };   // reach：夜晚光斑在燈頭前方多遠（燈頭斜照跑道）
+// reach、pool：夜晚光斑在燈頭前方多遠、多大，落在縫隙外側的藍色跑道中間（光斑會裁在縫隙到外緣之間）
+const LIGHT = { spacing: 36, height: 9, fromOuter: 1.6, reach: 5, pool: 10 };
 const RAIL = { fromOuter: 0.3, posts: 2.5, heights: [0.5, 1.05] };
 
 const TREE_KINDS = ['round', 'cone'] as const;
@@ -350,7 +351,7 @@ function addSign(g: THREE.Group, M: TrackMaterials, text: string): void {
 function addFloodLight(g: THREE.Group, M: TrackMaterials): void {
   skipCollider(g);
   markCollider(g, [0.4, LIGHT.height, 0.4], [0, LIGHT.height / 2, 0]);
-  markLight(g, [0, LIGHT.height, 0.35], 'flood', LIGHT.height, LIGHT.reach);
+  markLight(g, [0, LIGHT.height, 0.35], 'flood', LIGHT.height, LIGHT.reach, LIGHT.pool);
   rod(g, M.metal, [0, 0, 0], [0, LIGHT.height, 0], 0.12, 0.08, 10);
   const head = childGroup(g, [0, LIGHT.height, 0.25]);
   head.rotation.x = 0.4;
@@ -475,7 +476,11 @@ export function buildTrackRing(spec: RingSpec): PropsBuild {
 
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
-  build.lights.push(...collectLights(props));
+  // 縫隙兩側各自一段：照明燈照外側的藍色跑道，步道燈在縫隙內側；光斑不跨過縫隙
+  for (const spot of collectLights(props)) {
+    const isOuter = spot.kind === 'flood';
+    build.lights.push({ ...spot, clipInner: isOuter ? gapOuter : inner, clipOuter: isOuter ? outer : gapInner });
+  }
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);
   return build;

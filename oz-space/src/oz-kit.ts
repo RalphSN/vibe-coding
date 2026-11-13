@@ -133,17 +133,27 @@ export function collectColliders(root: THREE.Object3D): SolidBox[] {
 const LIGHT_KEY = 'ozLight';
 /** 燈的種類：street 路燈、path 步道燈、indoor 室內吊燈、flood 照明燈（有光束、光斑大） */
 export type LightKind = 'street' | 'path' | 'indoor' | 'flood';
-/** 一盞燈（世界座標）：燈泡位置、光斑中心與地面高度、光斑朝向（照明燈的光束從燈泡打到光斑中心）。 */
-export interface LightSpot { kind: LightKind; x: number; y: number; z: number; poolX: number; poolY: number; poolZ: number }
-interface LightMark { kind: LightKind; drop: number; reach: number }
+/**
+ * 一盞燈（世界座標）：燈泡位置、光斑中心與地面高度（照明燈的光束從燈泡打到光斑中心）。
+ * poolRadius 是光斑半徑（0 = 用這種燈的預設）；光斑只畫在離圓心 clipInner–clipOuter 的範圍，
+ * 不會蓋到環外的空中或環上的縫隙（main.ts 預設設成整圈環的範圍，有縫隙的環自己縮小）。
+ */
+export interface LightSpot {
+  kind: LightKind; x: number; y: number; z: number; poolX: number; poolY: number; poolZ: number;
+  poolRadius: number; clipInner: number; clipOuter: number;
+}
+interface LightMark { kind: LightKind; drop: number; reach: number; poolRadius: number }
 const isLightMark = (value: unknown): value is LightMark =>
-  typeof value === 'object' && value !== null && 'kind' in value && 'drop' in value && 'reach' in value;
+  typeof value === 'object' && value !== null && 'kind' in value && 'drop' in value && 'reach' in value && 'poolRadius' in value;
 
-/** 在 parent 座標的 center 放一盞燈；drop 是燈泡到下方地面的高度（預設 center 的 y，也就是 parent 在地面上），reach 是光斑沿 parent 的 +z 往前偏多遠。 */
-export function markLight(parent: THREE.Object3D, center: Vec3, kind: LightKind, drop = center[1], reach = 0): void {
+/**
+ * 在 parent 座標的 center 放一盞燈；drop 是燈泡到下方地面的高度（預設 center 的 y，也就是 parent 在地面上），
+ * reach 是光斑沿 parent 的 +z 往前偏多遠，poolRadius 是光斑半徑（0 = 用這種燈的預設）。
+ */
+export function markLight(parent: THREE.Object3D, center: Vec3, kind: LightKind, drop = center[1], reach = 0, poolRadius = 0): void {
   const marker = new THREE.Object3D();
   marker.position.set(...center);
-  const mark: LightMark = { kind, drop, reach };
+  const mark: LightMark = { kind, drop, reach, poolRadius };
   marker.userData[LIGHT_KEY] = mark;
   parent.add(marker);
 }
@@ -163,6 +173,7 @@ export function collectLights(root: THREE.Object3D): LightSpot[] {
     spots.push({
       kind: mark.kind, x: position.x, y: position.y, z: position.z,
       poolX: position.x + forward.x * mark.reach, poolY: position.y - mark.drop, poolZ: position.z + forward.z * mark.reach,
+      poolRadius: mark.poolRadius, clipInner: 0, clipOuter: Infinity,
     });
   });
   return spots;
