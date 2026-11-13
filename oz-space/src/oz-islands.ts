@@ -6,6 +6,7 @@
 // 碰撞：頂面是 TOP_STRIPS 條從中心往外、照邊緣形狀切的長條方塊（拼起來就是島的輪廓），上面每個東西各自一個方塊，
 // 全部站得上去、跟著飄。頂面是平的，站的高度和看到的草地一樣。
 import * as THREE from 'three';
+import { glowAtNight } from './oz-night';
 import { bakeByMaterial, colorMaterial, orientedSolid, shinyMaterial, type SolidBox } from './oz-props';
 import {
   TAU, addMesh, box, childGroup, collectColliders, cylinder, markChildGroups, markCollider, pixelTexture, range, rod, skipCollider,
@@ -106,6 +107,8 @@ function createShared() {
     waterfall: new THREE.MeshBasicMaterial({ map: pixelTexture(32, 256, drawWaterfall), transparent: true, depthWrite: false, side: THREE.DoubleSide }),
     pond: shinyMaterial(0x3a8fd0, 0.2, 0.12),
     glass: shinyMaterial(0x2a3e55, 0.4, 0.12),
+    // 小屋與塔台的窗戶：同樣的深色玻璃，晚上透出屋裡的暖光（直升機的座艙罩不亮，用上面那個）
+    windowGlass: glowAtNight(shinyMaterial(0x2a3e55, 0.4, 0.12), 0xffcf87, 0.9),
     metal: shinyMaterial(0xc9ced4, 0.8, 0.3),
     iron: shinyMaterial(0x2e3338, 0.6, 0.45),
     warmLight: glow(0xfff1c9),
@@ -501,7 +504,7 @@ function decorateHelipad(props: THREE.Group, rng: Rng, shape: IslandShape, taken
   // 塔台小屋：灰牆、整排窗、平屋頂、天線與小碟、門口小燈
   const hut = childGroup(props, [edge * 0.78, 0, edge * 0.35], -Math.PI / 2 - 0.4);
   box(hut, colorMaterial(0xd9dde2), [3.4, 2.7, 2.8], [0, 1.35, 0]);
-  box(hut, S.glass, [3.42, 0.8, 2.82], [0, 1.9, 0]);
+  box(hut, S.windowGlass, [3.42, 0.8, 2.82], [0, 1.9, 0]);
   box(hut, colorMaterial(0x6b7280), [3.8, 0.22, 3.2], [0, 2.81, 0]);
   box(hut, colorMaterial(0x2f4b7c), [0.95, 2.05, 0.08], [0.8, 1.02, 1.42]);
   box(hut, S.warmLight, [0.2, 0.2, 0.1], [1.5, 2.3, 1.45]);
@@ -532,7 +535,7 @@ function addCottageWindow(g: THREE.Group, rng: Rng, shutter: THREE.Material, has
   const S = getShared();
   const white = colorMaterial(0xfbf8f2);
   box(g, white, [1.15, 1.25, 0.1], [0, 0, 0]);
-  box(g, S.glass, [0.9, 1.0, 0.12], [0, 0, 0]);
+  box(g, S.windowGlass, [0.9, 1.0, 0.12], [0, 0, 0]);
   box(g, white, [0.06, 1.0, 0.14], [0, 0, 0]);
   box(g, white, [0.9, 0.06, 0.14], [0, 0.1, 0]);
   box(g, white, [1.35, 0.08, 0.28], [0, -0.66, 0.1]);
@@ -578,7 +581,7 @@ function addCottage(g: THREE.Group, rng: Rng): void {
   const gable = new THREE.Shape([new THREE.Vector2(-D / 2, 0), new THREE.Vector2(D / 2, 0), new THREE.Vector2(0, roofH * (D / 2) / halfSpan)]);
   for (const side of [-1, 1]) addMesh(g, new THREE.ShapeGeometry(gable), cream, [side * W / 2, eaveY, 0], [0, side * Math.PI / 2, 0]);
   // 山牆上的小圓窗
-  for (const side of [-1, 1]) addMesh(g, new THREE.CircleGeometry(0.35, 16), S.glass, [side * (W / 2 + 0.02), eaveY + 0.8, 0], [0, side * Math.PI / 2, 0]);
+  for (const side of [-1, 1]) addMesh(g, new THREE.CircleGeometry(0.35, 16), S.windowGlass, [side * (W / 2 + 0.02), eaveY + 0.8, 0], [0, side * Math.PI / 2, 0]);
   // 煙囪
   box(g, colorMaterial(0x9c5a4a), [0.75, 2.6, 0.75], [W * 0.28, eaveY + roofH * 0.55, -D * 0.18]);
   box(g, colorMaterial(0x7d4538), [0.95, 0.18, 0.95], [W * 0.28, eaveY + roofH * 0.55 + 1.35, -D * 0.18]);

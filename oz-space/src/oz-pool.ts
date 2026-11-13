@@ -7,7 +7,7 @@
 // 波紋在著色器裡即時計算（幾道不同方向、波長的深水波相加，波速照深水波公式），法線跟著波紋算，所以反光會動。
 import * as THREE from 'three';
 import { annulus, bakeByMaterial, createRng, emptyBuild, getPropsEnvironment, orientedSolid, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
-import { collectColliders, markChildGroups, markCollider, skipCollider } from './oz-kit';
+import { collectColliders, collectLights, markChildGroups, markCollider, markLight, skipCollider, type LightSpot } from './oz-kit';
 
 type Rng = () => number;
 type Vec3 = [number, number, number];
@@ -49,12 +49,17 @@ const WALL_SEGMENTS = 512;
 const DECK_TILE = 1.2;              // 池畔石板貼圖一張涵蓋幾公尺
 const ROPE = { radius: 0.06, length: 0.6, tubular: 1440 };
 const WAVE_TIME_SCALE = '0.55';     // 波紋時間倍率（GLSL 字面值）：泳池比海面平靜
-const SUN_DIRECTION = [3, 6, 2];    // 和 main.ts 的太陽方向一樣，水面高光才對得上
+const SUN_DIRECTION: Vec3 = [3, 6, 2];    // 原本固定的太陽方向（環境貼圖沒指定亮點方向時用）
 const LOUNGE_SPACING = 7;           // 內側池畔：每 7 m 一組（兩張躺椅加一把陽傘）
 const LADDER_SPACING = 45;
+const LADDER_OFFSET = 0.12;         // 第一把扶梯的角度（弧度）；水下燈要避開扶梯，兩邊用同一個
 const LIFEGUARD_CHAIRS = 4;
 const SHOWERS = 6;
 const PLANTER_SPACING = 14;
+// 池畔燈：每 every 組躺椅之間一盞（約 14 m），燈頭高 height；光斑只畫在內側池畔上
+const DECK_LAMP = { every: 2, height: 2.4, pool: 4, guardClear: 2.5 };
+// 水下燈：兩座池的內側池壁每 spacing 公尺一盞，在水面下 depth；光斑往池中央偏 reach、落在池底。避開扶梯與水道口
+const UNDERWATER_LAMP = { spacing: 12, depth: 0.8, reach: 1.6, pool: 2.2, ladderClear: 1.5 };
 
 const waterTime = { value: 0 };
 /** 每格呼叫：time 是累計秒數，水面波紋和池底光紋都跟著它動。 */
@@ -353,6 +358,8 @@ function createPoolMaterials() {
     waterGlass: new THREE.MeshStandardMaterial({ color: 0x5cc8e0, transparent: true, opacity: 0.38, roughness: 0.05, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false, envMap: getPropsEnvironment() }),
     clearGlass: new THREE.MeshStandardMaterial({ color: 0xdff4f8, transparent: true, opacity: 0.18, roughness: 0.03, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false, envMap: getPropsEnvironment() }),
     steel: shinyMaterial(0xc9ced4, 0.85, 0.25),
+    lampGlow: new THREE.MeshBasicMaterial({ color: 0xfff4dc }),
+    underwaterLens: new THREE.MeshBasicMaterial({ color: 0xc8f6ff }),
     deck: new THREE.MeshLambertMaterial({ map: pixelTexture(256, 256, drawDeck) }),
     coping: lambert(0xf2efe8),
     concrete: lambert(0xb7bcc2),
@@ -488,6 +495,24 @@ function addShower(g: THREE.Object3D, M: PoolMaterials): void {
   box(g, M.grate, [0.7, 0.01, 0.7], [0, 0.005, -0.3]);
 }
 
+// 池畔燈：細不鏽鋼燈桿，頂端一段霧白燈管加圓蓋。
+function addDeckLamp(g: THREE.Object3D, M: PoolMaterials): void {
+  const { height } = DECK_LAMP;
+  addMesh(g, new THREE.CylinderGeometry(0.12, 0.14, 0.05, 16), M.steel, [0, 0.025, 0]);
+  rod(g, M.steel, [0, 0, 0], [0, height, 0], 0.035);
+  addMesh(g, new THREE.CylinderGeometry(0.1, 0.1, 0.32, 16), M.lampGlow, [0, height + 0.12, 0]);
+  addMesh(g, new THREE.CylinderGeometry(0.13, 0.13, 0.04, 16), M.steel, [0, height + 0.3, 0]);
+  markLight(g, [0, height + 0.12, 0], 'path', height + 0.12, 0, DECK_LAMP.pool);
+}
+
+// 水下燈：池壁上的圓形燈（不鏽鋼外框加發光燈面），自身 +z 朝池中央。drop 是燈到池底的高度。
+function addUnderwaterLamp(g: THREE.Object3D, M: PoolMaterials, drop: number): void {
+  skipCollider(g);   // 貼在池壁上，擋的話游到池邊會卡住
+  addMesh(g, new THREE.CylinderGeometry(0.2, 0.2, 0.03, 20), M.steel, [0, 0, 0.015], [Math.PI / 2, 0, 0]);
+  addMesh(g, new THREE.CylinderGeometry(0.15, 0.15, 0.03, 20), M.underwaterLens, [0, 0, 0.03], [Math.PI / 2, 0, 0]);
+  markLight(g, [0, 0, 0.15], 'underwater', drop, UNDERWATER_LAMP.reach, UNDERWATER_LAMP.pool);
+}
+
 function addPlanter(g: THREE.Object3D, M: PoolMaterials, rng: Rng): void {
   const size = 0.6 + rng() * 0.4;
   box(g, M.planter, [size * 1.6, 0.6, size * 1.6], [0, 0.3, 0]);
@@ -509,13 +534,20 @@ function addDeckProps(props: THREE.Object3D, M: PoolMaterials, rng: Rng, poolIn:
   const showerAngles = anglesAround(poolIn, (TAU * poolIn) / SHOWERS, 0.3);
   const near = (angle: number, others: number[], meters: number): boolean =>
     others.some((other) => Math.abs(THREE.MathUtils.euclideanModulo(angle - other + Math.PI, TAU) - Math.PI) * loungeRadius < meters);
-  for (const angle of anglesAround(loungeRadius, LOUNGE_SPACING, 0)) {
+  const loungeAngles = anglesAround(loungeRadius, LOUNGE_SPACING, 0);
+  for (const angle of loungeAngles) {
     if (near(angle, guardAngles, 3)) continue;
     for (const offset of [-0.6, 0.6]) addLounger(placeOnRing(props, loungeRadius, deckY, angle + offset / loungeRadius, true), M, rng);
     addUmbrella(placeOnRing(props, loungeRadius - 0.6, deckY, angle), M, rng);
   }
+  // 池畔燈在兩組躺椅正中間（每 DECK_LAMP.every 個空檔一盞），救生員椅旁不放
+  const halfGap = Math.PI / loungeAngles.length;
+  loungeAngles.forEach((angle, i) => {
+    if (i % DECK_LAMP.every !== 0 || near(angle + halfGap, guardAngles, DECK_LAMP.guardClear)) return;
+    addDeckLamp(placeOnRing(props, loungeRadius, deckY, angle + halfGap), M);
+  });
   for (const angle of guardAngles) addLifeguardChair(placeOnRing(props, poolIn - 1.3, deckY, angle, true), M);
-  for (const angle of anglesAround(poolIn, LADDER_SPACING, 0.12)) addLadder(placeOnRing(props, poolIn, deckY, angle, true), M);
+  for (const angle of anglesAround(poolIn, LADDER_SPACING, LADDER_OFFSET)) addLadder(placeOnRing(props, poolIn, deckY, angle, true), M);
   for (const angle of showerAngles) addShower(placeOnRing(props, showerRadius, deckY, angle, true), M);
   const planterRadius = poolIn - 5.4;
   for (const angle of anglesAround(planterRadius, PLANTER_SPACING, 0)) {
@@ -724,9 +756,27 @@ export function buildPoolRing(spec: RingSpec): PropsBuild {
   build.decor.add(mist);
 
   addDeckProps(props, M, rng, raceIn, maxY);
+  // 水下燈：競速池與無邊際池的內側池壁，競速池避開扶梯、無邊際池避開水道口
+  const lampY = waterY - UNDERWATER_LAMP.depth;
+  const ladderAngles = anglesAround(raceIn, LADDER_SPACING, LADDER_OFFSET);
+  for (const [radius, avoid, clear] of [[raceIn, ladderAngles, UNDERWATER_LAMP.ladderClear], [infinityIn, channels, SPLIT.channelWidth / 2 + 0.6]] as const) {
+    for (const angle of anglesAround(radius, UNDERWATER_LAMP.spacing, UNDERWATER_LAMP.spacing / 2 / radius)) {
+      if (avoid.some((other) => Math.abs(THREE.MathUtils.euclideanModulo(angle - other + Math.PI, TAU) - Math.PI) * radius < clear)) continue;
+      addUnderwaterLamp(placeOnRing(props, radius + 0.02, lampY, angle), M, lampY - floorY);
+    }
+  }
   // 池畔設施（躺椅、救生員椅、淋浴柱、植栽、陽傘柱）各用自己的外框擋人；框、直框、欄杆一起合併
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
+  // 燈的光斑只畫在自己那一塊：池畔燈在內側池畔（不蓋到水面），水下燈在自己那座池的池底
+  const clipFor = (spot: LightSpot): [number, number] => {
+    if (spot.kind !== 'underwater') return [inner, raceIn - POOL.coping];
+    return Math.hypot(spot.x, spot.z) < raceOut ? [raceIn, raceOut] : [infinityIn, poolOut];
+  };
+  for (const spot of collectLights(props)) {
+    [spot.clipInner, spot.clipOuter] = clipFor(spot);
+    build.lights.push(spot);
+  }
   build.decor.add(bakeByMaterial(props));
   props.traverse((object) => {
     if (object instanceof THREE.Mesh) object.geometry.dispose();
@@ -735,10 +785,22 @@ export function buildPoolRing(spec: RingSpec): PropsBuild {
 }
 
 /**
- * 給金屬、水面反射用的天空環境貼圖：上面藍、地平線淡、下面灰，太陽方向一個很亮的點（水面高光就是它）。
- * 只設定在需要反射的材質上，不改 scene.environment，角色模型的打光才不會跟著變。
+ * 環境貼圖的天空配色（線性 RGB 0–1）：地平線、天頂、下方，以及太陽（或月亮）亮點的顏色與強度。
+ * direction 是亮點的方向（太陽或月亮，單位向量）；沒給就用原本固定的太陽方向。
  */
-export function createSkyEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
+export interface SkyPalette { horizon: Vec3; zenith: Vec3; ground: Vec3; sun: Vec3; sunStrength: number; direction?: Vec3 }
+/** 四個時段：白天、日落、夜晚（亮點是月亮）、日出。換天色時金屬與水面換成最接近的那張（見 main.ts）。 */
+export const DAY_SKY: SkyPalette = { horizon: [0.86, 0.89, 0.92], zenith: [0.32, 0.55, 0.82], ground: [0.62, 0.64, 0.66], sun: [1, 0.96, 0.88], sunStrength: 30 };
+export const SUNSET_SKY: SkyPalette = { horizon: [0.9, 0.45, 0.25], zenith: [0.15, 0.2, 0.4], ground: [0.25, 0.18, 0.2], sun: [1, 0.6, 0.3], sunStrength: 12 };
+export const DAWN_SKY: SkyPalette = { horizon: [0.85, 0.55, 0.45], zenith: [0.2, 0.28, 0.5], ground: [0.3, 0.25, 0.28], sun: [1, 0.75, 0.55], sunStrength: 12 };
+export const NIGHT_SKY: SkyPalette = { horizon: [0.07, 0.09, 0.16], zenith: [0.02, 0.03, 0.08], ground: [0.03, 0.03, 0.05], sun: [0.75, 0.82, 1], sunStrength: 2 };
+const glslVec3 = ([r, g, b]: Vec3): string => `vec3(${r.toFixed(3)}, ${g.toFixed(3)}, ${b.toFixed(3)})`;
+
+/**
+ * 給金屬、水面反射用的天空環境貼圖：上面藍、地平線淡、下面灰，太陽方向一個很亮的點（水面高光就是它）。
+ * 只設定在需要反射的材質上，不改 scene.environment，角色模型的打光才不會跟著變。palette 換成其他時段就是那個時段的版本。
+ */
+export function createSkyEnvironment(renderer: THREE.WebGLRenderer, palette: SkyPalette = DAY_SKY): THREE.Texture {
   const sky = new THREE.Scene();
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
@@ -747,12 +809,12 @@ export function createSkyEnvironment(renderer: THREE.WebGLRenderer): THREE.Textu
     fragmentShader: `varying vec3 vDirection;
       void main() {
         vec3 d = normalize(vDirection);
-        vec3 horizon = vec3(0.86, 0.89, 0.92);
-        vec3 zenith = vec3(0.32, 0.55, 0.82);
-        vec3 ground = vec3(0.62, 0.64, 0.66);
+        vec3 horizon = ${glslVec3(palette.horizon)};
+        vec3 zenith = ${glslVec3(palette.zenith)};
+        vec3 ground = ${glslVec3(palette.ground)};
         vec3 color = d.y > 0.0 ? mix(horizon, zenith, pow(d.y, 0.55)) : mix(horizon, ground, pow(-d.y, 0.4));
-        float sun = pow(max(dot(d, normalize(vec3(${SUN_DIRECTION.join('.0, ')}.0))), 0.0), 900.0);
-        gl_FragColor = vec4(color + vec3(1.0, 0.96, 0.88) * sun * 30.0, 1.0);
+        float sun = pow(max(dot(d, normalize(${glslVec3(palette.direction ?? SUN_DIRECTION)})), 0.0), 900.0);
+        gl_FragColor = vec4(color + ${glslVec3(palette.sun)} * sun * ${palette.sunStrength.toFixed(1)}, 1.0);
       }`,
   });
   const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32), material);

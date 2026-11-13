@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { annulus, bakeByMaterial, colorMaterial, createRng, emptyBuild, shinyMaterial, type PropsBuild, type RingSpec } from './oz-props';
 import { buildGym } from './oz-gym';
 import {
-  TAU, addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, fillDot, flat, lambert, mapped, markChildGroups, markCollider,
+  TAU, addMesh, box, childGroup, collectColliders, collectLights, cylinder, disposeGeometries, fillDot, flat, lambert, mapped, markChildGroups, markCollider, markLight,
   merge, meterTexture, pixelTexture, range, rod, skipCollider, speckle, sphere, strokeArc, strokeBox, strokeLine, upright, type Range, type Rng, type Vec3,
 } from './oz-kit';
 
@@ -47,7 +47,7 @@ const BALL_RADIUS = { basketball: 0.12, volleyball: 0.105, pickleball: 0.037, pi
 const FENCE_POST_SPACING = 3;
 // 觀眾席：6 排，每排深 0.8 m、高 0.45 m；後面是 1.1 m 高的矮牆；每隔約 24 m 留一條走道
 const STANDS = { rows: 6, tread: 0.8, rise: 0.45, parapet: 1.1, back: 0.25, frontGap: 0.2, seatSpacing: 0.52, aisleEvery: 24, aisleWidth: 1.3, railHeight: 1, colorBlocks: 24, segments: 360 };
-const TOWER = { spacing: 48, height: 22, tilt: 0.35 };
+const TOWER = { spacing: 48, height: 22, tilt: 0.35, reach: 26 };   // reach：夜晚光斑在燈頭前方多遠
 // 外緣欄杆：離環外緣 inset 公尺，柱距 postSpacing
 const OUTER_RAIL = { inset: 0.4, height: 1.1, postSpacing: 2.5 };
 // 戶外桌椅組（以人物 1.83 m 為準）：長桌、兩張長凳；一個間隔放 PICNIC_SETS 組，沿徑向排成一列，間距 PICNIC_SPACING
@@ -1187,6 +1187,7 @@ function addLamp(g: THREE.Object3D, M: SportsMaterials, x: number, z: number, ce
   const y = POOL_TABLE.bedY + 0.95;
   box(g, M.lampHood, [2, 0.2, 0.55], [x, y + 0.1, z]);
   box(g, M.lamp, [1.9, 0.02, 0.45], [x, y - 0.005, z]);
+  markLight(g, [x, y - 0.02, z], 'indoor', 0.95);
   box(g, M.brass, [2.04, 0.03, 0.59], [x, y + 0.2, z]);
   for (const dx of [-0.8, 0.8]) rod(g, M.darkMetal, [x + dx, y + 0.2, z], [x + dx, ceiling, z], 0.008, 0.008, 6);
 }
@@ -1308,10 +1309,12 @@ function addStandSeats(group: THREE.Group, M: SportsMaterials, front: number, in
 }
 
 // 照明燈塔：一根高桿、六格燈頭往下斜照；facingOut 時燈頭朝外（+徑向），否則朝圓心。
-function addLightTower(props: THREE.Group, M: SportsMaterials, radius: number, baseY: number, angle: number, facingOut: boolean): void {
+// raised：塔的底座比球場地面高多少（看台頂上的塔），夜晚光斑要落在球場上。
+function addLightTower(props: THREE.Group, M: SportsMaterials, radius: number, baseY: number, angle: number, facingOut: boolean, raised = 0): void {
   const tower = childGroup(props, [radius * Math.sin(angle), baseY, radius * Math.cos(angle)], angle + (facingOut ? 0 : Math.PI));
   skipCollider(tower);
   markCollider(tower, [0.6, TOWER.height, 0.6], [0, TOWER.height / 2, 0]);
+  markLight(tower, [0, TOWER.height, 0.5], 'flood', TOWER.height + raised, TOWER.reach + raised);
   rod(tower, M.metal, [0, 0, 0], [0, TOWER.height, 0], 0.3, 0.18, 10);
   const head = childGroup(tower, [0, TOWER.height, 0.3]);
   head.rotation.x = TOWER.tilt;
@@ -1335,7 +1338,7 @@ function addStandFixtures(props: THREE.Group, M: SportsMaterials, front: number,
   const towerRadius = front + inward * (depth + back / 2);
   const towerBase = baseY + rows * rise + STANDS.parapet;
   const towers = Math.max(4, Math.round((TAU * towerRadius) / TOWER.spacing));
-  for (let t = 0; t < towers; t++) addLightTower(props, M, towerRadius, towerBase, ((t + 0.5) / towers) * TAU, inward < 0);
+  for (let t = 0; t < towers; t++) addLightTower(props, M, towerRadius, towerBase, ((t + 0.5) / towers) * TAU, inward < 0, towerBase - baseY);
 }
 
 // 看台的碰撞：每一排的踏面是一圈站得住的環（Disc），每一排前緣的立面是一圈圓形牆（每階 0.45 m，比自動跨上的高度高，要跳）；
@@ -1430,6 +1433,7 @@ export function buildCourtsRing(spec: RingSpec): PropsBuild {
   const outerTowers = Math.max(4, Math.round((TAU * railRadius) / TOWER.spacing));
   for (let k = 0; k < outerTowers; k++) addLightTower(props, M, railRadius - 0.8, spec.maxY, (k / outerTowers) * TAU, false);
   build.solids.push(...collectColliders(props));
+  build.lights.push(...collectLights(props));
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);
   return build;

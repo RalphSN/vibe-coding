@@ -8,7 +8,9 @@ import GUI from 'lil-gui';
 import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingStyle, type RingsConfig, type SceneConfig } from './config/scene.config';
 import { CULL_DISTANCE_KEY, buildFloatingField, buildRing, isInWaterZone, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
 import { buildCourtsRing } from './oz-sports';
-import { buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
+import { DAWN_SKY, DAY_SKY, NIGHT_SKY, SUNSET_SKY, buildPoolRing, createSkyEnvironment, updateWater, type SkyPalette } from './oz-pool';
+import { SKY_HOURS, computeSky, createLampLights, createSky, createSkyState, moonDirection, nightUniform, sunDirection, updateLampVisibility, type SkyState } from './oz-night';
+import type { LightSpot } from './oz-kit';
 import { buildTrackRing } from './oz-track';
 import { buildGardenRing } from './oz-garden';
 import { buildGreenwayRing } from './oz-greenway';
@@ -110,11 +112,23 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuff
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
-// 金屬與水面反射用的天空環境貼圖，要在第一次建場景之前設定。
-setPropsEnvironment(createSkyEnvironment(renderer));
+// 金屬與水面反射用的天空環境貼圖：白天、日落、夜晚、日出各一張，亮點在那個時段太陽（夜晚是月亮）的方向。
+// 開頁面時一次產生，天色換時段就換成那一張（見 syncEnvironment），執行時不重算。要在第一次建場景之前設定。
+type SkyPeriod = 'day' | 'sunset' | 'night' | 'dawn';
+const ENVIRONMENT_HOURS = { sunset: 17.8, dawn: 6.2 };   // 日落、日出那兩張的亮點取這個時間的太陽（還在地平線上）
+const skyEnvironment = (palette: SkyPalette, direction: THREE.Vector3): THREE.Texture =>
+  createSkyEnvironment(renderer, { ...palette, direction: [direction.x, direction.y, direction.z] });
+const environments: Record<SkyPeriod, THREE.Texture> = {
+  day: skyEnvironment(DAY_SKY, sunDirection(SKY_HOURS.day, new THREE.Vector3())),
+  sunset: skyEnvironment(SUNSET_SKY, sunDirection(ENVIRONMENT_HOURS.sunset, new THREE.Vector3())),
+  night: skyEnvironment(NIGHT_SKY, moonDirection(SKY_HOURS.night, new THREE.Vector3())),
+  dawn: skyEnvironment(DAWN_SKY, sunDirection(ENVIRONMENT_HOURS.dawn, new THREE.Vector3())),
+};
+let skyPeriod: SkyPeriod = 'day';
+setPropsEnvironment(environments.day);
 
 const scene = new THREE.Scene();
-const SKY_COLOR = new THREE.Color(0xeef0f2);
+const SKY_COLOR = new THREE.Color(0xeef0f2);   // 天空球蓋在上面；只有第一格畫面之前看得到
 scene.background = SKY_COLOR;
 
 // 鏡頭進到水裡時：背景換成水的顏色、加上指數霧，越遠越看不清（泳池約 24 m 寬，看到對面就模糊了）。
@@ -125,10 +139,30 @@ const underwaterFog = new THREE.FogExp2(UNDERWATER_COLOR.getHex(), 0.11);
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, config.scene.groundSize * CAMERA_FAR_PER_GROUND);
 camera.position.set(0, 450, 830);   // 環繞檢視第一次進來：從南邊高處斜看中央
 
-scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+scene.add(ambient);
+// 唯一的平行光：白天跟著太陽、晚上跟著月亮（方向、顏色、亮度每格由 updateSky 設定）
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
 sun.position.set(3, 6, 2);
 scene.add(sun);
+
+// ---------- 天空：太陽、月亮與天色 ----------
+// 白天／夜晚只在畫面上切換（Inspector「場景」頁或 N 鍵），不存進設定檔；開頁面是白天（13 時）。
+// 切換時時間往前跑 SKY_TRANSITION_SECONDS 秒：白天到夜晚經過日落、月出，夜晚到白天經過日出、月落。
+// 天色、環境光、平行光、夜晚程度（路燈、窗戶、星星）都由 computeSky 依時間算出。
+const SKY_TRANSITION_SECONDS = 8;
+const dayNight = { isNight: false };
+const skyClock = { hour: SKY_HOURS.day, hoursPerSecond: 0 };
+const skyState: SkyState = computeSky(SKY_HOURS.day, createSkyState());
+const sky = createSky(renderer.getPixelRatio());
+scene.add(sky.group);
+let lampLights: THREE.Group = new THREE.Group();
+let lampSpots: LightSpot[] = [];
+// 唯一一盞真的點光源：晚上放在離角色最近的那盞路燈，角色與附近的牆、樹才真的被照亮（其他燈只有發光貼片）。
+// 一直留在場景裡、白天亮度 0：光源數量一變，所有材質都要重新編譯著色器，切換時會卡一下。
+const PLAYER_LAMP = { color: 0xffc77a, intensity: 70, distance: 16, reach: 14, below: 0.3 };
+const playerLamp = new THREE.PointLight(PLAYER_LAMP.color, 0, PLAYER_LAMP.distance, 2);
+scene.add(playerLamp);
 
 // world 是之後第一人稱模式也會用到的共用狀態：colliders 給垂直方向（站上去、撞頭），solids 給水平移動。
 const world: {
@@ -396,7 +430,19 @@ const FIELD_SEED = 42;
 const FIELD_RADIUS_PER_GROUND = 0.4;   // 周圍漂浮物散布的半徑 = 地面邊長 × 這個比例
 
 // 球場、泳池各自一個檔案，其他樣式在 oz-props.ts。
-const buildLayer = (spec: RingSpec): PropsBuild => {
+// 燈的光斑只畫在這一圈環上：沒指定範圍的燈設成整圈（有縫隙的環，例如跑道，建環時自己設好）。
+// 不裁的話，靠環邊的路燈光斑會伸出環外，浮在半空中，從下面或旁邊看得到。
+function clipLightsToRing(build: PropsBuild, spec: RingSpec): PropsBuild {
+  for (const spot of build.lights) {
+    if (Number.isFinite(spot.clipOuter)) continue;
+    spot.clipInner = spec.inner;
+    spot.clipOuter = spec.outer;
+  }
+  return build;
+}
+
+const buildLayer = (spec: RingSpec): PropsBuild => clipLightsToRing(buildLayerStyle(spec), spec);
+const buildLayerStyle = (spec: RingSpec): PropsBuild => {
   if (spec.style === 'courts') return buildCourtsRing(spec);
   if (spec.style === 'pool') return buildPoolRing(spec);
   if (spec.style === 'track') return buildTrackRing(spec);
@@ -494,6 +540,9 @@ function rebuildScene(): void {
   const ringBuilds = buildRings(center, rings);
   world.room.add(buildCenter(center), ...ringBuilds.map((build) => build.solid));
   world.decor.add(...ringBuilds.map((build) => build.decor));
+  lampSpots = ringBuilds.flatMap((build) => build.lights);
+  lampLights = createLampLights(lampSpots);
+  world.decor.add(lampLights);
   world.floaters = ringBuilds.flatMap((build) => build.floaters);
   const fence = groundFenceBoxes(groundSize);
   const centerParts = centerColliders(center);
@@ -507,6 +556,7 @@ function rebuildScene(): void {
   world.walls = ringBuilds.flatMap((build) => build.walls);
   world.waters = ringBuilds.flatMap((build) => build.waters);
   collectDetailMeshes();
+  syncEnvironment();
   camera.far = groundSize * CAMERA_FAR_PER_GROUND;
   camera.updateProjectionMatrix();
 }
@@ -1093,20 +1143,24 @@ const FLY_CLIMB_ARM_LIFT = 0.1;            // 往下飛時手往上浮多少（r
 const FLY_CLIMB_ARM_SPREAD = 0.06;         // 往下飛時手再往外張多少（m）
 const FLY_CLIMB_SMOOTH_TIME = 0.3;
 const FLOAT_REACH_MAX = 0.97;              // 加上浮動、風阻後，目標最遠只到鏈長的這個比例，膝蓋、手肘不會鎖直
-// 衝刺姿勢（Z 加速時，疊在動畫上）：跑、跳時上半身前傾、雙手幾乎伸直拖在身後不擺動、頭抬起看前方；
-// 往前飛時整個身體從骨盆轉成接近水平（趴著飛），腿伸直併攏、雙手貼著身體往腳的方向伸，只有臉朝前。
+// 衝刺姿勢（Z 加速時，疊在動畫上）：跑、跳時上半身前傾、雙手幾乎伸直往後上方擺（像排球攻擊助跑的後擺臂）、不跟著擺動，頭抬起看前方；
+// 加速飛行時整個身體從骨盆轉到和飛行方向一致（往前是趴平、往上是頭朝上、往下是頭朝下俯衝），
+// 腿伸直併攏、雙手貼著身體往腳的方向伸，頭往回抬，臉朝飛行方向。
 const DASH_SMOOTH_TIME = 0.15;             // 衝刺姿勢淡入淡出
 const DASH_LEAN = 20;                      // 跑、跳時上半身再前傾（度；衝刺動畫本身已經前傾），照 SPINE_COUNTER 的比例分給三節脊椎
-const DASH_ARM_DROP = 30;                  // 手臂在身後、低於水平幾度
+const DASH_ARM_RISE = 30;                  // 手臂在身後、高於水平幾度（後上方）
 const DASH_ARM_REACH = 0.95;               // 手離肩膀的距離 / 手臂長：接近伸直，手肘留一點彎
 const DASH_ARM_OUTWARD = 0.06;             // 手往外張多少（m）
-const SUPERMAN_PITCH = 80;                 // 往前飛時身體前傾到幾度（90 是完全水平；留一點，頭不會壓太低）
-const SUPERMAN_MIN_SPEED = 2;              // 往前飛的速度超過這裡（m/s）才趴平，停下或倒退就回到漂浮
+// 身體前傾角 = 飛行方向和正上方的夾角（往上飛 0、水平 90、往下 180）減掉 SUPERMAN_CHEST_UP（胸口微抬），限制在 SUPERMAN_PITCH_RANGE
+const SUPERMAN_CHEST_UP = 20;
+const SUPERMAN_PITCH_RANGE: [number, number] = [0, 170];
+const SUPERMAN_HEAD_LIFT = 80;             // 頭往回抬幾度（分給脖子與頭）：身體和飛行方向一致時，臉大約朝向飛行方向
+const SUPERMAN_MIN_SPEED = 2;              // 往前加上下的飛行速度超過這裡（m/s）才進入這個姿勢；停下或往後飛就回到漂浮
 const SUPERMAN_SMOOTH_TIME = 0.4;
 const SUPERMAN_LEG_STRETCH = 0.04;         // 趴平時腿再伸直多少（reach 增加）
 const SUPERMAN_ARM_REACH = 0.93;           // 趴平時手沿著身體往腳的方向伸
 const SUPERMAN_ARM_OUTWARD = 0.1;
-const HEAD_LIFT_SHARE = 0.85;              // 頭往回抬、抵銷身體傾角的比例（衝刺與趴平時才抬），分給脖子與頭
+const HEAD_LIFT_SHARE = 0.85;              // 跑、跳時頭往回抬、抵銷上半身前傾的比例，分給脖子與頭
 const NECK_BONES: [string, number][] = [['neck_01', 0.4], ['Head', 0.6]];
 const FLY_TOE_ANGLE = 70;         // 飛行時腳掌往下垂：腳踝到腳尖和水平面的夾角（度）；站立時約 31°
 const IK_SLACK = 0.08;             // 有手部 IK 時身體少退這麼多，手肘留彎度，斜著推時遠的那隻手也搆得到
@@ -1375,8 +1429,9 @@ function createCharacter(): Character {
   const climbMotion = { velocity: 0 };
   let dashWeight = 0;       // 跑、跳的衝刺姿勢：0 = 一般動畫、1 = 雙手拖在身後
   const dashMotion = { velocity: 0 };
-  let supermanWeight = 0;   // 往前飛的趴平姿勢
+  let supermanWeight = 0;   // 加速飛行的姿勢（身體順著飛行方向）
   const supermanMotion = { velocity: 0 };
+  let supermanPitch = DEG(90);   // 這個姿勢要前傾到幾度（弧度）；停止飛行後保留最後的值，淡出時不會跳
   let spineBones: BendBone[] = [];
   let neckBones: BendBone[] = [];
   let pelvisBone: THREE.Object3D | null = null;
@@ -1734,7 +1789,8 @@ function createCharacter(): Character {
       chain.restoreUpper.copy(chain.upper.quaternion);
       chain.restoreLower.copy(chain.lower.quaternion);
       chain.isApplied = true;
-      const reach = FLOAT_LEG_REACH[i] + rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK + cruise * FLY_CRUISE_LEG_STRETCH + prone * SUPERMAN_LEG_STRETCH;
+      const climbShare = 1 - prone;   // 順著飛行方向的姿勢裡，往上、往下飛不再拉腿或縮膝
+      const reach = FLOAT_LEG_REACH[i] + (rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK) * climbShare + cruise * FLY_CRUISE_LEG_STRETCH + prone * SUPERMAN_LEG_STRETCH;
       const sway = isCalm ? 0 : FLOAT_SWAY * Math.sin(floatTime * FLOAT_SWAY_RATES[i] + i * 2);
       solveTwoBoneIk(chain, floatGoal(chain, reach, (FLOAT_LEG_FORWARD[i] + sway) * (1 - prone), -FLOAT_FEET_INWARD, lag, 1), floatPole);
     });
@@ -1751,7 +1807,7 @@ function createCharacter(): Character {
     }
   }
 
-  // 衝刺：上半身照 SPINE_COUNTER 的比例前傾；頭往回抬，抵銷脊椎前傾與趴平時骨盆的傾角，臉維持看前方。
+  // 衝刺：上半身照 SPINE_COUNTER 的比例前傾、頭往回抬，臉維持看前方；加速飛行時頭抬 SUPERMAN_HEAD_LIFT，臉朝飛行方向。
   function applyDashLean(): void {
     if (!model || dashWeight + supermanWeight < IK_MIN_WEIGHT) return;
     model.updateMatrixWorld(true);
@@ -1759,7 +1815,7 @@ function createCharacter(): Character {
     leanAxis.crossVectors(WORLD_UP, floatForward);   // 繞這個軸轉正角度，頭往前
     const spineLean = DEG(DASH_LEAN) * dashWeight;
     if (spineLean > 0) bendBones(spineBones, leanAxis, spineLean);
-    bendBones(neckBones, leanAxis, -(spineLean + leanPitch * supermanWeight) * HEAD_LIFT_SHARE);
+    bendBones(neckBones, leanAxis, -(spineLean * HEAD_LIFT_SHARE + DEG(SUPERMAN_HEAD_LIFT) * supermanWeight));
   }
 
   function undoDashLean(): void {
@@ -1767,13 +1823,13 @@ function createCharacter(): Character {
     unbendBones(spineBones);
   }
 
-  // 衝刺時雙手接近伸直、拖在肩膀後下方，不跟著動畫擺；手肘往外。推牆 IK 正在用的手不動。
+  // 衝刺時雙手接近伸直、擺在肩膀後上方，不跟著動畫擺；手肘往外。推牆 IK 正在用的手不動。
   function applyDashArms(): void {
     if (!model || armChains.length === 0 || dashWeight < IK_MIN_WEIGHT) return;
     model.updateMatrixWorld(true);
     model.getWorldDirection(floatForward).setY(0).normalize();
     model.getWorldPosition(floatCenter);
-    const drop = DEG(DASH_ARM_DROP);
+    const rise = DEG(DASH_ARM_RISE);
     for (const chain of armChains) {
       if (chain.isApplied) continue;
       chain.restoreUpper.copy(chain.upper.quaternion);
@@ -1787,8 +1843,8 @@ function createCharacter(): Character {
       floatSide.y = 0;
       if (floatSide.lengthSq() > 0) floatSide.normalize();
       ikGoal.copy(ikShoulder)
-        .addScaledVector(floatForward, -Math.cos(drop) * length)
-        .addScaledVector(WORLD_UP, -Math.sin(drop) * length)
+        .addScaledVector(floatForward, -Math.cos(rise) * length)
+        .addScaledVector(WORLD_UP, Math.sin(rise) * length)
         .addScaledVector(floatSide, DASH_ARM_OUTWARD)
         .lerp(ikHand, 1 - dashWeight);
       solveTwoBoneIk(chain, ikGoal, floatSide);
@@ -1832,9 +1888,14 @@ function createCharacter(): Character {
       cruiseForward = smoothDamp(cruiseForward, motion.isFlying ? motion.forwardSpeed : 0, cruiseForwardMotion, FLY_CRUISE_SMOOTH_TIME, dt);
       cruiseSide = smoothDamp(cruiseSide, motion.isFlying ? motion.sideSpeed : 0, cruiseSideMotion, FLY_CRUISE_SMOOTH_TIME, dt);
       const lean = (speed: number): number => clamp(speed / FLY_LEAN_SPEED, -1, 1) * DEG(FLY_LEAN_MAX);
-      const wantsSuperman = motion.isFlying && motion.isDashing && motion.forwardSpeed > SUPERMAN_MIN_SPEED;
+      const ahead = Math.max(motion.forwardSpeed, 0);
+      const wantsSuperman = motion.isFlying && motion.isDashing && motion.forwardSpeed > -IDLE_SPEED && Math.hypot(ahead, motion.climbSpeed) > SUPERMAN_MIN_SPEED;
+      if (wantsSuperman) {
+        const [low, high] = SUPERMAN_PITCH_RANGE;
+        supermanPitch = clamp(Math.atan2(ahead, motion.climbSpeed) - DEG(SUPERMAN_CHEST_UP), DEG(low), DEG(high));
+      }
       supermanWeight = smoothDamp(supermanWeight, wantsSuperman ? 1 : 0, supermanMotion, SUPERMAN_SMOOTH_TIME, dt);
-      const pitchTarget = lerp(lean(cruiseForward), DEG(SUPERMAN_PITCH), supermanWeight);
+      const pitchTarget = lerp(lean(cruiseForward), supermanPitch, supermanWeight);
       leanPitch = smoothDamp(leanPitch, pitchTarget, leanPitchMotion, FLY_LEAN_SMOOTH_TIME, dt);
       leanRoll = smoothDamp(leanRoll, lean(cruiseSide) / 2, leanRollMotion, FLY_LEAN_SMOOTH_TIME, dt);
       const climb = motion.isFlying ? clamp(motion.climbSpeed / FLY_VERTICAL_SPEED, -1, 1) : 0;
@@ -2655,6 +2716,7 @@ function addSceneGroup(panel: GUI): GUI {
     rebuildScene();
     refreshLayerTitles();
   };
+  group.add(dayNight, 'isNight').name('夜晚（N）').onChange(setNight).listen();
   group.add(config.scene, 'groundSize', 200, 3000, 50).name('地面邊長（m）').onChange(rebuild);
   const center = group.addFolder('中央倒圓錐');
   center.add(config.scene.center, 'topRadius', 10, 200, 1).name('平台半徑（m）').onChange(rebuild);
@@ -2847,11 +2909,101 @@ function addPerfToggle(panel: GUI): void {
   panel.domElement.append(toggle);
 }
 
+// 從 from 時往前走到 to 時要幾個小時（0–24）：時間只往前，不會倒轉
+const hoursAhead = (from: number, to: number): number => (((to - from) % 24) + 24) % 24;
+
+function periodOf(state: SkyState): SkyPeriod {
+  if (state.sun.y > 0.2) return 'day';
+  if (state.sun.y < -0.12) return 'night';
+  return state.hour >= 12 ? 'sunset' : 'dawn';
+}
+
+// 時間往目標走一步，再依時間更新天空、環境光、平行光與夜晚程度；換時段時換反射用的環境貼圖。
+function updateSky(dt: number): void {
+  const target = dayNight.isNight ? SKY_HOURS.night : SKY_HOURS.day;
+  const remaining = hoursAhead(skyClock.hour, target);
+  if (remaining > 0) {
+    const step = skyClock.hoursPerSecond * dt;
+    skyClock.hour = step >= remaining ? target : (skyClock.hour + step) % 24;
+  }
+  computeSky(skyClock.hour, skyState);
+  nightUniform.value = skyState.night;
+  ambient.color.copy(skyState.look.ambient);
+  ambient.intensity = skyState.look.ambientIntensity;
+  sun.position.copy(skyState.light.direction);
+  sun.color.copy(skyState.light.color);
+  sun.intensity = skyState.light.intensity;
+  const period = periodOf(skyState);
+  if (period !== skyPeriod) {
+    skyPeriod = period;
+    syncEnvironment();
+  }
+  sky.update(camera, clock.elapsedTime, skyState);
+  updateLampVisibility(lampLights);
+  updatePlayerLamp();
+}
+
+// 會反射天空的材質（金屬、水面、玻璃）改用目前時段的環境貼圖。四張格式相同，換貼圖不會重新編譯著色器。
+// 新建的材質從 setPropsEnvironment 拿；已經在場景裡的逐一換（有些材質是模組裡共用、建場景前就建好的）。
+const knownEnvironments = new Set<THREE.Texture>(Object.values(environments));
+function syncEnvironment(): void {
+  const current = environments[skyPeriod];
+  setPropsEnvironment(current);
+  scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const list: THREE.Material[] = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of list) {
+      if (!('envMap' in material)) continue;
+      if (material.envMap instanceof THREE.Texture && knownEnvironments.has(material.envMap)) material.envMap = current;
+    }
+  });
+}
+
+// 角色附近 reach 公尺內最近的一盞燈：光源移到那裡，越遠越暗（平方衰減），換燈的那一刻兩盞都很暗，不會跳。
+const playerPosition = new THREE.Vector3();
+function updatePlayerLamp(): void {
+  playerLamp.intensity = 0;
+  if (nightUniform.value <= 0 || activeModeName !== 'firstPerson') return;
+  character.root.getWorldPosition(playerPosition);
+  let nearest: LightSpot | null = null;
+  let nearestDistance = PLAYER_LAMP.reach;
+  for (const spot of lampSpots) {
+    if (spot.kind === 'flood' || spot.kind === 'underwater') continue;   // 水下燈放真光源會從池底往上照亮池畔，不自然
+    const distance = Math.hypot(spot.x - playerPosition.x, (spot.y - playerPosition.y) * 0.5, spot.z - playerPosition.z);
+    if (distance < nearestDistance) {
+      nearest = spot;
+      nearestDistance = distance;
+    }
+  }
+  if (!nearest) return;
+  const falloff = 1 - nearestDistance / PLAYER_LAMP.reach;
+  playerLamp.position.set(nearest.x, nearest.y - PLAYER_LAMP.below, nearest.z);
+  playerLamp.intensity = PLAYER_LAMP.intensity * falloff * falloff * nightUniform.value;
+}
+
+// 開始往白天或夜晚走：不論剩幾個小時，都在 SKY_TRANSITION_SECONDS 秒內走完（減少動態時直接跳過去）
+function setNight(isNight: boolean): void {
+  dayNight.isNight = isNight;
+  const target = isNight ? SKY_HOURS.night : SKY_HOURS.day;
+  if (reducedMotion.matches) {
+    skyClock.hour = target;
+    return;
+  }
+  skyClock.hoursPerSecond = Math.max(hoursAhead(skyClock.hour, target), 1) / SKY_TRANSITION_SECONDS;
+}
+
+addEventListener('keydown', (event) => {
+  if (event.code !== 'KeyN' || event.repeat) return;
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+  setNight(!dayNight.isNight);
+});
+
 function updateUnderwater(): void {
   const { x, y, z } = camera.position;
   const isUnderwater = world.waters.some((water) => isInWaterZone(water, x, z) && y < water.surfaceY && y > water.floorY - 1);
   scene.fog = isUnderwater ? underwaterFog : null;
   scene.background = isUnderwater ? UNDERWATER_COLOR : SKY_COLOR;
+  sky.group.visible = !isUnderwater;   // 天空球最先畫、蓋滿整個畫面，水裡要藏起來才看得到水的顏色
 }
 
 // ================= 效能顯示 =================
@@ -2954,6 +3106,7 @@ renderer.setAnimationLoop(() => {
   updateFloaters(world.floaters, clock.elapsedTime);
   updateWater(clock.elapsedTime);
   updateUnderwater();
+  updateSky(dt);
   character.syncSkeletonHelper();
   updateDetailCulling();
   renderer.render(scene, camera);

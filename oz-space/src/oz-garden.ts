@@ -7,8 +7,8 @@
 import * as THREE from 'three';
 import { Batch, addFloater, bakeByMaterial, createRng, emptyBuild, orientedSolid, type Part, type PropsBuild, type RingSpec } from './oz-props';
 import {
-  TAU, addMesh, box, childGroup, collectColliders, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, pixelTexture, planarUv, range, rod,
-  skipCollider, type Range, type Rng,
+  TAU, addMesh, box, childGroup, collectColliders, collectLights, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, markLight, pixelTexture, planarUv,
+  range, rod, skipCollider, type Range, type Rng,
 } from './oz-kit';
 
 // ---------- 版面 ----------
@@ -17,6 +17,8 @@ const SOIL = 0x7a5233;
 const PATH_WIDTH = 3;
 const EDGE_POINTS = 13;                 // 斷口橫跨環寬的鋸齒點數
 const EDGE_DEPTH: Range = [2, 14];      // 每個鋸齒點往完整段內咬多深（m）
+const LANTERN_POOL = 3.5;               // 庭園燈（1.5 m 高）的地面光斑半徑：比步道燈預設小
+const BARN_LAMP_POOL = 3.2;             // 穀倉門口壁燈的光斑半徑
 const EDGE_CLEAR = 17;                  // 圍籬、步道設施、分區內容離斷口至少多遠
 // 沿完整段的五區（各佔的比例）
 const ZONES = [
@@ -393,6 +395,11 @@ function addBarn(g: THREE.Group): void {
   box(g, MAT.white, [2.6, 3, 0.12], [0, 1.5, 3.03]);
   box(g, MAT.red, [2.3, 2.7, 0.14], [0, 1.4, 3.05]);
   for (const s of [-1, 1]) box(g, MAT.white, [0.12, 3.3, 0.16], [0, 1.4, 3.08], [0, 0, s * 0.68]);
+  // 門上的鵝頸壁燈：從牆伸出的鐵臂、往下開的燈罩，晚上照亮門口
+  rod(g, MAT.iron, [0, 3.55, 3.02], [0, 3.55, 3.5], 0.03, 0.03, 6);
+  addMesh(g, new THREE.ConeGeometry(0.28, 0.22, 12), MAT.iron, [0, 3.48, 3.5]);
+  addMesh(g, new THREE.SphereGeometry(0.09, 10, 6), MAT.glow, [0, 3.37, 3.5]);   // 燈泡下半露出燈罩底
+  markLight(g, [0, 3.38, 3.5], 'path', 3.38, 1.2, BARN_LAMP_POOL);
 }
 
 function addWindmill(g: THREE.Group): void {
@@ -434,6 +441,7 @@ function addLantern(g: THREE.Group): void {
   rod(g, MAT.iron, [0, 0, 0], [0, 1.4, 0], 0.04, 0.03, 6);
   box(g, MAT.glow, [0.22, 0.28, 0.22], [0, 1.55, 0]);
   addMesh(g, new THREE.ConeGeometry(0.2, 0.18, 4), MAT.iron, [0, 1.78, 0], [0, Math.PI / 4, 0]);
+  markLight(g, [0, 1.55, 0], 'path', 1.55, 0, LANTERN_POOL);
 }
 
 function addGardenBench(g: THREE.Group): void {
@@ -725,6 +733,7 @@ export function buildGardenRing(spec: RingSpec): PropsBuild {
   }
   markChildGroups(props);
   build.solids.push(...collectColliders(props));
+  build.lights.push(...collectLights(props));
   build.decor.add(bakeByMaterial(props));
   disposeGeometries(props);
   return build;

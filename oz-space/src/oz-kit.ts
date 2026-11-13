@@ -127,6 +127,58 @@ export function collectColliders(root: THREE.Object3D): SolidBox[] {
   return solids;
 }
 
+// ---------- 夜間燈光 ----------
+// 燈也是看不見的標記（同碰撞）：放在燈泡位置，記著燈的種類、離下方地面多高、光斑往前偏多少（照明燈斜照時）。
+// 整區合併網格前用 collectLights 收集成世界座標，夜晚的光暈、地面光斑、光束都照這份清單畫（見 oz-night.ts）。
+const LIGHT_KEY = 'ozLight';
+/** 燈的種類：street 路燈、path 步道燈、indoor 室內吊燈與檯燈、flood 照明燈（有光束、光斑大）、underwater 泳池水下燈（藍綠色，光斑在池底） */
+export type LightKind = 'street' | 'path' | 'indoor' | 'flood' | 'underwater';
+/**
+ * 一盞燈（世界座標）：燈泡位置、光斑中心與地面高度（照明燈的光束從燈泡打到光斑中心）。
+ * poolRadius 是光斑半徑（0 = 用這種燈的預設）；光斑只畫在離圓心 clipInner–clipOuter 的範圍，
+ * 不會蓋到環外的空中或環上的縫隙（main.ts 預設設成整圈環的範圍，有縫隙的環自己縮小）。
+ */
+export interface LightSpot {
+  kind: LightKind; x: number; y: number; z: number; poolX: number; poolY: number; poolZ: number;
+  poolRadius: number; clipInner: number; clipOuter: number;
+}
+interface LightMark { kind: LightKind; drop: number; reach: number; poolRadius: number }
+const isLightMark = (value: unknown): value is LightMark =>
+  typeof value === 'object' && value !== null && 'kind' in value && 'drop' in value && 'reach' in value && 'poolRadius' in value;
+
+/**
+ * 在 parent 座標的 center 放一盞燈；drop 是燈泡到下方地面的高度（預設 center 的 y，也就是 parent 在地面上），
+ * reach 是光斑沿 parent 的 +z 往前偏多遠，poolRadius 是光斑半徑（0 = 用這種燈的預設）。
+ */
+export function markLight(parent: THREE.Object3D, center: Vec3, kind: LightKind, drop = center[1], reach = 0, poolRadius = 0): void {
+  const marker = new THREE.Object3D();
+  marker.position.set(...center);
+  const mark: LightMark = { kind, drop, reach, poolRadius };
+  marker.userData[LIGHT_KEY] = mark;
+  parent.add(marker);
+}
+
+/** 收集 root 底下所有燈的標記，換成世界座標。 */
+export function collectLights(root: THREE.Object3D): LightSpot[] {
+  root.updateMatrixWorld(true);
+  const spots: LightSpot[] = [];
+  const position = new THREE.Vector3();
+  const forward = new THREE.Vector3();
+  root.traverse((object) => {
+    const mark: unknown = object.userData[LIGHT_KEY];
+    if (!isLightMark(mark)) return;
+    object.getWorldPosition(position);
+    forward.set(0, 0, 1).transformDirection(object.matrixWorld).setY(0);
+    if (forward.lengthSq() > 0) forward.normalize();
+    spots.push({
+      kind: mark.kind, x: position.x, y: position.y, z: position.z,
+      poolX: position.x + forward.x * mark.reach, poolY: position.y - mark.drop, poolZ: position.z + forward.z * mark.reach,
+      poolRadius: mark.poolRadius, clipInner: 0, clipOuter: Infinity,
+    });
+  });
+  return spots;
+}
+
 /** 水平面的貼圖座標改成世界座標（公尺 / tileSize），磁磚、地墊在整圈上才會一樣大、不會被拉長。 */
 export function planarUv(geometry: THREE.BufferGeometry, tileSize: number): void {
   const positions = geometry.getAttribute('position');
