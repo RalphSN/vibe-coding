@@ -1143,20 +1143,24 @@ const FLY_CLIMB_ARM_LIFT = 0.1;            // 往下飛時手往上浮多少（r
 const FLY_CLIMB_ARM_SPREAD = 0.06;         // 往下飛時手再往外張多少（m）
 const FLY_CLIMB_SMOOTH_TIME = 0.3;
 const FLOAT_REACH_MAX = 0.97;              // 加上浮動、風阻後，目標最遠只到鏈長的這個比例，膝蓋、手肘不會鎖直
-// 衝刺姿勢（Z 加速時，疊在動畫上）：跑、跳時上半身前傾、雙手幾乎伸直拖在身後不擺動、頭抬起看前方；
-// 往前飛時整個身體從骨盆轉成接近水平（趴著飛），腿伸直併攏、雙手貼著身體往腳的方向伸，只有臉朝前。
+// 衝刺姿勢（Z 加速時，疊在動畫上）：跑、跳時上半身前傾、雙手幾乎伸直往後上方擺（像排球攻擊助跑的後擺臂）、不跟著擺動，頭抬起看前方；
+// 加速飛行時整個身體從骨盆轉到和飛行方向一致（往前是趴平、往上是頭朝上、往下是頭朝下俯衝），
+// 腿伸直併攏、雙手貼著身體往腳的方向伸，頭往回抬，臉朝飛行方向。
 const DASH_SMOOTH_TIME = 0.15;             // 衝刺姿勢淡入淡出
 const DASH_LEAN = 20;                      // 跑、跳時上半身再前傾（度；衝刺動畫本身已經前傾），照 SPINE_COUNTER 的比例分給三節脊椎
-const DASH_ARM_DROP = 30;                  // 手臂在身後、低於水平幾度
+const DASH_ARM_RISE = 30;                  // 手臂在身後、高於水平幾度（後上方）
 const DASH_ARM_REACH = 0.95;               // 手離肩膀的距離 / 手臂長：接近伸直，手肘留一點彎
 const DASH_ARM_OUTWARD = 0.06;             // 手往外張多少（m）
-const SUPERMAN_PITCH = 80;                 // 往前飛時身體前傾到幾度（90 是完全水平；留一點，頭不會壓太低）
-const SUPERMAN_MIN_SPEED = 2;              // 往前飛的速度超過這裡（m/s）才趴平，停下或倒退就回到漂浮
+// 身體前傾角 = 飛行方向和正上方的夾角（往上飛 0、水平 90、往下 180）減掉 SUPERMAN_CHEST_UP（胸口微抬），限制在 SUPERMAN_PITCH_RANGE
+const SUPERMAN_CHEST_UP = 20;
+const SUPERMAN_PITCH_RANGE: [number, number] = [0, 170];
+const SUPERMAN_HEAD_LIFT = 80;             // 頭往回抬幾度（分給脖子與頭）：身體和飛行方向一致時，臉大約朝向飛行方向
+const SUPERMAN_MIN_SPEED = 2;              // 往前加上下的飛行速度超過這裡（m/s）才進入這個姿勢；停下或往後飛就回到漂浮
 const SUPERMAN_SMOOTH_TIME = 0.4;
 const SUPERMAN_LEG_STRETCH = 0.04;         // 趴平時腿再伸直多少（reach 增加）
 const SUPERMAN_ARM_REACH = 0.93;           // 趴平時手沿著身體往腳的方向伸
 const SUPERMAN_ARM_OUTWARD = 0.1;
-const HEAD_LIFT_SHARE = 0.85;              // 頭往回抬、抵銷身體傾角的比例（衝刺與趴平時才抬），分給脖子與頭
+const HEAD_LIFT_SHARE = 0.85;              // 跑、跳時頭往回抬、抵銷上半身前傾的比例，分給脖子與頭
 const NECK_BONES: [string, number][] = [['neck_01', 0.4], ['Head', 0.6]];
 const FLY_TOE_ANGLE = 70;         // 飛行時腳掌往下垂：腳踝到腳尖和水平面的夾角（度）；站立時約 31°
 const IK_SLACK = 0.08;             // 有手部 IK 時身體少退這麼多，手肘留彎度，斜著推時遠的那隻手也搆得到
@@ -1425,8 +1429,9 @@ function createCharacter(): Character {
   const climbMotion = { velocity: 0 };
   let dashWeight = 0;       // 跑、跳的衝刺姿勢：0 = 一般動畫、1 = 雙手拖在身後
   const dashMotion = { velocity: 0 };
-  let supermanWeight = 0;   // 往前飛的趴平姿勢
+  let supermanWeight = 0;   // 加速飛行的姿勢（身體順著飛行方向）
   const supermanMotion = { velocity: 0 };
+  let supermanPitch = DEG(90);   // 這個姿勢要前傾到幾度（弧度）；停止飛行後保留最後的值，淡出時不會跳
   let spineBones: BendBone[] = [];
   let neckBones: BendBone[] = [];
   let pelvisBone: THREE.Object3D | null = null;
@@ -1784,7 +1789,8 @@ function createCharacter(): Character {
       chain.restoreUpper.copy(chain.upper.quaternion);
       chain.restoreLower.copy(chain.lower.quaternion);
       chain.isApplied = true;
-      const reach = FLOAT_LEG_REACH[i] + rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK + cruise * FLY_CRUISE_LEG_STRETCH + prone * SUPERMAN_LEG_STRETCH;
+      const climbShare = 1 - prone;   // 順著飛行方向的姿勢裡，往上、往下飛不再拉腿或縮膝
+      const reach = FLOAT_LEG_REACH[i] + (rising * FLY_CLIMB_LEG_STRETCH - falling * FLY_CLIMB_KNEE_TUCK) * climbShare + cruise * FLY_CRUISE_LEG_STRETCH + prone * SUPERMAN_LEG_STRETCH;
       const sway = isCalm ? 0 : FLOAT_SWAY * Math.sin(floatTime * FLOAT_SWAY_RATES[i] + i * 2);
       solveTwoBoneIk(chain, floatGoal(chain, reach, (FLOAT_LEG_FORWARD[i] + sway) * (1 - prone), -FLOAT_FEET_INWARD, lag, 1), floatPole);
     });
@@ -1801,7 +1807,7 @@ function createCharacter(): Character {
     }
   }
 
-  // 衝刺：上半身照 SPINE_COUNTER 的比例前傾；頭往回抬，抵銷脊椎前傾與趴平時骨盆的傾角，臉維持看前方。
+  // 衝刺：上半身照 SPINE_COUNTER 的比例前傾、頭往回抬，臉維持看前方；加速飛行時頭抬 SUPERMAN_HEAD_LIFT，臉朝飛行方向。
   function applyDashLean(): void {
     if (!model || dashWeight + supermanWeight < IK_MIN_WEIGHT) return;
     model.updateMatrixWorld(true);
@@ -1809,7 +1815,7 @@ function createCharacter(): Character {
     leanAxis.crossVectors(WORLD_UP, floatForward);   // 繞這個軸轉正角度，頭往前
     const spineLean = DEG(DASH_LEAN) * dashWeight;
     if (spineLean > 0) bendBones(spineBones, leanAxis, spineLean);
-    bendBones(neckBones, leanAxis, -(spineLean + leanPitch * supermanWeight) * HEAD_LIFT_SHARE);
+    bendBones(neckBones, leanAxis, -(spineLean * HEAD_LIFT_SHARE + DEG(SUPERMAN_HEAD_LIFT) * supermanWeight));
   }
 
   function undoDashLean(): void {
@@ -1817,13 +1823,13 @@ function createCharacter(): Character {
     unbendBones(spineBones);
   }
 
-  // 衝刺時雙手接近伸直、拖在肩膀後下方，不跟著動畫擺；手肘往外。推牆 IK 正在用的手不動。
+  // 衝刺時雙手接近伸直、擺在肩膀後上方，不跟著動畫擺；手肘往外。推牆 IK 正在用的手不動。
   function applyDashArms(): void {
     if (!model || armChains.length === 0 || dashWeight < IK_MIN_WEIGHT) return;
     model.updateMatrixWorld(true);
     model.getWorldDirection(floatForward).setY(0).normalize();
     model.getWorldPosition(floatCenter);
-    const drop = DEG(DASH_ARM_DROP);
+    const rise = DEG(DASH_ARM_RISE);
     for (const chain of armChains) {
       if (chain.isApplied) continue;
       chain.restoreUpper.copy(chain.upper.quaternion);
@@ -1837,8 +1843,8 @@ function createCharacter(): Character {
       floatSide.y = 0;
       if (floatSide.lengthSq() > 0) floatSide.normalize();
       ikGoal.copy(ikShoulder)
-        .addScaledVector(floatForward, -Math.cos(drop) * length)
-        .addScaledVector(WORLD_UP, -Math.sin(drop) * length)
+        .addScaledVector(floatForward, -Math.cos(rise) * length)
+        .addScaledVector(WORLD_UP, Math.sin(rise) * length)
         .addScaledVector(floatSide, DASH_ARM_OUTWARD)
         .lerp(ikHand, 1 - dashWeight);
       solveTwoBoneIk(chain, ikGoal, floatSide);
@@ -1882,9 +1888,14 @@ function createCharacter(): Character {
       cruiseForward = smoothDamp(cruiseForward, motion.isFlying ? motion.forwardSpeed : 0, cruiseForwardMotion, FLY_CRUISE_SMOOTH_TIME, dt);
       cruiseSide = smoothDamp(cruiseSide, motion.isFlying ? motion.sideSpeed : 0, cruiseSideMotion, FLY_CRUISE_SMOOTH_TIME, dt);
       const lean = (speed: number): number => clamp(speed / FLY_LEAN_SPEED, -1, 1) * DEG(FLY_LEAN_MAX);
-      const wantsSuperman = motion.isFlying && motion.isDashing && motion.forwardSpeed > SUPERMAN_MIN_SPEED;
+      const ahead = Math.max(motion.forwardSpeed, 0);
+      const wantsSuperman = motion.isFlying && motion.isDashing && motion.forwardSpeed > -IDLE_SPEED && Math.hypot(ahead, motion.climbSpeed) > SUPERMAN_MIN_SPEED;
+      if (wantsSuperman) {
+        const [low, high] = SUPERMAN_PITCH_RANGE;
+        supermanPitch = clamp(Math.atan2(ahead, motion.climbSpeed) - DEG(SUPERMAN_CHEST_UP), DEG(low), DEG(high));
+      }
       supermanWeight = smoothDamp(supermanWeight, wantsSuperman ? 1 : 0, supermanMotion, SUPERMAN_SMOOTH_TIME, dt);
-      const pitchTarget = lerp(lean(cruiseForward), DEG(SUPERMAN_PITCH), supermanWeight);
+      const pitchTarget = lerp(lean(cruiseForward), supermanPitch, supermanWeight);
       leanPitch = smoothDamp(leanPitch, pitchTarget, leanPitchMotion, FLY_LEAN_SMOOTH_TIME, dt);
       leanRoll = smoothDamp(leanRoll, lean(cruiseSide) / 2, leanRollMotion, FLY_LEAN_SMOOTH_TIME, dt);
       const climb = motion.isFlying ? clamp(motion.climbSpeed / FLY_VERTICAL_SPEED, -1, 1) : 0;
