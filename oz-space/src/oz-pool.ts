@@ -49,7 +49,7 @@ const WALL_SEGMENTS = 512;
 const DECK_TILE = 1.2;              // 池畔石板貼圖一張涵蓋幾公尺
 const ROPE = { radius: 0.06, length: 0.6, tubular: 1440 };
 const WAVE_TIME_SCALE = '0.55';     // 波紋時間倍率（GLSL 字面值）：泳池比海面平靜
-const SUN_DIRECTION = [3, 6, 2];    // 和 main.ts 的太陽方向一樣，水面高光才對得上
+const SUN_DIRECTION: Vec3 = [3, 6, 2];    // 原本固定的太陽方向（環境貼圖沒指定亮點方向時用）
 const LOUNGE_SPACING = 7;           // 內側池畔：每 7 m 一組（兩張躺椅加一把陽傘）
 const LADDER_SPACING = 45;
 const LIFEGUARD_CHAIRS = 4;
@@ -734,16 +734,21 @@ export function buildPoolRing(spec: RingSpec): PropsBuild {
   return build;
 }
 
-/** 環境貼圖的天空配色（線性 RGB 0–1）：地平線、天頂、下方，以及太陽（或月亮）亮點的顏色與強度。 */
-export interface SkyPalette { horizon: Vec3; zenith: Vec3; ground: Vec3; sun: Vec3; sunStrength: number }
-const DAY_SKY: SkyPalette = { horizon: [0.86, 0.89, 0.92], zenith: [0.32, 0.55, 0.82], ground: [0.62, 0.64, 0.66], sun: [1, 0.96, 0.88], sunStrength: 30 };
-/** 夜晚：深藍天空、更暗的下方，太陽方向換成很弱的月光，金屬與水面晚上不會反射白天的天空。 */
+/**
+ * 環境貼圖的天空配色（線性 RGB 0–1）：地平線、天頂、下方，以及太陽（或月亮）亮點的顏色與強度。
+ * direction 是亮點的方向（太陽或月亮，單位向量）；沒給就用原本固定的太陽方向。
+ */
+export interface SkyPalette { horizon: Vec3; zenith: Vec3; ground: Vec3; sun: Vec3; sunStrength: number; direction?: Vec3 }
+/** 四個時段：白天、日落、夜晚（亮點是月亮）、日出。換天色時金屬與水面換成最接近的那張（見 main.ts）。 */
+export const DAY_SKY: SkyPalette = { horizon: [0.86, 0.89, 0.92], zenith: [0.32, 0.55, 0.82], ground: [0.62, 0.64, 0.66], sun: [1, 0.96, 0.88], sunStrength: 30 };
+export const SUNSET_SKY: SkyPalette = { horizon: [0.9, 0.45, 0.25], zenith: [0.15, 0.2, 0.4], ground: [0.25, 0.18, 0.2], sun: [1, 0.6, 0.3], sunStrength: 12 };
+export const DAWN_SKY: SkyPalette = { horizon: [0.85, 0.55, 0.45], zenith: [0.2, 0.28, 0.5], ground: [0.3, 0.25, 0.28], sun: [1, 0.75, 0.55], sunStrength: 12 };
 export const NIGHT_SKY: SkyPalette = { horizon: [0.07, 0.09, 0.16], zenith: [0.02, 0.03, 0.08], ground: [0.03, 0.03, 0.05], sun: [0.75, 0.82, 1], sunStrength: 2 };
 const glslVec3 = ([r, g, b]: Vec3): string => `vec3(${r.toFixed(3)}, ${g.toFixed(3)}, ${b.toFixed(3)})`;
 
 /**
  * 給金屬、水面反射用的天空環境貼圖：上面藍、地平線淡、下面灰，太陽方向一個很亮的點（水面高光就是它）。
- * 只設定在需要反射的材質上，不改 scene.environment，角色模型的打光才不會跟著變。palette 換成 NIGHT_SKY 就是夜晚版。
+ * 只設定在需要反射的材質上，不改 scene.environment，角色模型的打光才不會跟著變。palette 換成其他時段就是那個時段的版本。
  */
 export function createSkyEnvironment(renderer: THREE.WebGLRenderer, palette: SkyPalette = DAY_SKY): THREE.Texture {
   const sky = new THREE.Scene();
@@ -758,7 +763,7 @@ export function createSkyEnvironment(renderer: THREE.WebGLRenderer, palette: Sky
         vec3 zenith = ${glslVec3(palette.zenith)};
         vec3 ground = ${glslVec3(palette.ground)};
         vec3 color = d.y > 0.0 ? mix(horizon, zenith, pow(d.y, 0.55)) : mix(horizon, ground, pow(-d.y, 0.4));
-        float sun = pow(max(dot(d, normalize(vec3(${SUN_DIRECTION.join('.0, ')}.0))), 0.0), 900.0);
+        float sun = pow(max(dot(d, normalize(${glslVec3(palette.direction ?? SUN_DIRECTION)})), 0.0), 900.0);
         gl_FragColor = vec4(color + ${glslVec3(palette.sun)} * sun * ${palette.sunStrength.toFixed(1)}, 1.0);
       }`,
   });

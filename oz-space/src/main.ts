@@ -8,8 +8,8 @@ import GUI from 'lil-gui';
 import { CLIP_ROLES, RING_STYLES, SAVE_ENDPOINT, loadSceneConfig, type CenterConfig, type ClipRole, type RingStyle, type RingsConfig, type SceneConfig } from './config/scene.config';
 import { CULL_DISTANCE_KEY, buildFloatingField, buildRing, isInWaterZone, setPropsEnvironment, updateFloaters, type Disc, type Floater, type PropsBuild, type RingSpec, type RoundWall, type WaterZone } from './oz-props';
 import { buildCourtsRing } from './oz-sports';
-import { NIGHT_SKY, buildPoolRing, createSkyEnvironment, updateWater } from './oz-pool';
-import { createLampLights, createNightSky, nightUniform, updateLampVisibility } from './oz-night';
+import { DAWN_SKY, DAY_SKY, NIGHT_SKY, SUNSET_SKY, buildPoolRing, createSkyEnvironment, updateWater, type SkyPalette } from './oz-pool';
+import { SKY_HOURS, computeSky, createLampLights, createSky, createSkyState, moonDirection, nightUniform, sunDirection, updateLampVisibility, type SkyState } from './oz-night';
 import type { LightSpot } from './oz-kit';
 import { buildTrackRing } from './oz-track';
 import { buildGardenRing } from './oz-garden';
@@ -112,13 +112,23 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuff
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
-// 金屬與水面反射用的天空環境貼圖，要在第一次建場景之前設定；夜晚換成暗的那張（見 syncEnvironment）。
-const dayEnvironment = createSkyEnvironment(renderer);
-const nightEnvironment = createSkyEnvironment(renderer, NIGHT_SKY);
-setPropsEnvironment(dayEnvironment);
+// 金屬與水面反射用的天空環境貼圖：白天、日落、夜晚、日出各一張，亮點在那個時段太陽（夜晚是月亮）的方向。
+// 開頁面時一次產生，天色換時段就換成那一張（見 syncEnvironment），執行時不重算。要在第一次建場景之前設定。
+type SkyPeriod = 'day' | 'sunset' | 'night' | 'dawn';
+const ENVIRONMENT_HOURS = { sunset: 17.8, dawn: 6.2 };   // 日落、日出那兩張的亮點取這個時間的太陽（還在地平線上）
+const skyEnvironment = (palette: SkyPalette, direction: THREE.Vector3): THREE.Texture =>
+  createSkyEnvironment(renderer, { ...palette, direction: [direction.x, direction.y, direction.z] });
+const environments: Record<SkyPeriod, THREE.Texture> = {
+  day: skyEnvironment(DAY_SKY, sunDirection(SKY_HOURS.day, new THREE.Vector3())),
+  sunset: skyEnvironment(SUNSET_SKY, sunDirection(ENVIRONMENT_HOURS.sunset, new THREE.Vector3())),
+  night: skyEnvironment(NIGHT_SKY, moonDirection(SKY_HOURS.night, new THREE.Vector3())),
+  dawn: skyEnvironment(DAWN_SKY, sunDirection(ENVIRONMENT_HOURS.dawn, new THREE.Vector3())),
+};
+let skyPeriod: SkyPeriod = 'day';
+setPropsEnvironment(environments.day);
 
 const scene = new THREE.Scene();
-const SKY_COLOR = new THREE.Color(0xeef0f2);   // 白天的顏色；晚上由 updateDayNight 原地改成夜空色
+const SKY_COLOR = new THREE.Color(0xeef0f2);   // 天空球蓋在上面；只有第一格畫面之前看得到
 scene.background = SKY_COLOR;
 
 // 鏡頭進到水裡時：背景換成水的顏色、加上指數霧，越遠越看不清（泳池約 24 m 寬，看到對面就模糊了）。
@@ -131,19 +141,21 @@ camera.position.set(0, 450, 830);   // 環繞檢視第一次進來：從南邊�
 
 const ambient = new THREE.AmbientLight(0xffffff, 1.2);
 scene.add(ambient);
+// 唯一的平行光：白天跟著太陽、晚上跟著月亮（方向、顏色、亮度每格由 updateSky 設定）
 const sun = new THREE.DirectionalLight(0xffffff, 1.8);
 sun.position.set(3, 6, 2);
 scene.add(sun);
 
-// ---------- 白天／黑夜 ----------
-// 只在畫面上切換（Inspector「場景」頁或 N 鍵），不存進設定檔；開頁面是白天。切換時 NIGHT_FADE_SECONDS 秒內漸變：
-// 背景、環境光、太陽（晚上當月光）跟著變，星空、路燈光暈這些發光貼片讀 nightUniform 淡入。
-const NIGHT_FADE_SECONDS = 1.5;
-const DAY_LOOK = { sky: new THREE.Color(0xeef0f2), ambient: new THREE.Color(0xffffff), ambientIntensity: 1.2, sun: new THREE.Color(0xffffff), sunIntensity: 1.8 };
-const NIGHT_LOOK = { sky: new THREE.Color(0x060a18), ambient: new THREE.Color(0x7d90c8), ambientIntensity: 0.32, sun: new THREE.Color(0xa9bcff), sunIntensity: 0.35 };
+// ---------- 天空：太陽、月亮與天色 ----------
+// 白天／夜晚只在畫面上切換（Inspector「場景」頁或 N 鍵），不存進設定檔；開頁面是白天（13 時）。
+// 切換時時間往前跑 SKY_TRANSITION_SECONDS 秒：白天到夜晚經過日落、月出，夜晚到白天經過日出、月落。
+// 天色、環境光、平行光、夜晚程度（路燈、窗戶、星星）都由 computeSky 依時間算出。
+const SKY_TRANSITION_SECONDS = 8;
 const dayNight = { isNight: false };
-const nightSky = createNightSky(renderer.getPixelRatio());
-scene.add(nightSky.group);
+const skyClock = { hour: SKY_HOURS.day, hoursPerSecond: 0 };
+const skyState: SkyState = computeSky(SKY_HOURS.day, createSkyState());
+const sky = createSky(renderer.getPixelRatio());
+scene.add(sky.group);
 let lampLights: THREE.Group = new THREE.Group();
 let lampSpots: LightSpot[] = [];
 // 唯一一盞真的點光源：晚上放在離角色最近的那盞路燈，角色與附近的牆、樹才真的被照亮（其他燈只有發光貼片）。
@@ -2874,36 +2886,52 @@ function addPerfToggle(panel: GUI): void {
   panel.domElement.append(toggle);
 }
 
-// 夜晚程度往目標走一步，背景、環境光、太陽跟著插值；過了一半就把金屬與水面的反射換成夜晚那張。
-function updateDayNight(dt: number): void {
-  const target = dayNight.isNight ? 1 : 0;
-  const before = nightUniform.value;
-  const step = dt / NIGHT_FADE_SECONDS;
-  nightUniform.value = target > before ? Math.min(target, before + step) : Math.max(target, before - step);
-  const amount = nightUniform.value;
-  if (amount !== before) {
-    SKY_COLOR.lerpColors(DAY_LOOK.sky, NIGHT_LOOK.sky, amount);
-    ambient.color.lerpColors(DAY_LOOK.ambient, NIGHT_LOOK.ambient, amount);
-    ambient.intensity = lerp(DAY_LOOK.ambientIntensity, NIGHT_LOOK.ambientIntensity, amount);
-    sun.color.lerpColors(DAY_LOOK.sun, NIGHT_LOOK.sun, amount);
-    sun.intensity = lerp(DAY_LOOK.sunIntensity, NIGHT_LOOK.sunIntensity, amount);
-    if ((before < 0.5) !== (amount < 0.5)) syncEnvironment();
+// 從 from 時往前走到 to 時要幾個小時（0–24）：時間只往前，不會倒轉
+const hoursAhead = (from: number, to: number): number => (((to - from) % 24) + 24) % 24;
+
+function periodOf(state: SkyState): SkyPeriod {
+  if (state.sun.y > 0.2) return 'day';
+  if (state.sun.y < -0.12) return 'night';
+  return state.hour >= 12 ? 'sunset' : 'dawn';
+}
+
+// 時間往目標走一步，再依時間更新天空、環境光、平行光與夜晚程度；換時段時換反射用的環境貼圖。
+function updateSky(dt: number): void {
+  const target = dayNight.isNight ? SKY_HOURS.night : SKY_HOURS.day;
+  const remaining = hoursAhead(skyClock.hour, target);
+  if (remaining > 0) {
+    const step = skyClock.hoursPerSecond * dt;
+    skyClock.hour = step >= remaining ? target : (skyClock.hour + step) % 24;
   }
+  computeSky(skyClock.hour, skyState);
+  nightUniform.value = skyState.night;
+  ambient.color.copy(skyState.look.ambient);
+  ambient.intensity = skyState.look.ambientIntensity;
+  sun.position.copy(skyState.light.direction);
+  sun.color.copy(skyState.light.color);
+  sun.intensity = skyState.light.intensity;
+  const period = periodOf(skyState);
+  if (period !== skyPeriod) {
+    skyPeriod = period;
+    syncEnvironment();
+  }
+  sky.update(camera, clock.elapsedTime, skyState);
   updateLampVisibility(lampLights);
   updatePlayerLamp();
 }
 
-// 會反射天空的材質（金屬、水面、玻璃）改用現在白天或夜晚的環境貼圖。兩張格式相同，換貼圖不會重新編譯著色器。
+// 會反射天空的材質（金屬、水面、玻璃）改用目前時段的環境貼圖。四張格式相同，換貼圖不會重新編譯著色器。
 // 新建的材質從 setPropsEnvironment 拿；已經在場景裡的逐一換（有些材質是模組裡共用、建場景前就建好的）。
+const knownEnvironments = new Set<THREE.Texture>(Object.values(environments));
 function syncEnvironment(): void {
-  const current = nightUniform.value >= 0.5 ? nightEnvironment : dayEnvironment;
+  const current = environments[skyPeriod];
   setPropsEnvironment(current);
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     const list: THREE.Material[] = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of list) {
       if (!('envMap' in material)) continue;
-      if (material.envMap === dayEnvironment || material.envMap === nightEnvironment) material.envMap = current;
+      if (material.envMap instanceof THREE.Texture && knownEnvironments.has(material.envMap)) material.envMap = current;
     }
   });
 }
@@ -2930,8 +2958,15 @@ function updatePlayerLamp(): void {
   playerLamp.intensity = PLAYER_LAMP.intensity * falloff * falloff * nightUniform.value;
 }
 
+// 開始往白天或夜晚走：不論剩幾個小時，都在 SKY_TRANSITION_SECONDS 秒內走完（減少動態時直接跳過去）
 function setNight(isNight: boolean): void {
   dayNight.isNight = isNight;
+  const target = isNight ? SKY_HOURS.night : SKY_HOURS.day;
+  if (reducedMotion.matches) {
+    skyClock.hour = target;
+    return;
+  }
+  skyClock.hoursPerSecond = Math.max(hoursAhead(skyClock.hour, target), 1) / SKY_TRANSITION_SECONDS;
 }
 
 addEventListener('keydown', (event) => {
@@ -2945,6 +2980,7 @@ function updateUnderwater(): void {
   const isUnderwater = world.waters.some((water) => isInWaterZone(water, x, z) && y < water.surfaceY && y > water.floorY - 1);
   scene.fog = isUnderwater ? underwaterFog : null;
   scene.background = isUnderwater ? UNDERWATER_COLOR : SKY_COLOR;
+  sky.group.visible = !isUnderwater;   // 天空球最先畫、蓋滿整個畫面，水裡要藏起來才看得到水的顏色
 }
 
 // ================= 效能顯示 =================
@@ -3047,8 +3083,7 @@ renderer.setAnimationLoop(() => {
   updateFloaters(world.floaters, clock.elapsedTime);
   updateWater(clock.elapsedTime);
   updateUnderwater();
-  updateDayNight(dt);
-  nightSky.update(camera, clock.elapsedTime);
+  updateSky(dt);
   character.syncSkeletonHelper();
   updateDetailCulling();
   renderer.render(scene, camera);

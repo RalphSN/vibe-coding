@@ -215,7 +215,7 @@ function facadeBox(): THREE.BufferGeometry {
 // 不另外加網格：外牆材質的著色器裡，照貼圖上的窗戶排法算出這個像素落在哪一扇窗，
 // 再用「房子位置 + 這面牆的方向 + 第幾扇窗」當亂數，決定這扇窗晚上亮不亮、亮什麼顏色。
 // 窗櫺（白色十字）不發光；白天 nightUniform 是 0，看起來和原本一樣。
-const WINDOW_GLOW = { litShare: 0.42, tvShare: 0.12, warm: '1.0, 0.72, 0.38', cool: '0.62, 0.78, 1.0', strength: 0.95 };
+const WINDOW_GLOW = { litShare: 0.42, tvShare: 0.12, warm: '1.0, 0.72, 0.38', cool: '0.62, 0.78, 1.0', strength: 0.95, stagger: '0.8' };   // stagger：開燈時間分散在夜晚程度 0–0.8 之間
 const WINDOW_VERTEX = `#include <begin_vertex>
 #ifdef USE_INSTANCING
   vWindowSeed = instanceMatrix[3].xyz + normal * 7.31;
@@ -238,7 +238,9 @@ const WINDOW_FRAGMENT = `#include <emissivemap_fragment>
     float pick = fract(sin(dot(seed, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
     if (pick < ${WINDOW_GLOW.litShare}) {
       vec3 tone = pick < ${WINDOW_GLOW.litShare * WINDOW_GLOW.tvShare} ? vec3(${WINDOW_GLOW.cool}) : vec3(${WINDOW_GLOW.warm});
-      totalEmissiveRadiance += tone * (0.7 + 0.3 * fract(pick * 91.7)) * ${WINDOW_GLOW.strength} * uNight;
+      // 每扇窗有自己的開燈時間：入夜時一扇一扇陸續亮起來，不是全部同時亮
+      float turnOn = fract(pick * 173.3) * ${WINDOW_GLOW.stagger};
+      totalEmissiveRadiance += tone * (0.7 + 0.3 * fract(pick * 91.7)) * ${WINDOW_GLOW.strength} * smoothstep(turnOn, turnOn + 0.15, uNight);
     }
   }
 }`;
