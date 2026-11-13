@@ -131,8 +131,8 @@ export function collectColliders(root: THREE.Object3D): SolidBox[] {
 // 燈也是看不見的標記（同碰撞）：放在燈泡位置，記著燈的種類、離下方地面多高、光斑往前偏多少（照明燈斜照時）。
 // 整區合併網格前用 collectLights 收集成世界座標，夜晚的光暈、地面光斑、光束都照這份清單畫（見 oz-night.ts）。
 const LIGHT_KEY = 'ozLight';
-/** 燈的種類：street 路燈、path 步道燈、indoor 室內吊燈、flood 照明燈（有光束、光斑大） */
-export type LightKind = 'street' | 'path' | 'indoor' | 'flood';
+/** 燈的種類：street 路燈、path 步道燈、indoor 室內吊燈與檯燈、flood 照明燈（有光束、光斑大）、underwater 泳池水下燈（藍綠色，光斑在池底） */
+export type LightKind = 'street' | 'path' | 'indoor' | 'flood' | 'underwater';
 /**
  * 一盞燈（世界座標）：燈泡位置、光斑中心與地面高度（照明燈的光束從燈泡打到光斑中心）。
  * poolRadius 是光斑半徑（0 = 用這種燈的預設）；光斑只畫在離圓心 clipInner–clipOuter 的範圍，

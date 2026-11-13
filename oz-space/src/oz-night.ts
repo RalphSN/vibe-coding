@@ -34,7 +34,13 @@ const LAMP_LOOK: Record<LightKind, { glow: number; pool: number; color: number; 
   path: { glow: 0.7, pool: 5, color: 0xffd394, strength: 0.45 },
   indoor: { glow: 0.55, pool: 1.5, color: 0xfff0c8, strength: 0.55 },
   flood: { glow: 2.6, pool: 18, color: 0xe8efff, strength: 0.3 },
+  // 水下燈先畫、再被玻璃池底與水面蓋過，只剩約三成亮：光暈與光斑要比水上的燈亮很多才看得出來
+  underwater: { glow: 1.1, pool: 2.4, color: 0x6fe8ff, strength: 1.8 },
 };
+// 透明物件照 renderOrder 由小到大畫。一般的燈最後畫，疊在所有東西上面。
+// 水下燈要比水面、玻璃池壁先畫（負的），水和玻璃再蓋上去，看起來在水裡、被水染色變暗；後畫的話會像浮在水面上。
+const LAMP_ORDER = { pool: 1, beam: 2, glow: 3 };
+const UNDERWATER_ORDER = { pool: -2, beam: -2, glow: -1 };
 const GLOW_MIN_SCREEN = 0.0025;   // 光暈至少佔「距離 × 這個比例」公尺，遠處的燈縮成幾個像素的亮點，不會消失或閃爍
 const GLOW_TOWARD_CAMERA = 0.6;   // 光暈往鏡頭方向挪（光暈半徑的比例），不會被燈罩切掉一半
 const POOL_LIFT = 0.04;           // 光斑離地面多高（m），不和地面搶深度
@@ -239,13 +245,20 @@ function nightMesh(geometry: THREE.BufferGeometry, material: THREE.Material, ren
 }
 
 /**
- * 所有燈的夜間發光：燈泡光暈、地面光斑、照明燈的光束，各一次繪製。
+ * 所有燈的夜間發光：燈泡光暈、地面光斑、照明燈的光束；水上與水下的燈各自一組，每種各一次繪製。
  * 回傳的群組每格要呼叫 updateLampVisibility（夜晚程度是 0 時整個不畫）。
  */
 export function createLampLights(spots: LightSpot[]): THREE.Group {
   const group = new THREE.Group();
   group.name = 'lamp-lights';
-  if (spots.length === 0) return group;
+  const isUnderwater = (spot: LightSpot): boolean => spot.kind === 'underwater';
+  const meshes = [...lampMeshes(spots.filter((spot) => !isUnderwater(spot)), LAMP_ORDER), ...lampMeshes(spots.filter(isUnderwater), UNDERWATER_ORDER)];
+  if (meshes.length > 0) group.add(...meshes);   // add() 不帶參數會印錯誤
+  return group;
+}
+
+function lampMeshes(spots: LightSpot[], order: typeof LAMP_ORDER): THREE.Mesh[] {
+  if (spots.length === 0) return [];
   const tint = new THREE.Color();
   const glow = quadGeometry(spots.length, (i) => {
     const spot = spots[i] as LightSpot;
@@ -263,10 +276,10 @@ export function createLampLights(spots: LightSpot[]): THREE.Group {
     };
   }, true);
   // 光斑先畫、光束再畫、光暈最後：疊加混合本身不分先後，順序固定只是避免每格重新排序
-  group.add(nightMesh(pool, poolShader, 1), nightMesh(glow, glowShader, 3));
+  const meshes = [nightMesh(pool, poolShader, order.pool), nightMesh(glow, glowShader, order.glow)];
   const beams = beamGeometry(spots.filter((spot) => spot.kind === 'flood'));
-  if (beams) group.add(nightMesh(beams, beamShader, 2));
-  return group;
+  if (beams) meshes.push(nightMesh(beams, beamShader, order.beam));
+  return meshes;
 }
 
 /** 白天整個不畫，省下透明物件的排序與繪製。 */

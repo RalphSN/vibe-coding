@@ -7,6 +7,7 @@ import type { RingStyle } from './config/scene.config';
 import { THEMED_ISLANDS, buildIsland } from './oz-islands';
 import { RUNES, runeGeometry } from './oz-runes';
 import { SHOP_LAYOUT, addBackToBackRows, addInnerShopRow } from './oz-shops';
+import { glowAtNight } from './oz-night';
 import { CODE_SYMBOLS, LETTERS, ZHUYIN, symbolGeometry } from './oz-symbols';
 import { addMesh, box, childGroup, collectColliders, collectLights, cylinder, disposeGeometries, mapped, markChildGroups, markCollider, markLight, pixelTexture, planarUv, rod, skipCollider, type LightSpot } from './oz-kit';
 
@@ -111,6 +112,10 @@ const LIBRARY_BACK = 0.3;              // 雙面書櫃中間的背板
 const LIBRARY_TOP = 0.4;
 const LIBRARY_OPENINGS = 5;            // 每圈書櫃的缺口數
 const LIBRARY_OPENING_WIDTH = 4.5;
+const LIBRARY_DESK_SPACING = 28;       // 走道上閱覽桌（和落地燈）的間隔（m）
+// 檯燈：燈泡離桌面多高、桌面光斑半徑；落地燈：燈桿高、燈罩下緣半徑、地板光斑半徑
+const DESK_LAMP = { drop: 0.27, pool: 0.45 };
+const FLOOR_LAMP = { height: 2.3, shade: 0.32, pool: 3.5 };
 const SHELF_BOARD = 0.25;
 const SHELF_BAY_WIDTH = 6;
 const SHELF_DIVIDER = 0.3;
@@ -582,6 +587,8 @@ function createDetailMaterials() {
     stool: colorMaterial(0x2b2b2b),
     darkMetal: colorMaterial(0x3a3f45),
     lamp: new THREE.MeshBasicMaterial({ color: 0xfff1c9 }),
+    // 落地燈的布燈罩：晚上從裡面透出暖光（不能用 colorMaterial 的共用材質，發光會連帶改到別的東西）
+    floorShade: glowAtNight(new THREE.MeshLambertMaterial({ color: 0xefe0bf, side: THREE.DoubleSide }), 0xffc98a, 0.75),
     bankerShade: colorMaterial(0x1f6b45),
     brass: colorMaterial(0xc9a24a),
     globe: colorMaterial(0x4a8fc0),
@@ -880,6 +887,8 @@ function addReadingDesk(g: THREE.Group, M: DetailMaterials, rng: Rng): void {
     rod(g, M.brass, [x, 0.8, 0], [x, 1.1, 0], 0.012);
     addMesh(g, new THREE.CylinderGeometry(0.11, 0.11, 0.35, 12, 1, false, 0, Math.PI), M.bankerShade, [x, 1.12, 0], [0, 0, Math.PI / 2]);
     box(g, M.lamp, [0.3, 0.01, 0.16], [x, 1.08, 0]);
+    // 光斑落在桌面（離燈 DESK_LAMP.drop）；半徑小於半張桌子，不會伸出桌緣浮在半空中
+    markLight(g, [x, 1.06, 0], 'indoor', DESK_LAMP.drop, 0, DESK_LAMP.pool);
   }
   for (const z of [-0.85, 0.85]) {
     for (const x of [-0.55, 0.55]) {
@@ -890,6 +899,16 @@ function addReadingDesk(g: THREE.Group, M: DetailMaterials, rng: Rng): void {
     }
   }
   for (let i = 0; i < 3; i++) box(g, colorMaterial(pick(rng, BOOK_COLORS)), [0.22, 0.05, 0.3], [-0.2 + i * 0.25, 0.815 + (i === 1 ? 0.05 : 0), 0.15], [0, rng() * 0.6 - 0.3, 0]);
+}
+
+// 復古落地燈：圓形底座、黃銅燈桿、布燈罩（晚上透光）、燈罩下的燈泡。
+function addFloorLamp(g: THREE.Group, M: DetailMaterials): void {
+  const { height, shade } = FLOOR_LAMP;
+  cylinder(g, colorMaterial(WOOD_DARK), 0.22, 0.04, [0, 0.02, 0], 16);
+  rod(g, M.brass, [0, 0.04, 0], [0, height, 0], 0.02);
+  addMesh(g, new THREE.CylinderGeometry(shade * 0.7, shade, 0.4, 20, 1, true), M.floorShade, [0, height + 0.05, 0]);
+  addMesh(g, new THREE.SphereGeometry(0.07, 10, 6), M.lamp, [0, height - 0.05, 0]);
+  markLight(g, [0, height - 0.05, 0], 'path', height - 0.05, 0, FLOOR_LAMP.pool);
 }
 
 // 地球儀：木底座、黃銅弧形支架、藍色球體加綠色陸塊。
@@ -960,14 +979,15 @@ function buildLibraryRing(spec: RingSpec, build: PropsBuild, rng: Rng): void {
       }
     }
   }
-  // 走道：地毯，每隔約 28 m 一張閱覽桌
+  // 走道：地毯，每隔約 28 m 一張閱覽桌；落地燈也是每 28 m 一盞，和閱覽桌錯開半格（兩側的走道沒有閱覽桌，只有燈）
   for (let k = 0; k <= LIBRARY_WALLS; k++) {
     const middle = inner + aisle * (k + 0.5) + wallDepth * k;
     const carpet = annulus(middle - 1.1, middle + 1.1, maxY + 0.01, maxY + 0.02, M.carpet);
     planarUv(carpet.geometry, 0.8);
     build.decor.add(carpet);
+    const desks = Math.max(3, Math.round((TAU * middle) / LIBRARY_DESK_SPACING));
+    for (let d = 0; d < desks; d++) addFloorLamp(ringGroup(props, middle, maxY + 0.02, (d / desks) * TAU), M);
     if (k === 0 || k === LIBRARY_WALLS) continue;
-    const desks = Math.max(3, Math.round((TAU * middle) / 28));
     for (let d = 0; d < desks; d++) {
       const angle = ((d + 0.5) / desks) * TAU;
       addReadingDesk(ringGroup(props, middle, maxY + 0.02, angle), M, rng);

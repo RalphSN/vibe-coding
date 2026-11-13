@@ -2968,7 +2968,7 @@ function updatePlayerLamp(): void {
   let nearest: LightSpot | null = null;
   let nearestDistance = PLAYER_LAMP.reach;
   for (const spot of lampSpots) {
-    if (spot.kind === 'flood') continue;
+    if (spot.kind === 'flood' || spot.kind === 'underwater') continue;   // 水下燈放真光源會從池底往上照亮池畔，不自然
     const distance = Math.hypot(spot.x - playerPosition.x, (spot.y - playerPosition.y) * 0.5, spot.z - playerPosition.z);
     if (distance < nearestDistance) {
       nearest = spot;
